@@ -100,25 +100,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * {@code QueryDispatcher} dispatch a query to different workers.
- */
+/// `QueryDispatcher` dispatch a query to different workers.
 public class QueryDispatcher {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);
   private static final String PINOT_BROKER_QUERY_DISPATCHER_FORMAT = "multistage-query-dispatch-%d";
-  /**
-   * Maximum time (ms) to wait for outstanding {@code OpChainComplete} stats messages on both the success and error
-   * paths of a stream-mode query:
-   * <ul>
-   *   <li><b>Success path:</b> after the broker receiving mailbox has finished (data is already in hand), the broker
-   *       waits up to this long for remaining stats before returning the result to the client.</li>
-   *   <li><b>Error path:</b> after a fan-out cancel has been issued, the broker waits up to this long for partial
-   *       stats before building the error result.</li>
-   * </ul>
-   * In both cases stats collection is best-effort — a single slow opchain must not hold the client response until
-   * the full query deadline. The wait window is configurable via
-   * {@link CommonConstants.Broker#CONFIG_OF_STREAM_STATS_DRAIN_MS}.
-   */
+  /// Maximum time (ms) to wait for outstanding `OpChainComplete` stats messages on both the success and error
+  /// paths of a stream-mode query:
+  ///
+  /// - **Success path:** after the broker receiving mailbox has finished (data is already in hand), the broker
+  ///      waits up to this long for remaining stats before returning the result to the client.
+  /// - **Error path:** after a fan-out cancel has been issued, the broker waits up to this long for partial
+  ///      stats before building the error result.
+  ///
+  /// In both cases stats collection is best-effort — a single slow opchain must not hold the client response until
+  /// the full query deadline. The wait window is configurable via
+  /// [CommonConstants.Broker#CONFIG_OF_STREAM_STATS_DRAIN_MS].
   private final long _statsDrainMs;
 
   private final MailboxService _mailboxService;
@@ -133,8 +129,8 @@ public class QueryDispatcher {
   private final Map<Long, Set<QueryServerInstance>> _serversByQuery;
   private final FailureDetector _failureDetector;
   private final Duration _cancelTimeout;
-  /// Cluster-level default for stream-stats mode. Used as the fallback in {@link #submitAndReduce} when the query
-  /// does not carry an explicit {@link QueryOptionKey#STREAM_STATS} override.
+  /// Cluster-level default for stream-stats mode. Used as the fallback in [#submitAndReduce] when the query
+  /// does not carry an explicit [QueryOptionKey#STREAM_STATS] override.
   private final boolean _streamStatsDefault;
 
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
@@ -192,16 +188,16 @@ public class QueryDispatcher {
     return submitAndReduce(context, dispatchableSubPlan, timeoutMs, queryOptions, null);
   }
 
-  /// Same as {@link #submitAndReduce(RequestContext, DispatchableSubPlan, long, Map)} but records per-server
-  /// in-flight request statistics into {@code statsManager} for use by the adaptive query router.
-  /// When {@code statsManager} is non-null:
-  /// <ul>
-  ///   <li>Each leaf server is registered as having one more in-flight request via
-  ///       {@link ServerRoutingStatsManager#recordStatsForQuerySubmission} after the fan-out begins.</li>
-  ///   <li>After the full fan-out completes (or fails), each server is decremented via
-  ///       {@link ServerRoutingStatsManager#recordStatsUponResponseArrival} with {@code latency = -1}
-  ///       (no latency is recorded at this stage).</li>
-  /// </ul>
+  /// Same as [#submitAndReduce(RequestContext, DispatchableSubPlan, long, Map)] but records per-server
+  /// in-flight request statistics into `statsManager` for use by the adaptive query router.
+  /// When `statsManager` is non-null:
+  ///
+  /// - Each leaf server is registered as having one more in-flight request via
+  ///      [ServerRoutingStatsManager#recordStatsForQuerySubmission] after the fan-out begins.
+  /// - After the full fan-out completes (or fails), each server is decremented via
+  ///      [ServerRoutingStatsManager#recordStatsUponResponseArrival] with `latency = -1`
+  ///      (no latency is recorded at this stage).
+  ///
   /// TODO: Replace the coarse end-of-fanout decrement with per-sender arrival once per-sender EOS
   ///       interception is in place, and record real leaf-stage latency at that point.
   public QueryResult submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
@@ -249,25 +245,25 @@ public class QueryDispatcher {
     }
   }
 
-  /// Streaming variant of {@link #submitAndReduce}: opens one {@code SubmitWithStream} bidi RPC per server, runs the
+  /// Streaming variant of [#submitAndReduce]: opens one `SubmitWithStream` bidi RPC per server, runs the
   /// broker's stage 0 reducer, and once the receiving mailbox finishes awaits the per-stage stats with early
   /// completion (returns as soon as every expected opchain has reported, or when the wait window fires — whichever
   /// happens first). Stats from the session accumulator are then merged into the broker's local stage 0 stats to
-  /// build the final {@link QueryResult}.
+  /// build the final [QueryResult].
   ///
-  /// The wait window is bounded by the query's remaining timeout: if {@code submitWithStream + runReducer} consumed
-  /// most of the budget, the per-stage stats may end up partial (visible via the per-stage {@code mergeFailed} /
-  /// {@code missing} counts the session exposes).
+  /// The wait window is bounded by the query's remaining timeout: if `submitWithStream + runReducer` consumed
+  /// most of the budget, the per-stage stats may end up partial (visible via the per-stage `mergeFailed` /
+  /// `missing` counts the session exposes).
   ///
-  /// Cancel is handled via {@link StreamingQuerySession#fanOutCancel()} — no unary Cancel RPCs are issued for this
+  /// Cancel is handled via [StreamingQuerySession#fanOutCancel()] — no unary Cancel RPCs are issued for this
   /// query path. On any error, fan-out cancel is broadcast over the open streams, then the broker waits for remaining
   /// stats before building the final result.
   ///
-  /// <b>Mixed-version policy.</b> No automatic fallback to the unary {@link #submit} path. Enabling
-  /// {@link CommonConstants.Broker.Request.QueryOptionKey#STREAM_STATS} requires every server in the
-  /// cluster to implement {@code SubmitWithStream}; if any server returns {@code UNIMPLEMENTED} or any other
-  /// transport error during dispatch, {@link #submitWithStream} surfaces the throwable through the ack queue,
-  /// {@link #processResults} throws, and this method fans out cancel via the session before propagating the failure.
+  /// **Mixed-version policy.** No automatic fallback to the unary [#submit] path. Enabling
+  /// [CommonConstants.Broker.Request.QueryOptionKey#STREAM_STATS] requires every server in the
+  /// cluster to implement `SubmitWithStream`; if any server returns `UNIMPLEMENTED` or any other
+  /// transport error during dispatch, [#submitWithStream] surfaces the throwable through the ack queue,
+  /// [#processResults] throws, and this method fans out cancel via the session before propagating the failure.
   private QueryResult submitAndReduceWithStream(RequestContext context, DispatchableSubPlan dispatchableSubPlan,
       long timeoutMs, Map<String, String> queryOptions, @Nullable ServerRoutingStatsManager statsManager)
       throws Exception {
@@ -339,9 +335,9 @@ public class QueryDispatcher {
     }
   }
 
-  /// Streaming variant of {@link #submit}: opens one {@code SubmitWithStream} bidi RPC per server, registers each
-  /// open stream with {@code session} (so cancel fan-out and {@code OpChainComplete} accumulation work), and waits
-  /// for every server's submit-ack before returning. Errors during ack-await trigger {@link #cancel} on all peers.
+  /// Streaming variant of [#submit]: opens one `SubmitWithStream` bidi RPC per server, registers each
+  /// open stream with `session` (so cancel fan-out and `OpChainComplete` accumulation work), and waits
+  /// for every server's submit-ack before returning. Errors during ack-await trigger [#cancel] on all peers.
   @VisibleForTesting
   void submitWithStream(long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
       Set<QueryServerInstance> serversOut, Map<String, String> queryOptions, StreamingQuerySession session)
@@ -399,10 +395,10 @@ public class QueryDispatcher {
     }
   }
 
-  /// Builds the final {@link QueryResult} for a stream-mode query: takes the broker's local stage-0 stats from
-  /// {@code brokerResult} and overlays the per-stage trees from the session accumulator (flattened to
-  /// {@link MultiStageQueryStats.StageStats.Closed} via inorder traversal so the resulting list shape matches the
-  /// legacy {@link QueryResult#_queryStats} contract).
+  /// Builds the final [QueryResult] for a stream-mode query: takes the broker's local stage-0 stats from
+  /// `brokerResult` and overlays the per-stage trees from the session accumulator (flattened to
+  /// [MultiStageQueryStats.StageStats.Closed] via inorder traversal so the resulting list shape matches the
+  /// legacy [QueryResult#_queryStats] contract).
   ///
   /// In stream mode the broker's local mailbox path is suppressed for stages 1..N, so brokerResult's _queryStats
   /// list typically only contains stage 0 plus any pipeline-breaker stages. The session's accumulator carries
@@ -410,7 +406,7 @@ public class QueryDispatcher {
   /// pipeline-breaker stats that the upstream server also reported).
   ///
   /// @param expectedByStage map from stage id to the number of opchain reports expected for that stage (used to
-  ///                        compute the {@link QueryResult.StageCoverage#getMissing()} count per stage)
+  ///                        compute the [QueryResult.StageCoverage#getMissing()] count per stage)
   private QueryResult mergeSessionStatsIntoResult(QueryResult brokerResult, StreamingQuerySession session,
       Map<Integer, Integer> expectedByStage) {
     StreamingQuerySession.Coverage coverage = session.snapshotCoverage();
@@ -460,20 +456,19 @@ public class QueryDispatcher {
   /// [QueryException] and [TimeoutException] are handled by returning a [QueryResult] with the error code and empty
   /// stats, while other exceptions are directly rethrown. Stats are not collected on the legacy cancel path.
   ///
-  /// <b>Why {@code cancelWithStats} was removed:</b> a previous revision of this method called a synchronous
-  /// {@code cancelWithStats} RPC on every participating server (fan-out) to collect partial per-stage stats on the
+  /// **Why `cancelWithStats` was removed:** a previous revision of this method called a synchronous
+  /// `cancelWithStats` RPC on every participating server (fan-out) to collect partial per-stage stats on the
   /// error path. That approach was reverted for two reasons:
-  /// <ol>
-  ///   <li><b>Cascade risk.</b> At high QPS, every query failure triggered an extra fan-out RPC to every server that
-  ///       already handled the failed query. Servers under stress would receive a second wave of requests just as they
-  ///       were trying to recover, risking a cascading overload.</li>
-  ///   <li><b>No consumer.</b> The call site that used the returned {@code Map<Integer, StageStats.Closed>} was also
-  ///       reverted as part of the same change, leaving the RPC overhead with no benefit.</li>
-  /// </ol>
   ///
-  /// Stats on the error path are now available only in stream mode ({@code SubmitWithStream}), where servers push
-  /// {@code OpChainComplete} messages independently and the broker collects whatever arrives before the drain
-  /// timeout (see {@link #tryRecoverWithStream}).
+  /// 1. **Cascade risk.** At high QPS, every query failure triggered an extra fan-out RPC to every server that
+  ///       already handled the failed query. Servers under stress would receive a second wave of requests just as they
+  ///       were trying to recover, risking a cascading overload.
+  /// 2. **No consumer.** The call site that used the returned `Map<Integer, StageStats.Closed>` was also
+  ///       reverted as part of the same change, leaving the RPC overhead with no benefit.
+  ///
+  /// Stats on the error path are now available only in stream mode (`SubmitWithStream`), where servers push
+  /// `OpChainComplete` messages independently and the broker collects whatever arrives before the drain
+  /// timeout (see [#tryRecoverWithStream]).
   private QueryResult tryRecover(long requestId, Set<QueryServerInstance> servers, Exception ex)
       throws Exception {
     if (servers.isEmpty()) {
@@ -497,13 +492,13 @@ public class QueryDispatcher {
     return new QueryResult(processingException, MultiStageQueryStats.emptyStats(0), 0L);
   }
 
-  /// Tries to recover from an exception thrown during stream-mode ({@code SubmitWithStream}) query dispatching.
+  /// Tries to recover from an exception thrown during stream-mode (`SubmitWithStream`) query dispatching.
   ///
-  /// Fans out cancel over the open streams, waits briefly for any remaining {@code OpChainComplete} messages (up to
-  /// the query deadline), and builds a {@link QueryResult} that includes whatever stats arrived before the deadline.
-  /// Stats from before the error are available because servers push {@code OpChainComplete} even on failure.
+  /// Fans out cancel over the open streams, waits briefly for any remaining `OpChainComplete` messages (up to
+  /// the query deadline), and builds a [QueryResult] that includes whatever stats arrived before the deadline.
+  /// Stats from before the error are available because servers push `OpChainComplete` even on failure.
   ///
-  /// Unknown exceptions (not {@link TimeoutException} or {@link QueryException}) are re-thrown after cancel fan-out.
+  /// Unknown exceptions (not [TimeoutException] or [QueryException]) are re-thrown after cancel fan-out.
   private QueryResult tryRecoverWithStream(StreamingQuerySession session, Map<Integer, Integer> expectedByStage,
       long deadlineMs, Exception ex)
       throws Exception {
@@ -796,7 +791,7 @@ public class QueryDispatcher {
     }
   }
 
-  ///  Cancels a request without waiting for the stats in the response.
+  /// Cancels a request without waiting for the stats in the response.
   private boolean cancel(long requestId, @Nullable Set<QueryServerInstance> servers) {
     if (servers == null) {
       return false;
@@ -821,11 +816,9 @@ public class QueryDispatcher {
         k -> new DispatchClient(hostname, port, _tlsConfig, _clientGrpcSslContext, _keepAliveConfig));
   }
 
-  /**
-   * Reset the connection backoff for a server. When the GRPC channel enters a TRANSIENT_FAILURE state from
-   * connection failures, it will fast fail requests and reconnect with exponential backoff. This method
-   * resets the backoff so servers that have recovered can be reconnected to immediately.
-   */
+  /// Reset the connection backoff for a server. When the GRPC channel enters a TRANSIENT_FAILURE state from
+  /// connection failures, it will fast fail requests and reconnect with exponential backoff. This method
+  /// resets the backoff so servers that have recovered can be reconnected to immediately.
   public void resetClientConnectionBackoff(ServerInstance serverInstance) {
     String hostname = serverInstance.getHostname();
     int port = serverInstance.getQueryServicePort();
@@ -998,24 +991,18 @@ public class QueryDispatcher {
     private final QueryProcessingException _processingException;
     private final List<MultiStageQueryStats.StageStats.Closed> _queryStats;
     private final long _brokerReduceTimeMs;
-    /**
-     * Non-null only in stream-mode queries. Indexed by stage id; entries may be null for stages with no coverage data
-     * (e.g. stage 0 which runs broker-local and is not tracked by the session).
-     */
+    /// Non-null only in stream-mode queries. Indexed by stage id; entries may be null for stages with no coverage data
+    /// (e.g. stage 0 which runs broker-local and is not tracked by the session).
     @Nullable
     private final List<StageCoverage> _stageCoverage;
-    /**
-     * Non-null only in stream-mode queries: the explicit per-stage stats trees decoded from the
-     * {@code SubmitWithStream} reports, keyed by stage id. Carries the exact tree shape (including plugin-defined
-     * operator types), which the flat {@link #_queryStats} list cannot represent. Stage 0 (broker-local) and stages
-     * that never reported are absent.
-     */
+    /// Non-null only in stream-mode queries: the explicit per-stage stats trees decoded from the
+    /// `SubmitWithStream` reports, keyed by stage id. Carries the exact tree shape (including plugin-defined
+    /// operator types), which the flat [#_queryStats] list cannot represent. Stage 0 (broker-local) and stages
+    /// that never reported are absent.
     @Nullable
     private final Map<Integer, StageStatsTreeNode> _stageStatsTrees;
 
-    /**
-     * Creates a successful query result.
-     */
+    /// Creates a successful query result.
     public QueryResult(ResultTable resultTable, MultiStageQueryStats queryStats, long brokerReduceTimeMs) {
       _resultTable = resultTable;
       Preconditions.checkArgument(queryStats.getCurrentStageId() == 0, "Expecting query stats for stage 0, got: %s",
@@ -1032,11 +1019,9 @@ public class QueryDispatcher {
       _stageStatsTrees = null;
     }
 
-    /**
-     * Creates a failed query result.
-     * @param processingException the exception that occurred during query processing
-     * @param queryStats the query stats, which may be empty
-     */
+    /// Creates a failed query result.
+    /// @param processingException the exception that occurred during query processing
+    /// @param queryStats the query stats, which may be empty
     public QueryResult(QueryProcessingException processingException, MultiStageQueryStats queryStats,
         long brokerReduceTimeMs) {
       _processingException = processingException;
@@ -1054,11 +1039,9 @@ public class QueryDispatcher {
       _stageStatsTrees = null;
     }
 
-    /**
-     * Creates a query result from a pre-built per-stage stats list. Used by the {@code SubmitWithStream} path so
-     * the caller can merge the broker's local stage-0 stats with the session accumulator's stages 1..N before
-     * constructing the result.
-     */
+    /// Creates a query result from a pre-built per-stage stats list. Used by the `SubmitWithStream` path so
+    /// the caller can merge the broker's local stage-0 stats with the session accumulator's stages 1..N before
+    /// constructing the result.
     public QueryResult(@Nullable ResultTable resultTable, @Nullable QueryProcessingException processingException,
         List<MultiStageQueryStats.StageStats.Closed> queryStats, long brokerReduceTimeMs,
         @Nullable List<StageCoverage> stageCoverage, @Nullable Map<Integer, StageStatsTreeNode> stageStatsTrees) {
@@ -1088,28 +1071,22 @@ public class QueryDispatcher {
       return _brokerReduceTimeMs;
     }
 
-    /**
-     * Returns per-stage coverage data from the stream-mode session, or {@code null} when the query ran in legacy mode.
-     * The list is indexed by stage id; entries may be {@code null} for stages with no coverage info (e.g. stage 0).
-     */
+    /// Returns per-stage coverage data from the stream-mode session, or `null` when the query ran in legacy mode.
+    /// The list is indexed by stage id; entries may be `null` for stages with no coverage info (e.g. stage 0).
     @Nullable
     public List<StageCoverage> getStageCoverage() {
       return _stageCoverage;
     }
 
-    /**
-     * Returns the explicit per-stage stats trees decoded from stream-mode reports, keyed by stage id, or {@code null}
-     * when the query ran in legacy mode. Stages that never reported are absent from the map.
-     */
+    /// Returns the explicit per-stage stats trees decoded from stream-mode reports, keyed by stage id, or `null`
+    /// when the query ran in legacy mode. Stages that never reported are absent from the map.
     @Nullable
     public Map<Integer, StageStatsTreeNode> getStageStatsTrees() {
       return _stageStatsTrees;
     }
 
-    /**
-     * Per-stage stats coverage for a stream-mode query. Captures how many opchain reports the broker received vs.
-     * expected, and how many it couldn't merge (version-skew or shape mismatch).
-     */
+    /// Per-stage stats coverage for a stream-mode query. Captures how many opchain reports the broker received vs.
+    /// expected, and how many it couldn't merge (version-skew or shape mismatch).
     public static final class StageCoverage {
       private final int _responded;
       private final int _mergeFailed;
@@ -1121,17 +1098,17 @@ public class QueryDispatcher {
         _missing = missing;
       }
 
-      /** Opchains that reported and whose stats were merged successfully. */
+      /// Opchains that reported and whose stats were merged successfully.
       public int getResponded() {
         return _responded;
       }
 
-      /** Opchains that reported but whose stats the broker could not merge (shape mismatch / decode error). */
+      /// Opchains that reported but whose stats the broker could not merge (shape mismatch / decode error).
       public int getMergeFailed() {
         return _mergeFailed;
       }
 
-      /** Opchains that were expected but never reported (timed out or stream error before reporting). */
+      /// Opchains that were expected but never reported (timed out or stream error before reporting).
       public int getMissing() {
         return _missing;
       }

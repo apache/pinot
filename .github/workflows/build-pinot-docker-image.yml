@@ -35,7 +35,7 @@ on:
         required: true
       jdkVersion:
         description: "The JDK version to use for the Pinot build and runtime image."
-        default: "21"
+        default: "25"
         required: true
       tags:
         description: "Tags to push of the image, comma separated, e.g. tag1,tag2,tag3"
@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Login to DockerHub
-      uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+      uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}

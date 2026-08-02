@@ -36,9 +36,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
- */
+/// Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
 public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @BeforeClass
@@ -126,14 +124,12 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
     return noDictionaryColumns;
   }
 
-  /**
-   * In realtime consuming segments, the dictionary is not sorted,
-   * and the dictionary based operator should not be used
-   *
-   * Adding explicit queries to test dictionary based functions,
-   * to ensure the right result is computed, wherein dictionary is not read if it is mutable
-   * @throws Exception
-   */
+  /// In realtime consuming segments, the dictionary is not sorted,
+  /// and the dictionary based operator should not be used
+  ///
+  /// Adding explicit queries to test dictionary based functions,
+  /// to ensure the right result is computed, wherein dictionary is not read if it is mutable
+  /// @throws Exception
   @Test(dataProvider = "useBothQueryEngines")
   public void testDictionaryBasedQueries(boolean useMultiStageQueryEngine)
       throws Exception {

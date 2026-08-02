@@ -33,7 +33,6 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
-import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTask;
@@ -53,33 +52,32 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A {@link PinotTaskGenerator} implementation for generating tasks of type {@link RealtimeToOfflineSegmentsTask}
- *
- * These will be generated only for REALTIME tables.
- * At any given time, only 1 task of this type should be generated for a table.
- *
- * Steps:
- *  - The watermarkMs is read from the {@link RealtimeToOfflineSegmentsTaskMetadata} ZNode
- *  found at MINION_TASK_METADATA/${tableNameWithType}/RealtimeToOfflineSegmentsTask
- *  In case of cold-start, no ZNode will exist.
- *  A new ZNode will be created, with watermarkMs as the smallest time found in the COMPLETED segments
- *
- *  - The execution window for the task is calculated as,
- *  windowStartMs = watermarkMs, windowEndMs = windowStartMs + bucketTimeMs,
- *  where bucketTime can be provided in the taskConfigs (default 1d)
- *
- *  - If the execution window is not older than bufferTimeMs, no task will be generated,
- *  where bufferTime can be provided in the taskConfigs (default 2d)
- *
- *  - Segment metadata is scanned for all COMPLETED segments,
- *  to pick those containing data in window [windowStartMs, windowEndMs)
- *
- *  - There are some special considerations for using last completed segment of a partition.
- *  Such segments will be checked for segment endTime, to ensure there's no overflow into CONSUMING segments
- *
- *  - A PinotTaskConfig is created, with segment information, execution window, and any config specific to the task
- */
+/// A [org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator] implementation for
+/// generating tasks of type [RealtimeToOfflineSegmentsTask]
+///
+/// These will be generated only for REALTIME tables.
+/// At any given time, only 1 task of this type should be generated for a table.
+///
+/// Steps:
+///  - The watermarkMs is read from the [RealtimeToOfflineSegmentsTaskMetadata] ZNode
+///  found at MINION_TASK_METADATA/${tableNameWithType}/RealtimeToOfflineSegmentsTask
+///  In case of cold-start, no ZNode will exist.
+///  A new ZNode will be created, with watermarkMs as the smallest time found in the COMPLETED segments
+///
+///  - The execution window for the task is calculated as,
+///  windowStartMs = watermarkMs, windowEndMs = windowStartMs + bucketTimeMs,
+///  where bucketTime can be provided in the taskConfigs (default 1d)
+///
+///  - If the execution window is not older than bufferTimeMs, no task will be generated,
+///  where bufferTime can be provided in the taskConfigs (default 2d)
+///
+///  - Segment metadata is scanned for all COMPLETED segments,
+///  to pick those containing data in window \[windowStartMs, windowEndMs)
+///
+///  - There are some special considerations for using last completed segment of a partition.
+///  Such segments will be checked for segment endTime, to ensure there's no overflow into CONSUMING segments
+///
+///  - A PinotTaskConfig is created, with segment information, execution window, and any config specific to the task
 @TaskGenerator
 public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeToOfflineSegmentsTaskGenerator.class);
@@ -241,14 +239,12 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     return pinotTaskConfigs;
   }
 
-  /**
-   * Fetch completed (DONE/UPLOADED) segment and partition information
-   *
-   * @param realtimeTableName the realtime table name
-   * @param completedSegmentsZKMetadata list for collecting the completed (DONE/UPLOADED) segments ZK metadata
-   * @param partitionToLatestLLCSegmentName map for collecting the partitionId to the latest LLC segment name
-   * @param allPartitions set for collecting all partition ids
-   */
+  /// Fetch completed (DONE/UPLOADED) segment and partition information
+  ///
+  /// @param realtimeTableName the realtime table name
+  /// @param completedSegmentsZKMetadata list for collecting the completed (DONE/UPLOADED) segments ZK metadata
+  /// @param partitionToLatestLLCSegmentName map for collecting the partitionId to the latest LLC segment name
+  /// @param allPartitions set for collecting all partition ids
   private void getCompletedSegmentsInfo(String realtimeTableName, List<SegmentZKMetadata> completedSegmentsZKMetadata,
       Map<Integer, String> partitionToLatestLLCSegmentName, Set<Integer> allPartitions) {
     List<SegmentZKMetadata> segmentsZKMetadata = getNonConsumingSegmentsZKMetadataForRealtimeTable(realtimeTableName);
@@ -278,11 +274,9 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     }
   }
 
-  /**
-   * Get the watermark from the RealtimeToOfflineSegmentsMetadata ZNode.
-   * If the znode is null, computes the watermark using either the start time config or the start time from segment
-   * metadata
-   */
+  /// Get the watermark from the RealtimeToOfflineSegmentsMetadata ZNode.
+  /// If the znode is null, computes the watermark using either the start time config or the start time from segment
+  /// metadata
   private long getWatermarkMs(String realtimeTableName, List<SegmentZKMetadata> completedSegmentsZKMetadata,
       long bucketMs) {
     ZNRecord realtimeToOfflineZNRecord =

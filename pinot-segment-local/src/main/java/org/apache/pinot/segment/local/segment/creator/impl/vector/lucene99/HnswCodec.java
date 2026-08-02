@@ -32,12 +32,10 @@ import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.apache.lucene.codecs.perfield.PerFieldPostingsFormat;
 
 
-/**
- * Extend the Lucene 9.5 index format
- * The major change here is to allow custom: @link{org.apache.lucene.codecs.KnnVectorsFormat}
- *
- * @see org.apache.lucene.codecs.lucene99 package documentation for file format details.
- */
+/// Extend the Lucene 9.5 index format
+/// The major change here is to allow custom: @link{org.apache.lucene.codecs.KnnVectorsFormat}
+///
+/// @see org.apache.lucene.codecs.lucene99 package documentation for file format details.
 public class HnswCodec extends FilterCodec {
 
   private final PostingsFormat _defaultPostingsFormat;
@@ -68,11 +66,9 @@ public class HnswCodec extends FilterCodec {
 
   private final KnnVectorsFormat _defaultKnnVectorsFormat;
 
-  /**
-   * Instantiates a new codec, specifying the stored fields compression mode to use.
-   *
-   * @param mode stored fields compression mode to use for newly flushed/merged segments.
-   */
+  /// Instantiates a new codec, specifying the stored fields compression mode to use.
+  ///
+  /// @param mode stored fields compression mode to use for newly flushed/merged segments.
   public HnswCodec(Lucene912Codec.Mode mode, KnnVectorsFormat defaultKnnVectorsFormat) {
     super("Lucene99", new Lucene912Codec(mode));
     _defaultKnnVectorsFormat = defaultKnnVectorsFormat;
@@ -95,39 +91,33 @@ public class HnswCodec extends FilterCodec {
     return _knnVectorsFormat;
   }
 
-  /**
-   * Returns the postings format that should be used for writing new segments of <code>field</code>.
-   *
-   * <p>The default implementation always returns "Lucene90".
-   *
-   * <p><b>WARNING:</b> if you subclass, you are responsible for index backwards compatibility:
-   * future version of Lucene are only guaranteed to be able to read the default implementation,
-   */
+  /// Returns the postings format that should be used for writing new segments of `field`.
+  ///
+  /// The default implementation always returns "Lucene90".
+  ///
+  /// **WARNING:** if you subclass, you are responsible for index backwards compatibility:
+  /// future version of Lucene are only guaranteed to be able to read the default implementation,
   public PostingsFormat getPostingsFormatForField(String field) {
     return _defaultPostingsFormat;
   }
 
-  /**
-   * Returns the docvalues format that should be used for writing new segments of <code>field</code>
-   * .
-   *
-   * <p>The default implementation always returns "Lucene90".
-   *
-   * <p><b>WARNING:</b> if you subclass, you are responsible for index backwards compatibility:
-   * future version of Lucene are only guaranteed to be able to read the default implementation.
-   */
+  /// Returns the docvalues format that should be used for writing new segments of `field`
+  /// .
+  ///
+  /// The default implementation always returns "Lucene90".
+  ///
+  /// **WARNING:** if you subclass, you are responsible for index backwards compatibility:
+  /// future version of Lucene are only guaranteed to be able to read the default implementation.
   public DocValuesFormat getDocValuesFormatForField(String field) {
     return _defaultDVFormat;
   }
 
-  /**
-   * Returns the vectors format that should be used for writing new segments of <code>field</code>
-   *
-   * <p>The default implementation always returns "Lucene99".
-   *
-   * <p><b>WARNING:</b> if you subclass, you are responsible for index backwards compatibility:
-   * future version of Lucene are only guaranteed to be able to read the default implementation.
-   */
+  /// Returns the vectors format that should be used for writing new segments of `field`
+  ///
+  /// The default implementation always returns "Lucene99".
+  ///
+  /// **WARNING:** if you subclass, you are responsible for index backwards compatibility:
+  /// future version of Lucene are only guaranteed to be able to read the default implementation.
   public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
     return _defaultKnnVectorsFormat;
   }

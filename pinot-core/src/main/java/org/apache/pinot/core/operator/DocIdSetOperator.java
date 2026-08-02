@@ -31,12 +31,11 @@ import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
-/**
- * The <code>AscendingDocIdSetOperator</code> takes a filter operator and returns blocks with set of the matched
- * document Ids.
- * <p>Should call {@link #nextBlock()} multiple times until it returns <code>null</code> (already exhausts all the
- * matched documents) or already gathered enough documents (for selection queries).
- */
+/// The `AscendingDocIdSetOperator` takes a filter operator and returns blocks with set of the matched
+/// document Ids.
+///
+/// Should call [#nextBlock()] multiple times until it returns `null` (already exhausts all the
+/// matched documents) or already gathered enough documents (for selection queries).
 public class DocIdSetOperator extends BaseDocIdSetOperator {
   private static final String EXPLAIN_NAME = "DOC_ID_SET";
 

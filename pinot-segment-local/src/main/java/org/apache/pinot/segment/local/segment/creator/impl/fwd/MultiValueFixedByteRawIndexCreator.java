@@ -31,29 +31,25 @@ import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Raw (non-dictionary-encoded) forward index creator for multi-value column of fixed length data type (INT, LONG,
- * FLOAT, DOUBLE).
- */
+/// Raw (non-dictionary-encoded) forward index creator for multi-value column of fixed length data type (INT, LONG,
+/// FLOAT, DOUBLE).
 public class MultiValueFixedByteRawIndexCreator implements CompressionStatsTrackingForwardIndexCreator {
 
   private final VarByteChunkWriter _indexWriter;
   private final DataType _valueType;
   private final ChunkCompressionType _chunkCompressionType;
 
-  /**
-   * Create a var-byte raw index creator for the given column
-   *
-   * @param baseIndexDir Index directory
-   * @param compressionType Type of compression to use
-   * @param column Name of column to index
-   * @param totalDocs Total number of documents to index
-   * @param valueType Type of the values
-   * @param deriveNumDocsPerChunk true if writer should auto-derive the number of rows per chunk
-   * @param writerVersion writer format version
-   * @param targetMaxChunkSizeBytes target max chunk size in bytes, applicable only for V4 or when
-   *                                deriveNumDocsPerChunk is true
-   */
+  /// Create a var-byte raw index creator for the given column
+  ///
+  /// @param baseIndexDir Index directory
+  /// @param compressionType Type of compression to use
+  /// @param column Name of column to index
+  /// @param totalDocs Total number of documents to index
+  /// @param valueType Type of the values
+  /// @param deriveNumDocsPerChunk true if writer should auto-derive the number of rows per chunk
+  /// @param writerVersion writer format version
+  /// @param targetMaxChunkSizeBytes target max chunk size in bytes, applicable only for V4 or when
+  ///                                deriveNumDocsPerChunk is true
   public MultiValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
       int totalDocs, DataType valueType, int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk,
       int writerVersion, int targetMaxChunkSizeBytes, int targetDocsPerChunk)

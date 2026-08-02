@@ -55,55 +55,51 @@ public class SegmentCompletionProtocol {
   private SegmentCompletionProtocol() {
   }
 
-  /**
-   * MAX_HOLD_TIME_MS is the maximum time (msecs) for which a server will be in HOLDING state, after which it will
-   * send in a SegmentConsumedRequest with its current offset in the stream.
-   */
+  /// MAX_HOLD_TIME_MS is the maximum time (msecs) for which a server will be in HOLDING state, after which it will
+  /// send in a SegmentConsumedRequest with its current offset in the stream.
   public static final long MAX_HOLD_TIME_MS = 3000;
-  /**
-   * MAX_SEGMENT_COMMIT_TIME_MS is the longest time (msecs) a server will take to complete building a segment and
-   * committing
-   * it  (via a SegmentCommit message) after the server has been notified that it is the committer.
-   */
+  /// MAX_SEGMENT_COMMIT_TIME_MS is the longest time (msecs) a server will take to complete building a segment and
+  /// committing
+  /// it  (via a SegmentCommit message) after the server has been notified that it is the committer.
   private static final int DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC = 120;
   private static long _maxSegmentCommitTimeMs =
       TimeUnit.MILLISECONDS.convert(DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC, TimeUnit.SECONDS);
 
   public enum ControllerResponseStatus {
-    /** Never sent by the controller, but locally used by server when sending a request fails */
+    /// Never sent by the controller, but locally used by server when sending a request fails
     NOT_SENT,
 
-    /** Server should send back a SegmentCommitRequest after processing this response */
+    /// Server should send back a SegmentCommitRequest after processing this response
     COMMIT,
 
-    /** Server should send SegmentConsumedRequest after waiting for less than MAX_HOLD_TIME_MS */
+    /// Server should send SegmentConsumedRequest after waiting for less than MAX_HOLD_TIME_MS
     HOLD,
 
-    /** Server should consume stream events to catch up to the offset contained in this response */
+    /// Server should consume stream events to catch up to the offset contained in this response
     CATCH_UP,
 
-    /** Server should discard the rows in memory */
+    /// Server should discard the rows in memory
     DISCARD,
 
-    /** Server should build a segment out of the rows in memory, and replace in-memory rows with the segment built */
+    /// Server should build a segment out of the rows in memory, and replace in-memory rows with the segment built
     KEEP,
 
-    /** Server should locate the current controller leader and re-send the message */
+    /// Server should locate the current controller leader and re-send the message
     NOT_LEADER,
 
-    /** Commit failed. Server should go back to HOLDING state and re-start with the SegmentConsumed message  */
+    /// Commit failed. Server should go back to HOLDING state and re-start with the SegmentConsumed message
     FAILED,
 
-    /** Commit succeeded, behave exactly like KEEP */
+    /// Commit succeeded, behave exactly like KEEP
     COMMIT_SUCCESS,
 
-    /** Never sent by the controller, but locally used by the controller during the segmentCommit() processing */
+    /// Never sent by the controller, but locally used by the controller during the segmentCommit() processing
     COMMIT_CONTINUE,
 
-    /** Sent by controller as an acknowledgement to the SegmentStoppedConsuming message */
+    /// Sent by controller as an acknowledgement to the SegmentStoppedConsuming message
     PROCESSED,
 
-    /** Sent by controller as an acknowledgement during split commit for successful segment upload */
+    /// Sent by controller as an acknowledgement during split commit for successful segment upload
     UPLOAD_SUCCESS,
   }
 

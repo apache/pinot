@@ -19,9 +19,9 @@
 package org.apache.pinot.core.segment.processing.aggregator;
 
 import java.util.Map;
-import org.apache.datasketches.theta.SetOperationBuilder;
-import org.apache.datasketches.theta.Sketch;
-import org.apache.datasketches.theta.Union;
+import org.apache.datasketches.theta.ThetaSetOperationBuilder;
+import org.apache.datasketches.theta.ThetaSketch;
+import org.apache.datasketches.theta.ThetaUnion;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -34,7 +34,7 @@ public class DistinctCountThetaSketchAggregator implements ValueAggregator {
 
   @Override
   public Object aggregate(Object value1, Object value2, Map<String, String> functionParameters) {
-    SetOperationBuilder unionBuilder = Union.builder();
+    ThetaSetOperationBuilder unionBuilder = ThetaUnion.builder();
 
     String samplingProbabilityParam = functionParameters.get(Constants.THETA_TUPLE_SKETCH_SAMPLING_PROBABILITY);
     String nominalEntriesParam = functionParameters.get(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES);
@@ -53,10 +53,10 @@ public class DistinctCountThetaSketchAggregator implements ValueAggregator {
       unionBuilder.setP(Float.parseFloat(samplingProbabilityParam));
     }
 
-    Union union = unionBuilder.buildUnion();
-    Sketch first = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize((byte[]) value1);
-    Sketch second = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize((byte[]) value2);
-    Sketch result = union.union(first, second);
+    ThetaUnion union = unionBuilder.buildUnion();
+    ThetaSketch first = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize((byte[]) value1);
+    ThetaSketch second = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize((byte[]) value2);
+    ThetaSketch result = union.union(first, second);
     return ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(result);
   }
 }

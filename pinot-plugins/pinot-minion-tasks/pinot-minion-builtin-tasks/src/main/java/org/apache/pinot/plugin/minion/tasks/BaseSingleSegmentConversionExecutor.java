@@ -54,12 +54,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base class which provides a framework for a single segment conversion task that refreshes the existing segment.
- * <p>This class handles segment download and upload.
- * <p>To extends this base class, override the {@link #convert(PinotTaskConfig, File, File)} method to plug in the logic
- * to convert the segment.
- */
+/// Base class which provides a framework for a single segment conversion task that refreshes the existing segment.
+///
+/// This class handles segment download and upload.
+///
+/// To extends this base class, override the [#convert(PinotTaskConfig, File, File)] method to plug in the logic
+/// to convert the segment.
 public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleSegmentConversionExecutor.class);
 
@@ -67,9 +67,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
   protected PinotTaskConfig _pinotTaskConfig;
   protected MinionEventObserver _eventObserver;
 
-  /**
-   * Converts the segment based on the given task config and returns the conversion result.
-   */
+  /// Converts the segment based on the given task config and returns the conversion result.
   protected abstract SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
       throws Exception;
 
@@ -195,7 +193,6 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       BatchConfigProperties.SegmentPushType pushType = getSegmentPushType(configs);
       _eventObserver.notifyProgress(_pinotTaskConfig, "Uploading segment: " + segmentName + " (push mode: " + pushType
           + ")");
-      boolean uploadSuccessful = true;
       try {
         switch (pushType) {
           case TAR:
@@ -210,30 +207,26 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
             throw new UnsupportedOperationException("Unrecognized push mode: " + pushType);
         }
       } catch (Exception e) {
-        uploadSuccessful = false;
         _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_UPLOAD_FAIL_COUNT, 1L);
         LOGGER.error("Segment upload failed for segment {}, table {}", segmentName, tableNameWithType, e);
         _eventObserver.notifyTaskError(_pinotTaskConfig, e);
-      }
-      if (!FileUtils.deleteQuietly(convertedTarredSegmentFile)) {
-        LOGGER.warn("Failed to delete tarred converted segment: {}", convertedTarredSegmentFile.getAbsolutePath());
-      }
-
-      if (uploadSuccessful) {
-        LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableNameWithType, segmentName);
+        throw e;
+      } finally {
+        if (!FileUtils.deleteQuietly(convertedTarredSegmentFile)) {
+          LOGGER.warn("Failed to delete tarred converted segment: {}", convertedTarredSegmentFile.getAbsolutePath());
+        }
       }
 
+      LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableNameWithType, segmentName);
       return segmentConversionResult;
     } finally {
       FileUtils.deleteQuietly(tempDataDir);
     }
   }
 
-  /**
-   * Pushes the segment in METADATA (or URI) mode: copies the tarred segment to the output PinotFS and sends segment
-   * URI and metadata to the controller. Requires {@link BatchConfigProperties#OUTPUT_SEGMENT_DIR_URI} and
-   * {@link BatchConfigProperties#PUSH_CONTROLLER_URI} in configs.
-   */
+  /// Pushes the segment in METADATA (or URI) mode: copies the tarred segment to the output PinotFS and sends segment
+  /// URI and metadata to the controller. Requires [BatchConfigProperties#OUTPUT_SEGMENT_DIR_URI] and
+  /// [BatchConfigProperties#PUSH_CONTROLLER_URI] in configs.
   private void uploadSegmentWithMetadata(Map<String, String> configs, PinotTaskConfig pinotTaskConfig,
       SegmentConversionResult segmentConversionResult, AuthProvider authProvider, List<NameValuePair> parameters,
       String tableNameWithType, File convertedTarredSegmentFile)
@@ -256,8 +249,22 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
     try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(configs, outputSegmentDirURI)) {
       Map<String, String> segmentUriToTarPathMap = SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI,
           pushJobSpec, new String[]{outputSegmentTarURI.toString()});
-      SegmentPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap, metadataHeaders,
-          parameters);
+      try {
+        SegmentPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap, metadataHeaders,
+            parameters);
+      } catch (Exception e) {
+        // The tar was already staged to the output PinotFS before this failure. If the task is retried, the next
+        // moveSegmentToOutputPinotFS() would fail with "Output file already exists" (overwriteOutput defaults to
+        // false), making transient metadata-push failures permanently stuck. Delete the staged tar so the retry can
+        // re-stage it and self-heal.
+        try {
+          outputFileFS.delete(outputSegmentTarURI, true);
+        } catch (Exception deleteException) {
+          LOGGER.warn("Failed to delete staged segment tar: {} after metadata push failure, the next retry may fail "
+              + "with 'Output file already exists'", outputSegmentTarURI, deleteException);
+        }
+        throw e;
+      }
     }
   }
 

@@ -25,25 +25,15 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
-/**
- * Starter for Pinot server.
- * <p>When the server starts for the first time, it will automatically join the Helix cluster with the default tag.
- * <ul>
- *   <li>
- *     Optional start-up checks:
- *     <ul>
- *       <li>Service status check (ON by default)</li>
- *     </ul>
- *   </li>
- *   <li>
- *     Optional shut-down checks:
- *     <ul>
- *       <li>Query check (drains and finishes existing queries, ON by default)</li>
- *       <li>Resource check (wait for all resources OFFLINE, OFF by default)</li>
- *     </ul>
- *   </li>
- * </ul>
- */
+/// Starter for Pinot server.
+///
+/// When the server starts for the first time, it will automatically join the Helix cluster with the default tag.
+///
+/// - Optional start-up checks:
+///   - Service status check (ON by default)
+/// - Optional shut-down checks:
+///   - Query check (drains and finishes existing queries, ON by default)
+///   - Resource check (wait for all resources OFFLINE, OFF by default)
 public class HelixServerStarter extends BaseServerStarter {
 
   public HelixServerStarter() {
@@ -69,9 +59,7 @@ public class HelixServerStarter extends BaseServerStarter {
     init(serverConf);
   }
 
-  /**
-   * This method is for reference purpose only.
-   */
+  /// This method is for reference purpose only.
   public static HelixServerStarter startDefault()
       throws Exception {
     Map<String, Object> properties = new HashMap<>();

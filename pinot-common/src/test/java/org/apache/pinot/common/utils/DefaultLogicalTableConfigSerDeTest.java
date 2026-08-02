@@ -33,10 +33,8 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-/**
- * Tests for {@link LogicalTableConfig} JSON serialization and
- * {@link DefaultLogicalTableConfigSerDe} ZNRecord round-trip serialization.
- */
+/// Tests for [LogicalTableConfig] JSON serialization and
+/// [DefaultLogicalTableConfigSerDe] ZNRecord round-trip serialization.
 public class DefaultLogicalTableConfigSerDeTest {
 
   private final DefaultLogicalTableConfigSerDe _serDe = new DefaultLogicalTableConfigSerDe();

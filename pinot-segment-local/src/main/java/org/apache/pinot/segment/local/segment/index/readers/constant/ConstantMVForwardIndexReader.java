@@ -23,9 +23,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Dictionary-encoded forward index reader for multi-value column with constant values.
- */
+/// Dictionary-encoded forward index reader for multi-value column with constant values.
 public final class ConstantMVForwardIndexReader implements ForwardIndexReader<ForwardIndexReaderContext> {
 
   @Override

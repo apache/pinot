@@ -23,18 +23,14 @@ import org.apache.helix.model.Message;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
 
-/**
- * This (Helix) message is sent from the controller to brokers when a request is received to update the application
- * quota.
- */
+/// This (Helix) message is sent from the controller to brokers when a request is received to update the application
+/// quota.
 public class ApplicationQpsQuotaRefreshMessage extends Message {
   public static final String REFRESH_APP_QUOTA_MSG_SUB_TYPE = "REFRESH_APPLICATION_QUOTA";
 
   private static final String APPLICATION_NAME_KEY = "applicationName";
 
-  /**
-   * Constructor for the sender.
-   */
+  /// Constructor for the sender.
   public ApplicationQpsQuotaRefreshMessage(String applicationName) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setMsgSubType(REFRESH_APP_QUOTA_MSG_SUB_TYPE);
@@ -45,9 +41,7 @@ public class ApplicationQpsQuotaRefreshMessage extends Message {
     znRecord.setSimpleField(APPLICATION_NAME_KEY, applicationName);
   }
 
-  /**
-   * Constructor for the receiver.
-   */
+  /// Constructor for the receiver.
   public ApplicationQpsQuotaRefreshMessage(Message message) {
     super(message.getRecord());
     if (!message.getMsgSubType().equals(REFRESH_APP_QUOTA_MSG_SUB_TYPE)) {

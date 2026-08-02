@@ -50,13 +50,10 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Benchmark for DistinctCountSmartHLLAggregationFunction with dictionary-encoded columns.
- *
- * <p>Tests the performance impact of adaptive RoaringBitmap → HLL conversion strategy
- * across different cardinality ratios and data scales.
- *
- */
+/// Benchmark for DistinctCountSmartHLLAggregationFunction with dictionary-encoded columns.
+///
+/// Tests the performance impact of adaptive RoaringBitmap → HLL conversion strategy
+/// across different cardinality ratios and data scales.
 @Fork(0)
 @BenchmarkMode(Mode.AverageTime)
 @Warmup(iterations = 2, time = 5, timeUnit = TimeUnit.SECONDS)

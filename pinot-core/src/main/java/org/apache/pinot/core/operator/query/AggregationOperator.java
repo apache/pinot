@@ -37,9 +37,7 @@ import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
-/**
- * The <code>AggregationOperator</code> class implements keyless aggregation query on a single segment in V1/SSQE.
- */
+/// The `AggregationOperator` class implements keyless aggregation query on a single segment in V1/SSQE.
 @SuppressWarnings("rawtypes")
 public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
   private static final String EXPLAIN_NAME = "AGGREGATE";

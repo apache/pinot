@@ -44,13 +44,13 @@ import java.util.PriorityQueue;
 import java.util.Random;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.datasketches.cpc.CpcSketch;
-import org.apache.datasketches.theta.SetOperationBuilder;
-import org.apache.datasketches.theta.Sketch;
-import org.apache.datasketches.theta.Sketches;
-import org.apache.datasketches.theta.UpdateSketch;
-import org.apache.datasketches.tuple.aninteger.IntegerSketch;
+import org.apache.datasketches.theta.ThetaSetOperationBuilder;
+import org.apache.datasketches.theta.ThetaSketch;
+import org.apache.datasketches.theta.UpdatableThetaSketch;
+import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
+import org.apache.datasketches.tuple.aninteger.IntegerTupleSketch;
 import org.apache.pinot.core.query.aggregation.function.PercentileEstAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
@@ -549,7 +549,7 @@ public class ObjectSerDeUtilsTest {
   @Test
   public void testThetaSketch() {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
-      UpdateSketch input = Sketches.updateSketchBuilder().build();
+      UpdatableThetaSketch input = UpdatableThetaSketch.builder().build();
       int size = RANDOM.nextInt(100) + 10;
       boolean shouldOrder = RANDOM.nextBoolean();
 
@@ -557,10 +557,10 @@ public class ObjectSerDeUtilsTest {
         input.update(j);
       }
 
-      Sketch sketch = input.compact(shouldOrder, null);
+      ThetaSketch sketch = input.compact(shouldOrder, null);
 
       byte[] bytes = ObjectSerDeUtils.serialize(sketch);
-      Sketch actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.DataSketch);
+      ThetaSketch actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.DataSketch);
 
       assertEquals(actual.getEstimate(), sketch.getEstimate(), ERROR_MESSAGE);
       assertEquals(actual.toByteArray(), sketch.toByteArray(), ERROR_MESSAGE);
@@ -571,16 +571,16 @@ public class ObjectSerDeUtilsTest {
   @Test
   public void testThetaSketchAccumulator() {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
-      UpdateSketch input = Sketches.updateSketchBuilder().build();
+      UpdatableThetaSketch input = UpdatableThetaSketch.builder().build();
       int size = RANDOM.nextInt(100) + 10;
 
       for (int j = 0; j < size; j++) {
         input.update(j);
       }
 
-      SetOperationBuilder setOperationBuilder = new SetOperationBuilder();
+      ThetaSetOperationBuilder setOperationBuilder = new ThetaSetOperationBuilder();
       ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(setOperationBuilder, 2);
-      Sketch sketch = input.compact(false, null);
+      ThetaSketch sketch = input.compact(false, null);
       accumulator.apply(sketch);
 
       byte[] bytes = ObjectSerDeUtils.serialize(accumulator);
@@ -597,7 +597,7 @@ public class ObjectSerDeUtilsTest {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
       int lgK = 4;
       int size = RANDOM.nextInt(100) + 10;
-      IntegerSketch input = new IntegerSketch(lgK, IntegerSummary.Mode.Sum);
+      IntegerTupleSketch input = new IntegerTupleSketch(lgK, IntegerSummary.Mode.Sum);
 
       for (int j = 0; j < size; j++) {
         input.update(j, RANDOM.nextInt(100));
@@ -606,7 +606,7 @@ public class ObjectSerDeUtilsTest {
       IntegerSummarySetOperations setOps =
           new IntegerSummarySetOperations(IntegerSummary.Mode.Sum, IntegerSummary.Mode.Sum);
       TupleIntSketchAccumulator accumulator = new TupleIntSketchAccumulator(setOps, (int) Math.pow(2, lgK), 2);
-      org.apache.datasketches.tuple.Sketch<IntegerSummary> sketch = input.compact();
+      TupleSketch<IntegerSummary> sketch = input.compact();
       accumulator.apply(sketch);
 
       byte[] bytes = ObjectSerDeUtils.serialize(accumulator);

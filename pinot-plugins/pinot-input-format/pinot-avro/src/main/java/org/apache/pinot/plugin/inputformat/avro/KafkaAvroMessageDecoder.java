@@ -50,10 +50,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * An implementation of StreamMessageDecoder to read avro from a Kafka stream
- * NOTE: Do not use schema in the implementation, as schema will be removed from the params
- */
+/// An implementation of StreamMessageDecoder to read avro from a Kafka stream
+/// NOTE: Do not use schema in the implementation, as schema will be removed from the params
 @NotThreadSafe
 public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaAvroMessageDecoder.class);
@@ -245,31 +243,24 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     return schemaFetcher.getSchema();
   }
 
-  /**
-   * Private class for encapsulating hash to Avro schema mapping.
-   * <ul>
-   *   <li> Maintains two lists, one for hashes and another for schema. </li>
-   *   <li> Hash at index i in the hash list corresponds to schema at index i in the schema list. </li>
-   * </ul>
-   */
+  /// Private class for encapsulating hash to Avro schema mapping.
+  ///
+  /// - Maintains two lists, one for hashes and another for schema.
+  /// - Hash at index i in the hash list corresponds to schema at index i in the schema list.
   private static class HashToSchemaMap {
     private final List<byte[]> _hashes;
     private final List<Schema> _schemas;
 
-    /**
-     * Constructor for the class.
-     */
+    /// Constructor for the class.
     private HashToSchemaMap() {
       _hashes = new ArrayList<>();
       _schemas = new ArrayList<>();
     }
 
-    /**
-     * Returns the Avro schema corresponding to the given hash.
-     *
-     * @param hash Hash for which to get the avro schema.
-     * @return Avro schema for the given hash.
-     */
+    /// Returns the Avro schema corresponding to the given hash.
+    ///
+    /// @param hash Hash for which to get the avro schema.
+    /// @return Avro schema for the given hash.
     private Schema getSchema(byte[] hash) {
       for (int i = 0; i < _hashes.size(); i++) {
         if (Arrays.equals(_hashes.get(i), hash)) {
@@ -279,13 +270,11 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
       return null;
     }
 
-    /**
-     * Adds mapping between hash and avro schema.
-     * Caller to ensure that addSchema is called only once per hash-schema pair.
-     *
-     * @param hash Hash for the schema
-     * @param schema Avro Schema
-     */
+    /// Adds mapping between hash and avro schema.
+    /// Caller to ensure that addSchema is called only once per hash-schema pair.
+    ///
+    /// @param hash Hash for the schema
+    /// @param schema Avro Schema
     private void addSchema(byte[] hash, Schema schema) {
       _hashes.add(Arrays.copyOf(hash, hash.length));
       _schemas.add(schema);

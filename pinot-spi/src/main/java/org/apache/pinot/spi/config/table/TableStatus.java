@@ -23,10 +23,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 
-/**
- * Container object to encapsulate table status which contains
- * - Ingestion status: specifies if the table is ingesting properly or not
- */
+/// Container object to encapsulate table status which contains
+/// - Ingestion status: specifies if the table is ingesting properly or not
 public class TableStatus {
 
   private IngestionStatus _ingestionStatus;

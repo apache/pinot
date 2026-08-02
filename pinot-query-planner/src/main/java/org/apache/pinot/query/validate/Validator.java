@@ -43,21 +43,17 @@ import org.apache.calcite.sql.validate.SqlValidatorImpl;
 import org.apache.calcite.sql.validate.SqlValidatorScope;
 
 
-/**
- * The {@code Validator} overwrites Calcite's Validator with Pinot specific logics.
- */
+/// The `Validator` overwrites Calcite's Validator with Pinot specific logics.
 public class Validator extends SqlValidatorImpl {
 
-  /**
-   * Pinot conformance that delegates to BABEL but disables non-strict GROUP BY.
-   *
-   * <p>Calcite 1.41.0 (CALCITE-7189) added MySQL-style non-strict GROUP BY support that wraps non-aggregated,
-   * non-grouped columns in {@code ANY_VALUE()}. However, the implementation has a bug where it doesn't handle window
-   * functions properly, causing an NPE during validation of queries like
-   * {@code SELECT MIN(col) OVER() FROM t GROUP BY col}. Disabling non-strict GROUP BY avoids this bug and is the
-   * correct behavior for Pinot, which requires all non-aggregated columns to appear in GROUP BY. The feature is still
-   * present (un-reverted) in Calcite 1.42.0, so this override must be retained.
-   */
+  /// Pinot conformance that delegates to BABEL but disables non-strict GROUP BY.
+  ///
+  /// Calcite 1.41.0 (CALCITE-7189) added MySQL-style non-strict GROUP BY support that wraps non-aggregated,
+  /// non-grouped columns in `ANY_VALUE()`. However, the implementation has a bug where it doesn't handle window
+  /// functions properly, causing an NPE during validation of queries like
+  /// `SELECT MIN(col) OVER() FROM t GROUP BY col`. Disabling non-strict GROUP BY avoids this bug and is the
+  /// correct behavior for Pinot, which requires all non-aggregated columns to appear in GROUP BY. The feature is still
+  /// present (un-reverted) in Calcite 1.42.0, so this override must be retained.
   private static final SqlDelegatingConformance PINOT_CONFORMANCE =
       new SqlDelegatingConformance(SqlConformanceEnum.BABEL) {
         @Override
@@ -73,16 +69,14 @@ public class Validator extends SqlValidatorImpl {
             .withTypeCoercionFactory(PinotTypeCoercion::new));
   }
 
-  /**
-   * Expand the star in the select list.
-   * Pinot table schema has all columns along with virtual columns.
-   * We don't want to include virtual columns in the select * query
-   *
-   * @param selectList        Select clause to be expanded
-   * @param select             Query
-   * @param includeSystemVars Whether to include system variables
-   * @return Expanded select list
-   */
+  /// Expand the star in the select list.
+  /// Pinot table schema has all columns along with virtual columns.
+  /// We don't want to include virtual columns in the select \* query
+  ///
+  /// @param selectList        Select clause to be expanded
+  /// @param select             Query
+  /// @param includeSystemVars Whether to include system variables
+  /// @return Expanded select list
   @Override
   public SqlNodeList expandStar(
       SqlNodeList selectList,
@@ -114,13 +108,11 @@ public class Validator extends SqlValidatorImpl {
     return new SqlNodeList(newSelectList, selectList.getParserPosition());
   }
 
-  /**
-   * Get the all the virtual columns explicitly selected from the query selection list.
-   * Use list in case there are duplicates.
-   *
-   * @param select query
-   * @return list of virtual columns selected
-   */
+  /// Get the all the virtual columns explicitly selected from the query selection list.
+  /// Use list in case there are duplicates.
+  ///
+  /// @param select query
+  /// @return list of virtual columns selected
   private List<String> getSelectedVirtualColumns(SqlSelect select) {
     List<String> columnNamesFromSelectList = new ArrayList<>();
     for (SqlNode node : select.getSelectList().getList()) {
@@ -134,33 +126,26 @@ public class Validator extends SqlValidatorImpl {
     return columnNamesFromSelectList;
   }
 
-  /**
-   * Check if the column is a virtual column.
-   * @param columnName column name
-   * @return true if the column is a virtual column
-   */
+  /// Check if the column is a virtual column.
+  /// @param columnName column name
+  /// @return true if the column is a virtual column
   public static boolean isVirtualColumn(String columnName) {
     return columnName.length() > 0 && columnName.charAt(0) == '$';
   }
 
-  /**
-   * Extract the column name from the identifier. The identifier could be in the format of [table].[columnName] or
-   * just [columnName].
-   * @param identifier column identifier
-   * @return column name
-   */
+  /// Extract the column name from the identifier. The identifier could be in the format of \[table\].\[columnName\] or
+  /// just \[columnName\].
+  /// @param identifier column identifier
+  /// @return column name
   private static String getColumnName(SqlIdentifier identifier) {
     List<String> names = identifier.names;
     return names.get(names.size() - 1);
   }
 
-  /**
-   * This method is only called by Calcite when adding rows to select as a result of doing {@code select *}.
-   *
-   * This is just a patch knowing the internals of Calcite, but there is no officially supported solution right now.
-   * See <a href="https://lists.apache.org/thread/c71fkv329001hjjq7bp4hm56q6yx6dvw">this question in the dev email
-   * list</a>
-   */
+  /// This method is only called by Calcite when adding rows to select as a result of doing `select *`.
+  ///
+  /// This is just a patch knowing the internals of Calcite, but there is no officially supported solution right now.
+  /// See [this question in the dev email list](https://lists.apache.org/thread/c71fkv329001hjjq7bp4hm56q6yx6dvw)
   @Override
   protected void addToSelectList(List<SqlNode> list, Set<String> aliases,
       List<Map.Entry<String, RelDataType>> fieldList, SqlNode exp, SelectScope scope, boolean includeSystemVars) {

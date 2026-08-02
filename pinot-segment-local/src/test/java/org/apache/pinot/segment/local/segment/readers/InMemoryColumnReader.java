@@ -27,9 +27,7 @@ import org.apache.pinot.spi.data.readers.MultiValueResult;
 import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/**
- * Mock ColumnReader for testing with configurable data.
- */
+/// Mock ColumnReader for testing with configurable data.
 public class InMemoryColumnReader implements ColumnReader {
   private final String _columnName;
   private final Object[] _values;

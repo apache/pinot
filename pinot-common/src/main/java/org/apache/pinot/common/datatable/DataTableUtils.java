@@ -30,14 +30,12 @@ public class DataTableUtils {
   private DataTableUtils() {
   }
 
-  /**
-   * Given a {@link DataSchema}, compute each column's offset and fill them into the passed in array, then return the
-   * row size in bytes.
-   *
-   * @param dataSchema data schema.
-   * @param columnOffsets array of column offsets.
-   * @return row size in bytes.
-   */
+  /// Given a [DataSchema], compute each column's offset and fill them into the passed in array, then return the
+  /// row size in bytes.
+  ///
+  /// @param dataSchema data schema.
+  /// @param columnOffsets array of column offsets.
+  /// @return row size in bytes.
   public static int computeColumnOffsets(DataSchema dataSchema, int[] columnOffsets, int dataTableVersion) {
     assert dataTableVersion == DataTableFactory.VERSION_4;
     int numColumns = columnOffsets.length;
@@ -75,9 +73,7 @@ public class DataTableUtils {
     return (int) b == 1;
   }
 
-  /**
-   * Helper method to decode string.
-   */
+  /// Helper method to decode string.
   public static String decodeString(ByteBuffer buffer)
       throws IOException {
     int length = buffer.getInt();

@@ -28,7 +28,6 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorIndexCombined;
 import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -38,11 +37,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This is used to create Lucene based HNSW index.
- * Used for both offline from {@link SegmentColumnarIndexCreator}
- * and realtime from {@link org.apache.pinot.segment.local.realtime.impl.vector.MutableVectorIndex}
- */
+/// This is used to create Lucene based HNSW index.
+/// Used for both offline from [org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator]
+/// and realtime from [org.apache.pinot.segment.local.realtime.impl.vector.MutableVectorIndex]
 public class HnswVectorIndexCreator implements VectorIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(HnswVectorIndexCreator.class);
   public static final String VECTOR_INDEX_DOC_ID_COLUMN_NAME = "DocID";

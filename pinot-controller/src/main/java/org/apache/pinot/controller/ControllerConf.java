@@ -618,51 +618,39 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS, UNSPECIFIED_THREAD_POOL);
   }
 
-  /**
-   * Rate limit the number of http request object created by controller.
-   * During load testing we saw a higher value (> 20K) can lead to memory pressure on controller.
-   */
+  /// Rate limit the number of http request object created by controller.
+  /// During load testing we saw a higher value (> 20K) can lead to memory pressure on controller.
   public double getControllerWorkloadPropagationRequestsPerSecond() {
     return getProperty(CONTROLLER_WORKLOAD_PROPAGATION_REQUESTS_PER_SECOND, 1000.0);
   }
 
-  /**
-   * Number of threads to used when sending/response for HTTP requests to servers/brokers.
-   */
+  /// Number of threads to used when sending/response for HTTP requests to servers/brokers.
   public int getControllerWorkloadExecutorThreads() {
     // We did benchmarking and found that having 5 threads helps us support about 50 requests per second with latency
     // of about 500ms and CPU utilization of 1% on a 40 core machine and memory consumption of about 100MB.
     return getProperty(CONTROLLER_WORKLOAD_EXECUTOR_THREADS, 5);
   }
 
-  /**
-   * Size of the bounded queue for workload propagation tasks.
-   */
+  /// Size of the bounded queue for workload propagation tasks.
   public int getControllerWorkloadExecutorQueueSize() {
     // We did benchmarking and found that each workload request queuing takes about 100K of memory.
     // So with default of 10,000 queue size we are using about 1GB of memory for queuing in worst case.
     return getProperty(CONTROLLER_WORKLOAD_EXECUTOR_QUEUE_SIZE, 10000);
   }
 
-  /**
-   * Number of threads for HTTP callback processing.
-   */
+  /// Number of threads for HTTP callback processing.
   public int getControllerWorkloadHttpExecutorThreads() {
     return getProperty(CONTROLLER_WORKLOAD_HTTP_EXECUTOR_THREADS, 5);
   }
 
-  /**
-   * Size of the bounded queue for HTTP callback tasks.
-   */
+  /// Size of the bounded queue for HTTP callback tasks.
   public int getControllerWorkloadHttpExecutorQueueSize() {
     // We did benchmarking and found that each HTTP callback queuing takes about 10K of memory.
     // So with default of 10,000 queue size we are using about 100MB of memory for queuing in worst case.
     return getProperty(CONTROLLER_WORKLOAD_HTTP_EXECUTOR_QUEUE_SIZE, 10000);
   }
 
-  /**
-   * Timeout in seconds for workload propagation and cost computation operations.
-   */
+  /// Timeout in seconds for workload propagation and cost computation operations.
   public long getControllerWorkloadPropagationTimeoutSeconds() {
     return getProperty(CONTROLLER_WORKLOAD_PROPAGATION_TIMEOUT_SECONDS, 120L);
   }
@@ -763,13 +751,11 @@ public class ControllerConf extends PinotConfiguration {
     setProperty(ControllerPeriodicTasksConf.RETENTION_MANAGER_CRON_EXPRESSION, cronExpression);
   }
 
-  /**
-   * Returns the offline segment interval checker frequency in seconds.
-   * Reads {@code controller.offline.segment.interval.checker.frequencyPeriod} as a period string (e.g. "24h"),
-   * falling back to {@code DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD} if absent or invalid.
-   *
-   * @return the configured frequency in seconds
-   */
+  /// Returns the offline segment interval checker frequency in seconds.
+  /// Reads `controller.offline.segment.interval.checker.frequencyPeriod` as a period string (e.g. "24h"),
+  /// falling back to `DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD` if absent or invalid.
+  ///
+  /// @return the configured frequency in seconds
   public int getOfflineSegmentIntervalCheckerFrequencyInSeconds() {
     String period = getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD,
         ControllerPeriodicTasksConf.DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD);
@@ -785,13 +771,11 @@ public class ControllerConf extends PinotConfiguration {
         Long.toString(validationFrequencyInSeconds) + "s");
   }
 
-  /**
-   * Returns the realtime segment validation frequency in seconds.
-   * Reads {@code controller.realtime.segment.validation.frequencyPeriod} as a period string (e.g. "1h"),
-   * falling back to {@code DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD} if absent or invalid.
-   *
-   * @return the configured frequency in seconds
-   */
+  /// Returns the realtime segment validation frequency in seconds.
+  /// Reads `controller.realtime.segment.validation.frequencyPeriod` as a period string (e.g. "1h"),
+  /// falling back to `DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD` if absent or invalid.
+  ///
+  /// @return the configured frequency in seconds
   public int getRealtimeSegmentValidationFrequencyInSeconds() {
     String period = getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD,
         ControllerPeriodicTasksConf.DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD);
@@ -841,13 +825,11 @@ public class ControllerConf extends PinotConfiguration {
     setProperty(ControllerPeriodicTasksConf.REALTIME_OFFSET_AUTO_RESET_BACKFILL_CRON_EXPRESSION, cronExpression);
   }
 
-  /**
-   * Returns the broker resource validation frequency in seconds.
-   * Reads {@code controller.broker.resource.validation.frequencyPeriod} as a period string (e.g. "1h"),
-   * falling back to {@code DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD} if absent or invalid.
-   *
-   * @return the configured frequency in seconds
-   */
+  /// Returns the broker resource validation frequency in seconds.
+  /// Reads `controller.broker.resource.validation.frequencyPeriod` as a period string (e.g. "1h"),
+  /// falling back to `DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD` if absent or invalid.
+  ///
+  /// @return the configured frequency in seconds
   public int getBrokerResourceValidationFrequencyInSeconds() {
     String period = getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD,
         ControllerPeriodicTasksConf.DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD);
@@ -987,11 +969,9 @@ public class ControllerConf extends PinotConfiguration {
         Long.toString(statusCheckerWaitForPushTimeInSeconds) + "s");
   }
 
-  /**
-   * Returns the segment relocator frequency in seconds.
-   * Reads {@code controller.segment.relocator.frequencyPeriod} as a period string (e.g. "1h"),
-   * falling back to {@code DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_PERIOD} if absent or invalid.
-   */
+  /// Returns the segment relocator frequency in seconds.
+  /// Reads `controller.segment.relocator.frequencyPeriod` as a period string (e.g. "1h"),
+  /// falling back to `DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_PERIOD` if absent or invalid.
   public int getSegmentRelocatorFrequencyInSeconds() {
     String period = getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_FREQUENCY_PERIOD,
         ControllerPeriodicTasksConf.DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_PERIOD);
@@ -1485,11 +1465,9 @@ public class ControllerConf extends PinotConfiguration {
         ControllerPeriodicTasksConf.DEFAULT_TASK_QUEUE_WARNING_THRESHOLD);
   }
 
-  /**
-   * Returns the segment relocator initial delay in seconds.
-   * Reads {@code controller.segmentRelocator.initialDelayInSeconds}, falling back to a random
-   * value between {@code MIN_INITIAL_DELAY_IN_SECONDS} and {@code MAX_INITIAL_DELAY_IN_SECONDS}.
-   */
+  /// Returns the segment relocator initial delay in seconds.
+  /// Reads `controller.segmentRelocator.initialDelayInSeconds`, falling back to a random
+  /// value between `MIN_INITIAL_DELAY_IN_SECONDS` and `MAX_INITIAL_DELAY_IN_SECONDS`.
   public long getSegmentRelocatorInitialDelayInSeconds() {
     return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS,
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
@@ -1542,9 +1520,7 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(CONTROLLER_RESOURCE_PACKAGES, DEFAULT_CONTROLLER_RESOURCE_PACKAGES);
   }
 
-  /**
-   * @return true if Groovy functions are disabled in controller config, otherwise returns false.
-   */
+  /// @return true if Groovy functions are disabled in controller config, otherwise returns false.
   public boolean isDisableIngestionGroovy() {
     return getProperty(DISABLE_GROOVY, DEFAULT_DISABLE_GROOVY);
   }
@@ -1619,10 +1595,8 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(CONFIG_OF_MAX_FORCE_COMMIT_JOBS_IN_ZK, ControllerJob.DEFAULT_MAXIMUM_CONTROLLER_JOBS_IN_ZK);
   }
 
-  /**
-   * Get the configured timeseries languages from controller configuration.
-   * @return List of enabled timeseries languages
-   */
+  /// Get the configured timeseries languages from controller configuration.
+  /// @return List of enabled timeseries languages
   public List<String> getTimeseriesLanguages() {
     String languagesConfig = getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey());
     if (languagesConfig == null) {

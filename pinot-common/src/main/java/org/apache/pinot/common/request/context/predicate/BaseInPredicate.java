@@ -27,21 +27,28 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
 
-/**
- * Base predicate for IN and NOT_IN.
- */
+/// Base predicate for `IN` and `NOT_IN`.
+///
+/// Instances are read concurrently: a predicate belongs to the query's filter tree, which is built once per query and
+/// then shared by the threads that build and run the per-segment plans. The lazily parsed value caches are therefore
+/// published safely; see the fields.
 public abstract class BaseInPredicate extends BasePredicate {
   protected final List<String> _values;
 
-  // Cache the parsed values
-  private int[] _intValues;
-  private long[] _longValues;
-  private float[] _floatValues;
-  private double[] _doubleValues;
-  private BigDecimal[] _bigDecimalValues;
-  private int[] _booleanValues;
-  private long[] _timestampValues;
-  private ByteArray[] _bytesValues;
+  /// Lazily parsed caches of the values, one per stored type.
+  ///
+  /// `volatile` is required, not just for the null checks in the getters: a predicate is read concurrently (see the
+  /// class javadoc), and without it the arrays are published unsafely. A racing thread can then read the non-null
+  /// array reference while the element writes are still invisible to it, seeing `0` for the primitive arrays and
+  /// `null` for the object arrays — which silently matches the wrong rows rather than failing.
+  private volatile int[] _intValues;
+  private volatile long[] _longValues;
+  private volatile float[] _floatValues;
+  private volatile double[] _doubleValues;
+  private volatile BigDecimal[] _bigDecimalValues;
+  private volatile int[] _booleanValues;
+  private volatile long[] _timestampValues;
+  private volatile ByteArray[] _bytesValues;
 
   public BaseInPredicate(ExpressionContext lhs, List<String> values) {
     super(lhs);

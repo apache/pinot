@@ -75,13 +75,11 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 
 
-/**
- * The {@code BaseStarTreeV2Test} is the base class to test star-tree index by scanning and aggregating records filtered
- * out from the {@link StarTreeFilterPlanNode} against normal {@link FilterPlanNode}.
- *
- * @param <R> Type or raw value
- * @param <A> Type of aggregated value
- */
+/// The `BaseStarTreeV2Test` is the base class to test star-tree index by scanning and aggregating records
+/// filtered out from the [StarTreeFilterPlanNode] against normal [FilterPlanNode].
+///
+/// @param <R> Type or raw value
+/// @param <A> Type of aggregated value
 @SuppressWarnings({"rawtypes", "unchecked"})
 abstract class BaseStarTreeV2Test<R, A> {
   private static final Random RANDOM = new Random();
@@ -489,9 +487,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     }
   }
 
-  /**
-   * Can be overridden to force the compression codec.
-   */
+  /// Can be overridden to force the compression codec.
   @Nullable
   CompressionCodec getCompressionCodec() {
     CompressionCodec[] compressionCodecs = CompressionCodec.values();
@@ -499,9 +495,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     return compressionCodec.isApplicableToRawIndex() ? compressionCodec : null;
   }
 
-  /**
-   * Can be overridden to force the index version.
-   */
+  /// Can be overridden to force the index version.
   @Nullable
   Integer getIndexVersion() {
     // Allow 2, 3, 4 or null

@@ -25,9 +25,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
 
-/**
- * Interface for value readers, which read a value at a given index.
- */
+/// Interface for value readers, which read a value at a given index.
 public interface ValueReader extends Closeable {
 
   int getInt(int index);
@@ -42,16 +40,12 @@ public interface ValueReader extends Closeable {
     return BigDecimalUtils.deserialize(getBytes(index, numBytesPerValue));
   }
 
-  /**
-   * Reads the unpadded bytes into the given buffer and returns the length.
-   * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
-   */
+  /// Reads the unpadded bytes into the given buffer and returns the length.
+  /// NOTE: The passed in reusable buffer should have capacity of at least `numBytesPerValue`.
   int readUnpaddedBytes(int index, int numBytesPerValue, byte[] buffer);
 
-  /**
-   * Returns un-padded bytes for string.
-   * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
-   */
+  /// Returns un-padded bytes for string.
+  /// NOTE: The passed in reusable buffer should have capacity of at least `numBytesPerValue`.
   default byte[] getUnpaddedBytes(int index, int numBytesPerValue, byte[] buffer) {
     int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
     byte[] value = new byte[length];
@@ -59,22 +53,16 @@ public interface ValueReader extends Closeable {
     return value;
   }
 
-  /**
-   * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
-   */
+  /// NOTE: The passed in reusable buffer should have capacity of at least `numBytesPerValue`.
   default String getUnpaddedString(int index, int numBytesPerValue, byte[] buffer) {
     int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
     return new String(buffer, 0, length, StandardCharsets.UTF_8);
   }
 
-  /**
-   * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
-   */
+  /// NOTE: The passed in reusable buffer should have capacity of at least `numBytesPerValue`.
   String getPaddedString(int index, int numBytesPerValue, byte[] buffer);
 
-  /**
-   * NOTE: Do not reuse buffer for BYTES because the return value can have variable length.
-   */
+  /// NOTE: Do not reuse buffer for BYTES because the return value can have variable length.
   byte[] getBytes(int index, int numBytesPerValue);
 
   /// Applicable to STRING only.
@@ -83,37 +71,27 @@ public interface ValueReader extends Closeable {
   /// Applicable to variable sized types other than STRING, i.e. BIG_DECIMAL, BYTES.
   int getByteSize(int index, int numBytesPerValue);
 
-  /**
-   * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
-   */
+  /// NOTE: The passed in reusable buffer should have capacity of at least `numBytesPerValue`.
   default int get32BitsMurmur3Hash(int index, int numBytesPerValue, byte[] buffer) {
     int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
     return MurmurHashFunctions.murmurHash3X64Bit32(buffer, length, 0);
   }
 
-  /**
-   * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
-   */
+  /// NOTE: The passed in reusable buffer should have capacity of at least `numBytesPerValue`.
   default long get64BitsMurmur3Hash(int index, int numBytesPerValue, byte[] buffer) {
     int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
     return MurmurHashFunctions.murmurHash3X64Bit64(buffer, length, 0);
   }
 
-  /**
-   * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
-   */
+  /// NOTE: The passed in reusable buffer should have capacity of at least `numBytesPerValue`.
   default long[] get128BitsMurmur3Hash(int index, int numBytesPerValue, byte[] buffer) {
     int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
     return MurmurHashFunctions.murmurHash3X64Bit128AsLongs(buffer, length, 0);
   }
 
-  /**
-   * Returns the comparison result of the UTF-8 decoded values.
-   */
+  /// Returns the comparison result of the UTF-8 decoded values.
   int compareUtf8Bytes(int index, int numBytesPerValue, byte[] bytes);
 
-  /**
-   * Returns the comparison result of the bytes values.
-   */
+  /// Returns the comparison result of the bytes values.
   int compareBytes(int index, int numBytesPerValue, byte[] bytes);
 }

@@ -23,9 +23,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 
-/**
- * A {@link TierSegmentSelector} strategy which selects segments for a tier based on the age of the segment
- */
+/// A [TierSegmentSelector] strategy which selects segments for a tier based on the age of the segment
 public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
   private final long _segmentAgeMillis;
 
@@ -52,9 +50,7 @@ public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
     return (System.currentTimeMillis() - endTimeMs) > _segmentAgeMillis;
   }
 
-  /**
-   * Gets the age cutoff for segments accepted by this strategy
-   */
+  /// Gets the age cutoff for segments accepted by this strategy
   public long getSegmentAgeMillis() {
     return _segmentAgeMillis;
   }

@@ -28,20 +28,16 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 
 
-/**
- * The {@code OnHeapSingleTreeBuilder} class is the single star-tree builder that uses on-heap memory.
- */
+/// The `OnHeapSingleTreeBuilder` class is the single star-tree builder that uses on-heap memory.
 public class OnHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   private final List<Record> _records = new ArrayList<>();
 
-  /**
-   * Constructor for the on-heap single star-tree builder.
-   *
-   * @param builderConfig Builder config
-   * @param outputDir Directory to store the index files
-   * @param segment Index segment
-   * @param metadataProperties Segment metadata properties
-   */
+  /// Constructor for the on-heap single star-tree builder.
+  ///
+  /// @param builderConfig Builder config
+  /// @param outputDir Directory to store the index files
+  /// @param segment Index segment
+  /// @param metadataProperties Segment metadata properties
   public OnHeapSingleTreeBuilder(StarTreeV2BuilderConfig builderConfig, File outputDir, ImmutableSegment segment,
       Configuration metadataProperties) {
     super(builderConfig, outputDir, segment, metadataProperties);

@@ -32,15 +32,11 @@ import org.apache.maven.model.DependencyManagement;
 import org.apache.maven.model.Model;
 import org.apache.maven.project.MavenProject;
 
-/**
- * Enforces that no submodule declares a hardcoded <version> on its <dependency> entries.
- * Versions must be managed centrally in the root POM's <dependencyManagement>.
- */
+/// Enforces that no submodule declares a hardcoded <version> on its <dependency> entries.
+/// Versions must be managed centrally in the root POM's <dependencyManagement>.
 @Named("pinotCustomDependencyVersionRule")
 public class PinotCustomDependencyVersionRule implements EnforcerRule {
-  /**
-   * Comma-separated list of artifactIds to skip (e.g. "pinot-plugins,pinot-connectors").
-   */
+  /// Comma-separated list of artifactIds to skip (e.g. "pinot-plugins,pinot-connectors").
   private List<String> _skipModuleList;
 
   public PinotCustomDependencyVersionRule() { }
@@ -49,10 +45,8 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
     setSkipModules(skipModules);
   }
 
-  /**
-   * Setter method used by Maven to inject the <skipModules> parameter
-   * from the POM into this rule, parsing String into a list
-   */
+  /// Setter method used by Maven to inject the <skipModules> parameter
+  /// from the POM into this rule, parsing String into a list
   public void setSkipModules(String skipModules) {
     if (skipModules == null || skipModules.isBlank()) {
       _skipModuleList = new ArrayList<>();

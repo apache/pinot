@@ -39,9 +39,7 @@ import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
 import org.apache.pinot.spi.config.table.FieldConfig;
 
 
-/**
- * Execution plan for distinct queries on a single segment.
- */
+/// Execution plan for distinct queries on a single segment.
 public class DistinctPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final SegmentContext _segmentContext;

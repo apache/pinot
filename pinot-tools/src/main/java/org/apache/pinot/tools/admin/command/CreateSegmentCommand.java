@@ -45,9 +45,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class to implement CreateSegment command.
- */
+/// Class to implement CreateSegment command.
 @SuppressWarnings("unused")
 @CommandLine.Command(name = "CreateSegment", mixinStandardHelpOptions = true)
 public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Command {

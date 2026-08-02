@@ -32,7 +32,6 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 
 
-///
 /// Tests for CalciteSqlParser.
 ///
 /// Important note about SQL string literal escaping:
@@ -46,7 +45,6 @@ import static org.testng.Assert.assertThrows;
 /// - After Calcite parsing: "test''value" (2 quotes)
 /// - With legacy enabled (additional '' -> '): "test'value" (WRONG - lost a quote)
 /// - Without legacy: "test''value" (CORRECT)
-///
 public class CalciteSqlParserTest {
   private static final String SINGLE_CHAR = "a";
   private static final String QUERY_TEMPLATE = "SELECT %s FROM %s";

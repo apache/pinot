@@ -24,9 +24,7 @@ import java.util.Map;
 import java.util.Set;
 
 
-/**
- * The {@code IntLookupTable} is a lookup table for int keys.
- */
+/// The `IntLookupTable` is a lookup table for int keys.
 @SuppressWarnings("unchecked")
 public class IntLookupTable extends PrimitiveLookupTable {
   private final Int2ObjectOpenHashMap<Object> _lookupTable = new Int2ObjectOpenHashMap<>(INITIAL_CAPACITY);

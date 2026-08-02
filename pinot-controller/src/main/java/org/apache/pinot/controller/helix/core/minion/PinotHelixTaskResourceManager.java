@@ -75,10 +75,8 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.spi.utils.CommonConstants.TABLE_NAME;
 
 
-/**
- * The class <code>PinotHelixTaskResourceManager</code> manages all the task resources in Pinot cluster.
- * In case you are wondering why methods that access taskDriver are synchronized, see comment in PR #1437
- */
+/// The class `PinotHelixTaskResourceManager` manages all the task resources in Pinot cluster.
+/// In case you are wondering why methods that access taskDriver are synchronized, see comment in PR #1437
 public class PinotHelixTaskResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixTaskResourceManager.class);
 
@@ -146,21 +144,17 @@ public class PinotHelixTaskResourceManager {
     return _queueCapacity;
   }
 
-  /**
-   * Updates the capacity used when creating <em>new</em> task queues. Existing Helix queues are intentionally
-   * not modified because calling {@code updateWorkflow} on a live queue could interfere with in-flight jobs.
-   * Count-based cleanup via {@link #trimTaskQueueIfNeeded} is the primary mechanism for bounding existing queues.
-   */
+  /// Updates the capacity used when creating _new_ task queues. Existing Helix queues are intentionally
+  /// not modified because calling `updateWorkflow` on a live queue could interfere with in-flight jobs.
+  /// Count-based cleanup via [#trimTaskQueueIfNeeded] is the primary mechanism for bounding existing queues.
   public void setQueueCapacity(int queueCapacity) {
     _queueCapacity = queueCapacity;
   }
 
-  /**
-   * Get all task types.
-   * @note: It reads all resource config back and check which are workflows and which are jobs, so it can take some time
-   * if there are a lot of tasks.
-   * @return Set of all task types
-   */
+  /// Get all task types.
+  /// @note: It reads all resource config back and check which are workflows and which are jobs, so it can take some
+  /// time if there are a lot of tasks.
+  /// @return Set of all task types
   public synchronized Set<String> getTaskTypes() {
     Set<String> helixJobQueues = _taskDriver.getWorkflows().keySet();
     Set<String> taskTypes = new HashSet<>(helixJobQueues.size());
@@ -170,14 +164,12 @@ public class PinotHelixTaskResourceManager {
     return taskTypes;
   }
 
-  /**
-   * Ensure the task queue for the given task type exists.
-   *
-   * @param taskType Task type
-   * @return the existing WorkflowConfig, or {@code null} if a new queue was just created
-   *         (callers should skip trimming on newly created queues since the WorkflowContext
-   *         may not yet be initialized by Helix's state machine)
-   */
+  /// Ensure the task queue for the given task type exists.
+  ///
+  /// @param taskType Task type
+  /// @return the existing WorkflowConfig, or `null` if a new queue was just created
+  ///         (callers should skip trimming on newly created queues since the WorkflowContext
+  ///         may not yet be initialized by Helix's state machine)
   public synchronized WorkflowConfig ensureTaskQueueExists(String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     WorkflowConfig workflowConfig = _taskDriver.getWorkflowConfig(helixJobQueueName);
@@ -194,32 +186,28 @@ public class PinotHelixTaskResourceManager {
     return workflowConfig;
   }
 
-  /**
-   * Clean up a task queue for the given task type.
-   *
-   * @param taskType Task type
-   */
+  /// Clean up a task queue for the given task type.
+  ///
+  /// @param taskType Task type
   public synchronized void cleanUpTaskQueue(String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     LOGGER.info("Cleaning up task queue: {} for task type: {}", helixJobQueueName, taskType);
     _taskDriver.cleanupQueue(helixJobQueueName);
   }
 
-  /**
-   * Trims terminal jobs from the task queue if the queue size exceeds the given limit.
-   * Deletes the oldest terminal jobs (COMPLETED, FAILED, TIMED_OUT, ABORTED) first, using a bounded max-heap
-   * ordered by Helix-recorded start times to avoid fragile job-name parsing.
-   *
-   * <p>NOTE: This is a best-effort operation. The {@code workflowConfig} is a point-in-time snapshot
-   * that may become stale if jobs are enqueued concurrently by other controllers or threads.
-   * The actual queue size after trimming is therefore approximate.
-   *
-   * @param taskType Task type
-   * @param workflowConfig The workflow config snapshot (from ensureTaskQueueExists)
-   * @param maxQueueSize Maximum allowed queue size. If &lt;= 0, trimming is disabled.
-   * @param maxDeletesPerCycle Maximum number of jobs to delete in a single cycle.
-   * @return Number of jobs deleted
-   */
+  /// Trims terminal jobs from the task queue if the queue size exceeds the given limit.
+  /// Deletes the oldest terminal jobs (COMPLETED, FAILED, TIMED_OUT, ABORTED) first, using a bounded max-heap
+  /// ordered by Helix-recorded start times to avoid fragile job-name parsing.
+  ///
+  /// NOTE: This is a best-effort operation. The `workflowConfig` is a point-in-time snapshot
+  /// that may become stale if jobs are enqueued concurrently by other controllers or threads.
+  /// The actual queue size after trimming is therefore approximate.
+  ///
+  /// @param taskType Task type
+  /// @param workflowConfig The workflow config snapshot (from ensureTaskQueueExists)
+  /// @param maxQueueSize Maximum allowed queue size. If &lt;= 0, trimming is disabled.
+  /// @param maxDeletesPerCycle Maximum number of jobs to delete in a single cycle.
+  /// @return Number of jobs deleted
   public synchronized int trimTaskQueueIfNeeded(String taskType, WorkflowConfig workflowConfig,
       int maxQueueSize, int maxDeletesPerCycle) {
     if (maxQueueSize <= 0 || maxDeletesPerCycle <= 0 || workflowConfig == null) {
@@ -292,38 +280,32 @@ public class PinotHelixTaskResourceManager {
     }
   }
 
-  /**
-   * Stop the task queue for the given task type.
-   *
-   * @param taskType Task type
-   */
+  /// Stop the task queue for the given task type.
+  ///
+  /// @param taskType Task type
   public synchronized void stopTaskQueue(String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     LOGGER.info("Stopping task queue: {} for task type: {}", helixJobQueueName, taskType);
     _taskDriver.stop(helixJobQueueName);
   }
 
-  /**
-   * Resume the task queue for the given task type.
-   *
-   * @param taskType Task type
-   */
+  /// Resume the task queue for the given task type.
+  ///
+  /// @param taskType Task type
   public synchronized void resumeTaskQueue(String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     LOGGER.info("Resuming task queue: {} for task type: {}", helixJobQueueName, taskType);
     _taskDriver.resume(helixJobQueueName);
   }
 
-  /**
-   * Delete the task queue for the given task type.
-   *
-   * @param taskType Task type
-   * @param forceDelete Expert only option to force deleting the task queue without going through the Helix transitions.
-   *                    CAUTION: if set true, workflow and all of its jobs' related ZNodes will be deleted immediately,
-   *                    no matter whether there are jobs running or not.
-   *                    Enabling this option can cause ZooKeeper delete failure as Helix might inadvertently try to
-   *                    write the deleted ZNodes back to ZooKeeper. Also this option might corrupt Task Framework cache.
-   */
+  /// Delete the task queue for the given task type.
+  ///
+  /// @param taskType Task type
+  /// @param forceDelete Expert only option to force deleting the task queue without going through the Helix
+  ///                    transitions. CAUTION: if set true, workflow and all of its jobs' related ZNodes will be deleted
+  ///                    immediately, no matter whether there are jobs running or not. Enabling this option can cause
+  ///                    ZooKeeper delete failure as Helix might inadvertently try to write the deleted ZNodes back to
+  ///                    ZooKeeper. Also this option might corrupt Task Framework cache.
   public synchronized void deleteTaskQueue(String taskType, boolean forceDelete) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     if (forceDelete) {
@@ -334,14 +316,12 @@ public class PinotHelixTaskResourceManager {
     _taskDriver.delete(helixJobQueueName, forceDelete);
   }
 
-  /**
-   * Delete a single task from the task queue. The task queue should be
-   * stopped before deleting the task, otherwise it fails with exception.
-   *
-   * @param taskName the task to delete from the queue.
-   * @param forceDelete as said in helix comment, if set true, all job's related zk nodes will
-   *                    be clean up from zookeeper even if its workflow information can not be found.
-   */
+  /// Delete a single task from the task queue. The task queue should be
+  /// stopped before deleting the task, otherwise it fails with exception.
+  ///
+  /// @param taskName the task to delete from the queue.
+  /// @param forceDelete as said in helix comment, if set true, all job's related zk nodes will
+  ///                    be clean up from zookeeper even if its workflow information can not be found.
   public synchronized void deleteTask(String taskName, boolean forceDelete) {
     String taskType = getTaskType(taskName);
     String helixJobQueueName = getHelixJobQueueName(taskType);
@@ -353,21 +333,17 @@ public class PinotHelixTaskResourceManager {
     _taskDriver.deleteJob(helixJobQueueName, taskName, forceDelete);
   }
 
-  /**
-   * Get all task queues.
-   *
-   * @return Set of task queue names
-   */
+  /// Get all task queues.
+  ///
+  /// @return Set of task queue names
   public synchronized Set<String> getTaskQueues() {
     return _taskDriver.getWorkflows().keySet();
   }
 
-  /**
-   * Get the task queue state for the given task type.
-   *
-   * @param taskType Task type
-   * @return Task queue state
-   */
+  /// Get the task queue state for the given task type.
+  ///
+  /// @param taskType Task type
+  /// @return Task queue state
   @Nullable
   public synchronized TaskState getTaskQueueState(String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
@@ -378,31 +354,27 @@ public class PinotHelixTaskResourceManager {
     return workflowContext != null ? workflowContext.getWorkflowState() : TaskState.NOT_STARTED;
   }
 
-  /**
-   * Submit a list of child tasks with same task type to the Minion instances with the default tag.
-   *
-   * @param pinotTaskConfigs List of child task configs to be submitted
-   * @param taskTimeoutMs Timeout in milliseconds for each task
-   * @param numConcurrentTasksPerInstance Maximum number of concurrent tasks allowed per instance
-   * @param maxAttemptsPerTask Maximum number of attempts per task
-   * @return Name of the submitted parent task
-   */
+  /// Submit a list of child tasks with same task type to the Minion instances with the default tag.
+  ///
+  /// @param pinotTaskConfigs List of child task configs to be submitted
+  /// @param taskTimeoutMs Timeout in milliseconds for each task
+  /// @param numConcurrentTasksPerInstance Maximum number of concurrent tasks allowed per instance
+  /// @param maxAttemptsPerTask Maximum number of attempts per task
+  /// @return Name of the submitted parent task
   public synchronized String submitTask(List<PinotTaskConfig> pinotTaskConfigs, long taskTimeoutMs,
       int numConcurrentTasksPerInstance, int maxAttemptsPerTask) {
     return submitTask(pinotTaskConfigs, Helix.UNTAGGED_MINION_INSTANCE, taskTimeoutMs, numConcurrentTasksPerInstance,
         maxAttemptsPerTask);
   }
 
-  /**
-   * Submit a list of child tasks with same task type to the Minion instances with the given tag.
-   *
-   * @param pinotTaskConfigs List of child task configs to be submitted
-   * @param minionInstanceTag Tag of the Minion instances to submit the task to
-   * @param taskTimeoutMs Timeout in milliseconds for each task
-   * @param numConcurrentTasksPerInstance Maximum number of concurrent tasks allowed per instance
-   * @param maxAttemptsPerTask Maximum number of attempts per task
-   * @return Name of the submitted parent task
-   */
+  /// Submit a list of child tasks with same task type to the Minion instances with the given tag.
+  ///
+  /// @param pinotTaskConfigs List of child task configs to be submitted
+  /// @param minionInstanceTag Tag of the Minion instances to submit the task to
+  /// @param taskTimeoutMs Timeout in milliseconds for each task
+  /// @param numConcurrentTasksPerInstance Maximum number of concurrent tasks allowed per instance
+  /// @param maxAttemptsPerTask Maximum number of attempts per task
+  /// @return Name of the submitted parent task
   public synchronized String submitTask(List<PinotTaskConfig> pinotTaskConfigs, String minionInstanceTag,
       long taskTimeoutMs, int numConcurrentTasksPerInstance, int maxAttemptsPerTask) {
     int numChildTasks = pinotTaskConfigs.size();
@@ -423,17 +395,15 @@ public class PinotHelixTaskResourceManager {
         maxAttemptsPerTask);
   }
 
-  /**
-   * Submit a list of child tasks with same task type to the Minion instances with the given tag.
-   *
-   * @param parentTaskName Parent task name to be submitted
-   * @param pinotTaskConfigs List of child task configs to be submitted
-   * @param minionInstanceTag Tag of the Minion instances to submit the task to
-   * @param taskTimeoutMs Timeout in milliseconds for each task
-   * @param numConcurrentTasksPerInstance Maximum number of concurrent tasks allowed per instance
-   * @param maxAttemptsPerTask Maximum number of attempts per task
-   * @return Name of the submitted parent task
-   */
+  /// Submit a list of child tasks with same task type to the Minion instances with the given tag.
+  ///
+  /// @param parentTaskName Parent task name to be submitted
+  /// @param pinotTaskConfigs List of child task configs to be submitted
+  /// @param minionInstanceTag Tag of the Minion instances to submit the task to
+  /// @param taskTimeoutMs Timeout in milliseconds for each task
+  /// @param numConcurrentTasksPerInstance Maximum number of concurrent tasks allowed per instance
+  /// @param maxAttemptsPerTask Maximum number of attempts per task
+  /// @return Name of the submitted parent task
   public synchronized String submitTask(String parentTaskName, List<PinotTaskConfig> pinotTaskConfigs,
       String minionInstanceTag, long taskTimeoutMs, int numConcurrentTasksPerInstance, int maxAttemptsPerTask) {
     int numChildTasks = pinotTaskConfigs.size();
@@ -465,12 +435,10 @@ public class PinotHelixTaskResourceManager {
     return parentTaskName;
   }
 
-  /**
-   * Get all tasks for the given task type.
-   *
-   * @param taskType Task type
-   * @return Set of task names. Null for invalid task type.
-   */
+  /// Get all tasks for the given task type.
+  ///
+  /// @param taskType Task type
+  /// @return Set of task names. Null for invalid task type.
   @Nullable
   public synchronized Set<String> getTasks(String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
@@ -486,13 +454,11 @@ public class PinotHelixTaskResourceManager {
     return tasks;
   }
 
-  /**
-   * Get all task states for the given task type.
-   * NOTE: For tasks just submitted without the context created, count them as NOT_STARTED.
-   *
-   * @param taskType Task type
-   * @return Map from task name to task state
-   */
+  /// Get all task states for the given task type.
+  /// NOTE: For tasks just submitted without the context created, count them as NOT_STARTED.
+  ///
+  /// @param taskType Task type
+  /// @return Map from task name to task state
   public synchronized Map<String, TaskState> getTaskStates(String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     WorkflowConfig workflowConfig = _taskDriver.getWorkflowConfig(helixJobQueueName);
@@ -513,12 +479,10 @@ public class PinotHelixTaskResourceManager {
     }
   }
 
-  /**
-   * This method returns a count of sub-tasks in various states, given the top-level task name.
-   *
-   * @param taskName in the form "Task_<taskType>_<uuid>_<timestamp>"
-   * @return TaskCount object
-   */
+  /// This method returns a count of sub-tasks in various states, given the top-level task name.
+  ///
+  /// @param taskName in the form "Task\_<taskType>\_<uuid>\_<timestamp>"
+  /// @return TaskCount object
   public synchronized TaskCount getTaskCount(String taskName) {
     String helixJobName = getHelixJobName(taskName);
     JobConfig jobConfig = _taskDriver.getJobConfig(helixJobName);
@@ -545,13 +509,11 @@ public class PinotHelixTaskResourceManager {
     return taskCount;
   }
 
-  /**
-   * This method returns a map of table name to count of sub-tasks in various states, given the top-level task name.
-   * It also collects waiting times for subtasks with null state and running times for subtasks in RUNNING state.
-   *
-   * @param taskName in the form "Task_<taskType>_<uuid>_<timestamp>"
-   * @return a map of table name to {@link TaskStatusSummary}
-   */
+  /// This method returns a map of table name to count of sub-tasks in various states, given the top-level task name.
+  /// It also collects waiting times for subtasks with null state and running times for subtasks in RUNNING state.
+  ///
+  /// @param taskName in the form "Task\_<taskType>\_<uuid>\_<timestamp>"
+  /// @return a map of table name to [TaskStatusSummary]
   public synchronized Map<String, TaskStatusSummary> getTableTaskStatusSummary(String taskName) {
     String helixJobName = getHelixJobName(taskName);
     JobConfig jobConfig = _taskDriver.getJobConfig(helixJobName);
@@ -603,28 +565,25 @@ public class PinotHelixTaskResourceManager {
     return taskStatusSummaryMap;
   }
 
-  /**
-   * Returns a set of Task names (in the form "Task_<taskType>_<uuid>_<timestamp>") that are in progress or not started
-   * yet.
-   * NOTE: For tasks just submitted without the context created, count them as NOT_STARTED.
-   *
-   * @param taskType Task type
-   * @return Set of task names
-   */
+  /// Returns a set of Task names (in the form "Task\_<taskType>\_<uuid>\_<timestamp>") that are in progress or not
+  /// started
+  /// yet.
+  /// NOTE: For tasks just submitted without the context created, count them as NOT_STARTED.
+  ///
+  /// @param taskType Task type
+  /// @return Set of task names
   public synchronized Set<String> getTasksInProgress(String taskType) {
     return getTasksByStatus(taskType, 0).getInProgressTasks();
   }
 
-  /**
-   * Returns tasks organized by status (in-progress and recent).
-   * NOTE: For tasks just submitted without the context created, count them as NOT_STARTED.
-   * This method combines in-progress tasks and recent tasks in a single Helix call to avoid duplicate calls.
-   *
-   * @param taskType Task type
-   * @param afterTimestampMs If > 0, also include tasks that started after this timestamp (in milliseconds).
-   *                         This is used to detect short-lived tasks that started and completed between cycles.
-   * @return TasksByStatus containing in-progress tasks and recent tasks that started after the timestamp
-   */
+  /// Returns tasks organized by status (in-progress and recent).
+  /// NOTE: For tasks just submitted without the context created, count them as NOT_STARTED.
+  /// This method combines in-progress tasks and recent tasks in a single Helix call to avoid duplicate calls.
+  ///
+  /// @param taskType Task type
+  /// @param afterTimestampMs If > 0, also include tasks that started after this timestamp (in milliseconds).
+  ///                         This is used to detect short-lived tasks that started and completed between cycles.
+  /// @return TasksByStatus containing in-progress tasks and recent tasks that started after the timestamp
   public synchronized TasksByStatus getTasksByStatus(String taskType, long afterTimestampMs) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     WorkflowConfig workflowConfig = _taskDriver.getWorkflowConfig(helixJobQueueName);
@@ -676,13 +635,11 @@ public class PinotHelixTaskResourceManager {
     return result;
   }
 
-  /**
-   * Get the task state for the given task name.
-   * NOTE: For tasks just submitted without the context created, count them as NOT_STARTED.
-   *
-   * @param taskName Task name
-   * @return Task state
-   */
+  /// Get the task state for the given task name.
+  /// NOTE: For tasks just submitted without the context created, count them as NOT_STARTED.
+  ///
+  /// @param taskName Task name
+  /// @return Task state
   @Nullable
   public synchronized TaskState getTaskState(String taskName) {
     String helixJobName = getHelixJobName(taskName);
@@ -701,12 +658,10 @@ public class PinotHelixTaskResourceManager {
     return TaskState.NOT_STARTED;
   }
 
-  /**
-   * Get states of all the sub tasks for a given task.
-   *
-   * @param taskName the task whose sub tasks to check
-   * @return states of all the sub tasks
-   */
+  /// Get states of all the sub tasks for a given task.
+  ///
+  /// @param taskName the task whose sub tasks to check
+  /// @return states of all the sub tasks
   public synchronized Map<String, TaskPartitionState> getSubtaskStates(String taskName) {
     String helixJobName = getHelixJobName(taskName);
     JobConfig jobConfig = _taskDriver.getJobConfig(helixJobName);
@@ -732,12 +687,10 @@ public class PinotHelixTaskResourceManager {
     return subtaskStates;
   }
 
-  /**
-   * Get the child task configs for the given task name.
-   *
-   * @param taskName Task name
-   * @return List of child task configs
-   */
+  /// Get the child task configs for the given task name.
+  ///
+  /// @param taskName Task name
+  /// @return List of child task configs
   public synchronized List<PinotTaskConfig> getSubtaskConfigs(String taskName) {
     JobConfig jobConfig = _taskDriver.getJobConfig(getHelixJobName(taskName));
     if (jobConfig == null) {
@@ -751,13 +704,11 @@ public class PinotHelixTaskResourceManager {
     return taskConfigs;
   }
 
-  /**
-   * Get the task runtime config for the given task name. A task can have multiple subtasks, whose configs can be
-   * retrieved via the getSubtaskConfigs() method instead.
-   *
-   * @param taskName Task name
-   * @return Configs for the task returned as a Map.
-   */
+  /// Get the task runtime config for the given task name. A task can have multiple subtasks, whose configs can be
+  /// retrieved via the getSubtaskConfigs() method instead.
+  ///
+  /// @param taskName Task name
+  /// @return Configs for the task returned as a Map.
   public synchronized Map<String, String> getTaskRuntimeConfig(String taskName) {
     JobConfig jobConfig = _taskDriver.getJobConfig(getHelixJobName(taskName));
     Preconditions.checkArgument(jobConfig != null, "Task: %s does not exist", taskName);
@@ -769,13 +720,11 @@ public class PinotHelixTaskResourceManager {
     return configs;
   }
 
-  /**
-   * Get configs of the specified sub task for a given task.
-   *
-   * @param taskName the task whose sub tasks to check
-   * @param subtaskNames the sub tasks to check
-   * @return the configs of the sub tasks
-   */
+  /// Get configs of the specified sub task for a given task.
+  ///
+  /// @param taskName the task whose sub tasks to check
+  /// @param subtaskNames the sub tasks to check
+  /// @return the configs of the sub tasks
   public synchronized Map<String, PinotTaskConfig> getSubtaskConfigs(String taskName, @Nullable String subtaskNames) {
     JobConfig jobConfig = _taskDriver.getJobConfig(getHelixJobName(taskName));
     if (jobConfig == null) {
@@ -893,16 +842,14 @@ public class PinotHelixTaskResourceManager {
     return subtaskProgressMap;
   }
 
-  /**
-   * Gets progress of all subtasks with specified state tracked by given minion workers in memory
-   * @param subtaskState a specified subtask state, valid values are in org.apache.pinot.minion.event.MinionTaskState
-   * @param executor an {@link Executor} used to run logic on
-   * @param connMgr a {@link HttpClientConnectionManager} used to manage http connections
-   * @param selectedMinionWorkerEndpoints a map of worker id to http endpoint for minions to get subtask progress from
-   * @param requestHeaders http headers used to send requests to minion workers
-   * @param timeoutMs timeout (in millisecond) for requests sent to minion workers
-   * @return a map of minion worker id to subtask progress
-   */
+  /// Gets progress of all subtasks with specified state tracked by given minion workers in memory
+  /// @param subtaskState a specified subtask state, valid values are in org.apache.pinot.minion.event.MinionTaskState
+  /// @param executor an [Executor] used to run logic on
+  /// @param connMgr a [HttpClientConnectionManager] used to manage http connections
+  /// @param selectedMinionWorkerEndpoints a map of worker id to http endpoint for minions to get subtask progress from
+  /// @param requestHeaders http headers used to send requests to minion workers
+  /// @param timeoutMs timeout (in millisecond) for requests sent to minion workers
+  /// @return a map of minion worker id to subtask progress
   public synchronized Map<String, Object> getSubtaskOnWorkerProgress(String subtaskState, Executor executor,
       HttpClientConnectionManager connMgr, Map<String, String> selectedMinionWorkerEndpoints,
       Map<String, String> requestHeaders, int timeoutMs)
@@ -944,14 +891,12 @@ public class PinotHelixTaskResourceManager {
     return minionWorkerIdSubtaskProgressMap;
   }
 
-  /**
-   * Helper method to return a map of task names to corresponding task state
-   * where the task corresponds to the given Pinot table name. This is used to
-   * check status of all tasks for a given table.
-   * @param taskType Pinot taskType / Helix JobQueue
-   * @param tableNameWithType table name with type to filter on
-   * @return Map of filtered task name to corresponding state
-   */
+  /// Helper method to return a map of task names to corresponding task state
+  /// where the task corresponds to the given Pinot table name. This is used to
+  /// check status of all tasks for a given table.
+  /// @param taskType Pinot taskType / Helix JobQueue
+  /// @param tableNameWithType table name with type to filter on
+  /// @return Map of filtered task name to corresponding state
   public synchronized Map<String, TaskState> getTaskStatesByTable(String taskType, String tableNameWithType) {
     Map<String, TaskState> filteredTaskStateMap = new HashMap<>();
     Map<String, TaskState> taskStateMap = getTaskStates(taskType);
@@ -973,12 +918,10 @@ public class PinotHelixTaskResourceManager {
     return filteredTaskStateMap;
   }
 
-  /**
-   * Fetch count of sub-tasks for each of the tasks for the given taskType.
-   *
-   * @param taskType      Pinot taskType / Helix JobQueue
-   * @return Map of Pinot Task Name to TaskCount
-   */
+  /// Fetch count of sub-tasks for each of the tasks for the given taskType.
+  ///
+  /// @param taskType      Pinot taskType / Helix JobQueue
+  /// @return Map of Pinot Task Name to TaskCount
   public synchronized Map<String, TaskCount> getTaskCounts(String taskType) {
     Set<String> tasks = getTasks(taskType);
     if (tasks == null) {
@@ -991,30 +934,26 @@ public class PinotHelixTaskResourceManager {
     return taskCounts;
   }
 
-  /**
-   * Fetch count of sub-tasks for each of the tasks for the given taskType, filtered by state.
-   *
-   * @param taskType      Pinot taskType / Helix JobQueue
-   * @param state         State(s) to filter by. Can be single state or comma-separated multiple states
-   *                      (waiting, running, error, completed, dropped, timedOut, aborted, unknown, total)
-   * @return Map of Pinot Task Name to TaskCount containing only tasks that have > 0 count for any of the
-   *         specified states
-   */
+  /// Fetch count of sub-tasks for each of the tasks for the given taskType, filtered by state.
+  ///
+  /// @param taskType      Pinot taskType / Helix JobQueue
+  /// @param state         State(s) to filter by. Can be single state or comma-separated multiple states
+  ///                      (waiting, running, error, completed, dropped, timedOut, aborted, unknown, total)
+  /// @return Map of Pinot Task Name to TaskCount containing only tasks that have > 0 count for any of the
+  ///         specified states
   public synchronized Map<String, TaskCount> getTaskCounts(String taskType, String state) {
     return getTaskCounts(taskType, state, null);
   }
 
-  /**
-   * Fetch count of sub-tasks for each of the tasks for the given taskType, filtered by state and/or table.
-   *
-   * @param taskType           Pinot taskType / Helix JobQueue
-   * @param state              State(s) to filter by. Can be single state or comma-separated multiple states
-   *                           (NOT_STARTED, IN_PROGRESS, STOPPED, STOPPING, FAILED, COMPLETED, ABORTED, TIMED_OUT,
-   *                           TIMING_OUT, FAILING). Can be null to skip state filtering.
-   * @param tableNameWithType  Table name with type to filter by. Only tasks that have subtasks for this table
-   *                           will be returned. Can be null to skip table filtering.
-   * @return Map of Pinot Task Name to TaskCount containing only tasks that match the specified filters
-   */
+  /// Fetch count of sub-tasks for each of the tasks for the given taskType, filtered by state and/or table.
+  ///
+  /// @param taskType           Pinot taskType / Helix JobQueue
+  /// @param state              State(s) to filter by. Can be single state or comma-separated multiple states
+  ///                           (NOT_STARTED, IN_PROGRESS, STOPPED, STOPPING, FAILED, COMPLETED, ABORTED, TIMED_OUT,
+  ///                           TIMING_OUT, FAILING). Can be null to skip state filtering.
+  /// @param tableNameWithType  Table name with type to filter by. Only tasks that have subtasks for this table
+  ///                           will be returned. Can be null to skip table filtering.
+  /// @return Map of Pinot Task Name to TaskCount containing only tasks that match the specified filters
   public synchronized Map<String, TaskCount> getTaskCounts(String taskType, @Nullable String state,
       @Nullable String tableNameWithType) {
     Set<String> tasks = getTasks(taskType);
@@ -1063,13 +1002,11 @@ public class PinotHelixTaskResourceManager {
     return taskCounts;
   }
 
-  /**
-   * Validates and parses a task state string into TaskState enum.
-   *
-   * @param state State string to validate (should be uppercase)
-   * @throws IllegalArgumentException if the state is invalid
-   * @return TaskState enum value
-   */
+  /// Validates and parses a task state string into TaskState enum.
+  ///
+  /// @param state State string to validate (should be uppercase)
+  /// @throws IllegalArgumentException if the state is invalid
+  /// @return TaskState enum value
   private TaskState validateAndParseTaskState(String state) {
     try {
       return TaskState.valueOf(state);
@@ -1079,13 +1016,11 @@ public class PinotHelixTaskResourceManager {
     }
   }
 
-  /**
-   * Helper method to check if a task has any subtasks for the specified table.
-   *
-   * @param taskName          Task name to check
-   * @param tableNameWithType Table name with type to check for
-   * @return true if the task has subtasks for the specified table
-   */
+  /// Helper method to check if a task has any subtasks for the specified table.
+  ///
+  /// @param taskName          Task name to check
+  /// @param tableNameWithType Table name with type to check for
+  /// @return true if the task has subtasks for the specified table
   private boolean hasTasksForTable(String taskName, String tableNameWithType) {
     try {
       // Get all subtask configs for this task
@@ -1106,13 +1041,11 @@ public class PinotHelixTaskResourceManager {
     }
   }
 
-  /**
-   * Get the server tenant name for a given table by looking up its configuration.
-   * Returns "unknown" if the table or tenant cannot be determined.
-   *
-   * @param tableName Table name with type (e.g., "myTable_OFFLINE")
-   * @return Server tenant name or "unknown"
-   */
+  /// Get the server tenant name for a given table by looking up its configuration.
+  /// Returns "unknown" if the table or tenant cannot be determined.
+  ///
+  /// @param tableName Table name with type (e.g., "myTable_OFFLINE")
+  /// @return Server tenant name or "unknown"
   private String getTenantForTable(String tableName) {
     if (tableName == null || UNKNOWN_TABLE_NAME.equals(tableName)) {
       return UNKNOWN_TENANT_NAME;
@@ -1131,15 +1064,13 @@ public class PinotHelixTaskResourceManager {
     }
   }
 
-  /**
-   * Get a summary of all tasks across all task types, grouped by tenant.
-   *
-   * <p>Only includes tasks with RUNNING or WAITING subtasks. Completed, failed, or aborted tasks are excluded.
-   * Tasks are first resolved to their table, then grouped by the table's server tenant.
-   *
-   * @param tenantFilter Optional tenant name to filter results. If null, returns all tenants.
-   * @return TaskSummaryResponse containing aggregated task counts grouped by tenant
-   */
+  /// Get a summary of all tasks across all task types, grouped by tenant.
+  ///
+  /// Only includes tasks with RUNNING or WAITING subtasks. Completed, failed, or aborted tasks are excluded.
+  /// Tasks are first resolved to their table, then grouped by the table's server tenant.
+  ///
+  /// @param tenantFilter Optional tenant name to filter results. If null, returns all tenants.
+  /// @return TaskSummaryResponse containing aggregated task counts grouped by tenant
   public synchronized TaskSummaryResponse getTasksSummary(@Nullable String tenantFilter) {
     TaskSummaryResponse response = new TaskSummaryResponse();
     Set<String> taskTypes = getTaskTypes();
@@ -1242,15 +1173,13 @@ public class PinotHelixTaskResourceManager {
     return response;
   }
 
-  /**
-   * Given a taskType, helper method to debug all the HelixJobs for the taskType.
-   * For each of the HelixJobs, collects status of the (sub)tasks in the taskbatch.
-   *
-   * @param taskType      Pinot taskType / Helix JobQueue
-   * @param verbosity     By default, does not show details for completed tasks.
-   *                      If verbosity > 0, shows details for all tasks.
-   * @return Map of Pinot Task Name to TaskDebugInfo. TaskDebugInfo contains details for subtasks.
-   */
+  /// Given a taskType, helper method to debug all the HelixJobs for the taskType.
+  /// For each of the HelixJobs, collects status of the (sub)tasks in the taskbatch.
+  ///
+  /// @param taskType      Pinot taskType / Helix JobQueue
+  /// @param verbosity     By default, does not show details for completed tasks.
+  ///                      If verbosity > 0, shows details for all tasks.
+  /// @return Map of Pinot Task Name to TaskDebugInfo. TaskDebugInfo contains details for subtasks.
   public synchronized Map<String, TaskDebugInfo> getTasksDebugInfo(String taskType, int verbosity) {
     Map<String, TaskDebugInfo> taskDebugInfos = new TreeMap<>();
     WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
@@ -1265,17 +1194,15 @@ public class PinotHelixTaskResourceManager {
     return taskDebugInfos;
   }
 
-  /**
-   * Given a taskType and a tableNameWithType, helper method to debug all the HelixJobs for
-   * the taskType and tableNameWithType. For each of the HelixJobs, collects status of
-   * the (sub)tasks in the taskbatch.
-   *
-   * @param taskType Pinot taskType / Helix JobQueue
-   * @param tableNameWithType Table name with type to filter on
-   * @param verbosity By default, does not show details for completed tasks.
-   *                  If verbosity > 0, shows details for all tasks.
-   * @return Map of Pinot Task Name to TaskDebugInfo. TaskDebugInfo contains details for subtasks.
-   */
+  /// Given a taskType and a tableNameWithType, helper method to debug all the HelixJobs for
+  /// the taskType and tableNameWithType. For each of the HelixJobs, collects status of
+  /// the (sub)tasks in the taskbatch.
+  ///
+  /// @param taskType Pinot taskType / Helix JobQueue
+  /// @param tableNameWithType Table name with type to filter on
+  /// @param verbosity By default, does not show details for completed tasks.
+  ///                  If verbosity > 0, shows details for all tasks.
+  /// @return Map of Pinot Task Name to TaskDebugInfo. TaskDebugInfo contains details for subtasks.
   public synchronized Map<String, TaskDebugInfo> getTasksDebugInfoByTable(String taskType, String tableNameWithType,
       int verbosity) {
     Map<String, TaskDebugInfo> taskDebugInfos = new TreeMap<>();
@@ -1307,27 +1234,23 @@ public class PinotHelixTaskResourceManager {
     return taskDebugInfos;
   }
 
-  /**
-   * Given a taskName, collects status of the (sub)tasks in the taskName.
-   *
-   * @param taskName      Pinot taskName
-   * @param verbosity     By default, does not show details for completed tasks.
-   *                      If verbosity > 0, shows details for all tasks.
-   * @return TaskDebugInfo contains details for subtasks in this task batch.
-   */
+  /// Given a taskName, collects status of the (sub)tasks in the taskName.
+  ///
+  /// @param taskName      Pinot taskName
+  /// @param verbosity     By default, does not show details for completed tasks.
+  ///                      If verbosity > 0, shows details for all tasks.
+  /// @return TaskDebugInfo contains details for subtasks in this task batch.
   public synchronized TaskDebugInfo getTaskDebugInfo(String taskName, int verbosity) {
     return getTaskDebugInfo(taskName, null, verbosity);
   }
 
-  /**
-   * Given a taskName and table name collects status of the (sub)tasks in the taskName for the table.
-   *
-   * @param taskName          Pinot taskName
-   * @param tableNameWithType table name for which subtask status to fetch
-   * @param verbosity         By default, does not show details for completed tasks.
-   *                          If verbosity > 0, shows details for all tasks.
-   * @return TaskDebugInfo contains details for subtasks in this task batch.
-   */
+  /// Given a taskName and table name collects status of the (sub)tasks in the taskName for the table.
+  ///
+  /// @param taskName          Pinot taskName
+  /// @param tableNameWithType table name for which subtask status to fetch
+  /// @param verbosity         By default, does not show details for completed tasks.
+  ///                          If verbosity > 0, shows details for all tasks.
+  /// @return TaskDebugInfo contains details for subtasks in this task batch.
   public synchronized TaskDebugInfo getTaskDebugInfo(String taskName, @Nullable String tableNameWithType,
       int verbosity) {
     String taskType = getTaskType(taskName);
@@ -1406,48 +1329,46 @@ public class PinotHelixTaskResourceManager {
     return taskDebugInfo;
   }
 
-  /**
-   * Helper method to convert task type to Helix JobQueue name.
-   * <p>E.g. DummyTask -> TaskQueue_DummyTask
-   *
-   * @param taskType Task type
-   * @return Helix JobQueue name
-   */
+  /// Helper method to convert task type to Helix JobQueue name.
+  ///
+  /// E.g. DummyTask -> TaskQueue_DummyTask
+  ///
+  /// @param taskType Task type
+  /// @return Helix JobQueue name
   public static String getHelixJobQueueName(String taskType) {
     return TASK_QUEUE_PREFIX + taskType;
   }
 
-  /**
-   * Helper method to convert Pinot task name to Helix Job name with JobQueue prefix.
-   * <p>E.g. Task_DummyTask_12345 -> TaskQueue_DummyTask_Task_DummyTask_12345
-   *
-   * @param pinotTaskName Pinot task name
-   * @return helixJobName Helix Job name
-   */
+  /// Helper method to convert Pinot task name to Helix Job name with JobQueue prefix.
+  ///
+  /// E.g. Task_DummyTask_12345 -> TaskQueue_DummyTask_Task_DummyTask_12345
+  ///
+  /// @param pinotTaskName Pinot task name
+  /// @return helixJobName Helix Job name
   public static String getHelixJobName(String pinotTaskName) {
     return getHelixJobQueueName(getTaskType(pinotTaskName)) + TASK_NAME_SEPARATOR + pinotTaskName;
   }
 
-  /**
-   * Helper method to convert Helix Job name with JobQueue prefix to Pinot task name.
-   * <p>E.g. TaskQueue_DummyTask_Task_DummyTask_12345 -> Task_DummyTask_12345
-   *
-   * @param helixJobName Helix Job name
-   * @return Pinot task name
-   */
+  /// Helper method to convert Helix Job name with JobQueue prefix to Pinot task name.
+  ///
+  /// E.g. TaskQueue_DummyTask_Task_DummyTask_12345 -> Task_DummyTask_12345
+  ///
+  /// @param helixJobName Helix Job name
+  /// @return Pinot task name
   public static String getPinotTaskName(String helixJobName) {
     return helixJobName.substring(TASK_QUEUE_PREFIX.length() + getTaskType(helixJobName).length() + 1);
   }
 
-  /**
-   * Helper method to extract task type from Pinot task name, Helix JobQueue name or Helix Job name.
-   * <p>E.g. Task_DummyTask_12345 -> DummyTask (from Pinot task name)
-   * <p>E.g. TaskQueue_DummyTask -> DummyTask (from Helix JobQueue name)
-   * <p>E.g. TaskQueue_DummyTask_Task_DummyTask_12345 -> DummyTask (from Helix Job name)
-   *
-   * @param name Pinot task name, Helix JobQueue name, or Helix Job name
-   * @return Task type
-   */
+  /// Helper method to extract task type from Pinot task name, Helix JobQueue name or Helix Job name.
+  ///
+  /// E.g. Task_DummyTask_12345 -> DummyTask (from Pinot task name)
+  ///
+  /// E.g. TaskQueue_DummyTask -> DummyTask (from Helix JobQueue name)
+  ///
+  /// E.g. TaskQueue_DummyTask_Task_DummyTask_12345 -> DummyTask (from Helix Job name)
+  ///
+  /// @param name Pinot task name, Helix JobQueue name, or Helix Job name
+  /// @return Task type
   public static String getTaskType(String name) {
     String[] parts = name.split(TASK_NAME_SEPARATOR);
     if (parts.length < 2) {
@@ -1476,23 +1397,19 @@ public class PinotHelixTaskResourceManager {
     MinionTaskMetadataUtils.deleteTaskMetadata(propertyStore, taskType, tableNameWithType);
   }
 
-  /**
-   * Gets the last update time (in ms) of all minion task metadata.
-   * @return a map storing the last update time (in ms) of all minion task metadata: (tableNameWithType -> taskType
-   *         -> last update time in ms)
-   */
+  /// Gets the last update time (in ms) of all minion task metadata.
+  /// @return a map storing the last update time (in ms) of all minion task metadata: (tableNameWithType -> taskType
+  ///         -> last update time in ms)
   public Map<String, Map<String, Long>> getTaskMetadataLastUpdateTimeMs() {
     ZkHelixPropertyStore<ZNRecord> propertyStore = _helixResourceManager.getPropertyStore();
     return MinionTaskMetadataUtils.getAllTaskMetadataLastUpdateTimeMs(propertyStore);
   }
 
-  /**
-   * Gets the status of all minion instances, including their task counts and drain state.
-   *
-   * @param statusFilter Optional filter by status ("ONLINE", "OFFLINE", or "DRAINED"). If null, returns all minions.
-   * @param includeTaskCounts Whether to include running task counts For each minion. Default false.
-   * @return MinionStatusResponse containing status information for minion instances
-   */
+  /// Gets the status of all minion instances, including their task counts and drain state.
+  ///
+  /// @param statusFilter Optional filter by status ("ONLINE", "OFFLINE", or "DRAINED"). If null, returns all minions.
+  /// @param includeTaskCounts Whether to include running task counts For each minion. Default false.
+  /// @return MinionStatusResponse containing status information for minion instances
   public MinionStatusResponse getMinionStatus(String statusFilter, boolean includeTaskCounts) {
     // Validate status filter
     if (statusFilter != null && !statusFilter.isEmpty()) {
@@ -1563,13 +1480,11 @@ public class PinotHelixTaskResourceManager {
     return new MinionStatusResponse(minionStatusList.size(), minionStatusList);
   }
 
-  /**
-   * Gets the count of running tasks for each minion instance.
-   * This method iterates through all task workflows and jobs to count tasks in RUNNING state
-   * assigned to each minion.
-   *
-   * @return Map of minion instance ID to running task count
-   */
+  /// Gets the count of running tasks for each minion instance.
+  /// This method iterates through all task workflows and jobs to count tasks in RUNNING state
+  /// assigned to each minion.
+  ///
+  /// @return Map of minion instance ID to running task count
   public synchronized Map<String, Integer> getRunningTaskCountsPerMinion() {
     Map<String, Integer> runningTaskCounts = new HashMap<>();
 
@@ -1771,10 +1686,8 @@ public class PinotHelixTaskResourceManager {
     }
   }
 
-  /**
-   * Result class that organizes tasks by status.
-   * Holds sets of tasks directly, making it extensible for future use cases.
-   */
+  /// Result class that organizes tasks by status.
+  /// Holds sets of tasks directly, making it extensible for future use cases.
   public static class TasksByStatus {
     private Set<String> _inProgressTasks = Set.of();
     private Set<String> _recentTasks = Set.of(); // Tasks that started after timestamp (any state)
@@ -1926,23 +1839,20 @@ public class PinotHelixTaskResourceManager {
     }
   }
 
-  /**
-   * Response model for the {@code GET /tasks/summary} endpoint.
-   *
-   * <p>Provides summary information about tasks currently managed by the Pinot cluster, grouped by tenant.
-   * Only tasks with RUNNING or WAITING subtasks are included; completed, failed, or aborted tasks are excluded.
-   *
-   * <p>Fields:
-   * <ul>
-   *   <li>{@code totalRunningTasks}: Total tasks in RUNNING or INIT state across all tenants</li>
-   *   <li>{@code totalWaitingTasks}: Total tasks in WAITING state (not yet assigned to a worker)</li>
-   *   <li>{@code taskBreakdown}: Task counts grouped by tenant and task type. Tasks with unknown tenant
-   *       configuration appear under tenant name "unknown"</li>
-   * </ul>
-   *
-   * @see TenantTaskBreakdown
-   * @see TaskTypeBreakdown
-   */
+  /// Response model for the `GET /tasks/summary` endpoint.
+  ///
+  /// Provides summary information about tasks currently managed by the Pinot cluster, grouped by tenant.
+  /// Only tasks with RUNNING or WAITING subtasks are included; completed, failed, or aborted tasks are excluded.
+  ///
+  /// Fields:
+  ///
+  /// - `totalRunningTasks`: Total tasks in RUNNING or INIT state across all tenants
+  /// - `totalWaitingTasks`: Total tasks in WAITING state (not yet assigned to a worker)
+  /// - `taskBreakdown`: Task counts grouped by tenant and task type. Tasks with unknown tenant
+  ///      configuration appear under tenant name "unknown"
+  ///
+  /// @see TenantTaskBreakdown
+  /// @see TaskTypeBreakdown
   @JsonPropertyOrder({"totalRunningTasks", "totalWaitingTasks", "taskBreakdown"})
   public static class TaskSummaryResponse {
     private int _totalRunningTasks;
@@ -1980,20 +1890,17 @@ public class PinotHelixTaskResourceManager {
     }
   }
 
-  /**
-   * Tenant-level breakdown of task counts for the {@code /tasks/summary} API response.
-   *
-   * <p>Fields:
-   * <ul>
-   *   <li>{@code tenant}: Server tenant name from table configuration (or "unknown" if not configured)</li>
-   *   <li>{@code runningTasks}: Total tasks in RUNNING or INIT state for this tenant</li>
-   *   <li>{@code waitingTasks}: Total tasks waiting to be assigned for this tenant</li>
-   *   <li>{@code taskTypeBreakdown}: Running/waiting counts per task type for this tenant</li>
-   * </ul>
-   *
-   * @see TaskSummaryResponse
-   * @see TaskTypeBreakdown
-   */
+  /// Tenant-level breakdown of task counts for the `/tasks/summary` API response.
+  ///
+  /// Fields:
+  ///
+  /// - `tenant`: Server tenant name from table configuration (or "unknown" if not configured)
+  /// - `runningTasks`: Total tasks in RUNNING or INIT state for this tenant
+  /// - `waitingTasks`: Total tasks waiting to be assigned for this tenant
+  /// - `taskTypeBreakdown`: Running/waiting counts per task type for this tenant
+  ///
+  /// @see TaskSummaryResponse
+  /// @see TaskTypeBreakdown
   @JsonPropertyOrder({"tenant", "runningTasks", "waitingTasks", "taskTypeBreakdown"})
   public static class TenantTaskBreakdown {
     private String _tenant;
@@ -2046,19 +1953,16 @@ public class PinotHelixTaskResourceManager {
     }
   }
 
-  /**
-   * Task type breakdown of task counts for the {@code /tasks/summary} API response.
-   *
-   * <p>Fields:
-   * <ul>
-   *   <li>{@code taskType}: Task type name (e.g., "SegmentGenerationAndPushTask", "MergeRollupTask")</li>
-   *   <li>{@code runningCount}: Tasks in RUNNING state</li>
-   *   <li>{@code waitingCount}: Tasks waiting to be scheduled</li>
-   * </ul>
-   *
-   * @see TaskSummaryResponse
-   * @see TenantTaskBreakdown
-   */
+  /// Task type breakdown of task counts for the `/tasks/summary` API response.
+  ///
+  /// Fields:
+  ///
+  /// - `taskType`: Task type name (e.g., "SegmentGenerationAndPushTask", "MergeRollupTask")
+  /// - `runningCount`: Tasks in RUNNING state
+  /// - `waitingCount`: Tasks waiting to be scheduled
+  ///
+  /// @see TaskSummaryResponse
+  /// @see TenantTaskBreakdown
   @JsonPropertyOrder({"taskType", "runningCount", "waitingCount"})
   public static class TaskTypeBreakdown {
     private String _taskType;

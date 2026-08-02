@@ -29,22 +29,19 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 
 
-/**
- * The <code>JsonExtractKeyTransformFunction</code> class implements the json path key transformation based on
- * <a href="https://goessner.net/articles/JsonPath/">Stefan Goessner JsonPath implementation.</a>.
- *
- * Please note, currently this method only works with String field. The values in this field should be Json String.
- *
- * Usage:
- * jsonExtractKey(jsonFieldName, 'jsonPath')
- * jsonExtractKey(jsonFieldName, 'jsonPath', 'optionalParameters')
- * <code>jsonFieldName</code> is the JSON String field/expression.
- * <code>jsonPath</code> is a JsonPath expression which used to read from JSON document
- * <code>optionalParameters</code> is extra optional parameters for this function, e.g. 'maxDepth=1;dotNotation=true'
- * <code>maxDepth</code> is an optional integer specifying the maximum depth to recurse
- * <code>dotNotation</code> is an optional boolean specifying output format (true=dot notation, false=JsonPath format)
- *
- */
+/// The `JsonExtractKeyTransformFunction` class implements the json path key transformation based on
+/// [Stefan Goessner JsonPath implementation.](https://goessner.net/articles/JsonPath/).
+///
+/// Please note, currently this method only works with String field. The values in this field should be Json String.
+///
+/// Usage:
+/// jsonExtractKey(jsonFieldName, 'jsonPath')
+/// jsonExtractKey(jsonFieldName, 'jsonPath', 'optionalParameters')
+/// `jsonFieldName` is the JSON String field/expression.
+/// `jsonPath` is a JsonPath expression which used to read from JSON document
+/// `optionalParameters` is extra optional parameters for this function, e.g. 'maxDepth=1;dotNotation=true'
+/// `maxDepth` is an optional integer specifying the maximum depth to recurse
+/// `dotNotation` is an optional boolean specifying output format (true=dot notation, false=JsonPath format)
 public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "jsonExtractKey";
 

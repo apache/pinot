@@ -57,7 +57,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-/// Test for {@link StreamingGroupByCombineOperator}.
+/// Test for [StreamingGroupByCombineOperator].
 public class StreamingGroupByCombineOperatorTest {
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), "StreamingGroupByCombineOperatorTest");

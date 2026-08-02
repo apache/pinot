@@ -39,16 +39,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * An Executor that queues tasks when the heap usage is critical instead of rejecting them.
- * Heap Usage level is obtained from {@link ThreadAccountant#throttleQuerySubmission()}.
- *
- * Features:
- * - Tasks are queued when heap usage is critical
- * - Queued tasks are processed when heap usage drops below critical level
- * - Configurable queue size and timeout (global default or per-task)
- * - Background monitoring of heap usage to process queued tasks
- */
+/// An Executor that queues tasks when the heap usage is critical instead of rejecting them.
+/// Heap Usage level is obtained from [ThreadAccountant#throttleQuerySubmission()].
+///
+/// Features:
+/// - Tasks are queued when heap usage is critical
+/// - Queued tasks are processed when heap usage drops below critical level
+/// - Configurable queue size and timeout (global default or per-task)
+/// - Background monitoring of heap usage to process queued tasks
 public class ThrottleOnCriticalHeapUsageExecutor extends DecoratorExecutorService {
   private static final Logger LOGGER = LoggerFactory.getLogger(ThrottleOnCriticalHeapUsageExecutor.class);
 
@@ -93,10 +91,8 @@ public class ThrottleOnCriticalHeapUsageExecutor extends DecoratorExecutorServic
         monitorIntervalMs);
   }
 
-  /**
-   * Check if a task should be queued due to critical heap usage
-   * @return true if the task should be queued, false if it can be executed immediately
-   */
+  /// Check if a task should be queued due to critical heap usage
+  /// @return true if the task should be queued, false if it can be executed immediately
   protected boolean shouldQueueTask() {
     QueryThreadContext ctx = QueryThreadContext.getIfAvailable();
     if (ctx == null) {
@@ -106,9 +102,7 @@ public class ThrottleOnCriticalHeapUsageExecutor extends DecoratorExecutorServic
     return ctx.getAccountant().throttleQuerySubmission();
   }
 
-  /**
-   * Process queued tasks when heap usage is below critical level
-   */
+  /// Process queued tasks when heap usage is below critical level
   private void processQueuedTasks() {
     if (_isShutdown.get()) {
       return;
@@ -236,9 +230,7 @@ public class ThrottleOnCriticalHeapUsageExecutor extends DecoratorExecutorServic
     return configuredTimeoutMs;
   }
 
-  /**
-   * Queue a callable task and wait for its execution
-   */
+  /// Queue a callable task and wait for its execution
   private <T> T queueCallableTask(Callable<T> task, long timeoutMs)
       throws Exception {
     QueuedCallableTask<T> queuedTask = new QueuedCallableTask<>(task, timeoutMs);
@@ -256,9 +248,7 @@ public class ThrottleOnCriticalHeapUsageExecutor extends DecoratorExecutorServic
     return queuedTask.get(timeoutMs, TimeUnit.MILLISECONDS);
   }
 
-  /**
-   * Queue a runnable task and wait for its execution
-   */
+  /// Queue a runnable task and wait for its execution
   private void queueRunnableTask(Runnable task, long timeoutMs) {
     QueuedRunnableTask queuedTask = new QueuedRunnableTask(task, timeoutMs);
 
@@ -283,9 +273,7 @@ public class ThrottleOnCriticalHeapUsageExecutor extends DecoratorExecutorServic
     }
   }
 
-  /**
-   * Enqueue a runnable task without waiting for its completion. Used when queuing at submission time.
-   */
+  /// Enqueue a runnable task without waiting for its completion. Used when queuing at submission time.
   private void enqueueRunnableTask(Runnable task, long timeoutMs) {
     QueuedRunnableTask queuedTask = new QueuedRunnableTask(task, timeoutMs);
 
@@ -334,30 +322,24 @@ public class ThrottleOnCriticalHeapUsageExecutor extends DecoratorExecutorServic
     return _taskQueue.size();
   }
 
-  /**
-   * Base class for queued tasks.
-   *
-   * <p>The {@code QueuedTask} class represents a task that can be queued for execution when the system is under
-   * critical heap usage. It provides a common interface for handling task execution, timeouts, and failures.</p>
-   *
-   * <p>Lifecycle:
-   * <ul>
-   *   <li>Tasks are created and added to the queue when heap usage is critical.</li>
-   *   <li>When heap usage drops below the critical level, tasks are dequeued and executed.</li>
-   *   <li>If a task remains in the queue beyond a configured timeout, the {@code timeout()} method is invoked.</li>
-   *   <li>If an exception occurs during execution, the {@code fail(Exception e)} method is invoked.</li>
-   * </ul>
-   * </p>
-   *
-   * <p>Thread-safety:
-   * <ul>
-   *   <li>Instances of {@code QueuedTask} are not inherently thread-safe and should be accessed in a thread-safe
-   *       manner by the enclosing executor.</li>
-   *   <li>The enclosing {@code ThrottleOnCriticalHeapUsageExecutor} ensures proper synchronization when accessing
-   *       and modifying the queue.</li>
-   * </ul>
-   * </p>
-   */
+  /// Base class for queued tasks.
+  ///
+  /// The `QueuedTask` class represents a task that can be queued for execution when the system is under
+  /// critical heap usage. It provides a common interface for handling task execution, timeouts, and failures.
+  ///
+  /// Lifecycle:
+  ///
+  /// - Tasks are created and added to the queue when heap usage is critical.
+  /// - When heap usage drops below the critical level, tasks are dequeued and executed.
+  /// - If a task remains in the queue beyond a configured timeout, the `timeout()` method is invoked.
+  /// - If an exception occurs during execution, the `fail(Exception e)` method is invoked.
+  ///
+  /// Thread-safety:
+  ///
+  /// - Instances of `QueuedTask` are not inherently thread-safe and should be accessed in a thread-safe
+  ///      manner by the enclosing executor.
+  /// - The enclosing `ThrottleOnCriticalHeapUsageExecutor` ensures proper synchronization when accessing
+  ///      and modifying the queue.
   private abstract static class QueuedTask<T> {
     private final long _queueTime;
     private final long _timeoutMs;
@@ -382,7 +364,7 @@ public class ThrottleOnCriticalHeapUsageExecutor extends DecoratorExecutorServic
       return _timeoutMs;
     }
 
-    /** Returns true if the originating context is still throttling submissions. */
+    /// Returns true if the originating context is still throttling submissions.
     public boolean isThrottled() {
       return _accountant != null && _accountant.throttleQuerySubmission();
     }
@@ -449,9 +431,7 @@ public class ThrottleOnCriticalHeapUsageExecutor extends DecoratorExecutorServic
     }
   }
 
-  /**
-   * Wrapper for callable tasks that can be queued
-   */
+  /// Wrapper for callable tasks that can be queued
   private static class QueuedCallableTask<T> extends QueuedTask<T> {
     private final Callable<T> _task;
 
@@ -471,9 +451,7 @@ public class ThrottleOnCriticalHeapUsageExecutor extends DecoratorExecutorServic
     }
   }
 
-  /**
-   * Wrapper for runnable tasks that can be queued
-   */
+  /// Wrapper for runnable tasks that can be queued
   private static class QueuedRunnableTask extends QueuedTask<Void> {
     private final Runnable _task;
 
@@ -493,7 +471,7 @@ public class ThrottleOnCriticalHeapUsageExecutor extends DecoratorExecutorServic
     }
   }
 
-  /** Marker wrapper for tasks dispatched from the internal queue to avoid re-decoration. */
+  /// Marker wrapper for tasks dispatched from the internal queue to avoid re-decoration.
   private static final class FromQueueRunnable implements Runnable {
     private final Runnable _delegate;
 
@@ -511,10 +489,8 @@ public class ThrottleOnCriticalHeapUsageExecutor extends DecoratorExecutorServic
     }
   }
 
-  /**
-   * Factory to conditionally wrap an executor with queue-based throttling based on config.
-   * Also handles config parsing and logging as requested in review.
-   */
+  /// Factory to conditionally wrap an executor with queue-based throttling based on config.
+  /// Also handles config parsing and logging as requested in review.
   public static ExecutorService maybeWrap(ExecutorService base, PinotConfiguration serverConf, String logContext) {
     boolean enabled = serverConf.getProperty(
         CommonConstants.Server.CONFIG_OF_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_HEAP_USAGE,

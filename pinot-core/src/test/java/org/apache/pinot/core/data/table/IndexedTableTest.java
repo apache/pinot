@@ -50,9 +50,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests the {@link Table} operations
- */
+/// Tests the [Table] operations
 @SuppressWarnings({"rawtypes"})
 public class IndexedTableTest {
   private static final int TRIM_SIZE = 10;

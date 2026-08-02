@@ -22,10 +22,8 @@ import java.io.IOException;
 import java.io.Writer;
 
 
-/**
- * Simple non-synchronized writer implementation using a StringBuilder
- * and skipping char buffer to reduce overhead
- */
+/// Simple non-synchronized writer implementation using a StringBuilder
+/// and skipping char buffer to reduce overhead
 public class StringBuilderWriter extends Writer {
 
   private final StringBuilder _buffer = new StringBuilder();

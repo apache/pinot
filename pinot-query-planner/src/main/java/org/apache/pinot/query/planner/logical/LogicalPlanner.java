@@ -27,9 +27,7 @@ import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgram;
 
 
-/**
- * The {@code LogicalPlanner} is an extended implementation of the Calcite's {@link HepPlanner}.
- */
+/// The `LogicalPlanner` is an extended implementation of the Calcite's [HepPlanner].
 public class LogicalPlanner extends HepPlanner {
 
   private List<RelTraitDef> _traitDefs;

@@ -34,8 +34,8 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
-/// End-to-end coverage of {@link JSONMessageDecoder} decoding each configured / auto-detected payload format
-/// through the shared {@link JSONRecordExtractor} into a {@link GenericRow}.
+/// End-to-end coverage of [JSONMessageDecoder] decoding each configured / auto-detected payload format
+/// through the shared [JSONRecordExtractor] into a [GenericRow].
 public class JSONMessageDecoderBinaryTest {
 
   private static final Set<String> RICH_FIELDS = Set.of("name", "count", "ratio");

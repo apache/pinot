@@ -39,9 +39,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.trace.Tracing;
 
 
-/**
- * Class for evaluating transform expressions.
- */
+/// Class for evaluating transform expressions.
 public class TransformOperator extends BaseProjectOperator<TransformBlock> {
   private static final String EXPLAIN_NAME = "TRANSFORM";
 

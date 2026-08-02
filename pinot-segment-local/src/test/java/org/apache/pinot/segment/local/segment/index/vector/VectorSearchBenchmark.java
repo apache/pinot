@@ -33,21 +33,18 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Manual benchmark for vector search operations across different backends and configurations.
- * All test methods are disabled by default so they do not run in CI. Enable individually
- * when running locally for performance evaluation.
- *
- * <p>This is a comparative micro-benchmark that measures:</p>
- * <ul>
- *   <li>IVF_FLAT search latency with different nprobe values</li>
- *   <li>SQ8 vs SQ4 vs FLAT quantizer encode/decode/distance performance</li>
- *   <li>Pre-filter vs post-filter ANN with different selectivities</li>
- *   <li>Recall quality across configurations</li>
- * </ul>
- *
- * <p>Run with: {@code mvn test -pl pinot-segment-local -Dtest=VectorSearchBenchmark -Dcheckstyle.skip}</p>
- */
+/// Manual benchmark for vector search operations across different backends and configurations.
+/// All test methods are disabled by default so they do not run in CI. Enable individually
+/// when running locally for performance evaluation.
+///
+/// This is a comparative micro-benchmark that measures:
+///
+/// - IVF_FLAT search latency with different nprobe values
+/// - SQ8 vs SQ4 vs FLAT quantizer encode/decode/distance performance
+/// - Pre-filter vs post-filter ANN with different selectivities
+/// - Recall quality across configurations
+///
+/// Run with: `mvn test -pl pinot-segment-local -Dtest=VectorSearchBenchmark -Dcheckstyle.skip`
 public class VectorSearchBenchmark {
 
   private static final int DIMENSION = 128;

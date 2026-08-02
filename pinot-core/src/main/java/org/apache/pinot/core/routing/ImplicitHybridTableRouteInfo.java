@@ -172,19 +172,15 @@ public class ImplicitHybridTableRouteInfo implements TableRouteInfo {
     _realtimeRoutingTable = realtimeRoutingTable;
   }
 
-  /**
-   * Offline if offline table config is present.
-   * @return true if there is an OFFLINE table, false otherwise
-   */
+  /// Offline if offline table config is present.
+  /// @return true if there is an OFFLINE table, false otherwise
   @Override
   public boolean hasOffline() {
     return _offlineTableConfig != null;
   }
 
-  /**
-   * Realtime if realtime table config is present.
-   * @return true if there is a REALTIME table, false otherwise
-   */
+  /// Realtime if realtime table config is present.
+  /// @return true if there is a REALTIME table, false otherwise
   @Override
   public boolean hasRealtime() {
     return _realtimeTableConfig != null;

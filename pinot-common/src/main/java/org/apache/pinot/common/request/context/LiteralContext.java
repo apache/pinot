@@ -33,28 +33,31 @@ import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/**
- * The {@code LiteralContext} class represents a literal in the query.
- * <p>This includes both value and type information. We translate thrift literal to this representation in server.
- */
+/// The {@code LiteralContext} class represents a literal in the query.
+///
+/// This includes both value and type information. We translate thrift literal to this representation in server.
 public class LiteralContext {
   // TODO: Support all of the types for sql.
   private final DataType _type;
   private final Object _value;
 
-  /**
-   * This is used for type conversion, and is not included in {@link #equals} and {@link #hashCode}.
-   */
+  /// This is used for type conversion, and is not included in {@link #equals} and {@link #hashCode}.
   private final PinotDataType _pinotDataType;
 
-  private Boolean _booleanValue;
-  private Integer _intValue;
-  private Long _longValue;
-  private Float _floatValue;
-  private Double _doubleValue;
-  private BigDecimal _bigDecimalValue;
-  private String _stringValue;
-  private byte[] _bytesValue;
+  /// Lazily converted caches of the value, one per stored type.
+  ///
+  /// `volatile` is required, not just for the null checks in the getters: a literal belongs to the query's expression
+  /// tree, which is built once per query and then read concurrently by the threads that build and run the per-segment
+  /// plans. Without it the values are published unsafely, and a racing thread can read a non-null reference whose
+  /// contents are not yet visible to it.
+  private volatile Boolean _booleanValue;
+  private volatile Integer _intValue;
+  private volatile Long _longValue;
+  private volatile Float _floatValue;
+  private volatile Double _doubleValue;
+  private volatile BigDecimal _bigDecimalValue;
+  private volatile String _stringValue;
+  private volatile byte[] _bytesValue;
 
   public LiteralContext(Literal literal) {
     switch (literal.getSetField()) {

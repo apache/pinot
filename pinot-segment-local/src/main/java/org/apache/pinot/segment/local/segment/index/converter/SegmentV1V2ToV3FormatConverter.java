@@ -49,9 +49,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * {@inheritDoc}
- */
+/// {@inheritDoc}
 public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentV1V2ToV3FormatConverter.class);
   private static final String V3_TEMP_DIR_SUFFIX = ".v3.tmp";

@@ -329,10 +329,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     resetBrokerTags();
   }
 
-  /**
-   * Verifies that when a new broker is added with the same tenant as a logical table,
-   * the broker resource ideal state is updated for the logical table partition (Issue #15751).
-   */
+  /// Verifies that when a new broker is added with the same tenant as a logical table,
+  /// the broker resource ideal state is updated for the logical table partition (Issue #15751).
   @Test
   public void testUpdateBrokerResourceWithLogicalTable()
       throws Exception {
@@ -1087,11 +1085,9 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     }
   }
 
-  /**
-   * Tests the code path where a subset of merged segments (from the original segmentsTo list)
-   * is passed to the endReplace API.
-   * @throws Exception
-   */
+  /// Tests the code path where a subset of merged segments (from the original segmentsTo list)
+  /// is passed to the endReplace API.
+  /// @throws Exception
   @Test
   public void testSegmentReplacementWithCustomToSegments()
       throws Exception {
@@ -1777,13 +1773,11 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     deleteSchema(rawTableName);
   }
 
-  /**
-   * Happy-path coverage for {@link PinotHelixResourceManager#multiWriteZK()}: pre-creates two
-   * segment ZK metadata znodes, atomically updates both via a single multi() transaction, then
-   * reads back through the property store and asserts the mutated fields round-tripped. Verifies
-   * the dedicated multi-write ZkClient is built correctly and the ZNRecord serialization /
-   * deserialization path matches what the rest of the controller uses.
-   */
+  /// Happy-path coverage for [PinotHelixResourceManager#multiWriteZK()]: pre-creates two
+  /// segment ZK metadata znodes, atomically updates both via a single multi() transaction, then
+  /// reads back through the property store and asserts the mutated fields round-tripped. Verifies
+  /// the dedicated multi-write ZkClient is built correctly and the ZNRecord serialization /
+  /// deserialization path matches what the rest of the controller uses.
   @Test
   public void testMultiWriteZkSegmentMetadataUpdates()
       throws Exception {

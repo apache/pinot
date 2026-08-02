@@ -21,12 +21,11 @@ package org.apache.pinot.common.function.scalar;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.concurrent.ThreadLocalRandom;
+import org.apache.pinot.spi.annotations.FunctionVolatility;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-/**
- * Arithmetic scalar functions.
- */
+/// Arithmetic scalar functions.
 public class ArithmeticFunctions {
   private static final double DOUBLE_UNIT = 0x1.0p-53;
 
@@ -155,7 +154,7 @@ public class ArithmeticFunctions {
     return Math.signum(a) * Math.floor(Math.abs(a));
   }
 
-  @ScalarFunction(isDeterministic = false)
+  @ScalarFunction(isDeterministic = false, volatility = FunctionVolatility.VOLATILE)
   public static double rand() {
     return ThreadLocalRandom.current().nextDouble();
   }
@@ -212,49 +211,49 @@ public class ArithmeticFunctions {
     return Long.reverseBytes(a);
   }
 
-  /** Returns the cube root of the given value. */
+  /// Returns the cube root of the given value.
   @ScalarFunction
   public static double cbrt(double a) {
     return Math.cbrt(a);
   }
 
-  /** Returns 2 raised to the power of the given value. */
+  /// Returns 2 raised to the power of the given value.
   @ScalarFunction
   public static double exp2(double a) {
     return Math.pow(2, a);
   }
 
-  /** Returns 10 raised to the power of the given value. */
+  /// Returns 10 raised to the power of the given value.
   @ScalarFunction
   public static double exp10(double a) {
     return Math.pow(10, a);
   }
 
-  /** Returns log(1 + x), computed in a way that is accurate even when x is close to zero. */
+  /// Returns log(1 + x), computed in a way that is accurate even when x is close to zero.
   @ScalarFunction
   public static double log1p(double a) {
     return Math.log1p(a);
   }
 
-  /** Returns the sigmoid (logistic) function: 1 / (1 + e^(-x)). */
+  /// Returns the sigmoid (logistic) function: 1 / (1 + e^(-x)).
   @ScalarFunction
   public static double sigmoid(double a) {
     return 1.0 / (1.0 + Math.exp(-a));
   }
 
-  /** Returns the mathematical constant pi (π). */
+  /// Returns the mathematical constant pi (π).
   @ScalarFunction
   public static double pi() {
     return Math.PI;
   }
 
-  /** Returns Euler's number (e), the base of the natural logarithm. */
+  /// Returns Euler's number (e), the base of the natural logarithm.
   @ScalarFunction(names = {"e", "euler"})
   public static double e() {
     return Math.E;
   }
 
-  /** Returns the number of set bits (popcount) in the binary representation of the given long value. */
+  /// Returns the number of set bits (popcount) in the binary representation of the given long value.
   @ScalarFunction
   public static int bitCount(long a) {
     return Long.bitCount(a);
@@ -270,13 +269,11 @@ public class ArithmeticFunctions {
     }
   }
 
-  /**
-   * Returns the factorial of the given non-negative integer.
-   *
-   * @param n non-negative integer (0 to 20)
-   * @return n! as a long
-   * @throws IllegalArgumentException if n is negative or greater than 20
-   */
+  /// Returns the factorial of the given non-negative integer.
+  ///
+  /// @param n non-negative integer (0 to 20)
+  /// @return n! as a long
+  /// @throws IllegalArgumentException if n is negative or greater than 20
   @ScalarFunction
   public static long factorial(long n) {
     if (n < 0 || n > 20) {
@@ -285,19 +282,17 @@ public class ArithmeticFunctions {
     return FACTORIALS[(int) n];
   }
 
-  /**
-   * Returns the bucket number for a value in a histogram with the given bounds and number of buckets.
-   *
-   * <p>SQL standard semantics: returns 0 if value < lo, numBuckets + 1 if value >= hi,
-   * otherwise a bucket in the range [1, numBuckets].
-   *
-   * @param value the value to bucket
-   * @param lo lower bound of the histogram (inclusive)
-   * @param hi upper bound of the histogram (exclusive)
-   * @param numBuckets number of equal-width buckets
-   * @return bucket number (0 to numBuckets + 1)
-   * @throws IllegalArgumentException if lo >= hi or numBuckets <= 0
-   */
+  /// Returns the bucket number for a value in a histogram with the given bounds and number of buckets.
+  ///
+  /// SQL standard semantics: returns 0 if value < lo, numBuckets + 1 if value >= hi,
+  /// otherwise a bucket in the range \[1, numBuckets\].
+  ///
+  /// @param value the value to bucket
+  /// @param lo lower bound of the histogram (inclusive)
+  /// @param hi upper bound of the histogram (exclusive)
+  /// @param numBuckets number of equal-width buckets
+  /// @return bucket number (0 to numBuckets + 1)
+  /// @throws IllegalArgumentException if lo >= hi or numBuckets <= 0
   @ScalarFunction(names = {"widthBucket", "width_bucket"})
   public static int widthBucket(double value, double lo, double hi, int numBuckets) {
     if (Double.isNaN(value) || Double.isNaN(lo) || Double.isNaN(hi)) {

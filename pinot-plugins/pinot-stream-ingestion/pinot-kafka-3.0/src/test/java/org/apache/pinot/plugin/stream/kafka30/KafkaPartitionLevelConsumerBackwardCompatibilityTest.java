@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.plugin.stream.kafka30;
 
-/**
- * Tests for the KafkaPartitionLevelConsumer with old kafka consumer factory name.
- */
+/// Tests for the KafkaPartitionLevelConsumer with old kafka consumer factory name.
 public class KafkaPartitionLevelConsumerBackwardCompatibilityTest extends KafkaPartitionLevelConsumerTest {
 
   @Override

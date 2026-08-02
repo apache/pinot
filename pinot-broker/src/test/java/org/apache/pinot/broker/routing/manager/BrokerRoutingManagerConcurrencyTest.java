@@ -67,12 +67,10 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/**
- * Test class to validate concurrency and race condition handling in BrokerRoutingManager,
- * specifically focusing on TimeBoundaryManager coordination for hybrid tables.
- *
- * This test uses a real ZooKeeper instance and PropertyStore for end-to-end validation.
- */
+/// Test class to validate concurrency and race condition handling in BrokerRoutingManager,
+/// specifically focusing on TimeBoundaryManager coordination for hybrid tables.
+///
+/// This test uses a real ZooKeeper instance and PropertyStore for end-to-end validation.
 public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
   private static final String RAW_TABLE_NAME = "testHybridTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
@@ -313,17 +311,15 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentMetadata);
   }
 
-  /**
-   * Test that validates concurrent buildRouting operations for REALTIME and OFFLINE tables
-   * of the same hybrid table don't result in missing TimeBoundaryManager due to race conditions.
-   *
-   * This test uses real ZooKeeper and PropertyStore to validate the new locking mechanism.
-   *
-   * The test ensures:
-   * 1. Both tables can be built concurrently without corruption
-   * 2. TimeBoundaryManager is properly set on the offline table when realtime is built
-   * 3. No race conditions occur that would leave the offline table without a TimeBoundaryManager
-   */
+  /// Test that validates concurrent buildRouting operations for REALTIME and OFFLINE tables
+  /// of the same hybrid table don't result in missing TimeBoundaryManager due to race conditions.
+  ///
+  /// This test uses real ZooKeeper and PropertyStore to validate the new locking mechanism.
+  ///
+  /// The test ensures:
+  /// 1. Both tables can be built concurrently without corruption
+  /// 2. TimeBoundaryManager is properly set on the offline table when realtime is built
+  /// 3. No race conditions occur that would leave the offline table without a TimeBoundaryManager
   @Test
   public void testConcurrentHybridTableBuildNoTimeBoundaryManagerRace() throws Exception {
     // Clean any existing routing entries to ensure test isolation
@@ -397,9 +393,7 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     }
   }
 
-  /**
-   * Test that validates sequential table building works correctly and establishes TimeBoundaryManager.
-   */
+  /// Test that validates sequential table building works correctly and establishes TimeBoundaryManager.
   @Test
   public void testSequentialHybridTableBuildTimeBoundaryManagerCreation() {
     // Clean any existing routing entries to ensure test isolation
@@ -457,11 +451,9 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     Assert.assertEquals(startTimes.get(tableNameWithType).longValue(), futureStart);
   }
 
-  /**
-   * Test concurrent interactions between processSegmentAssignmentChange and buildRouting.
-   * This validates that the global read lock (for processSegmentAssignmentChange) and
-   * per-table locks (for buildRouting) work correctly together without deadlocks.
-   */
+  /// Test concurrent interactions between processSegmentAssignmentChange and buildRouting.
+  /// This validates that the global read lock (for processSegmentAssignmentChange) and
+  /// per-table locks (for buildRouting) work correctly together without deadlocks.
   @Test
   public void testConcurrentProcessSegmentAssignmentChangeAndBuildRouting() throws Exception {
     clearRoutingEntries();
@@ -559,13 +551,11 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     }
   }
 
-  /**
-   * Test concurrent interactions between processInstanceConfigChange and buildRouting where buildRouting adds a new
-   * table.
-   * This validates that the global write lock (for processInstanceConfigChange) and
-   * per-table locks (for buildRouting) work correctly together, especially when buildRouting creates new routing
-   * entries.
-   */
+  /// Test concurrent interactions between processInstanceConfigChange and buildRouting where buildRouting adds a new
+  /// table.
+  /// This validates that the global write lock (for processInstanceConfigChange) and
+  /// per-table locks (for buildRouting) work correctly together, especially when buildRouting creates new routing
+  /// entries.
   @Test
   public void testConcurrentProcessInstanceConfigChangeAndBuildRoutingNewTable() throws Exception {
     clearRoutingEntries();
@@ -744,11 +734,9 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     }
   }
 
-  /**
-   * Test concurrent interactions between excludeServerFromRouting (global write lock) and buildRouting
-   * (global read lock + per-table lock).
-   * This validates that global write lock properly blocks global read lock operations.
-   */
+  /// Test concurrent interactions between excludeServerFromRouting (global write lock) and buildRouting
+  /// (global read lock + per-table lock).
+  /// This validates that global write lock properly blocks global read lock operations.
   @Test
   public void testConcurrentExcludeServerAndBuildRouting() throws Exception {
     clearRoutingEntries();
@@ -856,11 +844,9 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     }
   }
 
-  /**
-   * Test concurrent interactions between includeServerToRouting (global write lock) and refreshSegment
-   * (global read lock + per-table lock).
-   * This validates proper coordination between global write operations and segment refresh operations.
-   */
+  /// Test concurrent interactions between includeServerToRouting (global write lock) and refreshSegment
+  /// (global read lock + per-table lock).
+  /// This validates proper coordination between global write operations and segment refresh operations.
   @Test
   public void testConcurrentIncludeServerAndRefreshSegment() throws Exception {
     clearRoutingEntries();
@@ -952,11 +938,9 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     }
   }
 
-  /**
-   * Test concurrent query operations (getRoutingTable, getTimeBoundaryInfo, getQueryTimeoutMs) during routing
-   * modifications. This validates that query path operations can execute concurrently and are not blocked by
-   * routing modifications.
-   */
+  /// Test concurrent query operations (getRoutingTable, getTimeBoundaryInfo, getQueryTimeoutMs) during routing
+  /// modifications. This validates that query path operations can execute concurrently and are not blocked by
+  /// routing modifications.
   @Test
   public void testConcurrentQueryOperationsDuringRoutingModifications() throws Exception {
     clearRoutingEntries();
@@ -1119,11 +1103,9 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     }
   }
 
-  /**
-   * Test concurrent interactions between two global write lock methods: processInstanceConfigChange and
-   * includeServerToRouting. This validates that global write lock methods are properly serialized and don't
-   * cause deadlocks or race conditions.
-   */
+  /// Test concurrent interactions between two global write lock methods: processInstanceConfigChange and
+  /// includeServerToRouting. This validates that global write lock methods are properly serialized and don't
+  /// cause deadlocks or race conditions.
   @Test
   public void testConcurrentGlobalWriteLockMethods() throws Exception {
     clearRoutingEntries();
@@ -1253,11 +1235,9 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     }
   }
 
-  /**
-   * Test concurrent interactions between buildRoutingForLogicalTable and buildRouting.
-   * This validates proper coordination between logical table operations, regular table operations,
-   * and global write operations. Uses a hybrid logical table configuration with both offline and realtime tables.
-   */
+  /// Test concurrent interactions between buildRoutingForLogicalTable and buildRouting.
+  /// This validates proper coordination between logical table operations, regular table operations,
+  /// and global write operations. Uses a hybrid logical table configuration with both offline and realtime tables.
   @Test
   public void testConcurrentLogicalTableBuildAndRegularBuild() throws Exception {
     clearRoutingEntries();
@@ -1431,11 +1411,9 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     }
   }
 
-  /**
-   * Test concurrent interactions between buildRoutingForLogicalTable and buildRouting.
-   * This validates proper coordination between logical table operations, regular table operations,
-   * and global write operations. Uses a hybrid logical table configuration with both offline and realtime tables.
-   */
+  /// Test concurrent interactions between buildRoutingForLogicalTable and buildRouting.
+  /// This validates proper coordination between logical table operations, regular table operations,
+  /// and global write operations. Uses a hybrid logical table configuration with both offline and realtime tables.
   @Test
   public void testConcurrentLogicalTableBuildAndRegularBuildAndRealtimeBuild() throws Exception {
     clearRoutingEntries();
@@ -1627,10 +1605,8 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     }
   }
 
-  /**
-   * Test concurrent interactions with logical table containing multiple physical tables.
-   * This validates coordination when logical table operations affect multiple per-table locks.
-   */
+  /// Test concurrent interactions with logical table containing multiple physical tables.
+  /// This validates coordination when logical table operations affect multiple per-table locks.
   @Test
   public void testConcurrentMultiPhysicalTableLogicalOperations() throws Exception {
     clearRoutingEntries();
@@ -1791,10 +1767,8 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     }
   }
 
-  /**
-   * Test concurrent interactions with logical table containing multiple physical tables.
-   * This validates coordination when logical table operations affect multiple per-table locks.
-   */
+  /// Test concurrent interactions with logical table containing multiple physical tables.
+  /// This validates coordination when logical table operations affect multiple per-table locks.
   @Test
   public void testConcurrentMultiPhysicalTableLogicalOperationsWithRealtimeBuild() throws Exception {
     clearRoutingEntries();

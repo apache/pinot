@@ -53,11 +53,9 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import picocli.CommandLine;
 
 
-/**
- * Class to perform benchmark on lookups for dictionary encoded fwd index v.s. raw index without dictionary.
- * It can take an existing segment with two columns to compare. It can also create a segment on the fly with a
- * given input file containing strings (one string per line).
- */
+/// Class to perform benchmark on lookups for dictionary encoded fwd index v.s. raw index without dictionary.
+/// It can take an existing segment with two columns to compare. It can also create a segment on the fly with a
+/// given input file containing strings (one string per line).
 @SuppressWarnings({"FieldCanBeLocal", "unused"})
 @CommandLine.Command
 public class RawIndexBenchmark {
@@ -121,12 +119,10 @@ public class RawIndexBenchmark {
     segment.destroy();
   }
 
-  /**
-   * Helper method that builds a segment containing two columns both with data from input file.
-   * The first column has raw indices (no dictionary), where as the second column is dictionary encoded.
-   *
-   * @throws Exception
-   */
+  /// Helper method that builds a segment containing two columns both with data from input file.
+  /// The first column has raw indices (no dictionary), where as the second column is dictionary encoded.
+  ///
+  /// @throws Exception
   private File buildSegment()
       throws Exception {
     Schema schema = new Schema();
@@ -171,11 +167,9 @@ public class RawIndexBenchmark {
     return new File(SEGMENT_DIR_NAME, SEGMENT_NAME);
   }
 
-  /**
-   * Compares and prints the index size for the raw and dictionary encoded columns.
-   *
-   * @param segment Segment to compare
-   */
+  /// Compares and prints the index size for the raw and dictionary encoded columns.
+  ///
+  /// @param segment Segment to compare
   private void compareIndexSizes(IndexSegment segment, File segmentDir, String fwdIndexColumn, String rawIndexColumn) {
     String filePrefix = segmentDir.getAbsolutePath() + File.separator;
     File rawIndexFile = new File(filePrefix + rawIndexColumn + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
@@ -195,12 +189,10 @@ public class RawIndexBenchmark {
     System.out.println("Storage space saving: " + ((fwdIndexSize - rawIndexSize) * 100.0 / fwdIndexSize) + " %");
   }
 
-  /**
-   * Compares lookup times for the two columns.
-   * Performs {@link #_numConsecutiveLookups} on the two columns on randomly generated docIds.
-   *
-   * @param segment Segment to compare the columns for
-   */
+  /// Compares lookup times for the two columns.
+  /// Performs [#_numConsecutiveLookups] on the two columns on randomly generated docIds.
+  ///
+  /// @param segment Segment to compare the columns for
   private void compareLookups(IndexSegment segment) {
     int[] filteredDocIds = generateDocIds(segment);
     long rawIndexTime = profileLookups(segment, _rawIndexColumn, filteredDocIds);
@@ -211,14 +203,12 @@ public class RawIndexBenchmark {
     System.out.println("Percentage change: " + ((fwdIndexTime - rawIndexTime) * 100.0 / rawIndexTime) + " %");
   }
 
-  /**
-   * Profiles the lookup time for a given column, for the given docIds.
-   *
-   * @param segment Segment to profile
-   * @param column Column to profile
-   * @param docIds DocIds to lookup on the column
-   * @return Time take in millis for the lookups
-   */
+  /// Profiles the lookup time for a given column, for the given docIds.
+  ///
+  /// @param segment Segment to profile
+  /// @param column Column to profile
+  /// @param docIds DocIds to lookup on the column
+  /// @return Time take in millis for the lookups
   private long profileLookups(IndexSegment segment, String column, int[] docIds) {
     BaseFilterOperator filterOperator =
         new TestFilterOperator(docIds, segment.getDataSource(column).getDataSourceMetadata().getNumDocs());
@@ -235,22 +225,18 @@ public class RawIndexBenchmark {
     return (System.currentTimeMillis() - start);
   }
 
-  /**
-   * Convert from bytes to mega-bytes.
-   *
-   * @param sizeInBytes Size to convert
-   * @return Size in MB's
-   */
+  /// Convert from bytes to mega-bytes.
+  ///
+  /// @param sizeInBytes Size to convert
+  /// @return Size in MB's
   private double toMegaBytes(long sizeInBytes) {
     return sizeInBytes / (1024 * 1024);
   }
 
-  /**
-   * Helper method to build map from column to data source
-   *
-   * @param segment Segment for which to build the map
-   * @return Column to data source map
-   */
+  /// Helper method to build map from column to data source
+  ///
+  /// @param segment Segment for which to build the map
+  /// @return Column to data source map
   private Map<String, DataSource> buildDataSourceMap(IndexSegment segment) {
     Map<String, DataSource> dataSourceMap = new HashMap<>();
     for (String column : segment.getPhysicalColumnNames()) {
@@ -259,15 +245,13 @@ public class RawIndexBenchmark {
     return dataSourceMap;
   }
 
-  /**
-   * Generate random docIds.
-   * <ul>
-   *   <li> Total of {@link #_numLookups} docIds are generated. </li>
-   *   <li> DocId's are in clusters containing {@link #_numConsecutiveLookups} ids. </li>
-   * </ul>
-   * @param segment
-   * @return
-   */
+  /// Generate random docIds.
+  ///
+  /// - Total of [#_numLookups] docIds are generated.
+  /// - DocId's are in clusters containing [#_numConsecutiveLookups] ids.
+  ///
+  /// @param segment
+  /// @return
   private int[] generateDocIds(IndexSegment segment) {
     Random random = new Random();
     int numDocs = segment.getSegmentMetadata().getTotalDocs();
@@ -291,12 +275,10 @@ public class RawIndexBenchmark {
     return docIdSet;
   }
 
-  /**
-   * Main method for the class. Parses the command line arguments, and invokes the benchmark.
-   *
-   * @param args Command line arguments.
-   * @throws Exception
-   */
+  /// Main method for the class. Parses the command line arguments, and invokes the benchmark.
+  ///
+  /// @param args Command line arguments.
+  /// @throws Exception
   public static void main(String[] args)
       throws Exception {
     RawIndexBenchmark benchmark = new RawIndexBenchmark();

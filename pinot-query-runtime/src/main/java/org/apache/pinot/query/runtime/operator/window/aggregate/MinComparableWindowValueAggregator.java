@@ -22,22 +22,18 @@ import java.util.ArrayDeque;
 import javax.annotation.Nullable;
 
 
-/**
- * Window value aggregator for MIN window function that preserves the input type by using {@link Comparable} for
- * comparisons. Used for types like BIG_DECIMAL that don't have a dedicated primitive-typed aggregator.
- */
+/// Window value aggregator for MIN window function that preserves the input type by using [Comparable] for
+/// comparisons. Used for types like BIG_DECIMAL that don't have a dedicated primitive-typed aggregator.
 public class MinComparableWindowValueAggregator implements WindowValueAggregator<Object> {
 
   private final boolean _supportRemoval;
   private final ArrayDeque<Object> _deque = new ArrayDeque<>();
   private Object _minValue = null;
 
-  /**
-   * @param supportRemoval whether this window value aggregator should support removal of values. Some cases require
-   *                       only addition of values in which case this value aggregator will have O(1) space complexity;
-   *                       if {@code supportRemoval} is true, this value aggregator will have O(K) space complexity
-   *                       (where K is the max size of the window).
-   */
+  /// @param supportRemoval whether this window value aggregator should support removal of values. Some cases require
+  ///                       only addition of values in which case this value aggregator will have O(1) space complexity;
+  ///                       if `supportRemoval` is true, this value aggregator will have O(K) space complexity
+  ///                       (where K is the max size of the window).
   public MinComparableWindowValueAggregator(boolean supportRemoval) {
     _supportRemoval = supportRemoval;
   }

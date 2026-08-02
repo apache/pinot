@@ -21,9 +21,7 @@ package org.apache.pinot.integration.tests.tpch;
 import java.io.File;
 
 
-/**
- * Constants used in TPCH integration tests.
- */
+/// Constants used in TPCH integration tests.
 public final class Constants {
   static final String[] TPCH_TABLE_NAMES = {
       "customer", "lineitem", "nation", "orders", "part", "partsupp", "region", "supplier"

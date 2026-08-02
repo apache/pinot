@@ -38,21 +38,13 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 
 
-/**
- * Tests for PERCENTILE_TDIGEST and PERCENTILE_TDIGEST_MV aggregation functions.
- *
- * <ul>
- *   <li>
- *     Generates a segment with a double multi-valued column, a TDigest column, a custom compression TDigest column
- *     and a group-by column
- *   </li>
- *   <li>Runs aggregation and group-by queries on the generated segment</li>
- *   <li>
- *     Compares the results for PERCENTILE_TDIGEST_MV on double multi-valued column, PERCENTILE_TDIGEST on TDigest
- *     column with results for PERCENTILE_MV on double multi-valued column
- *   </li>
- * </ul>
- */
+/// Tests for PERCENTILE_TDIGEST and PERCENTILE_TDIGEST_MV aggregation functions.
+///
+/// - Generates a segment with a double multi-valued column, a TDigest column, a custom compression TDigest column
+///   and a group-by column
+/// - Runs aggregation and group-by queries on the generated segment
+/// - Compares the results for PERCENTILE_TDIGEST_MV on double multi-valued column, PERCENTILE_TDIGEST on TDigest
+///   column with results for PERCENTILE_MV on double multi-valued column
 public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest {
   private static final int MAX_NUM_MULTI_VALUES = 10;
   private long _numValues;

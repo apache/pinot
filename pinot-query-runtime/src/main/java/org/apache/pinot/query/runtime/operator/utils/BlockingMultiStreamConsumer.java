@@ -38,27 +38,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class is a utility class that helps to consume multiple mailboxes in a blocking manner by a single thread.
- *
- * The reader entry point is {@link #readBlockBlocking()} which will block until some of the mailboxes is ready to be
- * read. The method is blocking and will return the next block to be consumed. This method is designed to be called by
- * a single thread we call the consumer thread.
- *
- * All other methods but the ones specifically specified can only be called by the consumer thread.
- * @param <E>
- */
+/// This class is a utility class that helps to consume multiple mailboxes in a blocking manner by a single thread.
+///
+/// The reader entry point is [#readBlockBlocking()] which will block until some of the mailboxes is ready to be
+/// read. The method is blocking and will return the next block to be consumed. This method is designed to be called by
+/// a single thread we call the consumer thread.
+///
+/// All other methods but the ones specifically specified can only be called by the consumer thread.
+/// @param <E>
 public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BlockingMultiStreamConsumer.class);
   private final Object _id;
   protected final List<? extends AsyncStream<E>> _mailboxes;
   protected final ArrayBlockingQueue<Boolean> _newDataReady = new ArrayBlockingQueue<>(1);
   private final long _deadlineMs;
-  /**
-   * An index that used to calculate where do we are going to start reading.
-   * The invariant is that we are always going to start reading from {@code _lastRead + 1}.
-   * Therefore {@link #_lastRead} must be in the range {@code [-1, mailbox.size() - 1]}
-   */
+  /// An index that used to calculate where do we are going to start reading.
+  /// The invariant is that we are always going to start reading from `_lastRead + 1`.
+  /// Therefore [#_lastRead] must be in the range `[-1, mailbox.size() - 1]`
   protected int _lastRead;
   @Nullable
   private E _errorBlock = null;
@@ -72,104 +68,81 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     _lastRead = _mailboxes.size() - 1;
   }
 
-  /**
-   * Returns whether the element is considered an error element or not.
-   *
-   * This method is called by the consumer thread.
-   */
+  /// Returns whether the element is considered an error element or not.
+  ///
+  /// This method is called by the consumer thread.
   protected abstract boolean isError(E element);
 
-  /**
-   * Returns whether the element is considered a successful end of stream element or not.
-   *
-   * This method is called by the consumer thread.
-   */
+  /// Returns whether the element is considered a successful end of stream element or not.
+  ///
+  /// This method is called by the consumer thread.
   protected abstract boolean isSuccess(E element);
 
-  /**
-   * This method is called whenever a {@link #isSuccess(Object) successful EOS} is read from one of the mailboxes.
-   *
-   * It is guaranteed that the received element is an EOS as defined by {@link #isSuccess(Object)}.
-   * No more messages are going to be read from that mailbox.
-   *
-   * This method is called by the consumer thread.
-   */
+  /// This method is called whenever a [`successful EOS`]\[#isSuccess(Object)\] is read from one of the mailboxes.
+  ///
+  /// It is guaranteed that the received element is an EOS as defined by [#isSuccess(Object)].
+  /// No more messages are going to be read from that mailbox.
+  ///
+  /// This method is called by the consumer thread.
   protected abstract void onMailboxSuccess(E element);
 
-  /**
-   * This method is called whenever a timeout is reached while reading an element.
-   *
-   * This method is called by the consumer thread.
-   */
+  /// This method is called whenever a timeout is reached while reading an element.
+  ///
+  /// This method is called by the consumer thread.
   protected abstract E onTimeout();
 
-  /**
-   * This method is called whenever an exception (other than timeout) is thrown while reading an element.
-   *
-   * This method is called by the consumer thread.
-   */
+  /// This method is called whenever an exception (other than timeout) is thrown while reading an element.
+  ///
+  /// This method is called by the consumer thread.
   protected abstract E onException(Exception e);
 
-  /**
-   * This method is called whenever all mailboxes emitted EOS.
-   *
-   * This method is called by the consumer thread.
-   */
+  /// This method is called whenever all mailboxes emitted EOS.
+  ///
+  /// This method is called by the consumer thread.
   protected abstract E onSuccess();
 
-  /**
-   * This method is called when an error is found in any of the mailboxes.
-   *
-   * After this method is called no more messages are going to be read from the mailboxes.
-   */
+  /// This method is called when an error is found in any of the mailboxes.
+  ///
+  /// After this method is called no more messages are going to be read from the mailboxes.
   protected abstract void onError(E element);
 
-  /**
-   * This method must be called when the consumer is not going to read anymore from the mailboxes.
-   *
-   * <strong>This method can be called from any thread</strong>.
-   */
+  /// This method must be called when the consumer is not going to read anymore from the mailboxes.
+  ///
+  /// **This method can be called from any thread**.
   @Override
   public void close() {
     cancelRemainingMailboxes();
   }
 
-  /**
-   * This method is called whenever the consumer is cancelled.
-   *
-   * <strong>This method can be called from any thread</strong>.
-   */
+  /// This method is called whenever the consumer is cancelled.
+  ///
+  /// **This method can be called from any thread**.
   public void cancel(Throwable t) {
     cancelRemainingMailboxes();
   }
 
-  /**
-   * This method is called whenever the consumer is early terminated.
-   *
-   * This method is called by the consumer thread.
-   */
+  /// This method is called whenever the consumer is early terminated.
+  ///
+  /// This method is called by the consumer thread.
   public void earlyTerminate() {
     for (AsyncStream<E> mailbox : _mailboxes) {
       mailbox.earlyTerminate();
     }
   }
 
-  /**
-   * This method is called whenever the consumer is early terminated.
-   *
-   * <strong>This method can be called from any thread</strong>.
-   */
+  /// This method is called whenever the consumer is early terminated.
+  ///
+  /// **This method can be called from any thread**.
   protected void cancelRemainingMailboxes() {
     for (AsyncStream<E> mailbox : _mailboxes) {
       mailbox.cancel();
     }
   }
 
-  /**
-   * This method is called whenever the consumer is early terminated.
-   *
-   * <strong>This method can be called by any thread</strong>, although it is expected to be called by producer threads.
-   */
+  /// This method is called whenever the consumer is early terminated.
+  ///
+  /// **This method can be called by any thread**, although it is expected to be called by producer
+  /// threads.
   protected void onData() {
     if (_newDataReady.offer(Boolean.TRUE)) {
       if (LOGGER.isTraceEnabled()) {
@@ -180,24 +153,21 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     }
   }
 
-  /**
-   * Reads the next block for any ready mailbox or blocks until some of them is ready.
-   *
-   * The method implements a sequential read semantic. Meaning that:
-   * <ol>
-   *   <li>EOS is only returned when all mailboxes already emitted EOS or there are no mailboxes</li>
-   *   <li>If an error is read from a mailbox, the error is returned</li>
-   *   <li>If data is read from a mailbox, that data block is returned</li>
-   *   <li>If no mailbox is ready, the calling thread is blocked</li>
-   * </ol>
-   *
-   * Right now the implementation tries to be fair. If one call returned the block from mailbox {@code i}, then next
-   * call will look for mailbox {@code i+1}, {@code i+2}... in a circular manner.
-   *
-   * In order to unblock a thread blocked here, {@link #onData()} should be called.
-   *
-   * This method is called by the consumer thread.
-   */
+  /// Reads the next block for any ready mailbox or blocks until some of them is ready.
+  ///
+  /// The method implements a sequential read semantic. Meaning that:
+  ///
+  /// 1. EOS is only returned when all mailboxes already emitted EOS or there are no mailboxes
+  /// 2. If an error is read from a mailbox, the error is returned
+  /// 3. If data is read from a mailbox, that data block is returned
+  /// 4. If no mailbox is ready, the calling thread is blocked
+  ///
+  /// Right now the implementation tries to be fair. If one call returned the block from mailbox `i`, then next
+  /// call will look for mailbox `i+1`, `i+2`... in a circular manner.
+  ///
+  /// In order to unblock a thread blocked here, [#onData()] should be called.
+  ///
+  /// This method is called by the consumer thread.
   public E readBlockBlocking() {
     if (LOGGER.isTraceEnabled()) {
       String mailboxIds = _mailboxes.stream()
@@ -241,16 +211,14 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     }
   }
 
-  /**
-   * This is a utility method that tries to read from the different mailboxes in a circular manner.
-   *
-   * The method is a bit more complex than expected because ir order to simplify {@link #readBlockBlocking} we added
-   * some extra logic here. For example, this method checks for timeouts, adds some logs, releases mailboxes that
-   * emitted EOS and in case an error block is found, stores it.
-   *
-   * @return the new block to consume or null if none is found. EOS is only emitted when all mailboxes already emitted
-   * EOS.
-   */
+  /// This is a utility method that tries to read from the different mailboxes in a circular manner.
+  ///
+  /// The method is a bit more complex than expected because ir order to simplify [#readBlockBlocking] we added
+  /// some extra logic here. For example, this method checks for timeouts, adds some logs, releases mailboxes that
+  /// emitted EOS and in case an error block is found, stores it.
+  ///
+  /// @return the new block to consume or null if none is found. EOS is only emitted when all mailboxes already emitted
+  /// EOS.
   @Nullable
   private E readDroppingSuccessEos() {
     if (_errorBlock != null) {
@@ -301,10 +269,8 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     return block;
   }
 
-  /**
-   * The utility method that actually does the circular reading trying to be fair.
-   * @return The first block that is found on any mailbox, including EOS.
-   */
+  /// The utility method that actually does the circular reading trying to be fair.
+  /// @return The first block that is found on any mailbox, including EOS.
   @Nullable
   private E readBlockOrNull() {
     // in case _lastRead is _mailboxes.size() - 1, we just skip this loop.

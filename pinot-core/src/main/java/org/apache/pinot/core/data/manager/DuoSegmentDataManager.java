@@ -25,12 +25,10 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
-/**
- * Segment data manager tracking two segments associated with one segment name, e.g. when committing a mutable
- * segment, a new immutable segment is created to replace the mutable one, and the two segments are having same name.
- * By tracked both with this segment data manager, we can provide queries both segments for complete data view.
- * The primary segment represents all segments tracked by this manager for places asking for segment metadata.
- */
+/// Segment data manager tracking two segments associated with one segment name, e.g. when committing a mutable
+/// segment, a new immutable segment is created to replace the mutable one, and the two segments are having same name.
+/// By tracked both with this segment data manager, we can provide queries both segments for complete data view.
+/// The primary segment represents all segments tracked by this manager for places asking for segment metadata.
 public class DuoSegmentDataManager extends SegmentDataManager {
   private final SegmentDataManager _primary;
   private final List<SegmentDataManager> _segmentDataManagers;

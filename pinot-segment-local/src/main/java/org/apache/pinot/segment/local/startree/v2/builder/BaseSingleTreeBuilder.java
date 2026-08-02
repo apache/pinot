@@ -55,10 +55,8 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.BYTES;
 
 
-/**
- * The {@code BaseSingleTreeBuilder} class is the base class for star-tree builders that works on a single
- * {@link StarTreeV2BuilderConfig}s and provides common methods to build a single star-tree.
- */
+/// The `BaseSingleTreeBuilder` class is the base class for star-tree builders that works on a single
+/// [StarTreeV2BuilderConfig]s and provides common methods to build a single star-tree.
 @SuppressWarnings({"rawtypes", "unchecked"})
 abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleTreeBuilder.class);
@@ -88,9 +86,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   int _numDocs;
   int _numNodes;
 
-  /**
-   * The {@code Record} class represents a record (raw or aggregated) with dimension dictionary Ids and metric values.
-   */
+  /// The `Record` class represents a record (raw or aggregated) with dimension dictionary Ids and metric values.
   static class Record {
     final int[] _dimensions;
     final Object[] _metrics;
@@ -101,14 +97,12 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     }
   }
 
-  /**
-   * Constructor for the base single star-tree builder.
-   *
-   * @param builderConfig Builder config
-   * @param outputDir Directory to store the index files
-   * @param segment Index segment
-   * @param metadataProperties Segment metadata properties
-   */
+  /// Constructor for the base single star-tree builder.
+  ///
+  /// @param builderConfig Builder config
+  /// @param outputDir Directory to store the index files
+  /// @param segment Index segment
+  /// @param metadataProperties Segment metadata properties
   BaseSingleTreeBuilder(StarTreeV2BuilderConfig builderConfig, File outputDir, ImmutableSegment segment,
       Configuration metadataProperties) {
     _builderConfig = builderConfig;
@@ -162,68 +156,57 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     _maxLeafRecords = builderConfig.getMaxLeafRecords();
   }
 
-  /**
-   * Appends a record to the star-tree.
-   *
-   * @param record Record to be appended
-   */
+  /// Appends a record to the star-tree.
+  ///
+  /// @param record Record to be appended
   abstract void appendRecord(Record record)
       throws IOException;
 
-  /**
-   * Returns the record of the given document Id in the star-tree.
-   *
-   * @param docId Document Id
-   * @return Star-tree record
-   */
+  /// Returns the record of the given document Id in the star-tree.
+  ///
+  /// @param docId Document Id
+  /// @return Star-tree record
   abstract Record getStarTreeRecord(int docId)
       throws IOException;
 
-  /**
-   * Returns the dimension value of the given document and dimension Id in the star-tree.
-   *
-   * @param docId Document Id
-   * @param dimensionId Dimension Id
-   * @return Dimension value
-   */
+  /// Returns the dimension value of the given document and dimension Id in the star-tree.
+  ///
+  /// @param docId Document Id
+  /// @param dimensionId Dimension Id
+  /// @return Dimension value
   abstract int getDimensionValue(int docId, int dimensionId)
       throws IOException;
 
-  /**
-   * Sorts and aggregates the records in the segment, and returns a record iterator for all the aggregated records.
-   * <p>This method reads records from segment and generates the initial records for the star-tree.
-   *
-   * @param numDocs Number of documents in the segment
-   * @return Iterator for the aggregated records
-   */
+  /// Sorts and aggregates the records in the segment, and returns a record iterator for all the aggregated records.
+  ///
+  /// This method reads records from segment and generates the initial records for the star-tree.
+  ///
+  /// @param numDocs Number of documents in the segment
+  /// @return Iterator for the aggregated records
   abstract Iterator<Record> sortAndAggregateSegmentRecords(int numDocs)
       throws IOException;
 
-  /**
-   * Generates aggregated records for star-node.
-   * <p>This method will do the following steps:
-   * <ul>
-   *   <li>Creates a temporary buffer for the given range of documents</li>
-   *   <li>Replaces the value for the given dimension Id to {@code STAR}</li>
-   *   <li>Sorts the records inside the temporary buffer</li>
-   *   <li>Aggregates the records with same dimensions</li>
-   *   <li>Returns an iterator for the aggregated records</li>
-   * </ul>
-   *
-   * @param startDocId Start document Id in the star-tree
-   * @param endDocId End document Id (exclusive) in the star-tree
-   * @param dimensionId Dimension Id of the star-node
-   * @return Iterator for the aggregated records
-   */
+  /// Generates aggregated records for star-node.
+  ///
+  /// This method will do the following steps:
+  ///
+  /// - Creates a temporary buffer for the given range of documents
+  /// - Replaces the value for the given dimension Id to `STAR`
+  /// - Sorts the records inside the temporary buffer
+  /// - Aggregates the records with same dimensions
+  /// - Returns an iterator for the aggregated records
+  ///
+  /// @param startDocId Start document Id in the star-tree
+  /// @param endDocId End document Id (exclusive) in the star-tree
+  /// @param dimensionId Dimension Id of the star-node
+  /// @return Iterator for the aggregated records
   abstract Iterator<Record> generateRecordsForStarNode(int startDocId, int endDocId, int dimensionId)
       throws IOException;
 
-  /**
-   * Reads the dimensions for a record of the given document Id in the segment.
-   *
-   * @param docId Document Id
-   * @return Dimensions (dictionary Ids) for a segment record
-   */
+  /// Reads the dimensions for a record of the given document Id in the segment.
+  ///
+  /// @param docId Document Id
+  /// @return Dimensions (dictionary Ids) for a segment record
   int[] getSegmentRecordDimensions(int docId) {
     int[] dimensions = new int[_numDimensions];
     for (int i = 0; i < _numDimensions; i++) {
@@ -232,12 +215,10 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     return dimensions;
   }
 
-  /**
-   * Reads a record of the given document Id in the segment.
-   *
-   * @param docId Document Id
-   * @return Segment record
-   */
+  /// Reads a record of the given document Id in the segment.
+  ///
+  /// @param docId Document Id
+  /// @return Segment record
   Record getSegmentRecord(int docId) {
     int[] dimensions = getSegmentRecordDimensions(docId);
     Object[] metrics = new Object[_numMetrics];
@@ -250,14 +231,13 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     return new Record(dimensions, metrics);
   }
 
-  /**
-   * Merges a segment record (raw) into the aggregated record.
-   * <p>Will create a new aggregated record if the current one is {@code null}.
-   *
-   * @param aggregatedRecord Aggregated record
-   * @param segmentRecord Segment record
-   * @return Merged record
-   */
+  /// Merges a segment record (raw) into the aggregated record.
+  ///
+  /// Will create a new aggregated record if the current one is `null`.
+  ///
+  /// @param aggregatedRecord Aggregated record
+  /// @param segmentRecord Segment record
+  /// @return Merged record
   Record mergeSegmentRecord(@Nullable Record aggregatedRecord, Record segmentRecord) {
     if (aggregatedRecord == null) {
       int[] dimensions = Arrays.copyOf(segmentRecord._dimensions, _numDimensions);
@@ -286,14 +266,13 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     }
   }
 
-  /**
-   * Merges a star-tree record (aggregated) into the aggregated record.
-   * <p>Will create a new aggregated record if the current one is {@code null}.
-   *
-   * @param aggregatedRecord Aggregated record
-   * @param starTreeRecord Star-tree record
-   * @return Merged record
-   */
+  /// Merges a star-tree record (aggregated) into the aggregated record.
+  ///
+  /// Will create a new aggregated record if the current one is `null`.
+  ///
+  /// @param aggregatedRecord Aggregated record
+  /// @param starTreeRecord Star-tree record
+  /// @return Merged record
   Record mergeStarTreeRecord(@Nullable Record aggregatedRecord, Record starTreeRecord) {
     if (aggregatedRecord == null) {
       int[] dimensions = Arrays.copyOf(starTreeRecord._dimensions, _numDimensions);

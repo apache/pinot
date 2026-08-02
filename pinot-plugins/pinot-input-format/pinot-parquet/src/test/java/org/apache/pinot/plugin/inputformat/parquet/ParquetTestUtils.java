@@ -33,9 +33,7 @@ public class ParquetTestUtils {
   private ParquetTestUtils() {
   }
 
-  /**
-   * Returns a ParquetWriter with the given path and schema.
-   */
+  /// Returns a ParquetWriter with the given path and schema.
   public static ParquetWriter<GenericRecord> getParquetAvroWriter(Path path, Schema schema)
       throws IOException {
     OutputFile outputFile = HadoopOutputFile.fromPath(path, ParquetUtils.getParquetHadoopConfiguration());

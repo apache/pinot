@@ -61,9 +61,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for MODE queries.
- */
+/// Queries test for MODE queries.
 public class ModeQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "ModeQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";

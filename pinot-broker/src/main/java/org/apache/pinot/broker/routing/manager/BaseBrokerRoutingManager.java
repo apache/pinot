@@ -106,28 +106,25 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code RoutingManager} manages the routing of all tables hosted by the broker instance. It listens to the cluster
- * changes and updates the routing components accordingly.
- * <p>The following methods are provided:
- * <ul>
- *   <li>{@link #buildRouting(String)}: Builds/rebuilds the routing for a table</li>
- *   <li>{@link #removeRouting(String)}: Removes the routing for a table</li>
- *   <li>{@link #refreshSegment(String, String)}: Refreshes the metadata for a segment</li>
- *   <li>{@link #routingExists(String)}: Returns whether the routing exists for a table</li>
- *   <li>{@link #getRoutingTable(BrokerRequest, long)}: Returns the routing table for a query</li>
- *   <li>{@link #getTimeBoundaryInfo(String)}: Returns the time boundary info for a table</li>
- *   <li>{@link #getQueryTimeoutMs(String)}: Returns the table-level query timeout in milliseconds for a table</li>
- * </ul>
- *
- * LOCK ORDERING RULE: Always acquire locks in this order to prevent deadlocks:
- * 1. _globalLock (read or write)
- * 2. _routingTableBuildLocks (per rawTableName, grouping OFFLINE and REALTIME tables under a single lock)
- * Never hold table locks when trying to acquire global lock.
- *
- * TODO: Expose RoutingEntry class to get a consistent view in the broker request handler and save the redundant map
- *       lookups.
- */
+/// The `RoutingManager` manages the routing of all tables hosted by the broker instance. It listens to the
+/// cluster changes and updates the routing components accordingly.
+///
+/// The following methods are provided:
+///   - [#buildRouting(String)]: Builds/rebuilds the routing for a table
+///   - [#removeRouting(String)]: Removes the routing for a table
+///   - [#refreshSegment(String, String)]: Refreshes the metadata for a segment
+///   - [#routingExists(String)]: Returns whether the routing exists for a table
+///   - [#getRoutingTable(BrokerRequest, long)]: Returns the routing table for a query
+///   - [#getTimeBoundaryInfo(String)]: Returns the time boundary info for a table
+///   - [#getQueryTimeoutMs(String)]: Returns the table-level query timeout in milliseconds for a table
+///
+/// LOCK ORDERING RULE: Always acquire locks in this order to prevent deadlocks:
+/// 1. \_globalLock (read or write)
+/// 2. \_routingTableBuildLocks (per rawTableName, grouping OFFLINE and REALTIME tables under a single lock)
+/// Never hold table locks when trying to acquire global lock.
+///
+/// TODO: Expose RoutingEntry class to get a consistent view in the broker request handler and save the redundant map
+///       lookups.
 public abstract class BaseBrokerRoutingManager implements RoutingManager, ClusterChangeHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRoutingManager.class);
 
@@ -210,20 +207,16 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     _propertyStore = helixManager.getHelixPropertyStore();
   }
 
-  /**
-   * Sets a callback to be invoked when a server is re-enabled after being excluded.
-   * This is useful for resetting gRPC channel state to avoid exponential backoff delays.
-   */
+  /// Sets a callback to be invoked when a server is re-enabled after being excluded.
+  /// This is useful for resetting gRPC channel state to avoid exponential backoff delays.
   public void setServerReenableCallback(Consumer<ServerInstance> callback) {
     _serverReenableCallback = callback;
   }
 
-  /**
-   * Registers a provider of an extra {@link SegmentZkMetadataFetchListener} that is attached to every table's routing
-   * entry, alongside the built-in segment pruners. The provider is invoked once per table with the table name with
-   * type and may return {@code null} to skip a table. Must be called before routing is built (i.e. before the cluster
-   * change mediator starts) so that all tables pick it up.
-   */
+  /// Registers a provider of an extra [SegmentZkMetadataFetchListener] that is attached to every table's routing
+  /// entry, alongside the built-in segment pruners. The provider is invoked once per table with the table name with
+  /// type and may return `null` to skip a table. Must be called before routing is built (i.e. before the cluster
+  /// change mediator starts) so that all tables pick it up.
   public void addSegmentZkMetadataFetchListenerProvider(Function<String, SegmentZkMetadataFetchListener> provider) {
     _extraFetchListenerProviders.add(provider);
   }
@@ -237,10 +230,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     return _routingTableBuildStartTimeMs.computeIfAbsent(tableNameWithType, k -> Long.MIN_VALUE);
   }
 
-  /**
-   * This method is called from a method which is synchronized to prevent multiple calls to process cluster changes
-   * Thus, this cannot have contention with itself, but it can have contention with other methods in this class
-   */
+  /// This method is called from a method which is synchronized to prevent multiple calls to process cluster changes
+  /// Thus, this cannot have contention with itself, but it can have contention with other methods in this class
   @Override
   public void processClusterChange(ChangeType changeType) {
     if (changeType == ChangeType.IDEAL_STATE || changeType == ChangeType.EXTERNAL_VIEW) {
@@ -366,10 +357,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     }
   }
 
-  /**
-   * Returns true if the IS / EV version has changed (irrespective of whether the routing entry was updated), otherwise
-   * return false
-   */
+  /// Returns true if the IS / EV version has changed (irrespective of whether the routing entry was updated), otherwise
+  /// return false
   private boolean processAssignmentChangeForTable(int idealStateVersion, int externalViewVersion,
       RoutingEntry routingEntry) {
     // Table lock must be held prior to calling this helper method
@@ -532,9 +521,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     return true;
   }
 
-  /**
-   * Excludes a server from the routing.
-   */
+  /// Excludes a server from the routing.
   public void excludeServerFromRouting(String instanceId) {
     _globalLock.writeLock().lock();
     try {
@@ -577,9 +564,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
         System.currentTimeMillis() - startTimeMs, _routingEntryMap.size());
   }
 
-  /**
-   * Includes a previous excluded server to the routing.
-   */
+  /// Includes a previous excluded server to the routing.
   public void includeServerToRouting(String instanceId) {
     _globalLock.writeLock().lock();
     try {
@@ -626,10 +611,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
         System.currentTimeMillis() - startTimeMs, _routingEntryMap.size());
   }
 
-  /**
-   * Builds the routing for a logical table. This method is called when a logical table is created or updated.
-   * @param logicalTableName the name of the logical table
-   */
+  /// Builds the routing for a logical table. This method is called when a logical table is created or updated.
+  /// @param logicalTableName the name of the logical table
   public void buildRoutingForLogicalTable(String logicalTableName) {
     _globalLock.readLock().lock();
     try {
@@ -704,10 +687,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     }
   }
 
-  /**
-   * Builds the routing for a table.
-   * @param tableNameWithType the name of the table
-   */
+  /// Builds the routing for a table.
+  /// @param tableNameWithType the name of the table
   public void buildRouting(String tableNameWithType) {
     _globalLock.readLock().lock();
     try {
@@ -949,9 +930,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     }
   }
 
-  /**
-   * Returns the online segments (with ONLINE/CONSUMING instances) in the given ideal state.
-   */
+  /// Returns the online segments (with ONLINE/CONSUMING instances) in the given ideal state.
   private static Set<String> getOnlineSegments(IdealState idealState) {
     Map<String, Map<String, String>> segmentAssignment = idealState.getRecord().getMapFields();
     Set<String> onlineSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
@@ -965,9 +944,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     return onlineSegments;
   }
 
-  /**
-   * Removes the routing for the given table.
-   */
+  /// Removes the routing for the given table.
   public void removeRouting(String tableNameWithType) {
     _globalLock.readLock().lock();
     try {
@@ -1019,9 +996,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     }
   }
 
-  /**
-   * Removes routing for logical tables
-   */
+  /// Removes routing for logical tables
   public void removeRoutingForLogicalTable(String logicalTableName) {
     _globalLock.readLock().lock();
     try {
@@ -1072,9 +1047,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     }
   }
 
-  /**
-   * Refreshes the metadata for the given segment (called when segment is getting refreshed).
-   */
+  /// Refreshes the metadata for the given segment (called when segment is getting refreshed).
   public void refreshSegment(String tableNameWithType, String segment) {
     _globalLock.readLock().lock();
     try {
@@ -1098,19 +1071,15 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     }
   }
 
-  /**
-   * Returns {@code true} if the routing exists for the given table.
-   */
+  /// Returns `true` if the routing exists for the given table.
   @Override
   public boolean routingExists(String tableNameWithType) {
     return _routingEntryMap.containsKey(tableNameWithType);
   }
 
-  /**
-   * Returns whether the given table is enabled
-   * @param tableNameWithType Table name with type
-   * @return Whether the given table is enabled
-   */
+  /// Returns whether the given table is enabled
+  /// @param tableNameWithType Table name with type
+  /// @return Whether the given table is enabled
   @Override
   public boolean isTableDisabled(String tableNameWithType) {
     RoutingEntry routingEntry = _routingEntryMap.getOrDefault(tableNameWithType, null);
@@ -1121,11 +1090,10 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     }
   }
 
-  /**
-   * Returns the routing table (a map from server instance to list of segments hosted by the server, and a list of
-   * unavailable segments) based on the broker request, or {@code null} if the routing does not exist.
-   * <p>NOTE: The broker request should already have the table suffix (_OFFLINE or _REALTIME) appended.
-   */
+  /// Returns the routing table (a map from server instance to list of segments hosted by the server, and a list of
+  /// unavailable segments) based on the broker request, or `null` if the routing does not exist.
+  ///
+  /// NOTE: The broker request should already have the table suffix (\_OFFLINE or \_REALTIME) appended.
   @Nullable
   @Override
   public RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId) {
@@ -1243,11 +1211,10 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     return _externalViewPathPrefix + tableNameWithType;
   }
 
-  /**
-   * Returns the time boundary info for the given offline table, or {@code null} if the routing or time boundary does
-   * not exist.
-   * <p>NOTE: Time boundary info is only available for the offline part of the hybrid table.
-   */
+  /// Returns the time boundary info for the given offline table, or `null` if the routing or time boundary does
+  /// not exist.
+  ///
+  /// NOTE: Time boundary info is only available for the offline part of the hybrid table.
   @Nullable
   @Override
   public TimeBoundaryInfo getTimeBoundaryInfo(String offlineTableName) {
@@ -1291,10 +1258,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     return routingEntry._instanceSelector.getServingInstances();
   }
 
-  /**
-   * Returns the table-level query timeout in milliseconds for the given table, or {@code null} if the timeout is not
-   * configured in the table config.
-   */
+  /// Returns the table-level query timeout in milliseconds for the given table, or `null` if the timeout is not
+  /// configured in the table config.
   @Nullable
   public Long getQueryTimeoutMs(String tableNameWithType) {
     RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);

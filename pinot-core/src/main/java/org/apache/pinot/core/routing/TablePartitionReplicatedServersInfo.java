@@ -22,10 +22,8 @@ import java.util.List;
 import java.util.Set;
 
 
-/**
- * An advanced version of {@link TablePartitionInfo} that also contains information about the fully replicated servers
- * for each partition.
- */
+/// An advanced version of [TablePartitionInfo] that also contains information about the fully replicated servers
+/// for each partition.
 public class TablePartitionReplicatedServersInfo {
   private final String _tableNameWithType;
   private final String _partitionColumn;

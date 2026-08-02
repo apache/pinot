@@ -26,12 +26,10 @@ import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 
 
-/**
- * The {@link PlanNode} version for the {@link org.apache.pinot.core.plan.PinotExplainedRelNode}.
- *
- * Remember that {@link PlanNode} are just the serializable and deserializable version of a
- * {@link org.apache.calcite.rel.RelNode}.
- */
+/// The [PlanNode] version for the [org.apache.pinot.core.plan.PinotExplainedRelNode].
+///
+/// Remember that [PlanNode] are just the serializable and deserializable version of a
+/// [org.apache.calcite.rel.RelNode].
 public class ExplainedNode extends BasePlanNode {
 
   private final String _title;

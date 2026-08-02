@@ -54,12 +54,10 @@ public class DictIdDistinctTable extends IntDistinctTable {
         : (v1, v2) -> Integer.compare(v1, v2);
   }
 
-  /**
-   * Adds a dictId while iterating in final ORDER BY order.
-   *
-   * <p>When nulls sort first, the null placeholder consumes one top-N slot. For nulls last, the top-N rows are
-   * determined entirely by non-null values, so early termination should not reserve space for null.
-   */
+  /// Adds a dictId while iterating in final ORDER BY order.
+  ///
+  /// When nulls sort first, the null placeholder consumes one top-N slot. For nulls last, the top-N rows are
+  /// determined entirely by non-null values, so early termination should not reserve space for null.
   public boolean addForOrderedEarlyTermination(int dictId) {
     assert _orderByExpression != null;
     assert hasLimit();
@@ -94,9 +92,7 @@ public class DictIdDistinctTable extends IntDistinctTable {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Converts this dictId-based table to a typed distinct table by resolving dictionary values.
-   */
+  /// Converts this dictId-based table to a typed distinct table by resolving dictionary values.
   public DistinctTable toTypedDistinctTable(Dictionary dictionary, boolean hasNull) {
     DataSchema dataSchema = getDataSchema();
     int limit = getLimit();

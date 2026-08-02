@@ -29,14 +29,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Client for schema administration operations.
- * Provides methods to create, update, delete, and manage Pinot schemas.
- *
- * This client exposes two complementary getters:
- * - getSchema(schemaName): returns the raw JSON string for callers that need to persist or forward the JSON
- * - getSchemaObject(schemaName): returns a typed Schema object for callers that want to work with the model
- */
+/// Client for schema administration operations.
+/// Provides methods to create, update, delete, and manage Pinot schemas.
+///
+/// This client exposes two complementary getters:
+/// - getSchema(schemaName): returns the raw JSON string for callers that need to persist or forward the JSON
+/// - getSchemaObject(schemaName): returns a typed Schema object for callers that want to work with the model
 public class SchemaAdminClient extends BaseServiceAdminClient {
   private static final Logger LOGGER = LoggerFactory.getLogger(SchemaAdminClient.class);
 
@@ -45,12 +43,10 @@ public class SchemaAdminClient extends BaseServiceAdminClient {
     super(transport, controllerAddress, headers);
   }
 
-  /**
-   * Lists all schema names in the cluster.
-   *
-   * @return List of schema names
-   * @throws PinotAdminException If the request fails
-   */
+  /// Lists all schema names in the cluster.
+  ///
+  /// @return List of schema names
+  /// @throws PinotAdminException If the request fails
   public List<String> listSchemaNames()
       throws PinotAdminException {
     /// GET /schemas returns a bare JSON array of schema names, not a wrapper object.
@@ -58,77 +54,65 @@ public class SchemaAdminClient extends BaseServiceAdminClient {
     return PinotAdminTransport.parseStringArrayNode(response);
   }
 
-  /**
-   * Gets information about all schemas including field count details.
-   *
-   * @return Schema information as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets information about all schemas including field count details.
+  ///
+  /// @return Schema information as JSON string
+  /// @throws PinotAdminException If the request fails
   public String getSchemasInfo()
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/schemas/info", null, _headers);
     return response.toString();
   }
 
-  /**
-   * Gets a specific schema as a JSON string.
-   *
-   * @param schemaName Name of the schema
-   * @return Schema configuration as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets a specific schema as a JSON string.
+  ///
+  /// @param schemaName Name of the schema
+  /// @return Schema configuration as JSON string
+  /// @throws PinotAdminException If the request fails
   public String getSchema(String schemaName)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/schemas/" + schemaName, null, _headers);
     return response.toString();
   }
 
-  /**
-   * Gets a specific schema as a typed object.
-   * Prefer this method when you want to work with the Schema model directly.
-   * Use {@link #getSchema(String)} if you need the raw JSON.
-   *
-   * @param schemaName Name of the schema
-   * @return Pinot Schema object
-   * @throws PinotAdminException If the request fails
-   * @throws IOException If the response cannot be parsed as a Schema
-   */
+  /// Gets a specific schema as a typed object.
+  /// Prefer this method when you want to work with the Schema model directly.
+  /// Use [#getSchema(String)] if you need the raw JSON.
+  ///
+  /// @param schemaName Name of the schema
+  /// @return Pinot Schema object
+  /// @throws PinotAdminException If the request fails
+  /// @throws IOException If the response cannot be parsed as a Schema
   public Schema getSchemaObject(String schemaName)
       throws PinotAdminException, IOException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/schemas/" + schemaName, null, _headers);
     return Schema.fromString(response.toString());
   }
 
-  /**
-   * Deletes a schema by name.
-   *
-   * @param schemaName Name of the schema to delete
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Deletes a schema by name.
+  ///
+  /// @param schemaName Name of the schema to delete
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String deleteSchema(String schemaName)
       throws PinotAdminException {
     JsonNode response = _transport.executeDelete(_controllerAddress, "/schemas/" + schemaName, null, _headers);
     return response.toString();
   }
 
-  /**
-   * Updates an existing schema.
-   *
-   * @param schemaName Name of the schema to update
-   * @param schemaConfig New schema configuration as JSON string
-   * @param reloadTables Whether to reload tables using this schema
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Updates an existing schema.
+  ///
+  /// @param schemaName Name of the schema to update
+  /// @param schemaConfig New schema configuration as JSON string
+  /// @param reloadTables Whether to reload tables using this schema
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String updateSchema(String schemaName, String schemaConfig, boolean reloadTables)
       throws PinotAdminException {
     return updateSchema(schemaName, schemaConfig, reloadTables, false);
   }
 
-  /**
-   * Updates an existing schema with optional reload and force controls.
-   */
+  /// Updates an existing schema with optional reload and force controls.
   public String updateSchema(String schemaName, String schemaConfig, boolean reloadTables, boolean force)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
@@ -140,27 +124,23 @@ public class SchemaAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Updates an existing schema (without reloading tables).
-   *
-   * @param schemaName Name of the schema to update
-   * @param schemaConfig New schema configuration as JSON string
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Updates an existing schema (without reloading tables).
+  ///
+  /// @param schemaName Name of the schema to update
+  /// @param schemaConfig New schema configuration as JSON string
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String updateSchema(String schemaName, String schemaConfig)
       throws PinotAdminException {
     return updateSchema(schemaName, schemaConfig, false);
   }
 
-  /**
-   * Creates a new schema.
-   *
-   * @param schemaConfig Schema configuration as JSON string
-   * @param force Whether to force creation even if schema exists
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Creates a new schema.
+  ///
+  /// @param schemaConfig Schema configuration as JSON string
+  /// @param force Whether to force creation even if schema exists
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String createSchema(String schemaConfig, boolean override, boolean force)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
@@ -171,39 +151,33 @@ public class SchemaAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Creates a new schema.
-   *
-   * @param schemaConfig Schema configuration as JSON string
-   * @param force Whether to force creation even if schema exists
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Creates a new schema.
+  ///
+  /// @param schemaConfig Schema configuration as JSON string
+  /// @param force Whether to force creation even if schema exists
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String createSchema(String schemaConfig, boolean force)
       throws PinotAdminException {
     return createSchema(schemaConfig, true, force);
   }
 
-  /**
-   * Creates a new schema (non-force creation).
-   *
-   * @param schemaConfig Schema configuration as JSON string
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Creates a new schema (non-force creation).
+  ///
+  /// @param schemaConfig Schema configuration as JSON string
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String createSchema(String schemaConfig)
       throws PinotAdminException {
     return createSchema(schemaConfig, true, false);
   }
 
-  /**
-   * Validates a schema configuration without applying it.
-   *
-   * @param schemaConfig Schema configuration to validate as JSON string
-   * @param force Whether to force validation even if schema exists
-   * @return Validation response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Validates a schema configuration without applying it.
+  ///
+  /// @param schemaConfig Schema configuration to validate as JSON string
+  /// @param force Whether to force validation even if schema exists
+  /// @return Validation response
+  /// @throws PinotAdminException If the request fails
   public String validateSchema(String schemaConfig, boolean force)
       throws PinotAdminException {
     Map<String, String> queryParams = Map.of("force", String.valueOf(force));
@@ -213,24 +187,20 @@ public class SchemaAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Validates a schema configuration without applying it (non-force validation).
-   *
-   * @param schemaConfig Schema configuration to validate as JSON string
-   * @return Validation response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Validates a schema configuration without applying it (non-force validation).
+  ///
+  /// @param schemaConfig Schema configuration to validate as JSON string
+  /// @return Validation response
+  /// @throws PinotAdminException If the request fails
   public String validateSchema(String schemaConfig)
       throws PinotAdminException {
     return validateSchema(schemaConfig, false);
   }
 
-  /**
-   * Gets field specification metadata.
-   *
-   * @return Field specification metadata as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets field specification metadata.
+  ///
+  /// @return Field specification metadata as JSON string
+  /// @throws PinotAdminException If the request fails
   public String getFieldSpecMetadata()
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/schemas/fieldSpec", null, _headers);
@@ -239,25 +209,19 @@ public class SchemaAdminClient extends BaseServiceAdminClient {
 
   // Async versions of key methods
 
-  /**
-   * Lists all schema names in the cluster (async).
-   */
+  /// Lists all schema names in the cluster (async).
   public CompletableFuture<List<String>> listSchemaNamesAsync() {
     return _transport.executeGetAsync(_controllerAddress, "/schemas", null, _headers)
         .thenApply(BaseServiceAdminClient::toStringListSafe);
   }
 
-  /**
-   * Gets a specific schema by name (async) and returns the raw JSON string.
-   */
+  /// Gets a specific schema by name (async) and returns the raw JSON string.
   public CompletableFuture<String> getSchemaAsync(String schemaName) {
     return _transport.executeGetAsync(_controllerAddress, "/schemas/" + schemaName, null, _headers)
         .thenApply(JsonNode::toString);
   }
 
-  /**
-   * Creates a new schema (async).
-   */
+  /// Creates a new schema (async).
   public CompletableFuture<String> createSchemaAsync(String schemaConfig, boolean force) {
     Map<String, String> queryParams = Map.of("force", String.valueOf(force));
 
@@ -265,9 +229,7 @@ public class SchemaAdminClient extends BaseServiceAdminClient {
         .thenApply(JsonNode::toString);
   }
 
-  /**
-   * Creates a new schema (async, non-force).
-   */
+  /// Creates a new schema (async, non-force).
   public CompletableFuture<String> createSchemaAsync(String schemaConfig) {
     return createSchemaAsync(schemaConfig, false);
   }

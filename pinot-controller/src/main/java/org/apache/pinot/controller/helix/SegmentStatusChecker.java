@@ -67,10 +67,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Manages the segment status metrics, regarding tables with fewer replicas than requested
- * and segments in error state.
- */
+/// Manages the segment status metrics, regarding tables with fewer replicas than requested
+/// and segments in error state.
 public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusChecker.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStatusChecker.class);
   private static final ZNRecordSerializer RECORD_SERIALIZER = new ZNRecordSerializer();
@@ -90,11 +88,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
   private long _lastDisabledTableLogTimestamp = 0;
 
-  /**
-   * Constructs the segment status checker.
-   * @param pinotHelixResourceManager The resource checker used to interact with Helix
-   * @param config The controller configuration object
-   */
+  /// Constructs the segment status checker.
+  /// @param pinotHelixResourceManager The resource checker used to interact with Helix
+  /// @param config The controller configuration object
   public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
       TableSizeReader tableSizeReader) {
@@ -169,10 +165,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     });
   }
 
-  /**
-   * Updates metrics related to the table config.
-   * If table config not found, resets the metrics
-   */
+  /// Updates metrics related to the table config.
+  /// If table config not found, resets the metrics
   private void updateTableConfigMetrics(String tableNameWithType, TableConfig tableConfig, Context context) {
     if (tableConfig == null) {
       LOGGER.warn("Found null table config for table: {}. Resetting table config metrics.", tableNameWithType);
@@ -211,14 +205,12 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     updateTenantInfoGauge(tableNameWithType, tableConfig);
   }
 
-  /**
-   * Emits one {@code tableTenantInfo} gauge per (tenantType, tenantName) pair for a table so Prometheus can extract
-   * both as labels and join them onto other table-scoped metrics.  Every gauge is always set to {@code 1}.
-   * TenantType values: {@code "server"} (server tenant), {@code "broker"} (broker tenant), {@code "tier"} (tier
-   * server tenant).  The compound key {@code "<tenantType>.<tenantName>"} is embedded in the JMX metric name.
-   * Gauges are only written on first registration or when the tenant assignment changes, not on every periodic cycle.
-   * When assignments change, new gauges are registered before stale ones are removed to avoid a scrape-window gap.
-   */
+  /// Emits one `tableTenantInfo` gauge per (tenantType, tenantName) pair for a table so Prometheus can extract
+  /// both as labels and join them onto other table-scoped metrics.  Every gauge is always set to `1`.
+  /// TenantType values: `"server"` (server tenant), `"broker"` (broker tenant), `"tier"` (tier
+  /// server tenant).  The compound key `"<tenantType>.<tenantName>"` is embedded in the JMX metric name.
+  /// Gauges are only written on first registration or when the tenant assignment changes, not on every periodic cycle.
+  /// When assignments change, new gauges are registered before stale ones are removed to avoid a scrape-window gap.
   private void updateTenantInfoGauge(String tableNameWithType, TableConfig tableConfig) {
     TenantConfig tenantConfig = tableConfig.getTenantConfig();
 
@@ -277,10 +269,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
   }
 
-  /**
-   * Runs a segment status pass over the given table.
-   * TODO: revisit the logic and reduce the ZK access
-   */
+  /// Runs a segment status pass over the given table.
+  /// TODO: revisit the logic and reduce the ZK access
   private boolean updateSegmentMetrics(String tableNameWithType, TableConfig tableConfig, Context context) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
 

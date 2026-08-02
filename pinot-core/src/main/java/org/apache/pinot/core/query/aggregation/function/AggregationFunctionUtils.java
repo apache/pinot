@@ -59,19 +59,15 @@ import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * The <code>AggregationFunctionUtils</code> class provides utility methods for aggregation function.
- */
+/// The `AggregationFunctionUtils` class provides utility methods for aggregation function.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class AggregationFunctionUtils {
   private AggregationFunctionUtils() {
   }
 
-  /**
-   * (For Star-Tree) Creates an {@link AggregationFunctionColumnPair} in stored type from the
-   * {@link AggregationFunction}. Returns {@code null} if the {@link AggregationFunction} cannot be represented as an
-   * {@link AggregationFunctionColumnPair} (e.g. has multiple arguments, argument is not column etc.).
-   */
+  /// (For Star-Tree) Creates an [AggregationFunctionColumnPair] in stored type from the
+  /// [AggregationFunction]. Returns `null` if the [AggregationFunction] cannot be represented as an
+  /// [AggregationFunctionColumnPair] (e.g. has multiple arguments, argument is not column etc.).
   @Nullable
   public static AggregationFunctionColumnPair getStoredFunctionColumnPair(AggregationFunction aggregationFunction) {
     AggregationFunctionType functionType = aggregationFunction.getType();
@@ -89,11 +85,10 @@ public class AggregationFunctionUtils {
     return null;
   }
 
-  /**
-   * Collects all transform expressions required for aggregation/group-by queries.
-   * <p>NOTE: We don't need to consider order-by columns here as the ordering is only allowed for aggregation functions
-   *          or group-by expressions.
-   */
+  /// Collects all transform expressions required for aggregation/group-by queries.
+  ///
+  /// NOTE: We don't need to consider order-by columns here as the ordering is only allowed for aggregation functions
+  ///          or group-by expressions.
   public static Set<ExpressionContext> collectExpressionsToTransform(AggregationFunction[] aggregationFunctions,
       @Nullable List<ExpressionContext> groupByExpressions) {
     Set<ExpressionContext> expressions = new HashSet<>();
@@ -106,10 +101,8 @@ public class AggregationFunctionUtils {
     return expressions;
   }
 
-  /**
-   * Creates a map from expression required by the {@link AggregationFunction} to {@link BlockValSet} fetched from the
-   * {@link ValueBlock}.
-   */
+  /// Creates a map from expression required by the [AggregationFunction] to [BlockValSet] fetched from the
+  /// [ValueBlock].
   public static Map<ExpressionContext, BlockValSet> getBlockValSetMap(AggregationFunction aggregationFunction,
       ValueBlock valueBlock) {
     //noinspection unchecked
@@ -129,12 +122,11 @@ public class AggregationFunctionUtils {
     return blockValSetMap;
   }
 
-  /**
-   * (For Star-Tree) Creates a map from expression required by the {@link AggregationFunctionColumnPair} to
-   * {@link BlockValSet} fetched from the {@link ValueBlock}.
-   * <p>NOTE: We construct the map with original column name as the key but fetch BlockValSet with the aggregation
-   *          function pair so that the aggregation result column name is consistent with or without star-tree.
-   */
+  /// (For Star-Tree) Creates a map from expression required by the [AggregationFunctionColumnPair] to
+  /// [BlockValSet] fetched from the [ValueBlock].
+  ///
+  /// NOTE: We construct the map with original column name as the key but fetch BlockValSet with the aggregation
+  ///          function pair so that the aggregation result column name is consistent with or without star-tree.
   public static Map<ExpressionContext, BlockValSet> getBlockValSetMap(
       AggregationFunctionColumnPair aggregationFunctionColumnPair, ValueBlock valueBlock) {
     ExpressionContext expression = ExpressionContext.forIdentifier(aggregationFunctionColumnPair.getColumn());
@@ -142,9 +134,7 @@ public class AggregationFunctionUtils {
     return Map.of(expression, blockValSet);
   }
 
-  /**
-   * Reads the intermediate result from the {@link DataTable}.
-   */
+  /// Reads the intermediate result from the [DataTable].
   @Nullable
   public static Object getIntermediateResult(AggregationFunction aggregationFunction, DataTable dataTable,
       ColumnDataType columnDataType, int rowId, int colId) {
@@ -171,11 +161,9 @@ public class AggregationFunctionUtils {
     }
   }
 
-  /**
-   * Writes a non-OBJECT intermediate result into the {@link DataTableBuilder} at the given column.
-   * Counterpart of {@link #getIntermediateResult}. OBJECT columns are handled by the caller via
-   * {@link AggregationFunction#serializeIntermediateResult}, since they need the aggregation function.
-   */
+  /// Writes a non-OBJECT intermediate result into the [DataTableBuilder] at the given column.
+  /// Counterpart of [#getIntermediateResult]. OBJECT columns are handled by the caller via
+  /// [AggregationFunction#serializeIntermediateResult], since they need the aggregation function.
   public static void setIntermediateResult(DataTableBuilder dataTableBuilder, ColumnDataType columnDataType, int colId,
       Object result)
       throws IOException {
@@ -206,9 +194,7 @@ public class AggregationFunctionUtils {
     }
   }
 
-  /**
-   * Reads the final result from the {@link DataTable}.
-   */
+  /// Reads the final result from the [DataTable].
   public static Comparable getFinalResult(DataTable dataTable, ColumnDataType columnDataType, int rowId, int colId) {
     switch (columnDataType.getStoredType()) {
       case INT:
@@ -244,10 +230,8 @@ public class AggregationFunctionUtils {
     }
   }
 
-  /**
-   * Reads the converted final result from the {@link DataTable}. It should be equivalent to running
-   * {@link #getFinalResult} and {@link ColumnDataType#convert}.
-   */
+  /// Reads the converted final result from the [DataTable]. It should be equivalent to running
+  /// [#getFinalResult] and [ColumnDataType#convert].
   public static Object getConvertedFinalResult(DataTable dataTable, ColumnDataType columnDataType, int rowId,
       int colId) {
     switch (columnDataType) {
@@ -332,9 +316,7 @@ public class AggregationFunctionUtils {
     }
   }
 
-  /**
-   * Builds {@link AggregationInfo} for aggregations.
-   */
+  /// Builds [AggregationInfo] for aggregations.
   public static AggregationInfo buildAggregationInfo(SegmentContext segmentContext, QueryContext queryContext,
       AggregationFunction[] aggregationFunctions, @Nullable FilterContext filter, BaseFilterOperator filterOperator,
       List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators) {
@@ -346,10 +328,8 @@ public class AggregationFunctionUtils {
         : buildAggregationInfoWithoutStarTree(segmentContext, queryContext, aggregationFunctions, filterOperator);
   }
 
-  /**
-   * Builds {@link AggregationInfo} for aggregations using star-tree index. Returns {@code null} if star-tree index
-   * cannot be used.
-   */
+  /// Builds [AggregationInfo] for aggregations using star-tree index. Returns `null` if star-tree index
+  /// cannot be used.
   @Nullable
   public static AggregationInfo buildAggregationInfoWithStarTree(SegmentContext segmentContext,
       QueryContext queryContext, AggregationFunction[] aggregationFunctions, @Nullable FilterContext filter,
@@ -370,9 +350,7 @@ public class AggregationFunctionUtils {
     return null;
   }
 
-  /**
-   * Builds {@link AggregationInfo} for aggregations without using star-tree index.
-   */
+  /// Builds [AggregationInfo] for aggregations without using star-tree index.
   public static AggregationInfo buildAggregationInfoWithoutStarTree(SegmentContext segmentContext,
       QueryContext queryContext, AggregationFunction[] aggregationFunctions, BaseFilterOperator filterOperator) {
     Set<ExpressionContext> expressionsToTransform =
@@ -384,9 +362,7 @@ public class AggregationFunctionUtils {
     return new AggregationInfo(aggregationFunctions, projectOperator, false);
   }
 
-  /**
-   * Builds swim-lanes (list of {@link AggregationInfo}) for filtered aggregations.
-   */
+  /// Builds swim-lanes (list of [AggregationInfo]) for filtered aggregations.
   public static List<AggregationInfo> buildFilteredAggregationInfos(SegmentContext segmentContext,
       QueryContext queryContext) {
     assert queryContext.getAggregationFunctions() != null && queryContext.getFilteredAggregationFunctions() != null;

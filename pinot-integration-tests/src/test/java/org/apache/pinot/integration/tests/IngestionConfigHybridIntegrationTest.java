@@ -38,9 +38,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
-/**
- * Tests ingestion configs on a hybrid table
- */
+/// Tests ingestion configs on a hybrid table
 public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;
