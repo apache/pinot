@@ -38,6 +38,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.fail;
 
 
@@ -82,6 +83,30 @@ public class JSONMessageDecoderTest {
     assertEquals(row.getValue("missing"), null);
     assertEquals(row.getValue("unselected"), "preserved");
     assertEquals(row.getFieldToValueMap().keySet(), Set.of("id", "missing", "unselected"));
+  }
+
+  @Test
+  public void testDirectDecodeHonorsOffsetAndLength()
+      throws Exception {
+    String prefix = "invalid-prefix";
+    String record = "{\"id\":1,\"name\":\"alice\"}";
+    byte[] payload = (prefix + record + "invalid-suffix").getBytes(StandardCharsets.UTF_8);
+    int offset = prefix.getBytes(StandardCharsets.UTF_8).length;
+    int length = record.getBytes(StandardCharsets.UTF_8).length;
+
+    JSONMessageDecoder allFieldsDecoder = new JSONMessageDecoder();
+    allFieldsDecoder.init(Map.of(), null, "testTopic");
+    GenericRow allFieldsRow = allFieldsDecoder.decode(payload, offset, length, new GenericRow());
+    assertEquals(allFieldsRow.getFieldToValueMap(), Map.of("id", 1, "name", "alice"));
+
+    JSONMessageDecoder selectedFieldsDecoder = new JSONMessageDecoder();
+    selectedFieldsDecoder.init(Map.of(), Set.of("id"), "testTopic");
+    GenericRow selectedFieldsRow = selectedFieldsDecoder.decode(payload, offset, length, new GenericRow());
+    assertEquals(selectedFieldsRow.getFieldToValueMap(), Map.of("id", 1));
+
+    // Exclude the closing brace to prove the parser honors length instead of reading the remaining array.
+    assertThrows(RuntimeException.class,
+        () -> allFieldsDecoder.decode(payload, offset, length - 1, new GenericRow()));
   }
 
   @Test

@@ -56,7 +56,11 @@ public interface JsonPayloadParser {
       throws Exception;
 
   /// Parses the payload directly into `destination`, avoiding a top-level per-record map when the
-  /// implementation supports it.
+  /// implementation supports it. When this method returns `false`, it must leave `destination` unchanged so
+  /// the caller can safely fall back to [#parse]. When it returns `true`, it must overwrite every requested
+  /// field (using `null` for missing fields) and leave unrequested fields unchanged. When `fields` is `null`,
+  /// it must populate every top-level field present in the payload. If parsing throws, `destination` may be
+  /// partially modified and the caller must discard or clear it before reuse.
   ///
   /// @param fields fields to populate, or `null` to populate every top-level field
   /// @return `true` when the payload was decoded into `destination`; `false` when the caller
