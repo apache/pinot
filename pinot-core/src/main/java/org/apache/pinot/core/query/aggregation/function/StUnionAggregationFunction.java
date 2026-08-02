@@ -139,14 +139,12 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
     return new ByteArray(GeometrySerializer.serialize(geometry));
   }
 
-  /**
-   * Returns the union of the supplied geometries.
-   *
-   * <p>When either operand is a {@code GeometryCollection}, {@link Geometry#union(Geometry)} can produce invalid
-   * topologies or drop components because it expects homogeneous inputs.  The {@link UnaryUnionOp} implementation is
-   * purpose-built for arbitrary collections, so we first combine the components and delegate to it to ensure a valid
-   * and deterministic result.</p>
-   */
+  /// Returns the union of the supplied geometries.
+  ///
+  /// When either operand is a `GeometryCollection`, [Geometry#union(Geometry)] can produce invalid
+  /// topologies or drop components because it expects homogeneous inputs.  The [UnaryUnionOp] implementation is
+  /// purpose-built for arbitrary collections, so we first combine the components and delegate to it to ensure a valid
+  /// and deterministic result.
   @Nullable
   private static Geometry union(@Nullable Geometry left, @Nullable Geometry right) {
     if (left == null) {

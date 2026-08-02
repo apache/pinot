@@ -61,9 +61,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for {@link WorkerManager}.
- */
+/// Tests for [WorkerManager].
 public class WorkerManagerTest {
 
   private static Schema.SchemaBuilder getSchemaBuilder(String schemaName) {
@@ -85,14 +83,12 @@ public class WorkerManagerTest {
     return new ServerInstance(instanceConfig);
   }
 
-  /**
-   * Tests that when useLeafServerForIntermediateStage is enabled and querying an empty table
-   * (which results in no leaf servers), the query planner falls back to using all enabled servers
-   * instead of failing.
-   *
-   * This test simulates the scenario where a table exists with routing but has no segments,
-   * resulting in an empty RoutingTable (no server instances with segments).
-   */
+  /// Tests that when useLeafServerForIntermediateStage is enabled and querying an empty table
+  /// (which results in no leaf servers), the query planner falls back to using all enabled servers
+  /// instead of failing.
+  ///
+  /// This test simulates the scenario where a table exists with routing but has no segments,
+  /// resulting in an empty RoutingTable (no server instances with segments).
   @Test
   public void testSingletonWorkerWithEmptyTableAndUseLeafServerEnabled() {
     Schema emptyTableSchema = getSchemaBuilder("emptyTable").build();
@@ -498,12 +494,10 @@ public class WorkerManagerTest {
     assertNull(brokerRequest.getPinotQuery().getFilterExpression());
   }
 
-  /**
-   * Mimics how segment pruners consume a routing filter: operators are resolved via {@code FilterKind.valueOf}
-   * (which throws on non-FilterKind operators, e.g. bare boolean scalar functions like {@code contains}) and
-   * AND/OR/NOT operands are walked recursively. Keeps the mock routing managers honest: a routing query that would
-   * crash the real segment pruners also fails the unit tests.
-   */
+  /// Mimics how segment pruners consume a routing filter: operators are resolved via `FilterKind.valueOf`
+  /// (which throws on non-FilterKind operators, e.g. bare boolean scalar functions like `contains`) and
+  /// AND/OR/NOT operands are walked recursively. Keeps the mock routing managers honest: a routing query that would
+  /// crash the real segment pruners also fails the unit tests.
   private static void validatePrunableFilter(@Nullable Expression expression) {
     if (expression == null || expression.getFunctionCall() == null) {
       return;
@@ -517,7 +511,7 @@ public class WorkerManagerTest {
     }
   }
 
-  /** Builds a QueryEnvironment over a single offline table "testTable" backed by the given routing manager. */
+  /// Builds a QueryEnvironment over a single offline table "testTable" backed by the given routing manager.
   private static QueryEnvironment newQueryEnvironment(Schema schema, RoutingManager routingManager) {
     Map<String, String> tableNameMap = new HashMap<>();
     tableNameMap.put("testTable_OFFLINE", "testTable_OFFLINE");
@@ -841,12 +835,10 @@ public class WorkerManagerTest {
     }
   }
 
-  /**
-   * Builds a QueryEnvironment for a hybrid partitioned table "testTable" (function Hashcode on col1, 4 partitions).
-   * Partition {@code p} holds offline segment {@code "segO{p}"} and realtime segment {@code "segR{p}"}, both fully
-   * replicated on server {@code p}. The given surviving segment lists are what the {@link RoutingManager} returns for
-   * the filtered routing query of each table type.
-   */
+  /// Builds a QueryEnvironment for a hybrid partitioned table "testTable" (function Hashcode on col1, 4 partitions).
+  /// Partition `p` holds offline segment `"segO{p}"` and realtime segment `"segR{p}"`, both fully
+  /// replicated on server `p`. The given surviving segment lists are what the [RoutingManager] returns for
+  /// the filtered routing query of each table type.
   private static QueryEnvironment newHybridPartitionedQueryEnvironment(List<String> survivingOfflineSegments,
       List<String> survivingRealtimeSegments) {
     int numPartitions = 4;
@@ -894,7 +886,7 @@ public class WorkerManagerTest {
     return new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache, workerManager);
   }
 
-  /** Buckets the given surviving segments onto their owning server (partition p's segment lives on server p). */
+  /// Buckets the given surviving segments onto their owning server (partition p's segment lives on server p).
   private static RoutingTable hybridRoutingTable(ServerInstance[] servers, List<String> survivingSegments) {
     Map<ServerInstance, List<String>> serverToSegmentList = new HashMap<>();
     for (String segment : survivingSegments) {
@@ -913,14 +905,13 @@ public class WorkerManagerTest {
         reportedPrunedByRouting, false);
   }
 
-  /**
-   * Builds a QueryEnvironment for an offline partitioned table "testTable" (function Hashcode on col1). Partition
-   * {@code p} holds one segment {@code "seg{p}"} fully replicated on the {@code replicasPerPartition} servers starting
-   * at {@code serverIdxPerPartition[p]}. {@code survivingSegments} is what the {@link RoutingManager} returns from
-   * getRoutingTable for the filtered routing query -- i.e. the segments that survive broker pruning; the corresponding
-   * partitions are kept. {@code unavailableSegments} are reported by the routing table as unavailable (they must keep
-   * their partition alive). When {@code throwOnRouting} is true, getRoutingTable throws to exercise the fail-open path.
-   */
+  /// Builds a QueryEnvironment for an offline partitioned table "testTable" (function Hashcode on col1). Partition
+  /// `p` holds one segment `"seg{p}"` fully replicated on the `replicasPerPartition` servers starting
+  /// at `serverIdxPerPartition[p]`. `survivingSegments` is what the [RoutingManager] returns from
+  /// getRoutingTable for the filtered routing query -- i.e. the segments that survive broker pruning; the corresponding
+  /// partitions are kept. `unavailableSegments` are reported by the routing table as unavailable (they must
+  /// keep their partition alive). When `throwOnRouting` is true, getRoutingTable throws to exercise the
+  /// fail-open path.
   private static QueryEnvironment newPartitionedQueryEnvironment(int[] serverIdxPerPartition, int numServers,
       int replicasPerPartition, List<String> survivingSegments, List<String> unavailableSegments,
       int reportedPrunedByRouting, boolean throwOnRouting) {
@@ -974,14 +965,14 @@ public class WorkerManagerTest {
     return new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache, workerManager);
   }
 
-  /** Returns the leaf table-scan fragment: the only fragment with segment assignments. */
+  /// Returns the leaf table-scan fragment: the only fragment with segment assignments.
   @Nullable
   private static DispatchablePlanFragment leafFragment(DispatchableSubPlan dispatchableSubPlan) {
     List<DispatchablePlanFragment> leafFragments = leafFragments(dispatchableSubPlan);
     return leafFragments.isEmpty() ? null : leafFragments.get(0);
   }
 
-  /** Returns all fragments with segment assignments (the table-scan leaves). */
+  /// Returns all fragments with segment assignments (the table-scan leaves).
   private static List<DispatchablePlanFragment> leafFragments(DispatchableSubPlan dispatchableSubPlan) {
     List<DispatchablePlanFragment> leafFragments = new ArrayList<>();
     for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStageMap().values()) {
@@ -992,7 +983,7 @@ public class WorkerManagerTest {
     return leafFragments;
   }
 
-  /** Maps each assigned segment to the instance id of the server its worker was placed on. */
+  /// Maps each assigned segment to the instance id of the server its worker was placed on.
   private static Map<String, String> segmentToServer(DispatchablePlanFragment leafFragment) {
     Map<Integer, String> workerIdToServer = new HashMap<>();
     for (Map.Entry<QueryServerInstance, List<Integer>> entry
@@ -1021,14 +1012,12 @@ public class WorkerManagerTest {
     return segments;
   }
 
-  /**
-   * Tests that literal-only stages (e.g. UNION ALL of constant values) are assigned to the same
-   * servers as the table-scanning stages, not to all enabled servers across all tenants.
-   *
-   * <p>Simulates two server tenants: T1 (serves the queried table) and T2 (unrelated). Before the fix,
-   * literal-only stages processed before leaf stages would see an empty candidate set and fall back to
-   * all enabled servers, potentially landing on T2 servers.
-   */
+  /// Tests that literal-only stages (e.g. UNION ALL of constant values) are assigned to the same
+  /// servers as the table-scanning stages, not to all enabled servers across all tenants.
+  ///
+  /// Simulates two server tenants: T1 (serves the queried table) and T2 (unrelated). Before the fix,
+  /// literal-only stages processed before leaf stages would see an empty candidate set and fall back to
+  /// all enabled servers, potentially landing on T2 servers.
   @Test
   public void testLiteralOnlyStagesUseTableServers() {
     Schema tableSchema = getSchemaBuilder("testTable").build();
@@ -1117,11 +1106,9 @@ public class WorkerManagerTest {
     assertTrue(anyT1Server, "Expected at least one T1 server to be used");
   }
 
-  /**
-   * A RoutingManager that simulates two tenants of servers, where only one tenant serves the queried
-   * tables. {@code getEnabledServerInstanceMap()} returns all servers across both tenants, while
-   * {@code getServingInstances()} returns only the tenant's servers.
-   */
+  /// A RoutingManager that simulates two tenants of servers, where only one tenant serves the queried
+  /// tables. `getEnabledServerInstanceMap()` returns all servers across both tenants, while
+  /// `getServingInstances()` returns only the tenant's servers.
   private static class MultiTenantRoutingManager implements RoutingManager {
     private final Map<String, ServerInstance> _allEnabledServers;
     private final Set<String> _servingInstanceIds;
@@ -1191,10 +1178,8 @@ public class WorkerManagerTest {
     }
   }
 
-  /**
-   * A custom RoutingManager implementation that simulates a table with routing but no segments.
-   * This is used to test the empty leaf server fallback logic.
-   */
+  /// A custom RoutingManager implementation that simulates a table with routing but no segments.
+  /// This is used to test the empty leaf server fallback logic.
   private static class EmptyTableRoutingManager implements RoutingManager {
     private final Map<String, ServerInstance> _serverInstanceMap;
     private final RoutingTable _emptyRoutingTable;
@@ -1280,7 +1265,7 @@ public class WorkerManagerTest {
       _throwOnFilteredRouting = throwOnFilteredRouting;
     }
 
-    /** When set, filter-bearing routing requests return an all-pruned (empty) routing table. */
+    /// When set, filter-bearing routing requests return an all-pruned (empty) routing table.
     void setEmptyOnFilteredRouting(boolean emptyOnFilteredRouting) {
       _emptyOnFilteredRouting = emptyOnFilteredRouting;
     }
@@ -1356,13 +1341,11 @@ public class WorkerManagerTest {
     }
   }
 
-  /**
-   * A RoutingManager for the partitioned leaf path. It exposes a {@link TablePartitionReplicatedServersInfo} per typed
-   * table (driving {@code calculatePartitionTableInfo}) and returns a pre-configured {@link RoutingTable} of surviving
-   * segments from getRoutingTable (simulating what the real segment pruners would return for the query filter). This
-   * lets the test drive which partitions survive without depending on the pruner internals (which are tested
-   * separately).
-   */
+  /// A RoutingManager for the partitioned leaf path. It exposes a [TablePartitionReplicatedServersInfo] per typed
+  /// table (driving `calculatePartitionTableInfo`) and returns a pre-configured [RoutingTable] of surviving
+  /// segments from getRoutingTable (simulating what the real segment pruners would return for the query filter). This
+  /// lets the test drive which partitions survive without depending on the pruner internals (which are tested
+  /// separately).
   private static class PartitionedRoutingManager implements RoutingManager {
     private final Map<String, ServerInstance> _enabledServers;
     private final Map<String, TablePartitionReplicatedServersInfo> _partitionInfoByTable;

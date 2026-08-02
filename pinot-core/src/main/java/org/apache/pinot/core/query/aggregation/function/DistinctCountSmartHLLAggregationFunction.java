@@ -41,22 +41,20 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The {@code DistinctCountSmartHLLAggregationFunction} calculates the number of distinct values for a given expression
- * (both single-valued and multi-valued are supported).
- *
- * For aggregation-only queries, the distinct values are stored in a Set initially. Once the number of distinct values
- * exceeds a threshold, the Set will be converted into a HyperLogLog, and approximate result will be returned.
- *
- * The function takes an optional second argument for parameters:
- * - threshold: Threshold of the number of distinct values to trigger the conversion, 100_000 by default. Non-positive
- *              value means never convert.
- * - log2m: Log2m for the converted HyperLogLog, 12 by default.
- * - dictThreshold: Threshold for dictionary-encoded columns to trigger early conversion from RoaringBitmap to HLL
- *                  during aggregation. 100_000 by default. Set to Integer.MAX_VALUE to disable and convert only
- *                  at finalization.
- * Example of second argument: 'threshold=10;log2m=8;dictThreshold=100000'
- */
+/// The `DistinctCountSmartHLLAggregationFunction` calculates the number of distinct values for a given expression
+/// (both single-valued and multi-valued are supported).
+///
+/// For aggregation-only queries, the distinct values are stored in a Set initially. Once the number of distinct values
+/// exceeds a threshold, the Set will be converted into a HyperLogLog, and approximate result will be returned.
+///
+/// The function takes an optional second argument for parameters:
+/// - threshold: Threshold of the number of distinct values to trigger the conversion, 100_000 by default. Non-positive
+///              value means never convert.
+/// - log2m: Log2m for the converted HyperLogLog, 12 by default.
+/// - dictThreshold: Threshold for dictionary-encoded columns to trigger early conversion from RoaringBitmap to HLL
+///                  during aggregation. 100_000 by default. Set to Integer.MAX_VALUE to disable and convert only
+///                  at finalization.
+/// Example of second argument: 'threshold=10;log2m=8;dictThreshold=100000'
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountSmartSketchAggregationFunction {
 
@@ -123,9 +121,7 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
     }
   }
 
-  /**
-   * Aggregate dictionary IDs into HLL (when already converted).
-   */
+  /// Aggregate dictionary IDs into HLL (when already converted).
   private void aggregateDictIdsIntoHLL(HyperLogLog hyperLogLog, Dictionary dictionary, BlockValSet blockValSet,
                                        int length) {
     if (blockValSet.isSingleValue()) {
@@ -143,9 +139,7 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
     }
   }
 
-  /**
-   * Aggregate dictionary IDs into RoaringBitmap (before conversion to HLL).
-   */
+  /// Aggregate dictionary IDs into RoaringBitmap (before conversion to HLL).
   private void aggregateDictIdsIntoBitmap(RoaringBitmap dictIdBitmap, BlockValSet blockValSet, int length) {
     if (blockValSet.isSingleValue()) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
@@ -158,9 +152,7 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
     }
   }
 
-  /**
-   * Check and convert to HLL if cardinality threshold exceeded for non-group-by aggregation.
-   */
+  /// Check and convert to HLL if cardinality threshold exceeded for non-group-by aggregation.
   private void checkAndConvertToHLL(AggregationResultHolder aggregationResultHolder, RoaringBitmap dictIdBitmap) {
     if (dictIdBitmap.getCardinality() > _dictIdCardinalityThreshold) {
       aggregationResultHolder.setValue(convertToHLL(aggregationResultHolder.getResult()));
@@ -390,14 +382,10 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
     return finalResult1 + finalResult2;
   }
 
-  /**
-   * Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
-   */
+  /// Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
   // helper methods for dict/value set conversions are provided by the base class
 
-  /**
-   * Helper method to read dictionary and convert dictionary ids to a HyperLogLog for dictionary-encoded expression.
-   */
+  /// Helper method to read dictionary and convert dictionary ids to a HyperLogLog for dictionary-encoded expression.
   private HyperLogLog convertToHLL(BaseDistinctCountSmartSketchAggregationFunction.DictIdsWrapper dictIdsWrapper) {
     HyperLogLog hyperLogLog = new HyperLogLog(_log2m);
     Dictionary dictionary = dictIdsWrapper._dictionary;
@@ -431,9 +419,7 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
             : "_MV"));
   }
 
-  /**
-   * Helper class to wrap the parameters.
-   */
+  /// Helper class to wrap the parameters.
   private static class Parameters {
     static final char PARAMETER_DELIMITER = ';';
     static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';

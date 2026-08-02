@@ -26,10 +26,8 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 
 
-/**
- * Startable implementation for Pinot broker.
- * Contains methods to start and stop a Pinot broker
- */
+/// Startable implementation for Pinot broker.
+/// Contains methods to start and stop a Pinot broker
 @SuppressWarnings("unused")
 public class HelixBrokerStarter extends BaseBrokerStarter {
 

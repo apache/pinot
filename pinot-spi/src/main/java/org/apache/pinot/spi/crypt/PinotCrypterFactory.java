@@ -27,9 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This factory instantiates the PinotCrypter, which participates in encrypting and decrypting files.
- */
+/// This factory instantiates the PinotCrypter, which participates in encrypting and decrypting files.
 public class PinotCrypterFactory {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotCrypterFactory.class);
   // Map of lower case simple class name to PinotCrypter object
@@ -41,13 +39,11 @@ public class PinotCrypterFactory {
   private PinotCrypterFactory() {
   }
 
-  /**
-   * Initializes map of crypter classes at startup time. Will initialize map with lower case simple class names.
-   * @param config
-   * Sample configuration:
-   * class.nooppinotcrypter = org.apache.pinot.core.crypt.NoOpPinotCrypter
-   * nooppinotcrypter.keyMap = sample_key
-   */
+  /// Initializes map of crypter classes at startup time. Will initialize map with lower case simple class names.
+  /// @param config
+  /// Sample configuration:
+  /// class.nooppinotcrypter = org.apache.pinot.core.crypt.NoOpPinotCrypter
+  /// nooppinotcrypter.keyMap = sample_key
   public static void init(PinotConfiguration config) {
     // Get schemes and their respective classes
     PinotConfiguration schemesConfig = config.subset(CLASS);

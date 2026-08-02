@@ -27,9 +27,7 @@ import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerConfig;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * Container for all spec related to Segment Processor Framework required for running via pinot-admin
- */
+/// Container for all spec related to Segment Processor Framework required for running via pinot-admin
 public class SegmentProcessorFrameworkSpec {
 
   private String _inputSegmentsDir;

@@ -30,27 +30,25 @@ import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
-/**
- * Bit-compressed dictionary-encoded forward index writer for multi-value columns, where a second level dictionary
- * encoding for multi-value entries (instead of individual values within the entry) are maintained within the forward
- * index.
- *
- * Index layout:
- * - Index header (24 bytes)
- * - ID buffer (stores the multi-value entry id for each doc id)
- * - Offset buffer (stores the start offset of each multi-value entry, followed by end offset of the last value)
- * - Value buffer (stores the individual values)
- *
- * Header layout:
- * - Magic marker (4 bytes)
- * - Version (2 bytes)
- * - Bits per value (1 byte)
- * - Bits per id (1 byte)
- * - Number of unique MV entries (4 bytes)
- * - Number of total values (4 bytes)
- * - Start offset of offset buffer (4 bytes)
- * - Start offset of value buffer (4 bytes)
- */
+/// Bit-compressed dictionary-encoded forward index writer for multi-value columns, where a second level dictionary
+/// encoding for multi-value entries (instead of individual values within the entry) are maintained within the forward
+/// index.
+///
+/// Index layout:
+/// - Index header (24 bytes)
+/// - ID buffer (stores the multi-value entry id for each doc id)
+/// - Offset buffer (stores the start offset of each multi-value entry, followed by end offset of the last value)
+/// - Value buffer (stores the individual values)
+///
+/// Header layout:
+/// - Magic marker (4 bytes)
+/// - Version (2 bytes)
+/// - Bits per value (1 byte)
+/// - Bits per id (1 byte)
+/// - Number of unique MV entries (4 bytes)
+/// - Number of total values (4 bytes)
+/// - Start offset of offset buffer (4 bytes)
+/// - Start offset of value buffer (4 bytes)
 public class FixedBitMVEntryDictForwardIndexWriter implements Closeable {
   public static final int MAGIC_MARKER = 0xffabcdef;
   public static final short VERSION = 1;

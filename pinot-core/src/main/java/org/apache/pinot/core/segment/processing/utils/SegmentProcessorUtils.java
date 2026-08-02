@@ -36,14 +36,16 @@ public final class SegmentProcessorUtils {
   private SegmentProcessorUtils() {
   }
 
-  /**
-   * Returns the field specs (physical only) and number of sort fields based on the merge type and sort order.
-   * <p>The field specs returned should have sorted columns in the front, followed by dimension/time columns sorted in
-   * alphabetical order, followed by metric columns sorted in alphabetical order.
-   * <p>For CONCAT, only include sort columns as sort fields;
-   * <p>For ROLLUP, include sort columns and dimension/time columns as sort fields;
-   * <p>For DEDUP, include all columns as sort fields.
-   */
+  /// Returns the field specs (physical only) and number of sort fields based on the merge type and sort order.
+  ///
+  /// The field specs returned should have sorted columns in the front, followed by dimension/time columns sorted in
+  /// alphabetical order, followed by metric columns sorted in alphabetical order.
+  ///
+  /// For CONCAT, only include sort columns as sort fields;
+  ///
+  /// For ROLLUP, include sort columns and dimension/time columns as sort fields;
+  ///
+  /// For DEDUP, include all columns as sort fields.
   public static Pair<List<FieldSpec>, Integer> getFieldSpecs(Schema schema, MergeType mergeType,
       @Nullable List<String> sortOrder) {
     return getFieldSpecs(schema, mergeType, sortOrder, false);

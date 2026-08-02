@@ -62,9 +62,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for ID_SET queries.
- */
+/// Queries test for ID_SET queries.
 public class IdSetQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "IdSetQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";

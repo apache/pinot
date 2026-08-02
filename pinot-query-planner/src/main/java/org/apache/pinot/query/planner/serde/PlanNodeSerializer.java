@@ -94,16 +94,18 @@ public class PlanNodeSerializer {
 
     @Override
     public Void visitAggregate(AggregateNode node, Plan.PlanNode.Builder builder) {
-      Plan.AggregateNode aggregateNode = Plan.AggregateNode.newBuilder()
+      Plan.AggregateNode.Builder aggregateNodeBuilder = Plan.AggregateNode.newBuilder()
           .addAllAggCalls(convertFunctionCalls(node.getAggCalls()))
           .addAllFilterArgs(node.getFilterArgs())
           .addAllGroupKeys(node.getGroupKeys())
           .setAggType(convertAggType(node.getAggType()))
           .setLeafReturnFinalResult(node.isLeafReturnFinalResult())
           .addAllCollations(convertCollations(node.getCollations()))
-          .setLimit(node.getLimit())
-          .build();
-      builder.setAggregateNode(aggregateNode);
+          .setLimit(node.getLimit());
+      for (List<Integer> groupingSet : node.getGroupingSets()) {
+        aggregateNodeBuilder.addGroupingSets(Plan.GroupingSet.newBuilder().addAllGroupKeyIndexes(groupingSet).build());
+      }
+      builder.setAggregateNode(aggregateNodeBuilder.build());
       return null;
     }
 
@@ -132,6 +134,7 @@ public class PlanNodeSerializer {
       return null;
     }
 
+    @Deprecated(forRemoval = true, since = "1.6.0")
     @Override
     public Void visitEnrichedJoin(EnrichedJoinNode node, Plan.PlanNode.Builder builder) {
       Plan.EnrichedJoinNode.Builder enrichedJoinNode = Plan.EnrichedJoinNode.newBuilder()

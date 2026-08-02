@@ -28,10 +28,8 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
-/**
- * Runs the shared {@link AbstractMetricsTest} against the in-memory {@link FakePinotMetricsRegistry}. This covers
- * {@code AbstractMetrics} logic in pinot-common without pulling in a real metrics plugin.
- */
+/// Runs the shared [AbstractMetricsTest] against the in-memory [FakePinotMetricsRegistry]. This covers
+/// `AbstractMetrics` logic in pinot-common without pulling in a real metrics plugin.
 public class FakeMetricsAbstractMetricsTest extends AbstractMetricsTest {
 
   @Override

@@ -21,9 +21,7 @@ package org.apache.pinot.core.segment.processing.partitioner;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/**
- * Partitioner which extracts a column value as the partition
- */
+/// Partitioner which extracts a column value as the partition
 public class ColumnValuePartitioner implements Partitioner {
 
   private final String _columnName;

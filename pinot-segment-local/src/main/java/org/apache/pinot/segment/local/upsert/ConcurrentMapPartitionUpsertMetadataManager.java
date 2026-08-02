@@ -41,9 +41,7 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * Implementation of {@link PartitionUpsertMetadataManager} that is backed by a {@link ConcurrentHashMap}.
- */
+/// Implementation of [PartitionUpsertMetadataManager] that is backed by a [ConcurrentHashMap].
 @SuppressWarnings({"rawtypes", "unchecked"})
 @ThreadSafe
 public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUpsertMetadataManager {

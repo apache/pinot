@@ -37,189 +37,133 @@ import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * The <code>InstanceDataManager</code> class is the instance level data manager, which manages all tables and segments
- * served by the instance.
- */
+/// The `InstanceDataManager` class is the instance level data manager, which manages all tables and segments
+/// served by the instance.
 @InterfaceAudience.Private
 @ThreadSafe
 public interface InstanceDataManager {
 
-  /**
-   * Initializes the data manager.
-   * <p>Should be called only once and before calling any other method.
-   * <p>NOTE: The config is the subset of server config with prefix 'pinot.server.instance'
-   */
+  /// Initializes the data manager.
+  ///
+  /// Should be called only once and before calling any other method.
+  ///
+  /// NOTE: The config is the subset of server config with prefix 'pinot.server.instance'
   void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics,
       @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet,
       ServerReloadJobStatusCache reloadJobStatusCache)
       throws Exception;
 
-  /**
-   * Returns the instance id.
-   */
+  /// Returns the instance id.
   String getInstanceId();
 
-  /**
-   * Starts the data manager.
-   * <p>Should be called only once after data manager gets initialized but before calling any other method.
-   */
+  /// Starts the data manager.
+  ///
+  /// Should be called only once after data manager gets initialized but before calling any other method.
   void start();
 
-  /**
-   * Shuts down the data manager.
-   * <p>Should be called only once. After calling shut down, no other method should be called.
-   */
+  /// Shuts down the data manager.
+  ///
+  /// Should be called only once. After calling shut down, no other method should be called.
   void shutDown();
 
-  /**
-   * Delete a table.
-   */
+  /// Delete a table.
   void deleteTable(String tableNameWithType, long deletionTimeMs)
       throws Exception;
 
-  /**
-   * Adds an ONLINE segment into a table.
-   * This method is triggered by state transition to ONLINE state.
-   */
+  /// Adds an ONLINE segment into a table.
+  /// This method is triggered by state transition to ONLINE state.
   void addOnlineSegment(String tableNameWithType, String segmentName)
       throws Exception;
 
-  /**
-   * Adds a CONSUMING segment into a REALTIME table.
-   * This method is triggered by state transition to CONSUMING state.
-   */
+  /// Adds a CONSUMING segment into a REALTIME table.
+  /// This method is triggered by state transition to CONSUMING state.
   void addConsumingSegment(String realtimeTableName, String segmentName)
       throws Exception;
 
-  /**
-   * Replaces an already loaded segment in a table if the segment has been overridden in the deep store (CRC mismatch).
-   * This method is triggered by a custom message (NOT state transition), and the target segment should be in ONLINE
-   * state.
-   */
+  /// Replaces an already loaded segment in a table if the segment has been overridden in the deep store (CRC mismatch).
+  /// This method is triggered by a custom message (NOT state transition), and the target segment should be in ONLINE
+  /// state.
   void replaceSegment(String tableNameWithType, String segmentName)
       throws Exception;
 
-  /**
-   * Offloads a segment from table but not dropping its data from server.
-   * This method is triggered by state transition to OFFLINE state.
-   */
+  /// Offloads a segment from table but not dropping its data from server.
+  /// This method is triggered by state transition to OFFLINE state.
   void offloadSegment(String tableNameWithType, String segmentName)
       throws Exception;
 
-  /**
-   * Delete segment data from the server physically.
-   * This method is triggered by state transition to DROPPED state.
-   */
+  /// Delete segment data from the server physically.
+  /// This method is triggered by state transition to DROPPED state.
   void deleteSegment(String tableNameWithType, String segmentName)
       throws Exception;
 
-  /**
-   * Reloads a segment in a table. This method can download a new segment to replace the local one before loading.
-   * Download happens when local segment's CRC mismatches the one of the remote segment; but can also be forced to do
-   * regardless of CRC.
-   */
+  /// Reloads a segment in a table. This method can download a new segment to replace the local one before loading.
+  /// Download happens when local segment's CRC mismatches the one of the remote segment; but can also be forced to do
+  /// regardless of CRC.
   void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload, String reloadJobId)
       throws Exception;
 
-  /**
-   * Reloads all segments of a table.
-   */
+  /// Reloads all segments of a table.
   void reloadAllSegments(String tableNameWithType, boolean forceDownload, String reloadJobId)
       throws Exception;
 
-  /**
-   * Reload a list of segments in a table.
-   */
+  /// Reload a list of segments in a table.
   void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload, String reloadJobId)
       throws Exception;
 
-  /**
-   * Returns all tables served by the instance.
-   */
+  /// Returns all tables served by the instance.
   Set<String> getAllTables();
 
-  /**
-   * Returns the table data manager for the given table, or <code>null</code> if it does not exist.
-   */
+  /// Returns the table data manager for the given table, or `null` if it does not exist.
   @Nullable
   TableDataManager getTableDataManager(String tableNameWithType);
 
-  /**
-   * Returns the segment metadata for the given segment in the given table, or <code>null</code> if it does not exist.
-   */
+  /// Returns the segment metadata for the given segment in the given table, or `null` if it does not exist.
   @Nullable
   SegmentMetadata getSegmentMetadata(String tableNameWithType, String segmentName);
 
-  /**
-   * Returns the metadata for all segments in the given table.
-   */
+  /// Returns the metadata for all segments in the given table.
   List<SegmentMetadata> getAllSegmentsMetadata(String tableNameWithType);
 
-  /**
-   * Returns the directory for un-tarred segment data.
-   */
+  /// Returns the directory for un-tarred segment data.
   File getSegmentDataDirectory(String tableNameWithType, String segmentName);
 
-  /**
-   * Returns the directory for tarred segment files.
-   */
+  /// Returns the directory for tarred segment files.
   String getSegmentFileDirectory();
 
-  /**
-   * Returns the maximum number of segments allowed to refresh in parallel.
-   */
+  /// Returns the maximum number of segments allowed to refresh in parallel.
   int getMaxParallelRefreshThreads();
 
-  /**
-   * Returns true if background processing for SEGMENT_REFRESH is enabled, false otherwise
-   */
+  /// Returns true if background processing for SEGMENT_REFRESH is enabled, false otherwise
   boolean isAsyncSegmentRefreshEnabled();
 
-  /**
-   * Returns the Helix property store.
-   */
+  /// Returns the Helix property store.
   ZkHelixPropertyStore<ZNRecord> getPropertyStore();
 
-  /**
-   * Returns the segment uploader, which uploads a llc segment to the destination place and returns the url of
-   * uploaded segment file. Servers utilize segment uploader to upload llc segment to segment store.
-   */
+  /// Returns the segment uploader, which uploads a llc segment to the destination place and returns the url of
+  /// uploaded segment file. Servers utilize segment uploader to upload llc segment to segment store.
   SegmentUploader getSegmentUploader();
 
-  /**
-   * Immediately stop consumption and start committing the consuming segments.
-   */
+  /// Immediately stop consumption and start committing the consuming segments.
   void forceCommit(String tableNameWithType, Set<String> segmentNames);
 
-  /**
-   * Installs a supplier that gates consuming-segment ingestion. While the supplier returns {@code false}, newly created
-   * realtime consumers wait at the entry of their consumer thread before pulling any data. The supplier is consulted
-   * per consumer; once it returns {@code true} for a given consumer, that consumer should proceed and should
-   * not be gated again. Implementations default to a no-op so subclasses opt in explicitly.
-   */
+  /// Installs a supplier that gates consuming-segment ingestion. While the supplier returns `false`, newly
+  /// created realtime consumers wait at the entry of their consumer thread before pulling any data. The supplier is
+  /// consulted per consumer; once it returns `true` for a given consumer, that consumer should proceed and should
+  /// not be gated again. Implementations default to a no-op so subclasses opt in explicitly.
   void setSupplierOfIsServerReadyToConsumeData(BooleanSupplier isServerReadyToConsumeData);
 
-  /**
-   * Enables the installation of a method to determine if a server is ready to server queries.
-   *
-   * @param isServerReadyToServeQueries supplier to retrieve state of server.
-   */
+  /// Enables the installation of a method to determine if a server is ready to server queries.
+  ///
+  /// @param isServerReadyToServeQueries supplier to retrieve state of server.
   void setSupplierOfIsServerReadyToServeQueries(BooleanSupplier isServerReadyToServeQueries);
 
-  /**
-   * Returns consumer directory paths on the instance
-   */
+  /// Returns consumer directory paths on the instance
   List<File> getConsumerDirPaths();
 
-  /**
-   * Returns the instance data directory
-   */
+  /// Returns the instance data directory
   String getInstanceDataDir();
 
-  /**
-   * Returns the logical table config and schema for the given logical table name.
-   */
+  /// Returns the logical table config and schema for the given logical table name.
   @Nullable
   LogicalTableContext getLogicalTableContext(String logicalTableName);
 }

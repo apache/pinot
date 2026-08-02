@@ -30,9 +30,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/**
- * The <code>PinotSegmentToAvroConverter</code> class is the tool to convert Pinot segment to AVRO format.
- */
+/// The `PinotSegmentToAvroConverter` class is the tool to convert Pinot segment to AVRO format.
 public class PinotSegmentToAvroConverter implements PinotSegmentConverter {
   private final String _segmentDir;
   private final String _outputFile;
@@ -56,7 +54,8 @@ public class PinotSegmentToAvroConverter implements PinotSegmentConverter {
     PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader();
     pinotSegmentRecordReader.init(indexDir, null, null, false, _forwardIndexOnly);
     try (pinotSegmentRecordReader) {
-      try (DataFileWriter<Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
+      try (DataFileWriter<Record> recordWriter =
+          new DataFileWriter<>(new GenericDatumWriter<>(avroSchema, SegmentProcessorAvroUtils.getAvroDataModel()))) {
         recordWriter.create(avroSchema, new File(_outputFile));
 
         GenericRow row = new GenericRow();

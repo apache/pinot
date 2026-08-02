@@ -66,7 +66,6 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
@@ -108,9 +107,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOpt
 import static org.testng.Assert.*;
 
 
-/**
- * Integration test that converts Avro data for 12 segments and runs queries against it.
- */
+/// Integration test that converts Avro data for 12 segments and runs queries against it.
 public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
@@ -641,11 +638,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     addRangeIndex(true);
   }
 
-  /**
-   * SELECT DISTINCT on an inverted-indexed column. InvertedIndexDistinctOperator is used when
-   * opted in via query option. Verifies correctness with and without filter.
-   * Origin already has an inverted index by default (see DEFAULT_INVERTED_INDEX_COLUMNS).
-   */
+  /// SELECT DISTINCT on an inverted-indexed column. InvertedIndexDistinctOperator is used when
+  /// opted in via query option. Verifies correctness with and without filter.
+  /// Origin already has an inverted index by default (see DEFAULT_INVERTED_INDEX_COLUMNS).
   @Test(dataProvider = "useBothQueryEngines")
   public void testDistinctWithInvertedIndex(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -1622,9 +1617,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble(), expectedForwardIndexSize);
   }
 
-  /**
-   * Check if server returns error response quickly without timing out Broker.
-   */
+  /// Check if server returns error response quickly without timing out Broker.
   @Test(dataProvider = "useBothQueryEngines")
   public void testServerErrorWithBrokerTimeout(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -1831,38 +1824,35 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(queryResponse.get("numDocsScanned").asInt(), expectedDocsScanned);
   }
 
-  /**
-   * We will add extra new columns to the schema to test adding new columns with default value/transform function to the
-   * offline segments.
-   * <p>New columns are: (name, field type, data type, single/multi value, default null value)
-   * <ul>
-   *   <li>"NewAddedIntMetric", METRIC, INT, single-value, 1</li>
-   *   <li>"NewAddedLongMetric", METRIC, LONG, single-value, 1</li>
-   *   <li>"NewAddedFloatMetric", METRIC, FLOAT, single-value, default (0.0)</li>
-   *   <li>"NewAddedDoubleMetric", METRIC, DOUBLE, single-value, default (0.0)</li>
-   *   <li>"NewAddedBigDecimalMetric", METRIC, BIG_DECIMAL, single-value, default (0)</li>
-   *   <li>"NewAddedBytesMetric", METRIC, BYTES, single-value, default (byte[0])</li>
-   *   <li>"NewAddedMVIntDimension", DIMENSION, INT, multi-value, default (Integer.MIN_VALUE)</li>
-   *   <li>"NewAddedMVLongDimension", DIMENSION, LONG, multi-value, default (Long.MIN_VALUE)</li>
-   *   <li>"NewAddedMVFloatDimension", DIMENSION, FLOAT, multi-value, default (Float.NEGATIVE_INFINITY)</li>
-   *   <li>"NewAddedMVDoubleDimension", DIMENSION, DOUBLE, multi-value, default (Double.NEGATIVE_INFINITY)</li>
-   *   <li>"NewAddedMVBooleanDimension", DIMENSION, BOOLEAN, multi-value, default (false)</li>
-   *   <li>"NewAddedMVTimestampDimension", DIMENSION, TIMESTAMP, multi-value, default (EPOCH)</li>
-   *   <li>"NewAddedMVStringDimension", DIMENSION, STRING, multi-value, default ("null")</li>
-   *   <li>"NewAddedSVJSONDimension", DIMENSION, JSON, single-value, default ("null")</li>
-   *   <li>"NewAddedSVBytesDimension", DIMENSION, BYTES, single-value, default (byte[0])</li>
-   *   <li>"NewAddedDerivedHoursSinceEpoch", DATE_TIME, INT, single-value, DaysSinceEpoch * 24</li>
-   *   <li>"NewAddedDerivedTimestamp", DATE_TIME, TIMESTAMP, single-value, DaysSinceEpoch * 24 * 3600 * 1000</li>
-   *   <li>"NewAddedDerivedSVBooleanDimension", DIMENSION, BOOLEAN, single-value, ActualElapsedTime > 0</li>
-   *   <li>"NewAddedDerivedMVStringDimension", DIMENSION, STRING, multi-value, split(DestCityName, ', ')</li>
-   *   <li>"NewAddedDerivedDivAirportSeqIDs", DIMENSION, INT, multi-value, DivAirportSeqIDs</li>
-   *   <li>"NewAddedDerivedDivAirportSeqIDsString", DIMENSION, STRING, multi-value, DivAirportSeqIDs</li>
-   *   <li>"NewAddedRawDerivedStringDimension", DIMENSION, STRING, single-value, reverse(DestCityName)</li>
-   *   <li>"NewAddedRawDerivedMVIntDimension", DIMENSION, INT, multi-value, array(ActualElapsedTime)</li>
-   *   <li>"NewAddedDerivedMVDoubleDimension", DIMENSION, DOUBLE, multi-value, array(ArrDelayMinutes)</li>
-   *   <li>"NewAddedDerivedNullString", DIMENSION, STRING, single-value, caseWhen(true, null, null)</li>
-   * </ul>
-   */
+  /// We will add extra new columns to the schema to test adding new columns with default value/transform function to
+  /// the offline segments.
+  ///
+  /// New columns are: (name, field type, data type, single/multi value, default null value)
+  ///   - "NewAddedIntMetric", METRIC, INT, single-value, 1
+  ///   - "NewAddedLongMetric", METRIC, LONG, single-value, 1
+  ///   - "NewAddedFloatMetric", METRIC, FLOAT, single-value, default (0.0)
+  ///   - "NewAddedDoubleMetric", METRIC, DOUBLE, single-value, default (0.0)
+  ///   - "NewAddedBigDecimalMetric", METRIC, BIG_DECIMAL, single-value, default (0)
+  ///   - "NewAddedBytesMetric", METRIC, BYTES, single-value, default (byte\[0\])
+  ///   - "NewAddedMVIntDimension", DIMENSION, INT, multi-value, default (Integer.MIN_VALUE)
+  ///   - "NewAddedMVLongDimension", DIMENSION, LONG, multi-value, default (Long.MIN_VALUE)
+  ///   - "NewAddedMVFloatDimension", DIMENSION, FLOAT, multi-value, default (Float.NEGATIVE_INFINITY)
+  ///   - "NewAddedMVDoubleDimension", DIMENSION, DOUBLE, multi-value, default (Double.NEGATIVE_INFINITY)
+  ///   - "NewAddedMVBooleanDimension", DIMENSION, BOOLEAN, multi-value, default (false)
+  ///   - "NewAddedMVTimestampDimension", DIMENSION, TIMESTAMP, multi-value, default (EPOCH)
+  ///   - "NewAddedMVStringDimension", DIMENSION, STRING, multi-value, default ("null")
+  ///   - "NewAddedSVJSONDimension", DIMENSION, JSON, single-value, default ("null")
+  ///   - "NewAddedSVBytesDimension", DIMENSION, BYTES, single-value, default (byte\[0\])
+  ///   - "NewAddedDerivedHoursSinceEpoch", DATE_TIME, INT, single-value, DaysSinceEpoch \* 24
+  ///   - "NewAddedDerivedTimestamp", DATE_TIME, TIMESTAMP, single-value, DaysSinceEpoch \* 24 \* 3600 \* 1000
+  ///   - "NewAddedDerivedSVBooleanDimension", DIMENSION, BOOLEAN, single-value, ActualElapsedTime > 0
+  ///   - "NewAddedDerivedMVStringDimension", DIMENSION, STRING, multi-value, split(DestCityName, ', ')
+  ///   - "NewAddedDerivedDivAirportSeqIDs", DIMENSION, INT, multi-value, DivAirportSeqIDs
+  ///   - "NewAddedDerivedDivAirportSeqIDsString", DIMENSION, STRING, multi-value, DivAirportSeqIDs
+  ///   - "NewAddedRawDerivedStringDimension", DIMENSION, STRING, single-value, reverse(DestCityName)
+  ///   - "NewAddedRawDerivedMVIntDimension", DIMENSION, INT, multi-value, array(ActualElapsedTime)
+  ///   - "NewAddedDerivedMVDoubleDimension", DIMENSION, DOUBLE, multi-value, array(ArrDelayMinutes)
+  ///   - "NewAddedDerivedNullString", DIMENSION, STRING, single-value, caseWhen(true, null, null)
   @Test(dataProvider = "useBothQueryEngines")
   public void testDefaultColumns(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -3631,7 +3621,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
             + "Rule: EvaluateFilterLiteral -> Time: *\n");
   }
 
-  /** Test to make sure we are properly handling string comparisons in predicates. */
+  /// Test to make sure we are properly handling string comparisons in predicates.
   @Test(dataProvider = "useBothQueryEngines")
   public void testStringComparisonInFilter(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -3652,9 +3642,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(getLongCellValue(jsonNode, 0, 0), 19755);
   }
 
-  /**
-   * Test queries that can be solved with {@link NonScanBasedAggregationOperator}.
-   */
+  /// Test queries that can be solved with [org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator].
   @Test(dataProvider = "useBothQueryEngines")
   public void testNonScanAggregationQueries(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -4360,15 +4348,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  /**
-   * Test SQL string literal escaping behavior.
-   *
-   * In SQL, single quotes within string literals are escaped by doubling them:
-   * - 'It''s' represents the string "It's" (2 quotes = 1 quote in result)
-   *
-   * The Calcite parser handles this escaping correctly. This test disables the legacy SSE behavior of double escaping
-   * quotes. With the legacy behavior disabled, both SSE and MSE have the same standard behavior.
-   */
+  /// Test SQL string literal escaping behavior.
+  ///
+  /// In SQL, single quotes within string literals are escaped by doubling them:
+  /// - 'It''s' represents the string "It's" (2 quotes = 1 quote in result)
+  ///
+  /// The Calcite parser handles this escaping correctly. This test disables the legacy SSE behavior of double escaping
+  /// quotes. With the legacy behavior disabled, both SSE and MSE have the same standard behavior.
   @Test(dataProvider = "useBothQueryEngines")
   public void testStringLiteralEscaping(boolean useMultiStageQueryEngine)
       throws Exception {

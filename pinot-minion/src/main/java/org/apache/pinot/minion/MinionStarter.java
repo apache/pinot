@@ -22,10 +22,9 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * The class <code>MinionStarter</code> provides methods to start and stop the Pinot Minion.
- * <p>Pinot Minion will automatically join the given Helix cluster as a participant.
- */
+/// The class `MinionStarter` provides methods to start and stop the Pinot Minion.
+///
+/// Pinot Minion will automatically join the given Helix cluster as a participant.
 public class MinionStarter extends BaseMinionStarter {
 
   public MinionStarter() {

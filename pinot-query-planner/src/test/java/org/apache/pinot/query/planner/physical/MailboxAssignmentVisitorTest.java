@@ -40,13 +40,11 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for mailbox assignment determinism in {@link MailboxAssignmentVisitor}.
- *
- * These tests verify that the mailbox info list is sorted by worker ID to ensure
- * deterministic hash-distributed exchange routing. This is critical for correct
- * join results when HashExchange uses (hash % numMailboxes) as an index.
- */
+/// Tests for mailbox assignment determinism in [MailboxAssignmentVisitor].
+///
+/// These tests verify that the mailbox info list is sorted by worker ID to ensure
+/// deterministic hash-distributed exchange routing. This is critical for correct
+/// join results when HashExchange uses (hash % numMailboxes) as an index.
 public class MailboxAssignmentVisitorTest extends QueryEnvironmentTestBase {
 
   @Test

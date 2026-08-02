@@ -25,11 +25,11 @@ import java.util.Base64;
 import java.util.List;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.datasketches.tuple.Intersection;
-import org.apache.datasketches.tuple.Sketch;
-import org.apache.datasketches.tuple.aninteger.IntegerSketch;
+import org.apache.datasketches.tuple.TupleIntersection;
+import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
+import org.apache.datasketches.tuple.aninteger.IntegerTupleSketch;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -64,7 +64,7 @@ public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
     JsonNode jsonNode = postQuery(query);
     long distinctCount = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
     byte[] rawSketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(1).asText());
-    Sketch<IntegerSummary> deserializedSketch =
+    TupleSketch<IntegerSummary> deserializedSketch =
         ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(rawSketchBytes);
 
     assertTrue(distinctCount > 0);
@@ -149,11 +149,11 @@ public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
 
       String sketch1 = jsonNode.get("resultTable").get("rows").get(0).get(1).asText();
       String sketch2 = jsonNode.get("resultTable").get("rows").get(0).get(2).asText();
-      Sketch<IntegerSummary> deserializedSketch1 =
+      TupleSketch<IntegerSummary> deserializedSketch1 =
           ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(Base64.getDecoder().decode(sketch1));
-      Sketch<IntegerSummary> deserializedSketch2 =
+      TupleSketch<IntegerSummary> deserializedSketch2 =
           ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(Base64.getDecoder().decode(sketch2));
-      Intersection<IntegerSummary> intersection = new Intersection<>(new IntegerSummarySetOperations(
+      TupleIntersection<IntegerSummary> intersection = new TupleIntersection<>(new IntegerSummarySetOperations(
           IntegerSummary.Mode.Sum, IntegerSummary.Mode.Sum));
       intersection.intersect(deserializedSketch1);
       intersection.intersect(deserializedSketch2);
@@ -189,7 +189,7 @@ public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
     JsonNode jsonNode = postQuery(query);
     long distinctCount = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
     byte[] rawSketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(1).asText());
-    Sketch<IntegerSummary> deserializedSketch =
+    TupleSketch<IntegerSummary> deserializedSketch =
         ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(rawSketchBytes);
 
     assertTrue(distinctCount > 0);
@@ -224,7 +224,7 @@ public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
     JsonNode jsonNode = postQuery(query);
     long distinctCount = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
     byte[] rawSketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(1).asText());
-    Sketch<IntegerSummary> deserializedSketch =
+    TupleSketch<IntegerSummary> deserializedSketch =
         ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(rawSketchBytes);
     assertTrue(distinctCount > 0);
     assertEquals(Double.valueOf(deserializedSketch.getEstimate()).longValue(), distinctCount);
@@ -302,7 +302,7 @@ public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   private byte[] getRandomRawValue() {
-    IntegerSketch is = new IntegerSketch(4, IntegerSummary.Mode.Sum);
+    IntegerTupleSketch is = new IntegerTupleSketch(4, IntegerSummary.Mode.Sum);
     is.update(RANDOM.nextInt(100), RANDOM.nextInt(100));
     return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(is.compact());
   }

@@ -34,10 +34,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class to implement StartBroker command.
- *
- */
+/// Class to implement StartBroker command.
 @CommandLine.Command(name = "StartBroker", mixinStandardHelpOptions = true)
 public class StartBrokerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartBrokerCommand.class);

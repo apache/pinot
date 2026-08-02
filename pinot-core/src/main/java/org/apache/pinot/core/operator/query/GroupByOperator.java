@@ -49,9 +49,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>GroupByOperator</code> class implements keyed aggregation on a single segment in V1/SSQE.
- */
+/// The `GroupByOperator` class implements keyed aggregation on a single segment in V1/SSQE.
 @SuppressWarnings("rawtypes")
 public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByOperator.class);

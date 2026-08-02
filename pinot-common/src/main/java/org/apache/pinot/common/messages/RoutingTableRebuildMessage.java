@@ -23,13 +23,11 @@ import org.apache.helix.model.Message;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
 
-/**
- * This (Helix) message is sent from the controller to brokers when a request is received to rebuild the routing table.
- * When the broker receives this message, it will rebuild the routing table for the given table.
- *
- * NOTE: Changing this class to include new fields is a change in the protocol, so the new fields must be made optional,
- * and coded in such a way that either controller, broker or server may be upgraded first.
- */
+/// This (Helix) message is sent from the controller to brokers when a request is received to rebuild the routing table.
+/// When the broker receives this message, it will rebuild the routing table for the given table.
+///
+/// NOTE: Changing this class to include new fields is a change in the protocol, so the new fields must be made
+/// optional, and coded in such a way that either controller, broker or server may be upgraded first.
 public class RoutingTableRebuildMessage extends Message {
 
   public static final String REBUILD_ROUTING_TABLE_MSG_SUB_TYPE = "REBUILD_ROUTING_TABLE";
@@ -48,12 +46,10 @@ public class RoutingTableRebuildMessage extends Message {
     znRecord.setSimpleField(TABLE_NAME_KEY, tableNameWithType);
   }
 
-  /**
-   * Constructor for the receiver.
-   *
-   * @param message The incoming message that has been received from helix.
-   * @throws IllegalArgumentException if the message is not of right sub-type
-   */
+  /// Constructor for the receiver.
+  ///
+  /// @param message The incoming message that has been received from helix.
+  /// @throws IllegalArgumentException if the message is not of right sub-type
   public RoutingTableRebuildMessage(Message message) {
     super(message.getRecord());
     if (!message.getMsgSubType().equals(REBUILD_ROUTING_TABLE_MSG_SUB_TYPE)) {

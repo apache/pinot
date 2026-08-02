@@ -22,9 +22,7 @@ import java.math.BigDecimal;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * DocId dictionary for the segment
- */
+/// DocId dictionary for the segment
 public class DocIdDictionary extends BaseImmutableDictionary {
   private final int _numDocs;
 

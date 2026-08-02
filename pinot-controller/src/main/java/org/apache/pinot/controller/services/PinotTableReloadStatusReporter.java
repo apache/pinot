@@ -82,12 +82,10 @@ public class PinotTableReloadStatusReporter {
     return estimatedRemainingTimeInMinutes;
   }
 
-  /**
-   * Derives the overall reload job status from aggregated counts.
-   * - COMPLETED: all segments reloaded successfully, no server call failures
-   * - COMPLETED_WITH_ERRORS: reload finished but some segments failed
-   * - IN_PROGRESS: reload is still running
-   */
+  /// Derives the overall reload job status from aggregated counts.
+  /// - COMPLETED: all segments reloaded successfully, no server call failures
+  /// - COMPLETED_WITH_ERRORS: reload finished but some segments failed
+  /// - IN_PROGRESS: reload is still running
   private static String deriveReloadStatus(PinotTableReloadStatusResponse response) {
     int processed = response.getSuccessCount() + (response.getFailureCount() != null
         ? response.getFailureCount().intValue() : 0);

@@ -24,16 +24,12 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 
-/**
- * Annotation to mark WorkloadBudgetManager implementations for automatic registration.
- */
+/// Annotation to mark WorkloadBudgetManager implementations for automatic registration.
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface WorkloadBudgetManagerAnnotation {
 
-  /**
-   * Whether this WorkloadBudgetManager implementation is enabled for automatic registration.
-   * @return true if enabled, false otherwise
-   */
+  /// Whether this WorkloadBudgetManager implementation is enabled for automatic registration.
+  /// @return true if enabled, false otherwise
   boolean enabled() default true;
 }

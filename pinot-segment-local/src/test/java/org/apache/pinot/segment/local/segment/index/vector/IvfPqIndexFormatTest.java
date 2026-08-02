@@ -33,9 +33,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit tests for {@link IvfPqIndexFormat}.
- */
+/// Unit tests for [IvfPqIndexFormat].
 public class IvfPqIndexFormatTest {
   private File _tempDir;
 

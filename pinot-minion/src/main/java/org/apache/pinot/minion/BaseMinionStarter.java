@@ -82,9 +82,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base class for minion starter
- */
+/// Base class for minion starter
 public abstract class BaseMinionStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseMinionStarter.class);
 
@@ -159,18 +157,16 @@ public abstract class BaseMinionStarter implements ServiceStartable {
             CommonConstants.Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
-  /**
-   * Registers a task executor factory.
-   * <p>This is for pluggable task executor factories.
-   */
+  /// Registers a task executor factory.
+  ///
+  /// This is for pluggable task executor factories.
   public void registerTaskExecutorFactory(PinotTaskExecutorFactory taskExecutorFactory) {
     _taskExecutorFactoryRegistry.registerTaskExecutorFactory(taskExecutorFactory);
   }
 
-  /**
-   * Registers an event observer factory.
-   * <p>This is for pluggable event observer factories.
-   */
+  /// Registers an event observer factory.
+  ///
+  /// This is for pluggable event observer factories.
   public void registerEventObserverFactory(MinionEventObserverFactory eventObserverFactory) {
     _eventObserverFactoryRegistry.registerEventObserverFactory(eventObserverFactory);
   }
@@ -210,10 +206,9 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     return _config;
   }
 
-  /**
-   * Starts the Pinot Minion instance.
-   * <p>Should be called after all classes of task executor get registered.
-   */
+  /// Starts the Pinot Minion instance.
+  ///
+  /// Should be called after all classes of task executor get registered.
   @Override
   public void start()
       throws Exception {
@@ -376,9 +371,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     }
   }
 
-  /**
-   * Stops the Pinot Minion instance.
-   */
+  /// Stops the Pinot Minion instance.
   @Override
   public void stop() {
     try {

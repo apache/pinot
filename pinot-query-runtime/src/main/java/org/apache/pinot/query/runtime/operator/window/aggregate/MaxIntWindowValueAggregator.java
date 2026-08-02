@@ -22,23 +22,19 @@ import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
 import javax.annotation.Nullable;
 
 
-/**
- * Window value aggregator for MAX window function over INT types.
- * Uses primitive {@code int} operations and {@link IntArrayFIFOQueue} to avoid boxing overhead and improve cache
- * locality compared to the {@link Comparable}-based aggregator.
- */
+/// Window value aggregator for MAX window function over INT types.
+/// Uses primitive `int` operations and [IntArrayFIFOQueue] to avoid boxing overhead and improve cache
+/// locality compared to the [Comparable]-based aggregator.
 public class MaxIntWindowValueAggregator implements WindowValueAggregator<Object> {
 
   private final boolean _supportRemoval;
   private final IntArrayFIFOQueue _deque = new IntArrayFIFOQueue();
   private Integer _maxValue = null;
 
-  /**
-   * @param supportRemoval whether this window value aggregator should support removal of values. Some cases require
-   *                       only addition of values in which case this value aggregator will have O(1) space complexity;
-   *                       if {@code supportRemoval} is true, this value aggregator will have O(K) space complexity
-   *                       (where K is the max size of the window).
-   */
+  /// @param supportRemoval whether this window value aggregator should support removal of values. Some cases require
+  ///                       only addition of values in which case this value aggregator will have O(1) space complexity;
+  ///                       if `supportRemoval` is true, this value aggregator will have O(K) space complexity
+  ///                       (where K is the max size of the window).
   public MaxIntWindowValueAggregator(boolean supportRemoval) {
     _supportRemoval = supportRemoval;
   }

@@ -72,9 +72,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for the KafkaPartitionLevelConsumer.
- */
+/// Tests for the KafkaPartitionLevelConsumer.
 public class KafkaPartitionLevelConsumerTest {
   private static final long STABILIZE_SLEEP_DELAYS = 3000;
   private static final String TEST_TOPIC_1 = "foo";

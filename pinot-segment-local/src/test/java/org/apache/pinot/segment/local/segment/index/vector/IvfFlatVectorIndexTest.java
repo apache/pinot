@@ -40,12 +40,10 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit tests for the IVF_FLAT vector index implementation.
- *
- * <p>Tests cover serialization round-trips, search correctness with all distance functions,
- * k-means training quality, and various edge cases.</p>
- */
+/// Unit tests for the IVF_FLAT vector index implementation.
+///
+/// Tests cover serialization round-trips, search correctness with all distance functions,
+/// k-means training quality, and various edge cases.
 public class IvfFlatVectorIndexTest {
   private static final String COLUMN_NAME = "vectorCol";
   private static final long TEST_SEED = 42L;
@@ -868,9 +866,7 @@ public class IvfFlatVectorIndexTest {
     return vectors;
   }
 
-  /**
-   * Brute-force top-K computation for verification.
-   */
+  /// Brute-force top-K computation for verification.
   private Set<Integer> bruteForceTopK(float[][] vectors, float[] query, int topK,
       VectorIndexConfig.VectorDistanceFunction distanceFunction) {
     int numVectors = vectors.length;

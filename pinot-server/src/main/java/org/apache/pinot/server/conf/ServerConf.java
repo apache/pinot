@@ -27,9 +27,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.*;
 
 
-/**
- * The config used for Server.
- */
+/// The config used for Server.
 public class ServerConf {
 
   private final PinotConfiguration _serverConf;
@@ -125,10 +123,8 @@ public class ServerConf {
     return _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);
   }
 
-  /**
-   * Returns a list of transform function names as defined in the config
-   * @return List of transform functions
-   */
+  /// Returns a list of transform function names as defined in the config
+  /// @return List of transform functions
   public List<String> getTransformFunctions() {
     return _serverConf.getProperty(CONFIG_OF_TRANSFORM_FUNCTIONS, List.of());
   }

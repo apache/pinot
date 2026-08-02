@@ -20,12 +20,10 @@ package org.apache.pinot.segment.local.upsert.merger.columnar;
 
 public interface PartialUpsertColumnMerger {
 
-  /**
-   * Handle partial upsert merge for single column between previous and new row.
-   *
-   * @param previousValue the value of given field from the last derived full record during ingestion.
-   * @param currentValue the value of given field from the new consumed record.
-   * @return a new value after merge
-   */
+  /// Handle partial upsert merge for single column between previous and new row.
+  ///
+  /// @param previousValue the value of given field from the last derived full record during ingestion.
+  /// @param currentValue the value of given field from the new consumed record.
+  /// @return a new value after merge
   Object merge(Object previousValue, Object currentValue);
 }

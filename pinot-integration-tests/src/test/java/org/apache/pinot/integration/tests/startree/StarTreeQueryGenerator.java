@@ -31,10 +31,8 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 
-/**
- * Given a list of dimension and metric columns, and possible values for dimension columns:
- * Generate queries of the form: SELECT SUM(m1), SUM(m2)... WHERE d1='v1' AND d2='v2'... GROUP BY d3,d4...
- */
+/// Given a list of dimension and metric columns, and possible values for dimension columns:
+/// Generate queries of the form: SELECT SUM(m1), SUM(m2)... WHERE d1='v1' AND d2='v2'... GROUP BY d3,d4...
 public class StarTreeQueryGenerator {
   private static final String SELECT = "SELECT ";
   private static final String FROM = " FROM ";
@@ -72,12 +70,10 @@ public class StarTreeQueryGenerator {
     _random = random;
   }
 
-  /**
-   * Generate one aggregation function for the given metric column.
-   *
-   * @param metricColumn metric column.
-   * @return aggregation function.
-   */
+  /// Generate one aggregation function for the given metric column.
+  ///
+  /// @param metricColumn metric column.
+  /// @return aggregation function.
   private String generateAggregation(String metricColumn) {
     return String.format("%s(%s)", _aggregationFunctions.get(_random.nextInt(_aggregationFunctions.size())),
         metricColumn);
@@ -93,11 +89,9 @@ public class StarTreeQueryGenerator {
     return filteredAgg.toString();
   }
 
-  /**
-   * Generate the aggregation section of the query, returns at least one aggregation.
-   *
-   * @return aggregation section.
-   */
+  /// Generate the aggregation section of the query, returns at least one aggregation.
+  ///
+  /// @return aggregation section.
   private String generateAggregations() {
     int numAggregations = _random.nextInt(MAX_NUM_AGGREGATIONS) + 1;
     int numMetrics = _metricColumns.size();
@@ -112,12 +106,10 @@ public class StarTreeQueryGenerator {
     return StringUtils.join(aggregations, ", ");
   }
 
-  /**
-   * Generate a comparison predicate for the given dimension column.
-   *
-   * @param dimensionColumn dimension column.
-   * @return comparison predicate.
-   */
+  /// Generate a comparison predicate for the given dimension column.
+  ///
+  /// @param dimensionColumn dimension column.
+  /// @return comparison predicate.
   private String generateComparisonPredicate(String dimensionColumn) {
     StringBuilder stringBuilder = new StringBuilder(dimensionColumn);
 
@@ -134,12 +126,10 @@ public class StarTreeQueryGenerator {
     return stringBuilder.toString();
   }
 
-  /**
-   * Generate a between predicate for the given dimension column.
-   *
-   * @param dimensionColumn dimension column.
-   * @return between predicate.
-   */
+  /// Generate a between predicate for the given dimension column.
+  ///
+  /// @param dimensionColumn dimension column.
+  /// @return between predicate.
   private String generateBetweenPredicate(String dimensionColumn) {
     StringBuilder stringBuilder = new StringBuilder(dimensionColumn).append(BETWEEN);
 
@@ -171,12 +161,10 @@ public class StarTreeQueryGenerator {
     return stringBuilder.toString();
   }
 
-  /**
-   * Generate a in predicate for the given dimension column.
-   *
-   * @param dimensionColumn dimension column.
-   * @return in predicate.
-   */
+  /// Generate a in predicate for the given dimension column.
+  ///
+  /// @param dimensionColumn dimension column.
+  /// @return in predicate.
   private String generateInPredicate(String dimensionColumn) {
     StringBuilder stringBuilder = new StringBuilder(dimensionColumn);
     if (_random.nextBoolean()) {
@@ -227,11 +215,9 @@ public class StarTreeQueryGenerator {
     return stringBuilder.append(')').toString();
   }
 
-  /**
-   * Randomly generate the WHERE clause of the query, may return {@code null}.
-   *
-   * @return all predicates.
-   */
+  /// Randomly generate the WHERE clause of the query, may return `null`.
+  ///
+  /// @return all predicates.
   @Nullable
   private String generatePredicates() {
     int numPredicates = _random.nextInt(MAX_NUM_PREDICATES + 1);
@@ -263,9 +249,7 @@ public class StarTreeQueryGenerator {
     return stringBuilder.toString();
   }
 
-  /**
-   * Randomly generate the group-by columns, may return {@code null}.
-   */
+  /// Randomly generate the group-by columns, may return `null`.
   private String generateGroupByColumns() {
     int numColumns = _random.nextInt(MAX_NUM_GROUP_BYS + 1);
     if (numColumns == 0) {
@@ -277,14 +261,12 @@ public class StarTreeQueryGenerator {
     return StringUtils.join(dimensions.subList(0, numColumns), ", ");
   }
 
-  /**
-   * Combine the various sections to form the overall query.
-   *
-   * @param aggregations aggregation section.
-   * @param predicates predicate section.
-   * @param groupByColumns group-by columns.
-   * @return overall query.
-   */
+  /// Combine the various sections to form the overall query.
+  ///
+  /// @param aggregations aggregation section.
+  /// @param predicates predicate section.
+  /// @param groupByColumns group-by columns.
+  /// @return overall query.
   private String buildQuery(String aggregations, String predicates, String groupByColumns) {
     StringBuilder stringBuilder = new StringBuilder(SELECT);
     if (groupByColumns != null) {
@@ -301,11 +283,9 @@ public class StarTreeQueryGenerator {
     return stringBuilder.toString();
   }
 
-  /**
-   * Randomly generate a query.
-   *
-   * @return Return the generated query.
-   */
+  /// Randomly generate a query.
+  ///
+  /// @return Return the generated query.
   public String nextQuery() {
     return buildQuery(generateAggregations(), generatePredicates(), generateGroupByColumns());
   }

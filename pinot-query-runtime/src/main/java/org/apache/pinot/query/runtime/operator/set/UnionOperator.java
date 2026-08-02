@@ -33,10 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Union operator for UNION queries. Unlike {@link UnionAllOperator}, this operator removes duplicate rows and only
- * returns distinct rows. Each child operator is fully drained sequentially and distinct rows are returned.
- */
+/// Union operator for UNION queries. Unlike [UnionAllOperator], this operator removes duplicate rows and only
+/// returns distinct rows. Each child operator is fully drained sequentially and distinct rows are returned.
 public class UnionOperator extends SetOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UnionOperator.class);
   private static final String EXPLAIN_NAME = "UNION";

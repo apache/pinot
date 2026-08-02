@@ -37,25 +37,22 @@ import org.apache.pinot.spi.utils.PinotDataType;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
 
-/**
- * Stateless schema-driven Arrow → Pinot value converter shared by the row-major and
- * column-major Arrow ingestion paths.
- *
- * <p>The conversion mirrors the contract established by {@link ArrowRecordExtractor} prior to
- * this extraction (see apache/pinot#18434 for the original row-major refactor): one branch per
- * {@link ArrowType.ArrowTypeID}, with complex types recursing through their child {@link Field}s
- * and scalars normalising per Pinot's expected JDK types.
- *
- * <p>Reused by:
- * <ul>
- *   <li>{@link ArrowRecordExtractor} — row-major ingestion via {@code ArrowRecordReader}
- *   <li>Column-major {@code ColumnReader} implementations that wrap Arrow vectors and need to
- *       emit Pinot-canonical JDK types from {@code getValue() / next()}
- * </ul>
- *
- * <p>All conversion methods are static; the only per-extraction state is the
- * {@code extractRawTimeValues} flag, passed through as a method parameter.
- */
+/// Stateless schema-driven Arrow → Pinot value converter shared by the row-major and
+/// column-major Arrow ingestion paths.
+///
+/// The conversion mirrors the contract established by [ArrowRecordExtractor] prior to
+/// this extraction (see apache/pinot#18434 for the original row-major refactor): one branch per
+/// [ArrowType.ArrowTypeID], with complex types recursing through their child [Field]s
+/// and scalars normalising per Pinot's expected JDK types.
+///
+/// Reused by:
+///
+/// - [ArrowRecordExtractor] — row-major ingestion via `ArrowRecordReader`
+/// - Column-major `ColumnReader` implementations that wrap Arrow vectors and need to
+///      emit Pinot-canonical JDK types from `getValue() / next()`
+///
+/// All conversion methods are static; the only per-extraction state is the
+/// `extractRawTimeValues` flag, passed through as a method parameter.
 public final class ArrowToPinotTypeConverter {
 
   private ArrowToPinotTypeConverter() {
@@ -95,17 +92,15 @@ public final class ArrowToPinotTypeConverter {
     }
   }
 
-  /**
-   * Convert an Arrow vector value to its Pinot-canonical JDK representation.
-   *
-   * @param field the Arrow {@link Field} describing the value's type
-   * @param value the raw value emitted by {@code FieldVector.getObject(docId)}
-   * @param extractRawTimeValues when {@code true}, {@code Date} / {@code Time} / {@code Timestamp}
-   *                             surface as raw {@code int} / {@code long} in the schema's
-   *                             {@link org.apache.arrow.vector.types.TimeUnit} instead of the
-   *                             corresponding {@code java.time} / {@link Timestamp} contract type
-   * @return the Pinot-canonical value, or {@code null} for {@link ArrowType.Null}
-   */
+  /// Convert an Arrow vector value to its Pinot-canonical JDK representation.
+  ///
+  /// @param field the Arrow [Field] describing the value's type
+  /// @param value the raw value emitted by `FieldVector.getObject(docId)`
+  /// @param extractRawTimeValues when `true`, `Date` / `Time` / `Timestamp`
+  ///                             surface as raw `int` / `long` in the schema's
+  ///                             [org.apache.arrow.vector.types.TimeUnit] instead of the
+  ///                             corresponding `java.time` / [Timestamp] contract type
+  /// @return the Pinot-canonical value, or `null` for [ArrowType.Null]
   @Nullable
   public static Object toPinotValue(Field field, Object value, boolean extractRawTimeValues) {
     ArrowType type = field.getType();

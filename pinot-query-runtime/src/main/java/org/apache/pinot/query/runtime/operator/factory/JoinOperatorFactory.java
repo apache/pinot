@@ -25,14 +25,16 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
-/**
- * Factory for join operators.
- */
+/// Factory for join operators.
 public interface JoinOperatorFactory {
 
   MultiStageOperator createJoinOperator(OpChainExecutionContext context, MultiStageOperator leftOperator,
       PlanNode leftPlanNode, MultiStageOperator rightOperator, PlanNode rightPlanNode, JoinNode joinNode);
 
+  /// Enriched joins have been removed; retained for backward compatibility. Implementations should throw.
+  ///
+  /// @deprecated enriched joins are no longer supported; implementations should throw.
+  @Deprecated(forRemoval = true, since = "1.6.0")
   MultiStageOperator createEnrichedJoinOperator(OpChainExecutionContext context, MultiStageOperator leftOperator,
       PlanNode leftPlanNode, MultiStageOperator rightOperator, PlanNode rightPlanNode, EnrichedJoinNode joinNode);
 }

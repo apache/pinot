@@ -39,9 +39,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for RexExpressionUtils, focusing on the handleSearch method and null handling.
- */
+/// Tests for RexExpressionUtils, focusing on the handleSearch method and null handling.
 public class RexExpressionUtilsTest {
   private RexBuilder _rexBuilder;
   private RelDataTypeFactory _typeFactory;

@@ -44,52 +44,43 @@ import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 
 
-/**
- * A base test class that can be used to write tests for stages using a fluent DSL.
- *
- * This class provides two features:
- * <ul>
- *   <li>Builders that can be used to create nodes in a fluent way.</li>
- *   <li>Access to the stages that were created during the test with {@link #stage(int)}.</li>
- * </ul>
- *
- * It is expected that each test method will call {@link #when(SimpleChildBuilder)} to create a new plan, which will
- * populate the list of stages. After that, the test can look for the stages with the {@link #stage(int)} method and
- * assert the expected behavior.
- */
+/// A base test class that can be used to write tests for stages using a fluent DSL.
+///
+/// This class provides two features:
+///
+/// - Builders that can be used to create nodes in a fluent way.
+/// - Access to the stages that were created during the test with [#stage(int)].
+///
+/// It is expected that each test method will call [#when(SimpleChildBuilder)] to create a new plan, which will
+/// populate the list of stages. After that, the test can look for the stages with the [#stage(int)] method and
+/// assert the expected behavior.
 public class StagesTestBase {
   private final HashMap<Integer, MailboxSendNode> _stageRoots = new HashMap<>();
 
-  /**
-   * Clears the list of stages.
-   *
-   * This method is automatically called by the test framework, ensuring each test starts with a clean slate.
-   * This method can also be called in middle of the test, but that is not recommended given it usually means that the
-   * test is getting too complex and difficult to read and/or get insights from it in case of failure.
-   */
+  /// Clears the list of stages.
+  ///
+  /// This method is automatically called by the test framework, ensuring each test starts with a clean slate.
+  /// This method can also be called in middle of the test, but that is not recommended given it usually means that the
+  /// test is getting too complex and difficult to read and/or get insights from it in case of failure.
   @AfterMethod
   public void cleanup() {
     _stageRoots.clear();
   }
 
-  /**
-   * Creates a new plan that will have an initial stage.
-   *
-   * The stage will have a default {@link MailboxSendNode} whose stage will be 0 and its child the one created by the
-   * builder.
-   *
-   * Notice that this method does not offer any way to customize the initial send mailbox.
-   */
+  /// Creates a new plan that will have an initial stage.
+  ///
+  /// The stage will have a default [MailboxSendNode] whose stage will be 0 and its child the one created by the
+  /// builder.
+  ///
+  /// Notice that this method does not offer any way to customize the initial send mailbox.
   public MailboxSendNode when(SimpleChildBuilder<? extends PlanNode> builder) {
     return sendMailbox(0, builder).build(0);
   }
 
-  /**
-   * Returns a builder that can be used to create a new mailbox receive node.
-   *
-   * It is usually recommended to use {@link #exchange(int, SimpleChildBuilder)} instead of this method, given that
-   * {@code exchange} creates a pair of send and receive mailboxes and deals with the stageId management.
-   */
+  /// Returns a builder that can be used to create a new mailbox receive node.
+  ///
+  /// It is usually recommended to use [#exchange(int, SimpleChildBuilder)] instead of this method, given that
+  /// `exchange` creates a pair of send and receive mailboxes and deals with the stageId management.
   public SimpleChildBuilder<MailboxReceiveNode> receiveMailbox(SimpleChildBuilder<MailboxSendNode> childBuilder) {
     return (stageId, mySchema, myHints) -> {
       MailboxSendNode mailbox = childBuilder.build(stageId);
@@ -99,13 +90,11 @@ public class StagesTestBase {
     };
   }
 
-  /**
-   * Creates a join node that will have the left and right nodes as children.
-   *
-   * The join type will be {@link JoinRelType#FULL}, the join strategy will be {@link JoinNode.JoinStrategy#HASH} and
-   * there will be no conditions. If custom joins are needed feel free to add more builder methods or create your own
-   * instance of {@link SimpleChildBuilder}.
-   */
+  /// Creates a join node that will have the left and right nodes as children.
+  ///
+  /// The join type will be [JoinRelType#FULL], the join strategy will be [JoinNode.JoinStrategy#HASH] and
+  /// there will be no conditions. If custom joins are needed feel free to add more builder methods or create your own
+  /// instance of [SimpleChildBuilder].
   public SimpleChildBuilder<JoinNode> join(
       SimpleChildBuilder<? extends PlanNode> leftBuilder,
       SimpleChildBuilder<? extends PlanNode> rightBuilder) {
@@ -117,14 +106,12 @@ public class StagesTestBase {
     };
   }
 
-  /**
-   * Creates a pair of receiver and sender nodes that will be logically connected.
-   *
-   * Whenever this builder is used to create a node, the mailbox send node will be added to the list of mailboxes.
-   *
-   * Although there are builder methods to create send and receive mailboxes separately, this method is recommended
-   * because it deals with the stageId management and creates tests that are easier to read.
-   */
+  /// Creates a pair of receiver and sender nodes that will be logically connected.
+  ///
+  /// Whenever this builder is used to create a node, the mailbox send node will be added to the list of mailboxes.
+  ///
+  /// Although there are builder methods to create send and receive mailboxes separately, this method is recommended
+  /// because it deals with the stageId management and creates tests that are easier to read.
   public ExchangeBuilder exchange(
       int nextStageId, SimpleChildBuilder<? extends PlanNode> childBuilder) {
     return new ExchangeBuilder() {
@@ -161,32 +148,26 @@ public class StagesTestBase {
     }
   }
 
-  /**
-   * Creates a table scan node with the given table name.
-   */
+  /// Creates a table scan node with the given table name.
   public SimpleChildBuilder<TableScanNode> tableScan(String tableName) {
     return (stageId, mySchema, myHints) -> new TableScanNode(stageId, mySchema, myHints, List.of(), tableName,
         List.of());
   }
 
-  /**
-   * Looks for the mailbox that corresponds to the given stageId.
-   * @throws IllegalStateException if the mailbox is not found.
-   */
+  /// Looks for the mailbox that corresponds to the given stageId.
+  /// @throws IllegalStateException if the mailbox is not found.
   public MailboxSendNode stage(int stageId) {
     MailboxSendNode result = _stageRoots.get(stageId);
     Preconditions.checkState(result != null, "Mailbox not found for stageId: %s", stageId);
     return result;
   }
 
-  /**
-   * Returns a builder that can be used to create a new mailbox send node.
-   *
-   * Whenever this builder is used to create a node, the created node will be added to the list of mailboxes.
-   *
-   * It is usually recommended to use {@link #exchange(int, SimpleChildBuilder)} instead of this method, given that
-   * {@code exchange} creates a pair of send and receive mailboxes and deals with the stageId management.
-   */
+  /// Returns a builder that can be used to create a new mailbox send node.
+  ///
+  /// Whenever this builder is used to create a node, the created node will be added to the list of mailboxes.
+  ///
+  /// It is usually recommended to use [#exchange(int, SimpleChildBuilder)] instead of this method, given that
+  /// `exchange` creates a pair of send and receive mailboxes and deals with the stageId management.
   public SimpleChildBuilder<MailboxSendNode> sendMailbox(
       int newStageId, SimpleChildBuilder<? extends PlanNode> childBuilder) {
     return (stageId, mySchema, myHints) -> {
@@ -199,44 +180,39 @@ public class StagesTestBase {
     };
   }
 
-  /**
-   * A builder that can be used to create a child node.
-   *
-   * It is not expected for test writers to implement this class. Instead it is recommended to use methods like
-   * {@link #exchange(int, SimpleChildBuilder)}, {@link #join(SimpleChildBuilder, SimpleChildBuilder)},
-   * {@link #tableScan(String)} and others to chain instances of this class.
-   */
+  /// A builder that can be used to create a child node.
+  ///
+  /// It is not expected for test writers to implement this class. Instead it is recommended to use methods like
+  /// [#exchange(int, SimpleChildBuilder)], [#join(SimpleChildBuilder, SimpleChildBuilder)],
+  /// [#tableScan(String)] and others to chain instances of this class.
   @FunctionalInterface
   public interface ChildBuilder<P extends PlanNode> {
     P build(int stageId, @Nullable DataSchema dataSchema, @Nullable PlanNode.NodeHint hints);
 
-    /**
-     * This can be used to set the data schema for the node being built in a fluent way.
-     *
-     * For example:
-     *
-     * <pre>
-     *   when(
-     *     tableScan("T1")
-     *       .withDataSchema(new DataSchema(...))
-     *   );
-     * </pre>
-     */
+    /// This can be used to set the data schema for the node being built in a fluent way.
+    ///
+    /// For example:
+    ///
+    /// ```
+    /// when(
+    ///   tableScan("T1")
+    ///     .withDataSchema(new DataSchema(...))
+    /// );
+    /// ```
     default SimpleChildBuilder<P> withDataSchema(DataSchema dataSchema) {
       return (stageId, dataSchema1, hints) -> build(stageId, dataSchema, hints);
     }
 
-    /**
-     * This can be used to set the hints for the node being built in a fluent way.
-     *
-     * For example:
-     * <pre>
-     *   when(
-     *     tableScan("T1")
-     *       .withHints("hint1", Map.of("key1", "value1"))
-     *   );
-     * </pre>
-     */
+    /// This can be used to set the hints for the node being built in a fluent way.
+    ///
+    /// For example:
+    ///
+    /// ```
+    /// when(
+    ///   tableScan("T1")
+    ///     .withHints("hint1", Map.of("key1", "value1"))
+    /// );
+    /// ```
     default SimpleChildBuilder<P> withHints(String key, Map<String, String> values) {
       return (stageId, dataSchema, hints1) -> {
         PlanNode.NodeHint myHints = hints1 == null
@@ -247,14 +223,12 @@ public class StagesTestBase {
     }
   }
 
-  /**
-   * A marker interface that extends {@link ChildBuilder} that is used to create a child node without any additional
-   * customization.
-   *
-   * Usually this is the kind of builder used by most builder methods (like {@link #tableScan(String)}) because hints
-   * and data schema are not usually needed to be modified from the parent node.
-   * @param <P>
-   */
+  /// A marker interface that extends [ChildBuilder] that is used to create a child node without any additional
+  /// customization.
+  ///
+  /// Usually this is the kind of builder used by most builder methods (like [#tableScan(String)]) because hints
+  /// and data schema are not usually needed to be modified from the parent node.
+  /// @param
   @FunctionalInterface
   public interface SimpleChildBuilder<P extends PlanNode> extends ChildBuilder<P> {
     default P build(int stageId) {
@@ -262,93 +236,80 @@ public class StagesTestBase {
     }
   }
 
-  /**
-   * A helper class that can be used to create a spool in the context of a test.
-   * <p>
-   * These spools are used to create a single sender that will send data to multiple receivers.
-   * This class is just a helper to make it easier to create the sender and the receivers in a single fluent way during
-   * a test. A spool breaks by definition the idea that plan nodes are tree-like. Instead once spools are used, the
-   * plan nodes are a directed graph that should not have cycles. The latter is not enforced by this class but a
-   * responsibility of the test writer.
-   * <p>
-   * Graphs are more complex to write in a nice readable way and require some mutation on the nodes that are created.
-   * In order to help, this class has two states: the initial state and the sealed state. When a new spool is created,
-   * it is in the initial state and can {@link #newReceiver()} can be called multiple times to create multiple
-   * receivers. Once one of these receivers is built, the spool is sealed and no more receivers can be created.
-   * <p>
-   * Usually this class should be used in the following manner:
-   * <p>
-   * <pre>
-   *   Spool readT1 = new Spool(3, tableScan("T1")); // here the spool is created
-   *   ExchangeBuilder builder = exchange(1,
-   *     join(
-   *       readT1.newReceiver(), // here a new receiver is created
-   *       readT1.newReceiver() // another receiver is created
-   *     )
-   *   );
-   *   // here the builder is called, which recursively calls the build method on the receivers, which seals the spool
-   *   when(builder);
-   * </pre>
-   * <p>
-   *
-   * Notice that usually the builder is not stored as a variable but directly used as argument to when. For example,
-   * {@code when(exchange(1, ...));}. This is completely fine and recommended. The snippet above splits the creation of
-   * the builder from the call to when to make it easier to understand the flow of the test.
-   * <p>
-   * This means that if more than one spool is needed in a test, the test writer should create multiple instances of
-   * this class.
-   */
+  /// A helper class that can be used to create a spool in the context of a test.
+  ///
+  /// These spools are used to create a single sender that will send data to multiple receivers.
+  /// This class is just a helper to make it easier to create the sender and the receivers in a single fluent way during
+  /// a test. A spool breaks by definition the idea that plan nodes are tree-like. Instead once spools are used, the
+  /// plan nodes are a directed graph that should not have cycles. The latter is not enforced by this class but a
+  /// responsibility of the test writer.
+  ///
+  /// Graphs are more complex to write in a nice readable way and require some mutation on the nodes that are created.
+  /// In order to help, this class has two states: the initial state and the sealed state. When a new spool is created,
+  /// it is in the initial state and can [#newReceiver()] can be called multiple times to create multiple
+  /// receivers. Once one of these receivers is built, the spool is sealed and no more receivers can be created.
+  ///
+  /// Usually this class should be used in the following manner:
+  ///
+  /// ```
+  /// Spool readT1 = new Spool(3, tableScan("T1")); // here the spool is created
+  /// ExchangeBuilder builder = exchange(1,
+  ///   join(
+  ///     readT1.newReceiver(), // here a new receiver is created
+  ///     readT1.newReceiver() // another receiver is created
+  ///   )
+  /// );
+  /// // here the builder is called, which recursively calls the build method on the receivers, which seals the spool
+  /// when(builder);
+  /// ```
+  ///
+  /// Notice that usually the builder is not stored as a variable but directly used as argument to when. For example,
+  /// `when(exchange(1, ...));`. This is completely fine and recommended. The snippet above splits the creation of
+  /// the builder from the call to when to make it easier to understand the flow of the test.
+  ///
+  /// This means that if more than one spool is needed in a test, the test writer should create multiple instances of
+  /// this class.
   public static class SpoolBuilder {
     private final int _senderStageId;
-    /**
-     * The set of receiver builders. A new element is added every time {@link #newReceiver()} is called.
-     * When the first builder is built, {@link #seal()} is called, which creates the sender node.
-     */
+    /// The set of receiver builders. A new element is added every time [#newReceiver()] is called.
+    /// When the first builder is built, [#seal()] is called, which creates the sender node.
     private final Set<SpoolReceiverBuilder> _receiverBuilder = Collections.newSetFromMap(new IdentityHashMap<>());
     private MailboxSendNode _sender;
     private final SimpleChildBuilder<? extends PlanNode> _childBuilder;
 
-    /**
-     * Creates a new spool with the given sender stage id and child builder.
-     *
-     * The child builder will be used to create the child node that will generate the data that will be sent to the
-     * multiple receivers.
-     */
+    /// Creates a new spool with the given sender stage id and child builder.
+    ///
+    /// The child builder will be used to create the child node that will generate the data that will be sent to the
+    /// multiple receivers.
     public SpoolBuilder(int senderStageId, SimpleChildBuilder<? extends PlanNode> spoolChildBuilder) {
       _senderStageId = senderStageId;
       _childBuilder = spoolChildBuilder;
     }
 
-    /**
-     * Returns the sender node for this spool.
-     *
-     * This method can only be called after the spool is sealed, otherwise the sender won't be available and this method
-     * will fail with an exception.
-     */
+    /// Returns the sender node for this spool.
+    ///
+    /// This method can only be called after the spool is sealed, otherwise the sender won't be available and this
+    /// method will fail with an exception.
     public MailboxSendNode getSender() {
       Preconditions.checkState(isSealed(), "Spool not sealed");
       return _sender;
     }
 
-    /**
-     * Returns whether the spool is sealed or not.
-     */
+    /// Returns whether the spool is sealed or not.
     public boolean isSealed() {
       return _sender != null;
     }
 
-    /**
-     * Creates a new receiver builder that can be used to create a new receiver for this spool.
-     *
-     * This method is similar to other builder methods (like {@link #tableScan(String)} or
-     * {@link #join(SimpleChildBuilder, SimpleChildBuilder)}) and can be called multiple times to create multiple
-     * receivers.
-     *
-     * In most scenarios, the overloaded method {@link #newReceiver()} is good enough. This method is useful when the
-     * test writer wants to customize the receiver in some way (for example, changing the data schema or hints).
-     * The customize function will be called with a base builder that creates the receiver with the same data schema
-     * as the server and no hints.
-     */
+    /// Creates a new receiver builder that can be used to create a new receiver for this spool.
+    ///
+    /// This method is similar to other builder methods (like [#tableScan(String)] or
+    /// [#join(SimpleChildBuilder, SimpleChildBuilder)]) and can be called multiple times to create multiple
+    /// receivers.
+    ///
+    /// In most scenarios, the overloaded method [#newReceiver()] is good enough. This method is useful when the
+    /// test writer wants to customize the receiver in some way (for example, changing the data schema or hints).
+    /// The customize function will be called with a base builder that creates the receiver with the same data schema
+    /// as the server and no hints.
     public SimpleChildBuilder<MailboxReceiveNode> newReceiver(
         Function<SimpleChildBuilder<MailboxReceiveNode>, SimpleChildBuilder<MailboxReceiveNode>> customize) {
       Preconditions.checkState(!isSealed(), "Spool already sealed");
@@ -360,16 +321,14 @@ public class StagesTestBase {
     }
 
 
-    /**
-     * Creates a new receiver builder that can be used to create a new receiver for this spool.
-     *
-     * This method is similar to other builder methods (like {@link #tableScan(String)} or
-     * {@link #join(SimpleChildBuilder, SimpleChildBuilder)}) and can be called multiple times to create multiple
-     * receivers.
-     *
-     * This method creates a receiver with the same data schema as the sender and no hints. In case the test writer
-     * wants to customize the receiver, the method {@link #newReceiver(Function)} should be used.
-     */
+    /// Creates a new receiver builder that can be used to create a new receiver for this spool.
+    ///
+    /// This method is similar to other builder methods (like [#tableScan(String)] or
+    /// [#join(SimpleChildBuilder, SimpleChildBuilder)]) and can be called multiple times to create multiple
+    /// receivers.
+    ///
+    /// This method creates a receiver with the same data schema as the sender and no hints. In case the test writer
+    /// wants to customize the receiver, the method [#newReceiver(Function)] should be used.
     public SimpleChildBuilder<MailboxReceiveNode> newReceiver() {
       return newReceiver(a -> a);
     }
@@ -385,12 +344,10 @@ public class StagesTestBase {
           null, null, false, null, false, KeySelector.DEFAULT_HASH_ALGORITHM);
     }
 
-    /**
-     * This is the internal class returned as a result of the {@link #newReceiver(Function)} method.
-     *
-     * They don't just create the receiver, but also end up sealing the spool and modify the sender to add the receiver
-     * to the list of receivers.
-     */
+    /// This is the internal class returned as a result of the [#newReceiver(Function)] method.
+    ///
+    /// They don't just create the receiver, but also end up sealing the spool and modify the sender to add the receiver
+    /// to the list of receivers.
     private class SpoolReceiverBuilder implements SimpleChildBuilder<MailboxReceiveNode> {
       @Nullable
       private MailboxReceiveNode _receiver;

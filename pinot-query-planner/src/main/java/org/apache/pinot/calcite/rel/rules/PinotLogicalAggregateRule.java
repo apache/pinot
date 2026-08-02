@@ -43,16 +43,14 @@ import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * Same as {@link PinotAggregateExchangeNodeInsertRule}, with the following differences:
- * <ol>
- *   <li>We don't generate project under the aggregate.</li>
- *   <li>We don't generate exchange and merely generate a PinotLogicalAggregate.</li>
- *   <li>We don't convert Agg Calls.</li>
- * </ol>
- * All of these will be done in the Physical Planning phase instead, since that is when we will know whether the
- * aggregate has been split or not. (e.g. project under aggregate is required when you skip partial aggregate).
- */
+/// Same as [PinotAggregateExchangeNodeInsertRule], with the following differences:
+///
+/// 1. We don't generate project under the aggregate.
+/// 2. We don't generate exchange and merely generate a PinotLogicalAggregate.
+/// 3. We don't convert Agg Calls.
+///
+/// All of these will be done in the Physical Planning phase instead, since that is when we will know whether the
+/// aggregate has been split or not. (e.g. project under aggregate is required when you skip partial aggregate).
 public class PinotLogicalAggregateRule {
   public static class SortProjectAggregate extends RelOptRule {
     public static final SortProjectAggregate INSTANCE = new SortProjectAggregate(PinotRuleUtils.PINOT_REL_FACTORY);
@@ -133,10 +131,8 @@ public class PinotLogicalAggregateRule {
     }
   }
 
-  /**
-   * Convert any remaining LogicalAggregate to PinotLogicalAggregate. Some nodes may already be converted as part of
-   * the aggregate group-trim rules above.
-   */
+  /// Convert any remaining LogicalAggregate to PinotLogicalAggregate. Some nodes may already be converted as part of
+  /// the aggregate group-trim rules above.
   public static class PinotLogicalAggregateConverter extends RelOptRule {
     public static final PinotLogicalAggregateConverter INSTANCE = new PinotLogicalAggregateConverter(
         PinotRuleUtils.PINOT_REL_FACTORY);
@@ -156,12 +152,10 @@ public class PinotLogicalAggregateRule {
     return createPlan(aggRel, null, 0);
   }
 
-  /**
-   * Returns the limit to push down into the aggregate for group trim, or 0 if group trim should not be applied.
-   * The pushed-down limit is {@code offset + fetch} so that the leaf/intermediate aggregate retains enough groups to
-   * cover the outer {@code OFFSET ... FETCH} window. Adding only {@code fetch} would trim away rows that the offset
-   * window still needs, under-counting paginated queries.
-   */
+  /// Returns the limit to push down into the aggregate for group trim, or 0 if group trim should not be applied.
+  /// The pushed-down limit is `offset + fetch` so that the leaf/intermediate aggregate retains enough groups to
+  /// cover the outer `OFFSET ... FETCH` window. Adding only `fetch` would trim away rows that the offset
+  /// window still needs, under-counting paginated queries.
   private static int getGroupTrimLimit(Sort sortRel) {
     if (sortRel.fetch == null) {
       return 0;

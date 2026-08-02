@@ -24,33 +24,25 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.joda.time.Duration;
 
 
-/**
- * Helper methods for segment interval validations
- */
+/// Helper methods for segment interval validations
 public class SegmentIntervalUtils {
   private SegmentIntervalUtils() {
   }
 
-  /**
-   * We only want to check missing segments if the table has at least 2 segments and a time column
-   * TODO: Use TimeFieldSpec in Schema
-   */
+  /// We only want to check missing segments if the table has at least 2 segments and a time column
+  /// TODO: Use TimeFieldSpec in Schema
   public static boolean eligibleForMissingSegmentCheck(int numSegments,
       SegmentsValidationAndRetentionConfig validationConfig) {
     return numSegments >= 2 && StringUtils.isNotEmpty(validationConfig.getTimeColumnName());
   }
 
-  /**
-   * We only want to check intervals if the table has a time column
-   * TODO: Use TimeFieldSpec in Schema
-   */
+  /// We only want to check intervals if the table has a time column
+  /// TODO: Use TimeFieldSpec in Schema
   public static boolean eligibleForSegmentIntervalCheck(SegmentsValidationAndRetentionConfig validationConfig) {
     return StringUtils.isNotEmpty(validationConfig.getTimeColumnName());
   }
 
-  /**
-   * Converts push frequency into duration. For invalid or less than 'hourly' push frequency, treats it as 'daily'.
-   */
+  /// Converts push frequency into duration. For invalid or less than 'hourly' push frequency, treats it as 'daily'.
   public static Duration convertToDuration(String pushFrequency) {
     if (CommonConstants.Table.PUSH_FREQUENCY_HOURLY.equalsIgnoreCase(pushFrequency)) {
       return Duration.standardHours(1L);

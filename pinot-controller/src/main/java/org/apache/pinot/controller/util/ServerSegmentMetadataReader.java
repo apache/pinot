@@ -60,12 +60,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This is a helper class that calls the server API endpoints to fetch server metadata and the segment reload status
- * Only the servers returning success are returned by the method. For servers returning errors (http error or
- * otherwise),
- * no entry is created in the return list
- */
+/// This is a helper class that calls the server API endpoints to fetch server metadata and the segment reload status
+/// Only the servers returning success are returned by the method. For servers returning errors (http error or
+/// otherwise),
+/// no entry is created in the return list
 public class ServerSegmentMetadataReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerSegmentMetadataReader.class);
   private static final String COLUMNS_KEY = "columns";
@@ -84,16 +82,14 @@ public class ServerSegmentMetadataReader {
     _connectionManager = connectionManager;
   }
 
-  /**
-   * This method is called when the API request is to fetch aggregated segment metadata for all segments of the table.
-   * This method makes a MultiGet call to all servers that host their respective segments and gets the results.
-   * This method accept a list of column names as filter, and will return column metadata for the column in the
-   * list.
-   * TODO Some performance improvement ideas to explore:
-   * - If table has replica groups, only send requests to one replica group.
-   * - If table does not have replica groups, send requests to a minimal set of servers hosting all segments of the
-   *   table.
-   */
+  /// This method is called when the API request is to fetch aggregated segment metadata for all segments of the table.
+  /// This method makes a MultiGet call to all servers that host their respective segments and gets the results.
+  /// This method accept a list of column names as filter, and will return column metadata for the column in the
+  /// list.
+  /// TODO Some performance improvement ideas to explore:
+  /// - If table has replica groups, only send requests to one replica group.
+  /// - If table does not have replica groups, send requests to a minimal set of servers hosting all segments of the
+  ///   table.
   /// Reads aggregate metadata without compression statistics.
   public TableMetadataInfo getAggregatedTableMetadataFromServer(String tableNameWithType,
       BiMap<String, String> serverEndPoints, @Nullable List<String> columns, int numReplica, int timeoutMs) {
@@ -198,13 +194,11 @@ public class ServerSegmentMetadataReader {
     return aggregateTableMetadataInfo;
   }
 
-  /**
-   * This method is called when the API request is to fetch segment metadata for all segments of the table.
-   * This method makes a MultiGet call to all servers that host their respective segments and gets the results.
-   * This method accept a list of column names as filter, and will return column metadata for the column in the
-   * list.
-   * @return list of segments and their metadata as a JSON string
-   */
+  /// This method is called when the API request is to fetch segment metadata for all segments of the table.
+  /// This method makes a MultiGet call to all servers that host their respective segments and gets the results.
+  /// This method accept a list of column names as filter, and will return column metadata for the column in the
+  /// list.
+  /// @return list of segments and their metadata as a JSON string
   public List<String> getSegmentMetadataFromServer(String tableNameWithType,
       Map<String, List<String>> serversToSegmentsMap, BiMap<String, String> endpoints, List<String> columns,
       int timeoutMs) {
@@ -242,12 +236,10 @@ public class ServerSegmentMetadataReader {
     return segmentsMetadata;
   }
 
-  /**
-   * This method is called when the API request is to fetch data about segment reload of the table.
-   * This method makes a MultiGet call to all servers that host their respective segments and gets the results.
-   * This method will return metadata of all the servers along with need reload flag.
-   * In future additional details like segments list can also be added
-   */
+  /// This method is called when the API request is to fetch data about segment reload of the table.
+  /// This method makes a MultiGet call to all servers that host their respective segments and gets the results.
+  /// This method will return metadata of all the servers along with need reload flag.
+  /// In future additional details like segments list can also be added
   public TableReloadResponse getCheckReloadSegmentsFromServer(String tableNameWithType,
       Set<String> serverInstances, BiMap<String, String> endpoints, int timeoutMs) {
     LOGGER.debug("Checking if reload is needed on segments from servers for table {}.", tableNameWithType);
@@ -279,12 +271,10 @@ public class ServerSegmentMetadataReader {
     return new TableReloadResponse(serviceResponse._failedResponseCount, serversNeedReloadResponses);
   }
 
-  /**
-   * This method is called when the API request is to fetch validDocId metadata for a list segments of the given table.
-   * This method will pick one server randomly that hosts the target segment and fetch the segment metadata result.
-   *
-   * @return list of valid doc id metadata, one per segment processed.
-   */
+  /// This method is called when the API request is to fetch validDocId metadata for a list segments of the given table.
+  /// This method will pick one server randomly that hosts the target segment and fetch the segment metadata result.
+  ///
+  /// @return list of valid doc id metadata, one per segment processed.
   public List<ValidDocIdsMetadataInfo> getValidDocIdsMetadataFromServer(String tableNameWithType,
       Map<String, List<String>> serverToSegmentsMap, BiMap<String, String> serverToEndpoints,
       @Nullable List<String> segmentNames, int timeoutMs, String validDocIdsType,
@@ -295,13 +285,11 @@ public class ServerSegmentMetadataReader {
         .collect(Collectors.toList());
   }
 
-  /**
-   * This method is called when the API request is to fetch validDocId metadata for a list segments of the given table.
-   * This method will pick all servers that hosts the target segment and fetch the segment metadata result and
-   * return as a list.
-   *
-   * @return the per-segment metadata from every responding server, plus the expected replica count per segment.
-   */
+  /// This method is called when the API request is to fetch validDocId metadata for a list segments of the given table.
+  /// This method will pick all servers that hosts the target segment and fetch the segment metadata result and
+  /// return as a list.
+  ///
+  /// @return the per-segment metadata from every responding server, plus the expected replica count per segment.
   public ValidDocIdsMetadataResult getSegmentToValidDocIdsMetadataFromServer(String tableNameWithType,
       Map<String, List<String>> serverToSegmentsMap, BiMap<String, String> serverToEndpoints,
       @Nullable List<String> segmentNames, int timeoutMs, String validDocIdsType,
@@ -383,7 +371,7 @@ public class ServerSegmentMetadataReader {
     return new ValidDocIdsMetadataResult(validDocIdsMetadataInfos, segmentToExpectedReplicaCount);
   }
 
-  /// Result of [#getSegmentToValidDocIdsMetadataFromServer]: the per-segment metadata from every responding server,
+  /// Result of \[#getSegmentToValidDocIdsMetadataFromServer\]: the per-segment metadata from every responding server,
   /// plus the expected replica count per segment (how many servers host it). The count lets callers detect a replica
   /// that did not respond, since a missing replica is simply absent from the metadata.
   public static class ValidDocIdsMetadataResult {
@@ -405,12 +393,10 @@ public class ServerSegmentMetadataReader {
     }
   }
 
-  /**
-   * This method is called when the API request is to fetch validDocIds for a segment of the given table. This method
-   * will pick a server that hosts the target segment and fetch the validDocIds result.
-   *
-   * @return a bitmap of validDocIds
-   */
+  /// This method is called when the API request is to fetch validDocIds for a segment of the given table. This method
+  /// will pick a server that hosts the target segment and fetch the validDocIds result.
+  ///
+  /// @return a bitmap of validDocIds
   @Deprecated
   public RoaringBitmap getValidDocIdsFromServer(String tableNameWithType, String segmentName, String validDocIdsType,
       String endpoint, int timeoutMs) {
@@ -429,12 +415,10 @@ public class ServerSegmentMetadataReader {
     return RoaringBitmapUtils.deserialize(validDocIds);
   }
 
-  /**
-   * This method is called when the API request is to fetch validDocIds for a segment of the given table. This method
-   * will pick a server that hosts the target segment and fetch the validDocIds result.
-   *
-   * @return a bitmap of validDocIds
-   */
+  /// This method is called when the API request is to fetch validDocIds for a segment of the given table. This method
+  /// will pick a server that hosts the target segment and fetch the validDocIds result.
+  ///
+  /// @return a bitmap of validDocIds
   public ValidDocIdsBitmapResponse getValidDocIdsBitmapFromServer(String tableNameWithType, String segmentName,
       String endpoint, String validDocIdsType, int timeoutMs) {
     // Build the endpoint url

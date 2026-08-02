@@ -36,12 +36,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Recommend one sorted index and inverted indices
- * See details in
- * https://cwiki.apache.org/confluence/display/PINOT/Automated+Inverted+Index+Recommendation+for+Pinot
- * #AutomatedInvertedIndexRecommendationforPinot-3.Parser-basedEstimation:
- */
+/// Recommend one sorted index and inverted indices
+/// See details in
+/// https://cwiki.apache.org/confluence/display/PINOT/Automated+Inverted+Index+Recommendation+for+Pinot
+/// #AutomatedInvertedIndexRecommendationforPinot-3.Parser-basedEstimation:
 public class InvertedSortedIndexJointRule extends AbstractRule {
   private static final Logger LOGGER = LoggerFactory.getLogger(InvertedSortedIndexJointRule.class);
   InvertedSortedIndexJointRuleParams _params;
@@ -160,11 +158,9 @@ public class InvertedSortedIndexJointRule extends AbstractRule {
     }
   }
 
-  /**
-   * Gradually increment the number of indices to apply index on
-   * @param parsedQuery a list of query parsed and scored using {@link QueryInvertedSortedIndexRecommender}
-   * @return the optimal combination of indices and the nESI with such combination
-   */
+  /// Gradually increment the number of indices to apply index on
+  /// @param parsedQuery a list of query parsed and scored using [QueryInvertedSortedIndexRecommender]
+  /// @return the optimal combination of indices and the nESI with such combination
   public PredicateParseResult findOptimalCombination(List<List<PredicateParseResult>> parsedQuery) {
     int n = _input.getNumColumnsInvertedSortedApplicable();
     int iterationsWithoutGain = 0;
@@ -189,15 +185,13 @@ public class InvertedSortedIndexJointRule extends AbstractRule {
     return optimalCombinationResult;
   }
 
-  /**
-   * @param n total number of dimensions in this table
-   * @param r number of dimensions to apply index on
-   * @param parsedQuery a list of query parsed and scored using {@link QueryInvertedSortedIndexRecommender}
-   * @return {@link PredicateParseResult}
-   * {@link PredicateParseResult#getCandidateDims()} the optimal r-sized set of dimensions to apply index on
-   * {@link PredicateParseResult#getnESI()} the nESI before applying any index
-   * {@link PredicateParseResult#getnESIWithIdx()} the estimated nESI after applying optimal indices
-   */
+  /// @param n total number of dimensions in this table
+  /// @param r number of dimensions to apply index on
+  /// @param parsedQuery a list of query parsed and scored using [QueryInvertedSortedIndexRecommender]
+  /// @return [PredicateParseResult]
+  /// [PredicateParseResult#getCandidateDims()] the optimal r-sized set of dimensions to apply index on
+  /// [PredicateParseResult#getnESI()] the nESI before applying any index
+  /// [PredicateParseResult#getnESIWithIdx()] the estimated nESI after applying optimal indices
   public PredicateParseResult evaluateCombination(final int n, final int r,
       List<List<PredicateParseResult>> parsedQuery) {
     FixedLenBitset usedCols = new FixedLenBitset(n);
@@ -253,11 +247,9 @@ public class InvertedSortedIndexJointRule extends AbstractRule {
     }
   }
 
-  /**
-   * @param n the size of a set N={0, 2, 3, 4, ..., n-1}
-   * @param r size of subset to select from N
-   * @return enumeration of all r-sized subsets
-   */
+  /// @param n the size of a set N={0, 2, 3, 4, ..., n-1}
+  /// @param r size of subset to select from N
+  /// @return enumeration of all r-sized subsets
   public static List<int[]> generateCombinations(int n, int r) {
     List<int[]> combinations = new ArrayList<>();
     if (r == 0) {

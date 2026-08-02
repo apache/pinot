@@ -33,19 +33,17 @@ import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * Basic Authentication based on http headers. Configured via the "controller.admin.access.control" family of
- * properties.
- *
- * <pre>
- *     Example:
- *     controller.admin.access.control.principals=admin123,user456
- *     controller.admin.access.control.principals.admin123.password=verysecret
- *     controller.admin.access.control.principals.user456.password=kindasecret
- *     controller.admin.access.control.principals.user456.tables=stuff,lessImportantStuff
- *     controller.admin.access.control.principals.user456.permissions=read,update
- * </pre>
- */
+/// Basic Authentication based on http headers. Configured via the "controller.admin.access.control" family of
+/// properties.
+///
+/// ```
+/// Example:
+/// controller.admin.access.control.principals=admin123,user456
+/// controller.admin.access.control.principals.admin123.password=verysecret
+/// controller.admin.access.control.principals.user456.password=kindasecret
+/// controller.admin.access.control.principals.user456.tables=stuff,lessImportantStuff
+/// controller.admin.access.control.principals.user456.permissions=read,update
+/// ```
 public class BasicAuthAccessControlFactory implements AccessControlFactory {
   private static final String PREFIX = "controller.admin.access.control.principals";
 
@@ -64,9 +62,7 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
     return _accessControl;
   }
 
-  /**
-   * Access Control using header-based basic http authentication
-   */
+  /// Access Control using header-based basic http authentication
   private static class BasicAuthAccessControl implements AccessControl {
     private final Map<String, BasicAuthPrincipal> _token2principal;
 

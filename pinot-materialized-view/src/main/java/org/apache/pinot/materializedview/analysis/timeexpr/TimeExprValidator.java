@@ -37,7 +37,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /// is unconstrained: any base-table dateTime column is acceptable so long as the SELECT
 /// expression produces a millis-epoch value the MV can store as TIMESTAMP.
 ///
-/// <h3>Accepted MV time-column SELECT shapes</h3>
+/// ## Accepted MV time-column SELECT shapes
 ///
 ///   - **Identity passthrough**: a bare identifier equal to the base table's primary time
 ///       column. Allowed only when the base column is itself TIMESTAMP — otherwise the value
@@ -57,17 +57,17 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /// Anything else (DATETIMECONVERT, TODATETIME, mixed addition/subtraction, nested DATETRUNC,
 /// non-TIMESTAMP MV column type) is rejected at table-create time with an actionable message.
 ///
-/// <h3>Structure</h3>
+/// ## Structure
 ///
 /// The file is logically two layers:
 ///
-///   1. **Shape recognition** (the {@link #parse} pipeline and the
-///      {@link TimeExpression} ADT) — pure structural recognition that emits one of the three
+///   1. **Shape recognition** (the [#parse] pipeline and the
+///      [TimeExpression] ADT) — pure structural recognition that emits one of the three
 ///      variants with literal arguments attached. No policy, no TIMESTAMP-ness check, no
-///      bucket-alignment check. {@link ParseException} surfaces structural violations.
-///   2. **Policy validation** (the {@link #validate} entry point and its helpers) — maps the
+///      bucket-alignment check. [ParseException] surfaces structural violations.
+///   2. **Policy validation** (the [#validate] entry point and its helpers) — maps the
 ///      recognised shape onto the TIMESTAMP / `bucketTimePeriod` / base-column-type rules
-///      above and rethrows {@link IllegalStateException} on any violation so the analyzer has
+///      above and rethrows [IllegalStateException] on any violation so the analyzer has
 ///      a single exception type to catch.
 public final class TimeExprValidator {
 
@@ -82,8 +82,8 @@ public final class TimeExprValidator {
       Map.entry("DAY", TimeUnit.DAYS));
 
   /// Canonical name produced by [FunctionRegistry#canonicalize] for `DATETRUNC` calls.
-  /// {@code FunctionRegistry.canonicalize} strips underscores and lower-cases, so
-  /// `DATETRUNC`, `date_trunc`, `DateTrunc` all collapse to {@code "datetrunc"}.
+  /// `FunctionRegistry.canonicalize` strips underscores and lower-cases, so
+  /// `DATETRUNC`, `date_trunc`, `DateTrunc` all collapse to `"datetrunc"`.
   private static final String DATETRUNC_CANONICAL = "datetrunc";
 
   /// Canonical name for the `*` operator (Calcite's `times` function). Pinot's parser emits
@@ -200,7 +200,7 @@ public final class TimeExprValidator {
   // ─── Structural layer: ADT + parser ────────────────────────────────────────────────────
 
   /// Closed-set ADT for the three SELECT-list expression shapes a Materialized View accepts
-  /// as its time-column expression. Produced by {@link #parse}. Does not carry policy: it
+  /// as its time-column expression. Produced by [#parse]. Does not carry policy: it
   /// reports the shape and the literal arguments the user wrote.
   public abstract static class TimeExpression {
     private final String _baseTimeColumnName;
@@ -256,8 +256,8 @@ public final class TimeExprValidator {
 
   /// Thrown when the input expression does not match any of the three accepted MV
   /// time-column shapes or carries a structural violation (negative literal, non-default
-  /// DATETRUNC inputTimeUnit, etc.). Unchecked; {@link #validate} catches this and rethrows
-  /// as {@link IllegalStateException} so the analyzer has a single exception type to catch.
+  /// DATETRUNC inputTimeUnit, etc.). Unchecked; [#validate] catches this and rethrows
+  /// as [IllegalStateException] so the analyzer has a single exception type to catch.
   public static class ParseException extends RuntimeException {
     public ParseException(String message) {
       super(message);
@@ -265,16 +265,16 @@ public final class TimeExprValidator {
   }
 
   /// Parses the alias-stripped SELECT-list expression for an MV time column into the
-  /// {@link TimeExpression} ADT.
+  /// [TimeExpression] ADT.
   ///
-  /// @param sourceExpr the [Expression] tree, with any wrapping {@code AS} already removed
-  ///                   by the caller (e.g. via {@code RequestUtils.unwrapAlias}). Must not
-  ///                   be {@code null}.
+  /// @param sourceExpr the [Expression] tree, with any wrapping `AS` already removed
+  ///                   by the caller (e.g. via `RequestUtils.unwrapAlias`). Must not
+  ///                   be `null`.
   /// @return the recognised shape with literal arguments attached.
   /// @throws ParseException if the expression is none of the three accepted shapes or
   ///         violates a structural constraint of one of them (non-default DATETRUNC arg,
   ///         non-positive literal, repeated base column reference, etc.).
-  /// @throws NullPointerException if {@code sourceExpr} is {@code null}.
+  /// @throws NullPointerException if `sourceExpr` is `null`.
   public static TimeExpression parse(Expression sourceExpr) {
     if (sourceExpr == null) {
       throw new NullPointerException("sourceExpr");
@@ -309,7 +309,7 @@ public final class TimeExprValidator {
   /// Recognises the `DATETRUNC` shape and validates the optional trailing arguments equal
   /// their defaults. Note: this method does NOT enforce the unit is among the MILLISECOND /
   /// SECOND / MINUTE / HOUR / DAY whitelist — that is policy and lives in
-  /// {@link #validateDateTruncPolicy} (calendar units are rejected because their bucket size
+  /// [#validateDateTruncPolicy] (calendar units are rejected because their bucket size
   /// is calendar-dependent and incompatible with `bucketTimePeriod`).
   private static DateTrunc parseDateTrunc(Function func) {
     List<Expression> operands = func.getOperands();

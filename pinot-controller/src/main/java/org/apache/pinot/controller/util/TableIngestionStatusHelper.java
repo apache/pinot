@@ -36,9 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Helper class to fetch ingestion status for realtime and offline table
- */
+/// Helper class to fetch ingestion status for realtime and offline table
 public class TableIngestionStatusHelper {
   private TableIngestionStatusHelper() {
   }

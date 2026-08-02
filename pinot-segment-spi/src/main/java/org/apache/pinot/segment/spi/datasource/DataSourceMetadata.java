@@ -24,87 +24,59 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * The {@code DataSourceMetadata} class contains all the metadata for a column for query execution purpose.
- */
+/// The `DataSourceMetadata` class contains all the metadata for a column for query execution purpose.
 public interface DataSourceMetadata {
 
-  /**
-   * Returns the field spec of the column.
-   */
+  /// Returns the field spec of the column.
   FieldSpec getFieldSpec();
 
-  /**
-   * Returns the data type of the column.
-   */
+  /// Returns the data type of the column.
   default FieldSpec.DataType getDataType() {
     return getFieldSpec().getDataType();
   }
 
-  /**
-   * Returns {@code true} if the column is single-valued, {@code false} otherwise.
-   */
+  /// Returns `true` if the column is single-valued, `false` otherwise.
   default boolean isSingleValue() {
     return getFieldSpec().isSingleValueField();
   }
 
-  /**
-   * Returns {@code true} if the column is sorted, {@code false} otherwise.
-   *
-   * The result of this method cannot be trusted if null handling is enabled.
-   */
+  /// Returns `true` if the column is sorted, `false` otherwise.
+  ///
+  /// The result of this method cannot be trusted if null handling is enabled.
   boolean isSorted();
 
-  /**
-   * Returns the number of documents of the column.
-   */
+  /// Returns the number of documents of the column.
   int getNumDocs();
 
-  /**
-   * Returns the number of values of the column. For single-value column, number of values always equals to number of
-   * documents; for multi-value column, each document (multi-value entry) may contain multiple values.
-   */
+  /// Returns the number of values of the column. For single-value column, number of values always equals to number of
+  /// documents; for multi-value column, each document (multi-value entry) may contain multiple values.
   int getNumValues();
 
-  /**
-   * Returns the maximum number of values for each multi-value entry of the multi-value column. Returns {@code -1} for
-   * single-value column.
-   */
+  /// Returns the maximum number of values for each multi-value entry of the multi-value column. Returns `-1` for
+  /// single-value column.
   int getMaxNumValuesPerMVEntry();
 
-  /**
-   * Returns the minimum value of the column, or {@code null} if it is not available.
-   */
+  /// Returns the minimum value of the column, or `null` if it is not available.
   @Nullable
   Comparable getMinValue();
 
-  /**
-   * Returns the maximum value of the column, or {@code null} if it is not available.
-   */
+  /// Returns the maximum value of the column, or `null` if it is not available.
   @Nullable
   Comparable getMaxValue();
 
-  /**
-   * Returns the partition function of the column, or {@code null} if the column is not partitioned.
-   */
+  /// Returns the partition function of the column, or `null` if the column is not partitioned.
   @Nullable
   PartitionFunction getPartitionFunction();
 
-  /**
-   * Returns the partitions the column belongs to, or {@code null} if the column is not partitioned.
-   */
+  /// Returns the partitions the column belongs to, or `null` if the column is not partitioned.
   @Nullable
   Set<Integer> getPartitions();
 
-  /**
-   * Returns the cardinality of the column, {@code -1} if not applicable
-   */
+  /// Returns the cardinality of the column, `-1` if not applicable
   int getCardinality();
 
-  /**
-   * Returns the max row length in bytes for a var byte MV column. {@code -1} if not applicable.
-   * @return
-   */
+  /// Returns the max row length in bytes for a var byte MV column. `-1` if not applicable.
+  /// @return
   default int getMaxRowLengthInBytes() {
     return -1;
   }

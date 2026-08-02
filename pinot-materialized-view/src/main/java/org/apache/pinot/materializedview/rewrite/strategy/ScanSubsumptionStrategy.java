@@ -44,7 +44,6 @@ import org.apache.pinot.materializedview.rewrite.MaterializedViewRewritePlan;
 ///
 ///   - `2.0` — projection-subset match without residual WHERE
 ///   - `3.0` — projection-subset match with residual WHERE
-///
 public class ScanSubsumptionStrategy extends AbstractSubsumptionStrategy {
 
   private static final double COST_SCAN_SUBSUMPTION = 2.0;

@@ -28,9 +28,7 @@ import org.apache.pinot.core.minion.SegmentPurger;
 import org.apache.pinot.spi.auth.AuthProvider;
 
 
-/**
- * The <code>MinionContext</code> class is a singleton class which contains all minion related context.
- */
+/// The `MinionContext` class is a singleton class which contains all minion related context.
 public class MinionContext {
   private static final MinionContext INSTANCE = new MinionContext();
 

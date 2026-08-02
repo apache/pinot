@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby.utils;
 
-/**
- * Interface for mapping primitive values to contiguous id's.
- */
+/// Interface for mapping primitive values to contiguous id's.
 public interface ValueToIdMap {
   int INVALID_KEY = -1;
 
@@ -60,18 +58,16 @@ public interface ValueToIdMap {
 
   int getId(Object value);
 
-  /**
-   * Returns the value for the given id.
-   * <p>The Object type returned for each value type:
-   * <ul>
-   *   <li>INT -> Integer</li>
-   *   <li>LONG -> Long</li>
-   *   <li>FLOAT -> Float</li>
-   *   <li>DOUBLE -> Double</li>
-   *   <li>BIG_DECIMAL -> BigDecimal</li>
-   *   <li>STRING -> String</li>
-   *   <li>BYTES -> ByteArray</li>
-   * </ul>
-   */
+  /// Returns the value for the given id.
+  ///
+  /// The Object type returned for each value type:
+  ///
+  /// - INT -> Integer
+  /// - LONG -> Long
+  /// - FLOAT -> Float
+  /// - DOUBLE -> Double
+  /// - BIG_DECIMAL -> BigDecimal
+  /// - STRING -> String
+  /// - BYTES -> ByteArray
   Object get(int id);
 }

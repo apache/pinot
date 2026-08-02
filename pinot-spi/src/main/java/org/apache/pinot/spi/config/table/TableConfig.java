@@ -142,7 +142,7 @@ public class TableConfig extends BaseJsonConfig {
   /// Legacy constructor preserved for binary backward-compatibility on the public SPI surface.
   /// Callers compiled against the pre-`isMaterializedView` signature still link against this entry
   /// point; it forwards to the canonical constructor with `materializedView=false`. Prefer the
-  /// {@link TableConfigBuilder} or the canonical constructor below for new code.
+  /// [TableConfigBuilder] or the canonical constructor below for new code.
   @Deprecated
   public TableConfig(String tableName, String tableType,
       SegmentsValidationAndRetentionConfig validationConfig, TenantConfig tenantConfig,

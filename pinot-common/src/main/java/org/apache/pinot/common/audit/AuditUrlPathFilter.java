@@ -30,30 +30,28 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * URL path filter utility that uses Java's PathMatcher with glob and regex patterns
- * to determine if a URL path should be audited based on include/exclude patterns.
- *
- * This class provides powerful pattern matching capabilities including:
- * - Wildcards: * (within path segment), ** (across path segments), ? (single character)
- * - Character sets: [abc], [a-z], [!abc]
- * - Grouping: {api,v1,v2}
- * - Regular expressions with regex: prefix
- *
- * Glob pattern examples:
- * - health - exact match
- * - api/* - matches api/users but not api/v1/users
- * - api/** - matches api/users and api/v1/users
- * - api/v[12]/users - matches api/v1/users and api/v2/users
- * - api/{users,groups}/list - matches api/users/list and api/groups/list
- *
- * Regex pattern examples (must be prefixed with "regex:"):
- * - regex:api/v[0-9]+/users - matches api/v1/users, api/v2/users, api/v123/users
- * - regex:^health(check)?$ - matches only "health" or "healthcheck"
- * - regex:.*\.(jpg|png|gif)$ - matches paths ending with image extensions
- * - regex:api/(user|group|role)/[0-9]+ - matches api/user/123, api/group/456
- * - regex:^(ping|status|healthz?)$ - matches ping, status, health, or healthz
- */
+/// URL path filter utility that uses Java's PathMatcher with glob and regex patterns
+/// to determine if a URL path should be audited based on include/exclude patterns.
+///
+/// This class provides powerful pattern matching capabilities including:
+/// - Wildcards: \* (within path segment), \*\* (across path segments), ? (single character)
+/// - Character sets: \[abc\], \[a-z\], \[!abc\]
+/// - Grouping: {api,v1,v2}
+/// - Regular expressions with regex: prefix
+///
+/// Glob pattern examples:
+/// - health - exact match
+/// - api/\* - matches api/users but not api/v1/users
+/// - api/\*\* - matches api/users and api/v1/users
+/// - api/v\[12\]/users - matches api/v1/users and api/v2/users
+/// - api/{users,groups}/list - matches api/users/list and api/groups/list
+///
+/// Regex pattern examples (must be prefixed with "regex:"):
+/// - regex:api/v\[0-9\]+/users - matches api/v1/users, api/v2/users, api/v123/users
+/// - regex:^health(check)?$ - matches only "health" or "healthcheck"
+/// - regex:.\*\.(jpg|png|gif)$ - matches paths ending with image extensions
+/// - regex:api/(user|group|role)/\[0-9\]+ - matches api/user/123, api/group/456
+/// - regex:^(ping|status|healthz?)$ - matches ping, status, health, or healthz
 @Singleton
 public class AuditUrlPathFilter {
   private static final Logger LOG = LoggerFactory.getLogger(AuditUrlPathFilter.class);
@@ -66,13 +64,11 @@ public class AuditUrlPathFilter {
     _configManager = configManager;
   }
 
-  /**
-   * Determines whether a given endpoint should be audited based on include/exclude patterns.
-   * Exclusion patterns have priority over inclusion patterns.
-   *
-   * @param endpoint the URL endpoint to check
-   * @return true if the endpoint should be audited, false otherwise
-   */
+  /// Determines whether a given endpoint should be audited based on include/exclude patterns.
+  /// Exclusion patterns have priority over inclusion patterns.
+  ///
+  /// @param endpoint the URL endpoint to check
+  /// @return true if the endpoint should be audited, false otherwise
   public boolean shouldAudit(String endpoint) {
     AuditConfig config = _configManager.getCurrentConfig();
 
@@ -108,13 +104,11 @@ public class AuditUrlPathFilter {
     return false;
   }
 
-  /**
-   * Checks if the given URL path matches any of the provided patterns.
-   *
-   * @param urlPath The URL path to check (e.g., "api/v1/users")
-   * @param patternsCommaSeparated Comma-separated list of glob patterns
-   * @return true if the path matches any pattern, false otherwise
-   */
+  /// Checks if the given URL path matches any of the provided patterns.
+  ///
+  /// @param urlPath The URL path to check (e.g., "api/v1/users")
+  /// @param patternsCommaSeparated Comma-separated list of glob patterns
+  /// @return true if the path matches any pattern, false otherwise
   public boolean matches(String urlPath, String patternsCommaSeparated) {
     if (StringUtils.isBlank(urlPath) || StringUtils.isBlank(patternsCommaSeparated)) {
       return false;

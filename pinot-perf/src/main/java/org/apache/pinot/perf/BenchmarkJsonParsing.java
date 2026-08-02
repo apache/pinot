@@ -45,18 +45,16 @@ import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
-/**
- * Benchmark to compare JSON parsing performance:
- * - Old approach: bytesToJsonNode() + jsonNodeToMap() (two-step parsing)
- * - New approach: bytesToMap() (single-step parsing)
- *
- * This benchmark simulates the JSON decoding path in RealtimeSegmentDataManager.consumeLoop()
- * where JSONMessageDecoder.decode() is called for each message from the stream.
- *
- * Run with: mvn exec:exec -Dexec.executable="java" -Dexec.args="-cp %classpath org.apache.pinot.perf
- * .BenchmarkJsonParsing"
- * Or compile and run: java -jar pinot-perf/target/pinot-perf-*-shaded.jar BenchmarkJsonParsing
- */
+/// Benchmark to compare JSON parsing performance:
+/// - Old approach: bytesToJsonNode() + jsonNodeToMap() (two-step parsing)
+/// - New approach: bytesToMap() (single-step parsing)
+///
+/// This benchmark simulates the JSON decoding path in RealtimeSegmentDataManager.consumeLoop()
+/// where JSONMessageDecoder.decode() is called for each message from the stream.
+///
+/// Run with: mvn exec:exec -Dexec.executable="java" -Dexec.args="-cp %classpath org.apache.pinot.perf
+/// .BenchmarkJsonParsing"
+/// Or compile and run: java -jar pinot-perf/target/pinot-perf-\*-shaded.jar BenchmarkJsonParsing
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @Fork(1)
@@ -94,9 +92,7 @@ public class BenchmarkJsonParsing {
     }
   }
 
-  /**
-   * Generates different types of JSON payloads to simulate real-world streaming data.
-   */
+  /// Generates different types of JSON payloads to simulate real-world streaming data.
   private String generateJsonPayload(String type, Random random, int index) {
     switch (type) {
       case "small":
@@ -203,10 +199,8 @@ public class BenchmarkJsonParsing {
     return payload;
   }
 
-  /**
-   * OLD APPROACH: Two-step parsing (bytesToJsonNode + jsonNodeToMap)
-   * This was the original implementation that caused high CPU usage.
-   */
+  /// OLD APPROACH: Two-step parsing (bytesToJsonNode + jsonNodeToMap)
+  /// This was the original implementation that caused high CPU usage.
   @Benchmark
   public Map<String, Object> oldApproachTwoStepParsing(Blackhole blackhole)
       throws IOException {
@@ -222,10 +216,8 @@ public class BenchmarkJsonParsing {
     return result;
   }
 
-  /**
-   * NEW APPROACH: Single-step parsing (bytesToMap)
-   * This is the optimized implementation that parses directly to Map.
-   */
+  /// NEW APPROACH: Single-step parsing (bytesToMap)
+  /// This is the optimized implementation that parses directly to Map.
   @Benchmark
   public Map<String, Object> newApproachDirectParsing(Blackhole blackhole)
       throws IOException {

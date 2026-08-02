@@ -22,22 +22,16 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.distinct.table.DistinctTable;
 
 
-/**
- * Interface class for executing the distinct queries.
- */
+/// Interface class for executing the distinct queries.
 public interface DistinctExecutor {
   // TODO: Tune the initial capacity
   int MAX_INITIAL_CAPACITY = 10000;
 
-  /**
-   * Processes the given value block, returns {@code true} if the query is already satisfied, {@code false}
-   * otherwise. No more calls should be made after it returns {@code true}.
-   */
+  /// Processes the given value block, returns `true` if the query is already satisfied, `false`
+  /// otherwise. No more calls should be made after it returns `true`.
   boolean process(ValueBlock valueBlock);
 
-  /**
-   * Returns the distinct result. Note that the returned DistinctTable might not be a main DistinctTable, thus cannot be
-   * used to merge other records or tables, but can only be merged into the main DistinctTable.
-   */
+  /// Returns the distinct result. Note that the returned DistinctTable might not be a main DistinctTable, thus
+  /// cannot be used to merge other records or tables, but can only be merged into the main DistinctTable.
   DistinctTable getResult();
 }

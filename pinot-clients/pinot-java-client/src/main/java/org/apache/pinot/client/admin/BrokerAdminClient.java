@@ -25,9 +25,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.JsonUtils;
 
-/**
- * Client for broker-related administration operations.
- */
+/// Client for broker-related administration operations.
 public class BrokerAdminClient extends BaseServiceAdminClient {
 
   public BrokerAdminClient(PinotAdminTransport transport, String controllerAddress, Map<String, String> headers) {

@@ -37,16 +37,15 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
-/**
- * This function is used for BigDecimal calculations. It supports the sum aggregation using both precision and scale.
- * <p>The function can be used as SUMPRECISION(expression, precision, scale)
- * <p>Following arguments are supported:
- * <ul>
- *   <li>Expression: expression that contains the values to be summed up, can be serialized BigDecimal objects</li>
- *   <li>Precision (optional): precision to be set to the final result</li>
- *   <li>Scale (optional): scale to be set to the final result</li>
- * </ul>
- */
+/// This function is used for BigDecimal calculations. It supports the sum aggregation using both precision and scale.
+///
+/// The function can be used as SUMPRECISION(expression, precision, scale)
+///
+/// Following arguments are supported:
+///
+/// - Expression: expression that contains the values to be summed up, can be serialized BigDecimal objects
+/// - Precision (optional): precision to be set to the final result
+/// - Scale (optional): scale to be set to the final result
 public class SumPrecisionAggregationFunction extends NullableSingleInputAggregationFunction<BigDecimal, BigDecimal> {
   private final Integer _precision;
   private final Integer _scale;

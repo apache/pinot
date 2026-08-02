@@ -42,7 +42,6 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
-import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
@@ -62,13 +61,11 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This is used to read/search the Lucene text index.
- * When {@link ImmutableSegmentLoader} loads the segment,
- * it also loads (mmaps) the Lucene text index if the segment has TEXT column(s).
- *
- * This class is a version of LuceneTestIndexReader adapted to handling multiple columns.
- */
+/// This is used to read/search the Lucene text index.
+/// When [org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader] loads the segment,
+/// it also loads (mmaps) the Lucene text index if the segment has TEXT column(s).
+///
+/// This class is a version of LuceneTestIndexReader adapted to handling multiple columns.
 public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexReader {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MultiColumnLuceneTextIndexReader.class);
   public static final String CLASSIC_QUERY_PARSER = "org.apache.lucene.queryparser.classic.QueryParser";
@@ -244,12 +241,10 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
     }
   }
 
-  /**
-   * Parse given per column configurations.
-   * @param perColumnConfig
-   * @return map of columns names to per-column lucene configuration
-   * @throws ReflectiveOperationException
-   */
+  /// Parse given per column configurations.
+  /// @param perColumnConfig
+  /// @return map of columns names to per-column lucene configuration
+  /// @throws ReflectiveOperationException
   public static Map<String, ColumnConfig> buildColumnConfigs(Map<String, Map<String, String>> perColumnConfig)
       throws ReflectiveOperationException {
     Map<String, ColumnConfig> perColumnConfigs;
@@ -312,20 +307,18 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
         metadata.getMultiColumnTextMetadata().getPerColumnProperties());
   }
 
-  /**
-   * CASE 1: If IndexLoadingConfig specifies a segment version to load and if it is different then
-   * the on-disk version of the segment, then {@link ImmutableSegmentLoader}
-   * will take care of up-converting the on-disk segment to v3 before load. The converter
-   * already has support for converting v1 text index to v3. So the text index can be
-   * loaded from segmentIndexDir/v3/ since v3 sub-directory would have already been created
-   *
-   * CASE 2: However, if IndexLoadingConfig doesn't specify the segment version to load or if the specified
-   * version is same as the on-disk version of the segment, then ImmutableSegmentLoader will load
-   * whatever the version of segment is on disk.
-   *
-   * @param segmentIndexDir top-level segment index directory
-   * @return text index file
-   */
+  /// CASE 1: If IndexLoadingConfig specifies a segment version to load and if it is different then the on-disk
+  /// version of the segment, then [org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader]
+  /// will take care of up-converting the on-disk segment to v3 before load. The converter already has support for
+  /// converting v1 text index to v3. So the text index can be loaded from segmentIndexDir/v3/ since v3 sub-directory
+  /// would have already been created
+  ///
+  /// CASE 2: However, if IndexLoadingConfig doesn't specify the segment version to load or if the specified
+  /// version is same as the on-disk version of the segment, then ImmutableSegmentLoader will load
+  /// whatever the version of segment is on disk.
+  ///
+  /// @param segmentIndexDir top-level segment index directory
+  /// @return text index file
   private File getTextIndexFile(File segmentIndexDir) {
     // will return null if file does not exist
     File file =
@@ -427,13 +420,11 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
     }
   }
 
-  /**
-   * When we destroy the loaded ImmutableSegment, all the indexes
-   * (for each column) are destroyed and as part of that
-   * we release the text index
-   *
-   * @throws IOException
-   */
+  /// When we destroy the loaded ImmutableSegment, all the indexes
+  /// (for each column) are destroyed and as part of that
+  /// we release the text index
+  ///
+  /// @throws IOException
   @Override
   public void close()
       throws IOException {

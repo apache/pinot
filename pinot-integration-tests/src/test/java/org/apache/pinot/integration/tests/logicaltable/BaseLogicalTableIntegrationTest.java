@@ -259,9 +259,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     ClusterIntegrationTestUtils.setUpH2TableWithAvro(avroFiles, getLogicalTableName(), _h2Connection);
   }
 
-  /**
-   * Creates a new OFFLINE table config.
-   */
+  /// Creates a new OFFLINE table config.
   protected TableConfig createOfflineTableConfig(String tableName) {
     // @formatter:off
     return new TableConfigBuilder(TableType.OFFLINE)
@@ -453,16 +451,14 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     super.testGeneratedQueries(true, useMultiStageQueryEngine);
   }
 
-  /**
-   * End-to-end smoke test that enabling broker segment pruning on the MSE logical-planner path executes cleanly for a
-   * logical table and does not change results. It exercises the logical-table routing path where the leaf-stage filter
-   * is forwarded (via {@code WorkerManager.buildLogicalTableRoutingBrokerRequest}) into each physical table's routing
-   * request so the {@code LogicalTableRouteProvider} runs segment pruners over a filter-bearing request rather than a
-   * bare {@code SELECT *}. A malformed forwarded request would surface here as an exception or a changed result.
-   *
-   * <p>Note: these physical tables carry no segment-pruner config, so this asserts correctness, not that a segment was
-   * actually pruned; the exact pruning behavior is unit-tested in {@code WorkerManagerTest}.
-   */
+  /// End-to-end smoke test that enabling broker segment pruning on the MSE logical-planner path executes cleanly for a
+  /// logical table and does not change results. It exercises the logical-table routing path where the leaf-stage filter
+  /// is forwarded (via `WorkerManager.buildLogicalTableRoutingBrokerRequest`) into each physical table's routing
+  /// request so the `LogicalTableRouteProvider` runs segment pruners over a filter-bearing request rather than a
+  /// bare `SELECT *`. A malformed forwarded request would surface here as an exception or a changed result.
+  ///
+  /// Note: these physical tables carry no segment-pruner config, so this asserts correctness, not that a segment was
+  /// actually pruned; the exact pruning behavior is unit-tested in `WorkerManagerTest`.
   @Test(dataProvider = "useBothQueryEngines")
   public void testBrokerPruningPreservesLogicalTableResults(boolean useMultiStageQueryEngine)
       throws Exception {

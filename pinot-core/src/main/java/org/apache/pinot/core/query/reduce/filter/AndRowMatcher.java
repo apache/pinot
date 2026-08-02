@@ -22,9 +22,7 @@ import java.util.List;
 import org.apache.pinot.common.request.context.FilterContext;
 
 
-/**
- * AND filter matcher.
- */
+/// AND filter matcher.
 public class AndRowMatcher implements RowMatcher {
   private final RowMatcher[] _childMatchers;
 

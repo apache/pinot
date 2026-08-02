@@ -28,9 +28,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit test for time retention.
- */
+/// Unit test for time retention.
 public class TimeRetentionStrategyTest {
 
   @Test

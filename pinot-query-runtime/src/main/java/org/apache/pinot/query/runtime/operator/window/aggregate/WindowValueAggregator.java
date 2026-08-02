@@ -23,25 +23,17 @@ import javax.annotation.Nullable;
 
 public interface WindowValueAggregator<T> {
 
-  /**
-   * Add a new value into the window aggregator.
-   */
+  /// Add a new value into the window aggregator.
   void addValue(@Nullable T value);
 
-  /**
-   * Remove a value from the window aggregator. No validation is done to ensure that only a previously added value is
-   * being removed. It is the responsibility of the caller to ensure that the value being removed is a valid one.
-   */
+  /// Remove a value from the window aggregator. No validation is done to ensure that only a previously added value is
+  /// being removed. It is the responsibility of the caller to ensure that the value being removed is a valid one.
   void removeValue(@Nullable T value);
 
-  /**
-   * Get the current aggregated value for the window.
-   */
+  /// Get the current aggregated value for the window.
   @Nullable
   T getCurrentAggregatedValue();
 
-  /**
-   * Remove all values from the window aggregator.
-   */
+  /// Remove all values from the window aggregator.
   void clear();
 }

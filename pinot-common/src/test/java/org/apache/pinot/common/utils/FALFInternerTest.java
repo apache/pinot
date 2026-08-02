@@ -65,10 +65,8 @@ public class FALFInternerTest {
     Assert.assertTrue(nHits3 > (nTotalObjs - nUniqueObjs) * 0.6);
   }
 
-  /**
-   * Ad hoc benchmarking code. In one run the MacBook laptop, FALFInterner below performs nearly twice faster (1217 ms
-   * vs 2230 ms) With custom hash function, FALFInterner's speed is about the same as the Guava interner.
-   */
+  /// Ad hoc benchmarking code. In one run the MacBook laptop, FALFInterner below performs nearly twice faster (1217 ms
+  /// vs 2230 ms) With custom hash function, FALFInterner's speed is about the same as the Guava interner.
   @Test
   public void benchmarkingTest() {
     Random random = new Random(1);

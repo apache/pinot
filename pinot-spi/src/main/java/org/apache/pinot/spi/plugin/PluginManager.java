@@ -205,14 +205,12 @@ public class PluginManager {
     }
   }
 
-  /**
-   * This method will take a semi-colon delimited string of directories and a semi-colon delimited string of plugin
-   * names. It will traverse the directories in order and produce a <String, File> map of plugins to be loaded.
-   * If a plugin is found in multiple directories, only the first copy of it will be picked up.
-   * @param pluginsDirectories
-   * @param pluginsInclude
-   * @return A hash map with key = plugin name, value = file object
-   */
+  /// This method will take a semi-colon delimited string of directories and a semi-colon delimited string of plugin
+  /// names. It will traverse the directories in order and produce a <String, File> map of plugins to be loaded.
+  /// If a plugin is found in multiple directories, only the first copy of it will be picked up.
+  /// @param pluginsDirectories
+  /// @param pluginsInclude
+  /// @return A hash map with key = plugin name, value = file object
   @VisibleForTesting
   public HashMap<String, File> getPluginsToLoad(String pluginsDirectories, String pluginsInclude)
       throws IllegalArgumentException {
@@ -261,11 +259,9 @@ public class PluginManager {
   private void initRecordReaderClassMap() {
   }
 
-  /**
-   * Loads jars recursively
-   * @param pluginName
-   * @param directory the directory of one plugin
-   */
+  /// Loads jars recursively
+  /// @param pluginName
+  /// @param directory the directory of one plugin
   public void load(String pluginName, File directory) {
     Path pluginPropertiesPath = directory.toPath().resolve(PINOUT_PLUGIN_PROPERTIES_FILE_NAME);
     if (Files.isRegularFile(pluginPropertiesPath)) {
@@ -359,14 +355,15 @@ public class PluginManager {
     return new PluginClassLoader(urls, this.getClass().getClassLoader());
   }
 
-  /**
-   * Loads a class. The class name can be in any of the following formats
-   * <li>com.x.y.foo</li> loads the class in the default class path
-   * <li>pluginName:com.x.y.foo</li> loads the class in plugin specific classloader
-   * @param className
-   * @return
-   * @throws ClassNotFoundException
-   */
+  /// Loads a class. The class name can be in any of the following formats
+  ///
+  /// - com.x.y.foo
+  ///   loads the class in the default class path
+  /// - pluginName:com.x.y.foo
+  ///   loads the class in plugin specific classloader
+  ///   @param className
+  ///   @return
+  ///   @throws ClassNotFoundException
   public Class<?> loadClass(String className)
       throws ClassNotFoundException {
     String pluginName = DEFAULT_PLUGIN_NAME;
@@ -379,13 +376,11 @@ public class PluginManager {
     return loadClass(pluginName, realClassName);
   }
 
-  /**
-   * Loads a class using the plugin specific class loader
-   * @param pluginName
-   * @param className
-   * @return
-   * @throws ClassNotFoundException
-   */
+  /// Loads a class using the plugin specific class loader
+  /// @param pluginName
+  /// @param className
+  /// @return
+  /// @throws ClassNotFoundException
   public Class<?> loadClass(String pluginName, String className)
       throws ClassNotFoundException {
     // Backward compatible check.
@@ -407,25 +402,27 @@ public class PluginManager {
     return PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP.getOrDefault(className, className);
   }
 
-  /**
-   * Create an instance of the className. The className can be in any of the following formats
-   * <li>com.x.y.foo</li> loads the class in the default class path
-   * <li>pluginName:com.x.y.foo</li> loads the class in plugin specific classloader
-   * @param className
-   * @return
-   */
+  /// Create an instance of the className. The className can be in any of the following formats
+  ///
+  /// - com.x.y.foo
+  ///   loads the class in the default class path
+  /// - pluginName:com.x.y.foo
+  ///   loads the class in plugin specific classloader
+  ///   @param className
+  ///   @return
   public <T> T createInstance(String className)
       throws Exception {
     return createInstance(className, new Class[]{}, new Object[]{});
   }
 
-  /**
-   * Create an instance of the className. The className can be in any of the following formats
-   * <li>com.x.y.foo</li> loads the class in the default class path
-   * <li>pluginName:com.x.y.foo</li> loads the class in plugin specific classloader
-   * @param className
-   * @return
-   */
+  /// Create an instance of the className. The className can be in any of the following formats
+  ///
+  /// - com.x.y.foo
+  ///   loads the class in the default class path
+  /// - pluginName:com.x.y.foo
+  ///   loads the class in plugin specific classloader
+  ///   @param className
+  ///   @return
   public <T> T createInstance(String className, Class[] argTypes, Object[] argValues)
       throws Exception {
     String pluginName = DEFAULT_PLUGIN_NAME;
@@ -438,28 +435,23 @@ public class PluginManager {
     return createInstance(pluginName, realClassName, argTypes, argValues);
   }
 
-  /**
-   * Creates an instance of className using classloader specific to the plugin
-   * @param pluginName
-   * @param className
-   * @param <T>
-   * @return
-   * @throws Exception
-   */
+  /// Creates an instance of className using classloader specific to the plugin
+  /// @param pluginName
+  /// @param className
+  /// @param <T>
+  /// @return
+  /// @throws Exception
   public <T> T createInstance(String pluginName, String className)
       throws Exception {
     return createInstance(pluginName, className, new Class[]{}, new Object[]{});
   }
 
-  /**
-   *
-   * @param pluginName
-   * @param className
-   * @param argTypes
-   * @param argValues
-   * @param <T>
-   * @return
-   */
+  /// @param pluginName
+  /// @param className
+  /// @param argTypes
+  /// @param argValues
+  /// @param <T>
+  /// @return
   public <T> T createInstance(String pluginName, String className, Class[] argTypes, Object[] argValues)
       throws Exception {
     Class<T> loadedClass;

@@ -51,11 +51,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A Vector index reader for the real-time Vector index values on the fly.
- * Since there is no good mutable vector index implementation for topK search, we just do brute force search.
- * <p>This class is thread-safe for single writer multiple readers.
- */
+/// A Vector index reader for the real-time Vector index values on the fly.
+/// Since there is no good mutable vector index implementation for topK search, we just do brute force search.
+///
+/// This class is thread-safe for single writer multiple readers.
 public class MutableVectorIndex implements VectorIndexReader, MutableIndex, VectorIndexConfigProvider, EfSearchAware {
   private static final Logger LOGGER = LoggerFactory.getLogger(MutableVectorIndex.class);
   private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =

@@ -33,14 +33,11 @@ public class BrokerSelectorUtils {
   private BrokerSelectorUtils() {
   }
 
-  /**
-   *
-   * @param tableNames: List of table names.
-   * @param brokerData: map holding data for table hosting on brokers.
-   * @return list of common brokers hosting all the tables or null if no common brokers found.
-   * @deprecated Use {@link #getTablesCommonBrokersSet(List, Map)} instead. It is more efficient and its semantics are
-   * clearer (ie it returns an empty set instead of null if no common brokers are found).
-   */
+  /// @param tableNames: List of table names.
+  /// @param brokerData: map holding data for table hosting on brokers.
+  /// @return list of common brokers hosting all the tables or null if no common brokers found.
+  /// @deprecated Use [#getTablesCommonBrokersSet(List, Map)] instead. It is more efficient and its semantics are
+  /// clearer (ie it returns an empty set instead of null if no common brokers are found).
   @Nullable
   @Deprecated
   public static List<String> getTablesCommonBrokers(@Nullable List<String> tableNames,
@@ -52,9 +49,7 @@ public class BrokerSelectorUtils {
     return new ArrayList<>(tablesCommonBrokersSet);
   }
 
-  /**
-   * Returns a random broker from the common brokers hosting all the tables.
-   */
+  /// Returns a random broker from the common brokers hosting all the tables.
   @Nullable
   public static String getRandomBroker(@Nullable List<String> tableNames, Map<String, List<String>> brokerData) {
     Set<String> tablesCommonBrokersSet = getTablesCommonBrokersSet(tableNames, brokerData);
@@ -67,12 +62,9 @@ public class BrokerSelectorUtils {
         .orElseThrow(() -> new IllegalStateException("No broker found"));
   }
 
-  /**
-   *
-   * @param tableNames: List of table names.
-   * @param brokerData: map holding data for table hosting on brokers.
-   * @return set of common brokers hosting all the tables
-   */
+  /// @param tableNames: List of table names.
+  /// @param brokerData: map holding data for table hosting on brokers.
+  /// @return set of common brokers hosting all the tables
   public static Set<String> getTablesCommonBrokersSet(
       @Nullable List<String> tableNames, Map<String, List<String>> brokerData) {
     if (tableNames == null || tableNames.isEmpty()) {
@@ -92,11 +84,9 @@ public class BrokerSelectorUtils {
             replace(ExternalViewReader.REALTIME_SUFFIX, "");
   }
 
-  /**
-   * Returns the brokers for the given table name.
-   *
-   * This means that an empty set is returned if there are no brokers for the given table name.
-   */
+  /// Returns the brokers for the given table name.
+  ///
+  /// This means that an empty set is returned if there are no brokers for the given table name.
   private static HashSet<String> getBrokers(String tableName, Map<String, List<String>> brokerData) {
     String tableNameWithoutSuffix = getTableNameWithoutSuffix(tableName);
     int idx = tableNameWithoutSuffix.indexOf('.');

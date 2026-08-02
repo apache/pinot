@@ -29,9 +29,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * Extension of {@link AbstractColumnStatisticsCollector} for byte[] column type.
- */
+/// Extension of [AbstractColumnStatisticsCollector] for byte\[\] column type.
 public class BytesColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
   private Set<ByteArray> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
   private int _minLength = Integer.MAX_VALUE;
@@ -74,7 +72,12 @@ public class BytesColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
       addressSorted(value);
       if (_values.add(value)) {
         if (isPartitionEnabled()) {
-          updatePartition(value.toString());
+          // Use DataType.toString so UUID columns get their canonical RFC 4122 form (with dashes) rather
+          // than the bare hex from ByteArray.toString(). The runtime ingest path (MutableSegmentImpl) and
+          // every partition function (Murmur, Uuid) expect this canonical form; passing bare hex here
+          // produces a different partition value than runtime — silently breaking partition pruning — and
+          // throws for the Uuid partition function (UuidUtils.toBytes rejects no-dash strings).
+          updatePartition(_fieldSpec.getDataType().toString(entry));
         }
         int length = value.length();
         _minLength = Math.min(_minLength, length);

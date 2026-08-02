@@ -24,13 +24,11 @@ import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesReade
 import org.apache.commons.lang3.StringUtils;
 
 
-/**
- * VersionedPropertyReader extends the PropertiesReader
- * <p>
- * Purpose: loads the segment metadata faster
- *  - by skipping the unescaping of key and
- *  - parsing the line by splitting based on first occurrence of separator
- */
+/// VersionedPropertyReader extends the PropertiesReader
+///
+/// Purpose: loads the segment metadata faster
+///  - by skipping the unescaping of key and
+///  - parsing the line by splitting based on first occurrence of separator
 class VersionedPropertyReader extends PropertiesReader {
 
   public VersionedPropertyReader(Reader reader) {

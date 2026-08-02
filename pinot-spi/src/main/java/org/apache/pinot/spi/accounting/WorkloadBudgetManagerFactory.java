@@ -27,10 +27,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Factory for {@link WorkloadBudgetManager} implementations.
- * Maintains per-instance WorkloadBudgetManager to support multiple instances in the same JVM (e.g., integration tests).
- */
+/// Factory for [WorkloadBudgetManager] implementations. Maintains per-instance WorkloadBudgetManager to support
+/// multiple instances in the same JVM (e.g., integration tests).
 public class WorkloadBudgetManagerFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadBudgetManagerFactory.class);
   private static final String REGEX_PATTERN = ".*\\.spi\\.accounting\\..*";
@@ -39,12 +37,10 @@ public class WorkloadBudgetManagerFactory {
   private WorkloadBudgetManagerFactory() {
   }
 
-  /**
-   * Registers WorkloadBudgetManager implementations via reflection for a specific instance.
-   * NOTE: In order to plugin a class using reflection, the class should include ".plugin.accounting."
-   * in its class path. This convention can significantly reduce the time of class scanning.
-   * @param config The configuration for this instance
-   */
+  /// Registers WorkloadBudgetManager implementations via reflection for a specific instance.
+  /// NOTE: In order to plugin a class using reflection, the class should include ".plugin.accounting."
+  /// in its class path. This convention can significantly reduce the time of class scanning.
+  /// @param config The configuration for this instance
   public static void register(PinotConfiguration config) {
     if (_workloadBudgetManager != null) {
       LOGGER.warn("WorkloadBudgetManager is already registered, skipping the re-registration attempt");
@@ -82,9 +78,7 @@ public class WorkloadBudgetManagerFactory {
         System.currentTimeMillis() - startTimeMs);
   }
 
-  /**
-   * Returns the registered WorkloadBudgetManager
-   */
+  /// Returns the registered WorkloadBudgetManager
   public static WorkloadBudgetManager get() {
     return _workloadBudgetManager;
   }

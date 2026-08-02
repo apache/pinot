@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.lang.foreign.MemorySegment;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import org.apache.datasketches.cpc.CpcSketch;
-import org.apache.datasketches.memory.Memory;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -110,7 +110,7 @@ public class DistinctCountCPCSketchAggregationFunctionTest {
     // The string should be a valid Base64-encoded CPC sketch that round-trips
     String base64 = (String) converted;
     byte[] bytes = Base64.getDecoder().decode(base64);
-    CpcSketch deserialized = CpcSketch.heapify(Memory.wrap(bytes));
+    CpcSketch deserialized = CpcSketch.heapify(MemorySegment.ofArray(bytes));
     Assert.assertEquals(deserialized.getEstimate(), 0.0);
   }
 

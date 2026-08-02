@@ -21,14 +21,11 @@ package org.apache.pinot.controller.helix.core;
 import org.apache.helix.model.StateModelDefinition;
 
 
-/**
- * Segment state model generator describes the transitions for segment states.
- *
- * Online to Offline, Online to Dropped
- * Consuming to Online, Consuming to Offline, Consuming to Dropped
- * Offline to Online, Offline to Consuming, Offline to Dropped
- *
- */
+/// Segment state model generator describes the transitions for segment states.
+///
+/// Online to Offline, Online to Dropped
+/// Consuming to Online, Consuming to Offline, Consuming to Dropped
+/// Offline to Online, Offline to Consuming, Offline to Dropped
 public class PinotHelixSegmentOnlineOfflineStateModelGenerator {
   private PinotHelixSegmentOnlineOfflineStateModelGenerator() {
   }
