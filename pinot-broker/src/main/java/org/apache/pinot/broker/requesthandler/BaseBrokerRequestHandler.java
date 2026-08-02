@@ -580,7 +580,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       LOGGER.debug("Injected Calcite AST filter for skipOutOfRetentionValues on table: {}. Cutoff: {}", rawTableName,
           formattedCutoffTime);
     } catch (RuntimeException e) {
-      throw new IllegalStateException("Failed to apply skipOutOfRetentionValues on table: " + rawTableName, e);
+      LOGGER.warn("Failed to apply skipOutOfRetentionValues on table: {}", rawTableName, e);
     }
   }
 }
