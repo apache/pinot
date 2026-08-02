@@ -49,14 +49,6 @@ public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
   private final BloomFilter<String> _bloomFilter;
   private final FieldSpec.DataType _dataType;
 
-  // TODO: This method is here for compatibility reasons, should be removed in future PRs
-  //  exit_criteria: Not needed in Apache Pinot once #10184 is merged
-  @Deprecated
-  public OnHeapGuavaBloomFilterCreator(File indexDir, String columnName, int cardinality,
-      BloomFilterConfig bloomFilterConfig) {
-    this(indexDir, columnName, cardinality, bloomFilterConfig, null);
-  }
-
   public OnHeapGuavaBloomFilterCreator(File indexDir, String columnName, int cardinality,
       BloomFilterConfig bloomFilterConfig, FieldSpec.DataType dataType) {
     _dataType = dataType;

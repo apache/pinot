@@ -430,14 +430,14 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
       long endTimestampMs, boolean excludeReplacedSegments)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
-    /// Controller reads startTimestamp/endTimestamp (ms); see PinotSegmentRestletResource#getSelectedSegments.
+    /// Controller reads startTimestamp/endTimestamp (ms); see PinotSegmentRestletResource#getSegments.
     queryParams.put("startTimestamp", String.valueOf(startTimestampMs));
     queryParams.put("endTimestamp", String.valueOf(endTimestampMs));
     queryParams.put("excludeReplacedSegments", String.valueOf(excludeReplacedSegments));
     if (tableType != null) {
       queryParams.put("type", tableType);
     }
-    JsonNode response = _transport.executeGet(_controllerAddress, "/segments/" + tableName + "/select",
+    JsonNode response = _transport.executeGet(_controllerAddress, "/segments/" + tableName,
         queryParams, _headers);
     return response.toString();
   }
