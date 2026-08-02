@@ -47,16 +47,24 @@ public class JSONMessageDecoderTest {
   public void testDirectDecodePreservesValueConversion()
       throws Exception {
     byte[] payload = ("{\"id\":1,\"huge\":99999999999999999999999999,"
-        + "\"nested\":{\"values\":[1,null,3]},\"tags\":[\"a\",\"b\"]}").getBytes(StandardCharsets.UTF_8);
+        + "\"nested\":{\"values\":[1,null,3]},\"tags\":[\"a\",\"b\"],"
+        + "\"flag\":true,\"off\":false,\"gone\":null}").getBytes(StandardCharsets.UTF_8);
     JSONMessageDecoder decoder = new JSONMessageDecoder();
     decoder.init(Map.of(), null, "testTopic");
+    GenericRow row = new GenericRow();
+    // Without a field selection there is no pre-nulling pass, so an explicit JSON null must still overwrite
+    // the previous message's value in a reused row.
+    row.putValue("gone", "stale");
 
-    GenericRow row = decoder.decode(payload, new GenericRow());
+    decoder.decode(payload, row);
 
     assertEquals(row.getValue("id"), 1);
     assertEquals(row.getValue("huge"), new BigDecimal("99999999999999999999999999"));
     assertEquals((Object[]) ((Map<?, ?>) row.getValue("nested")).get("values"), new Object[]{1, null, 3});
     assertEquals((Object[]) row.getValue("tags"), new Object[]{"a", "b"});
+    assertEquals(row.getValue("flag"), Boolean.TRUE);
+    assertEquals(row.getValue("off"), Boolean.FALSE);
+    assertEquals(row.getValue("gone"), null);
   }
 
   @Test

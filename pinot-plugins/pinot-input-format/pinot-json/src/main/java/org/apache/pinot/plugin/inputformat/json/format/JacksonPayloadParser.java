@@ -23,6 +23,7 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
+import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -45,6 +46,9 @@ abstract class JacksonPayloadParser implements JsonPayloadParser {
     this(new ObjectMapper(factory).reader());
   }
 
+  /// The reader must use default deserialization features: [#readValue]'s scalar fast path bypasses databind,
+  /// so features like `USE_BIG_DECIMAL_FOR_FLOATS` would apply to containers but silently not to top-level
+  /// scalars. Every current caller passes a default-configured reader.
   JacksonPayloadParser(ObjectReader reader) {
     _factory = reader.getFactory();
     _mapReader = reader.forType(JsonUtils.MAP_TYPE_REFERENCE);
@@ -93,13 +97,42 @@ abstract class JacksonPayloadParser implements JsonPayloadParser {
           throw new IllegalArgumentException("Unexpected end of JSON value for field: " + fieldName);
         }
         if (fields == null || fields.contains(fieldName)) {
-          Object value = _valueReader.readValue(parser);
-          destination.putValue(fieldName, value != null ? JSONRecordExtractor.convert(value) : null);
+          destination.putValue(fieldName, readValue(parser, valueToken));
         } else if (valueToken.isStructStart()) {
           parser.skipChildren();
         }
       }
     }
     return true;
+  }
+
+  /// Materializes the value at the parser's current token in [JSONRecordExtractor]'s converted shape. Scalars
+  /// are read straight off the parser rather than through databind, which allocates a fresh
+  /// `DeserializationContext` per `readValue` call. `getNumberValue()` keeps the binary formats' `Float`
+  /// (never upcast to `Double`) and text JSON's `Double`, matching Jackson's untyped materialization.
+  @Nullable
+  private Object readValue(JsonParser parser, JsonToken valueToken)
+      throws IOException {
+    switch (valueToken) {
+      case VALUE_STRING:
+        return parser.getText();
+      case VALUE_NUMBER_INT:
+      case VALUE_NUMBER_FLOAT:
+        // Oversized ints widen to BigDecimal via the shared contract (Pinot has no BigInteger type)
+        return JSONRecordExtractor.convert(parser.getNumberValue());
+      case VALUE_TRUE:
+        return Boolean.TRUE;
+      case VALUE_FALSE:
+        return Boolean.FALSE;
+      case VALUE_NULL:
+        return null;
+      case VALUE_EMBEDDED_OBJECT:
+        // Binary formats' native scalars (e.g. byte[]) pass through unchanged, as in the map path.
+        return parser.getEmbeddedObject();
+      default:
+        // START_OBJECT / START_ARRAY: containers materialize through databind and convert recursively.
+        Object value = _valueReader.readValue(parser);
+        return value != null ? JSONRecordExtractor.convert(value) : null;
+    }
   }
 }
