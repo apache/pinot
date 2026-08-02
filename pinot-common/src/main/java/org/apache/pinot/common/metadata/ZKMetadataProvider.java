@@ -161,13 +161,6 @@ public class ZKMetadataProvider {
     }
   }
 
-  @Deprecated
-  public static void setTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType,
-      ZNRecord znRecord) {
-    propertyStore.set(constructPropertyStorePathForResourceConfig(tableNameWithType), znRecord,
-        AccessOption.PERSISTENT);
-  }
-
   /// Create table config, fail if existed.
   ///
   /// @return true if creation is successful.
@@ -208,18 +201,6 @@ public class ZKMetadataProvider {
     }
     return propertyStore.set(constructPropertyStorePathForResourceConfig(tableNameWithType), tableConfigZNRecord,
         expectedVersion, AccessOption.PERSISTENT);
-  }
-
-  @Deprecated
-  public static void setRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String realtimeTableName,
-      ZNRecord znRecord) {
-    setTableConfig(propertyStore, realtimeTableName, znRecord);
-  }
-
-  @Deprecated
-  public static void setOfflineTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String offlineTableName,
-      ZNRecord znRecord) {
-    setTableConfig(propertyStore, offlineTableName, znRecord);
   }
 
   public static String constructPropertyStorePathForSegment(String resourceName, String segmentName) {

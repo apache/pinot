@@ -175,13 +175,6 @@ public class TableConfigBuilder {
     return this;
   }
 
-  @Deprecated
-  public TableConfigBuilder setLLC(boolean isLLC) {
-    Preconditions.checkState(_tableType == TableType.REALTIME);
-    Preconditions.checkArgument(isLLC, "Real-time table must use LLC");
-    return this;
-  }
-
   public TableConfigBuilder setNumReplicas(int numReplicas) {
     Preconditions.checkArgument(numReplicas > 0);
     _numReplicas = String.valueOf(numReplicas);

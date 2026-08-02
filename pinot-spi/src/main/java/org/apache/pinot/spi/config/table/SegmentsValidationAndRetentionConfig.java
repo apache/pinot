@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.config.table;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -196,22 +195,6 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   public void setCompletionConfig(CompletionConfig completionConfig) {
     _completionConfig = completionConfig;
-  }
-
-  /// Try to Use [TableConfig#getReplication()]
-  @Deprecated
-  @JsonIgnore
-  public int getReplicationNumber() {
-    return Integer.parseInt(_replication);
-  }
-
-  /// Try to Use [TableConfig#getReplication()]
-  ///
-  /// Will be deleted in future version of Pinot
-  @Deprecated
-  @JsonIgnore
-  public int getReplicasPerPartitionNumber() {
-    return Integer.parseInt(_replicasPerPartition);
   }
 
   public String getPeerSegmentDownloadScheme() {

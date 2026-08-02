@@ -3660,11 +3660,6 @@ public class PinotHelixResourceManager {
     return consumingSegments;
   }
 
-  @Deprecated
-  public Set<String> getServersForSegment(String tableNameWithType, String segmentName) {
-    return getServers(tableNameWithType, segmentName);
-  }
-
   public synchronized Map<String, String> getSegmentsCrcForTable(String tableNameWithType) {
     // Get the segment list for this table
     IdealState is = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);

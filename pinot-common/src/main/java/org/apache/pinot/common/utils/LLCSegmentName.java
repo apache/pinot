@@ -81,11 +81,6 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     return numSeparators == 3;
   }
 
-  @Deprecated
-  public static boolean isLowLevelConsumerSegmentName(String segmentName) {
-    return isLLCSegment(segmentName);
-  }
-
   /// Returns the sequence number of the given segment name.
   public static int getSequenceNumber(String segmentName) {
     return Integer.parseInt(StringUtils.splitByWholeSeparator(segmentName, SEPARATOR)[2]);

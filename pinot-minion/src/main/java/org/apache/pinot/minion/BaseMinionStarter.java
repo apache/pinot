@@ -240,7 +240,6 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     minionMetrics.setValueOfGlobalGauge(MinionGauge.ZK_JUTE_MAX_BUFFER,
         Integer.getInteger(ZkSystemPropertyKeys.JUTE_MAXBUFFER, 0xfffff));
     MinionMetrics.register(minionMetrics);
-    minionContext.setMinionMetrics(minionMetrics);
     minionContext.setAllowDownloadFromServer(_config.isAllowDownloadFromServer());
 
     // Install default SSL context if necessary (even if not force-enabled everywhere)
