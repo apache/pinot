@@ -172,7 +172,9 @@ public class PinotTableInstances {
     try {
       return _pinotHelixResourceManager.getTableToLiveBrokersMapping(headers.getHeaderString(DATABASE), tables);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
+      // Unknown tables are filtered out rather than reported, so anything thrown here (e.g. a missing broker
+      // ExternalView) is a server-side failure, not a lookup miss.
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 

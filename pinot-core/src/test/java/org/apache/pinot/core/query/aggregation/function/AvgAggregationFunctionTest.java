@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.util.List;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -197,7 +196,7 @@ public class AvgAggregationFunctionTest extends AbstractAggregationFunctionTest 
             new TableConfigBuilder(TableType.OFFLINE)
                 .setTableName("testTable")
                 .addFieldConfig(
-                    new FieldConfig("key", encoding, (List<FieldConfig.IndexType>) null, PASS_THROUGH, null))
+                    new FieldConfig("key", encoding, null, PASS_THROUGH, null))
                 .build())
         .onFirstInstance(new Object[]{7, 1}, new Object[]{6, 2}, new Object[]{5, 3}, new Object[]{4, 4})
         .andOnSecondInstance(new Object[]{7, 1}, new Object[]{6, 2}, new Object[]{5, 3}, new Object[]{4, 4})
@@ -229,9 +228,9 @@ public class AvgAggregationFunctionTest extends AbstractAggregationFunctionTest 
             new TableConfigBuilder(TableType.OFFLINE)
                 .setTableName("testTable")
                 .addFieldConfig(
-                    new FieldConfig("key1", encoding, (List<FieldConfig.IndexType>) null, PASS_THROUGH, null))
+                    new FieldConfig("key1", encoding, null, PASS_THROUGH, null))
                 .addFieldConfig(
-                    new FieldConfig("key2", encoding, (List<FieldConfig.IndexType>) null, PASS_THROUGH, null))
+                    new FieldConfig("key2", encoding, null, PASS_THROUGH, null))
                 .build())
         .onFirstInstance(new Object[]{7, 1}, new Object[]{6, 2}, new Object[]{5, 3}, new Object[]{4, 4})
         .andOnSecondInstance(new Object[]{7, 1}, new Object[]{6, 2}, new Object[]{5, 3}, new Object[]{4, 4})

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.minion.tasks.materializedview;
 
+import com.google.common.base.Preconditions;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.materializedview.executor.GrpcMaterializedViewQueryExecutor;
 import org.apache.pinot.materializedview.executor.MaterializedViewQueryExecutor;
@@ -65,12 +66,12 @@ public class MaterializedViewTaskExecutorFactory implements PinotTaskExecutorFac
           // Build the gRPC client config from the minion's own configuration, scoped to the
           // MaterializedViewTask.MINION_BROKER_GRPC_CONFIG_PREFIX prefix.  This is how operators
           // enable TLS, raise the max inbound message size for large MV result sets, and tune
-          // keepalive.  Falling back to an empty configuration (no TLS, defaults) when no
-          // MinionConf was provided — fine for local tests but production deployments should
-          // initialize the factory with a MinionConf.
-          PinotConfiguration grpcClientConfig = _minionConf != null
-              ? _minionConf.subset(MaterializedViewTask.MINION_BROKER_GRPC_CONFIG_PREFIX)
-              : new PinotConfiguration();
+          // keepalive.  Defaulting silently would build a plaintext client with default limits,
+          // so fail loudly instead.
+          Preconditions.checkState(_minionConf != null,
+              "MinionConf is not set; init(zkMetadataManager, minionConf) must be called before create()");
+          PinotConfiguration grpcClientConfig =
+              _minionConf.subset(MaterializedViewTask.MINION_BROKER_GRPC_CONFIG_PREFIX);
           _queryExecutor = new GrpcMaterializedViewQueryExecutor(
               MinionContext.getInstance().getHelixManager(),
               new GrpcConfig(grpcClientConfig));
