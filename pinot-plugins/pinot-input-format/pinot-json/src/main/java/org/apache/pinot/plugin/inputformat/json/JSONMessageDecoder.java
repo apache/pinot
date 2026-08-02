@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.inputformat.json;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.plugin.inputformat.json.format.JsonPayloadFormat;
 import org.apache.pinot.plugin.inputformat.json.format.JsonPayloadParser;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -53,6 +54,8 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
       "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
 
   private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
+  private Set<String> _fieldsToRead;
+  private boolean _usesDefaultRecordExtractor;
   // For AUTO this resolves the concrete format per message; otherwise it is the pinned format's parser.
   private JsonPayloadParser _parser;
 
@@ -70,6 +73,10 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
     }
     _jsonRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
     _jsonRecordExtractor.init(fieldsToRead, null);
+    _fieldsToRead = CollectionUtils.isNotEmpty(fieldsToRead) ? Set.copyOf(fieldsToRead) : null;
+    // Direct parsing implements JSONRecordExtractor's conversion contract and bypasses extract(). Require the
+    // exact default class so a configured extractor or subclass cannot lose custom extraction behavior.
+    _usesDefaultRecordExtractor = _jsonRecordExtractor.getClass() == JSONRecordExtractor.class;
     _parser = JsonPayloadFormat.fromConfig(jsonFormat).getParser();
   }
 
@@ -81,7 +88,9 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
     try {
-      // Parse directly to Map, avoiding an intermediate JsonNode representation for better performance.
+      if (_usesDefaultRecordExtractor && _parser.parse(payload, offset, length, destination, _fieldsToRead)) {
+        return destination;
+      }
       Map<String, Object> jsonMap = _parser.parse(payload, offset, length);
       return _jsonRecordExtractor.extract(jsonMap, destination);
     } catch (Exception e) {
