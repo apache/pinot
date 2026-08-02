@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.BaseJsonConfig;
@@ -272,6 +273,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   }
 
   /// Converts the configured retention to ms.
+  @JsonIgnore
   public long getRetentionTimeMillis() {
     return TimeUnit.valueOf(_retentionTimeUnit.toUpperCase()).toMillis(Long.parseLong(_retentionTimeValue));
   }
