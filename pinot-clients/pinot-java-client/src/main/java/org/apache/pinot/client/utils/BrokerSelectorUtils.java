@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.client.utils;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -31,22 +30,6 @@ import org.apache.pinot.client.ExternalViewReader;
 public class BrokerSelectorUtils {
 
   private BrokerSelectorUtils() {
-  }
-
-  /// @param tableNames: List of table names.
-  /// @param brokerData: map holding data for table hosting on brokers.
-  /// @return list of common brokers hosting all the tables or null if no common brokers found.
-  /// @deprecated Use [#getTablesCommonBrokersSet(List, Map)] instead. It is more efficient and its semantics are
-  /// clearer (ie it returns an empty set instead of null if no common brokers are found).
-  @Nullable
-  @Deprecated
-  public static List<String> getTablesCommonBrokers(@Nullable List<String> tableNames,
-      Map<String, List<String>> brokerData) {
-    Set<String> tablesCommonBrokersSet = getTablesCommonBrokersSet(tableNames, brokerData);
-    if (tablesCommonBrokersSet == null || tablesCommonBrokersSet.isEmpty()) {
-      return null;
-    }
-    return new ArrayList<>(tablesCommonBrokersSet);
   }
 
   /// Returns a random broker from the common brokers hosting all the tables.

@@ -45,7 +45,6 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.spi.config.table.HashFunction;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,12 +99,6 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
   @Override
   public DedupContext getContext() {
     return _context;
-  }
-
-  @Override
-  public boolean checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment) {
-    throw new UnsupportedOperationException(
-        "checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment) is " + "deprecated!");
   }
 
   @Override

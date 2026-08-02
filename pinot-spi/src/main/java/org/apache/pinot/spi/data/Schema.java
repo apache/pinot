@@ -899,22 +899,6 @@ public final class Schema implements Serializable {
     return result;
   }
 
-  /// @deprecated this method is not correctly implemented. ie doesn't call super.clone and does not create a deep copy
-  /// of the fieldSpecs.
-  @Deprecated
-  @Override
-  public Schema clone() {
-    Schema cloned = new SchemaBuilder()
-        .setSchemaName(getSchemaName())
-        .setDescription(getDescription())
-        .setTags(getTags())
-        .setPrimaryKeyColumns(getPrimaryKeyColumns())
-        .setEnableColumnBasedNullHandling(isEnableColumnBasedNullHandling())
-        .build();
-    getAllFieldSpecs().forEach(fieldSpec -> cloned.addField(fieldSpec));
-    return cloned;
-  }
-
   public static Schema cloneSchemaWithName(Schema source, String newName) {
     try {
       String json = JsonUtils.objectToString(source);

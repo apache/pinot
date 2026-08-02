@@ -21,7 +21,6 @@ package org.apache.pinot.server.realtime;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +43,6 @@ import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
-import org.apache.pinot.core.data.manager.realtime.Server2ControllerSegmentUploader;
 import org.apache.pinot.core.util.SegmentCompletionProtocolUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.spi.auth.AuthProvider;
@@ -158,26 +156,6 @@ public class ServerSegmentCompletionProtocolHandler {
       return SegmentCompletionProtocol.RESP_NOT_SENT;
     }
     return sendCommitEndWithMetadataFiles(url, metadataFiles);
-  }
-
-  public SegmentCompletionProtocol.Response segmentCommit(SegmentCompletionProtocol.Request.Params params,
-      final File segmentTarFile) {
-    SegmentCompletionProtocol.SegmentCommitRequest request = new SegmentCompletionProtocol.SegmentCommitRequest(params);
-    String url = createSegmentCompletionUrl(request);
-    if (url == null) {
-      return SegmentCompletionProtocol.RESP_NOT_SENT;
-    }
-
-    Server2ControllerSegmentUploader segmentUploader = null;
-    try {
-      segmentUploader =
-          new Server2ControllerSegmentUploader(LOGGER, _fileUploadDownloadClient, url, params.getSegmentName(),
-              _segmentUploadRequestTimeoutMs, _serverMetrics, _authProvider, _rawTableName);
-    } catch (URISyntaxException e) {
-      LOGGER.error("Segment commit upload url error: ", e);
-      return SegmentCompletionProtocol.RESP_NOT_SENT;
-    }
-    return segmentUploader.uploadSegmentToController(segmentTarFile);
   }
 
   public SegmentCompletionProtocol.Response extendBuildTime(SegmentCompletionProtocol.Request.Params params) {

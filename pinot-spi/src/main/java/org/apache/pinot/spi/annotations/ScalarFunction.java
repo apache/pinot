@@ -68,6 +68,4 @@ public @interface ScalarFunction {
   /// existing function has been audited for environment-sensitive behavior. When class-level and method-level
   /// declarations coexist, the most volatile category wins.
   FunctionVolatility volatility() default FunctionVolatility.IMMUTABLE;
-
-  @Deprecated boolean isPlaceholder() default false;
 }
