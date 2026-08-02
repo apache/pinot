@@ -30,13 +30,13 @@
     <Console name="spammy" target="SYSTEM_OUT">
       <PatternLayout pattern="%d{HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n"/>
       <Filters>
-        <BurstFilter level="ERROR" rate="1" maxBurst="2"/>
+        <BurstFilter level="DEBUG" rate="1" maxBurst="2"/>
       </Filters>
     </Console>
   </Appenders>
 
   <Loggers>
-    <Logger name="org.apache.pinot" level="DEBUG" additivity="false">
+    <Logger name="org.apache.pinot" level="warn" additivity="false">
       <AppenderRef ref="console"/>
     </Logger>
     <Logger name="org.apache.pinot.core.accounting" level="warn" additivity="false">

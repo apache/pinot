@@ -1026,7 +1026,7 @@ public class CommonConstants {
         /// Setting false uses an unbounded per-query collector and requires vectorEfSearch.
         public static final String VECTOR_USE_BOUNDED_QUEUE = "vectorUseBoundedQueue";
 
-        /** Controls whether out of retention records are excluded at query time. Defaults to false. */
+        /// Controls whether out of retention records are excluded at query time. Defaults to false.
         public static final String SKIP_OUT_OF_RETENTION_VALUES = "skipOutOfRetentionValues";
       }
 

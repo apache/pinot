@@ -55,15 +55,11 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-
-/**
- * Tests for the {@code skipOutOfRetentionValues} query option in {@link BaseBrokerRequestHandler}.
- *
- * <p>When the option is set the broker injects a lower-bound time filter derived from the table's
- * retention config before the query reaches any server. Tests verify the injected filter's
- * structure and value, and the skip conditions (option absent, no retention config, missing time
- * column in schema, ORDER BY wrapper, existing WHERE clause).
- */
+/// Tests for the {@code skipOutOfRetentionValues} query option in {@link BaseBrokerRequestHandler}.
+/// <p>When the option is set the broker injects a lower-bound time filter derived from the table's
+/// retention config before the query reaches any server. Tests verify the injected filter's
+/// structure and value, and the skip conditions (option absent, no retention config, missing time
+/// column in schema, ORDER BY wrapper, existing WHERE clause).
 public class SkipOutOfRetentionValuesTest {
 
   private static final String RAW_TABLE = "myTable";
@@ -72,7 +68,7 @@ public class SkipOutOfRetentionValuesTest {
   private static final int RETENTION_DAYS = 30;
   private static final long RETENTION_MS = RETENTION_DAYS * 24L * 3600 * 1000;
 
-  /** Allowed delta between expected and actual cutoff to absorb test execution time. */
+  /// Allowed delta between expected and actual cutoff to absorb test execution time.
   private static final long CUTOFF_TOLERANCE_MS = 5_000L;
 
   @Test
@@ -191,14 +187,12 @@ public class SkipOutOfRetentionValuesTest {
   // Infrastructure helpers
   // ---------------------------------------------------------------------------
 
-  /**
-   * Builds a mock {@link TableCache} for {@value RAW_TABLE}.
-   *
-   * @param withRetention when {@code true} the validation config carries a 30-day retention on
-   *     {@value TIME_COLUMN}; when {@code false} the retention fields are left empty
-   * @param withTimeColumnInSchema when {@code true} the schema includes the {@value TIME_COLUMN}
-   *     DateTime column; when {@code false} only {@code col} is present
-   */
+  /// Builds a mock {@link TableCache} for {@value RAW_TABLE}.
+  ///
+  /// @param withRetention when {@code true} the validation config carries a 30-day retention on
+  ///     {@value TIME_COLUMN}; when {@code false} the retention fields are left empty
+  /// @param withTimeColumnInSchema when {@code true} the schema includes the {@value TIME_COLUMN}
+  ///     DateTime column; when {@code false} only {@code col} is present
   private static TableCache buildTableCache(boolean withRetention, boolean withTimeColumnInSchema) {
     Schema.SchemaBuilder schemaBuilder = new Schema.SchemaBuilder()
         .setSchemaName(RAW_TABLE)
@@ -282,9 +276,7 @@ public class SkipOutOfRetentionValuesTest {
     };
   }
 
-  /**
-   * Returns true if {@code expr} or any of its descendants references {@code columnName}.
-   */
+  /// Returns true if {@code expr} or any of its descendants references {@code columnName}.
   private static boolean filterContainsColumn(Expression expr, String columnName) {
     if (expr == null) {
       return false;
@@ -302,14 +294,12 @@ public class SkipOutOfRetentionValuesTest {
     return false;
   }
 
-  /**
-   * Finds the retention lower-bound predicate on {@code timeColumn} inside {@code filter} and
-   * returns the cutoff as an epoch-ms long.
-   *
-   * <p>A standalone {@code >=} injected by the broker stays as {@code GREATER_THAN_OR_EQUAL} in
-   * the PinotQuery; Pinot only rewrites to a {@code RANGE} when merging two-sided bounds (e.g.
-   * {@code BETWEEN}, a time-boundary merge). Both forms are handled here.
-   */
+  /// Finds the retention lower-bound predicate on {@code timeColumn} inside {@code filter} and
+  /// returns the cutoff as an epoch-ms long.
+  ///
+  /// <p>A standalone {@code >=} injected by the broker stays as {@code GREATER_THAN_OR_EQUAL} in
+  /// the PinotQuery; Pinot only rewrites to a {@code RANGE} when merging two-sided bounds (e.g.
+  /// {@code BETWEEN}, a time-boundary merge). Both forms are handled here.
   private static long extractLowerBound(Expression filter, String timeColumn) {
     Assert.assertNotNull(filter, "filter must not be null");
     Function func = filter.getFunctionCall();
@@ -342,17 +332,15 @@ public class SkipOutOfRetentionValuesTest {
     return extractLongLiteral(func.getOperands().get(1));
   }
 
-  /**
-   * Parses the lower bound from a RANGE string of the form {@code '[value\0*)'},
-   * using {@link Range#DELIMITER} as the separator between lower and upper bound.
-   */
+  /// Parses the lower bound from a RANGE string of the form {@code '[value\0*)'},
+  /// using {@link Range#DELIMITER} as the separator between lower and upper bound.
   private static long parseLowerBoundFromRange(String rangeStr) {
     int delimIdx = rangeStr.indexOf(Range.DELIMITER);
     Assert.assertTrue(delimIdx > 1, "Range string missing delimiter: " + rangeStr);
     return Long.parseLong(rangeStr.substring(1, delimIdx).trim());
   }
 
-  /** Extracts a long value from a numeric literal expression. */
+  /// Extracts a long value from a numeric literal expression.
   private static long extractLongLiteral(Expression expr) {
     Assert.assertNotNull(expr.getLiteral(), "Expected a literal expression");
     if (expr.getLiteral().isSetLongValue()) {

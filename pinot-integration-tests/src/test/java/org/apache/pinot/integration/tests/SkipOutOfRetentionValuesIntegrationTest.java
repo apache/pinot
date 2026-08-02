@@ -41,12 +41,10 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Integration test for the `skipOutOfRetentionValues` query option.
- *
- * Verifies that when the query option is provided, the broker dynamically injects a time
- * filter based on the table's retention configuration and pushes it down to the servers.
- */
+
+ /// Integration test for the `skipOutOfRetentionValues` query option.
+ /// Verifies that when the query option is provided, the broker dynamically injects a time
+ /// filter based on the table's retention configuration and pushes it down to the servers.
 public class SkipOutOfRetentionValuesIntegrationTest extends BaseClusterIntegrationTest {
   private static final String DEFAULT_TABLE_NAME = "retentionTestTable";
   private static final String TIME_COLUMN = "eventTime";

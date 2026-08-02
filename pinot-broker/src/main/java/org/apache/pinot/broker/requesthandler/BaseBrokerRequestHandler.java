@@ -481,17 +481,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return _enableQueryCancellation;
   }
 
-  /**
-   * Appends a where clause to the query to filter out of retention data if SKIP_OUT_OF_RETENTION_VALUES is
-   * set to True in query Options.
-   * @param sqlNodeAndOptions
-   */
+  /// Appends a where clause to the query to filter out of retention data if SKIP_OUT_OF_RETENTION_VALUES is
+  /// set to True in query Options.
+  /// @param sqlNodeAndOptions
   private void applySkipOutOfRetentionValuesIfNeeded(SqlNodeAndOptions sqlNodeAndOptions) {
     Map<String, String> options = sqlNodeAndOptions.getOptions();
     if (!Boolean.parseBoolean(options.get(QueryOptionKey.SKIP_OUT_OF_RETENTION_VALUES))) {
       return;
     }
-    SegmentsValidationAndRetentionConfig validationAndRetentionConfig = new SegmentsValidationAndRetentionConfig();
     SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
     if (sqlNode == null) {
       return;
@@ -529,16 +526,23 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     String rawTableName = TableNameBuilder.extractRawTableName(tableNames.iterator().next());
 
-    TableConfig tableConfig = _tableCache.getTableConfig(rawTableName);
+    TableConfig tableConfig = _tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
+    if (tableConfig == null) {
+      tableConfig = _tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
+    }
     Schema schema = _tableCache.getSchema(rawTableName);
     if (tableConfig == null || schema == null || tableConfig.getValidationConfig() == null) {
       return;
     }
 
     //get timestamp column and retention details
-    String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    String timeColumnName = validationConfig.getTimeColumnName();
+    if (StringUtils.isEmpty(timeColumnName) || !validationConfig.hasRetention()) {
+      return;
+    }
     try {
-      long retentionTimeMs = validationAndRetentionConfig.getRetentionTimeMillis();
+      long retentionTimeMs = validationConfig.getRetentionTimeMillis();
       long cutoffMs = System.currentTimeMillis() - retentionTimeMs;
       DateTimeFieldSpec timeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
       if (timeFieldSpec == null) {
@@ -575,7 +579,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
       LOGGER.debug("Injected Calcite AST filter for skipOutOfRetentionValues on table: {}. Cutoff: {}", rawTableName,
           formattedCutoffTime);
-      LOGGER.debug("final sql statement: {}", sqlSelect);
     } catch (RuntimeException e) {
       throw new IllegalStateException("Failed to apply skipOutOfRetentionValues on table: " + rawTableName, e);
     }
