@@ -38,6 +38,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.spi.data.FieldSpec;
 
 import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
 
@@ -179,6 +180,25 @@ public class AggregationPlanNode implements PlanNode {
       }
       DataSource dataSource = _indexSegment.getDataSource(argument.getIdentifier(), _queryContext.getSchema());
       if (DICTIONARY_BASED_FUNCTIONS.contains(aggregationFunction.getType())) {
+        // MINLONG/MAXLONG can only be resolved from dictionary for INT/LONG columns, because the resolver
+        // (getMinValueLong/getMaxValueLong) requires an integer stored type.
+        AggregationFunctionType functionType = aggregationFunction.getType();
+        if (functionType == MINLONG || functionType == MAXLONG) {
+          FieldSpec.DataType storedType =
+              dataSource.getDataSourceMetadata().getDataType().getStoredType();
+          if (storedType != FieldSpec.DataType.INT && storedType != FieldSpec.DataType.LONG) {
+            return false;
+          }
+        }
+        // MINSTRING/MAXSTRING can only be resolved from dictionary for STRING columns, because the
+        // function rejects numeric columns on the scan path.
+        if (functionType == MINSTRING || functionType == MAXSTRING) {
+          FieldSpec.DataType storedType =
+              dataSource.getDataSourceMetadata().getDataType().getStoredType();
+          if (storedType != FieldSpec.DataType.STRING) {
+            return false;
+          }
+        }
         if (dataSource.getDictionary() != null) {
           continue;
         }
