@@ -46,7 +46,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     AggregationOperator aggregationOperator = getOperator(AGGREGATION_QUERY);
     AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 30000L, 0L,
-        120000L, 30000L);
+        60000L, 30000L);
     QueriesTestUtils.testInnerSegmentAggregationResult(resultsBlock.getResults(), 30000L, 32317185437847L, 2147419555,
         1689277, 28175373944314L, 30000L);
 

@@ -114,6 +114,62 @@ public class DefaultAggregationExecutorTest {
   /// Asserts that the aggregation results returned by the executor are as expected.
   @Test
   void testAggregation() {
+    TransformBlock transformBlock = nextTransformBlock();
+    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+    assert aggregationFunctions != null;
+    AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(aggregationFunctions);
+    aggregationExecutor.aggregate(transformBlock);
+    List<Object> result = aggregationExecutor.getResult();
+    for (int i = 0; i < result.size(); i++) {
+      double actual = (double) result.get(i);
+      double expected = computeAggregation(AGGREGATION_FUNCTIONS[i], _inputData[i]);
+      Assert.assertEquals(actual, expected,
+          "Aggregation mis-match for function " + AGGREGATION_FUNCTIONS[i] + ", Expected: " + expected + " Actual: "
+              + actual);
+    }
+  }
+
+  /// Verifies that functions with a non-scan result are not re-computed by scanning: the injected value is
+  /// returned as-is, while functions with a {@code null} non-scan entry are still computed from the scanned
+  /// block.
+  @Test
+  void testNonScanResultsSkipScan() {
+    TransformBlock transformBlock = nextTransformBlock();
+    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+    assert aggregationFunctions != null;
+
+    // Resolve only the second function (index 1 -> MAX) without scanning; the rest fall back to scan-based execution.
+    int nonScanIndex = 1;
+    Object[] nonScanResults = new Object[aggregationFunctions.length];
+    // inject a Double sentinel that cannot occur in the data (all values
+    // are non-negative), proving the injected value is returned untouched rather than recomputed by scanning.
+    double injectedMax = -1.0;
+    nonScanResults[nonScanIndex] = injectedMax;
+
+    AggregationExecutor aggregationExecutor =
+        new DefaultAggregationExecutor(aggregationFunctions, nonScanResults);
+    aggregationExecutor.aggregate(transformBlock);
+    List<Object> result = aggregationExecutor.getResult();
+
+    // The non-scan function returns the injected value untouched (not a scanned MAX).
+    Assert.assertEquals(result.get(nonScanIndex), injectedMax,
+        "Non-scan function should return the injected value, not a scanned result");
+
+    // Remaining functions are still computed by scanning the segment.
+    for (int i = 0; i < result.size(); i++) {
+      if (i == nonScanIndex) {
+        continue;
+      }
+      double actual = (double) result.get(i);
+      double expected = computeAggregation(AGGREGATION_FUNCTIONS[i], _inputData[i]);
+      Assert.assertEquals(actual, expected,
+          "Aggregation mis-match for function " + AGGREGATION_FUNCTIONS[i] + ", Expected: " + expected + " Actual: "
+              + actual);
+    }
+  }
+
+  /// Builds a transform block over all physical columns of the test segment with a match-all filter.
+  private TransformBlock nextTransformBlock() {
     Map<String, DataSource> dataSourceMap = new HashMap<>();
     List<ExpressionContext> expressions = new ArrayList<>();
     for (String column : _indexSegment.getPhysicalColumnNames()) {
@@ -127,19 +183,7 @@ public class DefaultAggregationExecutorTest {
     ProjectionOperator projectionOperator =
         new ProjectionOperator(dataSourceMap, docIdSetOperator, new QueryContext.Builder().build());
     TransformOperator transformOperator = new TransformOperator(_queryContext, projectionOperator, expressions);
-    TransformBlock transformBlock = transformOperator.nextBlock();
-    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
-    assert aggregationFunctions != null;
-    AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(aggregationFunctions);
-    aggregationExecutor.aggregate(transformBlock);
-    List<Object> result = aggregationExecutor.getResult();
-    for (int i = 0; i < result.size(); i++) {
-      double actual = (double) result.get(i);
-      double expected = computeAggregation(AGGREGATION_FUNCTIONS[i], _inputData[i]);
-      Assert.assertEquals(actual, expected,
-          "Aggregation mis-match for function " + AGGREGATION_FUNCTIONS[i] + ", Expected: " + expected + " Actual: "
-              + actual);
-    }
+    return transformOperator.nextBlock();
   }
 
   /// Helper method to setup the index segment on which to perform aggregation tests.

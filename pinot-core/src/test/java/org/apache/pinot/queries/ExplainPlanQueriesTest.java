@@ -1811,7 +1811,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     });
     result3.add(
         new Object[]{"AGGREGATE(aggregations:count(*), max(noIndexCol1), sum(noIndexCol2), avg(noIndexCol2))", 3, 2});
-    result3.add(new Object[]{"PROJECT(noIndexCol2, noIndexCol1)", 4, 3});
+    result3.add(new Object[]{"PROJECT(noIndexCol2)", 4, 3});
     result3.add(new Object[]{"DOC_ID_SET", 5, 4});
     result3.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
     check(query3, new ResultTable(DATA_SCHEMA, result3));
@@ -1924,7 +1924,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     });
     result3.add(
         new Object[]{"AGGREGATE(aggregations:count(*), max(noIndexCol1), sum(noIndexCol2), avg(noIndexCol2))", 3, 2});
-    result3.add(new Object[]{"PROJECT(noIndexCol2, noIndexCol1)", 4, 3});
+    result3.add(new Object[]{"PROJECT(noIndexCol2)", 4, 3});
     result3.add(new Object[]{"DOC_ID_SET", 5, 4});
     result3.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
     check(query3, new ResultTable(DATA_SCHEMA, result3));
