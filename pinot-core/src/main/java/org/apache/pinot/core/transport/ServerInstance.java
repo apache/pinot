@@ -159,16 +159,6 @@ public final class ServerInstance {
     return _pool;
   }
 
-  // Does not require TLS until all servers guaranteed to be on TLS
-  @Deprecated
-  public ServerRoutingInstance toServerRoutingInstance(TableType tableType, boolean preferNettyTls) {
-    if (preferNettyTls && _nettyTlsPort > 0) {
-      return new ServerRoutingInstance(_instanceId, _hostname, _nettyTlsPort, tableType, true);
-    } else {
-      return new ServerRoutingInstance(_instanceId, _hostname, _port, tableType);
-    }
-  }
-
   public ServerRoutingInstance toServerRoutingInstance(TableType tableType, RoutingType routingType) {
     switch (routingType) {
       case NETTY:

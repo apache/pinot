@@ -19,7 +19,6 @@
 package org.apache.pinot.controller;
 
 import java.io.File;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -27,12 +26,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
 public class ControllerStarter extends BaseControllerStarter {
 
   public ControllerStarter() {
-  }
-
-  @Deprecated
-  public ControllerStarter(PinotConfiguration pinotConfiguration)
-      throws Exception {
-    init(pinotConfiguration);
   }
 
   public static ControllerStarter startDefault()

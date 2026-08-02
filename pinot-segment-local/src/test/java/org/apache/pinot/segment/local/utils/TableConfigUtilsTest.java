@@ -1467,7 +1467,8 @@ public class TableConfigUtilsTest {
 
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null);
+          new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST), null,
+              null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail for with conflicting encoding type of myCol1");
@@ -1488,7 +1489,8 @@ public class TableConfigUtilsTest {
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null);
+          new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST), null,
+              null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail since FST index is enabled on multi value column");
@@ -1499,7 +1501,8 @@ public class TableConfigUtilsTest {
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null);
+          new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST), null,
+              null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail since FST index is enabled on non String column");
@@ -1512,7 +1515,7 @@ public class TableConfigUtilsTest {
         .build();
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null);
+          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT), null, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail since TEXT index is enabled on non String column");
@@ -1525,7 +1528,7 @@ public class TableConfigUtilsTest {
         .build();
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("myCol21", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.FST, null, null);
+          new FieldConfig("myCol21", FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.FST), null, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail since field name is not present in schema");

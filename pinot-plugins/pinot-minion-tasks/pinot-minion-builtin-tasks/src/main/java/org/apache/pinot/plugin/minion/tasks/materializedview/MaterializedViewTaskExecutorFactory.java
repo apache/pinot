@@ -47,11 +47,6 @@ public class MaterializedViewTaskExecutorFactory implements PinotTaskExecutorFac
   private volatile MaterializedViewQueryExecutor _queryExecutor;
 
   @Override
-  public void init(MinionTaskZkMetadataManager zkMetadataManager) {
-    _zkMetadataManager = zkMetadataManager;
-  }
-
-  @Override
   public void init(MinionTaskZkMetadataManager zkMetadataManager, MinionConf minionConf) {
     _zkMetadataManager = zkMetadataManager;
     _minionConf = minionConf;
@@ -70,9 +65,9 @@ public class MaterializedViewTaskExecutorFactory implements PinotTaskExecutorFac
           // Build the gRPC client config from the minion's own configuration, scoped to the
           // MaterializedViewTask.MINION_BROKER_GRPC_CONFIG_PREFIX prefix.  This is how operators
           // enable TLS, raise the max inbound message size for large MV result sets, and tune
-          // keepalive.  Falling back to an empty configuration (no TLS, defaults) when the minion
-          // was initialized via the legacy single-arg init(zkMetadataManager) overload — fine for
-          // local tests but production deployments should use the two-arg init.
+          // keepalive.  Falling back to an empty configuration (no TLS, defaults) when no
+          // MinionConf was provided — fine for local tests but production deployments should
+          // initialize the factory with a MinionConf.
           PinotConfiguration grpcClientConfig = _minionConf != null
               ? _minionConf.subset(MaterializedViewTask.MINION_BROKER_GRPC_CONFIG_PREFIX)
               : new PinotConfiguration();

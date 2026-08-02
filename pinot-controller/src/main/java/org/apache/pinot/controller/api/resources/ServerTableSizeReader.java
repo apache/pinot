@@ -92,7 +92,7 @@ public class ServerTableSizeReader {
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     boolean requestCompressionStats = includeCompressionStats || includeColumnCompressionStats;
     for (String endpoint : endpointsToServers.keySet()) {
-      String tableSizeUri = endpoint + "/table/" + tableNameWithType + "/size"
+      String tableSizeUri = endpoint + "/tables/" + tableNameWithType + "/size"
           + (requestCompressionStats ? "?includeCompressionStats=true" : "")
           + (includeColumnCompressionStats ? "&includeColumnCompressionStats=true" : "");
       serverUrls.add(tableSizeUri);

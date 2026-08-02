@@ -71,7 +71,7 @@ import static org.testng.Assert.*;
 
 public class TableSizeReaderTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableSizeReaderTest.class);
-  private static final String URI_PATH = "/table/";
+  private static final String URI_PATH = "/tables/";
   private static final int TIMEOUT_MSEC = 10000;
   private static final int EXTENDED_TIMEOUT_FACTOR = 100;
   private static final int NUM_REPLICAS = 2;
