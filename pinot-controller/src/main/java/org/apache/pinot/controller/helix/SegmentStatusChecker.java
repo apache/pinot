@@ -63,6 +63,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -407,18 +408,24 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         tableCompressedSize += sizeInBytes;
       }
 
-      // NOTE: We want to skip segments that are just created/pushed to avoid false alerts because it is expected for
-      //       servers to take some time to load them. For consuming (IN_PROGRESS) segments, we use creation time from
-      //       the ZK metadata; for pushed segments, we use push time from the ZK metadata. Both of them are the time
-      //       when segment is newly created. For committed segments from real-time table, push time doesn't exist, and
-      //       creationTimeMs will be Long.MIN_VALUE, which is fine because we want to include them in the check.
+      // NOTE: We want to skip segments that were recently created/committed/pushed to avoid false alerts, because it
+      //       is expected for servers to take some time to load them. We use the segment ZK znode's modification time
+      //       (mtime), which tracks the last state change: creation for consuming (IN_PROGRESS) segments, the
+      //       CONSUMING -> COMMITTING -> ONLINE commit transition for real-time (LLC) segments, and the push time for
+      //       offline segments. Creation time is not a correct proxy for a COMMITTING/DONE segment: it marks when
+      //       consumption STARTED, which can be long before commit, so a segment still transitioning to ONLINE would
+      //       be flagged. If the znode stat is unavailable we fall back to creation time (mtime == creation for a
+      //       freshly created IN_PROGRESS segment).
+      //       The grace window is _waitForPushTimeSeconds. Once a segment is older than it and still
+      //       under-replicated, it is checked normally, so genuinely stuck commits and real replica losses still alert.
       //       The comparison uses evSnapshotTimestamp instead of System.currentTimeMillis() because for large tables
       //       with many segments, the status check can take several minutes. A segment updated after
       //       the EV snapshot was taken but before this individual segment check runs could be incorrectly flagged as
       //       OFFLINE when using current time.
-      long creationTimeMs = segmentZKMetadata.getStatus() == Status.IN_PROGRESS ? segmentZKMetadata.getCreationTime()
-          : segmentZKMetadata.getPushTime();
-      if (creationTimeMs > evSnapshotTimestamp - _waitForPushTimeSeconds * 1000L) {
+      Stat segmentStat = propertyStore == null ? null : propertyStore.getStat(
+          ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segment), AccessOption.PERSISTENT);
+      long refTimeMs = segmentStat != null ? segmentStat.getMtime() : segmentZKMetadata.getCreationTime();
+      if (refTimeMs > evSnapshotTimestamp - _waitForPushTimeSeconds * 1000L) {
         continue;
       }
 
