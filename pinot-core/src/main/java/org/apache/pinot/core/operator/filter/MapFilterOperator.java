@@ -68,7 +68,7 @@ public class MapFilterOperator extends BaseFilterOperator {
 
   public MapFilterOperator(IndexSegment indexSegment, Predicate predicate, QueryContext queryContext,
       int numDocs) {
-    super(numDocs, false);
+    super(numDocs, queryContext.isNullHandlingEnabled());
     _predicate = predicate;
 
     List<ExpressionContext> arguments = predicate.getLhs().getFunction().getArguments();
@@ -274,6 +274,20 @@ public class MapFilterOperator extends BaseFilterOperator {
   @Override
   protected BlockDocIdSet getTrues() {
     return _delegate.getTrues();
+  }
+
+  /// Forwarded so three-valued logic survives the delegation. `NotFilterOperator.getTrues()` reads
+  /// `getFalses()`, and `And`/`OrFilterOperator.getFalses()` read `getNulls()`; leaving these on the
+  /// base implementation would report an absent key's UNKNOWN docs as FALSE, so
+  /// `NOT (col['key'] = v)` would match every doc missing the key.
+  @Override
+  protected BlockDocIdSet getNulls() {
+    return _delegate.getNulls();
+  }
+
+  @Override
+  protected BlockDocIdSet getFalses() {
+    return _delegate.getFalses();
   }
 
   @Override

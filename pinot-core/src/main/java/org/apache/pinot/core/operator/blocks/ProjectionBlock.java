@@ -76,6 +76,14 @@ public class ProjectionBlock implements ValueBlock {
   public BlockValSet getBlockValueSet(String[] paths) {
     // TODO: only support one level of path for now, e.g. `map.key`
     assert paths.length == 2;
+    String fullColumnKeyName = ComplexFieldSpec.getFullChildName(paths);
+    // Resolve once per ProjectionOperator, not once per block: _dataSourceMap is owned by the operator and
+    // shared across every block of the segment. Re-resolving an absent OPEN_STRUCT key rebuilds a null bitmap
+    // spanning the whole segment on each block, and DataFetcher keeps the first reader registered under the
+    // name anyway, so every later resolution is garbage that also leaves this map disagreeing with the fetcher.
+    if (_dataSourceMap.containsKey(fullColumnKeyName)) {
+      return getBlockValueSet(fullColumnKeyName);
+    }
     DataSource columnDataSource = _dataSourceMap.get(paths[0]);
     DataSource keyDataSource;
     if (columnDataSource instanceof MapDataSource) {
@@ -92,7 +100,6 @@ public class ProjectionBlock implements ValueBlock {
     } else {
       throw new IllegalStateException("Path-based access requires MAP or OPEN_STRUCT column: " + paths[0]);
     }
-    String fullColumnKeyName = ComplexFieldSpec.getFullChildName(paths);
     _dataSourceMap.put(fullColumnKeyName, keyDataSource);
     _dataBlockCache.addDataSource(fullColumnKeyName, keyDataSource);
     return getBlockValueSet(fullColumnKeyName);

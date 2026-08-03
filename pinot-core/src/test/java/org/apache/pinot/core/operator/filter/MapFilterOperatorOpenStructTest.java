@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,7 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.Constants;
@@ -417,5 +419,62 @@ public class MapFilterOperatorOpenStructTest {
     // BitmapBasedFilterOperator with exclusive=true: matches numDocs - nullCount
     assertTrue(op.canOptimizeCount());
     assertEquals(op.getNumMatchingDocs(), NUM_DOCS - 2);
+  }
+
+  /// With null handling on, docs missing the key are UNKNOWN, not FALSE. The operator delegates
+  /// getNulls()/getFalses(), so `NOT (col['key'] = v)` — which reads getFalses() — must not match
+  /// them. Without the delegation getFalses() is NOT(trues) and wrongly sweeps the null docs in.
+  @Test
+  public void testNullDocsAreUnknownNotFalseUnderNullHandling() {
+    OpenStructDataSource osDs = mock(OpenStructDataSource.class);
+    when(osDs.isMaterialized(KEY)).thenReturn(true);
+
+    DataSource keyDs = mock(DataSource.class);
+    when(osDs.getDataSource(KEY)).thenReturn(keyDs);
+
+    DataSourceMetadata meta = mock(DataSourceMetadata.class);
+    when(meta.getDataType()).thenReturn(FieldSpec.DataType.STRING);
+    when(meta.isSorted()).thenReturn(false);
+    when(meta.isSingleValue()).thenReturn(true);
+    when(keyDs.getDataSourceMetadata()).thenReturn(meta);
+    when(keyDs.getColumnName()).thenReturn(KEY);
+    when(keyDs.getForwardIndex()).thenReturn(null);
+
+    Dictionary dict = mock(Dictionary.class);
+    when(dict.indexOf("active")).thenReturn(0);
+    when(keyDs.getDictionary()).thenReturn(dict);
+
+    // Docs 0-2 carry "active"; docs 5 and 10 never set the key at all.
+    InvertedIndexReader<?> invertedIndex = mock(InvertedIndexReader.class);
+    doReturn(MutableRoaringBitmap.bitmapOf(0, 1, 2)).when(invertedIndex).getDocIds(0);
+    doReturn(invertedIndex).when(keyDs).getInvertedIndex();
+
+    NullValueVectorReader nullReader = mock(NullValueVectorReader.class);
+    when(nullReader.getNullBitmap()).thenReturn(MutableRoaringBitmap.bitmapOf(5, 10));
+    when(keyDs.getNullValueVector()).thenReturn(nullReader);
+
+    IndexSegment segment = mock(IndexSegment.class);
+    when(segment.getDataSourceNullable(COLUMN)).thenReturn(osDs);
+
+    MapFilterOperator op = new MapFilterOperator(segment, makeEqPredicate(COLUMN, KEY, "active"),
+        mockQueryContext(true), NUM_DOCS);
+    assertTrue(op.toExplainString().contains("delegateTo:per_key_index"));
+
+    assertEquals(collect(op.getTrues()), List.of(0, 1, 2));
+    assertEquals(collect(op.getNulls()), List.of(5, 10));
+
+    List<Integer> falses = collect(op.getFalses());
+    assertFalse(falses.contains(5), "doc 5 is missing the key: UNKNOWN, not FALSE");
+    assertFalse(falses.contains(10), "doc 10 is missing the key: UNKNOWN, not FALSE");
+    assertTrue(falses.contains(3), "doc 3 has the key with a non-matching value: FALSE");
+  }
+
+  private static List<Integer> collect(BlockDocIdSet docIdSet) {
+    List<Integer> docIds = new ArrayList<>();
+    BlockDocIdIterator iterator = docIdSet.iterator();
+    for (int docId = iterator.next(); docId != Constants.EOF; docId = iterator.next()) {
+      docIds.add(docId);
+    }
+    return docIds;
   }
 }
