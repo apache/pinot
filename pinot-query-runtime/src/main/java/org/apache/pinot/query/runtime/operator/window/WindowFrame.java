@@ -21,11 +21,9 @@ package org.apache.pinot.query.runtime.operator.window;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
-/**
- * Defines the window frame to be used for a window function. The 'lowerBound' and 'upperBound' indicate the frame
- * boundaries to be used. The frame can be of two types: ROWS or RANGE. Optionally an {@code EXCLUDE} clause may
- * specify a subset of rows around the current row to be excluded from the frame.
- */
+/// Defines the window frame to be used for a window function. The 'lowerBound' and 'upperBound' indicate the frame
+/// boundaries to be used. The frame can be of two types: ROWS or RANGE. Optionally an `EXCLUDE` clause may
+/// specify a subset of rows around the current row to be excluded from the frame.
 public class WindowFrame {
   // Enum to denote the FRAME type, can be either ROWS or RANGE types
   private final WindowNode.WindowFrameType _type;

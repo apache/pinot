@@ -43,10 +43,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for the ingestion restlet
- *
- */
+/// Tests for the ingestion restlet
 @Test(groups = "stateless")
 public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
   private static final String TABLE_NAME = "testTable";

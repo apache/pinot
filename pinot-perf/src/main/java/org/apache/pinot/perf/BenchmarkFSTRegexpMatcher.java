@@ -52,17 +52,15 @@ import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
-/**
- * Benchmark for FST/IFST regexp matching (REGEXP_LIKE backed by an FST index).
- *
- * This exercises {@code LuceneFSTIndexReader#getDictIds} / {@code LuceneIFSTIndexReader#getDictIds}, the production
- * path used by the FST-based regexp predicate evaluator. It is designed to highlight the memory footprint of the
- * automaton-over-FST traversal for high-cardinality, long-string columns (the case that caused server heap OOMs).
- *
- * Run with the GC profiler to see the allocation reduction, e.g.:
- *   java -cp 'pinot-perf/target/pinot-perf-pkg/lib/*' org.openjdk.jmh.Main \
- *     org.apache.pinot.perf.BenchmarkFSTRegexpMatcher -prof gc -wi 2 -i 3 -f 1 -r 5s -w 5s
- */
+/// Benchmark for FST/IFST regexp matching (REGEXP_LIKE backed by an FST index).
+///
+/// This exercises `LuceneFSTIndexReader#getDictIds` / `LuceneIFSTIndexReader#getDictIds`, the production
+/// path used by the FST-based regexp predicate evaluator. It is designed to highlight the memory footprint of the
+/// automaton-over-FST traversal for high-cardinality, long-string columns (the case that caused server heap OOMs).
+///
+/// Run with the GC profiler to see the allocation reduction, e.g.:
+///   java -cp 'pinot-perf/target/pinot-perf-pkg/lib/\*' org.openjdk.jmh.Main \
+///     org.apache.pinot.perf.BenchmarkFSTRegexpMatcher -prof gc -wi 2 -i 3 -f 1 -r 5s -w 5s
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Fork(1)

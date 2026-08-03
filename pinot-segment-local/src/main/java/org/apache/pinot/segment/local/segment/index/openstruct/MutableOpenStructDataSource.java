@@ -36,11 +36,11 @@ import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/// Per-key {@link DataSource} accessor for mutable (consuming) segments with an OPEN_STRUCT column.
+/// Per-key [DataSource] accessor for mutable (consuming) segments with an OPEN_STRUCT column.
 ///
 /// Always columnar — no blob branch. Per-key DataSources are synthesized on demand from the
-/// underlying {@link MutableOpenStructIndex}; mutable mode always holds every observed key, so
-/// {@link #isFullyMaterialized()} is unconditionally {@code true}.
+/// underlying [MutableOpenStructIndex]; mutable mode always holds every observed key, so
+/// [#isFullyMaterialized()] is unconditionally `true`.
 public class MutableOpenStructDataSource extends BaseDataSource implements OpenStructDataSource {
   private final ComplexFieldSpec _fieldSpec;
   private final MutableOpenStructIndex _index;

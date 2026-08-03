@@ -27,10 +27,8 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 
 
-/**
- * DefaultMetadataExtractor is an implementation of the MetadataExtractor interface.
- * By default, the metadata extractor we will use will assume that we are provided a .tar.gz pinot segment file.
- */
+/// DefaultMetadataExtractor is an implementation of the MetadataExtractor interface.
+/// By default, the metadata extractor we will use will assume that we are provided a .tar.gz pinot segment file.
 public class DefaultMetadataExtractor implements MetadataExtractor {
 
   static final String SEGMENT_METADATA_DIR_NAME = "segment_metadata";

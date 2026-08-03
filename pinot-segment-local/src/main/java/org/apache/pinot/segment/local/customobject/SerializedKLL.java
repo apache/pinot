@@ -23,10 +23,8 @@ import org.apache.datasketches.kll.KllDoublesSketch;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-/**
- * Serialized and comparable version of KllDoublesSketch.
- * Compares two sketches for a specific percentile value.
- */
+/// Serialized and comparable version of KllDoublesSketch.
+/// Compares two sketches for a specific percentile value.
 public class SerializedKLL implements Comparable<SerializedKLL> {
   private final double _quantile;
   private final KllDoublesSketch _sketch;

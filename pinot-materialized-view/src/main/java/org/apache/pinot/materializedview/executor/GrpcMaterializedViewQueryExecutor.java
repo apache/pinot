@@ -63,7 +63,6 @@ import org.slf4j.LoggerFactory;
 ///   - **Stale client cleanup**: when the broker list is refreshed, clients for
 ///       brokers that are no longer in the cluster are closed and evicted.
 ///
-///
 /// Instances are thread-safe and intended to be long-lived (one per executor factory).
 public class GrpcMaterializedViewQueryExecutor implements MaterializedViewQueryExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcMaterializedViewQueryExecutor.class);

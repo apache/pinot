@@ -222,10 +222,13 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
   }
 
   @Test
-  public void testRandFunctionNotEvaluatedInMultiStagePlanner() {
-    String query = "EXPLAIN PLAN FOR SELECT rand() FROM b";
+  public void testFunctionVolatilityDoesNotChangeLiteralEvaluationInMultiStagePlanner() {
+    String query = "EXPLAIN PLAN FOR SELECT now(), ago('PT1H'), rand(), rand(123) FROM b";
     String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
     assertTrue(explain.contains("RAND()"), "Expected RAND() to remain in logical plan");
+    assertFalse(explain.contains("NOW()"), "Expected NOW() to be evaluated into a literal");
+    assertFalse(explain.contains("AGO("), "Expected AGO('PT1H') to be evaluated into a literal");
+    assertFalse(explain.contains("RAND(123)"), "Expected RAND(123) to be evaluated into a literal");
   }
 
   @Test

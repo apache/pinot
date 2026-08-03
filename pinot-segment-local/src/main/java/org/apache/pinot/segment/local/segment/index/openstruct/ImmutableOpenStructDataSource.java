@@ -33,12 +33,12 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 
 
-/// Per-key {@link DataSource} accessor for sealed (immutable) segments with an OPEN_STRUCT column.
+/// Per-key [DataSource] accessor for sealed (immutable) segments with an OPEN_STRUCT column.
 ///
 /// Always columnar — there is no blob branch. Every key that was dense enough during segment
-/// creation gets its own materialized {@link DataSource} (forward index + optional inverted index /
+/// creation gets its own materialized [DataSource] (forward index + optional inverted index /
 /// dictionary). Keys that did not meet the density threshold are stored in an optional sparse
-/// column; the sparse {@link DataSource} is returned for any unmaterialized key lookup.
+/// column; the sparse [DataSource] is returned for any unmaterialized key lookup.
 ///
 /// Use [#isMaterialized(String)] and [#isFullyMaterialized()] together to choose
 /// the query execution path:
@@ -62,13 +62,13 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
     _sparseDataSource = sparseDataSource;
   }
 
-  /// Convenience constructor for segment-load time. Synthesizes a minimal {@link DataSourceMetadata}
+  /// Convenience constructor for segment-load time. Synthesizes a minimal [DataSourceMetadata]
   /// for the parent OPEN_STRUCT column (which has no on-disk presence of its own) and uses an empty
-  /// {@link ColumnIndexContainer} — all real readers live on the per-key data sources.
+  /// [ColumnIndexContainer] — all real readers live on the per-key data sources.
   ///
-  /// The parent's {@code getForwardIndex()} / {@code getDictionary()} will return {@code null}.
-  /// Callers must use {@link #getDataSource(String)} for per-key access; whole-struct projection
-  /// ({@code SELECT open_struct_col}) is handled by the query layer, not the storage layer.
+  /// The parent's `getForwardIndex()` / `getDictionary()` will return `null`.
+  /// Callers must use [#getDataSource(String)] for per-key access; whole-struct projection
+  /// (`SELECT open_struct_col`) is handled by the query layer, not the storage layer.
   public ImmutableOpenStructDataSource(ComplexFieldSpec fieldSpec, Map<String, DataSource> perKeyDataSources,
       @Nullable DataSource sparseDataSource, int numDocs) {
     this(fieldSpec, perKeyDataSources, sparseDataSource,

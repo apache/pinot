@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.minion.tasks.materializedview;
 
+import com.google.common.base.Preconditions;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.materializedview.executor.GrpcMaterializedViewQueryExecutor;
 import org.apache.pinot.materializedview.executor.MaterializedViewQueryExecutor;
@@ -47,11 +48,6 @@ public class MaterializedViewTaskExecutorFactory implements PinotTaskExecutorFac
   private volatile MaterializedViewQueryExecutor _queryExecutor;
 
   @Override
-  public void init(MinionTaskZkMetadataManager zkMetadataManager) {
-    _zkMetadataManager = zkMetadataManager;
-  }
-
-  @Override
   public void init(MinionTaskZkMetadataManager zkMetadataManager, MinionConf minionConf) {
     _zkMetadataManager = zkMetadataManager;
     _minionConf = minionConf;
@@ -64,18 +60,21 @@ public class MaterializedViewTaskExecutorFactory implements PinotTaskExecutorFac
 
   @Override
   public PinotTaskExecutor create() {
+    // Validated on every call rather than only on the first: without a MinionConf we would silently build a
+    // plaintext gRPC client with default limits instead of the configured one, and without a metadata manager
+    // we would hand a null straight to the executor.
+    Preconditions.checkState(_zkMetadataManager != null,
+        "MinionTaskZkMetadataManager is not set; init(zkMetadataManager, minionConf) must be called before create()");
+    Preconditions.checkState(_minionConf != null,
+        "MinionConf is not set; init(zkMetadataManager, minionConf) must be called before create()");
     if (_queryExecutor == null) {
       synchronized (this) {
         if (_queryExecutor == null) {
           // Build the gRPC client config from the minion's own configuration, scoped to the
           // MaterializedViewTask.MINION_BROKER_GRPC_CONFIG_PREFIX prefix.  This is how operators
-          // enable TLS, raise the max inbound message size for large MV result sets, and tune
-          // keepalive.  Falling back to an empty configuration (no TLS, defaults) when the minion
-          // was initialized via the legacy single-arg init(zkMetadataManager) overload — fine for
-          // local tests but production deployments should use the two-arg init.
-          PinotConfiguration grpcClientConfig = _minionConf != null
-              ? _minionConf.subset(MaterializedViewTask.MINION_BROKER_GRPC_CONFIG_PREFIX)
-              : new PinotConfiguration();
+          // enable TLS, raise the max inbound message size for large MV result sets, and tune keepalive.
+          PinotConfiguration grpcClientConfig =
+              _minionConf.subset(MaterializedViewTask.MINION_BROKER_GRPC_CONFIG_PREFIX);
           _queryExecutor = new GrpcMaterializedViewQueryExecutor(
               MinionContext.getInstance().getHelixManager(),
               new GrpcConfig(grpcClientConfig));

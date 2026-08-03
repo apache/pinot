@@ -641,6 +641,8 @@ public class PinotSegmentColumnReader implements Closeable {
         return _forwardIndexReader.getString(docId1, _forwardIndexReaderContext)
             .compareTo(_forwardIndexReader.getString(docId2, _forwardIndexReaderContext));
       case BYTES:
+        // ByteArray.compare is unsigned byte-wise lexicographic; for canonical 16-byte big-endian UUIDs this is
+        // identical to UuidUtils.compare's unsigned 64-bit-word ordering, so a single comparator handles both.
         return ByteArray.compare(_forwardIndexReader.getBytes(docId1, _forwardIndexReaderContext),
             _forwardIndexReader.getBytes(docId2, _forwardIndexReaderContext));
       default:

@@ -39,11 +39,9 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-/**
- * Verifies that querying an empty table (a table that exists and has a routing entry, but no routable segments) under
- * the multi-stage physical optimizer does not fail. Such a query should be short-circuited to an empty result on the
- * broker, mirroring the single-stage engine and the legacy multi-stage path (see PinotDispatchPlanner and #18538).
- */
+/// Verifies that querying an empty table (a table that exists and has a routing entry, but no routable segments) under
+/// the multi-stage physical optimizer does not fail. Such a query should be short-circuited to an empty result on the
+/// broker, mirroring the single-stage engine and the legacy multi-stage path (see PinotDispatchPlanner and #18538).
 public class EmptyTablePlanTest {
   private static final String EMPTY_TABLE = "emptytable_OFFLINE";
   private static final String EMPTY_TABLE_2 = "emptytable2_OFFLINE";
@@ -160,10 +158,8 @@ public class EmptyTablePlanTest {
         "Expected a clear partially-empty error, got: " + e.getMessage());
   }
 
-  /**
-   * When all leaf stages are empty, the plan is rewritten so that only the broker reduce stage (stage 0) remains,
-   * and its plan tree no longer contains any table scan (the leaves are inlined to empty literals).
-   */
+  /// When all leaf stages are empty, the plan is rewritten so that only the broker reduce stage (stage 0) remains,
+  /// and its plan tree no longer contains any table scan (the leaves are inlined to empty literals).
   private void assertShortCircuited(DispatchableSubPlan plan) {
     assertEquals(plan.getQueryStageMap().keySet(), Set.of(0),
         "Only the reduce stage should remain after short-circuiting empty leaves");

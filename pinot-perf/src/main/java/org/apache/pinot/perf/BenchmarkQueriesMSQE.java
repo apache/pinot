@@ -58,9 +58,7 @@ import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
-/**
- * Benchmark similar to BenchmarkQueries, but using multi-stage query engine.
- */
+/// Benchmark similar to BenchmarkQueries, but using multi-stage query engine.
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Fork(1)

@@ -79,24 +79,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * <h1>Overview</h1>
- * Assigns workers to all PRelNodes that are part of the leaf stage as determined by {@link PRelNode#isLeafStage()}.
- * The workers are mainly determined by the Table Scan, unless filter based server pruning is enabled.
- * <h1>Current Features</h1>
- * <ul>
- *   <li>
- *     Automatically detects partitioning and adds that information to PinotDataDistribution. This will be used
- *     in subsequent worker assignment steps to simplify Exchange.
- *   </li>
- * </ul>
- * <h1>Planned / Upcoming Features</h1>
- * <ul>
- *   <li>Support for look-up join.</li>
- *   <li>Support for partition parallelism and the colocated join hint. See F2 in #15455.</li>
- *   <li>Support for Hybrid Tables for automatic partitioning inference.</li>
- * </ul>
- */
+/// # Overview
+///
+/// Assigns workers to all PRelNodes that are part of the leaf stage as determined by [PRelNode#isLeafStage()].
+/// The workers are mainly determined by the Table Scan, unless filter based server pruning is enabled.
+///
+/// # Current Features
+///
+/// - Automatically detects partitioning and adds that information to PinotDataDistribution. This will be used
+///   in subsequent worker assignment steps to simplify Exchange.
+///
+/// # Planned / Upcoming Features
+///
+/// - Support for look-up join.
+/// - Support for partition parallelism and the colocated join hint. See F2 in #15455.
+/// - Support for Hybrid Tables for automatic partitioning inference.
 public class LeafStageWorkerAssignmentRule extends PRelOptRule {
   private static final Logger LOGGER = LoggerFactory.getLogger(LeafStageWorkerAssignmentRule.class);
   private static final int LIMIT_OF_INVALID_SEGMENTS_TO_LOG = 3;
@@ -209,10 +206,8 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     return tableScan.with(workerAssignmentResult._pinotDataDistribution, metadata);
   }
 
-  /**
-   * Assigns workers for the table-scan node, automatically detecting table partitioning whenever possible. The
-   * arguments to this method are minimal to facilitate unit-testing.
-   */
+  /// Assigns workers for the table-scan node, automatically detecting table partitioning whenever possible. The
+  /// arguments to this method are minimal to facilitate unit-testing.
   @VisibleForTesting
   static TableScanWorkerAssignmentResult assignTableScan(String tableName, List<String> fieldNames,
       InstanceIdToSegments instanceIdToSegments, Map<String, TablePartitionInfo> tpiMap,
@@ -280,10 +275,8 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     return new TableScanWorkerAssignmentResult(pinotDataDistribution, workerIdToSegmentsMap);
   }
 
-  /**
-   * Tries to assign workers for the table-scan node to generate a partitioned data distribution. If this is not
-   * possible, we simply return null.
-   */
+  /// Tries to assign workers for the table-scan node to generate a partitioned data distribution. If this is not
+  /// possible, we simply return null.
   @Nullable
   @VisibleForTesting
   static TableScanWorkerAssignmentResult attemptPartitionedDistribution(String tableNameWithType,
@@ -428,13 +421,10 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
         segmentsByPartition, segmentsWithInvalidPartition);
   }
 
-  /**
-   * Infers partition from invalid segments if the passed flag is set to true. Inference is done by simply:
-   * <ol>
-   *   <li>Extracting the stream partition number from the segment name</li>
-   *   <li>Doing a modulus with the numPartitions.</li>
-   * </ol>
-   */
+  /// Infers partition from invalid segments if the passed flag is set to true. Inference is done by simply:
+  ///
+  /// 1. Extracting the stream partition number from the segment name
+  /// 2. Doing a modulus with the numPartitions.
   @VisibleForTesting
   static Map<Integer, List<String>> getInvalidSegmentsByInferredPartition(@Nullable List<String> invalidSegments,
       boolean inferPartitionsForInvalidSegments, String tableNameWithType, int numPartitions) {
@@ -518,12 +508,10 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     return result;
   }
 
-  /**
-   * Acquire routing table for items listed in TableScanNode.
-   *
-   * @param pinotQuery the PinotQuery with filters, project and table-scan information.
-   * @return keyed-map from table type(s) to routing table(s).
-   */
+  /// Acquire routing table for items listed in TableScanNode.
+  ///
+  /// @param pinotQuery the PinotQuery with filters, project and table-scan information.
+  /// @return keyed-map from table type(s) to routing table(s).
   private Map<String, RoutingTable> getRoutingTable(PinotQuery pinotQuery, long requestId) {
     String tableName = pinotQuery.getDataSource().getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
@@ -560,10 +548,8 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     return tmp == null ? Map.of() : tmp;
   }
 
-  /**
-   * Gets the table name from the TableScan in a format that can be looked up in the table cache.
-   * This follows the same logic as {@link org.apache.pinot.query.catalog.PinotCatalog#getTable(String)}.
-   */
+  /// Gets the table name from the TableScan in a format that can be looked up in the table cache.
+  /// This follows the same logic as [org.apache.pinot.query.catalog.PinotCatalog#getTable(String)].
   private String getTableNameForLookup(TableScan tableScan) {
     RelOptTable table = tableScan.getTable();
     List<String> qualifiedName = table.getQualifiedName();
@@ -585,9 +571,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     return _tableCache.getActualLogicalTableName(tableName);
   }
 
-  /**
-   * Assigns workers for a logical table scan. A logical table maps to multiple physical tables.
-   */
+  /// Assigns workers for a logical table scan. A logical table maps to multiple physical tables.
   private PhysicalTableScan assignLogicalTableScan(PhysicalTableScan tableScan, long requestId,
       String logicalTableName) {
     Map<String, String> tableOptions = getTableOptions(tableScan.getHints());
@@ -636,9 +620,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     return tableScan.with(result._pinotDataDistribution, result._tableScanMetadata);
   }
 
-  /**
-   * Builds worker assignment for a logical table scan.
-   */
+  /// Builds worker assignment for a logical table scan.
   @VisibleForTesting
   static LogicalTableScanWorkerAssignmentResult buildLogicalTableWorkerAssignment(
       String logicalTableName, LogicalTableRouteInfo logicalTableRouteInfo, Map<String, String> tableOptions) {
@@ -716,9 +698,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     return new LogicalTableScanWorkerAssignmentResult(pinotDataDistribution, metadata, serverInstances);
   }
 
-  /**
-   * Helper method to transfer routing table entries to the server instance logical segments map.
-   */
+  /// Helper method to transfer routing table entries to the server instance logical segments map.
   @VisibleForTesting
   static void transferToServerInstanceLogicalSegmentsMap(String physicalTableName,
       Map<ServerInstance, SegmentsToQuery> routingTable,
@@ -743,9 +723,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     }
   }
 
-  /**
-   * Result of building worker assignment for a logical table scan.
-   */
+  /// Result of building worker assignment for a logical table scan.
   @VisibleForTesting
   static class LogicalTableScanWorkerAssignmentResult {
     final PinotDataDistribution _pinotDataDistribution;

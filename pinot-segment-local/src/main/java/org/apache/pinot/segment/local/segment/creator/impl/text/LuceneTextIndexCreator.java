@@ -41,25 +41,20 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.NRTCachingDirectory;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.LuceneNRTCachingMergePolicy;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.segment.index.text.AbstractTextIndexCreator;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
-import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This is used to create Lucene based text index.
- * Used for both offline from {@link SegmentColumnarIndexCreator}
- * and realtime from {@link RealtimeLuceneTextIndex}
- */
+/// This is used to create Lucene based text index.
+/// Used for both offline from [org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator]
+/// and realtime from [org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex]
 public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexCreator.class);
   public static final String LUCENE_INDEX_DOC_ID_COLUMN_NAME = "DocID";
@@ -84,34 +79,34 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
 
   public static final CharArraySet ENGLISH_STOP_WORDS_SET = new CharArraySet(getDefaultEnglishStopWordsSet(), true);
 
-  /**
-   * Called by {@link SegmentColumnarIndexCreator}
-   * when building an offline segment. Similar to how it creates per column
-   * dictionary, forward and inverted index, a text index is also created
-   * if text search is enabled on a column.
-   * @param column column name
-   * @param segmentIndexDir segment index directory
-   * @param commit true if the index should be committed (at the end after all documents have
-   *               been added), false if index should not be committed
-   * @param realtimeConversion index creator should create an index using the realtime segment
-   * @param consumerDir consumer dir containing the realtime index, used when realtimeConversion and commit is true
-   * @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
-   * @param combineAndCleanupFiles true if files should be combined and text index directory should be removed
-   * Note on commit:
-   *               Once {@link SegmentColumnarIndexCreator}
-   *               finishes indexing all documents/rows for the segment, we need to commit and close
-   *               the Lucene index which will internally persist the index on disk, do the necessary
-   *               resource cleanup etc. We commit during {@link DictionaryBasedInvertedIndexCreator#seal()}
-   *               and close during {@link DictionaryBasedInvertedIndexCreator#close()}.
-   *               This lucene index writer is used by both offline and realtime (both during
-   *               indexing in-memory MutableSegment and later during conversion to offline).
-   *               Since realtime segment conversion is again going to go through the offline
-   *               indexing path and will do everything (indexing, commit, close etc), there is
-   *               no need to commit the index from the realtime side. So when the realtime segment
-   *               is destroyed (which is after the realtime segment has been committed and converted
-   *               to offline), we close this lucene index writer to release resources but don't commit.
-   * @param config the text index config
-   */
+  /// Called by [org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator]
+  /// when building an offline segment. Similar to how it creates per column
+  /// dictionary, forward and inverted index, a text index is also created
+  /// if text search is enabled on a column.
+  /// @param column column name
+  /// @param segmentIndexDir segment index directory
+  /// @param commit true if the index should be committed (at the end after all documents have
+  ///               been added), false if index should not be committed
+  /// @param realtimeConversion index creator should create an index using the realtime segment
+  /// @param consumerDir consumer dir containing the realtime index, used when realtimeConversion and commit is true
+  /// @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
+  /// @param combineAndCleanupFiles true if files should be combined and text index directory should be removed
+  /// Note on commit:
+  ///               Once [org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator]
+  ///               finishes indexing all documents/rows for the segment, we need to commit and close
+  ///               the Lucene index which will internally persist the index on disk, do the necessary
+  ///               resource cleanup etc. We commit during
+  ///               [org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator#seal()]
+  ///               and close during
+  ///               [org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator#close()].
+  ///               This lucene index writer is used by both offline and realtime (both during
+  ///               indexing in-memory MutableSegment and later during conversion to offline).
+  ///               Since realtime segment conversion is again going to go through the offline
+  ///               indexing path and will do everything (indexing, commit, close etc), there is
+  ///               no need to commit the index from the realtime side. So when the realtime segment
+  ///               is destroyed (which is after the realtime segment has been committed and converted
+  ///               to offline), we close this lucene index writer to release resources but don't commit.
+  /// @param config the text index config
   public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit, boolean realtimeConversion,
       @Nullable File consumerDir, boolean mutableSegmentCompacted, @Nullable int[] immutableToMutableIdMap,
       boolean combineAndCleanupFiles, TextIndexConfig config) {
@@ -189,15 +184,13 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     }
   }
 
-  /**
-   * @param column column name
-   * @param segmentIndexDir segment index directory
-   * @param commit true if the index should be committed
-   * @param realtimeConversion index creator should create an index using the realtime segment
-   * @param consumerDir consumer dir containing the realtime index
-   * @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
-   * @param config the text index config
-   */
+  /// @param column column name
+  /// @param segmentIndexDir segment index directory
+  /// @param commit true if the index should be committed
+  /// @param realtimeConversion index creator should create an index using the realtime segment
+  /// @param consumerDir consumer dir containing the realtime index
+  /// @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
+  /// @param config the text index config
   public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit, boolean realtimeConversion,
       @Nullable File consumerDir, @Nullable int[] immutableToMutableIdMap, TextIndexConfig config) {
     this(column, segmentIndexDir, commit, realtimeConversion, consumerDir, false, immutableToMutableIdMap, false,
@@ -214,12 +207,10 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     return _indexWriter;
   }
 
-  /**
-   * Copy the mutable lucene index files to create an immutable lucene index
-   * @param segmentIndexDir segment index directory
-   * @param mutableToImmutableDocIdMap mutableToImmutableDocIdMap from segment conversion
-   * @param indexWriterConfig indexWriterConfig
-   */
+  /// Copy the mutable lucene index files to create an immutable lucene index
+  /// @param segmentIndexDir segment index directory
+  /// @param mutableToImmutableDocIdMap mutableToImmutableDocIdMap from segment conversion
+  /// @param indexWriterConfig indexWriterConfig
   private void convertMutableSegment(File segmentIndexDir, File consumerDir, @Nullable int[] mutableToImmutableDocIdMap,
       IndexWriterConfig indexWriterConfig) {
     try {
@@ -253,14 +244,12 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     }
   }
 
-  /**
-   * Generate the mapping file from mutable Pinot docId (stored within the Lucene index) to immutable Pinot docId using
-   * the mutableToImmutableDocIdMap from segment conversion
-   * @param segmentIndexDir segment index directory
-   * @param column column name
-   * @param directory directory of the index
-   * @param mutableToImmutableDocIdMap mutableToImmutableDocIdMap from segment conversion
-   */
+  /// Generate the mapping file from mutable Pinot docId (stored within the Lucene index) to immutable Pinot docId using
+  /// the mutableToImmutableDocIdMap from segment conversion
+  /// @param segmentIndexDir segment index directory
+  /// @param column column name
+  /// @param directory directory of the index
+  /// @param mutableToImmutableDocIdMap mutableToImmutableDocIdMap from segment conversion
   private void buildMappingFile(File segmentIndexDir, String column, Directory directory,
       @Nullable int[] mutableToImmutableDocIdMap)
       throws IOException {
@@ -369,10 +358,8 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     }
   }
 
-  /**
-   * Combines all text index files into a single file and removes the text index directory.
-   * This method is called only when _combineAndCleanupFiles is true.
-   */
+  /// Combines all text index files into a single file and removes the text index directory.
+  /// This method is called only when \_combineAndCleanupFiles is true.
   private void combineAndCleanupTextIndexFiles()
       throws IOException {
     // Combine all the Text Index Files into a single file named {column}.text in the segment directory

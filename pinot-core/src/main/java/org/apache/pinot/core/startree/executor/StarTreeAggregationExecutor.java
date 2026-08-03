@@ -25,18 +25,18 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 
 
-/**
- * The <code>StarTreeAggregationExecutor</code> class is the aggregation executor for star-tree index.
- * <ul>
- *   <li>The column in function context is function-column pair</li>
- *   <li>No transform function in aggregation</li>
- *   <li>For <code>COUNT</code> aggregation function, we need to aggregate on the pre-aggregated column</li>
- * </ul>
- */
+/// The `StarTreeAggregationExecutor` class is the aggregation executor for star-tree index.
+///
+/// - The column in function context is function-column pair
+/// - No transform function in aggregation
+/// - For `COUNT` aggregation function, we need to aggregate on the pre-aggregated column
 public class StarTreeAggregationExecutor extends DefaultAggregationExecutor {
   private final AggregationFunctionColumnPair[] _aggregationFunctionColumnPairs;
 
+
   public StarTreeAggregationExecutor(AggregationFunction[] aggregationFunctions) {
+    // StarTreeAggregationExecutor doesn't support pre-aggregated results.
+    // So, we don't need to pass pre-aggregated results to the super class.
     super(aggregationFunctions);
 
     int numAggregationFunctions = aggregationFunctions.length;

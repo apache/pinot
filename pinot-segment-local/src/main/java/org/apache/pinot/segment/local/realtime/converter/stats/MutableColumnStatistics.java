@@ -30,9 +30,7 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Column statistics for a column coming from an in-memory realtime segment.
- */
+/// Column statistics for a column coming from an in-memory realtime segment.
 public class MutableColumnStatistics implements ColumnStatistics {
   protected final DataSource _dataSource;
   protected final DataSourceMetadata _dataSourceMetadata;

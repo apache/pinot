@@ -36,23 +36,20 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * A map that stores statistics.
- * <p>
- * Statistics must be keyed by an enum that implements {@link StatMap.Key}.
- * <p>
- * A stat map efficiently store, serialize and deserialize these statistics.
- * <p>
- * Serialization and deserialization is backward and forward compatible as long as the only change in the keys are:
- * <ul>
- *   <li>Adding new keys</li>
- *   <li>Change the name of the keys</li>
- * </ul>
- *
- * Any other change (like changing the type of key, changing their literal order or removing keys)
- * are backward incompatible changes.
- * @param <K>
- */
+/// A map that stores statistics.
+///
+/// Statistics must be keyed by an enum that implements [StatMap.Key].
+///
+/// A stat map efficiently store, serialize and deserialize these statistics.
+///
+/// Serialization and deserialization is backward and forward compatible as long as the only change in the keys are:
+///
+/// - Adding new keys
+/// - Change the name of the keys
+///
+/// Any other change (like changing the type of key, changing their literal order or removing keys)
+/// are backward incompatible changes.
+/// @param <K>
 public class StatMap<K extends Enum<K> & StatMap.Key> {
   private final Class<K> _keyClass;
   private final Map<K, Object> _map;
@@ -170,11 +167,9 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     return this;
   }
 
-  /**
-   * Returns the value associated with the key.
-   * <p>
-   * Primitives will be boxed, so it is recommended to use the specific methods for each type.
-   */
+  /// Returns the value associated with the key.
+  ///
+  /// Primitives will be boxed, so it is recommended to use the specific methods for each type.
   public Object getAny(K key) {
     switch (key.getType()) {
       case BOOLEAN:
@@ -192,16 +187,14 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     }
   }
 
-  /**
-   * Returns the value associated with the key name.
-   *
-   * In general, it is better to use the type-specific getters with the enum key directly, but sometimes it is
-   * impossible or requires complex to read code (like complex unsafe casts).
-   *
-   * @param keyName The name of the key.
-   * @param defaultValue The default value to return if the key is not found.
-   * @throws ClassCastException if the value cannot be cast to the same static type as the default value.
-   */
+  /// Returns the value associated with the key name.
+  ///
+  /// In general, it is better to use the type-specific getters with the enum key directly, but sometimes it is
+  /// impossible or requires complex to read code (like complex unsafe casts).
+  ///
+  /// @param keyName The name of the key.
+  /// @param defaultValue The default value to return if the key is not found.
+  /// @throws ClassCastException if the value cannot be cast to the same static type as the default value.
   public <E> E getUnsafe(String keyName, E defaultValue)
       throws ClassCastException {
     K key = getKey(keyName);
@@ -211,12 +204,10 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     return (E) getAny(key);
   }
 
-  /**
-   * Modifies this object to merge the values of the other object.
-   *
-   * @param other The object to merge with. This argument will not be modified.
-   * @return this object once it is modified.
-   */
+  /// Modifies this object to merge the values of the other object.
+  ///
+  /// @param other The object to merge with. This argument will not be modified.
+  /// @return this object once it is modified.
   public StatMap<K> merge(StatMap<K> other) {
     Preconditions.checkState(_keyClass.equals(other._keyClass),
         "Different key classes %s and %s", _keyClass, other._keyClass);
@@ -534,9 +525,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   public interface Key {
     String name();
 
-    /**
-     * The name of the stat used to report it. Names must be unique on the same key family.
-     */
+    /// The name of the stat used to report it. Names must be unique on the same key family.
     default String getStatName() {
       return getDefaultStatName(this);
     }
@@ -563,9 +552,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       return merged;
     }
 
-    /**
-     * The type of the values associated to this key.
-     */
+    /// The type of the values associated to this key.
     Type getType();
 
     default boolean includeDefaultInJson() {

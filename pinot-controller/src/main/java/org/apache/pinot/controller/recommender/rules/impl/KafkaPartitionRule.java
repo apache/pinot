@@ -30,11 +30,9 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.REALTIME;
 
 
-/**
- * Recommend a number of kafka partitions if not provided
- * Divide the messages/sec (total aggregate in the topic) by 250 to get an optimal value of the number of kafka
- * partitions
- */
+/// Recommend a number of kafka partitions if not provided
+/// Divide the messages/sec (total aggregate in the topic) by 250 to get an optimal value of the number of kafka
+/// partitions
 public class KafkaPartitionRule extends AbstractRule {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionRule.class);
   PartitionRuleParams _params;

@@ -24,7 +24,6 @@ import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
@@ -34,13 +33,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This {@code SortedMailboxReceiveOperator} receives data from a {@link ReceivingMailbox} and serve it out from the
- * {@link #nextBlock()} API in a sorted manner.
- *
- *  TODO: Once sorting on the {@code MailboxSendOperator} is available, modify this to use a k-way merge instead of
- *        resorting via the PriorityQueue.
- */
+/// This `SortedMailboxReceiveOperator` receives data from a
+/// [org.apache.pinot.query.mailbox.ReceivingMailbox] and serve it out from the [#nextBlock()] API in a
+/// sorted manner.
+///
+///  TODO: Once sorting on the `MailboxSendOperator` is available, modify this to use a k-way merge instead of
+///        resorting via the PriorityQueue.
 public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SortedMailboxReceiveOperator.class);
 

@@ -40,9 +40,7 @@ import static org.apache.pinot.spi.data.FieldSpec.DataType.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 
-/**
- * Tests for {@link FieldSpec}.
- */
+/// Tests for [FieldSpec].
 public class FieldSpecTest {
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
@@ -50,9 +48,7 @@ public class FieldSpecTest {
   private static final String UUID_VALUE = "550e8400-e29b-41d4-a716-446655440000";
   private static final String LARGER_UUID_VALUE = "550e8400-e29b-41d4-a716-446655440001";
 
-  /**
-   * Test all {@link FieldSpec.DataType}.
-   */
+  /// Test all [FieldSpec.DataType].
   @Test
   public void testDataType() {
     Assert.assertEquals(INT.getStoredType(), INT);
@@ -76,9 +72,7 @@ public class FieldSpecTest {
     Assert.assertEquals(UUID.size(), UuidUtils.UUID_NUM_BYTES);
   }
 
-  /**
-   * Test all {@link FieldSpec.FieldType} with different {@link FieldSpec.DataType}.
-   */
+  /// Test all [FieldSpec.FieldType] with different [FieldSpec.DataType].
   @Test
   public void testFieldSpec() {
     // Single-value boolean type dimension field with default null value.
@@ -264,9 +258,7 @@ public class FieldSpecTest {
     Assert.assertEquals(TIMESTAMP.compare(1000L, 1000L), 0);
   }
 
-  /**
-   * Test {@link TimeFieldSpec} constructors.
-   */
+  /// Test [TimeFieldSpec] constructors.
   @Test
   public void testTimeFieldSpecConstructor() {
     String incomingName = "incoming";
@@ -287,9 +279,7 @@ public class FieldSpecTest {
     Assert.assertEquals(timeFieldSpec1, timeFieldSpec2);
   }
 
-  /**
-   * Test {@link DateTimeFieldSpec} constructors.
-   */
+  /// Test [DateTimeFieldSpec] constructors.
   @Test
   public void testDateTimeFieldSpecConstructor() {
     String name = "Date";
@@ -360,9 +350,7 @@ public class FieldSpecTest {
     return entries.toArray(new Object[entries.size()][]);
   }
 
-  /**
-   * Test different order of fields in serialized JSON string to deserialize {@link FieldSpec}.
-   */
+  /// Test different order of fields in serialized JSON string to deserialize [FieldSpec].
   @Test
   public void testOrderOfFields()
       throws Exception {
@@ -404,9 +392,7 @@ public class FieldSpecTest {
     Assert.assertEquals(dateTimeFieldSpec1, dateTimeFieldSpec2, ERROR_MESSAGE);
   }
 
-  /**
-   * Test {@link FieldSpec} serialize deserialize.
-   */
+  /// Test [FieldSpec] serialize deserialize.
   @Test
   public void testSerializeDeserialize()
       throws Exception {
@@ -460,9 +446,7 @@ public class FieldSpecTest {
     Assert.assertEquals(first, second, ERROR_MESSAGE);
   }
 
-  /**
-   * Helper function to generate JSON string with random order of fields passed in.
-   */
+  /// Helper function to generate JSON string with random order of fields passed in.
   private String getRandomOrderJsonString(String[] fields) {
     int length = fields.length;
     List<Integer> indices = new LinkedList<>();
@@ -525,11 +509,9 @@ public class FieldSpecTest {
   }
 
 
-  /**
-   * Test to ensure only expected fields are serialized and @JsonIgnore methods are excluded.
-   * This test verifies that getEffectiveMaxLength and getEffectiveMaxLengthExceedStrategy
-   * (which are annotated with @JsonIgnore) do not appear in the JSON output.
-   */
+  /// Test to ensure only expected fields are serialized and @JsonIgnore methods are excluded.
+  /// This test verifies that getEffectiveMaxLength and getEffectiveMaxLengthExceedStrategy
+  /// (which are annotated with @JsonIgnore) do not appear in the JSON output.
   @Test
   public void testJsonSerializationExcludesIgnoredFields() throws Exception {
     // Test DimensionFieldSpec with some null and some non-null values

@@ -25,7 +25,6 @@ import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
-import com.tdunning.math.stats.MergingDigest;
 import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.Double2LongMap;
 import it.unimi.dsi.fastutil.doubles.Double2LongOpenHashMap;
@@ -97,6 +96,7 @@ import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.VarianceTuple;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.local.utils.TDigestUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.locationtech.jts.geom.Geometry;
@@ -105,9 +105,7 @@ import org.roaringbitmap.RoaringBitmap;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * The {@code ObjectSerDeUtils} class provides the utility methods to serialize/de-serialize objects.
- */
+/// The `ObjectSerDeUtils` class provides the utility methods to serialize/de-serialize objects.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ObjectSerDeUtils {
   private ObjectSerDeUtils() {
@@ -181,9 +179,7 @@ public class ObjectSerDeUtils {
       return _value;
     }
 
-    /**
-     * @deprecated Avoid using this method because it is very inefficient.
-     */
+    /// @deprecated Avoid using this method because it is very inefficient.
     @Deprecated
     public static ObjectType getObjectType(Object value) {
       if (value instanceof String) {
@@ -324,26 +320,18 @@ public class ObjectSerDeUtils {
     }
   }
 
-  /**
-   * Serializer/De-serializer for a specific type of object.
-   *
-   * @param <T> Type of the object
-   */
+  /// Serializer/De-serializer for a specific type of object.
+  ///
+  /// @param <T> Type of the object
   public interface ObjectSerDe<T> {
 
-    /**
-     * Serializes a value into a byte array.
-     */
+    /// Serializes a value into a byte array.
     byte[] serialize(T value);
 
-    /**
-     * De-serializes a value from a byte array.
-     */
+    /// De-serializes a value from a byte array.
     T deserialize(byte[] bytes);
 
-    /**
-     * De-serializes a value from a byte buffer.
-     */
+    /// De-serializes a value from a byte buffer.
     T deserialize(ByteBuffer byteBuffer);
   }
 
@@ -1124,19 +1112,17 @@ public class ObjectSerDeUtils {
 
     @Override
     public byte[] serialize(TDigest tDigest) {
-      byte[] bytes = new byte[tDigest.byteSize()];
-      tDigest.asBytes(ByteBuffer.wrap(bytes));
-      return bytes;
+      return TDigestUtils.serialize(tDigest);
     }
 
     @Override
     public TDigest deserialize(byte[] bytes) {
-      return MergingDigest.fromBytes(ByteBuffer.wrap(bytes));
+      return TDigestUtils.deserialize(bytes);
     }
 
     @Override
     public TDigest deserialize(ByteBuffer byteBuffer) {
-      return MergingDigest.fromBytes(byteBuffer);
+      return TDigestUtils.deserialize(byteBuffer);
     }
   };
 
@@ -1946,9 +1932,7 @@ public class ObjectSerDeUtils {
   };
   //@formatter:on
 
-  /**
-   * @deprecated Use each individual SER_DE class instead.
-   */
+  /// @deprecated Use each individual SER_DE class instead.
   @Deprecated
   public static byte[] serialize(Object value, int objectTypeValue) {
     return SER_DES[objectTypeValue].serialize(value);

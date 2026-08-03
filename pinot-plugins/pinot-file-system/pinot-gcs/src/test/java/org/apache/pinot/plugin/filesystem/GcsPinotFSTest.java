@@ -57,21 +57,19 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test for GcsPinotFS
- *
- * Credentials to connect to gcs must be supplied via environment variables.
- * The following environment variables are used to connect to gcs:
- * GOOGLE_APPLICATION_CREDENTIALS: path to gcp json key file
- * GCP_PROJECT: the name of the project to use
- * GCS_BUCKET: the name of the bucket to use
- *
- * The reason we do not use RemoteStorageHelper is that create bucket
- * permissions are required. Pinot only needs to test creating objects.
- * The bucket should already exist.
- *
- * If credentials are not supplied then all tests are skipped.
- */
+/// Integration test for GcsPinotFS
+///
+/// Credentials to connect to gcs must be supplied via environment variables.
+/// The following environment variables are used to connect to gcs:
+/// GOOGLE_APPLICATION_CREDENTIALS: path to gcp json key file
+/// GCP_PROJECT: the name of the project to use
+/// GCS_BUCKET: the name of the bucket to use
+///
+/// The reason we do not use RemoteStorageHelper is that create bucket
+/// permissions are required. Pinot only needs to test creating objects.
+/// The bucket should already exist.
+///
+/// If credentials are not supplied then all tests are skipped.
 @Test(singleThreaded = true)
 public class GcsPinotFSTest {
   private static final String DATA_DIR_PREFIX = "testing-data";
@@ -136,13 +134,11 @@ public class GcsPinotFSTest {
     return _dataDir.resolve("dir-" + randomUUID());
   }
 
-  /**
-   * Resolved gcs uri does not contain trailing delimiter, e.g. "/",
-   * as the GcsUri.resolve() method uses Path.resolve() semantics.
-   *
-   * @param gcsUri
-   * @return path with trailing delimiter
-   */
+  /// Resolved gcs uri does not contain trailing delimiter, e.g. "/",
+  /// as the GcsUri.resolve() method uses Path.resolve() semantics.
+  ///
+  /// @param gcsUri
+  /// @return path with trailing delimiter
   private static GcsUri appendSlash(GcsUri gcsUri) {
     return createGcsUri(gcsUri.getBucketName(), gcsUri.getPrefix());
   }

@@ -251,12 +251,10 @@ public class PercentileAggregationFunction extends NullableSingleInputAggregatio
     }
   }
 
-  /**
-   * Returns the value list from the result holder or creates a new one if it does not exist.
-   *
-   * @param aggregationResultHolder Result holder
-   * @return Value list from the result holder
-   */
+  /// Returns the value list from the result holder or creates a new one if it does not exist.
+  ///
+  /// @param aggregationResultHolder Result holder
+  /// @return Value list from the result holder
   protected static DoubleArrayList getValueList(AggregationResultHolder aggregationResultHolder) {
     DoubleArrayList valueList = aggregationResultHolder.getResult();
     if (valueList == null) {
@@ -266,13 +264,11 @@ public class PercentileAggregationFunction extends NullableSingleInputAggregatio
     return valueList;
   }
 
-  /**
-   * Returns the value list for the given group key. If one does not exist, creates a new one and returns that.
-   *
-   * @param groupByResultHolder Result holder
-   * @param groupKey Group key for which to return the value list
-   * @return Value list for the group key
-   */
+  /// Returns the value list for the given group key. If one does not exist, creates a new one and returns that.
+  ///
+  /// @param groupByResultHolder Result holder
+  /// @param groupKey Group key for which to return the value list
+  /// @return Value list for the group key
   protected static DoubleArrayList getValueList(GroupByResultHolder groupByResultHolder, int groupKey) {
     DoubleArrayList valueList = groupByResultHolder.getResult(groupKey);
     if (valueList == null) {

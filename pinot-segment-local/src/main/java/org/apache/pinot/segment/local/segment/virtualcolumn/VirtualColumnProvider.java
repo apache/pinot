@@ -27,10 +27,8 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 
 
-/**
- * Virtual column provider interface, which is used to instantiate the various components (dictionary, reader, etc) that
- * comprise a proper column.
- */
+/// Virtual column provider interface, which is used to instantiate the various components (dictionary, reader, etc)
+/// that comprise a proper column.
 public interface VirtualColumnProvider {
 
   ForwardIndexReader<?> buildForwardIndex(VirtualColumnContext context);

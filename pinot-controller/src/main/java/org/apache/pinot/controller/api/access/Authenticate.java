@@ -25,10 +25,8 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 
-/**
- * Annotation to be used on top of REST endpoints. Methods annotated with this annotation automatically get
- * authenticated in {@link AuthenticationFilter} and if validation passes, then the methods get executed.
- */
+/// Annotation to be used on top of REST endpoints. Methods annotated with this annotation automatically get
+/// authenticated in [AuthenticationFilter] and if validation passes, then the methods get executed.
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 public @interface Authenticate {

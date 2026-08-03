@@ -21,11 +21,9 @@ package org.apache.pinot.query.routing;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 
 
-/**
- * {@code StagePlan} is the deserialized version of the {@link org.apache.pinot.common.proto.Worker.StagePlan}.
- *
- * <p>It is also the extended version of the {@link org.apache.pinot.core.query.request.ServerQueryRequest}.
- */
+/// `StagePlan` is the deserialized version of the [org.apache.pinot.common.proto.Worker.StagePlan].
+///
+/// It is also the extended version of the [org.apache.pinot.core.query.request.ServerQueryRequest].
 public class StagePlan {
   private final PlanNode _rootNode;
   private final StageMetadata _stageMetadata;

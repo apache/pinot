@@ -126,6 +126,7 @@ import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.FixedIntArray;
 import org.apache.pinot.spi.utils.MapUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.BatchIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -374,16 +375,9 @@ public class MutableSegmentImpl implements MutableSegment {
       } else {
         dictionary = null;
         if (!fieldSpec.isSingleValueField()) {
-          // Raw MV columns
-          switch (storedType) {
-            case INT:
-            case LONG:
-            case FLOAT:
-            case DOUBLE:
-              break;
-            default:
-              throw new UnsupportedOperationException(
-                  "Unsupported data type: " + dataType + " for MV no-dictionary column: " + column);
+          if (!dataType.isFixedWidth()) {
+            throw new UnsupportedOperationException(
+                "Unsupported data type: " + dataType + " for MV no-dictionary column: " + column);
           }
         }
       }
@@ -572,12 +566,10 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  /**
-   * Decide whether a given column should be dictionary encoded or not
-   * @param fieldSpec field spec of column
-   * @param column column name
-   * @return true if column is no-dictionary, false if dictionary encoded
-   */
+  /// Decide whether a given column should be dictionary encoded or not
+  /// @param fieldSpec field spec of column
+  /// @param column column name
+  /// @return true if column is no-dictionary, false if dictionary encoded
   private boolean isNoDictionaryColumn(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, String column) {
     DataType dataType = fieldSpec.getDataType();
     if (dataType == DataType.MAP || dataType == DataType.OPEN_STRUCT) {
@@ -734,10 +726,8 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  /**
-   * Updates ingestion timestamp metadata. This is a public function to allow
-   * external components to update the ingestion timestamp metadata without indexing a row.
-   */
+  /// Updates ingestion timestamp metadata. This is a public function to allow
+  /// external components to update the ingestion timestamp metadata without indexing a row.
   public void updateIngestionTimestamp(long recordIngestionTimeMs) {
     long now = System.currentTimeMillis();
     _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, recordIngestionTimeMs);
@@ -773,7 +763,8 @@ public class MutableSegmentImpl implements MutableSegment {
   private Comparable getComparisonValue(GenericRow row) {
     int numComparisonColumns = _upsertComparisonColumns.size();
     if (numComparisonColumns == 1) {
-      return (Comparable) row.getValue(_upsertComparisonColumns.get(0));
+      String comparisonColumn = _upsertComparisonColumns.get(0);
+      return toComparable(row.getValue(comparisonColumn));
     }
 
     Comparable[] comparisonValues = new Comparable[numComparisonColumns];
@@ -790,22 +781,16 @@ public class MutableSegmentImpl implements MutableSegment {
             "Documents must have exactly 1 non-null comparison column value");
 
         comparableIndex = i;
-
-        Object comparisonValue = row.getValue(columnName);
-        Preconditions.checkState(comparisonValue instanceof Comparable,
-            "Upsert comparison column: %s must be comparable", columnName);
-        comparisonValues[i] = (Comparable) comparisonValue;
+        comparisonValues[i] = toComparable(row.getValue(columnName));
       }
     }
     Preconditions.checkState(comparableIndex != -1, "Documents must have exactly 1 non-null comparison column value");
     return new ComparisonColumns(comparisonValues, comparableIndex);
   }
 
-  /**
-   * @param row
-   * @throws UnsupportedOperationException if the length of an MV column would exceed the
-   * capacity of a chunk in the ForwardIndex
-   */
+  /// @param row
+  /// @throws UnsupportedOperationException if the length of an MV column would exceed the
+  /// capacity of a chunk in the ForwardIndex
   private void validateLengthOfMVColumns(GenericRow row)
       throws UnsupportedOperationException {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
@@ -952,14 +937,7 @@ public class MutableSegmentImpl implements MutableSegment {
           // Update min/max value from raw value
           // NOTE: Skip updating min/max value for aggregated metrics because the value will change over time.
           if (!isAggregateMetricsEnabled() || fieldSpec.getFieldType() != FieldSpec.FieldType.METRIC) {
-            Comparable comparable;
-            if (dataType == BYTES) {
-              comparable = new ByteArray((byte[]) value);
-            } else if (dataType == MAP) {
-              comparable = new ByteArray(MapUtils.serializeMap((Map) value));
-            } else {
-              comparable = (Comparable) value;
-            }
+            Comparable comparable = toComparableValue(value, dataType, column);
             if (indexContainer._minValue == null) {
               indexContainer._minValue = comparable;
               indexContainer._maxValue = comparable;
@@ -1010,6 +988,29 @@ public class MutableSegmentImpl implements MutableSegment {
       _multiColumnTextIndex.add(_multiColumnValues);
       Collections.fill(_multiColumnValues, null);
     }
+  }
+
+  /// Wraps a raw comparison-column value as a Comparable without a per-row schema lookup: a byte[] (a BYTES or UUID
+  /// comparison column) becomes a ByteArray; every other type is already Comparable. Mirrors
+  /// UpsertUtils.SingleComparisonColumnReader so the write and read paths agree.
+  private static Comparable toComparable(Object value) {
+    if (value instanceof byte[]) {
+      return new ByteArray((byte[]) value);
+    }
+    Preconditions.checkState(value instanceof Comparable, "Upsert comparison column value must be comparable: %s",
+        value);
+    return (Comparable) value;
+  }
+
+  private Comparable toComparableValue(Object value, DataType dataType, @Nullable String columnName) {
+    if (dataType == MAP) {
+      return new ByteArray(MapUtils.serializeMap((Map) value));
+    }
+    if (dataType.getStoredType() == BYTES) {
+      return new ByteArray((byte[]) value);
+    }
+    Preconditions.checkState(value instanceof Comparable, "Column: %s must be comparable", columnName);
+    return (Comparable) value;
   }
 
   private void updateIndexCapacityThresholdBreached(MutableIndex mutableIndex, IndexType indexType, String column) {
@@ -1293,11 +1294,9 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  /**
-   * Calls commit() on all mutable indexes. This is used in preparation for realtime segment conversion.
-   * .commit() can be implemented per index to perform any required actions before using mutable segment
-   * artifacts to optimize immutable segment build.
-   */
+  /// Calls commit() on all mutable indexes. This is used in preparation for realtime segment conversion.
+  /// .commit() can be implemented per index to perform any required actions before using mutable segment
+  /// artifacts to optimize immutable segment build.
   public void commit() {
     for (IndexContainer indexContainer : _indexContainerMap.values()) {
       for (MutableIndex mutableIndex : indexContainer._mutableIndexes.values()) {
@@ -1310,10 +1309,8 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  /**
-   * Returns the per-column mutable OPEN_STRUCT index, or {@code null} if the column is not OPEN_STRUCT
-   * or the index has not been initialized.
-   */
+  /// Returns the per-column mutable OPEN_STRUCT index, or `null` if the column is not OPEN_STRUCT
+  /// or the index has not been initialized.
   @Nullable
   public MutableOpenStructIndex getOpenStructIndex(String column) {
     IndexContainer container = _indexContainerMap.get(column);
@@ -1466,7 +1463,8 @@ public class MutableSegmentImpl implements MutableSegment {
       docIds[i] = i;
     }
 
-    DataType storedType = indexContainer._fieldSpec.getDataType().getStoredType();
+    DataType dataType = indexContainer._fieldSpec.getDataType();
+    DataType storedType = dataType.getStoredType();
     switch (storedType) {
       case INT:
         IntArrays.quickSort(docIds, (d1, d2) -> Integer.compare(forwardIndex.getInt(d1), forwardIndex.getInt(d2)));
@@ -1488,8 +1486,13 @@ public class MutableSegmentImpl implements MutableSegment {
         IntArrays.quickSort(docIds, (d1, d2) -> forwardIndex.getString(d1).compareTo(forwardIndex.getString(d2)));
         break;
       case BYTES:
-        IntArrays.quickSort(docIds,
-            (d1, d2) -> ByteArray.compare(forwardIndex.getBytes(d1), forwardIndex.getBytes(d2)));
+        if (dataType == DataType.UUID) {
+          IntArrays.quickSort(docIds,
+              (d1, d2) -> UuidUtils.compare(forwardIndex.getBytes(d1), forwardIndex.getBytes(d2)));
+        } else {
+          IntArrays.quickSort(docIds,
+              (d1, d2) -> ByteArray.compare(forwardIndex.getBytes(d1), forwardIndex.getBytes(d2)));
+        }
         break;
       default:
         throw new UnsupportedOperationException(
@@ -1499,15 +1502,10 @@ public class MutableSegmentImpl implements MutableSegment {
     return docIds;
   }
 
-  /**
-   * Helper function that returns docId, depends on the following scenarios.
-   * <ul>
-   *   <li> If metrics aggregation is enabled and if the dimension values were already seen, return existing docIds
-   *   </li>
-   *   <li> Else, this function will create and return a new docId. </li>
-   * </ul>
-   *
-   * */
+  /// Helper function that returns docId, depends on the following scenarios.
+  ///
+  /// - If metrics aggregation is enabled and if the dimension values were already seen, return existing docIds
+  /// - Else, this function will create and return a new docId.
   private int getOrCreateDocId() {
     if (!isAggregateMetricsEnabled()) {
       return _numDocsIndexed;
@@ -1627,12 +1625,10 @@ public class MutableSegmentImpl implements MutableSegment {
       _maxNumValuesPerMVEntry = Math.max(_maxNumValuesPerMVEntry, numValuesInMVEntry);
     }
 
-    /**
-     * When an MV VarByte column is created with noDict, the realtime segment is still created with a dictionary.
-     * When the realtime segment is converted to offline segment, the offline segment creates a noDict column.
-     * MultiValueVarByteRawIndexCreator requires the maxRowLengthInBytes. Refer to OSS issue
-     * https://github.com/apache/pinot/issues/10127 for more details.
-     */
+    /// When an MV VarByte column is created with noDict, the realtime segment is still created with a dictionary.
+    /// When the realtime segment is converted to offline segment, the offline segment creates a noDict column.
+    /// MultiValueVarByteRawIndexCreator requires the maxRowLengthInBytes. Refer to OSS issue
+    /// https://github.com/apache/pinot/issues/10127 for more details.
     void updateVarByteMVMaxRowLengthInBytes(Object entry, DataType dataType) {
       // MV support for BigDecimal is not available.
       if (dataType != STRING && dataType != BYTES) {
@@ -1679,15 +1675,11 @@ public class MutableSegmentImpl implements MutableSegment {
     volatile Comparable _minValue;
     volatile Comparable _maxValue;
 
-    /**
-     * The dictionary id for the latest single-value record.
-     * It is set on {@link #updateDictionary(GenericRow)} and read in {@link #addNewRow(int, GenericRow)}
-     */
+    /// The dictionary id for the latest single-value record.
+    /// It is set on [#updateDictionary(GenericRow)] and read in [#addNewRow(int, GenericRow)]
     int _dictId = Integer.MIN_VALUE;
-    /**
-     * The dictionary ids for the latest multi-value record.
-     * It is set on {@link #updateDictionary(GenericRow)} and read in {@link #addNewRow(int, GenericRow)}
-     */
+    /// The dictionary ids for the latest multi-value record.
+    /// It is set on [#updateDictionary(GenericRow)] and read in [#addNewRow(int, GenericRow)]
     int[] _dictIds;
 
     IndexContainer(FieldSpec fieldSpec, @Nullable PartitionFunction partitionFunction,

@@ -39,25 +39,23 @@ import org.apache.pinot.spi.utils.TimestampUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The <code>CaseTransformFunction</code> class implements the CASE-WHEN-THEN-ELSE transformation.
- * <p>
- * The SQL Syntax is: CASE WHEN condition1 THEN result1 WHEN condition2 THEN result2 WHEN conditionN THEN resultN ELSE
- * result END;
- * <p>
- * Usage: case(${WHEN_STATEMENT_1}, ${THEN_EXPRESSION_1}, ..., ${WHEN_STATEMENT_N}, ${THEN_EXPRESSION_N}, ...,
- * ${ELSE_EXPRESSION})
- * <p>
- * There are 2 * N + 1 arguments:
- * <code>WHEN_STATEMENT_$i</code> is a <code>BinaryOperatorTransformFunction</code> represents <code>condition$i</code>
- * <code>THEN_EXPRESSION_$i</code> is a <code>TransformFunction</code> represents <code>result$i</code>
- * <code>ELSE_EXPRESSION</code> is a <code>TransformFunction</code> represents <code>result</code>
- * <p>
- * ELSE_EXPRESSION can be omitted. When none of when statements is evaluated to be true, and there is no else
- * expression, we output null. Note that when statement is considered as false if it is evaluated to be null.
- * <p>
- * PostgreSQL documentation: <a href="https://www.postgresql.org/docs/current/typeconv-union-case.html">CASE</a>
- */
+/// The `CaseTransformFunction` class implements the CASE-WHEN-THEN-ELSE transformation.
+///
+/// The SQL Syntax is: CASE WHEN condition1 THEN result1 WHEN condition2 THEN result2 WHEN conditionN THEN resultN ELSE
+/// result END;
+///
+/// Usage: case(${WHEN_STATEMENT_1}, ${THEN_EXPRESSION_1}, ..., ${WHEN_STATEMENT_N}, ${THEN_EXPRESSION_N}, ...,
+/// ${ELSE_EXPRESSION})
+///
+/// There are 2 \* N + 1 arguments:
+/// `WHEN_STATEMENT_$i` is a `BinaryOperatorTransformFunction` represents `condition$i`
+/// `THEN_EXPRESSION_$i` is a `TransformFunction` represents `result$i`
+/// `ELSE_EXPRESSION` is a `TransformFunction` represents `result`
+///
+/// ELSE_EXPRESSION can be omitted. When none of when statements is evaluated to be true, and there is no else
+/// expression, we output null. Note that when statement is considered as false if it is evaluated to be null.
+///
+/// PostgreSQL documentation: [CASE](https://www.postgresql.org/docs/current/typeconv-union-case.html)
 public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEnabledTransformFunction {
   public static final String FUNCTION_NAME = "case";
 
@@ -225,10 +223,8 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     return _resultMetadata;
   }
 
-  /**
-   * Evaluate the ValueBlock for the WHEN statements, returns an array with the index(1 to N) of matched WHEN clause -1
-   * means there is no match.
-   */
+  /// Evaluate the ValueBlock for the WHEN statements, returns an array with the index(1 to N) of matched WHEN clause -1
+  /// means there is no match.
   private int[] getSelectedArray(ValueBlock valueBlock, boolean nullHandlingEnabled) {
     int numDocs = valueBlock.getNumDocs();
     if (_selectedResults == null || _selectedResults.length < numDocs) {

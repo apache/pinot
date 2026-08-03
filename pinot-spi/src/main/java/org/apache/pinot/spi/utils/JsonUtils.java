@@ -210,9 +210,7 @@ public class JsonUtils {
     }
   }
 
-  /**
-   * Reads the first json object from the file that can contain multiple objects
-   */
+  /// Reads the first json object from the file that can contain multiple objects
   @Nullable
   public static JsonNode fileToFirstJsonNode(File jsonFile)
       throws IOException {
@@ -376,46 +374,46 @@ public class JsonUtils {
     }
   }
 
-  /**
-   * Flattens the given json node.
-   * <p>Json array will be flattened into multiple records, where each record has a special key to store the index of
-   * the element.
-   * <pre>
-   * E.g.
-   * {
-   *   "name": "adam",
-   *   "addresses": [
-   *     {
-   *       "country": "us",
-   *       "street": "main st",
-   *       "number": 1
-   *     },
-   *     {
-   *       "country": "ca",
-   *       "street": "second st",
-   *       "number": 2
-   *     }
-   *   ]
-   * }
-   * -->
-   * [
-   *   {
-   *     ".name": "adam",
-   *     ".addresses.$index": "0",
-   *     ".addresses..country": "us",
-   *     ".addresses..street": "main st",
-   *     ".addresses..number": "1"
-   *   },
-   *   {
-   *     ".name": "adam",
-   *     ".addresses.$index": "1",
-   *     ".addresses..country": "ca",
-   *     ".addresses..street": "second st",
-   *     ".addresses..number": "2"
-   *   }
-   * ]
-   * </pre>
-   */
+  /// Flattens the given json node.
+  ///
+  /// Json array will be flattened into multiple records, where each record has a special key to store the index of
+  /// the element.
+  ///
+  /// ```
+  /// E.g.
+  /// {
+  ///   "name": "adam",
+  ///   "addresses": [
+  ///     {
+  ///       "country": "us",
+  ///       "street": "main st",
+  ///       "number": 1
+  ///     },
+  ///     {
+  ///       "country": "ca",
+  ///       "street": "second st",
+  ///       "number": 2
+  ///     }
+  ///   ]
+  /// }
+  /// -->
+  /// [
+  ///   {
+  ///     ".name": "adam",
+  ///     ".addresses.$index": "0",
+  ///     ".addresses..country": "us",
+  ///     ".addresses..street": "main st",
+  ///     ".addresses..number": "1"
+  ///   },
+  ///   {
+  ///     ".name": "adam",
+  ///     ".addresses.$index": "1",
+  ///     ".addresses..country": "ca",
+  ///     ".addresses..street": "second st",
+  ///     ".addresses..number": "2"
+  ///   }
+  /// ]
+  /// ```
   protected static List<Map<String, String>> flatten(JsonNode node, JsonIndexConfig jsonIndexConfig) {
     try {
       return flatten(node, jsonIndexConfig, 0, "$", false, createTree(jsonIndexConfig));
@@ -720,9 +718,7 @@ public class JsonUtils {
     }
   }
 
-  /**
-   * Returns the data type stored in Pinot that is associated with the given Avro type.
-   */
+  /// Returns the data type stored in Pinot that is associated with the given Avro type.
   public static DataType valueOf(JsonNode jsonNode) {
     if (jsonNode.isInt()) {
       return DataType.INT;
@@ -787,13 +783,11 @@ public class JsonUtils {
     }
   }
 
-  /**
-   * Generates the JsonSchemaTreeNode tree from the given json index config indexPaths to represent which path we
-   * should flatten/index in the json record.
-   * @param jsonIndexConfig
-   * @return the root node of the json index paths tree
-   * @throws IllegalArgumentException
-   */
+  /// Generates the JsonSchemaTreeNode tree from the given json index config indexPaths to represent which path we
+  /// should flatten/index in the json record.
+  /// @param jsonIndexConfig
+  /// @return the root node of the json index paths tree
+  /// @throws IllegalArgumentException
   private static JsonSchemaTreeNode createTree(JsonIndexConfig jsonIndexConfig)
       throws IllegalArgumentException {
     Set<String> indexPaths = jsonIndexConfig.getIndexPaths();
@@ -819,28 +813,26 @@ public class JsonUtils {
   }
 }
 
-/**
- * JsonSchemaTreeNode represents the tree node when we construct the json schema tree.
- * This tree is used to represent how we want to flatten/index the json according to the {@link JsonIndexConfig}.
- * The node could be either leaf node or non-leaf node. Both types of node could hold the volume to indicate whether
- * we should flatten/index the json at this node.
- * For example, the config with *.*, a.b.*.*, a.b.x, a.b.c.**, a.b.d.*.*, e.f.g will have the following tree
- * structure:
- * root -- * -- *
- *      -- a -- b -- * -- *
- *                -- c -- **
- *                -- d -- * -- *
- *      -- e -- f -- g
- * The path structure is defined as:
- *  each key is separated by '.'
- *  the key without wildcard represents single value field
- *  the key "*" represents any types of single node
- *  the key "**" represents any types of leaf node OR a subtree with all its children
- * When multiple conditions are matched, e.g. a.b.c, it would match with priority:
- * 1. **
- * 2. exact match (either single value or array value)
- * 3. *
- */
+/// JsonSchemaTreeNode represents the tree node when we construct the json schema tree.
+/// This tree is used to represent how we want to flatten/index the json according to the [JsonIndexConfig].
+/// The node could be either leaf node or non-leaf node. Both types of node could hold the volume to indicate whether
+/// we should flatten/index the json at this node.
+/// For example, the config with \*.\*, a.b.\*.\*, a.b.x, a.b.c.\*\*, a.b.d.\*.\*, e.f.g will have the following tree
+/// structure:
+/// root -- \* -- \*
+///      -- a -- b -- \* -- \*
+///                -- c -- \*\*
+///                -- d -- \* -- \*
+///      -- e -- f -- g
+/// The path structure is defined as:
+///  each key is separated by '.'
+///  the key without wildcard represents single value field
+///  the key "\*" represents any types of single node
+///  the key "\*\*" represents any types of leaf node OR a subtree with all its children
+/// When multiple conditions are matched, e.g. a.b.c, it would match with priority:
+/// 1. \*\*
+/// 2. exact match (either single value or array value)
+/// 3. \*
 class JsonSchemaTreeNode {
   private Map<String, JsonSchemaTreeNode> _children;
   private JsonSchemaTreeNode _gloabalWildcardChild;
@@ -852,12 +844,10 @@ class JsonSchemaTreeNode {
     _children = new HashMap<>();
   }
 
-  /**
-   * If does not have the child node, add a child node to the current node and return the child node.
-   * If the child node already exists, return the existing child node.
-   * @param key
-   * @return child
-   */
+  /// If does not have the child node, add a child node to the current node and return the child node.
+  /// If the child node already exists, return the existing child node.
+  /// @param key
+  /// @return child
   public JsonSchemaTreeNode getAndCreateChild(String key) {
     // if .** is already added, no need to add any child
     if (_gloabalWildcardChild != null) {

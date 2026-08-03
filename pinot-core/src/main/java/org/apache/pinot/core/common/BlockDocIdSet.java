@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.common;
 
-import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.EmptyDocIdIterator;
@@ -33,36 +32,27 @@ import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * The {@code BlockDocIdSet} contains the matching document ids returned by the {@link FilterBlock}.
- */
+/// The `BlockDocIdSet` contains the matching document ids returned by the
+/// [org.apache.pinot.core.operator.blocks.FilterBlock].
 public interface BlockDocIdSet {
 
-  /**
-   * Returns an iterator of the matching document ids. The document ids returned from the iterator should be in
-   * ascending order.
-   */
+  /// Returns an iterator of the matching document ids. The document ids returned from the iterator should be in
+  /// ascending order.
   BlockDocIdIterator iterator();
 
-  /**
-   * Returns the number of entries (SV value contains one entry, MV value contains multiple entries) scanned in the
-   * filtering phase. This method should be called after the filtering is done.
-   */
+  /// Returns the number of entries (SV value contains one entry, MV value contains multiple entries) scanned in the
+  /// filtering phase. This method should be called after the filtering is done.
   long getNumEntriesScannedInFilter();
 
 
 
-  /**
-   * Returns an optimized version of this DocIdSet, potentially returning EmptyDocIdSet or MatchAllDocIdSet
-   * when appropriate, following the same pattern as filter operators.
-   */
+  /// Returns an optimized version of this DocIdSet, potentially returning EmptyDocIdSet or MatchAllDocIdSet
+  /// when appropriate, following the same pattern as filter operators.
   default BlockDocIdSet getOptimizedDocIdSet() {
     return this;
   }
 
-  /**
-   * For scan-based FilterBlockDocIdSet, pre-scans the documents and returns a non-scan-based FilterBlockDocIdSet.
-   */
+  /// For scan-based FilterBlockDocIdSet, pre-scans the documents and returns a non-scan-based FilterBlockDocIdSet.
   default BlockDocIdSet toNonScanDocIdSet() {
     BlockDocIdIterator docIdIterator = iterator();
     // NOTE: AND and OR DocIdIterator might contain scan-based DocIdIterator

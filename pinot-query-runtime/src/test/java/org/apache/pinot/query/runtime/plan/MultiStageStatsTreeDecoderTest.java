@@ -34,14 +34,10 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit tests for {@link MultiStageStatsTreeDecoder} and {@link StageStatsTreeNode#merge(StageStatsTreeNode)}.
- */
+/// Unit tests for [MultiStageStatsTreeDecoder] and [StageStatsTreeNode#merge(StageStatsTreeNode)].
 public class MultiStageStatsTreeDecoderTest {
 
-  /**
-   * Round-trip: build a proto tree by hand, decode it, verify shape, planNodeIds, and stat-map contents.
-   */
+  /// Round-trip: build a proto tree by hand, decode it, verify shape, planNodeIds, and stat-map contents.
   @Test
   public void testDecodeRoundTrip()
       throws Exception {
@@ -84,9 +80,7 @@ public class MultiStageStatsTreeDecoderTest {
     Assert.assertTrue(receive.getChildren().isEmpty());
   }
 
-  /**
-   * Merging two trees of the same shape sums the counters per node.
-   */
+  /// Merging two trees of the same shape sums the counters per node.
   @Test
   public void testMergeSameShape()
       throws Exception {
@@ -101,9 +95,7 @@ public class MultiStageStatsTreeDecoderTest {
     Assert.assertEquals(merged.getLong(AggregateOperator.StatKey.EMITTED_ROWS), 12);
   }
 
-  /**
-   * Merging a tree with mismatched operator type at the root throws ShapeMismatchException.
-   */
+  /// Merging a tree with mismatched operator type at the root throws ShapeMismatchException.
   @Test(expectedExceptions = StageStatsTreeNode.ShapeMismatchException.class)
   public void testMergeTypeMismatchThrows()
       throws Exception {
@@ -114,9 +106,7 @@ public class MultiStageStatsTreeDecoderTest {
     a.merge(b);
   }
 
-  /**
-   * Merging a tree with a different number of children throws ShapeMismatchException.
-   */
+  /// Merging a tree with a different number of children throws ShapeMismatchException.
   @Test(expectedExceptions = StageStatsTreeNode.ShapeMismatchException.class)
   public void testMergeArityMismatchThrows()
       throws Exception {
@@ -129,10 +119,8 @@ public class MultiStageStatsTreeDecoderTest {
     a.merge(b);
   }
 
-  /**
-   * Decoder rejects an unknown operator type id with DecodeFailedException — exercises mixed-version safety where a
-   * newer server emits a type id this older broker doesn't recognise.
-   */
+  /// Decoder rejects an unknown operator type id with DecodeFailedException — exercises mixed-version safety where a
+  /// newer server emits a type id this older broker doesn't recognise.
   @Test(expectedExceptions = MultiStageStatsTreeDecoder.DecodeFailedException.class)
   public void testDecodeUnknownTypeThrows()
       throws Exception {
@@ -146,10 +134,8 @@ public class MultiStageStatsTreeDecoderTest {
     MultiStageStatsTreeDecoder.decode(proto);
   }
 
-  /**
-   * A chain exactly at the depth limit (MAX_OPERATOR_TREE_DEPTH nodes → leaf at decode-depth
-   * MAX_OPERATOR_TREE_DEPTH - 1) must decode successfully.
-   */
+  /// A chain exactly at the depth limit (MAX_OPERATOR_TREE_DEPTH nodes → leaf at decode-depth
+  /// MAX_OPERATOR_TREE_DEPTH - 1) must decode successfully.
   @Test
   public void testDecodeAtDepthLimitSucceeds()
       throws Exception {
@@ -158,10 +144,8 @@ public class MultiStageStatsTreeDecoderTest {
     MultiStageStatsTreeDecoder.decodeNode(chain);
   }
 
-  /**
-   * A chain one node beyond the depth limit (MAX_OPERATOR_TREE_DEPTH + 1 nodes → leaf at decode-depth
-   * MAX_OPERATOR_TREE_DEPTH) must be rejected with DecodeFailedException.
-   */
+  /// A chain one node beyond the depth limit (MAX_OPERATOR_TREE_DEPTH + 1 nodes → leaf at decode-depth
+  /// MAX_OPERATOR_TREE_DEPTH) must be rejected with DecodeFailedException.
   @Test(expectedExceptions = MultiStageStatsTreeDecoder.DecodeFailedException.class)
   public void testDecodeExceedsDepthLimitThrows()
       throws Exception {
@@ -172,11 +156,9 @@ public class MultiStageStatsTreeDecoderTest {
 
   // ---- helpers ----
 
-  /**
-   * Builds a linear chain of {@code size} nodes: root wraps a child, which wraps a child, ... down to a single leaf.
-   * The chain has {@code size} nodes total; the leaf is at decode-depth {@code size - 1} when decoded recursively
-   * from the root (depth 0). Each node carries a valid (empty) serialized StatMap so deserialization succeeds.
-   */
+  /// Builds a linear chain of `size` nodes: root wraps a child, which wraps a child, ... down to a single leaf.
+  /// The chain has `size` nodes total; the leaf is at decode-depth `size - 1` when decoded recursively
+  /// from the root (depth 0). Each node carries a valid (empty) serialized StatMap so deserialization succeeds.
   private static Worker.StageStatsNode buildChain(int size)
       throws IOException {
     ByteString emptyReceiveStat = serialize(new StatMap<>(BaseMailboxReceiveOperator.StatKey.class));

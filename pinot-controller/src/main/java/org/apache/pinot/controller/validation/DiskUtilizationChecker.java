@@ -59,9 +59,7 @@ public class DiskUtilizationChecker implements UtilizationChecker {
     return DiskUtilizationChecker.class.getSimpleName();
   }
 
-  /**
-   * Check if disk utilization for the requested table is within the configured limits.
-   */
+  /// Check if disk utilization for the requested table is within the configured limits.
   @Override
   public CheckResult isResourceUtilizationWithinLimits(String tableNameWithType, CheckPurpose purpose) {
     if (StringUtils.isEmpty(tableNameWithType)) {
@@ -114,9 +112,7 @@ public class DiskUtilizationChecker implements UtilizationChecker {
     return numInstancesWithStaleOrNullResults == instances.size() ? CheckResult.UNDETERMINED : CheckResult.PASS;
   }
 
-  /**
-   * Compute disk utilization for the requested instances using the <code>CompletionServiceHelper</code>.
-   */
+  /// Compute disk utilization for the requested instances using the `CompletionServiceHelper`.
   @Override
   public void computeResourceUtilization(BiMap<String, String> endpointsToInstances,
       CompletionServiceHelper completionServiceHelper) {

@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.segment.local.customobject.SerializedTDigest;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.Test;
 
@@ -54,16 +55,82 @@ public class PercentileRawTDigestAggregationFunctionTest {
         new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(small)));
     assertTrue(intermediateResult instanceof PercentileTDigestAccumulator);
 
-    byte[] serialized = BytesUtils.toBytes(function.extractFinalResult(intermediateResult).toString());
+    SerializedTDigest finalResult = function.extractFinalResult(intermediateResult);
+    byte[] serialized = BytesUtils.toBytes(finalResult.toString());
+    assertLegacyCompatibleShape(serialized, compression);
 
     // Client side: a plain t-digest reader must be able to read the emitted bytes without losing
     // state. Before the fix this threw ArrayIndexOutOfBoundsException because the final result was
     // re-encoded as a verbose digest with more centroids than the reader allocates.
     TDigest roundTripped = MergingDigest.fromBytes(ByteBuffer.wrap(serialized));
-    assertEquals(roundTripped.size(), numCentroids);
-    assertEquals(roundTripped.quantile(0.0), 0.0);
-    assertEquals(roundTripped.quantile(0.5), (numCentroids - 1.0) / 2.0, 1.0);
-    assertEquals(roundTripped.quantile(1.0), numCentroids - 1.0);
+    assertUnitCentroidDigest(roundTripped, numCentroids);
+
+    // Also cover the materialized (merged) accumulator state, not just the serialized pass-through.
+    TDigest merged = function.merge(intermediateResult, function.deserializeIntermediateResult(
+        new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(small))));
+    byte[] mergedSerialized = BytesUtils.toBytes(function.extractFinalResult(merged).toString());
+    assertLegacyCompatibleShape(mergedSerialized, compression);
+    TDigest mergedRoundTripped = MergingDigest.fromBytes(ByteBuffer.wrap(mergedSerialized));
+    assertEquals(mergedRoundTripped.size(), 2L * numCentroids);
+    assertEquals(mergedRoundTripped.quantile(0.5), (numCentroids - 1.0) / 2.0, 1.0);
+  }
+
+  @Test
+  public void testFinalResultRoundTripForRegularDigest() {
+    double compression = 100.0;
+    TDigest input = TDigest.createMergingDigest(compression);
+    for (int i = 0; i < 1000; i++) {
+      input.add(i);
+    }
+    byte[] bytes = new byte[input.byteSize()];
+    input.asBytes(ByteBuffer.wrap(bytes));
+
+    PercentileRawTDigestAggregationFunction function =
+        new PercentileRawTDigestAggregationFunction(EXPRESSION, 50.0, (int) compression, false);
+    TDigest intermediateResult = function.deserializeIntermediateResult(
+        new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(bytes)));
+
+    SerializedTDigest finalResult = function.extractFinalResult(intermediateResult);
+    byte[] serialized = BytesUtils.toBytes(finalResult.toString());
+    TDigest roundTripped = MergingDigest.fromBytes(ByteBuffer.wrap(serialized));
+    assertEquals(roundTripped.size(), 1000);
+    assertEquals(roundTripped.quantile(0.5), input.quantile(0.5), 1e-6);
+  }
+
+  /// A verbose digest with more centroids than a t-digest 3.2 reader of the same compression allocates is accepted
+  /// since the 3.3 upgrade, but the emitted final result must stay readable by legacy readers.
+  @Test
+  public void testAccumulatorFinalSerializationIsLegacyCompatibleAtLowCompression() {
+    PercentileRawTDigestAggregationFunction function =
+        new PercentileRawTDigestAggregationFunction(EXPRESSION, 50.0, 20, false);
+    byte[] verbose = createVerboseUnitCentroidDigest(51, 20.0);
+    TDigest intermediateResult = function.deserializeIntermediateResult(
+        new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(verbose)));
+    assertTrue(intermediateResult instanceof PercentileTDigestAccumulator);
+
+    SerializedTDigest finalResult = function.extractFinalResult(intermediateResult);
+    byte[] serialized = BytesUtils.toBytes(finalResult.toString());
+    assertLegacyCompatibleShape(serialized, 20.0);
+
+    TDigest roundTripped = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(serialized);
+    assertEquals(roundTripped.compression(), 20.0);
+    assertUnitCentroidDigest(roundTripped, 51);
+  }
+
+  /// Verbose-encoded digest (encoding 1) with unit-weight centroids at means 0..numCentroids-1. Package-private:
+  /// shared with [PercentileSmartTDigestAggregationFunctionTest].
+  static byte[] createVerboseUnitCentroidDigest(int numCentroids, double compression) {
+    ByteBuffer buffer = ByteBuffer.allocate(4 * Integer.BYTES + 2 * Double.BYTES + 2 * Double.BYTES * numCentroids);
+    buffer.putInt(1);
+    buffer.putDouble(0.0);
+    buffer.putDouble(numCentroids - 1.0);
+    buffer.putDouble(compression);
+    buffer.putInt(numCentroids);
+    for (int i = 0; i < numCentroids; i++) {
+      buffer.putDouble(1.0);
+      buffer.putDouble(i);
+    }
+    return buffer.array();
   }
 
   /// SMALL-encoded digest (encoding 2) with explicit main/buffer capacities, unit-weight centroids
@@ -86,5 +153,25 @@ public class PercentileRawTDigestAggregationFunctionTest {
       buffer.putFloat(i);
     }
     return buffer.array();
+  }
+
+  private static void assertLegacyCompatibleShape(byte[] bytes, double compression) {
+    ByteBuffer buffer = ByteBuffer.wrap(bytes);
+    int encoding = buffer.getInt();
+    if (encoding == 1) {
+      assertEquals(buffer.getDouble(Integer.BYTES + 2 * Double.BYTES), compression);
+      int centroidCount = buffer.getInt(Integer.BYTES + 3 * Double.BYTES);
+      assertTrue(centroidCount <= 2 * Math.ceil(compression) + 10,
+          "Verbose encoding exceeds the fresh MergingDigest centroid capacity: " + centroidCount);
+    } else {
+      assertEquals(encoding, 2, "Unexpected t-digest encoding");
+    }
+  }
+
+  private static void assertUnitCentroidDigest(TDigest digest, int expectedSize) {
+    assertEquals(digest.size(), expectedSize);
+    assertEquals(digest.quantile(0.0), 0.0);
+    assertEquals(digest.quantile(0.5), (expectedSize - 1.0) / 2.0, 1.0);
+    assertEquals(digest.quantile(1.0), expectedSize - 1.0);
   }
 }

@@ -21,9 +21,7 @@ package org.apache.pinot.core.query.aggregation.groupby.utils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Factory for various implementations for {@link ValueToIdMap}
- */
+/// Factory for various implementations for [ValueToIdMap]
 public class ValueToIdMapFactory {
   private ValueToIdMapFactory() {
   }

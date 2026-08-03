@@ -29,19 +29,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 
 
-/**
- * ScalingThreadPoolExecutor is an auto-scaling ThreadPoolExecutor. If there is no available thread for a new task,
- * a new thread will be created by the internal ThreadPoolExecutor to process the task (up to maximumPoolSize). If
- * there is an available thread, no additional thread will be created.
- * <p>
- * This is done by creating a ScalingQueue that will 'reject' a new task if there are no available threads, forcing
- * the pool to create a new thread. The rejection is then handled to queue the task anyway.
- * <p>
- * This differs from the plain ThreadPoolExecutor implementation which does not create new threads if the queue (not
- * thread pool) has capacity. For a more complete explanation, see (note: the original version includes a race
- * condition, and the implementation here differs slightly):
- * https://github.com/kimchy/kimchy.github.com/blob/master/_posts/2008-11-23-juc-executorservice-gotcha.textile
- */
+/// ScalingThreadPoolExecutor is an auto-scaling ThreadPoolExecutor. If there is no available thread for a new task,
+/// a new thread will be created by the internal ThreadPoolExecutor to process the task (up to maximumPoolSize). If
+/// there is an available thread, no additional thread will be created.
+///
+/// This is done by creating a ScalingQueue that will 'reject' a new task if there are no available threads, forcing
+/// the pool to create a new thread. The rejection is then handled to queue the task anyway.
+///
+/// This differs from the plain ThreadPoolExecutor implementation which does not create new threads if the queue (not
+/// thread pool) has capacity. For a more complete explanation, see (note: the original version includes a race
+/// condition, and the implementation here differs slightly):
+/// https://github.com/kimchy/kimchy.github.com/blob/master/\_posts/2008-11-23-juc-executorservice-gotcha.textile
 public class ScalingThreadPoolExecutor extends ThreadPoolExecutor {
   private final AtomicInteger _activeCount = new AtomicInteger();
 
@@ -65,14 +63,12 @@ public class ScalingThreadPoolExecutor extends ThreadPoolExecutor {
     _activeCount.decrementAndGet();
   }
 
-  /**
-   * Creates a new ScalingThreadPoolExecutor
-   *
-   * @param min minimum pool size
-   * @param max maximum pool size
-   * @param keepAliveTime idle thread keepAliveTime (milliseconds)
-   * @return auto-scaling ExecutorService
-   */
+  /// Creates a new ScalingThreadPoolExecutor
+  ///
+  /// @param min minimum pool size
+  /// @param max maximum pool size
+  /// @param keepAliveTime idle thread keepAliveTime (milliseconds)
+  /// @return auto-scaling ExecutorService
   public static ExecutorService newScalingThreadPool(int min, int max, long keepAliveTime) {
     ScalingQueue<Runnable> queue = new ScalingQueue<>();
     ThreadPoolExecutor executor = new ScalingThreadPoolExecutor(min, max, keepAliveTime, TimeUnit.MILLISECONDS, queue);
@@ -80,10 +76,8 @@ public class ScalingThreadPoolExecutor extends ThreadPoolExecutor {
     return executor;
   }
 
-  /**
-   * Used to handle queue rejections. The policy ensures we still queue the Runnable, and the rejection ensures the pool
-   * will be expanded if necessary
-   */
+  /// Used to handle queue rejections. The policy ensures we still queue the Runnable, and the rejection ensures the
+  /// pool will be expanded if necessary
   static class ForceQueuePolicy implements RejectedExecutionHandler {
     public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
       try {
@@ -95,9 +89,8 @@ public class ScalingThreadPoolExecutor extends ThreadPoolExecutor {
     }
   }
 
-  /**
-   * Used to reject new elements if there is no available thread. Rejections will be handled by {@link ForceQueuePolicy}
-   */
+  /// Used to reject new elements if there is no available thread. Rejections will be handled by
+  /// [ForceQueuePolicy]
   static class ScalingQueue<E> extends LinkedBlockingQueue<E> {
 
     AtomicInteger _currentIdleThreadCount = new AtomicInteger(0);
@@ -130,13 +123,11 @@ public class ScalingThreadPoolExecutor extends ThreadPoolExecutor {
       }
     }
 
-    /**
-     * Inserts the specified element at the tail of this queue if there is at least one idle thread
-     * to run the current task. If all pool threads are actively busy, the offer is rejected.
-     *
-     * @param e the element to add.
-     * @return true if it was possible to add the element to this queue, else false
-     */
+    /// Inserts the specified element at the tail of this queue if there is at least one idle thread
+    /// to run the current task. If all pool threads are actively busy, the offer is rejected.
+    ///
+    /// @param e the element to add.
+    /// @return true if it was possible to add the element to this queue, else false
     @Override
     public boolean offer(E e) {
       return _currentIdleThreadCount.get() > 0 && super.offer(e);

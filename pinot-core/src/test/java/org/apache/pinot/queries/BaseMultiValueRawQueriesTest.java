@@ -44,24 +44,22 @@ import org.testng.annotations.BeforeTest;
 import static org.testng.Assert.assertNotNull;
 
 
-/**
- * The <code>BaseMultiValueQueriesTest</code> class sets up the index segment for the multi-value queries test.
- * <p>There are totally 14 columns, 100000 records inside the original Avro file where 10 columns are selected to build
- * the index segment. Selected columns information are as following:
- * <ul>
- *   ColumnName, FieldType, DataType, Cardinality, IsSorted, HasInvertedIndex, IsMultiValueRaw
- *   <li>column1, METRIC, INT, 51594, F, F, F</li>
- *   <li>column2, METRIC, INT, 42242, F, F, F</li>
- *   <li>column3, DIMENSION, STRING, 5, F, T, F</li>
- *   <li>column5, DIMENSION, STRING, 9, F, F, F</li>
- *   <li>column6, DIMENSION, INT, 18499, F, F, T</li>
- *   <li>column7, DIMENSION, INT, 359, F, F, T</li>
- *   <li>column8, DIMENSION, INT, 850, F, T, F</li>
- *   <li>column9, METRIC, INT, 146, F, T, F</li>
- *   <li>column10, METRIC, INT, 3960, F, F, F</li>
- *   <li>daysSinceEpoch, TIME, INT, 1, T, F, F</li>
- * </ul>
- */
+/// The `BaseMultiValueQueriesTest` class sets up the index segment for the multi-value queries test.
+///
+/// There are totally 14 columns, 100000 records inside the original Avro file where 10 columns are selected to build
+/// the index segment. Selected columns information are as following:
+///
+///   ColumnName, FieldType, DataType, Cardinality, IsSorted, HasInvertedIndex, IsMultiValueRaw
+/// - column1, METRIC, INT, 51594, F, F, F
+/// - column2, METRIC, INT, 42242, F, F, F
+/// - column3, DIMENSION, STRING, 5, F, T, F
+/// - column5, DIMENSION, STRING, 9, F, F, F
+/// - column6, DIMENSION, INT, 18499, F, F, T
+/// - column7, DIMENSION, INT, 359, F, F, T
+/// - column8, DIMENSION, INT, 850, F, T, F
+/// - column9, METRIC, INT, 146, F, T, F
+/// - column10, METRIC, INT, 3960, F, F, F
+/// - daysSinceEpoch, TIME, INT, 1, T, F, F
 public class BaseMultiValueRawQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "MultiValueRawQueriesTest");
   private static final String AVRO_DATA = "data" + File.separator + "test_data-mv.avro";

@@ -244,35 +244,27 @@ public abstract class AbstractRecordReaderTest {
     checkValue(recordReader, _records, _primaryKeys);
   }
 
-  /**
-   * Create the record reader given a file
-   *
-   * @param file input file
-   * @return an implementation of RecordReader of the given file
-   * @throws Exception
-   */
+  /// Create the record reader given a file
+  ///
+  /// @param file input file
+  /// @return an implementation of RecordReader of the given file
+  /// @throws Exception
   protected abstract RecordReader createRecordReader(File file)
       throws Exception;
 
-  /**
-   * @return an implementation of RecordReader
-   * @throws Exception
-   */
+  /// @return an implementation of RecordReader
+  /// @throws Exception
   protected RecordReader createRecordReader()
       throws Exception {
     return createRecordReader(_dataFile);
   }
 
-  /**
-   * Write records into a file
-   * @throws Exception
-   */
+  /// Write records into a file
+  /// @throws Exception
   protected abstract void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
       throws Exception;
 
-  /**
-   * Get data file name
-   * @throws Exception
-   */
+  /// Get data file name
+  /// @throws Exception
   protected abstract String getDataFileName();
 }

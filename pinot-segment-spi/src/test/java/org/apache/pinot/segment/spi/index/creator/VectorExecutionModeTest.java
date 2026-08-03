@@ -25,9 +25,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for the {@link VectorExecutionMode} enum.
- */
+/// Tests for the [VectorExecutionMode] enum.
 public class VectorExecutionModeTest {
 
   @Test

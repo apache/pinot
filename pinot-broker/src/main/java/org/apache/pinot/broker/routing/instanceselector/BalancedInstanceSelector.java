@@ -41,7 +41,6 @@ import org.apache.pinot.common.utils.HashUtil;
 /// If AdaptiveServerSelection is disabled, the selection algorithm will always evenly distribute the traffic to all
 /// replicas of each segment, and will try to select different replica id for each segment. The algorithm is very
 /// light-weight and will do best effort to balance the number of segments served by each selected server instance.
-///
 public class BalancedInstanceSelector extends BaseInstanceSelector {
 
   @Override

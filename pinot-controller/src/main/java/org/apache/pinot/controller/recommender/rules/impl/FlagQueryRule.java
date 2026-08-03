@@ -35,12 +35,10 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.FlagQueryRuleParams.WARNING_TOO_LONG_LIMIT;
 
 
-/**
- * Flag the queries that are not valid:
- *    Flag the queries with LIMIT value higher than a threshold.
- *    Flag the queries that are not using any filters.
- *    Flag the queries that are not using any time filters.
- */
+/// Flag the queries that are not valid:
+///    Flag the queries with LIMIT value higher than a threshold.
+///    Flag the queries that are not using any filters.
+///    Flag the queries that are not using any time filters.
 public class FlagQueryRule extends AbstractRule {
   private static final Logger LOGGER = LoggerFactory.getLogger(FlagQueryRule.class);
   private final FlagQueryRuleParams _params;

@@ -109,12 +109,12 @@ public abstract class BaseTransformFunctionTest {
   protected static final String JSON_COLUMN = "json";
   protected static final String DEFAULT_JSON_COLUMN = "defaultJson";
   /// MV INT column configured as RAW forward with an explicit shared dictionary (no secondary index).
-  /// Carries the same values as {@link #INT_MV_COLUMN} so callers can compare results against the
+  /// Carries the same values as [#INT_MV_COLUMN] so callers can compare results against the
   /// dict-encoded baseline. Exists to exercise the predicate-evaluator code paths for shared-dict + RAW
   /// columns: the forward index serves raw values while a dictionary file lives alongside.
   protected static final String INT_MV_DICT_RAW_COLUMN = "intMVDictRaw";
   /// MV INT column configured as RAW forward with a shared dictionary AND an inverted index. Same values as
-  /// {@link #INT_MV_COLUMN} and {@link #INT_MV_DICT_RAW_COLUMN}. The inverted index is irrelevant inside
+  /// [#INT_MV_COLUMN] and [#INT_MV_DICT_RAW_COLUMN]. The inverted index is irrelevant inside
   /// filterMv (filterMv evaluates a per-value predicate on the already-fetched MV array, not at filter-plan
   /// time), so the result must match both other variants — but exercising this shape makes sure the inverted
   /// index sitting on the column doesn't perturb the predicate evaluator's path selection.

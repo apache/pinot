@@ -57,6 +57,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.zookeeper.data.Stat;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -560,6 +561,118 @@ public class SegmentStatusCheckerTest {
     return segmentZKMetadata;
   }
 
+  // A pauseless COMMITTING segment: done consuming but its immutable segment is still being built/loaded on the
+  // replicas. The grace check keys off the segment znode's modification time (mtime), which the test drives via
+  // propertyStore.getStat(...); the metadata here only supplies status and size.
+  private SegmentZKMetadata mockCommittingSegmentZKMetadata() {
+    SegmentZKMetadata segmentZKMetadata = mock(SegmentZKMetadata.class);
+    when(segmentZKMetadata.getStatus()).thenReturn(Status.COMMITTING);
+    when(segmentZKMetadata.getSizeInBytes()).thenReturn(-1L);
+    return segmentZKMetadata;
+  }
+
+  // A ZK Stat whose modification time (mtime) is set to the given epoch millis, used to drive the grace-window check.
+  private Stat mockStatWithMTime(long mTimeMs) {
+    Stat stat = new Stat();
+    stat.setMtime(mTimeMs);
+    return stat;
+  }
+
+  /// A pauseless COMMITTING segment whose replicas are still building (only 1/3 ONLINE in the external view) must not
+  /// be counted as under-replicated while it is within the grace window, so percentOfReplicas stays at 100. Regression
+  /// test for the SegmentReplicasCriticallyLowForHATable false positive on pauseless tables.
+  @Test
+  public void realtimeCommittingSegmentWithinGraceNotUnderReplicated() {
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName("timeColumn")
+            .setNumReplicas(3).setStreamConfigs(getStreamConfigMap()).build();
+
+    String seg = new LLCSegmentName(RAW_TABLE_NAME, 1, 5, System.currentTimeMillis()).getSegmentName();
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+    idealState.setPartitionState(seg, "pinot1", "ONLINE");
+    idealState.setPartitionState(seg, "pinot2", "ONLINE");
+    idealState.setPartitionState(seg, "pinot3", "ONLINE");
+    idealState.setReplicas("3");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+    // Just committed: only 1 of 3 replicas ONLINE, the other two still building the immutable segment.
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    externalView.setState(seg, "pinot1", "ONLINE");
+    externalView.setState(seg, "pinot2", "OFFLINE");
+    externalView.setState(seg, "pinot3", "OFFLINE");
+
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getHelixInstanceConfig(any())).thenReturn(newQuerableInstanceConfig("any"));
+    when(resourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
+    when(resourceManager.getAllTables()).thenReturn(List.of(REALTIME_TABLE_NAME));
+    when(resourceManager.getTableIdealState(REALTIME_TABLE_NAME)).thenReturn(idealState);
+    when(resourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
+    SegmentZKMetadata committingSegmentZKMetadata = mockCommittingSegmentZKMetadata();
+    when(resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, seg)).thenReturn(committingSegmentZKMetadata);
+
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    ZNRecord znRecord = new ZNRecord("0");
+    znRecord.setSimpleField(CommonConstants.Segment.Realtime.END_OFFSET, "10000");
+    when(propertyStore.get(anyString(), any(), anyInt())).thenReturn(znRecord);
+    // Just committed: znode mtime is now, within the grace window.
+    when(propertyStore.getStat(anyString(), anyInt())).thenReturn(mockStatWithMTime(System.currentTimeMillis()));
+
+    // 1h grace window; the segment was just created, so it must be skipped and the table stays fully replicated.
+    runSegmentStatusChecker(resourceManager, 3600);
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, REALTIME_TABLE_NAME,
+        ControllerGauge.PERCENT_OF_REPLICAS), 100);
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, REALTIME_TABLE_NAME,
+        ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS), 0);
+  }
+
+  /// A COMMITTING segment that has been under-replicated for longer than the grace window is a genuinely stuck commit
+  /// and must still be flagged (percentOfReplicas drops), so the grace does not mask real problems.
+  @Test
+  public void realtimeCommittingSegmentBeyondGraceUnderReplicated() {
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName("timeColumn")
+            .setNumReplicas(3).setStreamConfigs(getStreamConfigMap()).build();
+
+    String seg = new LLCSegmentName(RAW_TABLE_NAME, 1, 5, System.currentTimeMillis()).getSegmentName();
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+    idealState.setPartitionState(seg, "pinot1", "ONLINE");
+    idealState.setPartitionState(seg, "pinot2", "ONLINE");
+    idealState.setPartitionState(seg, "pinot3", "ONLINE");
+    idealState.setReplicas("3");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    externalView.setState(seg, "pinot1", "ONLINE");
+    externalView.setState(seg, "pinot2", "OFFLINE");
+    externalView.setState(seg, "pinot3", "OFFLINE");
+
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getHelixInstanceConfig(any())).thenReturn(newQuerableInstanceConfig("any"));
+    when(resourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
+    when(resourceManager.getAllTables()).thenReturn(List.of(REALTIME_TABLE_NAME));
+    when(resourceManager.getTableIdealState(REALTIME_TABLE_NAME)).thenReturn(idealState);
+    when(resourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
+    SegmentZKMetadata committingSegmentZKMetadata = mockCommittingSegmentZKMetadata();
+    when(resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, seg)).thenReturn(committingSegmentZKMetadata);
+
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    ZNRecord znRecord = new ZNRecord("0");
+    znRecord.setSimpleField(CommonConstants.Segment.Realtime.END_OFFSET, "10000");
+    when(propertyStore.get(anyString(), any(), anyInt())).thenReturn(znRecord);
+    // Committed 2h ago (znode mtime), still under-replicated -> a stuck commit, must not be graced.
+    when(propertyStore.getStat(anyString(), anyInt()))
+        .thenReturn(mockStatWithMTime(System.currentTimeMillis() - 7200000L));
+
+    // 1h grace window; the segment is 2h old and still 1/3 replicas up, so it must be flagged (33%).
+    runSegmentStatusChecker(resourceManager, 3600);
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, REALTIME_TABLE_NAME,
+        ControllerGauge.PERCENT_OF_REPLICAS), 33);
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, REALTIME_TABLE_NAME,
+        ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS), 1);
+  }
+
   @Test
   public void missingEVPartitionTest() {
     IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
@@ -684,6 +797,12 @@ public class SegmentStatusCheckerTest {
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    // myTable_2 was just pushed (znode mtime is now) so it is within the grace window and skipped; the others were
+    // pushed long ago.
+    when(propertyStore.getStat(anyString(), anyInt())).thenAnswer(inv -> {
+      String path = inv.getArgument(0);
+      return mockStatWithMTime(path.endsWith("myTable_2") ? System.currentTimeMillis() : 11111L);
+    });
 
     runSegmentStatusChecker(resourceManager, 600);
     verifyControllerMetrics(OFFLINE_TABLE_NAME, 0, 3, 3, 2, 100, 0, 100, 0, 3702);
@@ -707,6 +826,8 @@ public class SegmentStatusCheckerTest {
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    // Both segments were just updated/created (znode mtime is now), so they are within the grace window and skipped.
+    when(propertyStore.getStat(anyString(), anyInt())).thenReturn(mockStatWithMTime(System.currentTimeMillis()));
 
     runSegmentStatusChecker(resourceManager, 600);
     verifyControllerMetrics(REALTIME_TABLE_NAME, 0, 2, 2, 1, 100, 0, 100, 0, 1234);

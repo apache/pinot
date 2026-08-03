@@ -20,43 +20,27 @@ package org.apache.pinot.segment.spi.index.creator;
 
 public interface RawValueBasedInvertedIndexCreator extends InvertedIndexCreator {
 
-  /**
-   * For single-value column, adds the int value for the next document.
-   */
+  /// For single-value column, adds the int value for the next document.
   void add(int value);
 
-  /**
-   * For multi-value column, adds the int values for the next document.
-   */
+  /// For multi-value column, adds the int values for the next document.
   void add(int[] values, int length);
 
-  /**
-   * For single-value column, adds the long value for the next document.
-   */
+  /// For single-value column, adds the long value for the next document.
   void add(long value);
 
-  /**
-   * For multi-value column, adds the long values for the next document.
-   */
+  /// For multi-value column, adds the long values for the next document.
   void add(long[] values, int length);
 
-  /**
-   * For single-value column, adds the float value for the next document.
-   */
+  /// For single-value column, adds the float value for the next document.
   void add(float value);
 
-  /**
-   * For multi-value column, adds the float values for the next document.
-   */
+  /// For multi-value column, adds the float values for the next document.
   void add(float[] values, int length);
 
-  /**
-   * For single-value column, adds the double value for the next document.
-   */
+  /// For single-value column, adds the double value for the next document.
   void add(double value);
 
-  /**
-   * For multi-value column, adds the double values for the next document.
-   */
+  /// For multi-value column, adds the double values for the next document.
   void add(double[] values, int length);
 }

@@ -32,35 +32,24 @@ import org.apache.pinot.core.operator.transform.transformer.datetimehop.SDFToSDF
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The <code>DateTimeConversionHopTransformFunction</code> class implements the date time conversion
- * with hop transform function.
- * <ul>
- *   <li>
- *     This transform function should be invoked with arguments:
- *     <ul>
- *       <li>Column name to convert. E.g. Date</li>
- *       <li>Input format of the column. E.g. EPOCH|MILLISECONDS (See Pipe Format in DateTimeFormatSpec)</li>
- *       <li>Output format. E.g. EPOCH|MILLISECONDS/|10</li>
- *       <li>Output granularity. E.g. MINUTES|15</li>
- *       <li>Hop window size. E.g. HOURS</li>
- *     </ul>
- *   </li>
- *   <li>
- *     Outputs:
- *     <ul>
- *       <li>Time values converted to the desired format and bucketed to desired granularity with hop windows</li>
- *       <li>Below is an example for one hour window with 15min hop for 12:10</li>
- *        |-----------------|  11:15 - 12:15
- *            |-----------------|  11:30 - 12:30
- *                |-----------------|  11:45 - 12:45
- *                    |-----------------|  12:00 - 13:00
- *       <li>The beginning of the windows returned</>
- *       <li>The end of the window can be fetched by adding window size</>
- *     </ul>
- *   </li>
- * </ul>
- */
+/// The `DateTimeConversionHopTransformFunction` class implements the date time conversion
+/// with hop transform function.
+///
+/// - This transform function should be invoked with arguments:
+///   - Column name to convert. E.g. Date
+///   - Input format of the column. E.g. EPOCH|MILLISECONDS (See Pipe Format in DateTimeFormatSpec)
+///   - Output format. E.g. EPOCH|MILLISECONDS/|10
+///   - Output granularity. E.g. MINUTES|15
+///   - Hop window size. E.g. HOURS
+/// - Outputs:
+///   - Time values converted to the desired format and bucketed to desired granularity with hop windows
+///   - Below is an example for one hour window with 15min hop for 12:10
+///      |-----------------|  11:15 - 12:15
+///        |-----------------|  11:30 - 12:30
+///        |-----------------|  11:45 - 12:45
+///        |-----------------|  12:00 - 13:00
+///   - The beginning of the windows returned</>
+///   - The end of the window can be fetched by adding window size</>
 public class DateTimeConversionHopTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "dateTimeConvertWindowHop";
 

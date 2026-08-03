@@ -41,10 +41,8 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 
 
-/**
- * This class is used to validate the arrayToMv usage.
- * Only leaf nodes are allowed to use arrayToMv function.
- */
+/// This class is used to validate the arrayToMv usage.
+/// Only leaf nodes are allowed to use arrayToMv function.
 public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean> {
   public static final ArrayToMvValidationVisitor INSTANCE = new ArrayToMvValidationVisitor();
 

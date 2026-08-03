@@ -33,13 +33,11 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for SortedRangeIntersection utility class.
- *
- * We hardcoded or random generated some lists of sorted doc range pairs (inclusive), and inside each list, there is no
- * overlap between two pairs. Then we compare the SortedRangeIntersection results with our simple set based brute force
- * solution results to verify the correctness of SortedRangeIntersection utility class.
- */
+/// Tests for SortedRangeIntersection utility class.
+///
+/// We hardcoded or random generated some lists of sorted doc range pairs (inclusive), and inside each list, there is no
+/// overlap between two pairs. Then we compare the SortedRangeIntersection results with our simple set based brute force
+/// solution results to verify the correctness of SortedRangeIntersection utility class.
 public class SortedRangeIntersectionTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(SortedRangeIntersectionTest.class);
 

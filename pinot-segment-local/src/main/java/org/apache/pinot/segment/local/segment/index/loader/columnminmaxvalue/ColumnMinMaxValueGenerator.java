@@ -72,9 +72,7 @@ public class ColumnMinMaxValueGenerator {
     _columnMinMaxValueGeneratorMode = columnMinMaxValueGeneratorMode;
   }
 
-  /**
-   * Returns the list of columns that need min/max values to be updated
-   */
+  /// Returns the list of columns that need min/max values to be updated
   public List<String> columnMinMaxValueUpdates() {
     List<String> columns = new ArrayList<>();
     for (String column : getColumnsToAddMinMaxValue()) {
@@ -360,6 +358,8 @@ public class ColumnMinMaxValueGenerator {
           break;
         }
         case BYTES: {
+          // ByteArray.compare is unsigned byte-wise lexicographic; for canonical 16-byte big-endian UUIDs this is
+          // identical to UuidUtils.compare's unsigned 64-bit-word ordering, so a single comparator is sufficient.
           byte[] min = null;
           byte[] max = null;
           if (isSingleValue) {

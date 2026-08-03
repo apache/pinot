@@ -27,9 +27,7 @@ import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Manager for generic row files.
- */
+/// Manager for generic row files.
 public class GenericRowFileManager {
   public static final String OFFSET_FILE_NAME = "record.offset";
   public static final String DATA_FILE_NAME = "record.data";
@@ -70,23 +68,17 @@ public class GenericRowFileManager {
     _hasOriginalTimeField = hasOriginalTimeField;
   }
 
-  /**
-   * Returns the field specs for the files.
-   */
+  /// Returns the field specs for the files.
   public List<FieldSpec> getFieldSpecs() {
     return _fieldSpecs;
   }
 
-  /**
-   * Returns {@code true} if the file contains null fields, {@code false} otherwise.
-   */
+  /// Returns `true` if the file contains null fields, `false` otherwise.
   public boolean isIncludeNullFields() {
     return _includeNullFields;
   }
 
-  /**
-   * Returns the number of sort fields.
-   */
+  /// Returns the number of sort fields.
   public int getNumSortFields() {
     return _numSortFields;
   }
@@ -97,9 +89,7 @@ public class GenericRowFileManager {
     return _hasOriginalTimeField;
   }
 
-  /**
-   * Returns the file writer. Creates one if not exists.
-   */
+  /// Returns the file writer. Creates one if not exists.
   public GenericRowFileWriter getFileWriter()
       throws IOException {
     if (_fileWriter == null) {
@@ -110,9 +100,7 @@ public class GenericRowFileManager {
     return _fileWriter;
   }
 
-  /**
-   * Closes the file writer.
-   */
+  /// Closes the file writer.
   public void closeFileWriter()
       throws IOException {
     if (_fileWriter != null) {
@@ -121,9 +109,7 @@ public class GenericRowFileManager {
     }
   }
 
-  /**
-   * Returns the file reader. Creates one if not exists.
-   */
+  /// Returns the file reader. Creates one if not exists.
   public GenericRowFileReader getFileReader()
       throws IOException {
     if (_fileReader == null) {
@@ -134,9 +120,7 @@ public class GenericRowFileManager {
     return _fileReader;
   }
 
-  /**
-   * Closes the file reader.
-   */
+  /// Closes the file reader.
   public void closeFileReader()
       throws IOException {
     if (_fileReader != null) {
@@ -145,9 +129,7 @@ public class GenericRowFileManager {
     }
   }
 
-  /**
-   * Cleans up the files.
-   */
+  /// Cleans up the files.
   public void cleanUp()
       throws IOException {
     closeFileWriter();

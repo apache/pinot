@@ -64,6 +64,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.SourceFieldConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -384,6 +385,60 @@ public class TableConfigUtilsTest {
     ingestionConfig.setAggregationConfigs(null);
     ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "reverse(anotherCol)")));
     TableConfigUtils.validate(tableConfig, schema);
+
+    Schema transformSchema = schema;
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "now()")));
+    IllegalStateException nonDeterministicError =
+        expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, transformSchema));
+    assertTrue(nonDeterministicError.getMessage().contains("Function 'now' has VOLATILE volatility"));
+
+    IngestionConfig existingIngestionConfig = new IngestionConfig();
+    existingIngestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "now()")));
+    TableConfig existingTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIngestionConfig(existingIngestionConfig)
+        .build();
+    TableConfigUtils.validate(tableConfig, schema, null, existingTableConfig);
+
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "plus(now(), 1)")));
+    nonDeterministicError = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validate(tableConfig, transformSchema, null, existingTableConfig));
+    assertTrue(nonDeterministicError.getMessage().contains("Function 'now' has VOLATILE volatility"));
+
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "rand()")));
+    nonDeterministicError =
+        expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, transformSchema));
+    assertTrue(nonDeterministicError.getMessage().contains("Function 'rand' has VOLATILE volatility"));
+
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "reqId('unused')")));
+    nonDeterministicError =
+        expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, transformSchema));
+    assertTrue(nonDeterministicError.getMessage().contains("Function 'reqid' has STABLE volatility"),
+        nonDeterministicError.getMessage());
+
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "rand(123)")));
+    TableConfigUtils.validate(tableConfig, schema);
+
+    // Legacy schema-level transforms are also part of the ingestion pipeline. A new table must reject them, while
+    // validation of an existing table stays permissive so unrelated config updates are not stranded.
+    ingestionConfig.setTransformConfigs(List.of());
+    schema.getFieldSpecFor("myCol").setTransformFunction("now()");
+    nonDeterministicError =
+        expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, transformSchema));
+    assertTrue(nonDeterministicError.getMessage().contains("Function 'now' has VOLATILE volatility"));
+    TableConfigUtils.validate(tableConfig, schema, null, tableConfig);
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "rand(123)")));
+    TableConfigUtils.validate(tableConfig, schema);
+
+    IngestionConfig noOverrideIngestionConfig = new IngestionConfig();
+    noOverrideIngestionConfig.setTransformConfigs(List.of());
+    TableConfig noOverrideTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIngestionConfig(noOverrideIngestionConfig)
+        .build();
+    nonDeterministicError = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validate(noOverrideTableConfig, transformSchema, null, tableConfig));
+    assertTrue(nonDeterministicError.getMessage().contains("Function 'now' has VOLATILE volatility"));
+
+    schema.getFieldSpecFor("myCol").setTransformFunction(null);
 
     // valid transform configs
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
@@ -1412,7 +1467,8 @@ public class TableConfigUtilsTest {
 
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null);
+          new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST), null,
+              null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail for with conflicting encoding type of myCol1");
@@ -1433,7 +1489,8 @@ public class TableConfigUtilsTest {
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null);
+          new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST), null,
+              null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail since FST index is enabled on multi value column");
@@ -1444,7 +1501,8 @@ public class TableConfigUtilsTest {
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null);
+          new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST), null,
+              null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail since FST index is enabled on non String column");
@@ -1457,7 +1515,7 @@ public class TableConfigUtilsTest {
         .build();
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null);
+          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT), null, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail since TEXT index is enabled on non String column");
@@ -1470,7 +1528,7 @@ public class TableConfigUtilsTest {
         .build();
     try {
       FieldConfig fieldConfig =
-          new FieldConfig("myCol21", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.FST, null, null);
+          new FieldConfig("myCol21", FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.FST), null, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail since field name is not present in schema");
@@ -1838,6 +1896,70 @@ public class TableConfigUtilsTest {
     } catch (Exception e) {
       fail("Should not fail for single FieldConfig entry", e);
     }
+  }
+
+  @Test
+  public void testValidateNullValueVectorBackfill()
+      throws Exception {
+    // Valid: opting a scalar column into null value vector backfill (indexes.null.backfill) passes validation.
+    Schema scalarSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("intCol", DataType.INT)
+        .build();
+    FieldConfig scalarFieldConfig = new FieldConfig.Builder("intCol")
+        .withIndexes(JsonUtils.stringToJsonNode("{\"null\": {\"backfill\": true}}"))
+        .build();
+    TableConfig scalarTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNullHandlingEnabled(true)
+        .setFieldConfigList(List.of(scalarFieldConfig))
+        .build();
+    TableConfigUtils.validate(scalarTableConfig, scalarSchema);
+
+    // Invalid: opting a MAP column into backfill is rejected with a clear message.
+    Schema mapSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
+    mapSchema.addField(new ComplexFieldSpec("mapCol", DataType.MAP, true, Map.of(
+        "key", new DimensionFieldSpec("key", DataType.STRING, true),
+        "value", new DimensionFieldSpec("value", DataType.INT, true)
+    )));
+    FieldConfig mapFieldConfig = new FieldConfig.Builder("mapCol")
+        .withIndexes(JsonUtils.stringToJsonNode("{\"null\": {\"backfill\": true}}"))
+        .build();
+    TableConfig mapTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNullHandlingEnabled(true)
+        .setFieldConfigList(List.of(mapFieldConfig))
+        .build();
+    IllegalStateException e =
+        expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(mapTableConfig, mapSchema));
+    assertTrue(e.getMessage().contains("Null value vector backfill is not supported"),
+        "Unexpected validation failure: " + e.getMessage());
+  }
+
+  @Test
+  public void testValidateNullValueVectorBackfillOnTimeColumn()
+      throws Exception {
+    FieldConfig timeFieldConfig = new FieldConfig.Builder(TIME_COLUMN)
+        .withIndexes(JsonUtils.stringToJsonNode("{\"null\": {\"backfill\": true}}"))
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setNullHandlingEnabled(true)
+        .setFieldConfigList(List.of(timeFieldConfig))
+        .build();
+
+    // Invalid: the default default null value (Long.MIN_VALUE) is outside the valid time range, so ingestion stores the
+    // current time for null values and a backfill scan could never match it.
+    Schema defaultDefaultSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    IllegalStateException e =
+        expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, defaultDefaultSchema));
+    assertTrue(e.getMessage().contains("Null value vector backfill is not supported for time column"),
+        "Unexpected validation failure: " + e.getMessage());
+
+    // Valid: an explicit in-range default null value is stored as-is for null values, so backfill can match it.
+    Schema inRangeDefaultSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS", 1600000000000L, null)
+        .build();
+    TableConfigUtils.validate(tableConfig, inRangeDefaultSchema);
   }
 
   @Test
@@ -3146,15 +3268,13 @@ public class TableConfigUtilsTest {
     }
   }
 
-  /**
-   * Utility function that can be used to write simple tests that modify the table config and schema.
-   *
-   * This function has been designed to test the nullability of the partial upsert config, but feel free to use it to
-   * other tests as well (probably changing the method name).
-   *
-   * @param configureFun A BiConsumer that takes a TableConfigBuilder and a Schema.SchemaBuilder and modifies them
-   *                   accordingly to what the test needs.
-   */
+  /// Utility function that can be used to write simple tests that modify the table config and schema.
+  ///
+  /// This function has been designed to test the nullability of the partial upsert config, but feel free to use it to
+  /// other tests as well (probably changing the method name).
+  ///
+  /// @param configureFun A BiConsumer that takes a TableConfigBuilder and a Schema.SchemaBuilder and modifies them
+  ///                   accordingly to what the test needs.
   private void testPartialUpsertConfigNullability(BiConsumer<TableConfigBuilder, Schema.SchemaBuilder> configureFun) {
     Map<String, String> streamConfigs = getStreamConfigs();
 
@@ -3186,11 +3306,9 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validatePartialUpsertStrategies(tableConfig, schema);
   }
 
-  /**
-   * Tests that the partial upsert config fails when the null handling is disabled.
-   *
-   * This means that both table config and schema nullability is turned off.
-   */
+  /// Tests that the partial upsert config fails when the null handling is disabled.
+  ///
+  /// This means that both table config and schema nullability is turned off.
   @Test
   public void partialUpsertConfigFailWhenNotNullableColumns() {
     try {
@@ -3203,11 +3321,9 @@ public class TableConfigUtilsTest {
     }
   }
 
-  /**
-   * Tests that the partial upsert config succeeds when table null handling is used.
-   *
-   * This means that schema nullability is turned off, but table null handling is turned on.
-   */
+  /// Tests that the partial upsert config succeeds when table null handling is used.
+  ///
+  /// This means that schema nullability is turned off, but table null handling is turned on.
   @Test
   public void partialUpsertConfigSuccessWhenUsingTableLevelNullability() {
     testPartialUpsertConfigNullability((tableConfigBuilder, schemaBuilder) -> {
@@ -3216,11 +3332,9 @@ public class TableConfigUtilsTest {
     });
   }
 
-  /**
-   * Tests that the partial upsert config succeeds when column null handling is used.
-   *
-   * This means that schema nullability is turned on, but table null handling can be either true or false.
-   */
+  /// Tests that the partial upsert config succeeds when column null handling is used.
+  ///
+  /// This means that schema nullability is turned on, but table null handling can be either true or false.
   @Test
   public void partialUpsertConfigSuccessWhenUsingColumnLevelNullability() {
     testPartialUpsertConfigNullability((tableConfigBuilder, schemaBuilder) -> {
@@ -4250,6 +4364,52 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       assertTrue(e.getMessage().contains("out-of-order record column"));
     }
+  }
+
+  @Test
+  public void testPostPartialUpsertTransformVolatility() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("pk", DataType.STRING)
+        .addMetric("total", DataType.DOUBLE)
+        .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .setPrimaryKeyColumns(List.of("pk"))
+        .build();
+    Map<String, String> streamConfigs = getStreamConfigs();
+
+    TableConfig nonDeterministicConfig = buildPostPartialUpsertTransformTableConfig(streamConfigs, "now()");
+    IllegalStateException nonDeterministicError = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateUpsertAndDedupConfig(nonDeterministicConfig, schema));
+    assertTrue(nonDeterministicError.getMessage().contains("Function 'now' has VOLATILE volatility"));
+
+    TableConfig existingConfig = buildPostPartialUpsertTransformTableConfig(streamConfigs, "now()");
+    TableConfigUtils.validateUpsertAndDedupConfig(nonDeterministicConfig, schema, existingConfig);
+
+    TableConfig changedConfig = buildPostPartialUpsertTransformTableConfig(streamConfigs, "plus(now(), 1)");
+    nonDeterministicError = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateUpsertAndDedupConfig(changedConfig, schema, existingConfig));
+    assertTrue(nonDeterministicError.getMessage().contains("Function 'now' has VOLATILE volatility"));
+
+    TableConfig randomConfig = buildPostPartialUpsertTransformTableConfig(streamConfigs, "rand()");
+    nonDeterministicError = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateUpsertAndDedupConfig(randomConfig, schema));
+    assertTrue(nonDeterministicError.getMessage().contains("Function 'rand' has VOLATILE volatility"));
+
+    TableConfig seededRandomConfig = buildPostPartialUpsertTransformTableConfig(streamConfigs, "rand(123)");
+    TableConfigUtils.validateUpsertAndDedupConfig(seededRandomConfig, schema);
+  }
+
+  private static TableConfig buildPostPartialUpsertTransformTableConfig(Map<String, String> streamConfigs,
+      String transformFunction) {
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("total", transformFunction)));
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(upsertConfig)
+        .setNullHandlingEnabled(true)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
+        .build();
   }
 
   @Test

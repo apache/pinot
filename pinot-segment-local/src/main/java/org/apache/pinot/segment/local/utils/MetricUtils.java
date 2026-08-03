@@ -23,9 +23,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 
 
-/**
- * Utils for metrics
- */
+/// Utils for metrics
 public class MetricUtils {
 
 

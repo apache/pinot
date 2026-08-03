@@ -45,17 +45,16 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /// Streaming combine operator for group-by queries. Instead of accumulating all groups into a single IndexedTable
-/// before returning (like {@link org.apache.pinot.core.operator.combine.GroupByCombineOperator}), this operator
+/// before returning (like [org.apache.pinot.core.operator.combine.GroupByCombineOperator]), this operator
 /// flushes partial results when the number of accumulated groups reaches a configurable threshold.
 ///
-/// <p>This bounds server memory usage for high-cardinality group-by queries on MSE leaf stages, while still
+/// This bounds server memory usage for high-cardinality group-by queries on MSE leaf stages, while still
 /// performing partial aggregation to reduce data volume compared to skipping leaf-stage group-by entirely.
 ///
-/// <p>The downstream FINAL stage merges partial results from multiple flushes correctly because:
-/// <ul>
-///   <li>Hash exchange routes the same group key to the same FINAL worker</li>
-///   <li>AggregationFunction.merge() is associative</li>
-/// </ul>
+/// The downstream FINAL stage merges partial results from multiple flushes correctly because:
+///
+/// - Hash exchange routes the same group key to the same FINAL worker
+/// - AggregationFunction.merge() is associative
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperator<GroupByResultsBlock> {
   private static final String EXPLAIN_NAME = "STREAMING_COMBINE_GROUP_BY";

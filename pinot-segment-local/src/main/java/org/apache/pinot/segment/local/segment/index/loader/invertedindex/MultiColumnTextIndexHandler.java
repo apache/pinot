@@ -30,7 +30,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.text.MultiColumnLucen
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
@@ -51,31 +50,30 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Helper class for text indexes used by {@link SegmentPreProcessor}.
- * to create text index for column during segment load time. Currently, text index is always
- * created (if enabled on a column) during segment generation
- *
- * (1) A new segment with text index is created/refreshed. Server loads the segment. The handler
- * detects the existence of text index and returns.
- *
- * (2) A reload is issued on an existing segment with existing text index. The handler
- * detects the existence of text index and returns.
- *
- * (3) A reload is issued on an existing segment after text index is enabled on an existing
- * column. Read the forward index to create text index.
- *
- * (4) A reload is issued on an existing segment after text index is enabled on a newly
- * added column. In this case, the default column handler would have taken care of adding
- * forward index for the new column. Read the forward index to create text index.
- *
- * NOTE:
- * Class is based on TextIndexHandler but operates on to multi-column text index.
- * This class extends BaseIndexHandler only to reuse some functionality (temporary forward indices handling)
- * but should not be used in the same way as other single-column indexes.
- * As the name implies, multi-column text index is not bound to a single column and can't be built with column-major
- * approach.
- */
+/// Helper class for text indexes used by
+/// [org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor].
+/// to create text index for column during segment load time. Currently, text index is always
+/// created (if enabled on a column) during segment generation
+///
+/// (1) A new segment with text index is created/refreshed. Server loads the segment. The handler
+/// detects the existence of text index and returns.
+///
+/// (2) A reload is issued on an existing segment with existing text index. The handler
+/// detects the existence of text index and returns.
+///
+/// (3) A reload is issued on an existing segment after text index is enabled on an existing
+/// column. Read the forward index to create text index.
+///
+/// (4) A reload is issued on an existing segment after text index is enabled on a newly
+/// added column. In this case, the default column handler would have taken care of adding
+/// forward index for the new column. Read the forward index to create text index.
+///
+/// NOTE:
+/// Class is based on TextIndexHandler but operates on to multi-column text index.
+/// This class extends BaseIndexHandler only to reuse some functionality (temporary forward indices handling)
+/// but should not be used in the same way as other single-column indexes.
+/// As the name implies, multi-column text index is not bound to a single column and can't be built with column-major
+/// approach.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MultiColumnTextIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiColumnTextIndexHandler.class);

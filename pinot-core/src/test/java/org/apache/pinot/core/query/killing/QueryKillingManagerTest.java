@@ -54,9 +54,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for {@link QueryKillingManager}.
- */
+/// Unit tests for [QueryKillingManager].
 public class QueryKillingManagerTest {
 
   private ServerMetrics _serverMetrics;
@@ -896,9 +894,7 @@ public class QueryKillingManagerTest {
     assertNotNull(execCtx.getTerminateException());
   }
 
-  /**
-   * A test strategy that always kills — used to verify custom factory loading.
-   */
+  /// A test strategy that always kills — used to verify custom factory loading.
   public static class AlwaysKillStrategy implements QueryKillingStrategy {
     @Override
     public boolean shouldTerminate(QueryScanCostContext context) {
@@ -913,9 +909,7 @@ public class QueryKillingManagerTest {
     }
   }
 
-  /**
-   * A test factory that creates an AlwaysKillStrategy — loaded by class name via config.
-   */
+  /// A test factory that creates an AlwaysKillStrategy — loaded by class name via config.
   public static class AlwaysKillStrategyFactory implements QueryKillingStrategyFactory {
     @Override
     public QueryKillingStrategy create(QueryMonitorConfig config) {

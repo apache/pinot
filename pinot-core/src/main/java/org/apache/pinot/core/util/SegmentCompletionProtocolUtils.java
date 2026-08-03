@@ -23,16 +23,12 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 
 
-/**
- * Util methods related to low level consumers' segment completion protocols.
- */
+/// Util methods related to low level consumers' segment completion protocols.
 public class SegmentCompletionProtocolUtils {
   private SegmentCompletionProtocolUtils() {
   }
 
-  /**
-   * raise a metric indicating the response we received from the controller
-   */
+  /// raise a metric indicating the response we received from the controller
   public static void raiseSegmentCompletionProtocolResponseMetric(ServerMetrics serverMetrics,
       SegmentCompletionProtocol.Response response) {
     switch (response.getStatus()) {

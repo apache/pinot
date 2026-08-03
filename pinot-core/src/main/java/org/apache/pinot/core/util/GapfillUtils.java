@@ -36,9 +36,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
-/**
- * Util class to encapsulate all utilities required for gapfill.
- */
+/// Util class to encapsulate all utilities required for gapfill.
 public class GapfillUtils {
   private static final String GAP_FILL = "gapfill";
   private static final String AS = "as";
@@ -78,9 +76,7 @@ public class GapfillUtils {
     return TIME_SERIES_ON.equals(expressionContext.getFunction().getFunctionName());
   }
 
-  /**
-   * The default gapfill value for each column type.
-   */
+  /// The default gapfill value for each column type.
   static public Serializable getDefaultValue(DataSchema.ColumnDataType dataType) {
     switch (dataType) {
       // Single-value column
@@ -134,10 +130,8 @@ public class GapfillUtils {
     return false;
   }
 
-  /**
-   * Get the gapfill type for queryContext. Also do the validation for gapfill request.
-   * @param queryContext
-   */
+  /// Get the gapfill type for queryContext. Also do the validation for gapfill request.
+  /// @param queryContext
   public static GapfillType getGapfillType(QueryContext queryContext) {
     GapfillType gapfillType = null;
     if (queryContext.getSubquery() == null) {

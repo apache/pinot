@@ -31,6 +31,7 @@ import com.jayway.jsonpath.spi.cache.CacheProvider;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.io.IOException;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -47,17 +48,16 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * Inbuilt json related transform functions
- *   An example DimFieldSpec that needs the toJsonMapStr function:
- *   <code>
- *     "dimFieldSpecs": [{
- *       "name": "jsonMapStr",
- *       "dataType": "STRING",
- *       "transformFunction": "toJsonMapStr(jsonMap)"
- *     }]
- *   </code>
- */
+/// Inbuilt json related transform functions
+///   An example DimFieldSpec that needs the toJsonMapStr function:
+///
+/// ```
+/// "dimFieldSpecs": [{
+///   "name": "jsonMapStr",
+///   "dataType": "STRING",
+///   "transformFunction": "toJsonMapStr(jsonMap)"
+/// }]
+/// ```
 public class JsonFunctions {
   private JsonFunctions() {
   }
@@ -80,27 +80,21 @@ public class JsonFunctions {
     CacheProvider.setCache(new JsonPathCache());
   }
 
-  /**
-   * Convert Map to Json String
-   */
+  /// Convert Map to Json String
   @ScalarFunction(nullableParameters = true)
   public static String toJsonMapStr(@Nullable Map map)
       throws JsonProcessingException {
     return JsonUtils.objectToString(map);
   }
 
-  /**
-   * Convert object to Json String
-   */
+  /// Convert object to Json String
   @ScalarFunction
   public static String jsonFormat(Object object)
       throws JsonProcessingException {
     return JsonUtils.objectToString(object);
   }
 
-  /**
-   * Extract object based on Json path
-   */
+  /// Extract object based on Json path
   @Nullable
   @ScalarFunction
   public static Object jsonPath(Object object, String jsonPath) {
@@ -135,17 +129,15 @@ public class JsonFunctions {
     return jsonPath(object, jsonPath);
   }
 
-  /**
-   * Returns {@code false} when the input is known to be non-extractable by a json path without invoking the JSON
-   * parser: a {@code null} value, or a string whose first non-whitespace character cannot begin a JSON value. Used
-   * by the default-value {@code jsonPath*} overloads to skip parsing plain-text input (e.g. raw log lines) that
-   * would otherwise throw a {@link com.jayway.jsonpath.InvalidJsonException} whose {@code fillInStackTrace()}
-   * dominates the hot ingestion path. It is intentionally conservative: any string that could begin a JSON value
-   * (object, array, string, number, or a {@code true}/{@code false}/{@code null} literal) is still handed to the
-   * parser, so the parser's behavior - including any exception it raises - is unchanged for those inputs. Returning
-   * the caller's default for the skipped inputs is equivalent to the prior behavior, where the parse exception was
-   * caught and the default returned.
-   */
+  /// Returns `false` when the input is known to be non-extractable by a json path without invoking the JSON
+  /// parser: a `null` value, or a string whose first non-whitespace character cannot begin a JSON value. Used
+  /// by the default-value `jsonPath*` overloads to skip parsing plain-text input (e.g. raw log lines) that
+  /// would otherwise throw a [com.jayway.jsonpath.InvalidJsonException] whose `fillInStackTrace()`
+  /// dominates the hot ingestion path. It is intentionally conservative: any string that could begin a JSON value
+  /// (object, array, string, number, or a `true`/`false`/`null` literal) is still handed to the
+  /// parser, so the parser's behavior - including any exception it raises - is unchanged for those inputs. Returning
+  /// the caller's default for the skipped inputs is equivalent to the prior behavior, where the parse exception was
+  /// caught and the default returned.
   private static boolean canExtractJsonPath(@Nullable Object object) {
     if (object == null) {
       return false;
@@ -167,9 +159,7 @@ public class JsonFunctions {
     return false; // empty / all-whitespace is not valid JSON
   }
 
-  /**
-   * Extract object array based on Json path
-   */
+  /// Extract object array based on Json path
   @Nullable
   @ScalarFunction
   public static Object[] jsonPathArray(Object object, String jsonPath) {
@@ -206,9 +196,7 @@ public class JsonFunctions {
     return new Object[]{arrayObject};
   }
 
-  /**
-   * Check if path exists in Json object
-   */
+  /// Check if path exists in Json object
   @ScalarFunction
   public static boolean jsonPathExists(Object object, String jsonPath) {
     try {
@@ -218,9 +206,7 @@ public class JsonFunctions {
     }
   }
 
-  /**
-   * Extract from Json with path to String
-   */
+  /// Extract from Json with path to String
   @Nullable
   @ScalarFunction
   public static String jsonPathString(Object object, String jsonPath)
@@ -229,9 +215,7 @@ public class JsonFunctions {
     return jsonValue != null ? jsonValueToString(jsonValue) : null;
   }
 
-  /**
-   * Extract from Json with path to String
-   */
+  /// Extract from Json with path to String
   @ScalarFunction(nullableParameters = true)
   public static String jsonPathString(@Nullable Object object, String jsonPath, String defaultValue) {
     if (!canExtractJsonPath(object)) {
@@ -294,17 +278,13 @@ public class JsonFunctions {
     }
   }
 
-  /**
-   * Extract from Json with path to Long
-   */
+  /// Extract from Json with path to Long
   @ScalarFunction
   public static long jsonPathLong(Object object, String jsonPath) {
     return jsonPathLong(object, jsonPath, Long.MIN_VALUE);
   }
 
-  /**
-   * Extract from Json with path to Long
-   */
+  /// Extract from Json with path to Long
   @ScalarFunction(nullableParameters = true)
   public static long jsonPathLong(@Nullable Object object, String jsonPath, long defaultValue) {
     if (!canExtractJsonPath(object)) {
@@ -312,16 +292,37 @@ public class JsonFunctions {
     }
     try {
       Object jsonValue = jsonPath(object, jsonPath);
-      if (jsonValue == null) {
-        return defaultValue;
-      }
-      if (jsonValue instanceof Number) {
-        return ((Number) jsonValue).longValue();
-      }
-      return Long.parseLong(jsonValue.toString());
+      return jsonValue != null ? jsonValueToLong(jsonValue) : defaultValue;
     } catch (Exception ignore) {
       return defaultValue;
     }
+  }
+
+  /// Converts a value resolved by a JSON path to `long` for the `jsonPathLong*` family, following the
+  /// conversion conventions of [org.apache.pinot.spi.utils.PinotDataType]. A `Number` yields its `longValue`
+  /// and a `Boolean` yields `1` / `0`, matching `jsonExtractScalar` on every value a parsed JSON document can
+  /// produce. [Timestamp] / [LocalDate] / [LocalTime] are non-JSON-native scalars a record extractor can
+  /// materialize; they have no parseable numeric `toString`, so they convert to their Pinot internal numeric
+  /// form - epoch millis, days since epoch, and millis since midnight respectively. Anything else (e.g. a JSON
+  /// string holding a number) is parsed from its `toString`, which throws for a value with no numeric meaning
+  /// (`UUID`, `byte[]`, a container) and leaves the caller returning its default value.
+  private static long jsonValueToLong(Object jsonValue) {
+    if (jsonValue instanceof Number) {
+      return ((Number) jsonValue).longValue();
+    }
+    if (jsonValue instanceof Boolean) {
+      return (Boolean) jsonValue ? 1L : 0L;
+    }
+    if (jsonValue instanceof Timestamp) {
+      return ((Timestamp) jsonValue).getTime();
+    }
+    if (jsonValue instanceof LocalDate) {
+      return ((LocalDate) jsonValue).toEpochDay();
+    }
+    if (jsonValue instanceof LocalTime) {
+      return ((LocalTime) jsonValue).toNanoOfDay() / 1_000_000L;
+    }
+    return Long.parseLong(jsonValue.toString());
   }
 
   /// Opt-in fast variant of [#jsonPathLong(Object, String, long)] with identical results; see
@@ -345,29 +346,19 @@ public class JsonFunctions {
     }
     try {
       Object jsonValue = fastJsonPath(object, jsonPath, false, earlyExit);
-      if (jsonValue == null) {
-        return defaultValue;
-      }
-      if (jsonValue instanceof Number) {
-        return ((Number) jsonValue).longValue();
-      }
-      return Long.parseLong(jsonValue.toString());
+      return jsonValue != null ? jsonValueToLong(jsonValue) : defaultValue;
     } catch (Exception ignore) {
       return defaultValue;
     }
   }
 
-  /**
-   * Extract from Json with path to Double
-   */
+  /// Extract from Json with path to Double
   @ScalarFunction
   public static double jsonPathDouble(Object object, String jsonPath) {
     return jsonPathDouble(object, jsonPath, Double.NaN);
   }
 
-  /**
-   * Extract from Json with path to Double
-   */
+  /// Extract from Json with path to Double
   @ScalarFunction(nullableParameters = true)
   public static double jsonPathDouble(@Nullable Object object, String jsonPath, double defaultValue) {
     if (!canExtractJsonPath(object)) {
@@ -375,16 +366,36 @@ public class JsonFunctions {
     }
     try {
       Object jsonValue = jsonPath(object, jsonPath);
-      if (jsonValue == null) {
-        return defaultValue;
-      }
-      if (jsonValue instanceof Number) {
-        return ((Number) jsonValue).doubleValue();
-      }
-      return Double.parseDouble(jsonValue.toString());
+      return jsonValue != null ? jsonValueToDouble(jsonValue) : defaultValue;
     } catch (Exception ignore) {
       return defaultValue;
     }
+  }
+
+  /// Double counterpart of [#jsonValueToLong], with the same type dispatch: a `Number` yields its
+  /// `doubleValue`, a `Boolean` yields `1` / `0`, [Timestamp] / [LocalDate] / [LocalTime] yield their internal
+  /// numeric form, and anything else is parsed from its `toString`.
+  ///
+  /// The three temporal forms stay integral here, matching `PinotDataType`: sub-millisecond nanos are truncated
+  /// rather than carried as a fraction, so a value extracted into a `DOUBLE` column holds exactly what the
+  /// corresponding `TIMESTAMP` / `DATE` / `TIME` column would store.
+  private static double jsonValueToDouble(Object jsonValue) {
+    if (jsonValue instanceof Number) {
+      return ((Number) jsonValue).doubleValue();
+    }
+    if (jsonValue instanceof Boolean) {
+      return (Boolean) jsonValue ? 1d : 0d;
+    }
+    if (jsonValue instanceof Timestamp) {
+      return ((Timestamp) jsonValue).getTime();
+    }
+    if (jsonValue instanceof LocalDate) {
+      return ((LocalDate) jsonValue).toEpochDay();
+    }
+    if (jsonValue instanceof LocalTime) {
+      return ((LocalTime) jsonValue).toNanoOfDay() / 1_000_000L;
+    }
+    return Double.parseDouble(jsonValue.toString());
   }
 
   /// Opt-in fast variant of [#jsonPathDouble(Object, String, double)] with identical results; see
@@ -408,23 +419,15 @@ public class JsonFunctions {
     }
     try {
       Object jsonValue = fastJsonPath(object, jsonPath, false, earlyExit);
-      if (jsonValue == null) {
-        return defaultValue;
-      }
-      if (jsonValue instanceof Number) {
-        return ((Number) jsonValue).doubleValue();
-      }
-      return Double.parseDouble(jsonValue.toString());
+      return jsonValue != null ? jsonValueToDouble(jsonValue) : defaultValue;
     } catch (Exception ignore) {
       return defaultValue;
     }
   }
 
-  /**
-   * Extract an array of key-value maps to a map.
-   * E.g. input: [{"key": "k1", "value": "v1"}, {"key": "k2", "value": "v2"}, {"key": "k3", "value": "v3"}]
-   *      output: {"k1": "v1", "k2": "v2", "k3": "v3"}
-   */
+  /// Extract an array of key-value maps to a map.
+  /// E.g. input: \[{"key": "k1", "value": "v1"}, {"key": "k2", "value": "v2"}, {"key": "k3", "value": "v3"}\]
+  ///      output: {"k1": "v1", "k2": "v2", "k3": "v3"}
   @ScalarFunction
   public static Object jsonKeyValueArrayToMap(Object keyValueArray) {
     return jsonKeyValueArrayToMap(keyValueArray, "key", "value");
@@ -506,20 +509,20 @@ public class JsonFunctions {
     return null;
   }
 
-  /**
-   * Parse a JSON document into a reusable {@code Map}/{@code List}, or pass through an already-parsed container,
-   * returning {@code null} for null, scalar, or non-JSON input <b>without throwing</b>.
-   * <p>Intended for "parse-once" ingestion transforms: materialize an intermediate object column once and point
-   * multiple {@code jsonPath*} extractions at it, instead of re-parsing the same source document for every extracted
-   * field. {@link #jsonPath} navigates the returned object directly (no re-parse), and because this never throws it
-   * is safe for columns that are sometimes structured JSON and sometimes plain text (e.g. a log {@code message}
-   * field) - the plain-text rows simply yield {@code null} and fall through to the default of the downstream
-   * extraction. Example transform configs:
-   * <pre>
-   *   {"columnName": "message_obj", "transformFunction": "jsonExtractObject(message)"}
-   *   {"columnName": "level",       "transformFunction": "JSONPATHSTRING(message_obj, '$.level', null)"}
-   * </pre>
-   */
+  /// Parse a JSON document into a reusable `Map`/`List`, or pass through an already-parsed container,
+  /// returning `null` for null, scalar, or non-JSON input **without throwing**.
+  ///
+  /// Intended for "parse-once" ingestion transforms: materialize an intermediate object column once and point
+  /// multiple `jsonPath*` extractions at it, instead of re-parsing the same source document for every extracted
+  /// field. [#jsonPath] navigates the returned object directly (no re-parse), and because this never throws it
+  /// is safe for columns that are sometimes structured JSON and sometimes plain text (e.g. a log `message`
+  /// field) - the plain-text rows simply yield `null` and fall through to the default of the downstream
+  /// extraction. Example transform configs:
+  ///
+  /// ```
+  /// {"columnName": "message_obj", "transformFunction": "jsonExtractObject(message)"}
+  /// {"columnName": "level",       "transformFunction": "JSONPATHSTRING(message_obj, '$.level', null)"}
+  /// ```
   @Nullable
   @ScalarFunction(nullableParameters = true)
   public static Object jsonExtractObject(@Nullable Object object) {
@@ -549,19 +552,17 @@ public class JsonFunctions {
     }
   }
 
-  /**
-   * Extract keys from JSON object using JsonPath.
-   * <p>
-   * Examples:
-   * - jsonExtractKey('{"a": 1, "b": {"c": 2}}', '$.*') returns ["$['a']", "$['b']"]
-   * - jsonExtractKey('{"a": 1, "b": {"c": 2}}', '$.*') returns ["$['a']", "$['b']"]
-   * - jsonExtractKey('{"a": 1, "b": {"c": 2}}', '$..**') returns ["$['a']", "$['b']", "$['b']['c']"]
-   * - jsonExtractKey('{"a": [1, 2]}', '$.*') returns ["$['a']"]
-   *
-   * @param jsonObj  JSON object or string
-   * @param jsonPath JsonPath expression to extract keys
-   * @return List of key paths matching the JsonPath, empty list if input is null or invalid
-   */
+  /// Extract keys from JSON object using JsonPath.
+  ///
+  /// Examples:
+  /// - jsonExtractKey('{"a": 1, "b": {"c": 2}}', '$.\*') returns \["$\['a'\]", "$\['b'\]"\]
+  /// - jsonExtractKey('{"a": 1, "b": {"c": 2}}', '$.\*') returns \["$\['a'\]", "$\['b'\]"\]
+  /// - jsonExtractKey('{"a": 1, "b": {"c": 2}}', '$..\*\*') returns \["$\['a'\]", "$\['b'\]", "$\['b'\]\['c'\]"\]
+  /// - jsonExtractKey('{"a": \[1, 2\]}', '$.\*') returns \["$\['a'\]"\]
+  ///
+  /// @param jsonObj  JSON object or string
+  /// @param jsonPath JsonPath expression to extract keys
+  /// @return List of key paths matching the JsonPath, empty list if input is null or invalid
   @ScalarFunction
   public static List<String> jsonExtractKey(Object jsonObj, String jsonPath) {
     // treat empty string as extracting all
@@ -617,9 +618,7 @@ public class JsonFunctions {
     return keys;
   }
 
-  /**
-   * Extract all keys recursively from a JSON object up to maxDepth with output format option
-   */
+  /// Extract all keys recursively from a JSON object up to maxDepth with output format option
   public static List<String> jsonExtractAllKeysInternal(Object jsonObj, int maxDepth, boolean dotNotation) {
     List<String> allKeys = new ArrayList<>();
     try {
@@ -637,9 +636,7 @@ public class JsonFunctions {
     return allKeys;
   }
 
-  /**
-   * Recursively extract keys from a JsonNode with output format option
-   */
+  /// Recursively extract keys from a JsonNode with output format option
   private static void extractKeysFromNode(JsonNode node, String currentPath, List<String> keys,
       int maxDepth, int currentDepth, boolean dotNotation) {
     if (currentDepth > maxDepth) {
@@ -671,11 +668,9 @@ public class JsonFunctions {
     }
   }
 
-  /**
-   * Convert JsonPath format to dot notation
-   * Example: $['a']['b']['c'] -> a.b.c
-   * $[0]['name'] -> 0.name
-   */
+  /// Convert JsonPath format to dot notation
+  /// Example: $\['a'\]\['b'\]\['c'\] -> a.b.c
+  /// $\[0\]\['name'\] -> 0.name
   static String convertToDotNotation(String jsonPath) {
     if (jsonPath == null || jsonPath.isEmpty() || "$".equals(jsonPath)) {
       return "";
@@ -740,11 +735,9 @@ public class JsonFunctions {
     return result;
   }
 
-  /**
-   * Calculate the depth of a key path.
-   * For JsonPath keys like "$['a']" or "$['a']['b']", count the number of levels.
-   * For dot notation keys like "a.b.c", count the number of dots + 1.
-   */
+  /// Calculate the depth of a key path.
+  /// For JsonPath keys like "$\['a'\]" or "$\['a'\]\['b'\]", count the number of levels.
+  /// For dot notation keys like "a.b.c", count the number of dots + 1.
   static int getKeyDepth(String key) {
     if (key == null || key.isEmpty()) {
       return 0;

@@ -259,13 +259,11 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
     return ObjectSerDeUtils.FUNNEL_STEP_EVENT_ACCUMULATOR_SER_DE.deserialize(customObject.getBuffer());
   }
 
-  /**
-   * Fill the sliding window with the events that fall into the window.
-   * Note that the events from stepEvents are dequeued and added to the sliding window.
-   * This method ensure the first event from the sliding window is the first step event.
-   * @param stepEvents The priority queue of step events
-   * @param slidingWindow The sliding window with events that fall into the window
-   */
+  /// Fill the sliding window with the events that fall into the window.
+  /// Note that the events from stepEvents are dequeued and added to the sliding window.
+  /// This method ensure the first event from the sliding window is the first step event.
+  /// @param stepEvents The priority queue of step events
+  /// @param slidingWindow The sliding window with events that fall into the window
   protected void fillWindow(PriorityQueue<FunnelStepEvent> stepEvents, ArrayDeque<FunnelStepEvent> slidingWindow) {
     // Ensure for the sliding window, the first event is the first step
     int numEventsProcessed = 0;

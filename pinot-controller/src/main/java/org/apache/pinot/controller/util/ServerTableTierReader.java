@@ -33,10 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Get the storage tier details from multi servers in parallel. Only servers returning success are returned by the
- * method. For those returning errors (http error or otherwise), no entry is created in the return map.
- */
+/// Get the storage tier details from multi servers in parallel. Only servers returning success are returned by the
+/// method. For those returning errors (http error or otherwise), no entry is created in the return map.
 public class ServerTableTierReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerTableTierReader.class);
 

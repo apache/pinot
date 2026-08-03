@@ -34,10 +34,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class to implement StartController command.
- *
- */
+/// Class to implement StartController command.
 @CommandLine.Command(name = "StartController", mixinStandardHelpOptions = true)
 public class StartControllerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartControllerCommand.class);

@@ -36,9 +36,7 @@ import static org.testng.Assert.fail;
 
 public class StreamConfigTest {
 
-  /**
-   * Checks that we fail if any of the mandatory properties are missing
-   */
+  /// Checks that we fail if any of the mandatory properties are missing
   @Test
   public void testStreamConfig() {
     String streamType = "fakeStream";
@@ -113,9 +111,7 @@ public class StreamConfigTest {
     }
   }
 
-  /**
-   * Checks that we use defaults where applicable
-   */
+  /// Checks that we use defaults where applicable
   @Test
   public void testStreamConfigDefaults() {
     String streamType = "fakeStream";
@@ -206,9 +202,7 @@ public class StreamConfigTest {
     assertEquals(streamConfig.getFlushThresholdSegmentSizeBytes(), DataSizeUtils.toBytes("10M"));
   }
 
-  /**
-   * Checks that we fail on invalid properties or use defaults
-   */
+  /// Checks that we fail on invalid properties or use defaults
   @Test
   public void testStreamConfigValidations() {
     String streamType = "fakeStream";
@@ -301,9 +295,7 @@ public class StreamConfigTest {
     }
   }
 
-  /**
-   * Checks that we return the right flush threshold for regular vs llc configs
-   */
+  /// Checks that we return the right flush threshold for regular vs llc configs
   @Test
   public void testFlushThresholdStreamConfigs() {
     StreamConfig streamConfig;

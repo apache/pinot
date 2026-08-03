@@ -40,9 +40,7 @@ public class InstanceUtils {
 
   public static final String POOL_KEY = "pool";
 
-  /**
-   * Returns the Helix instance id (e.g. {@code Server_localhost_1234}) for the given instance.
-   */
+  /// Returns the Helix instance id (e.g. `Server_localhost_1234`) for the given instance.
   public static String getHelixInstanceId(Instance instance) {
     String prefix;
     switch (instance.getType()) {
@@ -89,9 +87,7 @@ public class InstanceUtils {
     return String.format("%s://%s:%d", protocol, hostname, port);
   }
 
-  /**
-   * Returns the Helix InstanceConfig for the given instance.
-   */
+  /// Returns the Helix InstanceConfig for the given instance.
   public static InstanceConfig toHelixInstanceConfig(Instance instance) {
     InstanceConfig instanceConfig = new InstanceConfig(getHelixInstanceId(instance));
     instanceConfig.setInstanceEnabled(true);
@@ -99,10 +95,8 @@ public class InstanceUtils {
     return instanceConfig;
   }
 
-  /**
-   * Updates the Helix InstanceConfig with the given instance configuration. Leaves the fields not included in the
-   * instance configuration unchanged.
-   */
+  /// Updates the Helix InstanceConfig with the given instance configuration. Leaves the fields not included in the
+  /// instance configuration unchanged.
   public static void updateHelixInstanceConfig(InstanceConfig instanceConfig, Instance instance) {
     ZNRecord znRecord = instanceConfig.getRecord();
 
@@ -162,11 +156,9 @@ public class InstanceUtils {
     }
   }
 
-  /**
-   * Converts a Helix InstanceConfig to a pinot-spi Instance. This is the reverse of
-   * {@link #toHelixInstanceConfig(Instance)}. Extracts host, port, type, tags, pools,
-   * and optional port fields from the InstanceConfig's ZNRecord.
-   */
+  /// Converts a Helix InstanceConfig to a pinot-spi Instance. This is the reverse of
+  /// [#toHelixInstanceConfig(Instance)]. Extracts host, port, type, tags, pools,
+  /// and optional port fields from the InstanceConfig's ZNRecord.
   public static Instance toInstance(InstanceConfig instanceConfig) {
     String instanceId = instanceConfig.getInstanceName();
     ZNRecord znRecord = instanceConfig.getRecord();
@@ -240,24 +232,20 @@ public class InstanceUtils {
     return String.format("%s://%s:%s", scheme, hostName, adminPort);
   }
 
-  /**
-   * Returns the base URI for the given instance name.
-   * @param instanceName the instance name in the format of Type_hostname_port e.g. Server_localhost_1234
-   * @param httpScheme the HTTP scheme (http or https)
-   * @param port the port number
-   * @return the base URI for the given instance name
-   */
+  /// Returns the base URI for the given instance name.
+  /// @param instanceName the instance name in the format of Type_hostname_port e.g. Server_localhost_1234
+  /// @param httpScheme the HTTP scheme (http or https)
+  /// @param port the port number
+  /// @return the base URI for the given instance name
   public static String getInstanceBaseUri(String instanceName, String httpScheme, int port) {
     String hostname = instanceName.split("_")[1];
     return String.format("%s://%s:%d", httpScheme, hostname, port);
   }
 
-  /**
-   * Extracts the HTTP scheme and port from the given InstanceConfig.
-   *
-   * @param config The InstanceConfig to extract from.
-   * @return A Pair containing the HTTP scheme and port, or null if extraction fails.
-   */
+  /// Extracts the HTTP scheme and port from the given InstanceConfig.
+  ///
+  /// @param config The InstanceConfig to extract from.
+  /// @return A Pair containing the HTTP scheme and port, or null if extraction fails.
   public static Pair<String, Integer> extractHttpSchemeAndPort(InstanceConfig config) {
     try {
       Map<String, String> fields = config.getRecord().getSimpleFields();

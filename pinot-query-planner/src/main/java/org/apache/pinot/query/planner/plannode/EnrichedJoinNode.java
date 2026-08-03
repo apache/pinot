@@ -27,10 +27,10 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 
 /// @deprecated Enriched joins have been removed. This plan node type is retained only for backward compatibility
 /// so that a serialized plan produced by an older-version broker can still be deserialized (see
-/// {@code PlanNodeDeserializer}) without breaking the wire format. No current broker produces this node, and the
-/// runtime rejects it (see {@code DefaultJoinOperatorFactory#createEnrichedJoinOperator}).
+/// `PlanNodeDeserializer`) without breaking the wire format. No current broker produces this node, and the
+/// runtime rejects it (see `DefaultJoinOperatorFactory#createEnrichedJoinOperator`).
 ///
-/// Sunset: this type, {@code plan.proto} field 17, {@link PlanNodeVisitor#visitEnrichedJoin} and the associated
+/// Sunset: this type, `plan.proto` field 17, [PlanNodeVisitor#visitEnrichedJoin] and the associated
 /// serde may be deleted once no supported broker version still emits proto field 17 (i.e. once rolling upgrades
 /// from any pre-removal release are no longer supported).
 @Deprecated(forRemoval = true, since = "1.6.0")

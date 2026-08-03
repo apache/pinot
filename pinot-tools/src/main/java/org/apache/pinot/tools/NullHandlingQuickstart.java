@@ -27,10 +27,8 @@ import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 
-/**
- * Quickstart with a table that has some null values in order to be able to play around with Pinot's null handling
- * related features.
- */
+/// Quickstart with a table that has some null values in order to be able to play around with Pinot's null handling
+/// related features.
 public class NullHandlingQuickstart extends Quickstart {
 
   private static final String[] NULL_HANDLING_TABLE_DIRS = new String[]{"examples/batch/clientSalaryNulls"};

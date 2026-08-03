@@ -48,33 +48,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Class to support multiple http operations in parallel by using the executor that is passed in. This is a wrapper
- * around Apache common HTTP client.
- */
+/// Class to support multiple http operations in parallel by using the executor that is passed in. This is a wrapper
+/// around Apache common HTTP client.
 public class MultiHttpRequest {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiHttpRequest.class);
 
   private final Executor _executor;
   private final HttpClientConnectionManager _connectionManager;
 
-  /**
-   * @param executor executor service to use for making parallel requests
-   * @param connectionManager http connection manager to use.
-   */
+  /// @param executor executor service to use for making parallel requests
+  /// @param connectionManager http connection manager to use.
   public MultiHttpRequest(Executor executor, HttpClientConnectionManager connectionManager) {
     _executor = executor;
     _connectionManager = connectionManager;
   }
 
-  /**
-   * GET urls in parallel using the executor service.
-   * @param urls absolute URLs to GET
-   * @param requestHeaders headers to set when making the request
-   * @param timeoutMs timeout in milliseconds for each GET request
-   * @return instance of CompletionService. Completion service will provide
-   *   results as they arrive. The order is NOT same as the order of URLs
-   */
+  /// GET urls in parallel using the executor service.
+  /// @param urls absolute URLs to GET
+  /// @param requestHeaders headers to set when making the request
+  /// @param timeoutMs timeout in milliseconds for each GET request
+  /// @return instance of CompletionService. Completion service will provide
+  ///   results as they arrive. The order is NOT same as the order of URLs
   public CompletionService<MultiHttpRequestResponse> executeGet(List<String> urls,
       @Nullable Map<String, String> requestHeaders, int timeoutMs) {
     List<Pair<String, String>> urlsAndRequestBodies = new ArrayList<>();
@@ -101,29 +95,25 @@ public class MultiHttpRequest {
     }
   }
 
-  /**
-   * POST urls in parallel using the executor service.
-   * @param urlsAndRequestBodies absolute URLs to POST
-   * @param requestHeaders headers to set when making the request
-   * @param timeoutMs timeout in milliseconds for each POST request
-   * @return instance of CompletionService. Completion service will provide
-   *   results as they arrive. The order is NOT same as the order of URLs
-   */
+  /// POST urls in parallel using the executor service.
+  /// @param urlsAndRequestBodies absolute URLs to POST
+  /// @param requestHeaders headers to set when making the request
+  /// @param timeoutMs timeout in milliseconds for each POST request
+  /// @return instance of CompletionService. Completion service will provide
+  ///   results as they arrive. The order is NOT same as the order of URLs
   public CompletionService<MultiHttpRequestResponse> executePost(List<Pair<String, String>> urlsAndRequestBodies,
       @Nullable Map<String, String> requestHeaders, int timeoutMs) {
     return execute(urlsAndRequestBodies, requestHeaders, timeoutMs, "POST", HttpPost::new);
   }
 
-  /**
-   * Execute certain http method on the urls in parallel using the executor service.
-   * @param urlsAndRequestBodies absolute URLs to execute the http method
-   * @param requestHeaders headers to set when making the request
-   * @param timeoutMs timeout in milliseconds for each http request
-   * @param httpMethodName the name of the http method like GET, DELETE etc.
-   * @param httpRequestBaseSupplier a function to create a new http method object.
-   * @return instance of CompletionService. Completion service will provide
-   *   results as they arrive. The order is NOT same as the order of URLs
-   */
+  /// Execute certain http method on the urls in parallel using the executor service.
+  /// @param urlsAndRequestBodies absolute URLs to execute the http method
+  /// @param requestHeaders headers to set when making the request
+  /// @param timeoutMs timeout in milliseconds for each http request
+  /// @param httpMethodName the name of the http method like GET, DELETE etc.
+  /// @param httpRequestBaseSupplier a function to create a new http method object.
+  /// @return instance of CompletionService. Completion service will provide
+  ///   results as they arrive. The order is NOT same as the order of URLs
   public <T extends HttpUriRequestBase> CompletionService<MultiHttpRequestResponse> execute(
       List<Pair<String, String>> urlsAndRequestBodies, @Nullable Map<String, String> requestHeaders, int timeoutMs,
       String httpMethodName, Function<String, T> httpRequestBaseSupplier) {

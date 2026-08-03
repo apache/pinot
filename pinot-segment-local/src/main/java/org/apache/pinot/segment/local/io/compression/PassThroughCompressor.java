@@ -24,11 +24,9 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 
 
-/**
- * A pass-through implementation of {@link ChunkCompressor}, that simply returns the input uncompressed data
- * with performing any compression. This is useful in cases where cost of de-compression out-weighs benefit of
- * compression.
- */
+/// A pass-through implementation of [ChunkCompressor], that simply returns the input uncompressed data
+/// with performing any compression. This is useful in cases where cost of de-compression out-weighs benefit of
+/// compression.
 class PassThroughCompressor implements ChunkCompressor {
 
   static final PassThroughCompressor INSTANCE = new PassThroughCompressor();

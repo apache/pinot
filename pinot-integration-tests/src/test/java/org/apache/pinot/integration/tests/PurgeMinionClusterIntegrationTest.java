@@ -53,9 +53,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test for minion task of type "PurgeTask"
- */
+/// Integration test for minion task of type "PurgeTask"
 public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final String PURGE_FIRST_RUN_TABLE = "myTable1";
   private static final String PURGE_DELTA_PASSED_TABLE = "myTable2";
@@ -196,9 +194,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     return new TableTaskConfig(Map.of(MinionConstants.PurgeTask.TASK_TYPE, tableTaskConfigs));
   }
 
-  /**
-   * Test purge with no metadata on the segments (checking null safe implementation)
-   */
+  /// Test purge with no metadata on the segments (checking null safe implementation)
   @Test
   public void testFirstRunPurge()
       throws Exception {
@@ -248,9 +244,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     verifyTableDelete(offlineTableName);
   }
 
-  /**
-   * Test purge with passed delay
-   */
+  /// Test purge with passed delay
   @Test
   public void testPassedDelayTimePurge()
       throws Exception {
@@ -303,9 +297,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     verifyTableDelete(offlineTableName);
   }
 
-  /**
-   * Test purge with not passed delay
-   */
+  /// Test purge with not passed delay
   @Test
   public void testNotPassedDelayTimePurge()
       throws Exception {
@@ -343,10 +335,9 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     verifyTableDelete(offlineTableName);
   }
 
-  /**
-   * Test purge on segments which were built by older schema and table config.
-   * Two new columns are added after segments are built and indices are defined for the new columns in the table config.
-   */
+  /// Test purge on segments which were built by older schema and table config.
+  /// Two new columns are added after segments are built and indices are defined for the new columns in the table
+  /// config.
   @Test
   public void testPurgeOnOldSegmentsWithIndicesOnNewColumns()
       throws Exception {
@@ -405,9 +396,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     verifyTableDelete(offlineTableName);
   }
 
-  /**
-   * Test that segments are automatically deleted when all records are purged
-   */
+  /// Test that segments are automatically deleted when all records are purged
   @Test
   public void testSegmentDeletionWhenAllRecordsPurged()
       throws Exception {
@@ -470,11 +459,9 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     verifyTableDelete(offlineTableName);
   }
 
-  /**
-   * Test that empty segments are preserved when they are the last segment of a partition in realtime tables.
-   * This test specifically covers the edge case where empty segments should only
-   * be allowed when they are needed to mark the end of a stream partition (e.g. Kinesis).
-   */
+  /// Test that empty segments are preserved when they are the last segment of a partition in realtime tables.
+  /// This test specifically covers the edge case where empty segments should only
+  /// be allowed when they are needed to mark the end of a stream partition (e.g. Kinesis).
   @Test
   public void testRealtimeLastSegmentPreservation()
       throws Exception {

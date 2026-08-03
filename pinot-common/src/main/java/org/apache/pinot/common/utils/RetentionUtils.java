@@ -24,34 +24,29 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Utility methods for evaluating segment retention eligibility.
- */
+/// Utility methods for evaluating segment retention eligibility.
 public class RetentionUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(RetentionUtils.class);
 
   private RetentionUtils() {
   }
 
-  /**
-   * Implements the time-comparison and creation-time fallback logic used by {@code TimeRetentionStrategy} for
-   * completed segments. Does NOT check segment completion status — callers must guarantee that only completed
-   * segments (DONE or UPLOADED) are passed in.
-   * <ul>
-   *   <li>If end time is valid: expired when {@code currentTimeMs - endTimeMs > retentionMs}.</li>
-   *   <li>If end time is invalid and {@code useCreationTimeFallback} is true and creation time is valid:
-   *       expired when {@code currentTimeMs - creationTimeMs > retentionMs}.</li>
-   *   <li>Otherwise: not expired (fail-open).</li>
-   * </ul>
-   *
-   * @param tableNameWithType        table name with type suffix, used for logging
-   * @param segmentZKMetadata        segment metadata
-   * @param retentionMs              retention period in milliseconds (must be positive)
-   * @param currentTimeMs            current wall-clock time in milliseconds
-   * @param useCreationTimeFallback  when true, fall back to creation time if end time is invalid
-   *                                 (must match {@code controller.retentionManager.enableCreationTimeFallback})
-   * @return true if the segment is past the retention boundary, false otherwise
-   */
+  /// Implements the time-comparison and creation-time fallback logic used by `TimeRetentionStrategy` for
+  /// completed segments. Does NOT check segment completion status — callers must guarantee that only completed
+  /// segments (DONE or UPLOADED) are passed in.
+  ///
+  /// - If end time is valid: expired when `currentTimeMs - endTimeMs > retentionMs`.
+  /// - If end time is invalid and `useCreationTimeFallback` is true and creation time is valid:
+  ///      expired when `currentTimeMs - creationTimeMs > retentionMs`.
+  /// - Otherwise: not expired (fail-open).
+  ///
+  /// @param tableNameWithType        table name with type suffix, used for logging
+  /// @param segmentZKMetadata        segment metadata
+  /// @param retentionMs              retention period in milliseconds (must be positive)
+  /// @param currentTimeMs            current wall-clock time in milliseconds
+  /// @param useCreationTimeFallback  when true, fall back to creation time if end time is invalid
+  ///                                 (must match `controller.retentionManager.enableCreationTimeFallback`)
+  /// @return true if the segment is past the retention boundary, false otherwise
   public static boolean isPurgeable(String tableNameWithType, SegmentZKMetadata segmentZKMetadata, long retentionMs,
       long currentTimeMs, boolean useCreationTimeFallback) {
     String segmentName = segmentZKMetadata.getSegmentName();
