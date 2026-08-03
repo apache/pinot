@@ -478,8 +478,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testRawWithZstdCodecPasses() {
-    FieldConfig fc =
-        new FieldConfig(STR_COL, EncodingType.RAW, null, CompressionCodec.ZSTANDARD, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, null, CompressionCodec.ZSTANDARD, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -512,8 +511,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testDeltaDeltaCodecNonNumericColumnFails() {
     // DELTADELTA only valid on INT/LONG columns
-    FieldConfig fc =
-        new FieldConfig(STR_COL, EncodingType.RAW, null, CompressionCodec.DELTADELTA, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, null, CompressionCodec.DELTADELTA, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
