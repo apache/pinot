@@ -127,6 +127,12 @@ public interface IndexCreationContext extends ColumnShape {
     private int _maxNumberOfMultiValues;
     private int _maxRowLengthInBytes;
     private boolean _hasDictionary;
+    // Overrides for min/max; null means "delegate to the source ColumnShape". Set only when the source reports a
+    // null value domain that the caller has recomputed (see withMinValue / withMaxValue).
+    @Nullable
+    private Comparable<?> _minValue;
+    @Nullable
+    private Comparable<?> _maxValue;
 
     // Build-time toggles.
     private boolean _onHeap;
@@ -226,6 +232,20 @@ public interface IndexCreationContext extends ColumnShape {
       return this;
     }
 
+    /// Overrides the min value that would otherwise be sourced from the [ColumnShape]. Used when the source reports a
+    /// null min/max (e.g. ingestion-aggregated no-dictionary columns on the index-handler path) and the caller has
+    /// recomputed it. A null argument leaves delegation to the source unchanged.
+    public Builder withMinValue(Comparable<?> minValue) {
+      _minValue = minValue;
+      return this;
+    }
+
+    /// Overrides the max value derived from the source [ColumnShape]. See [#withMinValue].
+    public Builder withMaxValue(Comparable<?> maxValue) {
+      _maxValue = maxValue;
+      return this;
+    }
+
     // Build-time toggle setters.
 
     public Builder withOnHeap(boolean onHeap) {
@@ -299,6 +319,10 @@ public interface IndexCreationContext extends ColumnShape {
     private final int _maxNumberOfMultiValues;
     private final int _maxRowLengthInBytes;
     private final boolean _hasDictionary;
+    @Nullable
+    private final Comparable<?> _minValue;
+    @Nullable
+    private final Comparable<?> _maxValue;
 
     // Build-time toggles.
     private final boolean _onHeap;
@@ -328,6 +352,8 @@ public interface IndexCreationContext extends ColumnShape {
       _maxNumberOfMultiValues = builder._maxNumberOfMultiValues;
       _maxRowLengthInBytes = builder._maxRowLengthInBytes;
       _hasDictionary = builder._hasDictionary;
+      _minValue = builder._minValue;
+      _maxValue = builder._maxValue;
       _onHeap = builder._onHeap;
       _optimizeDictionary = builder._optimizedDictionary;
       _textCommitOnClose = builder._textCommitOnClose;
@@ -388,13 +414,14 @@ public interface IndexCreationContext extends ColumnShape {
     @Override
     @Nullable
     public Comparable<?> getMinValue() {
-      return _columnShape.getMinValue();
+      // Delegate to the source ColumnShape unless a caller supplied an explicit override.
+      return _minValue != null ? _minValue : _columnShape.getMinValue();
     }
 
     @Override
     @Nullable
     public Comparable<?> getMaxValue() {
-      return _columnShape.getMaxValue();
+      return _maxValue != null ? _maxValue : _columnShape.getMaxValue();
     }
 
     @Override

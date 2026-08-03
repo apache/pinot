@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -44,6 +45,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -226,7 +228,8 @@ public class RangeIndexHandler extends BaseIndexHandler {
     try (ForwardIndexReader forwardIndexReader = readerFactory.createIndexReader(segmentWriter,
         _fieldIndexConfigs.get(columnMetadata.getColumnName()), columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata)) {
+        CombinedInvertedIndexCreator rangeIndexCreator =
+            newRangeIndexCreator(columnMetadata, forwardIndexReader, readerContext, numDocs)) {
       if (columnMetadata.isSingleValue()) {
         // Single-value column.
         switch (columnMetadata.getDataType().getStoredType()) {
@@ -300,5 +303,68 @@ public class RangeIndexHandler extends BaseIndexHandler {
     RangeIndexConfig config = _fieldIndexConfigs.get(columnMetadata.getColumnName())
         .getConfig(StandardIndexes.range());
     return StandardIndexes.range().createIndexCreator(context, config);
+  }
+
+  /// Variant for the non-dictionary path. The BitSliced (v2) range index subtracts the column min for INT/LONG
+  /// columns, so it needs the value domain up front. Ingestion-aggregated no-dictionary columns committed before
+  /// min/max recovery report null min/max in their metadata, so recompute it here with a single scan of the forward
+  /// index before building the creator. This is a deliberate extra pass over the column: {@code RangeBitmap.appender}
+  /// requires the max at construction, so it cannot be folded into the add-loop that follows.
+  ///
+  /// Note: the recovered domain is written into the range index header (which the reader uses for the subtract-min),
+  /// but it is not written back into the column metadata. For such legacy segments the reader therefore still reads a
+  /// null metadata max and falls back to {@code Long.MAX_VALUE}; results stay correct (the RangeBitmap domain is
+  /// self-contained) but segment-level max pruning is weaker until the segment is rebuilt. Segments sealed with the
+  /// recovery in {@code MutableNoDictColumnStatistics} carry proper metadata min/max and do not hit this path.
+  private CombinedInvertedIndexCreator newRangeIndexCreator(ColumnMetadata columnMetadata,
+      ForwardIndexReader forwardIndexReader, ForwardIndexReaderContext readerContext, int numDocs)
+      throws Exception {
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    IndexCreationContext.Builder builder = new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata);
+    RangeIndexConfig config = _fieldIndexConfigs.get(columnMetadata.getColumnName())
+        .getConfig(StandardIndexes.range());
+    if (config.getVersion() == BitSlicedRangeIndexCreator.VERSION && columnMetadata.isSingleValue()
+        && (columnMetadata.getMinValue() == null || columnMetadata.getMaxValue() == null)) {
+      Comparable[] minMax = computeRawMinMax(forwardIndexReader, readerContext,
+          columnMetadata.getDataType().getStoredType(), numDocs);
+      if (minMax != null) {
+        builder.withMinValue(minMax[0]).withMaxValue(minMax[1]);
+      }
+    }
+    return StandardIndexes.range().createIndexCreator(builder.build(), config);
+  }
+
+  /// Computes {@code [min, max]} for a single-value INT/LONG no-dictionary column by scanning the forward index.
+  /// Returns {@code null} for stored types whose BitSliced range index does not read min/max (FLOAT/DOUBLE use the
+  /// full floating-point ordinal domain) or that do not support it, and for empty columns.
+  private static Comparable[] computeRawMinMax(ForwardIndexReader forwardIndexReader,
+      ForwardIndexReaderContext readerContext, DataType storedType, int numDocs) {
+    if (numDocs == 0) {
+      return null;
+    }
+    switch (storedType) {
+      case INT: {
+        int min = forwardIndexReader.getInt(0, readerContext);
+        int max = min;
+        for (int i = 1; i < numDocs; i++) {
+          int curr = forwardIndexReader.getInt(i, readerContext);
+          min = Math.min(min, curr);
+          max = Math.max(max, curr);
+        }
+        return new Comparable[]{min, max};
+      }
+      case LONG: {
+        long min = forwardIndexReader.getLong(0, readerContext);
+        long max = min;
+        for (int i = 1; i < numDocs; i++) {
+          long curr = forwardIndexReader.getLong(i, readerContext);
+          min = Math.min(min, curr);
+          max = Math.max(max, curr);
+        }
+        return new Comparable[]{min, max};
+      }
+      default:
+        return null;
+    }
   }
 }
