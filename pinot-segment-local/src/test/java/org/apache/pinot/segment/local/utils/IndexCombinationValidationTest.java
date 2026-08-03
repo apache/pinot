@@ -458,7 +458,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testRawWithLz4CodecPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, (List<IndexType>) null, CompressionCodec.LZ4, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, null, CompressionCodec.LZ4, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -468,7 +468,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testRawWithSnappyCodecPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, (List<IndexType>) null, CompressionCodec.SNAPPY, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, null, CompressionCodec.SNAPPY, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -478,8 +478,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testRawWithZstdCodecPasses() {
-    FieldConfig fc =
-        new FieldConfig(STR_COL, EncodingType.RAW, (List<IndexType>) null, CompressionCodec.ZSTANDARD, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, null, CompressionCodec.ZSTANDARD, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -490,7 +489,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testRawWithClpCodecStringColumnPasses() {
     // CLP codecs are valid for raw STRING columns
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, (List<IndexType>) null, CompressionCodec.CLP, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, null, CompressionCodec.CLP, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -501,7 +500,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testRawWithClpCodecNonStringColumnFails() {
     // CLP is only valid on STRING stored type
-    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.RAW, (List<IndexType>) null, CompressionCodec.CLP, null);
+    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.RAW, null, CompressionCodec.CLP, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(INT_COL))
         .setFieldConfigList(List.of(fc))
@@ -512,8 +511,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testDeltaDeltaCodecNonNumericColumnFails() {
     // DELTADELTA only valid on INT/LONG columns
-    FieldConfig fc =
-        new FieldConfig(STR_COL, EncodingType.RAW, (List<IndexType>) null, CompressionCodec.DELTADELTA, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, null, CompressionCodec.DELTADELTA, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))

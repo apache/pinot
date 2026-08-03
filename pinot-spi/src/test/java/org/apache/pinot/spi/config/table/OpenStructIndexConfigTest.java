@@ -54,8 +54,7 @@ public class OpenStructIndexConfigTest {
 
   @Test
   public void testNoDictionaryKeys() {
-    FieldConfig rawKey =
-        new FieldConfig("raw_payload", FieldConfig.EncodingType.RAW, (List<FieldConfig.IndexType>) null, null, null);
+    FieldConfig rawKey = new FieldConfig("raw_payload", FieldConfig.EncodingType.RAW, null, null, null);
     OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, 1000, null, 0.5, List.of(rawKey));
     assertFalse(config.shouldUseDictionaryForKey("raw_payload"));
     // Unconfigured key falls back to built-in default (DICTIONARY).
@@ -125,10 +124,8 @@ public class OpenStructIndexConfigTest {
 
   @Test
   public void testShouldUseDictionaryForKeyHardOverride() {
-    FieldConfig blob =
-        new FieldConfig("blob", FieldConfig.EncodingType.RAW, (List<FieldConfig.IndexType>) null, null, null);
-    FieldConfig rawPayload =
-        new FieldConfig("raw_payload", FieldConfig.EncodingType.RAW, (List<FieldConfig.IndexType>) null, null, null);
+    FieldConfig blob = new FieldConfig("blob", FieldConfig.EncodingType.RAW, null, null, null);
+    FieldConfig rawPayload = new FieldConfig("raw_payload", FieldConfig.EncodingType.RAW, null, null, null);
     OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, 1000, null, 0.5, List.of(blob, rawPayload));
     assertFalse(config.shouldUseDictionaryForKey("blob"));
     assertFalse(config.shouldUseDictionaryForKey("raw_payload"));
