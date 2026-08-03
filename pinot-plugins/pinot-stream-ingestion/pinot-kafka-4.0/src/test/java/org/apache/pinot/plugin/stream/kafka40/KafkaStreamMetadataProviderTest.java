@@ -337,11 +337,13 @@ public class KafkaStreamMetadataProviderTest {
     }
   }
 
-  @Test
-  public void testComputePartitionGroupMetadataOmitsPartitionWithoutOffset()
+  @Test(expectedExceptions = TransientConsumerException.class)
+  public void testComputePartitionGroupMetadataThrowsWhenPartitionOffsetMissing()
       throws Exception {
-    // A partition the stream no longer returns an offset for (e.g. reached end of life) is omitted from the result,
-    // matching the previous per-partition behavior.
+    // If the stream returns no offset for a requested partition, the whole fetch must fail with a transient error so
+    // PartitionGroupMetadataFetcher retries on the next run. The partition must NOT be silently dropped: downstream,
+    // absence from the list is the end-of-life signal (the CONSUMING segment is marked ONLINE with no successor) and
+    // also shrinks the derived partition count.
     String topicName = "asset";
     @SuppressWarnings("unchecked")
     Consumer<Bytes, Bytes> consumer = mock(Consumer.class);
@@ -364,10 +366,7 @@ public class KafkaStreamMetadataProviderTest {
     try {
       StreamConfig streamConfig = getStreamConfig(topicName);
       try (KafkaStreamMetadataProvider provider = new MockKafkaStreamMetadataProvider("client", streamConfig)) {
-        List<PartitionGroupMetadata> metadataList =
-            provider.computePartitionGroupMetadata("client", streamConfig, List.of(), 10000);
-        assertEquals(metadataList.stream().map(PartitionGroupMetadata::getPartitionGroupId)
-            .collect(Collectors.toList()), List.of(0, 2));
+        provider.computePartitionGroupMetadata("client", streamConfig, List.of(), 10000);
       }
     } finally {
       MOCK_CONSUMER.remove();

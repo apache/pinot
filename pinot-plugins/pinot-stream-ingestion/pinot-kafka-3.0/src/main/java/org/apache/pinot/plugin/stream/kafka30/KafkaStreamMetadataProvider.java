@@ -155,21 +155,11 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
 
     List<PartitionGroupMetadata> result = new ArrayList<>(partitionIds.size());
     for (Integer partitionId : partitionIds) {
-      if (partitionIdToEndOffset.containsKey(partitionId)) {
-        result.add(new PartitionGroupMetadata(partitionId, partitionIdToEndOffset.get(partitionId)));
-      } else {
-        StreamPartitionMsgOffset startOffset = fetchedOffsets.get(partitionId);
-        if (startOffset != null) {
-          result.add(new PartitionGroupMetadata(partitionId, startOffset));
-        } else {
-          // The stream returned no offset for this partition (it does not exist or has no data). Skip it gracefully
-          // so the remaining partitions are still processed; it is retried on the next validation run. Note this is
-          // a new, more resilient behavior: the previous per-partition implementation would fail the entire fetch
-          // here instead of dropping a single partition.
-          LOGGER.warn("No offset returned for topic: {} partition: {}; skipping it in partition group metadata",
-              _topic, partitionId);
-        }
-      }
+      // fetchOffsetsForPartitions returns an offset for every requested partition (or throws), so the lookup below
+      // is non-null for the partitions that were fetched.
+      StreamPartitionMsgOffset startOffset = partitionIdToEndOffset.containsKey(partitionId)
+          ? partitionIdToEndOffset.get(partitionId) : fetchedOffsets.get(partitionId);
+      result.add(new PartitionGroupMetadata(partitionId, startOffset));
     }
     return result;
   }
@@ -199,21 +189,19 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   @Override
   public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     Preconditions.checkNotNull(offsetCriteria);
-    StreamPartitionMsgOffset offset =
-        fetchOffsetsForPartitions(List.of(_partition), offsetCriteria, timeoutMillis).get(_partition);
-    if (offset == null) {
-      throw new TransientConsumerException(new RuntimeException(
-          "Failed to fetch offset for topic: " + _topic + " partition: " + _partition));
-    }
-    return offset;
+    // fetchOffsetsForPartitions throws if the stream returns no offset for _partition, so the result is non-null.
+    return fetchOffsetsForPartitions(List.of(_partition), offsetCriteria, timeoutMillis).get(_partition);
   }
 
   /**
    * Fetches the offset matching {@code offsetCriteria} for the given partitions in a single batched call to the
    * stream. Kafka's {@code beginningOffsets}/{@code endOffsets}/{@code offsetsForTimes} all accept a collection of
    * partitions, so this issues one broker round-trip regardless of the number of partitions (these calls do not
-   * require the consumer to be assigned to the partitions). A partition that the stream does not return an offset
-   * for is omitted from the result map.
+   * require the consumer to be assigned to the partitions).
+   *
+   * @return an offset for every requested partition
+   * @throws TransientConsumerException if the stream returns no offset for a requested partition (so the caller
+   *         retries rather than treating the partition as absent)
    */
   private Map<Integer, StreamPartitionMsgOffset> fetchOffsetsForPartitions(Collection<Integer> partitionIds,
       OffsetCriteria offsetCriteria, long timeoutMillis) {
@@ -265,6 +253,16 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       for (Map.Entry<TopicPartition, Long> entry : topicPartitionToOffset.entrySet()) {
         if (entry.getValue() != null) {
           result.put(entry.getKey().partition(), new LongMsgOffset(entry.getValue()));
+        }
+      }
+      // Every requested partition must resolve to an offset. If the stream returned none for a partition, fail the
+      // whole fetch with a transient error so PartitionGroupMetadataFetcher retries it on the next run, rather than
+      // returning a partial map: a missing partition would be misread downstream as having reached end of life (its
+      // CONSUMING segment marked ONLINE with no successor) and would shrink the derived partition count.
+      for (Integer partitionId : partitionIds) {
+        if (!result.containsKey(partitionId)) {
+          throw new TransientConsumerException(new RuntimeException(
+              "No offset returned for topic: " + _topic + " partition: " + partitionId));
         }
       }
       return result;
