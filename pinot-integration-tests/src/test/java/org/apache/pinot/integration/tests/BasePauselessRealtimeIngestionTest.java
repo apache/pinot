@@ -162,17 +162,25 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   }
 
   protected void injectFailure() {
+    String failurePoint = getFailurePoint();
+    if (failurePoint == null) {
+      return;
+    }
     PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
     if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
-      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).enableTestFault(getFailurePoint());
+      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).enableTestFault(failurePoint);
     }
     _failureEnabled = true;
   }
 
   protected void disableFailure() {
+    String failurePoint = getFailurePoint();
+    if (failurePoint == null) {
+      return;
+    }
     PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
     if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
-      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).disableTestFault(getFailurePoint());
+      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).disableTestFault(failurePoint);
     }
     _failureEnabled = false;
   }
