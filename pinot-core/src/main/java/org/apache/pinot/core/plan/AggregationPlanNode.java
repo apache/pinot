@@ -36,14 +36,13 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.AggregationInfo;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.segment.local.segment.index.map.NullDataSource;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.datasource.MapDataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.spi.data.Schema;
 
 import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
 
@@ -276,7 +275,7 @@ public class AggregationPlanNode implements PlanNode {
 
   @Nullable
   static DataSource resolveDataSource(ExpressionContext expression, IndexSegment segment,
-      @Nullable org.apache.pinot.spi.data.Schema schema) {
+      @Nullable Schema schema) {
     if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
       return segment.getDataSource(expression.getIdentifier(), schema);
     }
@@ -288,7 +287,7 @@ public class AggregationPlanNode implements PlanNode {
 
   @Nullable
   static DataSource tryResolveKeyedDataSource(ExpressionContext expression, IndexSegment segment,
-      @Nullable org.apache.pinot.spi.data.Schema schema) {
+      @Nullable Schema schema) {
     FunctionContext function = expression.getFunction();
     if (function == null
         || !ItemTransformFunction.FUNCTION_NAME.equals(function.getFunctionName())) {
@@ -303,14 +302,6 @@ public class AggregationPlanNode implements PlanNode {
     String columnName = args.get(0).getIdentifier();
     String key = args.get(1).getLiteral().getStringValue();
     DataSource columnDs = segment.getDataSource(columnName, schema);
-    if (columnDs instanceof MapDataSource) {
-      DataSource keyDs = ((MapDataSource) columnDs).getDataSource(key);
-      // An absent MAP key yields a NullDataSource whose metadata reports non-null min/max (the INT
-      // default) and which carries no null vector, so it would wrongly satisfy the metadata-based
-      // non-scan check and report hasNullValues=false. Fall back to a scan, mirroring the
-      // OPEN_STRUCT guard below.
-      return keyDs instanceof NullDataSource ? null : keyDs;
-    }
     if (columnDs instanceof OpenStructDataSource) {
       OpenStructDataSource osDs = (OpenStructDataSource) columnDs;
       DataSource keyDs = osDs.isMaterialized(key) ? osDs.getDataSource(key) : null;
