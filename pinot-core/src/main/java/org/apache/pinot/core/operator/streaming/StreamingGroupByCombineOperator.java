@@ -62,7 +62,7 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
 
   private final int _flushThreshold;
   private final int _numAggregationFunctions;
-  private final int _numGroupByExpressions;
+  private final int _numKeyColumns;
   private final int _numColumns;
 
   // Main-thread-only state for accumulating group-by results
@@ -81,8 +81,10 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
     assert aggregationFunctions != null;
     _numAggregationFunctions = aggregationFunctions.length;
     assert _queryContext.getGroupByExpressions() != null;
-    _numGroupByExpressions = _queryContext.getGroupByExpressions().size();
-    _numColumns = _numGroupByExpressions + _numAggregationFunctions;
+    // NOTE: Use the number of group-by KEY columns (which includes the synthetic $groupingId column for grouping
+    //       sets), matching GroupByCombineOperator, so raw grouping-set results are laid out correctly.
+    _numKeyColumns = _queryContext.getNumGroupByKeyColumns();
+    _numColumns = _numKeyColumns + _numAggregationFunctions;
   }
 
   /// For group-by queries, when maxExecutionThreads is not explicitly configured, override it to create as many tasks
@@ -163,7 +165,7 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
     if (aggregationGroupByResult == null || resultsBlock.getIntermediateRecords() != null) {
       return resultsBlock;
     }
-    List<IntermediateRecord> records = new ArrayList<>();
+    List<IntermediateRecord> records = new ArrayList<>(aggregationGroupByResult.getNumGroups());
     try {
       Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
       int extractedKeys = 0;
@@ -174,7 +176,7 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
         Object[] values = Arrays.copyOf(keys, _numColumns);
         int groupId = groupKey._groupId;
         for (int i = 0; i < _numAggregationFunctions; i++) {
-          values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+          values[_numKeyColumns + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
         }
         records.add(IntermediateRecord.withoutOrderByValues(new Key(keys), new Record(values)));
       }
@@ -213,6 +215,9 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
         QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
         _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
       }
+    } else if (resultsBlock.getAggregationGroupByResult() != null) {
+      throw new IllegalStateException(
+          "Raw group-by result reached the consumer thread; it must be detached on the worker thread");
     }
   }
 
