@@ -104,19 +104,15 @@ public class MapFilterOperatorOpenStructTest {
     return qc;
   }
 
-  /**
-   * OPEN_STRUCT source that is fully materialized but does not hold {@code key}. Stubs the field
-   * spec and doc count that {@code OpenStructNullDataSource.forAbsentKey} reads.
-   */
+  /// OPEN_STRUCT source that is fully materialized but does not hold {@code key}. Stubs the field
+  /// spec and doc count that {@code OpenStructNullDataSource.forAbsentKey} reads.
   private static OpenStructDataSource mockFullyMaterializedAbsentKey(String key) {
     return mockFullyMaterializedAbsentKey(key, Map.of());
   }
 
-  /**
-   * OPEN_STRUCT source that is fully materialized but does not hold {@code key}. Stubs the field
-   * spec and doc count that {@code OpenStructNullDataSource.forAbsentKey} reads. {@code children}
-   * carries the declared child specs — pass an empty map for an undeclared key.
-   */
+  /// OPEN_STRUCT source that is fully materialized but does not hold {@code key}. Stubs the field
+  /// spec and doc count that {@code OpenStructNullDataSource.forAbsentKey} reads. {@code children}
+  /// carries the declared child specs — pass an empty map for an undeclared key.
   private static OpenStructDataSource mockFullyMaterializedAbsentKey(String key, Map<String, FieldSpec> children) {
     OpenStructDataSource osDs = mock(OpenStructDataSource.class);
     when(osDs.isMaterialized(key)).thenReturn(false);
@@ -145,9 +141,7 @@ public class MapFilterOperatorOpenStructTest {
     return count;
   }
 
-  /**
-   * Materialized key with EQ predicate dispatches to PER_KEY_INDEX.
-   */
+  /// Materialized key with EQ predicate dispatches to PER_KEY_INDEX.
   @Test
   public void testPerKeyIndexEq() {
     OpenStructDataSource osDs = mock(OpenStructDataSource.class);
@@ -183,9 +177,7 @@ public class MapFilterOperatorOpenStructTest {
     assertTrue(op.toExplainString().contains("delegateTo:per_key_index"));
   }
 
-  /**
-   * Absent key on a fully materialized segment with EQ → no doc matches (getTrues returns EOF).
-   */
+  /// Absent key on a fully materialized segment with EQ → no doc matches (getTrues returns EOF).
   @Test
   public void testAbsentKeyFullyMaterializedEq() {
     OpenStructDataSource osDs = mockFullyMaterializedAbsentKey("missing_key");
@@ -198,9 +190,7 @@ public class MapFilterOperatorOpenStructTest {
     assertEquals(op.getTrues().iterator().next(), Constants.EOF);
   }
 
-  /**
-   * Absent key on a fully materialized segment with IS_NULL → every doc matches.
-   */
+  /// Absent key on a fully materialized segment with IS_NULL → every doc matches.
   @Test
   public void testAbsentKeyFullyMaterializedIsNull() {
     OpenStructDataSource osDs = mockFullyMaterializedAbsentKey("missing_key");
@@ -214,10 +204,8 @@ public class MapFilterOperatorOpenStructTest {
     assertEquals(op.getNumMatchingDocs(), NUM_DOCS);
   }
 
-  /**
-   * With null handling off, an absent key reads as its type default, so NOT_EQ against any other
-   * value must match every doc. Regression test — this previously returned EmptyFilterOperator.
-   */
+  /// With null handling off, an absent key reads as its type default, so NOT_EQ against any other
+  /// value must match every doc. Regression test — this previously returned EmptyFilterOperator.
   @Test
   public void testAbsentKeyNotEqMatchesAllWhenNullHandlingOff() {
     OpenStructDataSource osDs = mockFullyMaterializedAbsentKey("missing_key");
@@ -231,9 +219,7 @@ public class MapFilterOperatorOpenStructTest {
     assertEquals(countMatches(op), NUM_DOCS);
   }
 
-  /**
-   * Same as above for NOT_IN.
-   */
+  /// Same as above for NOT_IN.
   @Test
   public void testAbsentKeyNotInMatchesAllWhenNullHandlingOff() {
     OpenStructDataSource osDs = mockFullyMaterializedAbsentKey("missing_key");
@@ -246,9 +232,7 @@ public class MapFilterOperatorOpenStructTest {
     assertEquals(countMatches(op), NUM_DOCS);
   }
 
-  /**
-   * IN against an absent key never matches, regardless of null handling.
-   */
+  /// IN against an absent key never matches, regardless of null handling.
   @Test
   public void testAbsentKeyInMatchesNothingWhenNullHandlingOff() {
     OpenStructDataSource osDs = mockFullyMaterializedAbsentKey("missing_key");
@@ -260,13 +244,11 @@ public class MapFilterOperatorOpenStructTest {
     assertEquals(countMatches(op), 0);
   }
 
-  /**
-   * A numeric RANGE over an absent key that the schema does not declare. There is no type to
-   * recover, so the key resolves through the same STRING fallback {@code item()} uses and the
-   * comparison is lexicographic: the default "null" sorts above "100", so every doc matches.
-   * Pinned deliberately — filter and projection must not disagree, even when the answer is only
-   * meaningful as a string comparison.
-   */
+  /// A numeric RANGE over an absent key that the schema does not declare. There is no type to
+  /// recover, so the key resolves through the same STRING fallback {@code item()} uses and the
+  /// comparison is lexicographic: the default "null" sorts above "100", so every doc matches.
+  /// Pinned deliberately — filter and projection must not disagree, even when the answer is only
+  /// meaningful as a string comparison.
   @Test
   public void testAbsentUndeclaredKeyRangeUsesStringFallback() {
     OpenStructDataSource osDs = mockFullyMaterializedAbsentKey("missing_key");
@@ -279,11 +261,9 @@ public class MapFilterOperatorOpenStructTest {
     assertEquals(countMatches(op), NUM_DOCS);
   }
 
-  /**
-   * Same RANGE against a key the schema does declare — the declared type drives the comparison, so
-   * LONG's default (Long.MIN_VALUE) is correctly below 100 and nothing matches. The absent key is
-   * folded to a constant, so the operator stays countable instead of scanning an all-null column.
-   */
+  /// Same RANGE against a key the schema does declare — the declared type drives the comparison, so
+  /// LONG's default (Long.MIN_VALUE) is correctly below 100 and nothing matches. The absent key is
+  /// folded to a constant, so the operator stays countable instead of scanning an all-null column.
   @Test
   public void testAbsentDeclaredKeyRangeMatchesNothing() {
     OpenStructDataSource osDs = mockFullyMaterializedAbsentKey("missing_key",
@@ -298,10 +278,8 @@ public class MapFilterOperatorOpenStructTest {
     assertEquals(op.getNumMatchingDocs(), 0);
   }
 
-  /**
-   * With null handling on, three-valued logic makes every value predicate — including the
-   * negations — unmatched for an all-null key.
-   */
+  /// With null handling on, three-valued logic makes every value predicate — including the
+  /// negations — unmatched for an all-null key.
   @Test
   public void testAbsentKeyNotEqEmptyWhenNullHandlingOn() {
     OpenStructDataSource osDs = mockFullyMaterializedAbsentKey("missing_key");
@@ -347,12 +325,10 @@ public class MapFilterOperatorOpenStructTest {
     assertEquals(op.getNumMatchingDocs(), 0);
   }
 
-  /**
-   * A predicate the per-key path cannot rewrite (REGEXP_LIKE) must decline rather than fold the
-   * absent key to a match-all/match-none it never evaluated. Structured like
-   * {@link #testSparseKeyFallsToExpressionFilter} because ExpressionFilterOperator cannot be built
-   * against a mock segment.
-   */
+  /// A predicate the per-key path cannot rewrite (REGEXP_LIKE) must decline rather than fold the
+  /// absent key to a match-all/match-none it never evaluated. Structured like
+  /// {@link #testSparseKeyFallsToExpressionFilter} because ExpressionFilterOperator cannot be built
+  /// against a mock segment.
   @Test
   public void testAbsentKeyUnsupportedPredicateFallsThrough() {
     OpenStructDataSource osDs = mockFullyMaterializedAbsentKey("missing_key");
@@ -371,9 +347,7 @@ public class MapFilterOperatorOpenStructTest {
     }
   }
 
-  /**
-   * Non-materialized key on a segment that is NOT fully materialized → falls to EXPRESSION_FILTER.
-   */
+  /// Non-materialized key on a segment that is NOT fully materialized → falls to EXPRESSION_FILTER.
   @Test
   public void testSparseKeyFallsToExpressionFilter() {
     OpenStructDataSource osDs = mock(OpenStructDataSource.class);
@@ -413,9 +387,7 @@ public class MapFilterOperatorOpenStructTest {
     }
   }
 
-  /**
-   * Materialized key with IS_NOT_NULL and a null bitmap → PER_KEY_INDEX (BitmapBasedFilterOperator).
-   */
+  /// Materialized key with IS_NOT_NULL and a null bitmap → PER_KEY_INDEX (BitmapBasedFilterOperator).
   @Test
   public void testIsNotNullWithNullBitmap() {
     OpenStructDataSource osDs = mock(OpenStructDataSource.class);

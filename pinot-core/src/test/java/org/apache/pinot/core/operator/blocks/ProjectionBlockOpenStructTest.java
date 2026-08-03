@@ -41,18 +41,16 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/**
- * Covers projection over an OPEN_STRUCT column, where the parent data source carries no readers of its own and every
- * value is reached through a per-key child source that {@link ProjectionBlock#getBlockValueSet(String[])} registers
- * lazily. Also exercises the matching {@link DataFetcher} registration skip, since the two halves only make sense
- * together.
- */
+/// Covers projection over an OPEN_STRUCT column, where the parent data source carries no readers of its own and every
+/// value is reached through a per-key child source that {@link ProjectionBlock#getBlockValueSet(String[])} registers
+/// lazily. Also exercises the matching {@link DataFetcher} registration skip, since the two halves only make sense
+/// together.
 public class ProjectionBlockOpenStructTest {
   private static final String OPEN_STRUCT_COLUMN = "metrics";
   private static final String PLAIN_COLUMN = "ts";
   private static final String KEY = "errors";
 
-  /** OPEN_STRUCT parent: an empty index container, so {@code getForwardIndex()} is null. */
+  /// OPEN_STRUCT parent: an empty index container, so {@code getForwardIndex()} is null.
   private static OpenStructDataSource mockOpenStructDataSource() {
     return mock(OpenStructDataSource.class);
   }
@@ -69,11 +67,9 @@ public class ProjectionBlockOpenStructTest {
     return dataSource;
   }
 
-  /**
-   * Regression: registering the OPEN_STRUCT parent with the DataFetcher tripped its forward-index precondition, so
-   * every {@code SELECT metrics['key']} failed at ProjectionOperator construction with
-   * "Forward index disabled for column: metrics, cannot create DataFetcher!".
-   */
+  /// Regression: registering the OPEN_STRUCT parent with the DataFetcher tripped its forward-index precondition, so
+  /// every {@code SELECT metrics['key']} failed at ProjectionOperator construction with
+  /// "Forward index disabled for column: metrics, cannot create DataFetcher!".
   @Test
   public void testDataFetcherSkipsOpenStructParent() {
     Map<String, DataSource> dataSourceMap = new HashMap<>();
@@ -83,10 +79,8 @@ public class ProjectionBlockOpenStructTest {
     new DataFetcher(dataSourceMap, Map.of()).close();
   }
 
-  /**
-   * The skip is scoped to OPEN_STRUCT parents — an ordinary column with a disabled forward index must still be
-   * rejected rather than silently reading nothing.
-   */
+  /// The skip is scoped to OPEN_STRUCT parents — an ordinary column with a disabled forward index must still be
+  /// rejected rather than silently reading nothing.
   @Test
   public void testDataFetcherStillRejectsForwardIndexDisabledColumn() {
     DataSource dataSource = mock(DataSource.class);
@@ -96,10 +90,8 @@ public class ProjectionBlockOpenStructTest {
         () -> new DataFetcher(Map.of(PLAIN_COLUMN, dataSource), Map.of()));
   }
 
-  /**
-   * The parent is skipped, but the per-key child source it resolves is registered on first use, so the key remains
-   * readable.
-   */
+  /// The parent is skipped, but the per-key child source it resolves is registered on first use, so the key remains
+  /// readable.
   @Test
   public void testPerKeyDataSourceRegisteredOnFirstUse() {
     OpenStructDataSource openStructDataSource = mockOpenStructDataSource();
@@ -114,10 +106,8 @@ public class ProjectionBlockOpenStructTest {
     assertNotNull(projectionBlock.getBlockValueSet(new String[]{OPEN_STRUCT_COLUMN, KEY}));
   }
 
-  /**
-   * ProjectionBlock re-resolves the per-key source on every block. Registration must be idempotent, otherwise each
-   * block orphans the displaced ColumnValueReader along with its off-heap reader context.
-   */
+  /// ProjectionBlock re-resolves the per-key source on every block. Registration must be idempotent, otherwise each
+  /// block orphans the displaced ColumnValueReader along with its off-heap reader context.
   @Test
   public void testRegisteringSameColumnTwiceKeepsFirstReader() {
     DataFetcher dataFetcher = new DataFetcher(Map.of(), Map.of());
@@ -131,10 +121,8 @@ public class ProjectionBlockOpenStructTest {
     dataFetcher.close();
   }
 
-  /**
-   * Selecting the parent column itself is not supported. It must fail as a bad request pointing at the per-key syntax
-   * rather than an NPE from the reader the DataFetcher never registered.
-   */
+  /// Selecting the parent column itself is not supported. It must fail as a bad request pointing at the per-key syntax
+  /// rather than an NPE from the reader the DataFetcher never registered.
   @Test
   public void testSelectingOpenStructParentFailsWithClearMessage() {
     Map<String, DataSource> dataSourceMap = new HashMap<>();

@@ -47,19 +47,17 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
 
-/**
- * Covers {@link ItemTransformFunction#getNullBitmap} for both backing column types.
- *
- * <p>OPEN_STRUCT keeps a per-key presence bitmap, so {@code getNullBitmap} reads the per-key value set and must return
- * block-local indices (projected by
- * {@link org.apache.pinot.core.operator.docvalsets.ProjectionBlockValSet}) rather than raw segment-level doc IDs.
- *
- * <p>MAP has no per-key null information, so {@code getNullBitmap} must fall back to
- * {@link BaseTransformFunction#getNullBitmap} — the OR of the argument bitmaps, which yields the MAP column's own
- * null bitmap. Reading the per-key value set for a MAP column would report "no nulls" for a key that is absent from
- * every doc, because an absent MAP key resolves to a
- * {@link org.apache.pinot.segment.local.segment.index.map.NullDataSource} carrying only a forward index.
- */
+/// Covers {@link ItemTransformFunction#getNullBitmap} for both backing column types.
+///
+/// <p>OPEN_STRUCT keeps a per-key presence bitmap, so {@code getNullBitmap} reads the per-key value set and must return
+/// block-local indices (projected by
+/// {@link org.apache.pinot.core.operator.docvalsets.ProjectionBlockValSet}) rather than raw segment-level doc IDs.
+///
+/// <p>MAP has no per-key null information, so {@code getNullBitmap} must fall back to
+/// {@link BaseTransformFunction#getNullBitmap} — the OR of the argument bitmaps, which yields the MAP column's own
+/// null bitmap. Reading the per-key value set for a MAP column would report "no nulls" for a key that is absent from
+/// every doc, because an absent MAP key resolves to a
+/// {@link org.apache.pinot.segment.local.segment.index.map.NullDataSource} carrying only a forward index.
 public class ItemTransformFunctionNullBitmapTest {
   private static final String COLUMN = "myMap";
   private static final String KEY = "foo";
