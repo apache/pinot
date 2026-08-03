@@ -1,0 +1,13 @@
+[package]
+name = "pinot-native-ffi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "pinot_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+jni = { version = "0.21", default-features = false }
+pinot-native-kernels = { path = "../kernels" }
