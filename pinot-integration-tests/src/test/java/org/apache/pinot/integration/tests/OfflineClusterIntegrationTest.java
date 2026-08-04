@@ -3870,22 +3870,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode starColumnResponse = JsonUtils.objectToJsonNode(
         getOrCreateAdminClient().getTableClient().getAggregateMetadata(
             TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "*"));
-    validateMetadataResponse(starColumnResponse, 83, 10);
+    validateMetadataResponse(starColumnResponse, 84, 10);
 
     JsonNode starEncodedColumnResponse = JsonUtils.objectToJsonNode(
         getOrCreateAdminClient().getTableClient().getAggregateMetadata(
             TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "*"));
-    validateMetadataResponse(starEncodedColumnResponse, 83, 10);
+    validateMetadataResponse(starEncodedColumnResponse, 84, 10);
 
     JsonNode starWithExtraColumnResponse = JsonUtils.objectToJsonNode(
         getOrCreateAdminClient().getTableClient().getAggregateMetadata(
             TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "CRSElapsedTime,*,OriginStateName"));
-    validateMetadataResponse(starWithExtraColumnResponse, 83, 10);
+    validateMetadataResponse(starWithExtraColumnResponse, 84, 10);
 
     JsonNode starWithExtraEncodedColumnResponse = JsonUtils.objectToJsonNode(
         getOrCreateAdminClient().getTableClient().getAggregateMetadata(
             TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "CRSElapsedTime,*,OriginStateName"));
-    validateMetadataResponse(starWithExtraEncodedColumnResponse, 83, 10);
+    validateMetadataResponse(starWithExtraEncodedColumnResponse, 84, 10);
   }
 
   private void validateMetadataResponse(JsonNode response, int numTotalColumn, int numMVColumn) {
