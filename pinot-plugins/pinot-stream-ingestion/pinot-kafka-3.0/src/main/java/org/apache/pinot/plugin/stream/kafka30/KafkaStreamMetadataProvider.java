@@ -191,16 +191,14 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     return fetchOffsetsForPartitions(List.of(_partition), offsetCriteria, timeoutMillis).get(_partition);
   }
 
-  /**
-   * Fetches the offset matching {@code offsetCriteria} for the given partitions in a single batched call to the
-   * stream. Kafka's {@code beginningOffsets}/{@code endOffsets}/{@code offsetsForTimes} all accept a collection of
-   * partitions, so this issues one broker round-trip regardless of the number of partitions (these calls do not
-   * require the consumer to be assigned to the partitions).
-   *
-   * @return an offset for every requested partition
-   * @throws TransientConsumerException if the stream returns no offset for a requested partition (so the caller
-   *         retries rather than treating the partition as absent)
-   */
+  /// Fetches the offset matching `offsetCriteria` for the given partitions in a single batched call to the stream.
+  /// Kafka's `beginningOffsets`/`endOffsets`/`offsetsForTimes` all accept a collection of partitions, so this issues
+  /// one broker round-trip regardless of the number of partitions (these calls do not require the consumer to be
+  /// assigned to the partitions).
+  ///
+  /// @return an offset for every requested partition
+  /// @throws TransientConsumerException if the stream returns no offset for a requested partition (so the caller
+  ///         retries rather than treating the partition as absent)
   private Map<Integer, StreamPartitionMsgOffset> fetchOffsetsForPartitions(Collection<Integer> partitionIds,
       OffsetCriteria offsetCriteria, long timeoutMillis) {
     Preconditions.checkNotNull(offsetCriteria);
