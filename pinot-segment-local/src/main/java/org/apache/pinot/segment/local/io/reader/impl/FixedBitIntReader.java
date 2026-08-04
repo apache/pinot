@@ -21,9 +21,7 @@ package org.apache.pinot.segment.local.io.reader.impl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
-/**
- * Int reader for bit-compressed data.
- */
+/// Int reader for bit-compressed data.
 public abstract class FixedBitIntReader {
   final PinotDataBuffer _dataBuffer;
 
@@ -31,22 +29,16 @@ public abstract class FixedBitIntReader {
     _dataBuffer = dataBuffer;
   }
 
-  /**
-   * Returns the value at the given index.
-   */
+  /// Returns the value at the given index.
   public abstract int read(int index);
 
-  /**
-   * Returns the value at the given index. This method does not check the boundary of the data buffer, and assume there
-   * are enough bytes left in the data buffer. Use this method when the index is not pointing to the last two values in
-   * the data buffer.
-   */
+  /// Returns the value at the given index. This method does not check the boundary of the data buffer, and assume there
+  /// are enough bytes left in the data buffer. Use this method when the index is not pointing to the last two values in
+  /// the data buffer.
   public abstract int readUnchecked(int index);
 
-  /**
-   * Reads 32 values starting from the given index. The index must be multiple of 32, and all 32 values must be included
-   * in the data buffer, i.e. {@code index + 32 <= numValues}.
-   */
+  /// Reads 32 values starting from the given index. The index must be multiple of 32, and all 32 values must be
+  /// included in the data buffer, i.e. `index + 32 <= numValues`.
   public abstract void read32(int index, int[] out, int outPos);
 
   public static FixedBitIntReader getReader(PinotDataBuffer dataBuffer, int numBitsPerValue) {

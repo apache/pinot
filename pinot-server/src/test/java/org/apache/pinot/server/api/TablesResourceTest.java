@@ -377,43 +377,19 @@ public class TablesResourceTest extends BaseResourceTest {
   public void testDownloadValidDocIdsSnapshot()
       throws Exception {
     // Verify the content of the downloaded snapshot from a realtime table.
-    downLoadAndVerifyValidDocIdsSnapshot(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) _realtimeIndexSegments.get(0));
     downLoadAndVerifyValidDocIdsSnapshotBitmap(REALTIME_TABLE_NAME,
         (ImmutableSegmentImpl) _realtimeIndexSegments.get(0));
 
     // Verify non-existent table and segment download return NOT_FOUND status.
     Response response =
-        _webTarget.path("/tables/UNKNOWN_REALTIME/segments/segmentname/validDocIds").request().get(Response.class);
+        _webTarget.path("/segments/UNKNOWN_REALTIME/segmentname/validDocIdsBitmap").request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
 
     response =
-        _webTarget.path(String.format("/tables/%s/segments/%s/validDocIds", REALTIME_TABLE_NAME, "UNKNOWN_SEGMENT"))
+        _webTarget.path(String.format("/segments/%s/%s/validDocIdsBitmap", REALTIME_TABLE_NAME, "UNKNOWN_SEGMENT"))
             .request()
             .get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
-  }
-
-  @Deprecated
-  @Test
-  public void testValidDocIdMetadata()
-      throws IOException {
-    IndexSegment segment = _realtimeIndexSegments.get(0);
-    // Verify the content of the downloaded snapshot from a realtime table.
-    downLoadAndVerifyValidDocIdsSnapshot(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
-    downLoadAndVerifyValidDocIdsSnapshotBitmap(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
-
-    String validDocIdMetadataPath = "/tables/" + REALTIME_TABLE_NAME + "/validDocIdMetadata";
-    String metadataResponse = _webTarget.path(validDocIdMetadataPath)
-        .queryParam("segmentNames", segment.getSegmentName())
-        .request()
-        .get(String.class);
-    JsonNode validDocIdMetadata = JsonUtils.stringToJsonNode(metadataResponse).get(0);
-
-    Assert.assertEquals(validDocIdMetadata.get("totalDocs").asInt(), 200000);
-    Assert.assertEquals(validDocIdMetadata.get("totalValidDocs").asInt(), 8);
-    Assert.assertEquals(validDocIdMetadata.get("totalInvalidDocs").asInt(), 199992);
-    Assert.assertEquals(validDocIdMetadata.get("segmentCrc").asText(), segment.getSegmentMetadata().getCrc());
-    Assert.assertEquals(validDocIdMetadata.get("validDocIdsType").asText(), "SNAPSHOT");
   }
 
   @Test
@@ -421,7 +397,6 @@ public class TablesResourceTest extends BaseResourceTest {
       throws IOException {
     IndexSegment segment = _realtimeIndexSegments.get(0);
     // Verify the content of the downloaded snapshot from a realtime table.
-    downLoadAndVerifyValidDocIdsSnapshot(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
     downLoadAndVerifyValidDocIdsSnapshotBitmap(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
 
     List<String> segments = List.of(segment.getSegmentName());
@@ -455,7 +430,6 @@ public class TablesResourceTest extends BaseResourceTest {
       throws IOException {
     IndexSegment segment = _realtimeIndexSegments.get(0);
     // Verify the content of the downloaded snapshot from a realtime table.
-    downLoadAndVerifyValidDocIdsSnapshot(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
     downLoadAndVerifyValidDocIdsSnapshotBitmap(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
 
     List<String> segments = List.of(segment.getSegmentName());
@@ -513,78 +487,6 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(metadata.getTableName(), TableNameBuilder.extractRawTableName(tableNameWithType));
 
     FileUtils.forceDelete(tempMetadataDir);
-  }
-
-  // Verify metadata file from segments.
-  private void downLoadAndVerifyValidDocIdsSnapshot(String tableNameWithType, ImmutableSegmentImpl segment)
-      throws IOException {
-    String snapshotPath = "/segments/" + tableNameWithType + "/" + segment.getSegmentName() + "/validDocIds";
-
-    PartitionUpsertMetadataManager upsertMetadataManager = mock(PartitionUpsertMetadataManager.class);
-    ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
-    ThreadSafeMutableRoaringBitmap queryableDocIds = new ThreadSafeMutableRoaringBitmap();
-    ThreadSafeMutableRoaringBitmap validDocIdsSnapshot = new ThreadSafeMutableRoaringBitmap();
-
-    int[] docIds = new int[]{1, 4, 6, 10, 15, 17, 18, 20};
-    for (int docId : docIds) {
-      validDocIds.add(docId);
-      queryableDocIds.add(docId + 1);
-      validDocIdsSnapshot.add(docId + 2);
-    }
-    segment.enableUpsert(upsertMetadataManager, validDocIds, queryableDocIds);
-    File validDocIdsSnapshotFile =
-        new File(SegmentDirectoryPaths.findSegmentDirectory(segment.getSegmentMetadata().getIndexDir()),
-            V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
-    FileUtils.writeByteArrayToFile(validDocIdsSnapshotFile,
-        RoaringBitmapUtils.serialize(validDocIdsSnapshot.getMutableRoaringBitmap()));
-
-    // Create the queryableDocIds snapshot file needed for SNAPSHOT_WITH_DELETE
-    File queryableDocIdsSnapshotFile =
-        new File(SegmentDirectoryPaths.findSegmentDirectory(segment.getSegmentMetadata().getIndexDir()),
-            V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME);
-    FileUtils.writeByteArrayToFile(queryableDocIdsSnapshotFile,
-        RoaringBitmapUtils.serialize(queryableDocIds.getMutableRoaringBitmap()));
-
-    // Check no type (default should be validDocIdsSnapshot)
-    Response response = _webTarget.path(snapshotPath).request().get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
-    byte[] validDocIdsSnapshotBitmap = response.readEntity(byte[].class);
-    Assert.assertNotNull(validDocIdsSnapshotBitmap);
-    Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
-        validDocIdsSnapshot.getMutableRoaringBitmap());
-
-    // Check snapshot type
-    response = _webTarget.path(snapshotPath)
-        .queryParam("validDocIdsType", ValidDocIdsType.SNAPSHOT.toString())
-        .request()
-        .get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
-    validDocIdsSnapshotBitmap = response.readEntity(byte[].class);
-    Assert.assertNotNull(validDocIdsSnapshotBitmap);
-    Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
-        validDocIdsSnapshot.getMutableRoaringBitmap());
-
-    // Check onHeap type
-    response = _webTarget.path(snapshotPath)
-        .queryParam("validDocIdsType", ValidDocIdsType.IN_MEMORY)
-        .request()
-        .get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
-    validDocIdsSnapshotBitmap = response.readEntity(byte[].class);
-    Assert.assertNotNull(validDocIdsSnapshotBitmap);
-    Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
-        validDocIds.getMutableRoaringBitmap());
-
-    // Check onHeapWithDelete type
-    response = _webTarget.path(snapshotPath)
-        .queryParam("validDocIdsType", ValidDocIdsType.IN_MEMORY_WITH_DELETE.toString())
-        .request()
-        .get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
-    validDocIdsSnapshotBitmap = response.readEntity(byte[].class);
-    Assert.assertNotNull(validDocIdsSnapshotBitmap);
-    Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
-        queryableDocIds.getMutableRoaringBitmap());
   }
 
   private void downLoadAndVerifyValidDocIdsSnapshotBitmap(String tableNameWithType, ImmutableSegmentImpl segment)
@@ -667,36 +569,10 @@ public class TablesResourceTest extends BaseResourceTest {
   }
 
   @Test
-  public void testValidDocIdsMetadataGetForSnapshotWithDelete()
-      throws IOException {
-    IndexSegment segment = _realtimeIndexSegments.get(0);
-    // Verify the content of the downloaded snapshot from a realtime table.
-    downLoadAndVerifyValidDocIdsSnapshot(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
-    downLoadAndVerifyValidDocIdsSnapshotBitmap(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
-
-    String validDocIdsMetadataPath = "/tables/" + REALTIME_TABLE_NAME + "/validDocIdMetadata";
-
-    // Test GET endpoint with SNAPSHOT_WITH_DELETE validDocIdsType
-    String response = _webTarget.path(validDocIdsMetadataPath)
-        .queryParam("segmentNames", segment.getSegmentName())
-        .queryParam("validDocIdsType", ValidDocIdsType.SNAPSHOT_WITH_DELETE.toString())
-        .request()
-        .get(String.class);
-    JsonNode validDocIdsMetadata = JsonUtils.stringToJsonNode(response).get(0);
-
-    Assert.assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
-    Assert.assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
-    Assert.assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
-    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), segment.getSegmentMetadata().getCrc());
-    Assert.assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "SNAPSHOT_WITH_DELETE");
-  }
-
-  @Test
   public void testValidDocIdsBitmapForSnapshotWithDelete()
       throws IOException {
     IndexSegment segment = _realtimeIndexSegments.get(0);
     // Verify the content of the downloaded snapshot from a realtime table.
-    downLoadAndVerifyValidDocIdsSnapshot(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
     downLoadAndVerifyValidDocIdsSnapshotBitmap(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
 
     String validDocIdsBitmapPath =

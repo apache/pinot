@@ -31,22 +31,16 @@ import org.apache.pinot.spi.utils.Pairs;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * The BlockDocIdSet to perform OR on all child BlockDocIdSets.
- * <p>The OrBlockDocIdSet will construct the BlockDocIdIterator based on the BlockDocIdIterators from the child
- * BlockDocIdSets:
- * <ul>
- *   <li>
- *     When there are more than one index-base BlockDocIdIterator (SortedDocIdIterator or BitmapBasedDocIdIterator),
- *     merge them and construct a BitmapDocIdIterator from the merged document ids. If there is no remaining
- *     BlockDocIdIterator, directly return the merged BitmapDocIdIterator; otherwise, construct and return an
- *     OrDocIdIterator with the merged BitmapDocIdIterator and the remaining BlockDocIdIterators.
- *   </li>
- *   <li>
- *     Otherwise, construct and return an OrDocIdIterator with all BlockDocIdIterators.
- *   </li>
- * </ul>
- */
+/// The BlockDocIdSet to perform OR on all child BlockDocIdSets.
+///
+/// The OrBlockDocIdSet will construct the BlockDocIdIterator based on the BlockDocIdIterators from the child
+/// BlockDocIdSets:
+///
+/// - When there are more than one index-base BlockDocIdIterator (SortedDocIdIterator or BitmapBasedDocIdIterator),
+///   merge them and construct a BitmapDocIdIterator from the merged document ids. If there is no remaining
+///   BlockDocIdIterator, directly return the merged BitmapDocIdIterator; otherwise, construct and return an
+///   OrDocIdIterator with the merged BitmapDocIdIterator and the remaining BlockDocIdIterators.
+/// - Otherwise, construct and return an OrDocIdIterator with all BlockDocIdIterators.
 public final class OrDocIdSet implements BlockDocIdSet {
   // Keep the scan based BlockDocIdSets to be accessed when collecting query execution stats
   private final AtomicReference<List<BlockDocIdSet>> _scanBasedDocIdSets = new AtomicReference<>();

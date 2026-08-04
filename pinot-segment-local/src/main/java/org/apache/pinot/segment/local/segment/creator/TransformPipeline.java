@@ -32,10 +32,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The class for transforming validating GenericRow data against table schema and table config.
- * It is used mainly but not limited by RealTimeDataManager for each row that is going to be indexed into Pinot.
- */
+/// The class for transforming validating GenericRow data against table schema and table config.
+/// It is used mainly but not limited by RealTimeDataManager for each row that is going to be indexed into Pinot.
 public class TransformPipeline {
   private static final Logger LOGGER = LoggerFactory.getLogger(TransformPipeline.class);
 
@@ -124,9 +122,7 @@ public class TransformPipeline {
         _tableNameWithType);
   }
 
-  /**
-   * Wrapper for transforming results. For efficiency, right now the failed rows have only a counter
-   */
+  /// Wrapper for transforming results. For efficiency, right now the failed rows have only a counter
   public static class Result {
     private final List<GenericRow> _transformedRows;
     private final int _incompleteRowCount;

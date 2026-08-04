@@ -577,12 +577,9 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
     };
   }
 
-  /**
-   *
-   * @param resultsType The result type used in the query, either 'INT_ARRAY' or 'STRING_ARRAY'
-   * @param notUsed Not used, just here to be able to use the same provider as
-   *                {@link #mvWithNullsWithDefault(String, String)}
-   */
+  /// @param resultsType The result type used in the query, either 'INT_ARRAY' or 'STRING_ARRAY'
+  /// @param notUsed Not used, just here to be able to use the same provider as
+  ///                [#mvWithNullsWithDefault(String, String)]
   @Test(dataProvider = "multiValuesAndDefaults")
   public void mvWithNullsWithoutDefault(String resultsType, String notUsed) {
     // schema with a single column called "json" of type JSON
@@ -610,11 +607,8 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
     }
   }
 
-  /**
-   *
-   * @param resultsType The result type used in the query, either 'INT_ARRAY' or 'STRING_ARRAY'
-   * @param defaultValSql The default value to use in the query, as passed to jsonExtractScalar forth argument
-   */
+  /// @param resultsType The result type used in the query, either 'INT_ARRAY' or 'STRING_ARRAY'
+  /// @param defaultValSql The default value to use in the query, as passed to jsonExtractScalar forth argument
   @Test(dataProvider = "multiValuesAndDefaults")
   public void mvWithNullsWithDefault(String resultsType, String defaultValSql) {
     // schema with a single column called "json" of type JSON

@@ -26,36 +26,30 @@ import org.apache.pinot.spi.columntransformer.ColumnTransformer;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Column transformer that sanitizes STRING, JSON, and BYTES column values.
- *
- * <p>The sanitization rules include:
- * <ul>
- *   <li>No {@code null} characters in string values</li>
- *   <li>String values are within the length limit</li>
- * </ul>
- *
- * <p>Uses the MaxLengthExceedStrategy in the FieldSpec to decide what to do when the value exceeds the max:
- * <ul>
- *   <li>TRIM_LENGTH: The value is trimmed to the max length</li>
- *   <li>SUBSTITUTE_DEFAULT_VALUE: The value is replaced with the default null value string</li>
- *   <li>ERROR: An exception is thrown</li>
- *   <li>NO_ACTION: The value is kept as is if no NULL_CHARACTER present, else trimmed till NULL</li>
- * </ul>
- *
- * <p>NOTE: should put this after {@link DataTypeColumnTransformer} so that all values follow the data types in
- * FieldSpec, and after {@link NullValueColumnTransformer} so that before sanitization, all values are non-null
- * and follow the data types defined in the schema.
- */
+/// Column transformer that sanitizes STRING, JSON, and BYTES column values.
+///
+/// The sanitization rules include:
+///
+/// - No `null` characters in string values
+/// - String values are within the length limit
+///
+/// Uses the MaxLengthExceedStrategy in the FieldSpec to decide what to do when the value exceeds the max:
+///
+/// - TRIM_LENGTH: The value is trimmed to the max length
+/// - SUBSTITUTE_DEFAULT_VALUE: The value is replaced with the default null value string
+/// - ERROR: An exception is thrown
+/// - NO_ACTION: The value is kept as is if no NULL_CHARACTER present, else trimmed till NULL
+///
+/// NOTE: should put this after [DataTypeColumnTransformer] so that all values follow the data types in
+/// FieldSpec, and after [NullValueColumnTransformer] so that before sanitization, all values are non-null
+/// and follow the data types defined in the schema.
 public class SanitizationColumnTransformer implements ColumnTransformer {
 
   @Nullable
   private final SanitizedColumnInfo _columnInfo;
-  /**
-   * Create a SanitizationColumnTransformer.
-   *
-   * @param fieldSpec The field specification for the column
-   */
+  /// Create a SanitizationColumnTransformer.
+  ///
+  /// @param fieldSpec The field specification for the column
   public SanitizationColumnTransformer(FieldSpec fieldSpec) {
     _columnInfo = SanitizationTransformerUtils.getSanitizedColumnInfo(fieldSpec);
   }

@@ -59,11 +59,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * AggregateOperator is used to aggregate values over a (potentially empty) set of group by keys in V2/MSQE.
- * Output data will be in the format of [group by key, aggregate result1, ... aggregate resultN]
- * When the list of aggregation calls is empty, this class is used to calculate distinct result based on group by keys.
- */
+/// AggregateOperator is used to aggregate values over a (potentially empty) set of group by keys in V2/MSQE.
+/// Output data will be in the format of \[group by key, aggregate result1, ... aggregate resultN\]
+/// When the list of aggregation calls is empty, this class is used to calculate distinct result based on group by keys.
 public class AggregateOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
@@ -86,10 +84,8 @@ public class AggregateOperator extends MultiStageOperator {
 
   // trimming - related members
   private final int _groupTrimSize;
-  /**
-   * Comparator is used in priority queue, and the order is reversed so that peek() returns the smallest row to be
-   * compared with other rows.
-   */
+  /// Comparator is used in priority queue, and the order is reversed so that peek() returns the smallest row to be
+  /// compared with other rows.
   @Nullable
   private final Comparator<Object[]> _comparator;
 
@@ -264,11 +260,9 @@ public class AggregateOperator extends MultiStageOperator {
     return new StatMap<>(_statMap);
   }
 
-  /**
-   * Consumes the input blocks as a group by
-   *
-   * @return the last block, which must always be either an error or the end of the stream
-   */
+  /// Consumes the input blocks as a group by
+  ///
+  /// @return the last block, which must always be either an error or the end of the stream
   private MseBlock.Eos consumeGroupBy() {
     assert _groupByExecutor != null;
     MseBlock block = _input.nextBlock();
@@ -280,11 +274,9 @@ public class AggregateOperator extends MultiStageOperator {
     return (MseBlock.Eos) block;
   }
 
-  /**
-   * Consumes the input blocks as an aggregation
-   *
-   * @return the last block, which must always be either an error or the end of the stream
-   */
+  /// Consumes the input blocks as an aggregation
+  ///
+  /// @return the last block, which must always be either an error or the end of the stream
   private MseBlock.Eos consumeAggregation() {
     assert _aggregationExecutor != null;
     MseBlock block = _input.nextBlock();
@@ -482,13 +474,9 @@ public class AggregateOperator extends MultiStageOperator {
         return Math.max(value1, value2);
       }
     },
-    /**
-     * Allocated memory in bytes for this operator or its children in the same stage.
-     */
+    /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
-    /**
-     * Time spent on GC while this operator or its children in the same stage were running.
-     */
+    /// Time spent on GC while this operator or its children in the same stage were running.
     GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;

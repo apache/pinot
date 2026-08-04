@@ -25,10 +25,8 @@ import org.apache.pinot.spi.services.ServiceRole;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 
 
-/**
- * HK2 Binder for audit-related services.
- * Handles initialization and registration of audit components.
- */
+/// HK2 Binder for audit-related services.
+/// Handles initialization and registration of audit components.
 public class AuditServiceBinder extends AbstractBinder {
   private final DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   private final ServiceRole _serviceRole;

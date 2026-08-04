@@ -47,12 +47,10 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
-/**
- * JMH benchmark comparing SumIntAggregationFunction vs SumAggregationFunction performance.
- *
- * This benchmark demonstrates the performance benefits of using SumIntAggregationFunction
- * for INT column aggregations, avoiding type promotion and leveraging native integer arithmetic.
- */
+/// JMH benchmark comparing SumIntAggregationFunction vs SumAggregationFunction performance.
+///
+/// This benchmark demonstrates the performance benefits of using SumIntAggregationFunction
+/// for INT column aggregations, avoiding type promotion and leveraging native integer arithmetic.
 @Fork(1)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)

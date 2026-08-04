@@ -43,15 +43,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This {@code LookupJoinOperator} implements the lookup join algorithm.
- * <p>This algorithm assumes that the right table is a dimension table which is preloaded. For each of the left table
- * row, it looks up for the corresponding row from the dimension table and create a joint row.
- * <p>For each of the data block received from the left table, it generates a joint data block. The output is in the
- * format of [left_row, right_row].
- * <p>Since right table is a dimension table which is replicated across all servers, RIGHT and FULL join are not
- * supported to avoid duplication.
- */
+/// This `LookupJoinOperator` implements the lookup join algorithm.
+///
+/// This algorithm assumes that the right table is a dimension table which is preloaded. For each of the left table
+/// row, it looks up for the corresponding row from the dimension table and create a joint row.
+///
+/// For each of the data block received from the left table, it generates a joint data block. The output is in the
+/// format of \[left_row, right_row\].
+///
+/// Since right table is a dimension table which is replicated across all servers, RIGHT and FULL join are not
+/// supported to avoid duplication.
 public class LookupJoinOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(LookupJoinOperator.class);
   private static final String EXPLAIN_NAME = "LOOKUP_JOIN";
@@ -257,13 +258,9 @@ public class LookupJoinOperator extends MultiStageOperator {
         return true;
       }
     },
-    /**
-     * Allocated memory in bytes for this operator or its children in the same stage.
-     */
+    /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
-    /**
-     * Time spent on GC while this operator or its children in the same stage were running.
-     */
+    /// Time spent on GC while this operator or its children in the same stage were running.
     GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;

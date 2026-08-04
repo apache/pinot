@@ -106,31 +106,25 @@ public class MinionTaskUtils {
   public static final String DATETIME_PATTERN = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
   public static final String UTC = "UTC";
 
-  /**
-   * When true, allows METADATA push mode with local FS output dir. Intended for integration tests only.
-   * Production should leave this unset (defaults to false); local FS then always uses TAR push.
-   */
+  /// When true, allows METADATA push mode with local FS output dir. Intended for integration tests only.
+  /// Production should leave this unset (defaults to false); local FS then always uses TAR push.
   public static final String ALLOW_METADATA_PUSH_WITH_LOCAL_FS = "allowMetadataPushWithLocalFs";
 
-  /**
-   * Task config key for an optional safety margin subtracted from retention when filtering segments.
-   * Value is a period string (e.g. "1h", "30m"). Segments within {@code (now - endTime) > (retention - buffer)}
-   * are excluded from task generation. This is a table-level config — not per-merge-level — because retention
-   * itself is table-level.
-   * <p>
-   * Currently used by {@code MergeRollupTask} and {@code UpsertCompactMergeTask}. Not applied to
-   * {@code UpsertCompactionTask} (legacy single-segment compaction, being superseded by UpsertCompactMergeTask).
-   */
+  /// Task config key for an optional safety margin subtracted from retention when filtering segments.
+  /// Value is a period string (e.g. "1h", "30m"). Segments within `(now - endTime) > (retention - buffer)`
+  /// are excluded from task generation. This is a table-level config — not per-merge-level — because retention
+  /// itself is table-level.
+  ///
+  /// Currently used by `MergeRollupTask` and `UpsertCompactMergeTask`. Not applied to
+  /// `UpsertCompactionTask` (legacy single-segment compaction, being superseded by UpsertCompactMergeTask).
   public static final String RETENTION_EXPIRY_BUFFER_PERIOD_KEY = "retentionExpiryBufferPeriod";
 
   private MinionTaskUtils() {
   }
 
-  /**
-   * Reads the creation-time fallback flag from Helix cluster config. This is the same config that
-   * {@code RetentionManager} reacts to via {@code onChange()}, so the filter stays aligned with what
-   * RetentionManager will actually delete.
-   */
+  /// Reads the creation-time fallback flag from Helix cluster config. This is the same config that
+  /// `RetentionManager` reacts to via `onChange()`, so the filter stays aligned with what
+  /// RetentionManager will actually delete.
   public static boolean isCreationTimeFallbackEnabled(ClusterInfoAccessor clusterInfoAccessor) {
     String raw = clusterInfoAccessor.getClusterConfig(
         ControllerConf.ControllerPeriodicTasksConf.ENABLE_RETENTION_CREATION_TIME_FALLBACK);
@@ -139,15 +133,13 @@ public class MinionTaskUtils {
         : ControllerConf.ControllerPeriodicTasksConf.DEFAULT_ENABLE_RETENTION_CREATION_TIME_FALLBACK;
   }
 
-  /**
-   * Resolves the AuthProvider to use for Minion tasks.
-   * Priority order:
-   * 1. If AUTH_TOKEN is explicitly provided in task configs (by Controller), use it for this specific task
-   * 2. Otherwise, fall back to the runtime AuthProvider from MinionContext (enables per-request token rotation)
-   *
-   * This allows any minion task or util to resolve auth from task configs without requiring callers to pass
-   * AuthProvider explicitly.
-   */
+  /// Resolves the AuthProvider to use for Minion tasks.
+  /// Priority order:
+  /// 1. If AUTH_TOKEN is explicitly provided in task configs (by Controller), use it for this specific task
+  /// 2. Otherwise, fall back to the runtime AuthProvider from MinionContext (enables per-request token rotation)
+  ///
+  /// This allows any minion task or util to resolve auth from task configs without requiring callers to pass
+  /// AuthProvider explicitly.
   public static AuthProvider resolveAuthProvider(Map<String, String> taskConfigs) {
     String explicitToken = taskConfigs.get(MinionConstants.AUTH_TOKEN);
     if (StringUtils.isNotBlank(explicitToken)) {
@@ -162,14 +154,12 @@ public class MinionTaskUtils {
     return runtimeProvider;
   }
 
-  /**
-   * Resolves the auth token string to use for Minion tasks (e.g. for specs that accept a token string).
-   * If AUTH_TOKEN is already present in task configs, returns it without creating an AuthProvider.
-   * Otherwise resolves via {@link #resolveAuthProvider} and returns its static token.
-   *
-   * @param taskConfigs task config map (may contain MinionConstants.AUTH_TOKEN)
-   * @return auth token string, or null if none
-   */
+  /// Resolves the auth token string to use for Minion tasks (e.g. for specs that accept a token string).
+  /// If AUTH_TOKEN is already present in task configs, returns it without creating an AuthProvider.
+  /// Otherwise resolves via [#resolveAuthProvider] and returns its static token.
+  ///
+  /// @param taskConfigs task config map (may contain MinionConstants.AUTH_TOKEN)
+  /// @return auth token string, or null if none
   @Nullable
   public static String resolveAuthToken(Map<String, String> taskConfigs) {
     String explicitToken = taskConfigs.get(MinionConstants.AUTH_TOKEN);
@@ -322,9 +312,7 @@ public class MinionTaskUtils {
     return servers;
   }
 
-  /**
-   * Extract allowDownloadFromServer config from table task config
-   */
+  /// Extract allowDownloadFromServer config from table task config
   public static boolean extractMinionAllowDownloadFromServer(TableConfig tableConfig, String taskType,
       boolean defaultValue) {
     TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
@@ -338,10 +326,8 @@ public class MinionTaskUtils {
     return defaultValue;
   }
 
-  /**
-   * Returns the validDocIds bitmap from server(s). {@code comparisonMode} is the task config value: UNSAFE,
-   * EQUAL (default), or MOST_VALID_DOCS.
-   */
+  /// Returns the validDocIds bitmap from server(s). `comparisonMode` is the task config value: UNSAFE,
+  /// EQUAL (default), or MOST_VALID_DOCS.
   @Nullable
   public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
       String validDocIdsType, MinionContext minionContext, String expectedCrc, String comparisonModeStr) {
@@ -586,19 +572,17 @@ public class MinionTaskUtils {
     return Instant.parse(utcString).toEpochMilli();
   }
 
-  /**
-   * Get the validDocIdsType based on the upsertConfig and taskConfigs.
-   * The default value is 'snapshot' It validates the combination of validDocIdsType, snapshot and
-   * deleteRecordColumn:
-   * <ul>
-   *   <li>'snapshot' and 'snapshot_with_delete' require upsert snapshots to be enabled.</li>
-   *   <li>'snapshot_with_delete' and 'in_memory_with_delete' require a deleteRecordColumn to be configured.</li>
-   * </ul>
-   * @param upsertConfig upsertConfig of the table
-   * @param taskConfigs taskConfigs of the task
-   * @param validDocIdsTypeKey the key to get validDocIdsType from taskConfigs
-   * @return the validDocIdsType
-   */
+  /// Get the validDocIdsType based on the upsertConfig and taskConfigs.
+  /// The default value is 'snapshot' It validates the combination of validDocIdsType, snapshot and
+  /// deleteRecordColumn:
+  ///
+  /// - 'snapshot' and 'snapshot_with_delete' require upsert snapshots to be enabled.
+  /// - 'snapshot_with_delete' and 'in_memory_with_delete' require a deleteRecordColumn to be configured.
+  ///
+  /// @param upsertConfig upsertConfig of the table
+  /// @param taskConfigs taskConfigs of the task
+  /// @param validDocIdsTypeKey the key to get validDocIdsType from taskConfigs
+  /// @return the validDocIdsType
   public static ValidDocIdsType getValidDocIdsType(UpsertConfig upsertConfig, Map<String, String> taskConfigs,
       String validDocIdsTypeKey) {
     String validDocIdsTypeStr = taskConfigs.getOrDefault(validDocIdsTypeKey,
@@ -618,46 +602,44 @@ public class MinionTaskUtils {
     return validDocIdsType;
   }
 
-  /**
-   * Filters out segments that are past (or near) the table's retention period. This prevents task generators from
-   * selecting segments that RetentionManager may delete before the task executor downloads them.
-   * <p>
-   * Uses the same retention logic as {@code TimeRetentionStrategy}: a segment is considered expired if
-   * {@code currentTimeMs - endTimeMs > effectiveRetentionMs}, where effectiveRetentionMs is
-   * {@code retentionMs - bufferMs}.
-   * <p>
-   * If {@link #RETENTION_EXPIRY_BUFFER_PERIOD_KEY} is set in {@code taskConfigs}, the effective retention is reduced
-   * by that amount, excluding segments earlier — before RetentionManager actually deletes them. This is a table-level
-   * config, not a per-merge-level config, because retention itself is table-level.
-   * <p>
-   * <b>Note on hybrid tables:</b> This method reads only the table-level retention config
-   * ({@code segmentsConfig.retentionTimeUnit/Value}). It does not account for hybrid retention strategies that use
-   * the offline table's time boundary. If hybrid retention is enabled (off by default), RetentionManager may use a
-   * different deletion boundary than what this method computes, so the filter may not perfectly match the controller's
-   * deletion decisions for hybrid tables.
-   * <p>
-   * <b>Watermark impact (MergeRollupTask):</b> This filter runs before watermark advancement. If all segments in an
-   * early time bucket are filtered out, the watermark will advance past them permanently. This is a one-way door but
-   * is expected: those segments would be purged by RetentionManager regardless. If this is caused by a misconfigured
-   * {@code retentionExpiryBufferPeriod}, correcting the config will not recover already-skipped buckets.
-   *
-   * @apiNote Callers are expected to pass only completed segments (status DONE or UPLOADED). This method does not
-   * check segment status, unlike {@code TimeRetentionStrategy.isPurgeable()} which skips incomplete segments. All
-   * current callers ({@code UpsertCompactMergeTaskGenerator.getCandidateSegments},
-   * {@code MergeRollupTaskGenerator.getNonConsumingSegmentsZKMetadataForRealtimeTable}) already guarantee this.
-   *
-   * @param segments                    the candidate segments to filter (must not be null)
-   * @param tableConfig                 the table config containing retention settings
-   * @param taskConfigs                 task-level configs; may contain {@link #RETENTION_EXPIRY_BUFFER_PERIOD_KEY}.
-   *                                    Null if unavailable.
-   * @param currentTimeMs               the current time in milliseconds (pass {@code System.currentTimeMillis()})
-   * @param useCreationTimeFallback     when true, segments with invalid end times are evaluated against their
-   *                                    creation time; must match
-   *                                    {@code controller.retentionManager.enableCreationTimeFallback} so this
-   *                                    filter stays aligned with what RetentionManager will actually delete
-   * @return filtered list excluding segments past effective retention; returns the original list if retention is not
-   *         configured or cannot be parsed
-   */
+  /// Filters out segments that are past (or near) the table's retention period. This prevents task generators from
+  /// selecting segments that RetentionManager may delete before the task executor downloads them.
+  ///
+  /// Uses the same retention logic as `TimeRetentionStrategy`: a segment is considered expired if
+  /// `currentTimeMs - endTimeMs > effectiveRetentionMs`, where effectiveRetentionMs is
+  /// `retentionMs - bufferMs`.
+  ///
+  /// If [#RETENTION_EXPIRY_BUFFER_PERIOD_KEY] is set in `taskConfigs`, the effective retention is reduced
+  /// by that amount, excluding segments earlier — before RetentionManager actually deletes them. This is a table-level
+  /// config, not a per-merge-level config, because retention itself is table-level.
+  ///
+  /// **Note on hybrid tables:** This method reads only the table-level retention config
+  /// (`segmentsConfig.retentionTimeUnit/Value`). It does not account for hybrid retention strategies that use
+  /// the offline table's time boundary. If hybrid retention is enabled (off by default), RetentionManager may use a
+  /// different deletion boundary than what this method computes, so the filter may not perfectly match the controller's
+  /// deletion decisions for hybrid tables.
+  ///
+  /// **Watermark impact (MergeRollupTask):** This filter runs before watermark advancement. If all segments in an
+  /// early time bucket are filtered out, the watermark will advance past them permanently. This is a one-way door but
+  /// is expected: those segments would be purged by RetentionManager regardless. If this is caused by a misconfigured
+  /// `retentionExpiryBufferPeriod`, correcting the config will not recover already-skipped buckets.
+  ///
+  /// @apiNote Callers are expected to pass only completed segments (status DONE or UPLOADED). This method does not
+  /// check segment status, unlike `TimeRetentionStrategy.isPurgeable()` which skips incomplete segments. All
+  /// current callers (`UpsertCompactMergeTaskGenerator.getCandidateSegments`,
+  /// `MergeRollupTaskGenerator.getNonConsumingSegmentsZKMetadataForRealtimeTable`) already guarantee this.
+  ///
+  /// @param segments                    the candidate segments to filter (must not be null)
+  /// @param tableConfig                 the table config containing retention settings
+  /// @param taskConfigs                 task-level configs; may contain [#RETENTION_EXPIRY_BUFFER_PERIOD_KEY].
+  ///                                    Null if unavailable.
+  /// @param currentTimeMs               the current time in milliseconds (pass `System.currentTimeMillis()`)
+  /// @param useCreationTimeFallback     when true, segments with invalid end times are evaluated against their
+  ///                                    creation time; must match
+  ///                                    `controller.retentionManager.enableCreationTimeFallback` so this
+  ///                                    filter stays aligned with what RetentionManager will actually delete
+  /// @return filtered list excluding segments past effective retention; returns the original list if retention is not
+  ///         configured or cannot be parsed
   public static List<SegmentZKMetadata> filterSegmentsPastRetention(List<SegmentZKMetadata> segments,
       TableConfig tableConfig, @Nullable Map<String, String> taskConfigs, long currentTimeMs,
       boolean useCreationTimeFallback) {

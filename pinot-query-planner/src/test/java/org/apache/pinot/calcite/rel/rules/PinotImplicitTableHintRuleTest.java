@@ -35,10 +35,8 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-/**
- * Tests for {@link PinotImplicitTableHintRule}, verifying the table options hint that ends up on the table scan after
- * partition hint inference.
- */
+/// Tests for [PinotImplicitTableHintRule], verifying the table options hint that ends up on the table scan after
+/// partition hint inference.
 public class PinotImplicitTableHintRuleTest extends QueryEnvironmentTestBase {
 
   @Test

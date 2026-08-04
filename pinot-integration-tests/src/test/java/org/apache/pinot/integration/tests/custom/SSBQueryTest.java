@@ -40,11 +40,9 @@ import org.testng.annotations.Test;
 import org.yaml.snakeyaml.Yaml;
 
 
-/**
- * SSB (Star Schema Benchmark) query integration test.
- * Loads multiple SSB tables (lineorder, customer, supplier, part, dates) and validates
- * JOIN queries using the multi-stage query engine against H2.
- */
+/// SSB (Star Schema Benchmark) query integration test.
+/// Loads multiple SSB tables (lineorder, customer, supplier, part, dates) and validates
+/// JOIN queries using the multi-stage query engine against H2.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class SSBQueryTest extends CustomDataQueryClusterIntegrationTest {
 

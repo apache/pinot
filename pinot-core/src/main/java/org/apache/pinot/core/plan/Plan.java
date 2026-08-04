@@ -23,16 +23,14 @@ import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 
 
-/**
- * Instance level query plan.
- */
+/// Instance level query plan.
 @InterfaceAudience.Private
 public interface Plan {
 
-  /** Get plan node */
+  /// Get plan node
   PlanNode getPlanNode();
 
-  /** Execute the query plan and get the instance response. */
+  /// Execute the query plan and get the instance response.
   InstanceResponseBlock execute()
       throws TimeoutException;
 }

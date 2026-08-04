@@ -21,13 +21,11 @@ package org.apache.pinot.common.failuredetector;
 import javax.annotation.concurrent.ThreadSafe;
 
 
-/**
- * The {@code ConnectionFailureDetector} marks failed server (connection failure) from query response as unhealthy, and
- * retries the unhealthy servers with exponential increasing delays.
- * <p>
- * This class doesn't currently implement any additional logic over BaseExponentialBackoffRetryFailureDetector and is
- * retained for backward compatibility.
- */
+/// The `ConnectionFailureDetector` marks failed server (connection failure) from query response as unhealthy, and
+/// retries the unhealthy servers with exponential increasing delays.
+///
+/// This class doesn't currently implement any additional logic over BaseExponentialBackoffRetryFailureDetector and is
+/// retained for backward compatibility.
 @ThreadSafe
 public class ConnectionFailureDetector extends BaseExponentialBackoffRetryFailureDetector {
 }

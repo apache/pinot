@@ -286,10 +286,8 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
     }
   }
 
-  /**
-   * Validates ANY_VALUE behavior by checking if it returns non-null when expected.
-   * This makes tests deterministic by focusing on behavior rather than exact values.
-   */
+  /// Validates ANY_VALUE behavior by checking if it returns non-null when expected.
+  /// This makes tests deterministic by focusing on behavior rather than exact values.
   private void validateAnyValueBehavior(FluentQueryTest.QueryExecuted queryResult, boolean shouldReturnNonNull) {
     if (shouldReturnNonNull) {
       // For cases where non-null values exist, ANY_VALUE should return something non-null

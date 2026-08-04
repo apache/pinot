@@ -52,54 +52,53 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This transformer transforms records with varied structures so that they can be stored in a Pinot table.
- * Since the records do not have uniform structure, it is impractical to store each field in its own table column.
- * In high level, if a field exists in the table schema, this transformer puts the value to the corresponding column.
- * For those fields which do not exist in the table schema, it stores them in a type of catchall field in a json map.
- * For example, consider this record:
- * <pre>
- * {
- *   "a": 1,
- *   "b": "2",
- *   "c": {
- *     "d": 3,
- *     "x": {
- *       "y": 9,
- *     }
- *   }
- * }
- * </pre>
- * And let's say the table's schema is:
- * <ul>
- *   <li>a</li>
- *   <li>c</li>
- *   <li>c.d</li>
- * </ul>
- * <p>
- * The record would be transformed into the following (refer to {@link SchemaConformingTransformerConfig} for
- * default constant values) where json_data is the catch-all field:
- * <pre>
- * {
- *   "a": 1,
- *   "c.d": 3,
- *   "json_data": {
- *     "b": "2",
- *     "c": {
- *       "x": {
- *         "y": 9
- *       }
- *     }
- *   }
- * }
- * Apart from the basic transformation above, this transformer today also does the following additional tasks (which in
- * future can be decoupled from this transformer):
- *    1. Put all field + value pair in a special column "_mergedTextIndex" to facilitate full text indexing and search.
- *    This extra step can be enabled via mergedTextIndexFieldSpec.
- *    2. Allow users to tag certain fields in the input record not to be included in the catch-all field.
- * </pre>
- * <p>
- */
+/// This transformer transforms records with varied structures so that they can be stored in a Pinot table.
+/// Since the records do not have uniform structure, it is impractical to store each field in its own table column.
+/// In high level, if a field exists in the table schema, this transformer puts the value to the corresponding column.
+/// For those fields which do not exist in the table schema, it stores them in a type of catchall field in a json map.
+/// For example, consider this record:
+///
+/// ```
+/// {
+///   "a": 1,
+///   "b": "2",
+///   "c": {
+///     "d": 3,
+///     "x": {
+///       "y": 9,
+///     }
+///   }
+/// }
+/// ```
+///
+/// And let's say the table's schema is:
+///
+/// - a
+/// - c
+/// - c.d
+///
+/// The record would be transformed into the following (refer to [SchemaConformingTransformerConfig] for
+/// default constant values) where json_data is the catch-all field:
+///
+/// ```
+/// {
+///   "a": 1,
+///   "c.d": 3,
+///   "json_data": {
+///     "b": "2",
+///     "c": {
+///       "x": {
+///         "y": 9
+///       }
+///     }
+///   }
+/// }
+/// Apart from the basic transformation above, this transformer today also does the following additional tasks (which in
+/// future can be decoupled from this transformer):
+///    1. Put all field + value pair in a special column "_mergedTextIndex" to facilitate full text indexing and search.
+///    This extra step can be enabled via mergedTextIndexFieldSpec.
+///    2. Allow users to tag certain fields in the input record not to be included in the catch-all field.
+/// ```
 public class SchemaConformingTransformer implements RecordTransformer {
   private static final Logger _logger = LoggerFactory.getLogger(SchemaConformingTransformer.class);
   private static final int MAXIMUM_LUCENE_DOCUMENT_SIZE = 32766;
@@ -158,9 +157,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
     }
   }
 
-  /**
-   * Validates the schema against the given transformer's configuration.
-   */
+  /// Validates the schema against the given transformer's configuration.
   public static void validateSchema(Schema schema, SchemaConformingTransformerConfig transformerConfig) {
     validateSchemaFieldNames(schema.getPhysicalColumnNames(), transformerConfig);
 
@@ -189,20 +186,16 @@ public class SchemaConformingTransformer implements RecordTransformer {
     validateSchemaAndCreateTree(schema, transformerConfig);
   }
 
-  /**
-   * Heuristic filter to detect whether a byte array is longer than a specified length and contains only base64
-   * characters so that we treat it as encoded binary data.
-   * @param bytes array to check
-   * @param minLength byte array shorter than this length will not be treated as encoded binary data
-   * @return true if the input bytes is base64 encoded binary data by the heuristic above, false otherwise
-   */
+  /// Heuristic filter to detect whether a byte array is longer than a specified length and contains only base64
+  /// characters so that we treat it as encoded binary data.
+  /// @param bytes array to check
+  /// @param minLength byte array shorter than this length will not be treated as encoded binary data
+  /// @return true if the input bytes is base64 encoded binary data by the heuristic above, false otherwise
   public static boolean base64ValueFilter(final byte[] bytes, int minLength) {
     return bytes.length >= minLength && Base64Utils.isBase64IgnoreTrailingPeriods(bytes);
   }
 
-  /**
-   * Validates that none of the schema fields have names that conflict with the transformer's configuration.
-   */
+  /// Validates that none of the schema fields have names that conflict with the transformer's configuration.
   private static void validateSchemaFieldNames(Set<String> schemaFields,
       SchemaConformingTransformerConfig transformerConfig) {
     // Validate that none of the columns in the schema end with unindexableFieldSuffix
@@ -223,15 +216,12 @@ public class SchemaConformingTransformer implements RecordTransformer {
     }
   }
 
-  /**
-   * Validates the schema with a {@link SchemaConformingTransformerConfig} instance and creates a tree representing
-   * the fields in the schema to be used when transforming input records. Refer to {@link SchemaTreeNode} for details.
-   * @throws IllegalArgumentException if schema validation fails in:
-   * <ul>
-   *   <li>One of the fields in the schema has a name which when interpreted as a JSON path, corresponds to an object
-   *   with an empty sub-key. E.g., the field name "a..b" corresponds to the JSON {"a": {"": {"b": ...}}}</li>
-   * </ul>
-   */
+  /// Validates the schema with a [SchemaConformingTransformerConfig] instance and creates a tree representing
+  /// the fields in the schema to be used when transforming input records. Refer to [SchemaTreeNode] for details.
+  /// @throws IllegalArgumentException if schema validation fails in:
+  ///
+  /// - One of the fields in the schema has a name which when interpreted as a JSON path, corresponds to an object
+  ///   with an empty sub-key. E.g., the field name "a..b" corresponds to the JSON {"a": {"": {"b": ...}}}
   private static SchemaTreeNode validateSchemaAndCreateTree(Schema schema,
       SchemaConformingTransformerConfig transformerConfig)
       throws IllegalArgumentException {
@@ -267,9 +257,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
     return rootNode;
   }
 
-  /**
-   * @return The field type for the given extras field
-   */
+  /// @return The field type for the given extras field
   private static DataType getAndValidateExtrasFieldType(Schema schema, String extrasFieldName) {
     FieldSpec fieldSpec = schema.getFieldSpecFor(extrasFieldName);
     Preconditions.checkState(null != fieldSpec, "Field '%s' doesn't exist in schema", extrasFieldName);
@@ -279,13 +267,11 @@ public class SchemaConformingTransformer implements RecordTransformer {
     return fieldDataType;
   }
 
-  /**
-   * Given a JSON path (e.g. "k1.k2.k3"), returns all the sub-keys (e.g. ["k1", "k2", "k3"])
-   * @param key The complete key
-   * @param firstKeySeparatorIdx The index of the first key separator in {@code key}
-   * @param subKeys Returns the sub-keys
-   * @throws IllegalArgumentException if any sub-key is empty
-   */
+  /// Given a JSON path (e.g. "k1.k2.k3"), returns all the sub-keys (e.g. \["k1", "k2", "k3"\])
+  /// @param key The complete key
+  /// @param firstKeySeparatorIdx The index of the first key separator in `key`
+  /// @param subKeys Returns the sub-keys
+  /// @throws IllegalArgumentException if any sub-key is empty
   private static void getAndValidateSubKeys(String key, int firstKeySeparatorIdx, List<String> subKeys)
       throws IllegalArgumentException {
     int subKeyBeginIdx = 0;
@@ -384,53 +370,51 @@ public class SchemaConformingTransformer implements RecordTransformer {
     }
   }
 
-  /**
-   * The method traverses the record and schema tree at the same time. It would check the specs of record key/value
-   * pairs with the corresponding schema tree node and {#link SchemaConformingTransformerConfig}. Finally drop or put
-   * them into the output record with the following logics:
-   * Taking example:
-   * {
-   *   "a": 1,
-   *   "b": {
-   *     "c": 2,
-   *     "d": 3,
-   *     "d_noIdx": 4
-   *   }
-   *   "b_noIdx": {
-   *     "c": 5,
-   *     "d": 6,
-   *   }
-   * }
-   * with column "a", "b", "b.c" in schema
-   * There are two types of output:
-   *  - flattened keys with values, e.g.,
-   *    - keyPath as column and value as leaf node, e.g., "a": 1, "b.c": 2. However, "b" is not a leaf node, so it would
-   *    be skipped
-   *    - __mergedTestIdx storing ["1:a", "2:b.c", "3:b.d"] as a string array
-   *  - structured Json format, e.g.,
-   *    - indexableFields/json_data: {"a": 1, "b": {"c": 2, "d": 3}}
-   *    - unindexableFields/json_data_noIdx: {"b": {"d_noIdx": 4} ,"b_noIdx": {"c": 5, "d": 6}}
-   * Expected behavior:
-   *  - If the current key is special, it would be added to the outputRecord and skip subtree
-   *  - If the keyJsonPath is in fieldPathsToDrop, it and its subtree would be skipped
-   *  - At leaf node (base case in recursion):
-   *    - Parse keyPath and value and add as flattened result to outputRecord
-   *    - Return structured fields as ExtraFieldsContainer
-   *   (leaf node is defined as node not as "Map" type. Leaf node is possible to be collection of or array of "Map". But
-   *   for simplicity, we still treat it as leaf node and do not traverse its children)
-   *  - For non-leaf node
-   *    - Construct ExtraFieldsContainer based on children's result and return
-   *
-   * @param parentNode The parent node in the schema tree which might or might not has a child with the given key. If
-   *                  parentNode is null, it means the current key is out of the schema tree.
-   * @param jsonPath The key json path split by "."
-   * @param value The value of the current field
-   * @param isIndexable Whether the current field is indexable
-   * @param outputRecord The output record updated during traverse
-   * @param mergedTextIndexMap The merged text index map updated during traverse
-   * @return ExtraFieldsContainer carries the indexable and unindexable fields of the current node as well as its
-   * subtree
-   */
+  /// The method traverses the record and schema tree at the same time. It would check the specs of record key/value
+  /// pairs with the corresponding schema tree node and {#link SchemaConformingTransformerConfig}. Finally drop or put
+  /// them into the output record with the following logics:
+  /// Taking example:
+  /// {
+  ///   "a": 1,
+  ///   "b": {
+  ///     "c": 2,
+  ///     "d": 3,
+  ///     "d_noIdx": 4
+  ///   }
+  ///   "b_noIdx": {
+  ///     "c": 5,
+  ///     "d": 6,
+  ///   }
+  /// }
+  /// with column "a", "b", "b.c" in schema
+  /// There are two types of output:
+  ///  - flattened keys with values, e.g.,
+  ///    - keyPath as column and value as leaf node, e.g., "a": 1, "b.c": 2. However, "b" is not a leaf node, so it
+  ///    would be skipped
+  ///    - \_\_mergedTestIdx storing \["1:a", "2:b.c", "3:b.d"\] as a string array
+  ///  - structured Json format, e.g.,
+  ///    - indexableFields/json_data: {"a": 1, "b": {"c": 2, "d": 3}}
+  ///    - unindexableFields/json_data_noIdx: {"b": {"d_noIdx": 4} ,"b_noIdx": {"c": 5, "d": 6}}
+  /// Expected behavior:
+  ///  - If the current key is special, it would be added to the outputRecord and skip subtree
+  ///  - If the keyJsonPath is in fieldPathsToDrop, it and its subtree would be skipped
+  ///  - At leaf node (base case in recursion):
+  ///    - Parse keyPath and value and add as flattened result to outputRecord
+  ///    - Return structured fields as ExtraFieldsContainer
+  ///   (leaf node is defined as node not as "Map" type. Leaf node is possible to be collection of or array of "Map".
+  ///   But for simplicity, we still treat it as leaf node and do not traverse its children)
+  ///  - For non-leaf node
+  ///    - Construct ExtraFieldsContainer based on children's result and return
+  ///
+  /// @param parentNode The parent node in the schema tree which might or might not has a child with the given key. If
+  ///                  parentNode is null, it means the current key is out of the schema tree.
+  /// @param jsonPath The key json path split by "."
+  /// @param value The value of the current field
+  /// @param isIndexable Whether the current field is indexable
+  /// @param outputRecord The output record updated during traverse
+  /// @param mergedTextIndexMap The merged text index map updated during traverse
+  /// @return ExtraFieldsContainer carries the indexable and unindexable fields of the current node as well as its
+  /// subtree
   private void processField(SchemaTreeNode parentNode, List<String> jsonPath, Object value, boolean isIndexable,
       GenericRow outputRecord, Map<String, Object> mergedTextIndexMap, Map<String, Object> indexableExtras,
       Map<String, Object> unindexableExtras) {
@@ -512,13 +496,11 @@ public class SchemaConformingTransformer implements RecordTransformer {
     }
   }
 
-  /**
-   * Generate a Lucene document based on the provided key-value pair.
-   * The index document follows this format: "val" + jsonKeyValueSeparator + "key".
-   * @param kv                               used to generate text index documents
-   * @param indexDocuments                   a list to store the generated index documents
-   * @param mergedTextIndexDocumentMaxLength which we enforce via truncation during document generation
-   */
+  /// Generate a Lucene document based on the provided key-value pair.
+  /// The index document follows this format: "val" + jsonKeyValueSeparator + "key".
+  /// @param kv                               used to generate text index documents
+  /// @param indexDocuments                   a list to store the generated index documents
+  /// @param mergedTextIndexDocumentMaxLength which we enforce via truncation during document generation
   public void generateTextIndexLuceneDocument(Map.Entry<String, Object> kv, List<String> indexDocuments,
       Integer mergedTextIndexDocumentMaxLength) {
     String key = kv.getKey();
@@ -600,9 +582,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
     }
   }
 
-  /**
-   * Converts (if necessary) and adds the given extras field to the output record
-   */
+  /// Converts (if necessary) and adds the given extras field to the output record
   private void putExtrasField(String fieldName, DataType fieldType, Map<String, Object> field,
       GenericRow outputRecord) {
     if (null == field || field.isEmpty()) {
@@ -669,19 +649,17 @@ public class SchemaConformingTransformer implements RecordTransformer {
   }
 }
 
-/**
- * SchemaTreeNode represents the tree node when we construct the schema tree. The node could be either leaf node or
- * non-leaf node. Both types of node could hold the volumn as a column in the schema.
- * For example, the schema with columns a, b, c, d.e, d.f, x.y, x.y.z, x.y.w will have the following tree structure:
- * root -- a*
- *      -- b*
- *      -- c*
- *      -- d -- e*
- *           -- f*
- *      -- x* -- y* -- z*
- *                  -- w*
- * where node with "*" could represent a valid column in the schema.
- */
+/// SchemaTreeNode represents the tree node when we construct the schema tree. The node could be either leaf node or
+/// non-leaf node. Both types of node could hold the volumn as a column in the schema.
+/// For example, the schema with columns a, b, c, d.e, d.f, x.y, x.y.z, x.y.w will have the following tree structure:
+/// root -- a\*
+///      -- b\*
+///      -- c\*
+///      -- d -- e\*
+///           -- f\*
+///      -- x\* -- y\* -- z\*
+///                  -- w\*
+/// where node with "\*" could represent a valid column in the schema.
 class SchemaTreeNode {
   private boolean _isColumn;
   private final Map<String, SchemaTreeNode> _children;
@@ -720,12 +698,10 @@ class SchemaTreeNode {
     return _children.containsKey(key);
   }
 
-  /**
-   * If does not have the child node, add a child node to the current node and return the child node.
-   * If the child node already exists, return the existing child node.
-   * @param key
-   * @return
-   */
+  /// If does not have the child node, add a child node to the current node and return the child node.
+  /// If the child node already exists, return the existing child node.
+  /// @param key
+  /// @return
   public SchemaTreeNode getAndCreateChild(String key, Schema schema) {
     SchemaTreeNode child = _children.get(key);
     if (child == null) {

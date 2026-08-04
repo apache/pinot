@@ -40,57 +40,48 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * This is a special {@link PinotMetricsRegistry} that actually reports metrics in one or more registries. For example,
- * it can be used to register metrics using both Yammer and Dropwizard. The way this class works is quite naive.
- * When it is created, a bunch of factories are used as sub-factories. Whenever a metric is registered in this factory,
- * it actually registers the metric in all the sub-factories.
- *
- * Probably the main reason to use this metrics is to compare the differences between one metric registry and another.
- * For example, Yammer and Dropwizard provide their own timer, but each one provides their own metrics on their timers.
- * Most metrics are the same (p50, p90, p95, etc) but some other may be different.
- *
- * Alternative it could be used in production, but it is important to make sure that the JMX MBeans produced by each
- * sub-registry are different. Otherwise the reported value is undetermined.
- *
- * In order to use this factory, you have to set the following properties in Pinot configuration:
- * <ol>
- *   <li>pinot.&lt;server|broker|minion|etc&gt;.metrics.factory.className should be set to
- *   org.apache.pinot.plugin.metrics.compound.CompoundPinotMetricsFactory</li>
- *   <li>(optional) pinot.&lt;server|broker|minion|etc&gt;.metrics.compound.algorithm should be set to SERVICE_LOADER,
- *   CLASSPATH or LIST. CLASSPATH is the default.</li>
- *   <li>(optional) pinot.&lt;server|broker|minion|etc&gt;.metrics.compound.ignored can be used to ignore specific
- *   metric registries</li>
- * </ol>
- */
+/// This is a special [PinotMetricsRegistry] that actually reports metrics in one or more registries. For example,
+/// it can be used to register metrics using both Yammer and Dropwizard. The way this class works is quite naive.
+/// When it is created, a bunch of factories are used as sub-factories. Whenever a metric is registered in this factory,
+/// it actually registers the metric in all the sub-factories.
+///
+/// Probably the main reason to use this metrics is to compare the differences between one metric registry and another.
+/// For example, Yammer and Dropwizard provide their own timer, but each one provides their own metrics on their timers.
+/// Most metrics are the same (p50, p90, p95, etc) but some other may be different.
+///
+/// Alternative it could be used in production, but it is important to make sure that the JMX MBeans produced by each
+/// sub-registry are different. Otherwise the reported value is undetermined.
+///
+/// In order to use this factory, you have to set the following properties in Pinot configuration:
+///
+/// 1. pinot.&lt;server|broker|minion|etc&gt;.metrics.factory.className should be set to
+///    org.apache.pinot.plugin.metrics.compound.CompoundPinotMetricsFactory
+/// 2. (optional) pinot.&lt;server|broker|minion|etc&gt;.metrics.compound.algorithm should be set to SERVICE_LOADER,
+///    CLASSPATH or LIST. CLASSPATH is the default.
+/// 3. (optional) pinot.&lt;server|broker|minion|etc&gt;.metrics.compound.ignored can be used to ignore specific
+///    metric registries
 @AutoService(PinotMetricsFactory.class)
 @MetricsFactory
 public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
   public static final Logger LOGGER = LoggerFactory.getLogger(CompoundPinotMetricsFactory.class);
-  /**
-   * The suffix property used to define the algorithm used to look for other registries. It will be prefixed with the
-   * corresponding property prefix (like pinot.server.plugin.metrics, pinot.broker.plugin.metrics, etc).
-   *
-   * See {@link Algorithm}
-   */
+  /// The suffix property used to define the algorithm used to look for other registries. It will be prefixed with the
+  /// corresponding property prefix (like pinot.server.plugin.metrics, pinot.broker.plugin.metrics, etc).
+  ///
+  /// See [Algorithm]
   public static final String ALGORITHM_KEY = "compound.algorithm";
-  /**
-   * The suffix property used to define a list of metric registries to ignore. It will be prefixed with the
-   * corresponding property prefix (like pinot.server.plugin.metrics, pinot.broker.plugin.metrics, etc).
-   *
-   * The list of metrics factory classes we want to ignore. They have to be actual names that can be converted into
-   * classes by using {@link PluginManager#loadClass(String)}. Any {@link PinotMetricsRegistry} that implements or
-   * extends any of the factories included here will be ignored by this metric registry.
-   */
+  /// The suffix property used to define a list of metric registries to ignore. It will be prefixed with the
+  /// corresponding property prefix (like pinot.server.plugin.metrics, pinot.broker.plugin.metrics, etc).
+  ///
+  /// The list of metrics factory classes we want to ignore. They have to be actual names that can be converted into
+  /// classes by using [PluginManager#loadClass(String)]. Any [PinotMetricsRegistry] that implements or
+  /// extends any of the factories included here will be ignored by this metric registry.
   public static final String IGNORED_METRICS = "compound.ignored";
-  /**
-   * The suffix property used to define a list of metric registries to include when using {@link Algorithm#LIST}.
-   * It will be prefixed with the corresponding property prefix (like pinot.server.plugin.metrics,
-   * pinot.broker.plugin.metrics, etc).
-   *
-   * Each value should be the name of a class that implements {@link PinotMetricsFactory} and can be instantiated with
-   * the {@link PluginManager}.
-   */
+  /// The suffix property used to define a list of metric registries to include when using [Algorithm#LIST].
+  /// It will be prefixed with the corresponding property prefix (like pinot.server.plugin.metrics,
+  /// pinot.broker.plugin.metrics, etc).
+  ///
+  /// Each value should be the name of a class that implements [PinotMetricsFactory] and can be instantiated with
+  /// the [PluginManager].
   public static final String LIST_KEY = "compound.list";
   private List<PinotMetricsFactory> _factories;
   private CompoundPinotMetricRegistry _registry;
@@ -174,13 +165,9 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
     return "Compound";
   }
 
-  /**
-   * How to look for other {@link PinotMetricsFactory}.
-   */
+  /// How to look for other [PinotMetricsFactory].
   enum Algorithm {
-    /**
-     * An algorithm that returns all {@link PinotMetricsFactory} defined as {@link ServiceLoader}.
-     */
+    /// An algorithm that returns all [PinotMetricsFactory] defined as [ServiceLoader].
     SERVICE_LOADER {
       @Override
       protected Stream<PinotMetricsFactory> streamInstances(PinotConfiguration metricsConfiguration) {
@@ -191,9 +178,7 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
         return result.stream();
       }
     },
-    /**
-     * An algorithm that returns all factories returned by {@link PinotMetricUtils#getPinotMetricsFactoryClasses()}.
-     */
+    /// An algorithm that returns all factories returned by [PinotMetricUtils#getPinotMetricsFactoryClasses()].
     CLASSPATH {
       @Override
       protected Stream<PinotMetricsFactory> streamInstances(PinotConfiguration metricsConfiguration) {
@@ -208,9 +193,7 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
             );
       }
     },
-    /**
-     * An algorithm returns all the factories listed in the config under the {@link #LIST_KEY}.
-     */
+    /// An algorithm returns all the factories listed in the config under the [#LIST_KEY].
     LIST {
       @Override
       protected Stream<PinotMetricsFactory> streamInstances(PinotConfiguration metricsConfiguration) {

@@ -39,9 +39,7 @@ import static org.testng.Assert.assertTrue;
 
 
 public class FunctionUtilsTest {
-  /**
-   * Test fixture for class-level function volatility.
-   */
+  /// Test fixture for class-level function volatility.
   @ScalarFunction(enabled = false, volatility = FunctionVolatility.STABLE)
   private static class AnnotatedFunction {
     @ScalarFunction(enabled = false)
@@ -50,9 +48,7 @@ public class FunctionUtilsTest {
     }
   }
 
-  /**
-   * Test fixture for method-level and legacy volatility metadata.
-   */
+  /// Test fixture for method-level and legacy volatility metadata.
   private static class VolatilityAnnotatedFunction {
     @ScalarFunction(enabled = false, isDeterministic = false)
     public static long legacyVolatile() {

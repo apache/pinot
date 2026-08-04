@@ -265,20 +265,18 @@ public class RealtimeConsumptionRateManager {
         });
   }
 
-  /**
-   * Tracks quota utilization for a stream consumer by aggregating the number of units (messages or bytes) consumed
-   * and computing the consumption rate against the configured rate limit.
-   * <p>
-   * This class maintains the unit count over time and computes the quota utilization ratio once per minute.
-   * The utilization is reported as a gauge metric to {@link ServerMetrics}.
-   * <p>
-   * Note: This class is not thread-safe and is intended to be used in contexts where concurrency control is
-   * managed externally (e.g., per-partition rate limiter instances).
-   * <p>
-   * Example:
-   *   - If 3000 messages are consumed in one minute and the rate limit is 50 msg/sec,
-   *     the quota utilization = (3000 / 60) / 50 = 1.0 → 100%
-   */
+  /// Tracks quota utilization for a stream consumer by aggregating the number of units (messages or bytes) consumed
+  /// and computing the consumption rate against the configured rate limit.
+  ///
+  /// This class maintains the unit count over time and computes the quota utilization ratio once per minute.
+  /// The utilization is reported as a gauge metric to [ServerMetrics].
+  ///
+  /// Note: This class is not thread-safe and is intended to be used in contexts where concurrency control is
+  /// managed externally (e.g., per-partition rate limiter instances).
+  ///
+  /// Example:
+  ///   - If 3000 messages are consumed in one minute and the rate limit is 50 msg/sec,
+  ///     the quota utilization = (3000 / 60) / 50 = 1.0 → 100%
   static class QuotaUtilizationTracker {
     private long _previousMinute = -1;
     // Aggregated over a minute; must be long because in byte-throttling mode this counts bytes/minute, which for a
@@ -304,9 +302,7 @@ public class RealtimeConsumptionRateManager {
       _serverLevel = serverLevel;
     }
 
-    /**
-     * Update count and return utilization ratio percentage (0 if not enough data yet).
-     */
+    /// Update count and return utilization ratio percentage (0 if not enough data yet).
     public int update(long unitsConsumed, double rateLimit, Instant now) {
       int ratioPercentage = 0;
       long nowInMinutes = now.getEpochSecond() / 60;
@@ -375,13 +371,11 @@ public class RealtimeConsumptionRateManager {
   static final ConsumptionRateLimiter NOOP_RATE_LIMITER = n -> {
   };
 
-  /**
-   * {@code PartitionRateLimiter} is an implementation of {@link ConsumptionRateLimiter} that uses Guava's
-   * {@link com.google.common.util.concurrent.RateLimiter} to throttle the rate of consumption at per partition
-   * level based on a configurable rate limit (in permits per second).
-   * <p>
-   * <p>This class is NOT thread-safe
-   */
+  /// `PartitionRateLimiter` is an implementation of [ConsumptionRateLimiter] that uses Guava's
+  /// [com.google.common.util.concurrent.RateLimiter] to throttle the rate of consumption at per partition
+  /// level based on a configurable rate limit (in permits per second).
+  ///
+  /// This class is NOT thread-safe
   @VisibleForTesting
   static class PartitionRateLimiter implements ConsumptionRateLimiter {
     private final double _rate;
@@ -423,16 +417,14 @@ public class RealtimeConsumptionRateManager {
     }
   }
 
-  /**
-   * {@code ServerRateLimiter} is an implementation of {@link ConsumptionRateLimiter} that uses Guava's
-   * {@link com.google.common.util.concurrent.RateLimiter} to throttle the rate of consumption at entire server
-   * level based on a configurable rate limit (in permits per second).
-   * <p>
-   * It supports dynamically updating the rate limit and emits metrics asynchronously to track quota utilization
-   * via {@link AsyncMetricEmitter}.
-   *
-   * <p>This class is thread-safe
-   */
+  /// `ServerRateLimiter` is an implementation of [ConsumptionRateLimiter] that uses Guava's
+  /// [com.google.common.util.concurrent.RateLimiter] to throttle the rate of consumption at entire server
+  /// level based on a configurable rate limit (in permits per second).
+  ///
+  /// It supports dynamically updating the rate limit and emits metrics asynchronously to track quota utilization
+  /// via [AsyncMetricEmitter].
+  ///
+  /// This class is thread-safe
   @VisibleForTesting
   static class ServerRateLimiter implements ConsumptionRateLimiter {
     private final RateLimiter _rateLimiter;
@@ -508,23 +500,21 @@ public class RealtimeConsumptionRateManager {
     }
   };
 
-  /**
-   * Asynchronously emits the quota utilization metric for a shared rate limiter (e.g., server-wide).
-   * <p>
-   * This class aggregates consumed message counts over a fixed time interval (default: 60 seconds) using a
-   * high-performance {@link java.util.concurrent.atomic.LongAdder}. A scheduled background task computes the
-   * actual message rate and reports the quota utilization ratio as a gauge metric.
-   * <p>
-   * This design avoids contention from multiple threads calling emit logic and ensures non-blocking accumulation
-   * of message counts. Thread-safe and suitable for shared use.
-   * <p>
-   * Usage:
-   *   - Call {@link #record(int)} to record messages consumed.
-   *   - Call {@link #start()} once to schedule metric emission.
-   *   - Optionally call {@link #close()} to stop the emitter.
-   * <p>
-   * Thread-safe.
-   */
+  /// Asynchronously emits the quota utilization metric for a shared rate limiter (e.g., server-wide).
+  ///
+  /// This class aggregates consumed message counts over a fixed time interval (default: 60 seconds) using a
+  /// high-performance [java.util.concurrent.atomic.LongAdder]. A scheduled background task computes the
+  /// actual message rate and reports the quota utilization ratio as a gauge metric.
+  ///
+  /// This design avoids contention from multiple threads calling emit logic and ensures non-blocking accumulation
+  /// of message counts. Thread-safe and suitable for shared use.
+  ///
+  /// Usage:
+  ///   - Call [#record(int)] to record messages consumed.
+  ///   - Call [#start()] once to schedule metric emission.
+  ///   - Optionally call [#close()] to stop the emitter.
+  ///
+  /// Thread-safe.
   static class AsyncMetricEmitter {
     private static final int METRIC_EMIT_FREQUENCY_SEC = 60;
     private final AtomicDouble _rateLimit;

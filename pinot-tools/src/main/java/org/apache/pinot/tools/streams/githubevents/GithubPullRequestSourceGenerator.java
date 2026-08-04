@@ -38,9 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The class that pulls events from GitHub by RPC calls, and converts them into byte[] so we can write to Kafka
- */
+/// The class that pulls events from GitHub by RPC calls, and converts them into byte\[\] so we can write to Kafka
 public class GithubPullRequestSourceGenerator implements PinotSourceDataGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(GithubPullRequestSourceGenerator.class);
   private static final long SLEEP_MILLIS = 10_000;
@@ -106,9 +104,7 @@ public class GithubPullRequestSourceGenerator implements PinotSourceDataGenerato
     return genericRecord;
   }
 
-  /**
-   * Convert the PullRequestMergedEvent to a GenericRecord
-   */
+  /// Convert the PullRequestMergedEvent to a GenericRecord
   private GenericRecord convertToGenericRecord(PullRequestMergedEvent pullRequestMergedEvent) {
     GenericRecord genericRecord = new GenericData.Record(_avroSchema);
 

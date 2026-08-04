@@ -42,21 +42,21 @@ import java.util.zip.ZipFile;
 /// Scans every entry of a classpath and reports any class file whose bytecode version is newer than a given Java
 /// feature release can load.
 ///
-/// This complements the hard-coded compiler {@code release} of 11 on Pinot's client and SPI modules. That pin
+/// This complements the hard-coded compiler `release` of 11 on Pinot's client and SPI modules. That pin
 /// guarantees Pinot's _own_ bytecode is Java 11 clean, but says nothing about the transitive third-party closure those
 /// modules drag in. A dependency bump that pulls in a Java 17+ jar would otherwise only be discovered by a user hitting
-/// {@link UnsupportedClassVersionError} at runtime.
+/// [UnsupportedClassVersionError] at runtime.
 ///
 /// Two categories of entry are deliberately _not_ violations, because a Java 11 JVM never loads them:
-///   - {@code module-info.class} descriptors, which are compiled at the version of the JDK that built the jar and are
+///   - `module-info.class` descriptors, which are compiled at the version of the JDK that built the jar and are
 ///     ignored entirely on the classpath.
-///   - Entries under {@code META-INF/versions/<n>/} that this JVM would not select. A JVM only performs multi-release
-///     lookup at all when the jar manifest carries {@code Multi-Release: true}, so in a jar without that attribute
+///   - Entries under `META-INF/versions/<n>/` that this JVM would not select. A JVM only performs multi-release
+///     lookup at all when the jar manifest carries `Multi-Release: true`, so in a jar without that attribute
 ///     every versioned entry is an inert resource and is skipped outright. In a genuine multi-release jar, only the
 ///     entries at or below the target release are selected, so entries above it are skipped and the rest are checked.
 ///     Directory classpath entries never get multi-release treatment, so their versioned entries are skipped too.
 ///
-/// This class is not thread-safe; a {@link Result} is produced by a single {@link #scan} call.
+/// This class is not thread-safe; a [Result] is produced by a single [#scan] call.
 final class ClasspathClosureScanner {
   /// Class file major version for Java 11 is 55; each later feature release adds one.
   private static final int CLASS_FILE_MAJOR_VERSION_OFFSET = 44;
@@ -103,7 +103,7 @@ final class ClasspathClosureScanner {
     private int _classFilesInDirectories;
 
     /// The first {@value #MAX_REPORTED_VIOLATIONS} violations, so a wholesale mistake does not produce megabytes of CI
-    /// log. {@link #getTotalViolationCount()} is the authoritative count.
+    /// log. [#getTotalViolationCount()] is the authoritative count.
     List<Violation> getReportedViolations() {
       return _reportedViolations;
     }
@@ -131,9 +131,9 @@ final class ClasspathClosureScanner {
       return _directoriesScanned;
     }
 
-    /// Class files inspected inside jars, counted separately from {@link #getClassFilesInDirectories()} so a vacuity
+    /// Class files inspected inside jars, counted separately from [#getClassFilesInDirectories()] so a vacuity
     /// guard can assert that third-party bytecode was actually looked at. Counting both together would let the
-    /// verifier's own {@code target/classes} satisfy the guard on its own.
+    /// verifier's own `target/classes` satisfy the guard on its own.
     int getClassFilesInArchives() {
       return _classFilesInArchives;
     }
@@ -165,10 +165,10 @@ final class ClasspathClosureScanner {
     }
   }
 
-  /// Scans {@code classpath} (a {@link File#pathSeparator}-delimited list) for class files that a JVM at {@code
-  /// targetJavaFeatureVersion} could not load.
+  /// Scans `classpath` (a [File#pathSeparator] -delimited list) for class files that a JVM at
+  /// `targetJavaFeatureVersion` could not load.
   ///
-  /// @throws IOException if a {@code .jar}/{@code .zip} entry on the classpath cannot be opened or read. A corrupt
+  /// @throws IOException if a `.jar`/`.zip` entry on the classpath cannot be opened or read. A corrupt
   /// archive is a hard error, never a silent skip.
   static Result scan(String classpath, int targetJavaFeatureVersion)
       throws IOException {
@@ -251,8 +251,8 @@ final class ClasspathClosureScanner {
     }
   }
 
-  /// Returns whether the archive declares {@code Multi-Release: true} in its manifest. Only such an archive gets
-  /// versioned-entry lookup from a JVM; in any other jar the {@code META-INF/versions/} tree is inert data.
+  /// Returns whether the archive declares `Multi-Release: true` in its manifest. Only such an archive gets
+  /// versioned-entry lookup from a JVM; in any other jar the `META-INF/versions/` tree is inert data.
   private static boolean isMultiRelease(ZipFile zipFile)
       throws IOException {
     ZipEntry manifestEntry = zipFile.getEntry(MANIFEST_ENTRY);
@@ -280,9 +280,9 @@ final class ClasspathClosureScanner {
     }
   }
 
-  /// Returns true if {@code name} is a class file that a JVM at {@code targetJavaFeatureVersion} would actually load
-  /// from the classpath. {@code multiRelease} says whether the enclosing archive declared
-  /// {@code Multi-Release: true}; when it did not, versioned entries are never selected and so are never checked.
+  /// Returns true if `name` is a class file that a JVM at `targetJavaFeatureVersion` would actually load
+  /// from the classpath. `multiRelease` says whether the enclosing archive declared
+  /// `Multi-Release: true`; when it did not, versioned entries are never selected and so are never checked.
   private static boolean isLoadableClassEntry(String name, int targetJavaFeatureVersion, boolean multiRelease) {
     if (!name.endsWith(".class")) {
       return false;
@@ -313,7 +313,7 @@ final class ClasspathClosureScanner {
   }
 
   /// Reads the class file major version from the first 8 bytes. Returns empty for anything that is not a class file
-  /// despite the {@code .class} name, which does occur in the wild as packaged test data.
+  /// despite the `.class` name, which does occur in the wild as packaged test data.
   private static Optional<Integer> readMajorVersion(InputStream inputStream)
       throws IOException {
     DataInputStream dataInputStream = new DataInputStream(inputStream);

@@ -35,15 +35,12 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-/**
- * Zookeeper Basic Authentication based on Pinot Controller UI.
- * The user role has been distinguished by user and admin. Only admin can have access to the
- * user console page in Pinot controller UI. And admin can change user info (table permission/
- * number of tables/password etc.) or add/delete user without restarting your Pinot clusters,
- * and these changes happen immediately.
- * Users Configuration store in Helix Zookeeper and encrypted user password via Bcrypt Encryption Algorithm.
- *
- */
+/// Zookeeper Basic Authentication based on Pinot Controller UI.
+/// The user role has been distinguished by user and admin. Only admin can have access to the
+/// user console page in Pinot controller UI. And admin can change user info (table permission/
+/// number of tables/password etc.) or add/delete user without restarting your Pinot clusters,
+/// and these changes happen immediately.
+/// Users Configuration store in Helix Zookeeper and encrypted user password via Bcrypt Encryption Algorithm.
 public class ZkBasicAuthAccessFactory implements AccessControlFactory {
   private static final String AUTHORIZATION_KEY = "authorization";
 
@@ -63,9 +60,7 @@ public class ZkBasicAuthAccessFactory implements AccessControlFactory {
     return _accessControl;
   }
 
-  /**
-   * Access Control using metadata-based basic grpc authentication
-   */
+  /// Access Control using metadata-based basic grpc authentication
   private static class BasicAuthAccessControl implements AccessControl {
     private Map<String, ZkBasicAuthPrincipal> _name2principal;
     private AccessControlUserCache _userCache;

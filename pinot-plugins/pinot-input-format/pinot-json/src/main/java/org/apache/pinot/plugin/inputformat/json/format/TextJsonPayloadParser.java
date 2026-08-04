@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.plugin.inputformat.json.format;
 
-import java.util.Map;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /// Parses UTF-8 text JSON, the historical [org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder]
-/// behavior. Delegates to [JsonUtils#bytesToMap] so the produced value types exactly match the rest of Pinot.
-class TextJsonPayloadParser implements JsonPayloadParser {
+/// behavior. Uses the same Jackson map/value materialization contract as the binary JSON parsers.
+class TextJsonPayloadParser extends JacksonPayloadParser {
+
+  TextJsonPayloadParser() {
+    super(JsonUtils.DEFAULT_READER);
+  }
 
   @Override
   public boolean matches(byte[] payload, int offset, int length) {
@@ -45,11 +48,5 @@ class TextJsonPayloadParser implements JsonPayloadParser {
       return b == '{' || b == '[';
     }
     return false;
-  }
-
-  @Override
-  public Map<String, Object> parse(byte[] payload, int offset, int length)
-      throws Exception {
-    return JsonUtils.bytesToMap(payload, offset, length);
   }
 }

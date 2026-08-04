@@ -41,7 +41,6 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 ///   - `DISTINCTCOUNTHLLPLUS` / `DISTINCTCOUNTRAWHLLPLUS`
 ///   - `DISTINCTCOUNTTHETASKETCH` / `DISTINCTCOUNTRAWTHETASKETCH`
 ///
-///
 /// Trailing literal parameters injected by broker overrides (e.g. HLL
 /// `log2m`) are preserved in the rewritten expression.
 ///

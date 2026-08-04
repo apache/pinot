@@ -37,13 +37,11 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * Pinot-specific query workload benchmark for filtered ANN and radius execution.
- *
- * <p>Unlike broad ANN frontiers, this suite focuses on the query shapes Pinot actually has to
- * execute correctly: exact filtered top-K, exact radius, filter-aware ANN on immutable IVF
- * backends, and approximate-radius candidate generation with exact refinement.</p>
- */
+/// Pinot-specific query workload benchmark for filtered ANN and radius execution.
+///
+/// Unlike broad ANN frontiers, this suite focuses on the query shapes Pinot actually has to
+/// execute correctly: exact filtered top-K, exact radius, filter-aware ANN on immutable IVF
+/// backends, and approximate-radius candidate generation with exact refinement.
 public final class BenchmarkVectorFilterWorkloads {
   private static final String COLUMN_NAME = "embedding";
   private static final long SEED = 20260411L;

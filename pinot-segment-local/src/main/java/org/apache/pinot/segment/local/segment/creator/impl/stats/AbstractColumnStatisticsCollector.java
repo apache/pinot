@@ -30,16 +30,14 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * This class in initialized per column and all the data is
- * sent to it before actual indexes are created
- * the job of this class is to collect
- * unique elements
- * record cardinality
- * compute min
- * compute max
- * see if column isSorted
- */
+/// This class in initialized per column and all the data is
+/// sent to it before actual indexes are created
+/// the job of this class is to collect
+/// unique elements
+/// record cardinality
+/// compute min
+/// compute max
+/// see if column isSorted
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class AbstractColumnStatisticsCollector implements ColumnStatistics {
   protected static final int INITIAL_HASH_SET_SIZE = 1000;
@@ -80,9 +78,7 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
     return fieldSpec;
   }
 
-  /**
-   * Collects statistics for the given entry (entry can be either single-valued or multi-valued).
-   */
+  /// Collects statistics for the given entry (entry can be either single-valued or multi-valued).
   public abstract void collect(Object entry);
 
   // Collects statistics for primitive values

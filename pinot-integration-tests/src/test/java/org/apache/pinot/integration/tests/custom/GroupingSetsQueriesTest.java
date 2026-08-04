@@ -41,21 +41,21 @@ import static org.testng.Assert.assertTrue;
 /// End-to-end coverage for GROUP BY GROUPING SETS / ROLLUP / CUBE and the GROUPING() / GROUPING_ID() helper
 /// functions, run against both the single-stage and multi-stage query engines.
 ///
-/// The dataset has two dimensions {@code d1} (values a/b, never null) and {@code d2} (values x or genuine
-/// NULL), with a metric {@code met = 1} per row. The genuine NULLs in {@code d2} are the crux of the
-/// discriminator test: a ROLLUP(d1, d2) produces BOTH a genuine {@code (a, NULL)} detail group (from the
-/// {d1, d2} set, GROUPING(d2)=0) and a rolled-up {@code (a, NULL)} subtotal group (from the {d1} set,
+/// The dataset has two dimensions `d1` (values a/b, never null) and `d2` (values x or genuine
+/// NULL), with a metric `met = 1` per row. The genuine NULLs in `d2` are the crux of the
+/// discriminator test: a ROLLUP(d1, d2) produces BOTH a genuine `(a, NULL)` detail group (from the
+/// {d1, d2} set, GROUPING(d2)=0) and a rolled-up `(a, NULL)` subtotal group (from the {d1} set,
 /// GROUPING(d2)=1). These must remain distinct rows with independent counts; without the synthetic
 /// $groupingId discriminator they would incorrectly merge.
 ///
-/// Every test selects its engine(s) through a data provider. Most run on BOTH via {@code useBothQueryEngines}: the
+/// Every test selects its engine(s) through a data provider. Most run on BOTH via `useBothQueryEngines`: the
 /// multi-stage engine returns identical results by pushing the per-set expansion down to the single-stage (leaf)
 /// engine. This includes null-handling-disabled queries (a rolled-up key still comes back NULL regardless of the
 /// null-handling option), the ORDER BY / HAVING aggregation and GROUPING() cases, and the compile-time rejection
-/// cases (rejected on both engines). The only test pinned to {@code useV1QueryEngine} is the multi-value grouping
+/// cases (rejected on both engines). The only test pinned to `useV1QueryEngine` is the multi-value grouping
 /// column, which the multi-stage engine rejects as an intermediate-stage group key. Tests inherently multi-stage
-/// specific use {@code useV2QueryEngine}: grouping sets over a JOIN, and the v2 physical planner
-/// ({@code usePhysicalOptimizer}) cases.
+/// specific use `useV2QueryEngine`: grouping sets over a JOIN, and the v2 physical planner
+/// (`usePhysicalOptimizer`) cases.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class GroupingSetsQueriesTest extends CustomDataQueryClusterIntegrationTest {
   private static final String DEFAULT_TABLE_NAME = "GroupingSetsQueriesTest";
@@ -140,7 +140,7 @@ public class GroupingSetsQueriesTest extends CustomDataQueryClusterIntegrationTe
     }
   }
 
-  /// Encodes a JSON cell value: literal {@code null} becomes the sentinel "NULL", everything else its text.
+  /// Encodes a JSON cell value: literal `null` becomes the sentinel "NULL", everything else its text.
   private static String cell(JsonNode row, int index) {
     JsonNode value = row.get(index);
     return value.isNull() ? "NULL" : value.asText();

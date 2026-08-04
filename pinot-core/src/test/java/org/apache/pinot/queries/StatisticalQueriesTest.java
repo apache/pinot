@@ -64,9 +64,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for statistical queries (i.e Variance, Covariance, Standard Deviation etc)
- */
+/// Queries test for statistical queries (i.e Variance, Covariance, Standard Deviation etc)
 public class StatisticalQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "CovarianceQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";

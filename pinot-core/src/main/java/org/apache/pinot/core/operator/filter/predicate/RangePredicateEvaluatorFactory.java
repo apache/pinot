@@ -36,21 +36,17 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
 
-/**
- * Factory for RANGE predicate evaluators.
- */
+/// Factory for RANGE predicate evaluators.
 public class RangePredicateEvaluatorFactory {
   private RangePredicateEvaluatorFactory() {
   }
 
-  /**
-   * Create a new instance of dictionary based RANGE predicate evaluator.
-   *
-   * @param rangePredicate RANGE predicate to evaluate
-   * @param dictionary Dictionary for the column
-   * @param dataType Data type for the column
-   * @return Dictionary based RANGE predicate evaluator
-   */
+  /// Create a new instance of dictionary based RANGE predicate evaluator.
+  ///
+  /// @param rangePredicate RANGE predicate to evaluate
+  /// @param dictionary Dictionary for the column
+  /// @param dataType Data type for the column
+  /// @return Dictionary based RANGE predicate evaluator
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(RangePredicate rangePredicate,
       Dictionary dictionary, DataType dataType) {
     if (dictionary.isSorted()) {
@@ -60,13 +56,11 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  /**
-   * Create a new instance of raw value based RANGE predicate evaluator.
-   *
-   * @param rangePredicate RANGE predicate to evaluate
-   * @param dataType Data type for the column
-   * @return Raw value based RANGE predicate evaluator
-   */
+  /// Create a new instance of raw value based RANGE predicate evaluator.
+  ///
+  /// @param rangePredicate RANGE predicate to evaluate
+  /// @param dataType Data type for the column
+  /// @return Raw value based RANGE predicate evaluator
   public static RangeRawPredicateEvaluator newRawValueBasedEvaluator(RangePredicate rangePredicate,
       DataType dataType) {
     String lowerBound = rangePredicate.getLowerBound();

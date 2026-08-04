@@ -61,9 +61,7 @@ import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 import software.amazon.awssdk.utils.AttributeMap;
 
 
-/**
- * Creates all dependencies (docker image, kinesis server, kinesis client, configs) for all tests requiring kinesis
- */
+/// Creates all dependencies (docker image, kinesis server, kinesis client, configs) for all tests requiring kinesis
 @LocalstackDockerProperties(services = {ServiceName.KINESIS}, imageTag = BaseKinesisIntegrationTest.LOCALSTACK_IMAGE)
 abstract class BaseKinesisIntegrationTest extends BaseClusterIntegrationTest {
 

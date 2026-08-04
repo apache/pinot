@@ -25,9 +25,7 @@ import com.google.common.base.Preconditions;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-/**
- * Class representing configurations related to realtime segment completion.
- */
+/// Class representing configurations related to realtime segment completion.
 public class CompletionConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription(

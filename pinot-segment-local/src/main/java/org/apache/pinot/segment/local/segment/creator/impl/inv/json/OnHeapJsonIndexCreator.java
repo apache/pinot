@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.util.Map;
 import org.apache.pinot.segment.local.io.util.VarLengthValueWriter;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter;
-import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
@@ -31,12 +30,11 @@ import org.roaringbitmap.RoaringBitmapWriter;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * Implementation of {@link JsonIndexCreator} that uses on-heap memory.
- * <p>On-heap creator uses more heap memory, but is cheaper on computation and does not flush data to disk which can
- * slow down the creation because of the IO latency. Use on-heap creator in the environment where there is enough heap
- * memory and garbage collection won't cause performance issue (e.g. Hadoop/Spark/Pinot Minion).
- */
+/// Implementation of [org.apache.pinot.segment.spi.index.creator.JsonIndexCreator] that uses on-heap memory.
+///
+/// On-heap creator uses more heap memory, but is cheaper on computation and does not flush data to disk which can
+/// slow down the creation because of the IO latency. Use on-heap creator in the environment where there is enough heap
+/// memory and garbage collection won't cause performance issue (e.g. Hadoop/Spark/Pinot Minion).
 public class OnHeapJsonIndexCreator extends BaseJsonIndexCreator {
 
   public OnHeapJsonIndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,

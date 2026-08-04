@@ -86,21 +86,21 @@ import org.apache.pinot.tsdb.spi.plan.serde.TimeSeriesPlanSerde;
 /// JVM.
 ///
 /// Six modules (pinot-spi, pinot-segment-spi, pinot-timeseries-spi, pinot-common, pinot-java-client and
-/// pinot-jdbc-client) hard-code a compiler {@code release} of 11 so that third-party plugins and embedding applications
-/// are not forced onto the JDK that Pinot's services require. {@code --release} makes Pinot's own code in those modules
+/// pinot-jdbc-client) hard-code a compiler `release` of 11 so that third-party plugins and embedding applications
+/// are not forced onto the JDK that Pinot's services require. `--release` makes Pinot's own code in those modules
 /// Java 11 clean, but it says nothing about their transitive dependency closure: a routine dependency bump can drop a
 /// Java 17+ jar into the client's classpath, and nothing in the build would notice. This verifier closes that gap.
 ///
 /// It must be launched by a JVM at the target feature release (11 by default) -- running it on the build JDK proves
-/// nothing, so {@link #checkJvmIsAtTargetFeatureVersion} fails loudly in that case. The build itself still requires JDK
-/// 25 ({@code requireJavaVersion} in the root pom), so CI builds the artifacts with JDK 25 and then runs this class
+/// nothing, so [#checkJvmIsAtTargetFeatureVersion] fails loudly in that case. The build itself still requires JDK
+/// 25 (`requireJavaVersion` in the root pom), so CI builds the artifacts with JDK 25 and then runs this class
 /// under Java 11.
 ///
-/// Usage: {@code java -cp <runtime closure> org.apache.pinot.java11.Java11CompatibilityVerifier
-/// [targetJavaFeatureVersion]}. Exits 0 if every check passes, 1 otherwise.
+/// Usage: `java -cp <runtime closure> org.apache.pinot.java11.Java11CompatibilityVerifier [targetJavaFeatureVersion]` .
+/// Exits 0 if every check passes, 1 otherwise.
 ///
-/// The assertions go through a local {@link #require} helper rather than TestNG on purpose. A test framework on the
-/// classpath would be scanned by {@link #checkClasspathClosureIsLoadable} alongside the real dependencies, so a TestNG
+/// The assertions go through a local [#require] helper rather than TestNG on purpose. A test framework on the
+/// classpath would be scanned by [#checkClasspathClosureIsLoadable] alongside the real dependencies, so a TestNG
 /// or byte-buddy release that dropped Java 11 support would fail this job for a reason no Pinot consumer would ever
 /// hit.
 ///
@@ -142,7 +142,7 @@ public final class Java11CompatibilityVerifier {
     _sampleBrokerResponse = JsonUtils.stringToJsonNode(_sampleBrokerResponseJson);
   }
 
-  /// A single named verification. Throwing anything -- including {@link AssertionError} -- fails it.
+  /// A single named verification. Throwing anything -- including [AssertionError] -- fails it.
   @FunctionalInterface
   private interface Check {
     void run()
@@ -234,7 +234,7 @@ public final class Java11CompatibilityVerifier {
         System.getProperty("java.home"));
   }
 
-  /// Walks the whole runtime closure looking for bytecode this JVM could not load. {@code --release 11} covers Pinot's
+  /// Walks the whole runtime closure looking for bytecode this JVM could not load. `--release 11` covers Pinot's
   /// own class files; this is the part that covers everybody else's.
   private void checkClasspathClosureIsLoadable()
       throws IOException {
@@ -359,8 +359,8 @@ public final class Java11CompatibilityVerifier {
   }
 
   /// pinot-segment-spi's off-heap buffer, which is what a third-party index or reader plugin built against the SPI
-  /// actually uses. Worth exercising rather than merely scanning: the allocation path goes through {@code Unsafe} and
-  /// {@code sun.misc.Cleaner} reflection whose availability is exactly what shifts between JDK releases, and the
+  /// actually uses. Worth exercising rather than merely scanning: the allocation path goes through `Unsafe` and
+  /// `sun.misc.Cleaner` reflection whose availability is exactly what shifts between JDK releases, and the
   /// class-file scan cannot see that.
   private void checkSegmentSpiDataBuffer()
       throws IOException {
@@ -497,7 +497,7 @@ public final class Java11CompatibilityVerifier {
         sqlNodeAndOptions.getOptions());
   }
 
-  /// pinot-common's ZooKeeper metadata model, which is Helix's {@code ZNRecord} plus Helix serialization.
+  /// pinot-common's ZooKeeper metadata model, which is Helix's `ZNRecord` plus Helix serialization.
   private void checkCommonHelixSegmentMetadata() {
     SegmentZKMetadata metadata = new SegmentZKMetadata(SAMPLE_TABLE_NAME + "_0");
     metadata.setCrc(3141592653L);
@@ -532,8 +532,8 @@ public final class Java11CompatibilityVerifier {
         "external view state lost: %s", externalView.getStateMap(SAMPLE_TABLE_NAME + "_OFFLINE"));
   }
 
-  /// The gRPC client's decode path end to end: a protobuf {@code BrokerResponse} carrying a compressed, encoded
-  /// payload, unpacked exactly the way {@code GrpcConnection} unpacks a server response. Covers protobuf, the
+  /// The gRPC client's decode path end to end: a protobuf `BrokerResponse` carrying a compressed, encoded
+  /// payload, unpacked exactly the way `GrpcConnection` unpacks a server response. Covers protobuf, the
   /// compression codecs and the response encoders in one go.
   private void checkCommonGrpcResponseDecoding()
       throws IOException {
@@ -684,8 +684,8 @@ public final class Java11CompatibilityVerifier {
     }
   }
 
-  /// The JDBC driver has to be discoverable through {@link DriverManager} without an explicit {@code Class.forName},
-  /// which means the {@code META-INF/services} descriptor and Java's {@code ServiceLoader} have to work together on
+  /// The JDBC driver has to be discoverable through [DriverManager] without an explicit `Class.forName`,
+  /// which means the `META-INF/services` descriptor and Java's `ServiceLoader` have to work together on
   /// this JVM.
   private void checkJdbcDriverRegistration()
       throws Exception {
@@ -757,8 +757,8 @@ public final class Java11CompatibilityVerifier {
     });
   }
 
-  /// A result table matching {@link #sampleDataSchema()}. Values are chosen so that the assertions in {@link
-  /// #assertSampleRowsMatch} are exact rather than approximate.
+  /// A result table matching [#sampleDataSchema()] . Values are chosen so that the assertions in
+  /// [#assertSampleRowsMatch] are exact rather than approximate.
   private static ResultTable sampleResultTable() {
     return new ResultTable(sampleDataSchema(), List.of(
         new Object[]{"Hank Aaron", 1001, 3298L, 0.305d, false},
@@ -766,8 +766,8 @@ public final class Java11CompatibilityVerifier {
         new Object[]{"Shohei Ohtani", 1003, 716L, 0.277d, true}));
   }
 
-  /// Asserts that a decoded result table still carries the values from {@link #sampleResultTable()}. Compares rendered
-  /// values because the encoders are free to pick their own boxed representation for a given {@link ColumnDataType}.
+  /// Asserts that a decoded result table still carries the values from [#sampleResultTable()]. Compares rendered
+  /// values because the encoders are free to pick their own boxed representation for a given [ColumnDataType].
   private static void assertSampleRowsMatch(String label, ResultTable decoded) {
     List<Object[]> expectedRows = sampleResultTable().getRows();
     for (int rowId = 0; rowId < expectedRows.size(); rowId++) {

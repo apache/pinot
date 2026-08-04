@@ -3393,40 +3393,38 @@ public class InstanceAssignmentTest {
       assertEquals(steadyStatePartitions.getInstances(0, rg), initialPartitions.getInstances(0, rg));
     }
   }
-  /**
-   * Verifies that subset-partition tables use the total Kafka partition count (not the subset size)
-   * for instance assignment, producing the same server spread as a normal full-partition table.
-   *
-   * <p><b>Topology:</b> 2 Kafka topic partitions, 4 servers, 2 replica groups,
-   * 1 instance per partition per replica group.
-   * <ul>
-   *   <li>Table A has {@code stream.kafka.partition.ids = "0"} (consumes only Kafka partition 0)</li>
-   *   <li>Table B has {@code stream.kafka.partition.ids = "1"} (consumes only Kafka partition 1)</li>
-   * </ul>
-   *
-   * <p>The {@link ImplicitRealtimeTablePartitionSelector} always fetches the <em>total</em>
-   * Kafka partition count from {@link StreamMetadataProvider#fetchPartitionCount} (= 2). This
-   * produces an instance map with <b>two distinct slots</b> so that {@link
-   * org.apache.pinot.controller.helix.core.assignment.segment.RealtimeSegmentAssignment} routes
-   * Kafka partition 0 → slot 0 and Kafka partition 1 → slot 1, each backed by different servers.
-   *
-   * <p>Without this behaviour ({@code numPartitions = subsetSize = 1}), only slot 0 exists, and
-   * the assignment computes {@code kafkaPartitionId % 1 = 0} for <em>every</em> Kafka partition,
-   * routing all consuming segments to the same slot-0 servers — a hotspot on lower-indexed servers.
-   *
-   * <p><b>Pre-computed hash rotations</b> (used for exact expected server values):
-   * <pre>
-   *   Math.abs("subsetTablePartition0_REALTIME".hashCode()) % 4 = 0  →  no rotation
-   *   Pool after rotation: [s0, s1, s2, s3]
-   *   Round-robin to 2 RGs:  RG0=[s0,s2],  RG1=[s1,s3]
-   *     slot 0: RG0=s0, RG1=s1   |   slot 1: RG0=s2, RG1=s3
-   *
-   *   Math.abs("subsetTablePartition1_REALTIME".hashCode()) % 4 = 1  →  rotate by 1
-   *   Pool after rotation: [s1, s2, s3, s0]
-   *   Round-robin to 2 RGs:  RG0=[s1,s3],  RG1=[s2,s0]
-   *     slot 0: RG0=s1, RG1=s2   |   slot 1: RG0=s3, RG1=s0
-   * </pre>
-   */
+  /// Verifies that subset-partition tables use the total Kafka partition count (not the subset size)
+  /// for instance assignment, producing the same server spread as a normal full-partition table.
+  ///
+  /// **Topology:** 2 Kafka topic partitions, 4 servers, 2 replica groups,
+  /// 1 instance per partition per replica group.
+  ///
+  /// - Table A has `stream.kafka.partition.ids = "0"` (consumes only Kafka partition 0)
+  /// - Table B has `stream.kafka.partition.ids = "1"` (consumes only Kafka partition 1)
+  ///
+  /// The [ImplicitRealtimeTablePartitionSelector] always fetches the _total_
+  /// Kafka partition count from [StreamMetadataProvider#fetchPartitionCount] (= 2). This
+  /// produces an instance map with **two distinct slots** so that
+  /// [org.apache.pinot.controller.helix.core.assignment.segment.RealtimeSegmentAssignment] routes
+  /// Kafka partition 0 → slot 0 and Kafka partition 1 → slot 1, each backed by different servers.
+  ///
+  /// Without this behaviour (`numPartitions = subsetSize = 1`), only slot 0 exists, and
+  /// the assignment computes `kafkaPartitionId % 1 = 0` for _every_ Kafka partition,
+  /// routing all consuming segments to the same slot-0 servers — a hotspot on lower-indexed servers.
+  ///
+  /// **Pre-computed hash rotations** (used for exact expected server values):
+  ///
+  /// ```
+  /// Math.abs("subsetTablePartition0_REALTIME".hashCode()) % 4 = 0  →  no rotation
+  /// Pool after rotation: [s0, s1, s2, s3]
+  /// Round-robin to 2 RGs:  RG0=[s0,s2],  RG1=[s1,s3]
+  ///   slot 0: RG0=s0, RG1=s1   |   slot 1: RG0=s2, RG1=s3
+  ///
+  /// Math.abs("subsetTablePartition1_REALTIME".hashCode()) % 4 = 1  →  rotate by 1
+  /// Pool after rotation: [s1, s2, s3, s0]
+  /// Round-robin to 2 RGs:  RG0=[s1,s3],  RG1=[s2,s0]
+  ///   slot 0: RG0=s1, RG1=s2   |   slot 1: RG0=s3, RG1=s0
+  /// ```
   @Test
   public void testSubsetPartitionInstanceAssignmentNoHotspot() {
     final int numReplicas = 2;

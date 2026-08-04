@@ -387,13 +387,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * CompileResult holds the result of the compilation phase. Compilation may or may not be successful. If compilation
-   * is successful then all member variables other than BrokerResponse will be available. If compilation is not
-   * successful, then only the BrokerResponse is set. This is done to keep the current behaviour as is.
-   * It became hard to keep the current behaviour if we were to throw an exception from the compileRequest method.
-   * The only exception is that a BrokerResponse is returned for a literal-only query.
-   */
+  /// CompileResult holds the result of the compilation phase. Compilation may or may not be successful. If compilation
+  /// is successful then all member variables other than BrokerResponse will be available. If compilation is not
+  /// successful, then only the BrokerResponse is set. This is done to keep the current behaviour as is.
+  /// It became hard to keep the current behaviour if we were to throw an exception from the compileRequest method.
+  /// The only exception is that a BrokerResponse is returned for a literal-only query.
   private static class CompileResult {
     final PinotQuery _pinotQuery;
     final PinotQuery _serverPinotQuery;
@@ -1551,10 +1549,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return tableConfig.getTenantConfig().getServer();
   }
 
-  /**
-   * Handles the subquery in the given query.
-   * <p>Currently only supports subquery within the filter.
-   */
+  /// Handles the subquery in the given query.
+  ///
+  /// Currently only supports subquery within the filter.
   private void handleSubquery(PinotQuery pinotQuery, long requestId, JsonNode jsonRequest,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders,
       AccessControl accessControl)
@@ -1566,13 +1563,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Handles the subquery in the given expression.
-   * <p>When subquery is detected, first executes the subquery and gets the response, then rewrites the expression with
-   * the subquery response.
-   * <p>Currently only supports ID_SET subquery within the IN_SUBQUERY transform function, which will be rewritten to an
-   * IN_ID_SET transform function.
-   */
+  /// Handles the subquery in the given expression.
+  ///
+  /// When subquery is detected, first executes the subquery and gets the response, then rewrites the expression with
+  /// the subquery response.
+  ///
+  /// Currently only supports ID_SET subquery within the IN_SUBQUERY transform function, which will be rewritten to an
+  /// IN_ID_SET transform function.
   private void handleSubquery(Expression expression, long requestId, JsonNode jsonRequest,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders,
       AccessControl accessControl)
@@ -1630,14 +1627,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Resolves the actual table name for:
-   * - Case-insensitive cluster
-   *
-   * @param tableName the table name in the query
-   * @param tableCache the table case-sensitive cache
-   * @return table name if the table name is found in Pinot registry.
-   */
+  /// Resolves the actual table name for:
+  /// - Case-insensitive cluster
+  ///
+  /// @param tableName the table name in the query
+  /// @param tableCache the table case-sensitive cache
+  /// @return table name if the table name is found in Pinot registry.
   @VisibleForTesting
   static String getActualTableName(String tableName, TableCache tableCache) {
     String actualTableName = tableCache.getActualTableName(tableName);
@@ -1648,14 +1643,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return actualTableName != null ? actualTableName : tableName;
   }
 
-  /**
-   * Retrieve segment partitioned columns for a table.
-   * For a hybrid table, a segment partitioned column has to be the intersection of both offline and realtime tables.
-   *
-   * @param tableCache
-   * @param tableName
-   * @return segment partitioned columns belong to both offline and realtime tables.
-   */
+  /// Retrieve segment partitioned columns for a table.
+  /// For a hybrid table, a segment partitioned column has to be the intersection of both offline and realtime tables.
+  ///
+  /// @param tableCache
+  /// @param tableName
+  /// @return segment partitioned columns belong to both offline and realtime tables.
   private static Set<String> getSegmentPartitionedColumns(TableCache tableCache, String tableName) {
     final TableConfig offlineTableConfig =
         tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
@@ -1689,18 +1682,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return segmentPartitionedColumns;
   }
 
-  /**
-   * Sets the table name in the given broker request.
-   * NOTE: Set table name in broker request because it is used for access control, query routing etc.
-   */
+  /// Sets the table name in the given broker request.
+  /// NOTE: Set table name in broker request because it is used for access control, query routing etc.
   private void setTableName(BrokerRequest brokerRequest, String tableName) {
     brokerRequest.getQuerySource().setTableName(tableName);
     brokerRequest.getPinotQuery().getDataSource().setTableName(tableName);
   }
 
-  /**
-   * Sets HyperLogLog log2m for DistinctCountHLL functions if not explicitly set for the given query.
-   */
+  /// Sets HyperLogLog log2m for DistinctCountHLL functions if not explicitly set for the given query.
   private static void handleHLLLog2mOverride(PinotQuery pinotQuery, int hllLog2mOverride) {
     List<Expression> selectList = pinotQuery.getSelectList();
     for (Expression expression : selectList) {
@@ -1719,9 +1708,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Sets HyperLogLog log2m for DistinctCountHLL functions if not explicitly set for the given expression.
-   */
+  /// Sets HyperLogLog log2m for DistinctCountHLL functions if not explicitly set for the given expression.
   private static void handleHLLLog2mOverride(Expression expression, int hllLog2mOverride) {
     Function function = expression.getFunctionCall();
     if (function == null) {
@@ -1744,9 +1731,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Overrides the LIMIT of the given query if it exceeds the query limit.
-   */
+  /// Overrides the LIMIT of the given query if it exceeds the query limit.
   @VisibleForTesting
   static void handleQueryLimitOverride(PinotQuery pinotQuery, int queryLimit) {
     if (queryLimit > 0 && pinotQuery.getLimit() > queryLimit) {
@@ -1754,9 +1739,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Rewrites 'DistinctCount' to 'SegmentPartitionDistinctCount' for the given query.
-   */
+  /// Rewrites 'DistinctCount' to 'SegmentPartitionDistinctCount' for the given query.
   @VisibleForTesting
   static void handleSegmentPartitionedDistinctCountOverride(PinotQuery pinotQuery,
       Set<String> segmentPartitionedColumns) {
@@ -1780,9 +1763,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Rewrites 'DistinctCount' to 'SegmentPartitionDistinctCount' for the given expression.
-   */
+  /// Rewrites 'DistinctCount' to 'SegmentPartitionDistinctCount' for the given expression.
   private static void handleSegmentPartitionedDistinctCountOverride(Expression expression,
       Set<String> segmentPartitionedColumns) {
     Function function = expression.getFunctionCall();
@@ -1802,9 +1783,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Rewrites 'DistinctCount' to 'DistinctCountBitmap' for the given query.
-   */
+  /// Rewrites 'DistinctCount' to 'DistinctCountBitmap' for the given query.
   private static void handleDistinctCountBitmapOverride(PinotQuery pinotQuery) {
     for (Expression expression : pinotQuery.getSelectList()) {
       handleDistinctCountBitmapOverride(expression);
@@ -1822,9 +1801,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Rewrites 'DistinctCount' to 'DistinctCountBitmap' for the given expression.
-   */
+  /// Rewrites 'DistinctCount' to 'DistinctCountBitmap' for the given expression.
   private static void handleDistinctCountBitmapOverride(Expression expression) {
     Function function = expression.getFunctionCall();
     if (function == null) {
@@ -1890,9 +1867,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Verifies that no groovy is present in the PinotQuery when disabled.
-   */
+  /// Verifies that no groovy is present in the PinotQuery when disabled.
   @VisibleForTesting
   static void validateGroovyScript(PinotQuery pinotQuery, boolean disableGroovy) {
     List<Expression> selectList = pinotQuery.getSelectList();
@@ -1949,11 +1924,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     GroovyFunctionEvaluator.parseGroovyScript(String.format("groovy({%s})", script));
   }
 
-  /**
-   * Rewrites potential expensive functions to their approximation counterparts.
-   * - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
-   * - PERCENTILE -> PERCENTILE_SMART_TDIGEST
-   */
+  /// Rewrites potential expensive functions to their approximation counterparts.
+  /// - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
+  /// - PERCENTILE -> PERCENTILE_SMART_TDIGEST
   @VisibleForTesting
   static void handleApproximateFunctionOverride(PinotQuery pinotQuery) {
     for (Expression expression : pinotQuery.getSelectList()) {
@@ -2048,9 +2021,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return expression;
   }
 
-  /**
-   * Returns {@code true} if the given query only contains literals, {@code false} otherwise.
-   */
+  /// Returns `true` if the given query only contains literals, `false` otherwise.
   @VisibleForTesting
   static boolean isLiteralOnlyQuery(PinotQuery pinotQuery) {
     for (Expression expression : pinotQuery.getSelectList()) {
@@ -2061,9 +2032,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return true;
   }
 
-  /**
-   * Processes the literal only query.
-   */
+  /// Processes the literal only query.
   private BrokerResponseNative processLiteralOnlyQuery(long requestId, PinotQuery pinotQuery,
       RequestContext requestContext) {
     BrokerResponseNative brokerResponse = new BrokerResponseNative();
@@ -2116,9 +2085,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     values[index] = typeAndValue.getRight();
   }
 
-  /**
-   * Fixes the column names to the actual column names in the given query.
-   */
+  /// Fixes the column names to the actual column names in the given query.
   @VisibleForTesting
   static void updateColumnNames(String rawTableName, PinotQuery pinotQuery, boolean isCaseInsensitive,
       Map<String, String> columnNameMap) {
@@ -2185,9 +2152,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     pinotQuery.setSelectList(newSelections);
   }
 
-  /**
-   * Fixes the column names to the actual column names in the given expression.
-   */
+  /// Fixes the column names to the actual column names in the given expression.
   private static void fixColumnName(String rawTableName, Expression expression, Map<String, String> columnNameMap,
       boolean ignoreCase) {
     ExpressionType expressionType = expression.getType();
@@ -2212,12 +2177,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Returns the actual column name for the given column name for:
-   * - Case-insensitive cluster
-   * - Column name in the format of [{@code rawTableName}].[column_name]
-   * - Column name in the format of [logical_table_name].[column_name] while {@code rawTableName} is a translated name
-   */
+  /// Returns the actual column name for the given column name for:
+  /// - Case-insensitive cluster
+  /// - Column name in the format of [`rawTableName`].\[column_name\]
+  /// - Column name in the format of \[logical_table_name\].\[column_name\] while `rawTableName` is a translated name
   @VisibleForTesting
   static String getActualColumnName(String rawTableName, String columnName, @Nullable Map<String, String> columnNameMap,
       boolean ignoreCase) {
@@ -2260,12 +2223,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return columnName;
   }
 
-  /**
-   * Sets the query timeout (remaining time in milliseconds) into the query options, and returns the remaining time in
-   * milliseconds.
-   * <p>For the overall query timeout, use query-level timeout (in the query options) if exists, or use table-level
-   * timeout (in the table config) if exists, or use instance-level timeout (in the broker config).
-   */
+  /// Sets the query timeout (remaining time in milliseconds) into the query options, and returns the remaining time in
+  /// milliseconds.
+  ///
+  /// For the overall query timeout, use query-level timeout (in the query options) if exists, or use table-level
+  /// timeout (in the table config) if exists, or use instance-level timeout (in the broker config).
   private long setQueryTimeout(String tableNameWithType, Long logicalTableQueryTimeout,
       Map<String, String> queryOptions, long timeSpentMs)
       throws TimeoutException {
@@ -2300,18 +2262,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return remainingTimeMs;
   }
 
-  /**
-   * Sets a query option indicating the maximum response size that can be sent from a server to the broker. This size
-   * is measured for the serialized response.
-   *
-   * The overriding order of priority is:
-   * 1. QueryOption  -> maxServerResponseSizeBytes
-   * 2. QueryOption  -> maxQueryResponseSizeBytes
-   * 3. TableConfig  -> maxServerResponseSizeBytes
-   * 4. TableConfig  -> maxQueryResponseSizeBytes
-   * 5. BrokerConfig -> maxServerResponseSizeBytes
-   * 6. BrokerConfig -> maxServerResponseSizeBytes
-   */
+  /// Sets a query option indicating the maximum response size that can be sent from a server to the broker. This size
+  /// is measured for the serialized response.
+  ///
+  /// The overriding order of priority is:
+  /// 1. QueryOption  -> maxServerResponseSizeBytes
+  /// 2. QueryOption  -> maxQueryResponseSizeBytes
+  /// 3. TableConfig  -> maxServerResponseSizeBytes
+  /// 4. TableConfig  -> maxQueryResponseSizeBytes
+  /// 5. BrokerConfig -> maxServerResponseSizeBytes
+  /// 6. BrokerConfig -> maxServerResponseSizeBytes
   private void setMaxServerResponseSizeBytes(int numServers, Map<String, String> queryOptions,
       @Nullable QueryConfig queryConfig) {
     // QueryOption
@@ -2354,16 +2314,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Broker side validation on the query.
-   * <p>Throw exception if query does not pass validation.
-   * <p>Current validations are:
-   * <ul>
-   *   <li>Value for 'LIMIT' <= configured value</li>
-   *   <li>Query options must be set to SQL mode</li>
-   *   <li>Check if numReplicaGroupsToQuery option provided is valid</li>
-   * </ul>
-   */
+  /// Broker side validation on the query.
+  ///
+  /// Throw exception if query does not pass validation.
+  ///
+  /// Current validations are:
+  ///
+  /// - Value for 'LIMIT' <= configured value
+  /// - Query options must be set to SQL mode
+  /// - Check if numReplicaGroupsToQuery option provided is valid
   @VisibleForTesting
   static void validateRequest(PinotQuery pinotQuery, int queryResponseLimit) {
     // Verify LIMIT
@@ -2561,16 +2520,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return union;
   }
 
-  /**
-   * Prepares the offline/realtime broker requests for the base table route based on
-   * whether the base table is hybrid, offline-only, or realtime-only.
-   * This mirrors the logic in the main doHandleRequest flow but operates on a pre-existing
-   * routeInfo for the base table.  Per-branch `handleExpressionOverride` /
-   * `handleTimestampIndexOverride` are applied so the SPLIT base-table branches receive the
-   * same expression-override and `$ts$DAY` timestamp-index hints as the non-split path —
-   * without these, table-level overrides configured on the base table would be silently
-   * dropped on the SPLIT path, producing divergent results vs. the base fallback path.
-   */
+  /// Prepares the offline/realtime broker requests for the base table route based on
+  /// whether the base table is hybrid, offline-only, or realtime-only.
+  /// This mirrors the logic in the main doHandleRequest flow but operates on a pre-existing
+  /// routeInfo for the base table.  Per-branch `handleExpressionOverride` /
+  /// `handleTimestampIndexOverride` are applied so the SPLIT base-table branches receive the
+  /// same expression-override and `$ts$DAY` timestamp-index hints as the non-split path —
+  /// without these, table-level overrides configured on the base table would be silently
+  /// dropped on the SPLIT path, producing divergent results vs. the base fallback path.
   private ImplicitHybridTableRouteInfo prepareBaseTableHybridRoute(BrokerRequest baseBrokerRequest,
       TableRouteInfo baseRouteInfo, Schema schema) {
     Preconditions.checkState(baseRouteInfo instanceof ImplicitHybridTableRouteInfo,
@@ -2647,20 +2604,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
 
-  /**
-   * Processes the optimized broker requests for both OFFLINE and REALTIME table.
-   * TODO: Directly take PinotQuery
-   */
+  /// Processes the optimized broker requests for both OFFLINE and REALTIME table.
+  /// TODO: Directly take PinotQuery
   protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception;
 
-  /**
-   * Returns the segments to report as unavailable for this query. The default returns the route's unavailable
-   * segments unchanged. A subclass may narrow the set, e.g. to the segments the query will actually read after
-   * routing-level pruning, so the "segments unavailable" warning does not include segments the query never touches.
-   */
+  /// Returns the segments to report as unavailable for this query. The default returns the route's unavailable
+  /// segments unchanged. A subclass may narrow the set, e.g. to the segments the query will actually read after
+  /// routing-level pruning, so the "segments unavailable" warning does not include segments the query never touches.
   protected List<String> getUnavailableSegments(BrokerRequest serverBrokerRequest, TableRouteInfo routeInfo) {
     return routeInfo.getUnavailableSegments();
   }
@@ -2707,9 +2660,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Helper class to pass the per server statistics.
-   */
+  /// Helper class to pass the per server statistics.
   public static class ServerStats {
     private String _serverStats;
 
@@ -2722,9 +2673,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  /**
-   * Helper class to track the query plaintext and the requested servers.
-   */
+  /// Helper class to track the query plaintext and the requested servers.
   private static class QueryServers {
     final String _query;
     final Set<ServerInstance> _servers = new HashSet<>();

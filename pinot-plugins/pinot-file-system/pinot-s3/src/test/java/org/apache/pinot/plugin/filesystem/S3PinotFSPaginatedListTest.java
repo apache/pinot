@@ -42,10 +42,8 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for S3PinotFS.listFilesWithMetadata(URI, boolean, Predicate, int)
- * — the paginated listing with early termination.
- */
+/// Unit tests for S3PinotFS.listFilesWithMetadata(URI, boolean, Predicate, int)
+/// — the paginated listing with early termination.
 public class S3PinotFSPaginatedListTest {
 
   private static final Instant NOW = Instant.now();

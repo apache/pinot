@@ -24,7 +24,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -43,9 +42,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Some tests for the SQL compiler.
- */
+/// Some tests for the SQL compiler.
 public class CalciteSqlCompilerTest {
   private static final long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
 
@@ -1901,10 +1898,8 @@ public class CalciteSqlCompilerTest {
             .getLiteral().getIntValue(), 5);
   }
 
-  /**
-   * SqlConformanceLevel BABEL allows most reserved keywords in the query.
-   * Some exceptions are time related keywords (date, timestamp, time), table, group, which need to be escaped
-   */
+  /// SqlConformanceLevel BABEL allows most reserved keywords in the query.
+  /// Some exceptions are time related keywords (date, timestamp, time), table, group, which need to be escaped
   @Test
   public void testReservedKeywords() {
 
@@ -3203,10 +3198,8 @@ public class CalciteSqlCompilerTest {
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getIntValue(), 1);
   }
 
-  /**
-   * This test ensures that Calcite {@link SqlNumericLiteral#isInteger()} does not throw NPE. The issue has been fixed
-   * in Calcite through CALCITE-4199 (https://issues.apache.org/jira/browse/CALCITE-4199).
-   */
+  /// This test ensures that Calcite [org.apache.calcite.sql.SqlNumericLiteral#isInteger()] does not throw NPE.
+  /// The issue has been fixed in Calcite through CALCITE-4199 (https://issues.apache.org/jira/browse/CALCITE-4199).
   @Test
   public void testSqlNumericalLiteralIntegerNPE() {
     CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM testTable WHERE floatColumn > " + Double.MAX_VALUE);
@@ -3363,9 +3356,7 @@ public class CalciteSqlCompilerTest {
         () -> compileToPinotQuery("SELECT UPPER(col1), avg(col2) from foo"));
   }
 
-  /**
-   * Test for customized components in src/main/codegen/parserImpls.ftl file.
-   */
+  /// Test for customized components in src/main/codegen/parserImpls.ftl file.
   @Test
   public void testParserExtensionImpl() {
     String customSql = "INSERT INTO db.tbl FROM FILE 'file:///tmp/file1', FILE 'file:///tmp/file2'";

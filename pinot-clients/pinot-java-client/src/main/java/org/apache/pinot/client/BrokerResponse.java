@@ -22,9 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import javax.annotation.Nullable;
 
 
-/**
- * Reimplementation of BrokerResponse from pinot-common, so that pinot-api does not depend on pinot-common.
- */
+/// Reimplementation of BrokerResponse from pinot-common, so that pinot-api does not depend on pinot-common.
 public class BrokerResponse {
   private String _requestId;
   private String _brokerId;

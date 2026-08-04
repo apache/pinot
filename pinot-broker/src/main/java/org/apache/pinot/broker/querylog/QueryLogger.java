@@ -37,11 +37,9 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.spi.utils.CommonConstants.Broker;
 
 
-/**
- * {@code QueryLogger} is responsible for logging query responses in a configurable
- * fashion. Query logging can be useful to capture production traffic to assist with
- * debugging or regression testing.
- */
+/// `QueryLogger` is responsible for logging query responses in a configurable
+/// fashion. Query logging can be useful to capture production traffic to assist with
+/// debugging or regression testing.
 @SuppressWarnings("UnstableApiUsage")
 public class QueryLogger {
 
@@ -111,16 +109,14 @@ public class QueryLogger {
     _sqlRedactionMode = sqlRedactionMode;
   }
 
-  /**
-   * Logs the query received message before processing begins.
-   * This method checks the rate limiter and returns whether logging was allowed.
-   * The return value should be passed to logQueryCompleted.
-   *
-   * @param requestId the request ID
-   * @param query the SQL query
-   * @param queryFingerprint the query fingerprint (used when redaction is enabled)
-   * @return true if the rate limiter allowed this query (not rate-limited), false if rate-limited
-   */
+  /// Logs the query received message before processing begins.
+  /// This method checks the rate limiter and returns whether logging was allowed.
+  /// The return value should be passed to logQueryCompleted.
+  ///
+  /// @param requestId the request ID
+  /// @param query the SQL query
+  /// @param queryFingerprint the query fingerprint (used when redaction is enabled)
+  /// @return true if the rate limiter allowed this query (not rate-limited), false if rate-limited
   public boolean logQueryReceived(long requestId, String query, @Nullable QueryFingerprint queryFingerprint) {
     if (!checkRateLimiter()) {
       return false;
@@ -134,14 +130,12 @@ public class QueryLogger {
     return true;
   }
 
-  /**
-   * Logs the query completion stats after processing completes.
-   *
-   * @param params the query log parameters
-   * @param wasLogged true if logQueryReceived returned true, false otherwise.
-   *                  When false, the completion log will only be emitted if force-log
-   *                  conditions are met (exceptions, slow queries).
-   */
+  /// Logs the query completion stats after processing completes.
+  ///
+  /// @param params the query log parameters
+  /// @param wasLogged true if logQueryReceived returned true, false otherwise.
+  ///                  When false, the completion log will only be emitted if force-log
+  ///                  conditions are met (exceptions, slow queries).
   public void logQueryCompleted(QueryLogParams params, boolean wasLogged) {
     _logger.debug("Broker Response: {}", params._response);
 
@@ -258,10 +252,8 @@ public class QueryLogger {
     }
   }
 
-  /**
-   * NOTE: please maintain the order of this query log entry enum. If you want to add a new
-   * entry, add it to the end of the existing list.
-   */
+  /// NOTE: please maintain the order of this query log entry enum. If you want to add a new
+  /// entry, add it to the end of the existing list.
   private enum QueryLogEntry {
     REQUEST_ID("requestId") {
       @Override

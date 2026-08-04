@@ -101,9 +101,7 @@ import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment.*;
 
 
-/**
- * Abstract base class for segment creators containing common functionality and metadata handling.
- */
+/// Abstract base class for segment creators containing common functionality and metadata handling.
 public abstract class BaseSegmentCreator implements SegmentCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSegmentCreator.class);
   // Allow at most 512 characters for the metadata property
@@ -154,10 +152,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
   }
 
-  /**
-   * Initializes a single column's dictionary and index creators.
-   * This encapsulates the common logic shared between different segment creator implementations.
-   */
+  /// Initializes a single column's dictionary and index creators.
+  /// This encapsulates the common logic shared between different segment creator implementations.
   protected ColumnIndexCreators createColIndexCreators(String columnName)
       throws Exception {
     FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
@@ -294,16 +290,12 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     return true;
   }
 
-  /**
-   * Checks if a field is nullable based on schema and config settings.
-   */
+  /// Checks if a field is nullable based on schema and config settings.
   private boolean isNullable(FieldSpec fieldSpec) {
     return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _config.isDefaultNullHandlingEnabled();
   }
 
-  /**
-   * Adapts field index configs based on column properties.
-   */
+  /// Adapts field index configs based on column properties.
   private FieldIndexConfigs adaptConfig(String columnName, FieldIndexConfigs config,
       ColumnStatistics columnStatistics, SegmentGeneratorConfig segmentCreationSpec, boolean dictEnabledColumn) {
     FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder(config);
@@ -328,12 +320,10 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     return builder.build();
   }
 
-  /**
-   * Creates the {@link IndexCreator} in a type safe way.
-   *
-   * This code needs to be in a specific method instead of inlined in the main loop in order to be able to use the
-   * limited generic capabilities of Java.
-   */
+  /// Creates the [IndexCreator] in a type safe way.
+  ///
+  /// This code needs to be in a specific method instead of inlined in the main loop in order to be able to use the
+  /// limited generic capabilities of Java.
   private <C extends IndexConfig> void tryCreateIndexCreator(Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex,
       IndexType<C, ?, ?> index, IndexCreationContext.Common context, FieldIndexConfigs fieldIndexConfigs)
       throws Exception {
@@ -344,21 +334,18 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
   }
 
-  /**
-   * Returns true if dictionary should be created for a column, false otherwise.
-   * Currently there are two sources for this config:
-   * <ul>
-   *   <li> ColumnStatistics (this is currently hard-coded to always return dictionary). </li>
-   *   <li> SegmentGeneratorConfig</li>
-   * </ul>
-   *
-   * This method gives preference to the SegmentGeneratorConfig first.
-   *
-   * @param stats Column statistics
-   * @param config Segment generation config
-   * @param spec Field spec for the column
-   * @return True if dictionary should be created for the column, false otherwise
-   */
+  /// Returns true if dictionary should be created for a column, false otherwise.
+  /// Currently there are two sources for this config:
+  ///
+  /// - ColumnStatistics (this is currently hard-coded to always return dictionary).
+  /// - SegmentGeneratorConfig
+  ///
+  /// This method gives preference to the SegmentGeneratorConfig first.
+  ///
+  /// @param stats Column statistics
+  /// @param config Segment generation config
+  /// @param spec Field spec for the column
+  /// @return True if dictionary should be created for the column, false otherwise
   private boolean createDictionaryForColumn(ColumnStatistics stats, SegmentGeneratorConfig config,
       FieldSpec spec) {
     if (spec instanceof ComplexFieldSpec) {
@@ -390,9 +377,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
         stats.getTotalNumberOfEntries());
   }
 
-  /**
-   * Calculates the raw value to be used for text index when forward index is disabled.
-   */
+  /// Calculates the raw value to be used for text index when forward index is disabled.
   @Nullable
   private Object calculateRawValueForTextIndex(boolean dictEnabledColumn, FieldIndexConfigs configs,
       FieldSpec fieldSpec) {
@@ -424,9 +409,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     return rawValue;
   }
 
-  /**
-   * Writes segment metadata to disk.
-   */
+  /// Writes segment metadata to disk.
   protected void writeMetadata()
       throws ConfigurationException {
     File metadataFile = new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
@@ -711,21 +694,19 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
   }
 
-  /**
-   * In order to persist complex field metadata, we need to recursively add child field specs
-   * So, each complex field spec will have a property for its child field names and each child field will have its
-   * own properties of the detailed field spec.
-   * E.g. a COMPLEX type `intMap` of Map<String, Integer> has 2 child fields:
-   *   - key in STRING type and value in INT type.
-   *   Then we will have the following properties to define a COMPLEX field:
-   *     column.intMap.childFieldNames = [key, value]
-   *     column.intMap$$key.columnType = DIMENSION
-   *     column.intMap$$key.dataType = STRING
-   *     column.intMap$$key.isSingleValued = true
-   *     column.intMap$$value.columnType = DIMENSION
-   *     column.intMap$$value.dataType = INT
-   *     column.intMap$$value.isSingleValued = true
-   */
+  /// In order to persist complex field metadata, we need to recursively add child field specs
+  /// So, each complex field spec will have a property for its child field names and each child field will have its
+  /// own properties of the detailed field spec.
+  /// E.g. a COMPLEX type `intMap` of Map<String, Integer> has 2 child fields:
+  ///   - key in STRING type and value in INT type.
+  ///   Then we will have the following properties to define a COMPLEX field:
+  ///     column.intMap.childFieldNames = \[key, value\]
+  ///     column.intMap$$key.columnType = DIMENSION
+  ///     column.intMap$$key.dataType = STRING
+  ///     column.intMap$$key.isSingleValued = true
+  ///     column.intMap$$value.columnType = DIMENSION
+  ///     column.intMap$$value.dataType = INT
+  ///     column.intMap$$value.isSingleValued = true
   public static void addFieldSpec(PropertiesConfiguration properties, String column, FieldSpec fieldSpec) {
     String fieldName = fieldSpec.getName();
     if (!column.equals(fieldName)) {
@@ -772,9 +753,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
   }
 
-  /**
-   * Adds column min/max value information to the properties configuration.
-   */
+  /// Adds column min/max value information to the properties configuration.
   public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column,
       @Nullable Object minValue, @Nullable Object maxValue, DataType storedType) {
     String validMinValue = minValue != null ? getValidPropertyValue(minValue.toString(), storedType) : null;
@@ -790,11 +769,9 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
   }
 
-  /**
-   * Helper method to get the valid value for setting min/max. Returns {@code null} if the value is too long (longer
-   * than 512 characters), or is not supported in {@link PropertiesConfiguration}, e.g. contains character with
-   * surrogate.
-   */
+  /// Helper method to get the valid value for setting min/max. Returns `null` if the value is too long (longer
+  /// than 512 characters), or is not supported in [PropertiesConfiguration], e.g. contains character with
+  /// surrogate.
   @Nullable
   private static String getValidPropertyValue(String value, DataType storedType) {
     if (value.length() > METADATA_PROPERTY_LENGTH_LIMIT) {
@@ -804,9 +781,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
         : value;
   }
 
-  /**
-   * Removes column metadata information from the properties configuration.
-   */
+  /// Removes column metadata information from the properties configuration.
   public static void removeColumnMetadataInfo(PropertiesConfiguration properties, String column) {
     properties.subset(COLUMN_PROPS_KEY_PREFIX + column).clear();
   }
@@ -856,10 +831,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     LOGGER.info("Successfully created segment: {} in {}", _segmentName, _indexDir);
   }
 
-  /**
-   * Generate segment name based on configuration and statistics.
-   * @return Generated segment name
-   */
+  /// Generate segment name based on configuration and statistics.
+  /// @return Generated segment name
   private String generateSegmentName() {
     ColumnStatistics timeStats = null;
     String timeColumn = _config.getTimeColumnName();
@@ -885,9 +858,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
   }
 
-  /**
-   * Writes the individual column index files to disk.
-   */
+  /// Writes the individual column index files to disk.
   private void flushColIndexes() throws Exception {
     for (ColumnIndexCreators colIndexes : _colIndexes.values()) {
       colIndexes.seal();
@@ -926,9 +897,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     converter.convert(segmentDirectory);
   }
 
-  /**
-   * Build star-tree V2 index if configured.
-   */
+  /// Build star-tree V2 index if configured.
   private void buildStarTreeV2IfNecessary(File indexDir)
       throws Exception {
     List<StarTreeIndexConfig> starTreeIndexConfigs = _config.getStarTreeIndexConfigs();
@@ -964,9 +933,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
   }
 
-  /**
-   * Build multi-column text index if configured.
-   */
+  /// Build multi-column text index if configured.
   private void buildMultiColumnTextIndex(File segmentOutputDir)
       throws Exception {
     if (_config.getMultiColumnTextIndexConfig() != null) {
@@ -991,9 +958,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
   }
 
-  /**
-   * Update indexes that are created post-segment creation.
-   */
+  /// Update indexes that are created post-segment creation.
   private void updatePostSegmentCreationIndexes(File indexDir)
       throws Exception {
     Set<IndexType> postSegCreationIndexes = IndexService.getInstance().getAllIndexes().stream()
@@ -1047,12 +1012,10 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     return false;
   }
 
-  /**
-   * Compute CRC and creation time, and persist to segment metadata file.
-   *
-   * @param indexDir Segment index directory
-   * @throws IOException If writing metadata fails
-   */
+  /// Compute CRC and creation time, and persist to segment metadata file.
+  ///
+  /// @param indexDir Segment index directory
+  /// @throws IOException If writing metadata fails
   private void persistCreationMeta(File indexDir, long dataCrc)
       throws IOException {
     long crc = CrcUtils.computeCrc(indexDir);

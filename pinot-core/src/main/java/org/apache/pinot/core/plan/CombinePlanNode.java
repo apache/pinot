@@ -48,10 +48,8 @@ import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
 
 
-/**
- * The <code>CombinePlanNode</code> class provides the execution plan for combining results from multiple segments in
- * V1/SSQE.
- */
+/// The `CombinePlanNode` class provides the execution plan for combining results from multiple segments in
+/// V1/SSQE.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class CombinePlanNode implements PlanNode {
   // Try to schedule 10 plans for each thread, or evenly distribute plans to all MAX_NUM_THREADS_PER_QUERY threads
@@ -62,14 +60,12 @@ public class CombinePlanNode implements PlanNode {
   private final ExecutorService _executorService;
   private final ResultsBlockStreamer _streamer;
 
-  /**
-   * Constructor for the class.
-   *
-   * @param planNodes List of underlying plan nodes
-   * @param queryContext Query context
-   * @param executorService Executor service
-   * @param streamer Optional results block streamer for streaming query
-   */
+  /// Constructor for the class.
+  ///
+  /// @param planNodes List of underlying plan nodes
+  /// @param queryContext Query context
+  /// @param executorService Executor service
+  /// @param streamer Optional results block streamer for streaming query
   public CombinePlanNode(List<PlanNode> planNodes, QueryContext queryContext, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer) {
     _planNodes = planNodes;

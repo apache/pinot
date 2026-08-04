@@ -30,10 +30,8 @@ import org.apache.pinot.segment.local.customobject.SerializedTDigest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * The {@code PercentileRawTDigestAggregationFunction} returns the serialized {@code TDigest} data structure of the
- * {@code PercentileEstAggregationFunction}.
- */
+/// The `PercentileRawTDigestAggregationFunction` returns the serialized `TDigest` data structure of the
+/// `PercentileEstAggregationFunction`.
 public class PercentileRawTDigestAggregationFunction
     extends BaseSingleInputAggregationFunction<TDigest, SerializedTDigest> {
   private final PercentileTDigestAggregationFunction _percentileTDigestAggregationFunction;

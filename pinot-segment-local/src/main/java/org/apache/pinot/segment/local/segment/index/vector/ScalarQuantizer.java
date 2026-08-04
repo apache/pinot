@@ -26,30 +26,27 @@ import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
 import org.apache.pinot.segment.spi.index.reader.VectorQuantizer;
 
 
-/**
- * Scalar quantizer that compresses float32 vectors to fixed-width integer representations.
- *
- * <p>Supports two modes:</p>
- * <ul>
- *   <li><b>SQ8</b>: Maps each dimension from [min, max] to [0, 255] (1 byte per dim).
- *       Encoded size = dimension bytes.</li>
- *   <li><b>SQ4</b>: Maps each dimension from [min, max] to [0, 15] (4 bits per dim).
- *       Two dimensions are packed into one byte. Encoded size = ceil(dimension / 2) bytes.</li>
- * </ul>
- *
- * <p>The quantizer must be trained on representative vectors before encoding. Training computes
- * per-dimension min/max values which define the quantization grid.</p>
- *
- * <p>Thread safety: after training, the quantizer is immutable and thread-safe for concurrent
- * encode/decode/distance operations.</p>
- */
+/// Scalar quantizer that compresses float32 vectors to fixed-width integer representations.
+///
+/// Supports two modes:
+///
+/// - **SQ8**: Maps each dimension from \[min, max\] to \[0, 255\] (1 byte per dim).
+///      Encoded size = dimension bytes.
+/// - **SQ4**: Maps each dimension from \[min, max\] to \[0, 15\] (4 bits per dim).
+///      Two dimensions are packed into one byte. Encoded size = ceil(dimension / 2) bytes.
+///
+/// The quantizer must be trained on representative vectors before encoding. Training computes
+/// per-dimension min/max values which define the quantization grid.
+///
+/// Thread safety: after training, the quantizer is immutable and thread-safe for concurrent
+/// encode/decode/distance operations.
 public class ScalarQuantizer implements VectorQuantizer {
 
-  /** Quantizer bit width. */
+  /// Quantizer bit width.
   public enum BitWidth {
-    /** 8-bit scalar quantization (SQ8). */
+    /// 8-bit scalar quantization (SQ8).
     SQ8(8, 255),
-    /** 4-bit scalar quantization (SQ4). */
+    /// 4-bit scalar quantization (SQ4).
     SQ4(4, 15);
 
     private final int _bits;
@@ -76,13 +73,11 @@ public class ScalarQuantizer implements VectorQuantizer {
   private final float[] _scales; // (max - min) / maxQuantizedValue per dimension
   private final boolean _trained;
 
-  /**
-   * Creates an untrained scalar quantizer. Use the static factory method
-   * {@link #train(float[][], int, BitWidth)} to create a trained instance.
-   *
-   * @param dimension vector dimension
-   * @param bitWidth quantization bit width (SQ8 or SQ4)
-   */
+  /// Creates an untrained scalar quantizer. Use the static factory method
+  /// [#train(float[][], int, BitWidth)] to create a trained instance.
+  ///
+  /// @param dimension vector dimension
+  /// @param bitWidth quantization bit width (SQ8 or SQ4)
   public ScalarQuantizer(int dimension, BitWidth bitWidth) {
     Preconditions.checkArgument(dimension > 0, "Dimension must be positive, got: %s", dimension);
     _dimension = dimension;
@@ -95,14 +90,12 @@ public class ScalarQuantizer implements VectorQuantizer {
     Arrays.fill(_maxValues, Float.NEGATIVE_INFINITY);
   }
 
-  /**
-   * Creates a pre-trained scalar quantizer from saved min/max values.
-   *
-   * @param dimension vector dimension
-   * @param bitWidth quantization bit width
-   * @param minValues per-dimension minimum values
-   * @param maxValues per-dimension maximum values
-   */
+  /// Creates a pre-trained scalar quantizer from saved min/max values.
+  ///
+  /// @param dimension vector dimension
+  /// @param bitWidth quantization bit width
+  /// @param minValues per-dimension minimum values
+  /// @param maxValues per-dimension maximum values
   public ScalarQuantizer(int dimension, BitWidth bitWidth, float[] minValues, float[] maxValues) {
     Preconditions.checkArgument(dimension > 0, "Dimension must be positive, got: %s", dimension);
     Preconditions.checkArgument(minValues.length == dimension,
@@ -118,13 +111,11 @@ public class ScalarQuantizer implements VectorQuantizer {
     _trained = true;
   }
 
-  /**
-   * Trains the quantizer on a set of representative vectors.
-   * Computes per-dimension min and max values.
-   *
-   * @param vectors training vectors (each must have length == dimension)
-   * @return a new trained ScalarQuantizer
-   */
+  /// Trains the quantizer on a set of representative vectors.
+  /// Computes per-dimension min and max values.
+  ///
+  /// @param vectors training vectors (each must have length == dimension)
+  /// @return a new trained ScalarQuantizer
   public static ScalarQuantizer train(float[][] vectors, int dimension, BitWidth bitWidth) {
     Preconditions.checkArgument(vectors.length > 0, "Training vectors must not be empty");
 
@@ -156,12 +147,10 @@ public class ScalarQuantizer implements VectorQuantizer {
     return new ScalarQuantizer(dimension, bitWidth, minValues, maxValues);
   }
 
-  /**
-   * Encodes a float32 vector to quantized bytes.
-   *
-   * @param vector input vector (length must equal dimension)
-   * @return encoded bytes
-   */
+  /// Encodes a float32 vector to quantized bytes.
+  ///
+  /// @param vector input vector (length must equal dimension)
+  /// @return encoded bytes
   public byte[] encode(float[] vector) {
     Preconditions.checkState(_trained, "Quantizer must be trained before encoding");
     Preconditions.checkArgument(vector.length == _dimension,
@@ -174,12 +163,10 @@ public class ScalarQuantizer implements VectorQuantizer {
     }
   }
 
-  /**
-   * Decodes quantized bytes back to an approximate float32 vector.
-   *
-   * @param encoded encoded bytes
-   * @return decoded approximate vector
-   */
+  /// Decodes quantized bytes back to an approximate float32 vector.
+  ///
+  /// @param encoded encoded bytes
+  /// @return decoded approximate vector
   public float[] decode(byte[] encoded) {
     Preconditions.checkState(_trained, "Quantizer must be trained before decoding");
 
@@ -190,14 +177,12 @@ public class ScalarQuantizer implements VectorQuantizer {
     }
   }
 
-  /**
-   * Computes approximate distance between a query vector and an encoded document vector.
-   *
-   * @param query the query vector (float32)
-   * @param encodedDoc the encoded document vector
-   * @param distanceFunction the distance function to use
-   * @return approximate distance
-   */
+  /// Computes approximate distance between a query vector and an encoded document vector.
+  ///
+  /// @param query the query vector (float32)
+  /// @param encodedDoc the encoded document vector
+  /// @param distanceFunction the distance function to use
+  /// @return approximate distance
   public float computeDistance(float[] query, byte[] encodedDoc,
       VectorIndexConfig.VectorDistanceFunction distanceFunction) {
     Preconditions.checkState(_trained, "Quantizer must be trained before computing distance");
@@ -217,9 +202,7 @@ public class ScalarQuantizer implements VectorQuantizer {
     }
   }
 
-  /**
-   * Returns the number of bytes per encoded vector.
-   */
+  /// Returns the number of bytes per encoded vector.
   public int getEncodedBytesPerVector() {
     if (_bitWidth == BitWidth.SQ8) {
       return _dimension;
@@ -228,11 +211,9 @@ public class ScalarQuantizer implements VectorQuantizer {
     }
   }
 
-  /**
-   * Serializes the quantizer parameters (min/max values) to bytes for storage.
-   *
-   * @return serialized bytes: [dimension(4)] [bitWidth ordinal(4)] [minValues(dim*4)] [maxValues(dim*4)]
-   */
+  /// Serializes the quantizer parameters (min/max values) to bytes for storage.
+  ///
+  /// @return serialized bytes: \[dimension(4)\] \[bitWidth ordinal(4)\] \[minValues(dim\*4)\] \[maxValues(dim\*4)\]
   public byte[] serialize() {
     Preconditions.checkState(_trained, "Quantizer must be trained before serializing");
     int size = 4 + 4 + _dimension * 4 * 2;
@@ -248,16 +229,14 @@ public class ScalarQuantizer implements VectorQuantizer {
     return buffer.array();
   }
 
-  /** Maximum supported dimension to prevent unreasonable memory allocation during deserialization. */
+  /// Maximum supported dimension to prevent unreasonable memory allocation during deserialization.
   private static final int MAX_DIMENSION = 65536;
 
-  /**
-   * Deserializes a quantizer from saved bytes.
-   *
-   * @param data serialized bytes
-   * @return the deserialized ScalarQuantizer
-   * @throws IllegalArgumentException if the data is malformed or contains out-of-range values
-   */
+  /// Deserializes a quantizer from saved bytes.
+  ///
+  /// @param data serialized bytes
+  /// @return the deserialized ScalarQuantizer
+  /// @throws IllegalArgumentException if the data is malformed or contains out-of-range values
   public static ScalarQuantizer deserialize(byte[] data) {
     Preconditions.checkArgument(data != null && data.length >= 8,
         "Serialized data must be at least 8 bytes (header), got: %s",

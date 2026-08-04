@@ -46,9 +46,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertThrows;
 
 
-/**
- * Tests schema validations
- */
+/// Tests schema validations
 public class SchemaUtilsTest {
   private static final String TABLE_NAME = "testTable";
   private static final String TIME_COLUMN = "timeColumn";
@@ -246,11 +244,9 @@ public class SchemaUtilsTest {
     return streamConfigs;
   }
 
-  /**
-   * TODO: transform functions have moved to tableConfig#ingestionConfig. However, these tests remain to test
-   * backward compatibility/
-   *  Remove these when we totally stop honoring transform functions in schema
-   */
+  /// TODO: transform functions have moved to tableConfig#ingestionConfig. However, these tests remain to test
+  /// backward compatibility/
+  ///  Remove these when we totally stop honoring transform functions in schema
   @Test
   public void testValidateTransformFunctionArguments() {
     Schema pinotSchema;
@@ -379,11 +375,9 @@ public class SchemaUtilsTest {
     checkValidationFails(pinotSchema, true);
   }
 
-  /**
-   * Case-only column collisions (e.g. memberId / MemberID) are rejected when case-insensitive mode is on.
-   * Cluster default is enable.case.insensitive=true, so new schemas on default clusters are already protected.
-   * When case-insensitive mode is off, collisions are allowed (always-on rejection needs validation levels #6645).
-   */
+  /// Case-only column collisions (e.g. memberId / MemberID) are rejected when case-insensitive mode is on.
+  /// Cluster default is enable.case.insensitive=true, so new schemas on default clusters are already protected.
+  /// When case-insensitive mode is off, collisions are allowed (always-on rejection needs validation levels #6645).
   @Test
   public void testValidateCaseOnlyColumnCollision() {
     Schema collidingSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
@@ -534,12 +528,10 @@ public class SchemaUtilsTest {
     SchemaUtils.validate(schema);
   }
 
-  /**
-   * Testcases for testing column name validation logic.
-   * Currently column name validation only checks no blank space in column names. Should we add more validation on
-   * column
-   * names later on, we can corresponding tests here.
-   */
+  /// Testcases for testing column name validation logic.
+  /// Currently column name validation only checks no blank space in column names. Should we add more validation on
+  /// column
+  /// names later on, we can corresponding tests here.
   @Test
   public void testColumnNameValidation()
       throws IOException {

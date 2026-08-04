@@ -332,9 +332,7 @@ public class RealtimeOffsetAutoResetManagerTest {
     return tableConfig;
   }
 
-  /**
-   * Test implementation of RealtimeOffsetAutoResetHandler for testing purposes
-   */
+  /// Test implementation of RealtimeOffsetAutoResetHandler for testing purposes
   public static class TestRealtimeOffsetAutoResetHandler implements RealtimeOffsetAutoResetHandler {
 
     public PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
@@ -374,10 +372,8 @@ public class RealtimeOffsetAutoResetManagerTest {
     }
   }
 
-  /**
-   * Legacy handler that only has a 2-arg constructor (the old SPI contract).
-   * Used to verify backward-compatibility fallback in getOrConstructHandler().
-   */
+  /// Legacy handler that only has a 2-arg constructor (the old SPI contract).
+  /// Used to verify backward-compatibility fallback in getOrConstructHandler().
   public static class LegacyRealtimeOffsetAutoResetHandler implements RealtimeOffsetAutoResetHandler {
 
     public PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;

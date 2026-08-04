@@ -26,9 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class RateLimiterTest {
 
-  /**
-   * Helper class to control time in tests for precise time-based assertions.
-   */
+  /// Helper class to control time in tests for precise time-based assertions.
   private static class ControllableTimeSource implements LongSupplier {
     private long _currentNanos;
 

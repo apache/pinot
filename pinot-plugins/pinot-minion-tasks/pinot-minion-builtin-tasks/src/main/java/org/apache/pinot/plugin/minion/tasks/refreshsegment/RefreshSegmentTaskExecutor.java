@@ -52,12 +52,10 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
 
   private long _taskStartTime;
 
-  /**
-   * The code here currently covers segment refresh for the following cases:
-   * 1. Process newly added columns.
-   * 2. Addition/removal of indexes.
-   * 3. Compatible datatype change for existing columns
-   */
+  /// The code here currently covers segment refresh for the following cases:
+  /// 1. Process newly added columns.
+  /// 2. Addition/removal of indexes.
+  /// 3. Compatible datatype change for existing columns
   @Override
   protected SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
       throws Exception {

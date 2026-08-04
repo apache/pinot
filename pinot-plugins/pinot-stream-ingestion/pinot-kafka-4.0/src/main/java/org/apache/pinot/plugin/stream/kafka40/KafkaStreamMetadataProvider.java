@@ -64,10 +64,8 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     implements StreamMetadataProvider {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaStreamMetadataProvider.class);
-  /**
-   * Immutable partition ID subset from table config. Read once at construction; does not change during the
-   * provider's lifetime. Empty when no subset is configured (consume all partitions).
-   */
+  /// Immutable partition ID subset from table config. Read once at construction; does not change during the
+  /// provider's lifetime. Empty when no subset is configured (consume all partitions).
   private final List<Integer> _partitionIdSubset;
 
   public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig) {

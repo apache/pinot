@@ -25,9 +25,7 @@ import java.util.Map;
 import java.util.Set;
 
 
-/**
- * Queries with warnings (expensive queries) and errors (invalid queries)
- */
+/// Queries with warnings (expensive queries) and errors (invalid queries)
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.NONE)
 public class FlaggedQueries {
   Map<String, String> _queriesAndWarnings = new HashMap<>();

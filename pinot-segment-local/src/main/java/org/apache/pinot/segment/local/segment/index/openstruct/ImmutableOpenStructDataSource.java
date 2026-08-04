@@ -33,23 +33,26 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 
 
-/// Per-key {@link DataSource} accessor for sealed (immutable) segments with an OPEN_STRUCT column.
+/// Per-key [DataSource] accessor for sealed (immutable) segments with an OPEN_STRUCT column.
 ///
 /// Always columnar — there is no blob branch. Every key that was dense enough during segment
-/// creation gets its own materialized {@link DataSource} (forward index + optional inverted index /
+/// creation gets its own materialized [DataSource] (forward index + optional inverted index /
 /// dictionary). Keys that did not meet the density threshold are stored in an optional sparse
-/// column; the sparse {@link DataSource} is returned for any unmaterialized key lookup.
+/// column. [#getDataSource(String)] returns `null` for any unmaterialized key — the sparse
+/// {@link DataSource} is never returned from it.
 ///
 /// Use [#isMaterialized(String)] and [#isFullyMaterialized()] together to choose
 /// the query execution path:
 /// - Materialized key → fast path via per-key DataSource (inverted/dictionary index available).
-/// - Not materialized + not fully materialized → fall back to the sparse DataSource.
+/// - Not materialized + not fully materialized → key may be in the sparse blob, which the query
+///   layer cannot read yet; the key reads as NULL.
 /// - Not materialized + fully materialized → key is definitively absent; short-circuit.
 ///
 /// Thread-safety: immutable after construction; safe for concurrent reads.
 public class ImmutableOpenStructDataSource extends BaseDataSource implements OpenStructDataSource {
   private final ComplexFieldSpec _fieldSpec;
   private final Map<String, DataSource> _perKeyDataSources;
+  /// Held only as a presence flag for [#isFullyMaterialized()] — nothing reads it as a DataSource.
   @Nullable
   private final DataSource _sparseDataSource;
 
@@ -62,13 +65,13 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
     _sparseDataSource = sparseDataSource;
   }
 
-  /// Convenience constructor for segment-load time. Synthesizes a minimal {@link DataSourceMetadata}
+  /// Convenience constructor for segment-load time. Synthesizes a minimal [DataSourceMetadata]
   /// for the parent OPEN_STRUCT column (which has no on-disk presence of its own) and uses an empty
-  /// {@link ColumnIndexContainer} — all real readers live on the per-key data sources.
+  /// [ColumnIndexContainer] — all real readers live on the per-key data sources.
   ///
-  /// The parent's {@code getForwardIndex()} / {@code getDictionary()} will return {@code null}.
-  /// Callers must use {@link #getDataSource(String)} for per-key access; whole-struct projection
-  /// ({@code SELECT open_struct_col}) is handled by the query layer, not the storage layer.
+  /// The parent's `getForwardIndex()` / `getDictionary()` will return `null`.
+  /// Callers must use [#getDataSource(String)] for per-key access; whole-struct projection
+  /// (`SELECT open_struct_col`) is handled by the query layer, not the storage layer.
   public ImmutableOpenStructDataSource(ComplexFieldSpec fieldSpec, Map<String, DataSource> perKeyDataSources,
       @Nullable DataSource sparseDataSource, int numDocs) {
     this(fieldSpec, perKeyDataSources, sparseDataSource,
@@ -84,8 +87,8 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   @Override
   @Nullable
   public DataSource getDataSource(String key) {
-    DataSource ds = _perKeyDataSources.get(key);
-    return ds != null ? ds : _sparseDataSource;
+    // TODO: sparse keys read as NULL on the query path; wire the sparse column in (PR 4/4).
+    return _perKeyDataSources.get(key);
   }
 
   @Override
@@ -98,6 +101,8 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
     return _sparseDataSource == null;
   }
 
+  /// Returns only the materialized (dense) key DataSources. Sparse keys are not included because
+  /// they share a single JSON column and have no individual DataSource.
   @Override
   public Map<String, DataSource> getDataSources() {
     return _perKeyDataSources;

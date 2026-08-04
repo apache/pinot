@@ -37,9 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A utility class for committing ideal states in a single commit operation.
- */
+/// A utility class for committing ideal states in a single commit operation.
 public class IdealStateSingleCommit {
   private static final Logger LOGGER = LoggerFactory.getLogger(IdealStateSingleCommit.class);
   private static final String ENABLE_COMPRESSIONS_KEY = "enableCompression";

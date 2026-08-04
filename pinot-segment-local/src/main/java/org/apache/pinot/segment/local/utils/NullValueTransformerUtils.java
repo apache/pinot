@@ -31,10 +31,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Utility class for null value transformation operations shared between
- * NullValueTransformer (record-level) and NullValueColumnTransformer (column-level).
- */
+/// Utility class for null value transformation operations shared between
+/// NullValueTransformer (record-level) and NullValueColumnTransformer (column-level).
 public class NullValueTransformerUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(NullValueTransformerUtils.class);
 
@@ -42,16 +40,14 @@ public class NullValueTransformerUtils {
     // Utility class - prevent instantiation
   }
 
-  /**
-   * Computes the default null value for a given field spec.
-   * For time columns, validates that the default time is within valid range,
-   * otherwise uses current time.
-   *
-   * @param fieldSpec The field specification
-   * @param tableConfig The table configuration
-   * @param schema The schema
-   * @return The default null value to use for this field
-   */
+  /// Computes the default null value for a given field spec.
+  /// For time columns, validates that the default time is within valid range,
+  /// otherwise uses current time.
+  ///
+  /// @param fieldSpec The field specification
+  /// @param tableConfig The table configuration
+  /// @param schema The schema
+  /// @return The default null value to use for this field
   @Nullable
   public static Object getDefaultNullValue(FieldSpec fieldSpec, TableConfig tableConfig, Schema schema) {
     String fieldName = fieldSpec.getName();
@@ -71,17 +67,15 @@ public class NullValueTransformerUtils {
     }
   }
 
-  /**
-   * Computes the default time value for the time column.
-   * Time column is used to manage the segments, so its values have to be within the valid range. If the default
-   * time value in the field spec is within the valid range, we use it as the default time value; if not, we use
-   * current time as the default time value.
-   *
-   * @param timeColumnName The name of the time column
-   * @param tableConfig The table configuration
-   * @param schema The schema
-   * @return The default time value to use
-   */
+  /// Computes the default time value for the time column.
+  /// Time column is used to manage the segments, so its values have to be within the valid range. If the default
+  /// time value in the field spec is within the valid range, we use it as the default time value; if not, we use
+  /// current time as the default time value.
+  ///
+  /// @param timeColumnName The name of the time column
+  /// @param tableConfig The table configuration
+  /// @param schema The schema
+  /// @return The default time value to use
   private static Object getDefaultTimeValue(String timeColumnName, TableConfig tableConfig, Schema schema) {
     DateTimeFieldSpec timeColumnSpec = schema.getSpecForTimeColumn(timeColumnName);
     Preconditions.checkState(timeColumnSpec != null, "Failed to find time field: %s from schema: %s", timeColumnName,
@@ -118,13 +112,11 @@ public class NullValueTransformerUtils {
     }
   }
 
-  /**
-   * Transforms a value by replacing null with the default null value.
-   *
-   * @param value The value to transform
-   * @param defaultNullValue The default null value to use if value is null
-   * @return The original value if not null, otherwise the default null value
-   */
+  /// Transforms a value by replacing null with the default null value.
+  ///
+  /// @param value The value to transform
+  /// @param defaultNullValue The default null value to use if value is null
+  /// @return The original value if not null, otherwise the default null value
   @Nullable
   public static Object transformValue(@Nullable Object value, Object defaultNullValue) {
     return value != null ? value : defaultNullValue;

@@ -33,9 +33,7 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 
 
-/**
- * Special rule for Pinot, this rule is fixed to always insert exchange after SetOp node.
- */
+/// Special rule for Pinot, this rule is fixed to always insert exchange after SetOp node.
 public class PinotSetOpExchangeNodeInsertRule extends RelOptRule {
   public static final PinotSetOpExchangeNodeInsertRule INSTANCE =
       new PinotSetOpExchangeNodeInsertRule(PinotRuleUtils.PINOT_REL_FACTORY);
@@ -68,8 +66,8 @@ public class PinotSetOpExchangeNodeInsertRule extends RelOptRule {
   }
 
   /// Resolves the colocation hint for a set operation. Calcite attaches the hint to the set operation itself only when
-  /// the query wraps it in an outer {@code SELECT} that carries the hint; in the natural inline form (the hint on the
-  /// first {@code SELECT} of a {@code UNION}/{@code INTERSECT}/{@code EXCEPT}) it lands on the first branch instead.
+  /// the query wraps it in an outer `SELECT` that carries the hint; in the natural inline form (the hint on the
+  /// first `SELECT` of a `UNION`/`INTERSECT`/`EXCEPT`) it lands on the first branch instead.
   /// Precedence: the set operation's own hint wins, otherwise the first input carrying the hint wins. The resolved
   /// value is applied to all inputs, so conflicting per-branch values are not supported.
   @Nullable

@@ -44,7 +44,7 @@ public class DedupContext {
   @Nullable
   private final Map<String, String> _metadataManagerConfigs;
 
-  /// @deprecated use {@link org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)} instead.
+  /// @deprecated use [org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)] instead.
   @Deprecated
   private final boolean _allowDedupConsumptionDuringCommit;
 

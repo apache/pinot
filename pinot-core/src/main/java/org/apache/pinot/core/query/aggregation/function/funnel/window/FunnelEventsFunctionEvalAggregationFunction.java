@@ -386,14 +386,12 @@ public class FunnelEventsFunctionEvalAggregationFunction
     throw new IllegalArgumentException("Unsupported serialized intermediate result version: " + customObject.getType());
   }
 
-  /**
-   * Fill the sliding window with the events that fall into the window.
-   * Note that the events from stepEvents are dequeued and added to the sliding window.
-   * This method ensure the first event from the sliding window is the first step event.
-   *
-   * @param stepEvents    The priority queue of step events
-   * @param slidingWindow The sliding window with events that fall into the window
-   */
+  /// Fill the sliding window with the events that fall into the window.
+  /// Note that the events from stepEvents are dequeued and added to the sliding window.
+  /// This method ensure the first event from the sliding window is the first step event.
+  ///
+  /// @param stepEvents    The priority queue of step events
+  /// @param slidingWindow The sliding window with events that fall into the window
   protected void fillWindow(PriorityQueue<FunnelStepEventWithExtraFields> stepEvents,
       ArrayDeque<FunnelStepEventWithExtraFields> slidingWindow) {
     // Ensure for the sliding window, the first event is the first step

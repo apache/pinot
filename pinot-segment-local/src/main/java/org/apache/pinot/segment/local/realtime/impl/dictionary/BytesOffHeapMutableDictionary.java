@@ -42,15 +42,13 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   private volatile int _lengthOfShortestElement = Integer.MAX_VALUE;
   private volatile int _lengthOfLongestElement = 0;
 
-  /**
-   * Constructor the class.
-   *
-   * @param estimatedCardinality Estimated cardinality for the column.
-   * @param maxOverflowHashSize Max size for in-memory hash.
-   * @param memoryManager Memory manager
-   * @param allocationContext Context for allocation
-   * @param avgLength Estimated average Length of entry
-   */
+  /// Constructor the class.
+  ///
+  /// @param estimatedCardinality Estimated cardinality for the column.
+  /// @param maxOverflowHashSize Max size for in-memory hash.
+  /// @param memoryManager Memory manager
+  /// @param allocationContext Context for allocation
+  /// @param avgLength Estimated average Length of entry
   public BytesOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize,
       PinotDataBufferMemoryManager memoryManager, String allocationContext, int avgLength) {
     super(estimatedCardinality, maxOverflowHashSize, memoryManager, allocationContext);

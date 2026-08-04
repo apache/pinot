@@ -46,7 +46,7 @@ public class V1Constants {
     public static final String BITMAP_INVERTED_INDEX_FILE_EXTENSION = ".bitmap.inv";
     public static final String BITMAP_RANGE_INDEX_FILE_EXTENSION = ".bitmap.range";
     public static final String JSON_INDEX_FILE_EXTENSION = ".json.idx";
-    /** @deprecated Legacy native text index file extension kept only for cleanup and migration logic. */
+    /// @deprecated Legacy native text index file extension kept only for cleanup and migration logic.
     @Deprecated
     public static final String DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION = ".nativetext.idx";
     public static final String H3_INDEX_FILE_EXTENSION = ".h3.idx";
@@ -73,23 +73,19 @@ public class V1Constants {
     public static final String VECTOR_HNSW_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".vector.hnsw.mapping";
     public static final String VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION = ".vector.ivfflat.index";
     public static final String VECTOR_IVF_PQ_INDEX_FILE_EXTENSION = ".vector.ivfpq.index";
-    /**
-     * Combined-form IVF file extensions. Written by the IVF creators when
-     * {@code VectorIndexConfig.storeInSegmentFile} is {@code true}; consumed (and removed) by the
-     * V2→V3 format converter, which packs the bytes into {@code columns.psf} as a typed entry via
-     * the standard {@code copyIndexIfExists} loop. Mirrors the text-index {@code .text.index}
-     * extension that signals "ready to be consolidated into the combined segment file."
-     */
+    /// Combined-form IVF file extensions. Written by the IVF creators when
+    /// `VectorIndexConfig.storeInSegmentFile` is `true`; consumed (and removed) by the
+    /// V2→V3 format converter, which packs the bytes into `columns.psf` as a typed entry via
+    /// the standard `copyIndexIfExists` loop. Mirrors the text-index `.text.index`
+    /// extension that signals "ready to be consolidated into the combined segment file."
     public static final String VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION = ".vector.ivfflat.combined.index";
     public static final String VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION = ".vector.ivfpq.combined.index";
-    /**
-     * Combined-form HNSW file — packs the Lucene HNSW directory's files (and the optional docId
-     * mapping file) into a single file using the same LUCENE_V2 layout the text index uses.
-     * Build-time transient: the V2→V3 converter packs it into {@code columns.psf} and removes the
-     * sibling. At read time the bytes are exposed as a Lucene {@code Directory} backed by a
-     * {@code PinotDataBuffer} slice, so {@code KnnVectorsReader} works against the consolidated
-     * entry without re-extracting to disk.
-     */
+    /// Combined-form HNSW file — packs the Lucene HNSW directory's files (and the optional docId
+    /// mapping file) into a single file using the same LUCENE_V2 layout the text index uses.
+    /// Build-time transient: the V2→V3 converter packs it into `columns.psf` and removes the
+    /// sibling. At read time the bytes are exposed as a Lucene `Directory` backed by a
+    /// `PinotDataBuffer` slice, so `KnnVectorsReader` works against the consolidated
+    /// entry without re-extracting to disk.
     public static final String VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION = ".vector.hnsw.combined.index";
   }
 
@@ -103,11 +99,9 @@ public class V1Constants {
       public static final String TABLE_NAME = "segment.table.name";
       public static final String DIMENSIONS = "segment.dimension.column.names";
       public static final String METRICS = "segment.metric.column.names";
-      /**
-       * The primary time column for the table. This will match the timeColumnName defined in the tableConfig.
-       * In the Pinot schema, this column can be defined as either a TimeFieldSpec (which is deprecated) or
-       * DateTimeFieldSpec
-       */
+      /// The primary time column for the table. This will match the timeColumnName defined in the tableConfig.
+      /// In the Pinot schema, this column can be defined as either a TimeFieldSpec (which is deprecated) or
+      /// DateTimeFieldSpec
       public static final String TIME_COLUMN_NAME = "segment.time.column.name";
       public static final String TIME_UNIT = "segment.time.unit";
       public static final String SEGMENT_START_TIME = "segment.start.time";

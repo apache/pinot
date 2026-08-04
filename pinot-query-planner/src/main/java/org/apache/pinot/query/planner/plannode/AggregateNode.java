@@ -88,7 +88,7 @@ public class AggregateNode extends BasePlanNode {
     return _leafReturnFinalResult;
   }
 
-  /// Per grouping set (in ordinal order), the indexes into {@link #getGroupKeys()} participating in it, or
+  /// Per grouping set (in ordinal order), the indexes into [#getGroupKeys()] participating in it, or
   /// empty for a plain GROUP BY.
   public List<List<Integer>> getGroupingSets() {
     return _groupingSets;
@@ -147,14 +147,12 @@ public class AggregateNode extends BasePlanNode {
         _collations, _limit, _groupingSets);
   }
 
-  /**
-   * Aggregation Types: Pinot aggregation functions can perform operation on input data which
-   *   (1) directly accumulate from raw input, or
-   *   (2) merging multiple intermediate data format;
-   * in terms of output format, it can also
-   *   (1) produce a mergeable intermediate data format, or
-   *   (2) extract result as final result format.
-   */
+  /// Aggregation Types: Pinot aggregation functions can perform operation on input data which
+  ///   (1) directly accumulate from raw input, or
+  ///   (2) merging multiple intermediate data format;
+  /// in terms of output format, it can also
+  ///   (1) produce a mergeable intermediate data format, or
+  ///   (2) extract result as final result format.
   public enum AggType {
     //@formatter:off
     DIRECT(false, false),

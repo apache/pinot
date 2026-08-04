@@ -21,10 +21,8 @@ package org.apache.pinot.spi.utils;
 import java.util.function.BooleanSupplier;
 
 
-/**
- * This enum is used to represent the enablement status of a feature.
- * It can be used to enable, disable, or use the default instance level enablement of a feature.
- */
+/// This enum is used to represent the enablement status of a feature.
+/// It can be used to enable, disable, or use the default instance level enablement of a feature.
 public enum Enablement {
   ENABLE,   // Enable a feature
   DISABLE,  // Disable a feature

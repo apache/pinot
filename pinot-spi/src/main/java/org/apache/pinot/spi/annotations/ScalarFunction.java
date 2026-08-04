@@ -24,42 +24,34 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 
-/**
- * Annotation Class for Scalar Functions.
- *
- * Methods annotated using the interface are registered in the FunctionsRegistry, and can be used for transform and
- * filtering during record ingestion, and transform and post-aggregation during query execution.
- *
- * NOTE:
- *   1. The annotated method must be under the package of name 'org.apache.pinot.*.function.*' to be auto-registered.
- *   2. The following parameter types are supported for auto type conversion:
- *     - int/Integer
- *     - long/Long
- *     - float/Float
- *     - double/Double
- *     - String
- *     - byte[]
- */
+/// Annotation Class for Scalar Functions.
+///
+/// Methods annotated using the interface are registered in the FunctionsRegistry, and can be used for transform and
+/// filtering during record ingestion, and transform and post-aggregation during query execution.
+///
+/// NOTE:
+///   1. The annotated method must be under the package of name 'org.apache.pinot.\*.function.\*' to be auto-registered.
+///   2. The following parameter types are supported for auto type conversion:
+///     - int/Integer
+///     - long/Long
+///     - float/Float
+///     - double/Double
+///     - String
+///     - byte\[\]
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE})
 public @interface ScalarFunction {
 
   boolean enabled() default true;
 
-  /**
-   * If empty, FunctionsRegistry registers the method name as function name;
-   * If not empty, FunctionsRegistry only registers the function names specified here, the method name is ignored.
-   */
+  /// If empty, FunctionsRegistry registers the method name as function name;
+  /// If not empty, FunctionsRegistry only registers the function names specified here, the method name is ignored.
   String[] names() default {};
 
-  /**
-   * Whether the scalar function expects and can handle null arguments.
-   */
+  /// Whether the scalar function expects and can handle null arguments.
   boolean nullableParameters() default false;
 
-  /**
-   * Whether the scalar function takes various number of arguments.
-   */
+  /// Whether the scalar function takes various number of arguments.
   boolean isVarArg() default false;
 
   /// Whether the scalar function is eligible for compile-time query evaluation.
@@ -76,6 +68,4 @@ public @interface ScalarFunction {
   /// existing function has been audited for environment-sensitive behavior. When class-level and method-level
   /// declarations coexist, the most volatile category wins.
   FunctionVolatility volatility() default FunctionVolatility.IMMUTABLE;
-
-  @Deprecated boolean isPlaceholder() default false;
 }

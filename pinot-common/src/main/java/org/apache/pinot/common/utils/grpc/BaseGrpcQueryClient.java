@@ -49,10 +49,8 @@ public abstract class BaseGrpcQueryClient<REQUEST, RESPONSE> implements Closeabl
   // We don't use TlsConfig as the map key because the TlsConfig is mutable, which means the hashCode can change. If the
   // hashCode changes and the map is resized, the SslContext of the old hashCode will be lost.
   private static final Map<Integer, SslContext> CLIENT_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
-  /**
-   * Shared buffer allocator configured to prefer direct (off-heap) buffers for better performance.
-   * Using a static allocator allows for better memory pooling across all client instances.
-   */
+  /// Shared buffer allocator configured to prefer direct (off-heap) buffers for better performance.
+  /// Using a static allocator allows for better memory pooling across all client instances.
   private static final PooledByteBufAllocator BUF_ALLOCATOR = new PooledByteBufAllocator(true);
 
   private final ManagedChannel _managedChannel;

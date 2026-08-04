@@ -79,13 +79,11 @@ public class HashUtilsTest {
         new PrimaryKey(new Object[]{UuidUtils.toBytes(firstUuid), UuidUtils.toBytes(secondUuid)})), expectedHash);
   }
 
-  /**
-   * Regression: {@link HashUtils#hashUUID} must accept non-canonical-but-Java-parseable UUID strings
-   * (e.g. {@code "1-2-3-4-5"}) so existing upsert tables using {@code HashFunction.UUID} keep producing
-   * the same hash before and after this PR. {@link UuidUtils#toBytes(String)} is strict and would reject
-   * such inputs — for the legacy hash path we route String inputs through {@code UUID.fromString} directly
-   * to preserve the lenient pre-PR behavior.
-   */
+  /// Regression: [HashUtils#hashUUID] must accept non-canonical-but-Java-parseable UUID strings
+  /// (e.g. `"1-2-3-4-5"`) so existing upsert tables using `HashFunction.UUID` keep producing
+  /// the same hash before and after this PR. [UuidUtils#toBytes(String)] is strict and would reject
+  /// such inputs — for the legacy hash path we route String inputs through `UUID.fromString` directly
+  /// to preserve the lenient pre-PR behavior.
   @Test
   public void testHashUUIDLenientForNonCanonicalStrings() {
     String nonCanonical = "1-2-3-4-5";

@@ -184,11 +184,9 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     }
   }
 
-  /**
-   * Constructor called when there is no file present.
-   *
-   * @param historyFilePath
-   */
+  /// Constructor called when there is no file present.
+  ///
+  /// @param historyFilePath
   private RealtimeSegmentStatsHistory(String historyFilePath) {
     _entries = new SegmentStats[_maxNumEntries];
     _historyFilePath = historyFilePath;
@@ -267,13 +265,11 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     save();
   }
 
-  /**
-   * Estimate the cardinality of a column based on past segments of a table
-   * For now, we return the average value.
-   *
-   * @param columnName
-   * @return estimated
-   */
+  /// Estimate the cardinality of a column based on past segments of a table
+  /// For now, we return the average value.
+  ///
+  /// @param columnName
+  /// @return estimated
   public synchronized int getEstimatedCardinality(String columnName) {
     int numEntriesToScan = getNumEntriesToScan();
     if (numEntriesToScan == 0) {
@@ -298,13 +294,11 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     return DEFAULT_EST_CARDINALITY;
   }
 
-  /**
-   * Estimate the average size of a string column based on the past segments of the table.
-   * For now, we return the average value.
-   *
-   * @param columnName
-   * @return estimated average string size
-   */
+  /// Estimate the average size of a string column based on the past segments of the table.
+  /// For now, we return the average value.
+  ///
+  /// @param columnName
+  /// @return estimated average string size
   public synchronized int getEstimatedAvgColSize(String columnName) {
     int numEntriesToScan = getNumEntriesToScan();
     if (numEntriesToScan == 0) {
@@ -394,13 +388,11 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     return getCursor();
   }
 
-  /**
-   * This is a work-around to be able to de-serialize an object written by the same class
-   * before its move from {@value OLD_PACKAGE_FOR_CLASS} to the current package of
-   * "org.apache.pinot.segment.local.realtime.impl".
-   *
-   * We sub-class ObjectInputStream, and overwrite the old package name with the new one.
-   */
+  /// This is a work-around to be able to de-serialize an object written by the same class
+  /// before its move from {@value OLD_PACKAGE_FOR_CLASS} to the current package of
+  /// "org.apache.pinot.segment.local.realtime.impl".
+  ///
+  /// We sub-class ObjectInputStream, and overwrite the old package name with the new one.
   private static class CustomObjectInputStream extends ObjectInputStream {
 
     public CustomObjectInputStream(InputStream in)

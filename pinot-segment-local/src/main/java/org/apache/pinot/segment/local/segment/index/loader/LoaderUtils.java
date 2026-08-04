@@ -39,15 +39,13 @@ public class LoaderUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(LoaderUtils.class);
 
-  /**
-   * Write an index file to v3 format single index file and remove the old one.
-   *
-   * @param segmentWriter v3 format segment writer.
-   * @param column column name.
-   * @param indexFile index file to write from.
-   * @param indexType index type.
-   * @throws IOException
-   */
+  /// Write an index file to v3 format single index file and remove the old one.
+  ///
+  /// @param segmentWriter v3 format segment writer.
+  /// @param column column name.
+  /// @param indexFile index file to write from.
+  /// @param indexType index type.
+  /// @throws IOException
   public static void writeIndexToV3Format(SegmentDirectory.Writer segmentWriter, String column, File indexFile,
       IndexType<?, ?, ?> indexType)
       throws IOException {
@@ -58,15 +56,13 @@ public class LoaderUtils {
     FileUtils.forceDelete(indexFile);
   }
 
-  /**
-   * Get string list from segment properties.
-   * <p>
-   * NOTE: When the property associated with the key is empty, {@link PropertiesConfiguration#getList(String)} will
-   * return an empty string singleton list. Using this method will return an empty list instead.
-   *
-   * @param key property key.
-   * @return string list value for the property.
-   */
+  /// Get string list from segment properties.
+  ///
+  /// NOTE: When the property associated with the key is empty, [PropertiesConfiguration#getList(String)] will
+  /// return an empty string singleton list. Using this method will return an empty list instead.
+  ///
+  /// @param key property key.
+  /// @return string list value for the property.
   public static List<String> getStringListFromSegmentProperties(String key, PropertiesConfiguration segmentProperties) {
     List<String> stringList = new ArrayList<>();
     List propertyList = segmentProperties.getList(key);
@@ -81,34 +77,31 @@ public class LoaderUtils {
     return stringList;
   }
 
-  /**
-   * Try to recover a segment from reload failures (reloadSegment() method in HelixInstanceDataManager). This has no
-   * effect for normal segments.
-   * <p>Reload failures include normal failures like Java exceptions (called in reloadSegment() finally block) and hard
-   * failures such as server restart during reload and JVM crash (called before trying to load segment from the index
-   * directory).
-   * <p>The following failure scenarios could happen (use atomic renaming operation to classify scenarios):
-   * <ul>
-   *   <li>
-   *     Failure happens before renaming index directory to segment backup directory:
-   *     <p>Only index directory exists. No need to recover because we have not loaded segment so index directory is
-   *     left unchanged.
-   *   </li>
-   *   <li>
-   *     Failure happens before renaming segment backup directory to segment temporary directory:
-   *     <p>Segment backup directory exists, and index directory might exist. Index directory could be left in corrupted
-   *     state because we tried to load segment from it and potentially added indexes. Need to recover index directory
-   *     from segment backup directory.
-   *   </li>
-   *   <li>
-   *     Failure happens after renaming segment backup directory to segment temporary directory (during deleting segment
-   *     temporary directory):
-   *     <p>Index directory and segment temporary directory exist. Segment has been successfully loaded, so index
-   *     segment is in good state. Delete segment temporary directory.
-   *   </li>
-   * </ul>
-   * <p>Should be called before trying to load the segment or metadata from index directory.
-   */
+  /// Try to recover a segment from reload failures (reloadSegment() method in HelixInstanceDataManager). This has no
+  /// effect for normal segments.
+  ///
+  /// Reload failures include normal failures like Java exceptions (called in reloadSegment() finally block) and hard
+  /// failures such as server restart during reload and JVM crash (called before trying to load segment from the index
+  /// directory).
+  ///
+  /// The following failure scenarios could happen (use atomic renaming operation to classify scenarios):
+  ///
+  /// - Failure happens before renaming index directory to segment backup directory:
+  ///
+  ///   Only index directory exists. No need to recover because we have not loaded segment so index directory is
+  ///   left unchanged.
+  /// - Failure happens before renaming segment backup directory to segment temporary directory:
+  ///
+  ///   Segment backup directory exists, and index directory might exist. Index directory could be left in corrupted
+  ///   state because we tried to load segment from it and potentially added indexes. Need to recover index directory
+  ///   from segment backup directory.
+  /// - Failure happens after renaming segment backup directory to segment temporary directory (during deleting
+  ///   segment temporary directory):
+  ///
+  ///   Index directory and segment temporary directory exist. Segment has been successfully loaded, so index
+  ///   segment is in good state. Delete segment temporary directory.
+  ///
+  /// Should be called before trying to load the segment or metadata from index directory.
   public static void reloadFailureRecovery(File indexDir)
       throws IOException {
     File parentDir = indexDir.getParentFile();

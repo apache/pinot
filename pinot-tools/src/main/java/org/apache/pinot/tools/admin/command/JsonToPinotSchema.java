@@ -36,11 +36,9 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class for command to infer pinot schema from Json data. Given that it is not always possible to
- * automatically do this, the intention is to get most of the work done by this class, and require any
- * manual editing on top.
- */
+/// Class for command to infer pinot schema from Json data. Given that it is not always possible to
+/// automatically do this, the intention is to get most of the work done by this class, and require any
+/// manual editing on top.
 @CommandLine.Command(name = "JsonToPinotSchema", mixinStandardHelpOptions = true)
 public class JsonToPinotSchema extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonToPinotSchema.class);
@@ -119,12 +117,10 @@ public class JsonToPinotSchema extends AbstractBaseAdminCommand implements Comma
         + _delimiter + " _collectionNotUnnestedToJson " + _collectionNotUnnestedToJson;
   }
 
-  /**
-   * Build a Map with column name as key and fieldType (dimension/metric/time) as value, from the
-   * options list.
-   *
-   * @return The column <-> fieldType map.
-   */
+  /// Build a Map with column name as key and fieldType (dimension/metric/time) as value, from the
+  /// options list.
+  ///
+  /// @return The column <-> fieldType map.
   private Map<String, FieldSpec.FieldType> buildFieldTypesMap() {
     Map<String, FieldSpec.FieldType> fieldTypes = new HashMap<>();
     if (_dimensions != null) {

@@ -54,16 +54,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>Schema</code> class is defined for each table to describe the details of the table's fields (columns).
- * <p>Four field types are supported: DIMENSION, METRIC, TIME, DATE_TIME.
- * ({@link DimensionFieldSpec}, {@link MetricFieldSpec},
- * {@link TimeFieldSpec}, {@link DateTimeFieldSpec})
- * <p>For each field, a {@link FieldSpec} is defined to provide the details of the field.
- * <p>There could be multiple DIMENSION or METRIC or DATE_TIME fields, but at most 1 TIME field.
- * <p>In pinot, we store data using 5 <code>DataType</code>s: INT, LONG, FLOAT, DOUBLE, STRING. All other
- * <code>DataType</code>s will be converted to one of them.
- */
+/// The `Schema` class is defined for each table to describe the details of the table's fields (columns).
+///
+/// Four field types are supported: DIMENSION, METRIC, TIME, DATE_TIME.
+/// ([DimensionFieldSpec], [MetricFieldSpec],
+/// [TimeFieldSpec], [DateTimeFieldSpec])
+///
+/// For each field, a [FieldSpec] is defined to provide the details of the field.
+///
+/// There could be multiple DIMENSION or METRIC or DATE_TIME fields, but at most 1 TIME field.
+///
+/// In pinot, we store data using 5 `DataType`s: INT, LONG, FLOAT, DOUBLE, STRING. All other
+/// `DataType`s will be converted to one of them.
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class Schema implements Serializable {
@@ -171,9 +173,7 @@ public final class Schema implements Serializable {
     }
   }
 
-  /**
-   * NOTE: schema name could be null in tests
-   */
+  /// NOTE: schema name could be null in tests
   public String getSchemaName() {
     return _schemaName;
   }
@@ -221,10 +221,8 @@ public final class Schema implements Serializable {
     return _dimensionFieldSpecs;
   }
 
-  /**
-   * Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
-   * Adding @Deprecated to prevent usage
-   */
+  /// Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
+  /// Adding @Deprecated to prevent usage
   @Deprecated
   public void setDimensionFieldSpecs(List<DimensionFieldSpec> dimensionFieldSpecs) {
     Preconditions.checkState(_dimensionFieldSpecs.isEmpty());
@@ -238,10 +236,8 @@ public final class Schema implements Serializable {
     return _metricFieldSpecs;
   }
 
-  /**
-   * Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
-   * Adding @Deprecated to prevent usage
-   */
+  /// Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
+  /// Adding @Deprecated to prevent usage
   @Deprecated
   public void setMetricFieldSpecs(List<MetricFieldSpec> metricFieldSpecs) {
     Preconditions.checkState(_metricFieldSpecs.isEmpty());
@@ -255,10 +251,8 @@ public final class Schema implements Serializable {
     return _dateTimeFieldSpecs;
   }
 
-  /**
-   * Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
-   * Adding @Deprecated to prevent usage
-   */
+  /// Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
+  /// Adding @Deprecated to prevent usage
   @Deprecated
   public void setDateTimeFieldSpecs(List<DateTimeFieldSpec> dateTimeFieldSpecs) {
     Preconditions.checkState(_dateTimeFieldSpecs.isEmpty());
@@ -275,10 +269,8 @@ public final class Schema implements Serializable {
     return _timeFieldSpec;
   }
 
-  /**
-   * Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
-   * Adding @Deprecated to prevent usage
-   */
+  /// Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
+  /// Adding @Deprecated to prevent usage
   @Deprecated
   public void setTimeFieldSpec(TimeFieldSpec timeFieldSpec) {
     if (timeFieldSpec != null) {
@@ -290,10 +282,8 @@ public final class Schema implements Serializable {
     return _complexFieldSpecs;
   }
 
-  /**
-   * Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
-   * Adding @Deprecated to prevent usage
-   */
+  /// Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
+  /// Adding @Deprecated to prevent usage
   @Deprecated
   public void setComplexFieldSpecs(List<ComplexFieldSpec> complexFieldSpecs) {
     Preconditions.checkState(_complexFieldSpecs.isEmpty());
@@ -338,12 +328,6 @@ public final class Schema implements Serializable {
 
     _hasJSONColumn |= fieldSpec.getDataType().equals(DataType.JSON);
     _fieldSpecMap.put(columnName, fieldSpec);
-  }
-
-  @Deprecated
-  // For third-eye backward compatible.
-  public void addField(String columnName, FieldSpec fieldSpec) {
-    addField(fieldSpec);
   }
 
   public boolean removeField(String columnName) {
@@ -413,12 +397,10 @@ public final class Schema implements Serializable {
     return physicalColumnNames;
   }
 
-  /**
-   * Returns a new schema containing only physical columns.
-   *
-   * All properties but the fields are the same.
-   * All field attributes are a shallow copy without the virtual column.
-   */
+  /// Returns a new schema containing only physical columns.
+  ///
+  /// All properties but the fields are the same.
+  /// All field attributes are a shallow copy without the virtual column.
   public Schema withoutVirtualColumns() {
     Schema newSchema = new Schema();
     newSchema.setSchemaName(getSchemaName());
@@ -443,9 +425,7 @@ public final class Schema implements Serializable {
     return newSchema;
   }
 
-  /**
-   * NOTE: The returned FieldSpecs are sorted with the column name alphabetically.
-   */
+  /// NOTE: The returned FieldSpecs are sorted with the column name alphabetically.
   @JsonIgnore
   public Collection<FieldSpec> getAllFieldSpecs() {
     return _fieldSpecMap.values();
@@ -496,11 +476,9 @@ public final class Schema implements Serializable {
     return null;
   }
 
-  /**
-   * Fetches the DateTimeFieldSpec for the given time column name.
-   * If the columnName is a DATE_TIME column, returns the DateTimeFieldSpec
-   * If the columnName is a TIME column, converts to DateTimeFieldSpec before returning
-   */
+  /// Fetches the DateTimeFieldSpec for the given time column name.
+  /// If the columnName is a DATE_TIME column, returns the DateTimeFieldSpec
+  /// If the columnName is a TIME column, converts to DateTimeFieldSpec before returning
   @JsonIgnore
   @Nullable
   @SuppressWarnings("deprecation")
@@ -537,9 +515,7 @@ public final class Schema implements Serializable {
     return _complexNames;
   }
 
-  /**
-   * Returns a json representation of the schema.
-   */
+  /// Returns a json representation of the schema.
   @JsonValue
   public ObjectNode toJsonObject() {
     ObjectNode jsonObject = JsonUtils.newObjectNode();
@@ -596,9 +572,7 @@ public final class Schema implements Serializable {
     return jsonObject;
   }
 
-  /**
-   * Returns a pretty json string representation of the schema.
-   */
+  /// Returns a pretty json string representation of the schema.
   public String toPrettyJsonString() {
     try {
       return JsonUtils.objectToPrettyString(toJsonObject());
@@ -607,26 +581,23 @@ public final class Schema implements Serializable {
     }
   }
 
-  /**
-   * Returns a single-line json string representation of the schema.
-   */
+  /// Returns a single-line json string representation of the schema.
   public String toSingleLineJsonString() {
     return toJsonObject().toString();
   }
 
-  /**
-   * Validates a pinot schema.
-   * <p>The following validations are performed:
-   * <ul>
-   *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL,
-   *   BOOLEAN, TIMESTAMP, STRING, JSON, UUID, BYTES</li>
-   *   <li>For metric fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL, BYTES</li>
-   * </ul>
-   * <p>Note: multi-value compatibility checks (e.g. rejecting MV JSON columns) live in
-   * {@code SchemaUtils.validateMultiValueCompatibility} so that schema construction via
-   * {@link SchemaBuilder#build()} stays a pure DTO operation; controller-side ingest validation continues
-   * to call {@code SchemaUtils.validate(Schema)} which enforces those constraints.
-   */
+  /// Validates a pinot schema.
+  ///
+  /// The following validations are performed:
+  ///
+  /// - For dimension, time, date time fields, support [DataType]: INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL,
+  ///   BOOLEAN, TIMESTAMP, STRING, JSON, UUID, BYTES
+  /// - For metric fields, support [DataType]: INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL, BYTES
+  ///
+  /// Note: multi-value compatibility checks (e.g. rejecting MV JSON columns) live in
+  /// `SchemaUtils.validateMultiValueCompatibility` so that schema construction via
+  /// [SchemaBuilder#build()] stays a pure DTO operation; controller-side ingest validation continues
+  /// to call `SchemaUtils.validate(Schema)` which enforces those constraints.
   public void validate() {
     for (FieldSpec fieldSpec : _fieldSpecMap.values()) {
       FieldType fieldType = fieldSpec.getFieldType();
@@ -714,25 +685,19 @@ public final class Schema implements Serializable {
       return this;
     }
 
-    /**
-     * Add single value dimensionFieldSpec
-     */
+    /// Add single value dimensionFieldSpec
     public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true));
       return this;
     }
 
-    /**
-     * Add single value dimensionFieldSpec with a defaultNullValue
-     */
+    /// Add single value dimensionFieldSpec with a defaultNullValue
     public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType, Object defaultNullValue) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, defaultNullValue));
       return this;
     }
 
-    /**
-     * Add single value dimensionFieldSpec with maxLength and a defaultNullValue
-     */
+    /// Add single value dimensionFieldSpec with maxLength and a defaultNullValue
     public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType, int maxLength,
         Object defaultNullValue) {
       Preconditions.checkArgument(dataType == DataType.STRING,
@@ -741,25 +706,19 @@ public final class Schema implements Serializable {
       return this;
     }
 
-    /**
-     * Add multi value dimensionFieldSpec
-     */
+    /// Add multi value dimensionFieldSpec
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false));
       return this;
     }
 
-    /**
-     * Add multi value dimensionFieldSpec with defaultNullValue
-     */
+    /// Add multi value dimensionFieldSpec with defaultNullValue
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, Object defaultNullValue) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false, defaultNullValue));
       return this;
     }
 
-    /**
-     * Add multi value dimensionFieldSpec with maxLength and a defaultNullValue
-     */
+    /// Add multi value dimensionFieldSpec with maxLength and a defaultNullValue
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, int maxLength,
         Object defaultNullValue) {
       Preconditions.checkArgument(dataType == DataType.STRING,
@@ -768,29 +727,23 @@ public final class Schema implements Serializable {
       return this;
     }
 
-    /**
-     * Add metricFieldSpec
-     */
+    /// Add metricFieldSpec
     public SchemaBuilder addMetric(String metricName, DataType dataType) {
       _schema.addField(new MetricFieldSpec(metricName, dataType));
       return this;
     }
 
-    /**
-     * Add metricFieldSpec with defaultNullValue
-     */
+    /// Add metricFieldSpec with defaultNullValue
     public SchemaBuilder addMetric(String metricName, DataType dataType, Object defaultNullValue) {
       _schema.addField(new MetricFieldSpec(metricName, dataType, defaultNullValue));
       return this;
     }
 
-    /**
-     * @deprecated in favor of {@link SchemaBuilder#addDateTime(String, DataType, String, String)}
-     * Adds timeFieldSpec with incoming and outgoing granularity spec
-     * This will continue to exist for a while in several tests, as it helps to test backward compatibility of
-     * schemas containing
-     * TimeFieldSpec
-     */
+    /// @deprecated in favor of [SchemaBuilder#addDateTime(String, DataType, String, String)]
+    /// Adds timeFieldSpec with incoming and outgoing granularity spec
+    /// This will continue to exist for a while in several tests, as it helps to test backward compatibility of
+    /// schemas containing
+    /// TimeFieldSpec
     @Deprecated
     public SchemaBuilder addTime(TimeGranularitySpec incomingTimeGranularitySpec,
         @Nullable TimeGranularitySpec outgoingTimeGranularitySpec) {
@@ -802,17 +755,13 @@ public final class Schema implements Serializable {
       return this;
     }
 
-    /**
-     * Add dateTimeFieldSpec with basic fields
-     */
+    /// Add dateTimeFieldSpec with basic fields
     public SchemaBuilder addDateTime(String name, DataType dataType, String format, String granularity) {
       _schema.addField(new DateTimeFieldSpec(name, dataType, format, granularity));
       return this;
     }
 
-    /**
-     * Add dateTimeFieldSpec with basic fields plus defaultNullValue and transformFunction
-     */
+    /// Add dateTimeFieldSpec with basic fields plus defaultNullValue and transformFunction
     public SchemaBuilder addDateTime(String name, DataType dataType, String format, String granularity,
         @Nullable Object defaultNullValue, @Nullable String transformFunction) {
       DateTimeFieldSpec dateTimeFieldSpec =
@@ -821,23 +770,19 @@ public final class Schema implements Serializable {
       return this;
     }
 
-    /**
-     * Add complex field spec
-     * @param name name of complex (nested) field
-     * @param dataType root data type of complex field
-     * @param childFieldSpecs map of child field specs
-     */
+    /// Add complex field spec
+    /// @param name name of complex (nested) field
+    /// @param dataType root data type of complex field
+    /// @param childFieldSpecs map of child field specs
     public SchemaBuilder addComplex(String name, DataType dataType, Map<String, FieldSpec> childFieldSpecs) {
       _schema.addField(new ComplexFieldSpec(name, dataType, /* single value field */ true, childFieldSpecs));
       return this;
     }
 
-    /**
-     * Adds an OPEN_STRUCT field to the schema.
-     *
-     * @param name field name
-     * @param childFieldSpecs per-key declared types; pass {@code Map.of()} for none
-     */
+    /// Adds an OPEN_STRUCT field to the schema.
+    ///
+    /// @param name field name
+    /// @param childFieldSpecs per-key declared types; pass `Map.of()` for none
     public SchemaBuilder addOpenStruct(String name, Map<String, FieldSpec> childFieldSpecs) {
       _schema.addField(new ComplexFieldSpec(name, FieldSpec.DataType.OPEN_STRUCT, true, childFieldSpecs));
       return this;
@@ -887,14 +832,12 @@ public final class Schema implements Serializable {
     //@formatter:on
   }
 
-  /**
-   * Updates fields with BOOLEAN data type to STRING if the data type in the old schema is STRING.
-   *
-   * BOOLEAN data type was stored as STRING within the schema before release 0.8.0. In release 0.8.0, we introduced
-   * native BOOLEAN support and BOOLEAN data type is no longer replaced with STRING.
-   * To keep the existing schema backward compatible, when the new field spec has BOOLEAN data type and the old field
-   * spec has STRING data type, set the new field spec's data type to STRING.
-   */
+  /// Updates fields with BOOLEAN data type to STRING if the data type in the old schema is STRING.
+  ///
+  /// BOOLEAN data type was stored as STRING within the schema before release 0.8.0. In release 0.8.0, we introduced
+  /// native BOOLEAN support and BOOLEAN data type is no longer replaced with STRING.
+  /// To keep the existing schema backward compatible, when the new field spec has BOOLEAN data type and the old field
+  /// spec has STRING data type, set the new field spec's data type to STRING.
   public void updateBooleanFieldsIfNeeded(Schema oldSchema) {
     for (Map.Entry<String, FieldSpec> entry : _fieldSpecMap.entrySet()) {
       FieldSpec fieldSpec = entry.getValue();
@@ -907,16 +850,14 @@ public final class Schema implements Serializable {
     }
   }
 
-  /**
-   * Check whether the current schema is backward compatible with oldSchema.
-   *
-   * Backward compatibility requires
-   * (1) all columns in oldSchema should be retained.
-   * (2) all column fieldSpecs should be backward compatible with the old ones.
-   * (3) primary key columns should not be changed if present(used in dimension tables, upsert, and dedup).
-   *
-   * @param oldSchema old schema
-   */
+  /// Check whether the current schema is backward compatible with oldSchema.
+  ///
+  /// Backward compatibility requires
+  /// (1) all columns in oldSchema should be retained.
+  /// (2) all column fieldSpecs should be backward compatible with the old ones.
+  /// (3) primary key columns should not be changed if present(used in dimension tables, upsert, and dedup).
+  ///
+  /// @param oldSchema old schema
   public boolean isBackwardCompatibleWith(Schema oldSchema) {
     List<String> oldPrimaryKeys = oldSchema.getPrimaryKeyColumns();
     List<String> newPrimaryKeys = getPrimaryKeyColumns();
@@ -958,24 +899,6 @@ public final class Schema implements Serializable {
     return result;
   }
 
-  /**
-   * @deprecated this method is not correctly implemented. ie doesn't call super.clone and does not create a deep copy
-   * of the fieldSpecs.
-   */
-  @Deprecated
-  @Override
-  public Schema clone() {
-    Schema cloned = new SchemaBuilder()
-        .setSchemaName(getSchemaName())
-        .setDescription(getDescription())
-        .setTags(getTags())
-        .setPrimaryKeyColumns(getPrimaryKeyColumns())
-        .setEnableColumnBasedNullHandling(isEnableColumnBasedNullHandling())
-        .build();
-    getAllFieldSpecs().forEach(fieldSpec -> cloned.addField(fieldSpec));
-    return cloned;
-  }
-
   public static Schema cloneSchemaWithName(Schema source, String newName) {
     try {
       String json = JsonUtils.objectToString(source);
@@ -987,13 +910,11 @@ public final class Schema implements Serializable {
     }
   }
 
-  /**
-   * Helper method that converts a {@link TimeFieldSpec} to {@link DateTimeFieldSpec}
-   * 1) If timeFieldSpec contains only incoming granularity spec, directly convert it to a dateTimeFieldSpec
-   * 2) If timeFieldSpec contains incoming aas well as outgoing granularity spec, use the outgoing spec to construct
-   * the dateTimeFieldSpec,
-   *    and configure a transform function for the conversion from incoming
-   */
+  /// Helper method that converts a [TimeFieldSpec] to [DateTimeFieldSpec]
+  /// 1) If timeFieldSpec contains only incoming granularity spec, directly convert it to a dateTimeFieldSpec
+  /// 2) If timeFieldSpec contains incoming aas well as outgoing granularity spec, use the outgoing spec to construct
+  /// the dateTimeFieldSpec,
+  ///    and configure a transform function for the conversion from incoming
   @SuppressWarnings("deprecation")
   public static DateTimeFieldSpec convertToDateTimeFieldSpec(TimeFieldSpec timeFieldSpec) {
     DateTimeFieldSpec dateTimeFieldSpec = new DateTimeFieldSpec();
@@ -1050,9 +971,7 @@ public final class Schema implements Serializable {
     return dateTimeFieldSpec;
   }
 
-  /**
-   * Constructs a transformFunction string for the time column, based on incoming and outgoing timeGranularitySpec
-   */
+  /// Constructs a transformFunction string for the time column, based on incoming and outgoing timeGranularitySpec
   private static String constructTransformFunctionString(String incomingName, int incomingTimeSize,
       TimeUnit incomingTimeUnit, int outgoingTimeSize, TimeUnit outgoingTimeUnit) {
 

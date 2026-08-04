@@ -291,9 +291,7 @@ public class BrokerRoutingManagerTest {
     assertTrue(_routingManager.getRoutableServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
   }
 
-  /**
-   * Creates a ZNRecord representing an enabled server instance.
-   */
+  /// Creates a ZNRecord representing an enabled server instance.
   private ZNRecord createEnabledServerZNRecord(String instanceId) {
     ZNRecord record = new ZNRecord(instanceId);
     record.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_ENABLED.name(), "true");

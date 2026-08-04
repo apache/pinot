@@ -95,10 +95,8 @@ public class SegmentOperationsThrottlerSetTest {
     ServerMetrics.register(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
   }
 
-  /**
-   * Creates an array of 4 SegmentOperationsThrottler instances, each configured with the appropriate
-   * gauge params so that metrics are emitted correctly.
-   */
+  /// Creates an array of 4 SegmentOperationsThrottler instances, each configured with the appropriate
+  /// gauge params so that metrics are emitted correctly.
   private SegmentOperationsThrottler[] createThrottlers(int maxConcurrency, int maxConcurrencyBeforeServing,
       boolean isServing) {
     SegmentOperationsThrottler[] throttlers = new SegmentOperationsThrottler[NUM_THROTTLERS];
@@ -109,9 +107,7 @@ public class SegmentOperationsThrottlerSetTest {
     return throttlers;
   }
 
-  /**
-   * Creates a SegmentOperationsThrottlerSet wrapping the given array of 4 throttlers.
-   */
+  /// Creates a SegmentOperationsThrottlerSet wrapping the given array of 4 throttlers.
   private SegmentOperationsThrottlerSet wrapInSegmentOperationsThrottler(SegmentOperationsThrottler[] throttlers) {
     return new SegmentOperationsThrottlerSet(throttlers[0], throttlers[1], throttlers[2], throttlers[3]);
   }

@@ -26,11 +26,9 @@ import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggrega
 import org.apache.pinot.segment.spi.Constants;
 
 
-/**
- * Aggregator for merging serialized TDigest sketches during segment processing
- * (e.g., MergeAndRollup). Handles both {@code PERCENTILETDIGEST} and
- * {@code PERCENTILERAWTDIGEST} aggregation types
- */
+/// Aggregator for merging serialized TDigest sketches during segment processing
+/// (e.g., MergeAndRollup). Handles both `PERCENTILETDIGEST` and
+/// `PERCENTILERAWTDIGEST` aggregation types
 public class PercentileTDigestAggregator implements ValueAggregator {
 
   @Override

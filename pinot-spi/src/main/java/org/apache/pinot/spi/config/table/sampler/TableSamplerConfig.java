@@ -25,14 +25,12 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-/**
- * Configuration for a table sampler.
- *
- * Samplers are defined in {@link org.apache.pinot.spi.config.table.TableConfig} and can be selected at query time
- * via a query option. The sampler type can be one of the built-in types, a fully qualified class name, or an alias
- * discovered via broker-side annotation scanning. Additional annotation packages can be configured via
- * {@code pinot.broker.table.sampler.annotation.packages}.
- */
+/// Configuration for a table sampler.
+///
+/// Samplers are defined in [org.apache.pinot.spi.config.table.TableConfig] and can be selected at query time
+/// via a query option. The sampler type can be one of the built-in types, a fully qualified class name, or an alias
+/// discovered via broker-side annotation scanning. Additional annotation packages can be configured via
+/// `pinot.broker.table.sampler.annotation.packages`.
 public class TableSamplerConfig extends BaseJsonConfig {
   private final String _name;
   private final String _type;

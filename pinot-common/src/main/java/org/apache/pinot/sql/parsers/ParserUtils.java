@@ -45,12 +45,10 @@ public class ParserUtils {
     }
   }
 
-  /**
-   * Sanitize the sql string for parsing by normalizing whitespace
-   * which is likely to cause performance issues with regex parsing.
-   * @param sql string to sanitize
-   * @return sanitized sql string
-   */
+  /// Sanitize the sql string for parsing by normalizing whitespace
+  /// which is likely to cause performance issues with regex parsing.
+  /// @param sql string to sanitize
+  /// @return sanitized sql string
   public static String sanitizeSql(String sql) {
 
     // 1. Strip single-line SQL comments (-- ... to end of line).
@@ -67,11 +65,9 @@ public class ParserUtils {
     return sql.substring(0, endIndex + 1);
   }
 
-  /**
-   * Returns the sql string with all single-line SQL comments (-- ... to end of line) removed,
-   * respecting single-quoted string literals, double-quoted identifiers, and block comments.
-   * A "--" found inside a block comment or a quoted context is not treated as a comment marker.
-   */
+  /// Returns the sql string with all single-line SQL comments (-- ... to end of line) removed,
+  /// respecting single-quoted string literals, double-quoted identifiers, and block comments.
+  /// A "--" found inside a block comment or a quoted context is not treated as a comment marker.
   static String stripSingleLineComments(String sql) {
     StringBuilder result = new StringBuilder(sql.length());
     int len = sql.length();

@@ -41,10 +41,10 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
-/// Guards the fail path of {@link ClasspathClosureScanner}.
+/// Guards the fail path of [ClasspathClosureScanner].
 ///
 /// The scanner is the only part of the Java 11 verifier that can go red on a dependency bump, and both of its filters
-/// ({@code isLoadableClassEntry} and {@code readMajorVersion}) fail _open_ -- an input they do not recognise is treated
+/// (`isLoadableClassEntry` and `readMajorVersion`) fail _open_ -- an input they do not recognise is treated
 /// as "not a violation". A regression in either therefore produces a permanently green CI job rather than a red one,
 /// which is worse than having no job at all. These tests pin the behaviour that keeps it honest, and need no Java 11
 /// JVM, so they run in the normal unit test job.
@@ -157,7 +157,7 @@ public class ClasspathClosureScannerTest {
     assertEquals(result.getTotalViolationCount(), 1);
   }
 
-  /// A JVM only performs versioned lookup when the manifest says {@code Multi-Release: true}. Without it the whole
+  /// A JVM only performs versioned lookup when the manifest says `Multi-Release: true`. Without it the whole
   /// META-INF/versions tree is inert data, so nothing under it may be reported -- including entries at or below the
   /// target, which would otherwise be a false positive on a shaded jar that merged versioned entries but lost the
   /// attribute.

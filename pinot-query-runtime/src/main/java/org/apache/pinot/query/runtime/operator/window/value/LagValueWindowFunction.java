@@ -26,11 +26,9 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 
 
-/**
- * Window function that returns the value of a column from a preceding row within the partition. Supports an optional
- * offset (default 1), an optional default value for when no row exists at that offset, and IGNORE NULLS mode which
- * skips null values when scanning backward. Custom window frames are not allowed (enforced by Calcite).
- */
+/// Window function that returns the value of a column from a preceding row within the partition. Supports an optional
+/// offset (default 1), an optional default value for when no row exists at that offset, and IGNORE NULLS mode which
+/// skips null values when scanning backward. Custom window frames are not allowed (enforced by Calcite).
 public class LagValueWindowFunction extends OffsetValueWindowFunction {
 
   public LagValueWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,

@@ -52,10 +52,8 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-/**
- * all special tests that doesn't fit into {@link org.apache.pinot.query.runtime.queries.ResourceBasedQueriesTest}
- * pattern goes here.
- */
+/// all special tests that doesn't fit into [org.apache.pinot.query.runtime.queries.ResourceBasedQueriesTest]
+/// pattern goes here.
 public class QueryRunnerTest extends QueryRunnerTestBase {
   //@formatter:off
   public static final Object[][] ROWS = new Object[][]{
@@ -165,21 +163,17 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     _mailboxService.shutdown();
   }
 
-  /**
-   * Test compares with expected row count only.
-   */
+  /// Test compares with expected row count only.
   @Test(dataProvider = "testDataWithSqlToFinalRowCount")
   public void testSqlWithFinalRowCountChecker(String sql, int expectedRows) {
     ResultTable resultTable = queryRunner(sql, false).getResultTable();
     Assert.assertEquals(resultTable.getRows().size(), expectedRows);
   }
 
-  /**
-   * Test automatically compares against H2.
-   *
-   * @deprecated do not add to this test set. this class will be broken down and clean up.
-   *   add your test to the appropriate files in {@link org.apache.pinot.query.runtime.queries} instead.
-   */
+  /// Test automatically compares against H2.
+  ///
+  /// @deprecated do not add to this test set. this class will be broken down and clean up.
+  ///   add your test to the appropriate files in [org.apache.pinot.query.runtime.queries] instead.
   @Test(dataProvider = "testSql")
   public void testSqlWithH2Checker(String sql)
       throws Exception {
@@ -189,9 +183,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     compareRowEquals(resultTable, expectedRows);
   }
 
-  /**
-   * Test compares against its desired exceptions.
-   */
+  /// Test compares against its desired exceptions.
   @Test(dataProvider = "testDataWithSqlExecutionExceptions")
   public void testSqlWithExceptionMsgChecker(String sql, @Language("regexp") String expectedError) {
     try {

@@ -148,10 +148,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected File _resourceTmpDir;
   protected Logger _logger;
   protected SegmentReloadSemaphore _segmentReloadSemaphore;
-  /**
-   * @deprecated Use {@link #_segmentReloadExecutor} or {@link #_segmentRefreshExecutor} instead. Kept for binary
-   * compatibility with downstream extensions; refers to the shared underlying executor pool.
-   */
+  /// @deprecated Use [#_segmentReloadExecutor] or [#_segmentRefreshExecutor] instead. Kept for binary
+  /// compatibility with downstream extensions; refers to the shared underlying executor pool.
   @Deprecated
   protected ExecutorService _segmentReloadRefreshExecutor;
   protected ExecutorService _segmentReloadExecutor;
@@ -315,9 +313,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   protected abstract void doShutdown();
 
-  /**
-   * Releases and removes all segments tracked by the table data manager.
-   */
+  /// Releases and removes all segments tracked by the table data manager.
   protected void releaseAndRemoveAllSegments() {
     List<SegmentDataManager> segmentDataManagers;
     synchronized (_segmentDataManagerMap) {
@@ -361,15 +357,16 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return _segmentDataManagerMap.containsKey(segmentName);
   }
 
-  /**
-   * {@inheritDoc}
-   * <p>If one segment already exists with the same name, replaces it with the new one.
-   * <p>Ensures that reference count of the old segment (if replaced) is reduced by 1, so that the last user of the old
-   * segment (or the calling thread, if there are none) remove the segment.
-   * <p>The new segment is added with reference count of 1, so that is never removed until a drop command comes through.
-   *
-   * @param immutableSegment Immutable segment to add
-   */
+  /// {@inheritDoc}
+  ///
+  /// If one segment already exists with the same name, replaces it with the new one.
+  ///
+  /// Ensures that reference count of the old segment (if replaced) is reduced by 1, so that the last user of the old
+  /// segment (or the calling thread, if there are none) remove the segment.
+  ///
+  /// The new segment is added with reference count of 1, so that is never removed until a drop command comes through.
+  ///
+  /// @param immutableSegment Immutable segment to add
   @Override
   public void addSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
     String segmentName = immutableSegment.getSegmentName();
@@ -466,9 +463,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  /**
-   * Replaces an already loaded segment in a table if the segment has been overridden in the deep store (CRC mismatch).
-   */
+  /// Replaces an already loaded segment in a table if the segment has been overridden in the deep store (CRC mismatch).
   protected void replaceSegmentIfCrcMismatch(SegmentDataManager segmentDataManager, SegmentZKMetadata zkMetadata,
       IndexLoadingConfig indexLoadingConfig)
       throws Exception {
@@ -644,9 +639,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _logger.info("Deleted segment: {}", segmentName);
   }
 
-  /**
-   * Removes the segment directory locally and does tier-aware cleanup too
-   */
+  /// Removes the segment directory locally and does tier-aware cleanup too
   public static void deleteSegmentFilesFromDisk(String tableDataDir, String segmentName,
       InstanceDataManagerConfig instanceConfig)
       throws Exception {
@@ -724,10 +717,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  /**
-   * Returns true if the given segment has been deleted recently. The time range is determined by
-   * {@link InstanceDataManagerConfig#getDeletedSegmentsCacheTtlMinutes()}.
-   */
+  /// Returns true if the given segment has been deleted recently. The time range is determined by
+  /// [InstanceDataManagerConfig#getDeletedSegmentsCacheTtlMinutes()].
   @Override
   public boolean isSegmentDeletedRecently(String segmentName) {
     return _recentlyDeletedSegments.getIfPresent(segmentName) != null;
@@ -1236,11 +1227,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
         && !ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig);
   }
 
-  /**
-   * _segmentDataManagerMap is used for fetching segments that need to be queried. If a new segment is created,
-   * calling this method ensures that all queries in the future can use the new segment. This method may replace an
-   * existing segment with the same name.
-   */
+  /// \_segmentDataManagerMap is used for fetching segments that need to be queried. If a new segment is created,
+  /// calling this method ensures that all queries in the future can use the new segment. This method may replace an
+  /// existing segment with the same name.
   @Nullable
   public SegmentDataManager registerSegment(String segmentName, SegmentDataManager segmentDataManager) {
     SegmentDataManager oldSegmentDataManager;
@@ -1248,16 +1237,45 @@ public abstract class BaseTableDataManager implements TableDataManager {
       oldSegmentDataManager = _segmentDataManagerMap.put(segmentName, segmentDataManager);
     }
     _recentlyDeletedSegments.invalidate(segmentName);
+    // Fire the post-registration lifecycle hook now that the segment is swapped into the serving set
+    fireOnSegmentAdded(segmentName, segmentDataManager);
     return oldSegmentDataManager;
   }
 
-  /**
-   * De-registering a segment ensures that no query uses the given segment until a segment with that name is
-   * re-registered. There may be scenarios where the broker thinks that a segment is available even though it has
-   * been de-registered in the servers (either due to manual deletion or retention). In such cases, acquireSegments
-   * will mark those segments as missingSegments. The caller can use {@link #isSegmentDeletedRecently(String)} to
-   * identify this scenario.
-   */
+  /// Fires the post-registration lifecycle hook on the segments exposed by a newly registered segment data manager.
+  ///
+  /// The hook runs after the segment is swapped into the serving set, so a reference is held while it runs: without it
+  /// a concurrent [#replaceSegment] / [#unregisterSegment] could drop the reference count to 0 and destroy
+  /// the segment (closing its [org.apache.pinot.segment.spi.store.SegmentDirectory]) while the hook is still
+  /// using it. A manager that is already destroyed cannot take a reference and has nothing left to notify, so it is
+  /// skipped.
+  ///
+  /// Failures are contained here: the segment is already serving, so a failing hook must not fail the registration or
+  /// the enclosing Helix state transition. This also keeps a manager that exposes a null segment (possible for a
+  /// custom implementation, as the default [SegmentDataManager#getReportableSegments()] wraps
+  /// [SegmentDataManager#getSegment()]) from aborting registration.
+  private void fireOnSegmentAdded(String segmentName, SegmentDataManager segmentDataManager) {
+    if (!segmentDataManager.increaseReferenceCount()) {
+      return;
+    }
+    try {
+      for (IndexSegment segment : segmentDataManager.getReportableSegments()) {
+        if (segment != null) {
+          segment.onSegmentAdded();
+        }
+      }
+    } catch (Exception e) {
+      _logger.warn("Caught exception while firing onSegmentAdded for segment: {}", segmentName, e);
+    } finally {
+      releaseSegment(segmentDataManager);
+    }
+  }
+
+  /// De-registering a segment ensures that no query uses the given segment until a segment with that name is
+  /// re-registered. There may be scenarios where the broker thinks that a segment is available even though it has
+  /// been de-registered in the servers (either due to manual deletion or retention). In such cases, acquireSegments
+  /// will mark those segments as missingSegments. The caller can use [#isSegmentDeletedRecently(String)] to
+  /// identify this scenario.
   @Nullable
   public SegmentDataManager unregisterSegment(String segmentName) {
     _recentlyDeletedSegments.put(segmentName, segmentName);
@@ -1266,11 +1284,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  /**
-   * Downloads an immutable segment into the index directory.
-   * Segment can be downloaded from deep store or from peer servers. Downloaded segment might be compressed or
-   * encrypted, and this method takes care of decompressing and decrypting the segment.
-   */
+  /// Downloads an immutable segment into the index directory.
+  /// Segment can be downloaded from deep store or from peer servers. Downloaded segment might be compressed or
+  /// encrypted, and this method takes care of decompressing and decrypting the segment.
   public File downloadSegment(SegmentZKMetadata zkMetadata)
       throws Exception {
     String segmentName = zkMetadata.getSegmentName();
@@ -1495,13 +1511,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return tmpDir;
   }
 
-  /**
-   * Create a backup directory to handle failure of segment reloading.
-   * First rename index directory to segment backup directory so that original segment have all file
-   * descriptors point to the segment backup directory to ensure original segment serves queries properly.
-   * The original index directory is restored lazily, as depending on the conditions,
-   * it may be restored from the backup directory or segment downloaded from deep store.
-   */
+  /// Create a backup directory to handle failure of segment reloading.
+  /// First rename index directory to segment backup directory so that original segment have all file
+  /// descriptors point to the segment backup directory to ensure original segment serves queries properly.
+  /// The original index directory is restored lazily, as depending on the conditions,
+  /// it may be restored from the backup directory or segment downloaded from deep store.
   public void createBackup(File indexDir) {
     if (!indexDir.exists()) {
       return;
@@ -1513,12 +1527,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
         "Failed to rename index directory: %s to segment backup directory: %s", indexDir, segmentBackupDir);
   }
 
-  /**
-   * Remove the backup directory to mark the completion of segment reloading.
-   * First rename then delete is as renaming is an atomic operation, but deleting is not.
-   * When we rename the segment backup directory to segment temporary directory, we know the reload
-   * already succeeded, so that we can safely delete the segment temporary directory.
-   */
+  /// Remove the backup directory to mark the completion of segment reloading.
+  /// First rename then delete is as renaming is an atomic operation, but deleting is not.
+  /// When we rename the segment backup directory to segment temporary directory, we know the reload
+  /// already succeeded, so that we can safely delete the segment temporary directory.
   public void removeBackup(File indexDir)
       throws IOException {
     File parentDir = indexDir.getParentFile();
@@ -1544,11 +1556,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return true;
   }
 
-  /**
-   * Just Loads a segment from the existing on-disk copy without registering it in {@code _segmentDataManagerMap} or
-   * invoking other hooks.
-   * Returns {@code null} when the on-disk copy is absent, has a stale CRC under or fails to load
-   */
+  /// Just Loads a segment from the existing on-disk copy without registering it in `_segmentDataManagerMap` or
+  /// invoking other hooks.
+  /// Returns `null` when the on-disk copy is absent, has a stale CRC under or fails to load
   @Nullable
   public ImmutableSegment tryLoadExistingSegmentWithoutRegistering(SegmentZKMetadata zkMetadata,
       IndexLoadingConfig indexLoadingConfig) {
@@ -2015,9 +2025,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  /**
-   * Returns the configured peer download scheme if peer-to-peer download is enabled; otherwise null.
-   */
+  /// Returns the configured peer download scheme if peer-to-peer download is enabled; otherwise null.
   @Nullable
   public String getPeerDownloadScheme() {
     return _peerDownloadScheme;

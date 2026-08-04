@@ -250,27 +250,21 @@ public class QueryExecutionContext {
     _queryId = queryId;
   }
 
-  /**
-   * Returns the per-table scan killing mode override set for this query, or {@code null} if no
-   * table-level override is configured. When {@code null}, the cluster-level mode from
-   * {@link org.apache.pinot.spi.utils.CommonConstants.Accounting} applies.
-   */
+  /// Returns the per-table scan killing mode override set for this query, or `null` if no
+  /// table-level override is configured. When `null`, the cluster-level mode from
+  /// [org.apache.pinot.spi.utils.CommonConstants.Accounting] applies.
   @Nullable
   public Accounting.ScanKillingMode getEffectiveScanKillingMode() {
     return _effectiveScanKillingMode;
   }
 
-  /**
-   * Sets the per-table scan killing mode for this query. Pass {@code null} to fall back to the
-   * cluster-level mode. Called once during query initialization; thread-safe via {@code volatile}.
-   */
+  /// Sets the per-table scan killing mode for this query. Pass `null` to fall back to the
+  /// cluster-level mode. Called once during query initialization; thread-safe via `volatile`.
   public void setEffectiveScanKillingMode(@Nullable Accounting.ScanKillingMode effectiveScanKillingMode) {
     _effectiveScanKillingMode = effectiveScanKillingMode;
   }
 
-  /**
-   * Atomically marks that the scan-based killing dry-run signal has been emitted for this query
-   */
+  /// Atomically marks that the scan-based killing dry-run signal has been emitted for this query
   public boolean markScanKillingDryRunEmitted() {
     return _scanKillingDryRunEmitted.compareAndSet(false, true);
   }

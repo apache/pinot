@@ -25,27 +25,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Reads the {@code pinot-version.properties} file to extract the
- * project version that this code was compiled against.
- */
+/// Reads the `pinot-version.properties` file to extract the
+/// project version that this code was compiled against.
 public class PinotVersion {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotVersion.class);
 
-  /**
-   * The compile version of Pinot (e.g. {@code 0.12.0}). Note that this relies
-   * on <a href="https://maven.apache.org/plugins/maven-resources-plugin/examples/filter.html">
-   * Maven Filtering</a> to properly work, which means that if you access this
-   * in a local, non-maven build this will resolve to {@code UNKNOWN}.
-   */
+  /// The compile version of Pinot (e.g. `0.12.0`). Note that this relies
+  /// on [Maven Filtering](https://maven.apache.org/plugins/maven-resources-plugin/examples/filter.html) to properly
+  /// work, which means that if you access this
+  /// in a local, non-maven build this will resolve to `UNKNOWN`.
   public static final String VERSION;
   public static final String UNKNOWN = "UNKNOWN";
 
-  /**
-   * A sanitized version string with all dots replaced with underscores, which is necessary
-   * for Prometheus to be able to properly handle the version.
-   */
+  /// A sanitized version string with all dots replaced with underscores, which is necessary
+  /// for Prometheus to be able to properly handle the version.
   public static final String VERSION_METRIC_NAME;
 
   private PinotVersion() {

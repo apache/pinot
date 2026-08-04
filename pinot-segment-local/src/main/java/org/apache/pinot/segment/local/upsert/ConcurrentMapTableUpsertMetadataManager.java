@@ -35,9 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Implementation of {@link TableUpsertMetadataManager} that is backed by a {@link ConcurrentHashMap}.
- */
+/// Implementation of [TableUpsertMetadataManager] that is backed by a [ConcurrentHashMap].
 @ThreadSafe
 public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMetadataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(ConcurrentMapTableUpsertMetadataManager.class);

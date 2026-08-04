@@ -42,28 +42,17 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.intellij.lang.annotations.Language;
 
 
-/**
- * The <code>QueryGenerator</code> class is used to generate random equivalent Pinot and H2 query pairs based on Avro
- * files.
- * <ul>
- *   <li>
- *     Supports COMPARISON, IN and BETWEEN predicate for both single-value and multi-value columns.
- *     <ul>
- *       <li>For multi-value columns, does not support NOT EQUAL and NOT IN.</li>
- *       <li>The reason for this restriction is that number of elements in multi-value columns is not fixed.</li>
- *     </ul>
- *   </li>
- *   <li>Supports single-value data type: BOOLEAN, INT, LONG, FLOAT, DOUBLE, STRING.</li>
- *   <li>Supports multi-value data type: INT, LONG, FLOAT, DOUBLE, STRING.</li>
- *   <li>
- *     Supports aggregation function: SUM, MIN, MAX, AVG, COUNT, DISTINCTCOUNT.
- *     <ul>
- *       <li>SUM, MIN, MAX, AVG can only work on numeric single-value columns.</li>
- *       <li>COUNT, DISTINCTCOUNT can work on any single-value columns.</li>
- *     </ul>
- *   </li>
- * </ul>
- */
+/// The `QueryGenerator` class is used to generate random equivalent Pinot and H2 query pairs based on Avro
+/// files.
+///
+/// - Supports COMPARISON, IN and BETWEEN predicate for both single-value and multi-value columns.
+///   - For multi-value columns, does not support NOT EQUAL and NOT IN.
+///   - The reason for this restriction is that number of elements in multi-value columns is not fixed.
+/// - Supports single-value data type: BOOLEAN, INT, LONG, FLOAT, DOUBLE, STRING.
+/// - Supports multi-value data type: INT, LONG, FLOAT, DOUBLE, STRING.
+/// - Supports aggregation function: SUM, MIN, MAX, AVG, COUNT, DISTINCTCOUNT.
+///   - SUM, MIN, MAX, AVG can only work on numeric single-value columns.
+///   - COUNT, DISTINCTCOUNT can work on any single-value columns.
 public class QueryGenerator {
   // Configurable variables.
   private static final int MAX_NUM_SELECTION_COLUMNS = 3;
@@ -108,13 +97,11 @@ public class QueryGenerator {
   private boolean _skipMultiValuePredicates = false;
   private boolean _useMultistageEngine = false;
 
-  /**
-   * Constructor for <code>QueryGenerator</code>.
-   *
-   * @param avroFiles list of Avro files.
-   * @param pinotTableName Pinot table name.
-   * @param h2TableName H2 table name.
-   */
+  /// Constructor for `QueryGenerator`.
+  ///
+  /// @param avroFiles list of Avro files.
+  /// @param pinotTableName Pinot table name.
+  /// @param h2TableName H2 table name.
   public QueryGenerator(List<File> avroFiles, String pinotTableName, String h2TableName) {
     _pinotTableName = pinotTableName;
     _h2TableName = h2TableName;
@@ -180,12 +167,10 @@ public class QueryGenerator {
     prepareToGenerateQueries();
   }
 
-  /**
-   * Helper method to store an Avro value into the valid SQL String value set.
-   *
-   * @param valueSet value set.
-   * @param avroValue Avro value.
-   */
+  /// Helper method to store an Avro value into the valid SQL String value set.
+  ///
+  /// @param valueSet value set.
+  /// @param avroValue Avro value.
   private static void storeAvroValueIntoValueSet(Set<String> valueSet, Object avroValue) {
     if (avroValue instanceof Number) {
       // For Number object, store raw value.
@@ -196,12 +181,10 @@ public class QueryGenerator {
     }
   }
 
-  /**
-   * Helper method to join several {@link String} elements with ' '.
-   *
-   * @param elements elements to be joined.
-   * @return joined result.
-   */
+  /// Helper method to join several [String] elements with ' '.
+  ///
+  /// @param elements elements to be joined.
+  /// @return joined result.
   private static String joinWithSpaces(String... elements) {
     StringBuilder stringBuilder = new StringBuilder();
     for (String element : elements) {
@@ -212,11 +195,9 @@ public class QueryGenerator {
     return stringBuilder.substring(0, stringBuilder.length() - 1);
   }
 
-  /**
-   * Sample main class for the query generator.
-   *
-   * @param args arguments.
-   */
+  /// Sample main class for the query generator.
+  ///
+  /// @param args arguments.
   public static void main(String[] args)
       throws Exception {
     File avroFile = new File("pinot-integration-tests/src/test/resources/On_Time_On_Time_Performance_2014_1.avro");
@@ -235,11 +216,9 @@ public class QueryGenerator {
     }
   }
 
-  /**
-   * Helper method to read in an Avro file and add data to the storage.
-   *
-   * @param avroFile Avro file.
-   */
+  /// Helper method to read in an Avro file and add data to the storage.
+  ///
+  /// @param avroFile Avro file.
   private void addAvroData(File avroFile) {
     // Read in records and update the values stored.
     GenericDatumReader<GenericRecord> datumReader = new GenericDatumReader<>();
@@ -291,11 +270,10 @@ public class QueryGenerator {
     }
   }
 
-  /**
-   * Helper method to finish initialization of the <code>QueryGenerator</code>, removing multi-value columns with too
-   * many elements and dumping storage into the final map from column name to list of column values.
-   * <p>Called after all Avro data loaded.
-   */
+  /// Helper method to finish initialization of the `QueryGenerator`, removing multi-value columns with too
+  /// many elements and dumping storage into the final map from column name to list of column values.
+  ///
+  /// Called after all Avro data loaded.
   private void prepareToGenerateQueries() {
     Iterator<String> columnNameIterator = _columnNames.iterator();
     while (columnNameIterator.hasNext()) {
@@ -316,11 +294,9 @@ public class QueryGenerator {
     _columnToValueSet.clear();
   }
 
-  /**
-   * Set whether to skip predicates on multi-value columns.
-   *
-   * @param skipMultiValuePredicates whether to skip predicates on multi-value columns.
-   */
+  /// Set whether to skip predicates on multi-value columns.
+  ///
+  /// @param skipMultiValuePredicates whether to skip predicates on multi-value columns.
   public void setSkipMultiValuePredicates(boolean skipMultiValuePredicates) {
     _skipMultiValuePredicates = skipMultiValuePredicates;
   }
@@ -329,13 +305,11 @@ public class QueryGenerator {
     _useMultistageEngine = useMultistageEngine;
   }
 
-  /**
-   * Helper method to pick a random value from the values list.
-   *
-   * @param list values list.
-   * @param <T> type of the value.
-   * @return randomly picked value.
-   */
+  /// Helper method to pick a random value from the values list.
+  ///
+  /// @param list values list.
+  /// @param <T> type of the value.
+  /// @return randomly picked value.
   private <T> T pickRandom(List<T> list) {
     return list.get(RANDOM.nextInt(list.size()));
   }
@@ -344,20 +318,16 @@ public class QueryGenerator {
     return _useMultistageEngine ? _multistageSingleValuePredicateGenerators : _singleValuePredicateGenerators;
   }
 
-  /**
-   * Generate one selection or aggregation query.
-   *
-   * @return generated query.
-   */
+  /// Generate one selection or aggregation query.
+  ///
+  /// @return generated query.
   public Query generateQuery() {
     return pickRandom(_queryGenerationStrategies).generateQuery();
   }
 
-  /**
-   * Helper method to generate a predicate query fragment.
-   *
-   * @return generated predicate query fragment.
-   */
+  /// Helper method to generate a predicate query fragment.
+  ///
+  /// @return generated predicate query fragment.
   private PredicateQueryFragment generatePredicate() {
     // Generate at most MAX_NUM_PREDICATES predicates.
     int predicateCount = RANDOM.nextInt(MAX_NUM_PREDICATES + 1);
@@ -409,51 +379,39 @@ public class QueryGenerator {
     String generateH2Query();
   }
 
-  /**
-   * Query generation strategy interface with capability of generating query using specific strategy.
-   */
+  /// Query generation strategy interface with capability of generating query using specific strategy.
   private interface QueryGenerationStrategy {
 
-    /**
-     * Generate a query using specific strategy.
-     *
-     * @return generated query.
-     */
+    /// Generate a query using specific strategy.
+    ///
+    /// @return generated query.
     Query generateQuery();
   }
 
-  /**
-   * Predicate generator interface with capability of generating a predicate query fragment on a column.
-   */
+  /// Predicate generator interface with capability of generating a predicate query fragment on a column.
   private interface PredicateGenerator {
 
-    /**
-     * Generate a predicate query fragment on a column.
-     *
-     * @param columnName          column name.
-     * @param useMultistageEngine
-     * @return generated predicate query fragment.
-     */
+    /// Generate a predicate query fragment on a column.
+    ///
+    /// @param columnName          column name.
+    /// @param useMultistageEngine
+    /// @return generated predicate query fragment.
     QueryFragment generatePredicate(String columnName, boolean useMultistageEngine);
   }
 
-  /**
-   * Selection query.
-   */
+  /// Selection query.
   private class SelectionQuery implements Query {
     final List<String> _projectionColumns;
     final PredicateQueryFragment _predicate;
     final OrderByQueryFragment _orderBy;
     final LimitQueryFragment _limit;
 
-    /**
-     * Constructor for <code>SelectionQuery</code>.
-     *
-     * @param projectionColumns projection columns.
-     * @param orderBy order by fragment.
-     * @param predicate predicate fragment.
-     * @param limit limit fragment.
-     */
+    /// Constructor for `SelectionQuery`.
+    ///
+    /// @param projectionColumns projection columns.
+    /// @param orderBy order by fragment.
+    /// @param predicate predicate fragment.
+    /// @param limit limit fragment.
     public SelectionQuery(List<String> projectionColumns, PredicateQueryFragment predicate,
         OrderByQueryFragment orderBy, LimitQueryFragment limit) {
       _projectionColumns = projectionColumns;
@@ -479,9 +437,7 @@ public class QueryGenerator {
     }
   }
 
-  /**
-   * Aggregation query.
-   */
+  /// Aggregation query.
   private class AggregationQuery implements Query {
     final List<String> _aggregateColumnsAndFunctions;
     final PredicateQueryFragment _predicate;
@@ -489,15 +445,13 @@ public class QueryGenerator {
     final Set<String> _groupColumns;
     final LimitQueryFragment _limit;
 
-    /**
-     * Constructor for <code>AggregationQuery</code>.
-     *
-     * @param aggregateColumnsAndFunctions aggregation functions.
-     * @param predicate predicate fragment.
-     * @param groupColumns group-by columns.
-     * @param havingPredicate having predicate fragment.
-     * @param limit limit fragment.
-     */
+    /// Constructor for `AggregationQuery`.
+    ///
+    /// @param aggregateColumnsAndFunctions aggregation functions.
+    /// @param predicate predicate fragment.
+    /// @param groupColumns group-by columns.
+    /// @param havingPredicate having predicate fragment.
+    /// @param limit limit fragment.
     public AggregationQuery(List<String> aggregateColumnsAndFunctions, PredicateQueryFragment predicate,
         Set<String> groupColumns, HavingQueryFragment havingPredicate, LimitQueryFragment limit) {
       _aggregateColumnsAndFunctions = aggregateColumnsAndFunctions;
@@ -591,26 +545,20 @@ public class QueryGenerator {
     }
   }
 
-  /**
-   * Most basic query fragment.
-   */
+  /// Most basic query fragment.
   private static class StringQueryFragment implements QueryFragment {
     @Language("sql")
     final String _pinotQuery;
     @Language("sql")
     final String _h2Query;
 
-    /**
-     * Constructor with same Pinot and H2 query fragment.
-     */
+    /// Constructor with same Pinot and H2 query fragment.
     StringQueryFragment(@Language("sql") String query) {
       _pinotQuery = query;
       _h2Query = query;
     }
 
-    /**
-     * Constructor for <code>StringQueryFragment</code> with different Pinot and H2 query fragment.
-     */
+    /// Constructor for `StringQueryFragment` with different Pinot and H2 query fragment.
     StringQueryFragment(@Language("sql") String pinotQuery, @Language("sql") String h2Query) {
       _pinotQuery = pinotQuery;
       _h2Query = h2Query;
@@ -627,12 +575,9 @@ public class QueryGenerator {
     }
   }
 
-  /**
-   * Limit query fragment for selection queries.
-   * <ul>
-   *   <li>SELECT ... FROM ... WHERE ... 'LIMIT ...'</li>
-   * </ul>
-   */
+  /// Limit query fragment for selection queries.
+  ///
+  /// - SELECT ... FROM ... WHERE ... 'LIMIT ...'
   private static class LimitQueryFragment extends StringQueryFragment {
     LimitQueryFragment(int limit) {
       // When limit is MAX_RESULT_LIMIT, construct query without LIMIT.
@@ -641,12 +586,9 @@ public class QueryGenerator {
     }
   }
 
-  /**
-   * Order by query fragment for aggregation queries.
-   * <ul>
-   *   <li>SELECT ... FROM ... WHERE ... 'ORDER BY ...'</li>
-   * </ul>
-   */
+  /// Order by query fragment for aggregation queries.
+  ///
+  /// - SELECT ... FROM ... WHERE ... 'ORDER BY ...'
   private static class OrderByQueryFragment extends StringQueryFragment {
     OrderByQueryFragment(Set<String> columns) {
       super(columns.isEmpty() ? "" : "ORDER BY " + StringUtils.join(columns, ", "),
@@ -655,22 +597,17 @@ public class QueryGenerator {
     }
   }
 
-  /**
-   * Predicate query fragment.
-   * <ul>
-   *   <li>SELECT ... FROM ... 'WHERE ...'</li>
-   * </ul>
-   */
+  /// Predicate query fragment.
+  ///
+  /// - SELECT ... FROM ... 'WHERE ...'
   private static class PredicateQueryFragment implements QueryFragment {
     final List<QueryFragment> _predicates;
     final List<QueryFragment> _operators;
 
-    /**
-     * Constructor for <code>PredicateQueryFragment</code>.
-     *
-     * @param predicates predicates.
-     * @param operators operators between predicates.
-     */
+    /// Constructor for `PredicateQueryFragment`.
+    ///
+    /// @param predicates predicates.
+    /// @param operators operators between predicates.
     PredicateQueryFragment(List<QueryFragment> predicates, List<QueryFragment> operators) {
       _predicates = predicates;
       _operators = operators;
@@ -715,12 +652,9 @@ public class QueryGenerator {
     }
   }
 
-  /**
-   * Having query fragment.
-   * <ul>
-   *   <li>SELECT ... FROM ... WHERE ... GROUP BY ... 'HAVING ...'</li>
-   * </ul>
-   */
+  /// Having query fragment.
+  ///
+  /// - SELECT ... FROM ... WHERE ... GROUP BY ... 'HAVING ...'
   private static class HavingQueryFragment implements QueryFragment {
     final List<String> _havingClauseAggregationFunctions;
     final List<String> _havingClauseOperatorsAndValues;
@@ -786,12 +720,9 @@ public class QueryGenerator {
     }
   }
 
-  /**
-   * Strategy to generate selection queries.
-   * <ul>
-   *   <li>SELECT a, b FROM table WHERE a = 'foo' AND b = 'bar' ORDER BY c LIMIT 10</li>
-   * </ul>
-   */
+  /// Strategy to generate selection queries.
+  ///
+  /// - SELECT a, b FROM table WHERE a = 'foo' AND b = 'bar' ORDER BY c LIMIT 10
   private class SelectionQueryGenerationStrategy implements QueryGenerationStrategy {
 
     @Override
@@ -825,12 +756,9 @@ public class QueryGenerator {
     }
   }
 
-  /**
-   * Strategy to generate aggregation queries.
-   * <ul>
-   *   <li>SELECT SUM(a), MAX(b) FROM table WHERE a = 'foo' AND b = 'bar' GROUP BY c TOP 10</li>
-   * </ul>
-   */
+  /// Strategy to generate aggregation queries.
+  ///
+  /// - SELECT SUM(a), MAX(b) FROM table WHERE a = 'foo' AND b = 'bar' GROUP BY c TOP 10
   private class AggregationQueryGenerationStrategy implements QueryGenerationStrategy {
 
     @Override
@@ -889,11 +817,9 @@ public class QueryGenerator {
           limit);
     }
 
-    /**
-     * Helper method to generate a having predicate query fragment.
-     *
-     * @return generated predicate query fragment.
-     */
+    /// Helper method to generate a having predicate query fragment.
+    ///
+    /// @return generated predicate query fragment.
     private HavingQueryFragment generateHavingPredicate(ArrayList<String> arrayOfAggregationColumnsAndFunctions) {
       //Generate a HAVING clause for group by query
       List<String> havingClauseAggregationFunctions = new ArrayList<>();
@@ -974,9 +900,7 @@ public class QueryGenerator {
     }
   }
 
-  /**
-   * Generator for single-value column comparison predicate query fragment.
-   */
+  /// Generator for single-value column comparison predicate query fragment.
   private class SingleValueComparisonPredicateGenerator implements PredicateGenerator {
 
     @Override
@@ -988,9 +912,7 @@ public class QueryGenerator {
     }
   }
 
-  /**
-   * Generator for single-value column <code>IN</code> predicate query fragment.
-   */
+  /// Generator for single-value column `IN` predicate query fragment.
   private class SingleValueInPredicateGenerator implements PredicateGenerator {
 
     @Override
@@ -1015,9 +937,7 @@ public class QueryGenerator {
     }
   }
 
-  /**
-   * Generator for single-value column <code>BETWEEN</code> predicate query fragment.
-   */
+  /// Generator for single-value column `BETWEEN` predicate query fragment.
   private class SingleValueBetweenPredicateGenerator implements PredicateGenerator {
 
     @Override
@@ -1031,9 +951,7 @@ public class QueryGenerator {
     }
   }
 
-  /**
-   * Generator for single-value column <code>REGEX</code> predicate query fragment.
-   */
+  /// Generator for single-value column `REGEX` predicate query fragment.
   private class SingleValueRegexPredicateGenerator implements PredicateGenerator {
     Random _random = new Random();
 
@@ -1062,10 +980,9 @@ public class QueryGenerator {
     }
   }
 
-  /**
-   * Generator for multi-value column comparison predicate query fragment.
-   * <p>DO NOT SUPPORT '<code>NOT EQUAL</code>'.
-   */
+  /// Generator for multi-value column comparison predicate query fragment.
+  ///
+  /// DO NOT SUPPORT '`NOT EQUAL`'.
   private class MultiValueComparisonPredicateGenerator implements PredicateGenerator {
 
     @Override
@@ -1091,10 +1008,9 @@ public class QueryGenerator {
     }
   }
 
-  /**
-   * Generator for multi-value column <code>IN</code> predicate query fragment.
-   * <p>DO NOT SUPPORT '<code>NOT IN</code>'.
-   */
+  /// Generator for multi-value column `IN` predicate query fragment.
+  ///
+  /// DO NOT SUPPORT '`NOT IN`'.
   private class MultiValueInPredicateGenerator implements PredicateGenerator {
 
     @Override
@@ -1120,9 +1036,7 @@ public class QueryGenerator {
     }
   }
 
-  /**
-   * Generator for multi-value column <code>BETWEEN</code> predicate query fragment.
-   */
+  /// Generator for multi-value column `BETWEEN` predicate query fragment.
   private class MultiValueBetweenPredicateGenerator implements PredicateGenerator {
 
     @Override

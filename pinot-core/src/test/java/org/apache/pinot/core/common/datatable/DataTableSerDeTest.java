@@ -42,9 +42,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit test for {@link DataTable} serialization/de-serialization.
- */
+/// Unit test for [DataTable] serialization/de-serialization.
 public class DataTableSerDeTest {
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);

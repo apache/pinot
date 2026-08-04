@@ -29,10 +29,8 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 
-/**
- * Functional tests for text search feature on multi-column text index.
- * Test is similar to TextSearchQueriesTest, but uses a single Multi-Column text index with same columns.
- */
+/// Functional tests for text search feature on multi-column text index.
+/// Test is similar to TextSearchQueriesTest, but uses a single Multi-Column text index with same columns.
 public class TextSearchMultiColIndexQueriesTest extends TextSearchQueriesTest {
 
   @Override

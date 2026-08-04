@@ -57,48 +57,45 @@ import static org.testng.Assert.*;
 
 /// End-to-end integration tests for the Materialized View (MV) query rewrite pipeline.
 ///
-/// <p>These tests bypass the MV task generator/executor and directly set up the MV
+/// These tests bypass the MV task generator/executor and directly set up the MV
 /// infrastructure (MV table, segments, ZK metadata) to validate the broker's query
 /// rewrite engine in a real cluster environment.
 ///
-/// <p>Phase 1 covers core rewrite scenarios:
-/// <ol>
-///   <li>{@link #testFullRewriteWithExactMatch()} — MV covers full data range,
-///       {@code ExactSubsumptionStrategy} rewrites the query to the MV table.</li>
-///   <li>{@link #testSplitRewriteWithAggReagg()} — MV covers a historical range,
-///       {@code AggregationSubsumptionStrategy} merges MV + base table in split mode.</li>
-///   <li>{@link #testColdStartSkip()} — MV exists but {@code watermarkMs == 0},
-///       verifying the broker skips the MV during cold-start.</li>
-/// </ol>
+/// Phase 1 covers core rewrite scenarios:
 ///
-/// <p>Phase 2 covers incremental updates and consistency:
-/// <ol>
-///   <li>{@link #testIncrementalAppend()} — advance split MV coverage via new segments
-///       and ZK metadata update; verify the expanded coverage is respected.</li>
-///   <li>{@link #testFreshnessGating()} — tighten the per-MV {@code stalenessThresholdMs} SLO
-///       on the definition → broker skips the MV; relax it → broker hits it again.</li>
-///   <li>{@link #testMaterializedViewDefinitionDeletion()} — delete MV definition from ZK → broker
-///       no longer considers the MV as a candidate.</li>
-/// </ol>
+/// 1. [#testFullRewriteWithExactMatch()] — MV covers full data range,
+///       `ExactSubsumptionStrategy` rewrites the query to the MV table.
+/// 2. [#testSplitRewriteWithAggReagg()] — MV covers a historical range,
+///       `AggregationSubsumptionStrategy` merges MV + base table in split mode.
+/// 3. [#testColdStartSkip()] — MV exists but `watermarkMs == 0`,
+///       verifying the broker skips the MV during cold-start.
 ///
-/// <p>Phase 3 covers edge cases and advanced matching:
-/// <ol>
-///   <li>{@link #testScanSubsumptionWithResidualFilter()} — SCAN-shaped MV with a
-///       user WHERE clause that becomes a residual filter on the MV table.</li>
-///   <li>{@link #testQueryWithLimitOffsetOrderBy()} — split mode query with
-///       ORDER BY + LIMIT + OFFSET; verify correct pagination and ordering.</li>
-///   <li>{@link #testMultipleMaterializedViewCostSelection()} — two MVs match the same query at
-///       different costs; verify the lower-cost MV is selected.</li>
-/// </ol>
+/// Phase 2 covers incremental updates and consistency:
 ///
-/// <p><b>Why this extends {@link BaseClusterIntegrationTest} directly instead of
-/// {@link org.apache.pinot.integration.tests.custom.CustomDataQueryClusterIntegrationTest}:</b>
-/// {@code CustomDataQueryClusterIntegrationTest} runs all sub-tests against a single
-/// suite-level shared cluster that is started once in {@code @BeforeSuite}. That shared
-/// cluster is created before any sub-test has a chance to call {@link #overrideBrokerConf},
-/// so {@code CONFIG_OF_BROKER_QUERY_ENABLE_MATERIALIZED_VIEW_REWRITE} cannot be applied to
+/// 1. [#testIncrementalAppend()] — advance split MV coverage via new segments
+///       and ZK metadata update; verify the expanded coverage is respected.
+/// 2. [#testFreshnessGating()] — tighten the per-MV `stalenessThresholdMs` SLO
+///       on the definition → broker skips the MV; relax it → broker hits it again.
+/// 3. [#testMaterializedViewDefinitionDeletion()] — delete MV definition from ZK → broker
+///       no longer considers the MV as a candidate.
+///
+/// Phase 3 covers edge cases and advanced matching:
+///
+/// 1. [#testScanSubsumptionWithResidualFilter()] — SCAN-shaped MV with a
+///       user WHERE clause that becomes a residual filter on the MV table.
+/// 2. [#testQueryWithLimitOffsetOrderBy()] — split mode query with
+///       ORDER BY + LIMIT + OFFSET; verify correct pagination and ordering.
+/// 3. [#testMultipleMaterializedViewCostSelection()] — two MVs match the same query at
+///       different costs; verify the lower-cost MV is selected.
+///
+/// **Why this extends [BaseClusterIntegrationTest] directly instead of
+/// [org.apache.pinot.integration.tests.custom.CustomDataQueryClusterIntegrationTest] :**
+/// `CustomDataQueryClusterIntegrationTest` runs all sub-tests against a single
+/// suite-level shared cluster that is started once in `@BeforeSuite`. That shared
+/// cluster is created before any sub-test has a chance to call [#overrideBrokerConf],
+/// so `CONFIG_OF_BROKER_QUERY_ENABLE_MATERIALIZED_VIEW_REWRITE` cannot be applied to
 /// it. MV rewrite is disabled by default; without a broker started with that flag the entire
-/// test suite would be a no-op. A dedicated cluster started in {@code @BeforeClass} is
+/// test suite would be a no-op. A dedicated cluster started in `@BeforeClass` is
 /// therefore required until the shared cluster supports per-test broker-config overrides.
 public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrationTest {
 
@@ -269,7 +266,7 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
 
   /// Verifies that when an MV fully covers the source data and the query matches
   /// the MV definition exactly, the broker rewrites the query to hit the MV table
-  /// via {@code FULL_REWRITE} execution mode.
+  /// via `FULL_REWRITE` execution mode.
   @Test
   public void testFullRewriteWithExactMatch()
       throws Exception {
@@ -295,10 +292,10 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
   /// -----------------------------------------------------------------------
 
   /// Verifies split-mode execution with re-aggregation. The MV covers only
-  /// historical data (up to {@code SPLIT_BOUNDARY_MS}). The broker merges
+  /// historical data (up to `SPLIT_BOUNDARY_MS`). The broker merges
   /// MV results with recent base table data.
   ///
-  /// <p>Uses a query with {@code Origin} in GROUP BY, which matches the split
+  /// Uses a query with `Origin` in GROUP BY, which matches the split
   /// MV definition but not the full MV definition, ensuring this test targets
   /// the split MV specifically.
   @Test
@@ -732,12 +729,12 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
   /// -----------------------------------------------------------------------
 
   /// Verifies that a SCAN-shaped MV (no GROUP BY, no aggregation) is matched by
-  /// {@code ScanSubsumptionStrategy} when the user query selects a subset of the
+  /// `ScanSubsumptionStrategy` when the user query selects a subset of the
   /// MV's columns and adds a WHERE filter that references only MV columns.
   ///
-  /// <p>The scan MV stores {@code Carrier, Origin, Dest, ArrDelayMinutes} from the
-  /// source table. The user query selects {@code Carrier, ArrDelayMinutes} with
-  /// {@code WHERE Origin = 'SFO'} — the WHERE clause becomes a residual filter
+  /// The scan MV stores `Carrier, Origin, Dest, ArrDelayMinutes` from the
+  /// source table. The user query selects `Carrier, ArrDelayMinutes` with
+  /// `WHERE Origin = 'SFO'` — the WHERE clause becomes a residual filter
   /// on the MV table.
   @Test
   public void testScanSubsumptionWithResidualFilter()
@@ -816,10 +813,10 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
   /// Verifies that when two MVs match the same user query, the one with the lower
   /// rewrite cost is selected.
   ///
-  /// <p>The full MV matches {@code GROUP BY Carrier} via {@code ExactSubsumptionStrategy}
-  /// (cost 0.0). The cost-competitor MV (GROUP BY {@code DaysSinceEpoch, Carrier},
+  /// The full MV matches `GROUP BY Carrier` via `ExactSubsumptionStrategy`
+  /// (cost 0.0). The cost-competitor MV (GROUP BY `DaysSinceEpoch, Carrier`,
   /// full coverage, no split spec) matches the same query via
-  /// {@code AggregationSubsumptionStrategy} (cost 6.0). The full MV should win.
+  /// `AggregationSubsumptionStrategy` (cost 6.0). The full MV should win.
   @Test
   public void testMultipleMaterializedViewCostSelection()
       throws Exception {
@@ -842,8 +839,8 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
   /// -----------------------------------------------------------------------
 
   /// Full-rewrite MV: no split spec, covers all data.
-  /// Definition: {@code SELECT Carrier, SUM(ArrDelayMinutes) AS sum_ArrDelayMinutes
-  /// FROM materializedViewSourceTable GROUP BY Carrier}
+  /// Definition:
+  /// `SELECT Carrier, SUM(ArrDelayMinutes) AS sum_ArrDelayMinutes FROM materializedViewSourceTable GROUP BY Carrier`
   private void setupFullRewriteMv()
       throws Exception {
     Schema materializedViewSchema = new Schema.SchemaBuilder()
@@ -888,13 +885,15 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
   }
 
   /// Split-rewrite MV: has split spec, covers historical data up to SPLIT_BOUNDARY_MS.
-  /// Definition: {@code SELECT DaysSinceEpoch, Carrier, Origin,
-  /// SUM(ArrDelayMinutes) AS sum_ArrDelayMinutes
-  /// FROM materializedViewSourceTable GROUP BY DaysSinceEpoch, Carrier, Origin}
+  /// Definition:
+  /// ```
+  /// SELECT DaysSinceEpoch, Carrier, Origin, SUM(ArrDelayMinutes) AS sum_ArrDelayMinutes
+  ///   FROM materializedViewSourceTable GROUP BY DaysSinceEpoch, Carrier, Origin
+  /// ```
   ///
-  /// <p>Includes {@code Origin} to differentiate from the full MV, ensuring test 2's
-  /// query (with {@code GROUP BY Carrier, Origin}) hits this MV via
-  /// {@code AggregationSubsumptionStrategy} and not the full MV.
+  /// Includes `Origin` to differentiate from the full MV, ensuring test 2's
+  /// query (with `GROUP BY Carrier, Origin`) hits this MV via
+  /// `AggregationSubsumptionStrategy` and not the full MV.
   private void setupSplitRewriteMv()
       throws Exception {
     Schema materializedViewSchema = new Schema.SchemaBuilder()
@@ -1002,7 +1001,7 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
 
   /// Scan MV: no GROUP BY, no aggregation. Stores a projection of the source table
   /// columns for scan-subsumption matching.
-  /// Definition: {@code SELECT Carrier, Origin, Dest, ArrDelayMinutes FROM materializedViewSourceTable}
+  /// Definition: `SELECT Carrier, Origin, Dest, ArrDelayMinutes FROM materializedViewSourceTable`
   private void setupScanMv()
       throws Exception {
     Schema materializedViewSchema = new Schema.SchemaBuilder()
@@ -1054,10 +1053,10 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
     MaterializedViewRuntimeMetadataUtils.persist(_propertyStore, runtime, -1);
   }
 
-  /// Cost-competitor MV: groups by {@code DaysSinceEpoch, Carrier} with full coverage
-  /// and no split spec. This MV matches {@code GROUP BY Carrier} queries via
-  /// {@code AggregationSubsumptionStrategy} (cost 6.0), competing with the full MV
-  /// which matches via {@code ExactSubsumptionStrategy} (cost 0.0).
+  /// Cost-competitor MV: groups by `DaysSinceEpoch, Carrier` with full coverage
+  /// and no split spec. This MV matches `GROUP BY Carrier` queries via
+  /// `AggregationSubsumptionStrategy` (cost 6.0), competing with the full MV
+  /// which matches via `ExactSubsumptionStrategy` (cost 0.0).
   private void setupCostCompetitorMv()
       throws Exception {
     Schema materializedViewSchema = new Schema.SchemaBuilder()

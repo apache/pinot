@@ -24,12 +24,10 @@ import java.util.Map;
 import org.apache.pinot.common.proto.Plan;
 
 
-/**
- * A class to represent an abstract explain plan node.
- *
- * It is a generic POJO that is generated when {@link org.apache.pinot.core.query.request.context.ExplainMode#NODE}
- * explain is requested.
- */
+/// A class to represent an abstract explain plan node.
+///
+/// It is a generic POJO that is generated when [org.apache.pinot.core.query.request.context.ExplainMode#NODE]
+/// explain is requested.
 public class ExplainInfo {
   private final String _title;
   private final Map<String, Plan.ExplainNode.AttributeValue> _attributes;

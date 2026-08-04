@@ -39,9 +39,7 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Stats container for an in-memory realtime segment.
- */
+/// Stats container for an in-memory realtime segment.
 public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContainer {
   private final Map<String, ColumnStatistics> _columnStatisticsMap;
   private final int _totalDocCount;
@@ -60,10 +58,8 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
     }
   }
 
-  /**
-   * Creates the appropriate {@link ColumnStatistics} for the given data source, dispatching on
-   * column type (map, dictionary, or no-dictionary) and whether compaction is active.
-   */
+  /// Creates the appropriate [ColumnStatistics] for the given data source, dispatching on
+  /// column type (map, dictionary, or no-dictionary) and whether compaction is active.
   private ColumnStatistics createColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds,
       boolean isSortedColumn, @Nullable RoaringBitmap validDocIds, StatsCollectorConfig statsCollectorConfig) {
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
@@ -101,9 +97,7 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
     }
   }
 
-  /**
-   * Creates column statistics for map columns.
-   */
+  /// Creates column statistics for map columns.
   private ColumnStatistics createMapColumnStatistics(DataSource dataSource, @Nullable RoaringBitmap validDocIds,
       StatsCollectorConfig statsCollectorConfig) {
     ForwardIndexReader reader = dataSource.getForwardIndex();

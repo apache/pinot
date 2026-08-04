@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.spi.metrics;
 
-/**
- * An incrementing and decrementing counter metric in Pinot.
- */
+/// An incrementing and decrementing counter metric in Pinot.
 public interface PinotCounter extends PinotMetric {
 
   Object getCounter();

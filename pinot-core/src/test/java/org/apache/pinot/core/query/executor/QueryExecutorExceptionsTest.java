@@ -155,10 +155,8 @@ public class QueryExecutorExceptionsTest {
     _queryExecutor.init(new PinotConfiguration(queryExecutorConfig), instanceDataManager, ServerMetrics.get());
   }
 
-  /**
-   * Given some segments were missing, when a query is executed, then the correct error code is returned along with
-   * the list of missing segments.
-   */
+  /// Given some segments were missing, when a query is executed, then the correct error code is returned along with
+  /// the list of missing segments.
   @Test
   public void testServerSegmentMissingExceptionDetails() {
     String query = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME;
@@ -175,9 +173,8 @@ public class QueryExecutorExceptionsTest {
     assertEqualsNoOrder(actualMissingSegments, expectedMissingSegments);
   }
 
-  /**
-   * When ignoreMissingSegments is set in queryOptions, the server should not populate SERVER_SEGMENT_MISSING exception.
-   */
+  /// When ignoreMissingSegments is set in queryOptions, the server should not populate SERVER_SEGMENT_MISSING
+  /// exception.
   @Test
   public void testServerSegmentMissingExceptionIgnoredByOption() {
     String query = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME;

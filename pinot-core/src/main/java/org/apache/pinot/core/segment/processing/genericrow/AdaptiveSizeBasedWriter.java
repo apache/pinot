@@ -28,23 +28,17 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * AdaptiveSizeBasedWriter provides adaptive control over writing data based on configurable constraints.
- * <p>
- * It supports two main constraints:
- * <ul>
- *   <li><b>Byte Limit:</b> The maximum number of bytes that can be written for a given instance of the class
- *   Once this limit is reached, no further data is written.
- *   This config doesn't take into account other writers writing to the same file store.
- *   </li>
- *   <li><b>Disk Usage Percentage:</b> The maximum allowed disk usage percentage for the underlying file store.
- *   If the disk usage exceeds this threshold, writing is halted.
- *   This config helps prevent the system from running out of disk space while considering other processes
- *   that may be writing to the same file store.
- *   </li>
- * </ul>
- * <p>
- */
+/// AdaptiveSizeBasedWriter provides adaptive control over writing data based on configurable constraints.
+///
+/// It supports two main constraints:
+///
+/// - **Byte Limit:** The maximum number of bytes that can be written for a given instance of the class
+///   Once this limit is reached, no further data is written.
+///   This config doesn't take into account other writers writing to the same file store.
+/// - **Disk Usage Percentage:** The maximum allowed disk usage percentage for the underlying file store.
+///   If the disk usage exceeds this threshold, writing is halted.
+///   This config helps prevent the system from running out of disk space while considering other processes
+///   that may be writing to the same file store.
 public class AdaptiveSizeBasedWriter implements AdaptiveConstraintsWriter<FileWriter<GenericRow>, GenericRow> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AdaptiveSizeBasedWriter.class);

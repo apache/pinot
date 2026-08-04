@@ -181,14 +181,12 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
     return result;
   }
 
-  /**
-   * Encodes a field with CLP
-   * <p></p>
-   * Given a field "x", this will output three fields: "x_logtype", "x_dictionaryVars", "x_encodedVars"
-   * @param key Key of the field to encode
-   * @param value Value of the field to encode
-   * @param to The output row
-   */
+  /// Encodes a field with CLP
+  ///
+  /// Given a field "x", this will output three fields: "x_logtype", "x_dictionaryVars", "x_encodedVars"
+  /// @param key Key of the field to encode
+  /// @param value Value of the field to encode
+  /// @param to The output row
   private void encodeFieldWithClp(String key, Object value, GenericRow to) {
     String logtype = null;
     Object[] dictVars = null;

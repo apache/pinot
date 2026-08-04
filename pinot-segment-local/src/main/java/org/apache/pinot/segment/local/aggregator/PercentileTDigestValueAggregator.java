@@ -91,9 +91,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
     return value;
   }
 
-  /**
-   * Adds a raw value (single value or multi-value array) to the TDigest.
-   */
+  /// Adds a raw value (single value or multi-value array) to the TDigest.
   protected void addToDigest(TDigest digest, Object rawValue) {
     if (rawValue instanceof Object[]) {
       Object[] values = (Object[]) rawValue;

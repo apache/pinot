@@ -36,8 +36,8 @@ import org.slf4j.LoggerFactory;
 
 
 /// Utility class to pack a Lucene HNSW index directory (and its optional docId mapping file) into
-/// a single combined file using the {@link LuceneCombinedTextIndexConstants#MAGIC_NUMBER LUCENE_V2}
-/// layout. Mirrors {@code LuceneTextIndexCombined} — reuses the same format constants to keep a
+/// a single combined file using the [`LUCENE_V2`][LuceneCombinedTextIndexConstants#MAGIC_NUMBER]
+/// layout. Mirrors `LuceneTextIndexCombined` — reuses the same format constants to keep a
 /// single on-disk format shared across text and HNSW vector indexes.
 ///
 /// Layout (identical to the text-index LUCENE_V2 format):
@@ -64,15 +64,15 @@ public final class HnswVectorIndexCombined {
   private HnswVectorIndexCombined() {
   }
 
-  /// Packs all files in {@code hnswIndexDir} (plus the optional docId mapping file) into a single
-  /// combined file at {@code outputFilePath}.
+  /// Packs all files in `hnswIndexDir` (plus the optional docId mapping file) into a single
+  /// combined file at `outputFilePath`.
   ///
   /// @param hnswIndexDir     the Lucene HNSW index directory to pack
   /// @param outputFilePath   destination path for the combined file
   /// @param segmentIndexDir  when non-null, the segment's top-level index directory; used to
   ///                         locate the docId mapping file for inclusion in the packed output
   /// @param column           column name; used to locate the docId mapping file when
-  ///                         {@code segmentIndexDir} is provided
+  ///                         `segmentIndexDir` is provided
   /// @throws IOException if any file operations fail
   public static void combineHnswIndexFiles(File hnswIndexDir, String outputFilePath,
       @Nullable File segmentIndexDir, @Nullable String column)
@@ -112,8 +112,8 @@ public final class HnswVectorIndexCombined {
     LOGGER.info("Combined {} HNSW index files into: {} ({} bytes)", fileCount, outputFilePath, totalSize);
   }
 
-  /// Collects all regular files from {@code hnswIndexDir} and optionally the docId mapping file
-  /// from the segment's flat directory. Uses a {@link TreeMap} for deterministic ordering.
+  /// Collects all regular files from `hnswIndexDir` and optionally the docId mapping file
+  /// from the segment's flat directory. Uses a [TreeMap] for deterministic ordering.
   private static Map<String, FileInfo> collectFiles(File hnswIndexDir, @Nullable File segmentIndexDir,
       @Nullable String column)
       throws IOException {
@@ -145,8 +145,8 @@ public final class HnswVectorIndexCombined {
 
   /// Extracts files packed inside a combined HNSW file back into a Lucene directory.
   ///
-  /// This is the inverse of {@link #combineHnswIndexFiles}. The docId mapping file (if present)
-  /// is extracted into {@code targetDir} alongside the Lucene index files; the caller is
+  /// This is the inverse of [#combineHnswIndexFiles]. The docId mapping file (if present)
+  /// is extracted into `targetDir` alongside the Lucene index files; the caller is
   /// responsible for moving it to its canonical location if needed.
   ///
   /// @param combinedFile source combined file (LUCENE_V2 layout)

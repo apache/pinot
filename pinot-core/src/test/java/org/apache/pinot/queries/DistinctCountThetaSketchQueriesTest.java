@@ -62,9 +62,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
-/**
- * Queries test for DISTINCT_COUNT_THETA_SKETCH queries.
- */
+/// Queries test for DISTINCT_COUNT_THETA_SKETCH queries.
 @SuppressWarnings("unchecked")
 public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "DistinctCountThetaSketchQueriesTest");

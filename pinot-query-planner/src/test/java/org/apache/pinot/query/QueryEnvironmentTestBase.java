@@ -343,10 +343,8 @@ public class QueryEnvironmentTestBase {
         new WorkerManager("Broker_localhost", "localhost", reducerPort, routingManager));
   }
 
-  /**
-   * JSON test case definition for query planner test cases. Tables and schemas will come from those already defined
-   * and part of the {@code QueryEnvironment} in this base and are not part of the JSON definition for now.
-   */
+  /// JSON test case definition for query planner test cases. Tables and schemas will come from those already defined
+  /// and part of the `QueryEnvironment` in this base and are not part of the JSON definition for now.
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class QueryPlanTestCase {
     // ignores the entire query test case

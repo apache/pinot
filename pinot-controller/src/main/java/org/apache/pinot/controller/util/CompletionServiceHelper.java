@@ -38,13 +38,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This is a helper class that can be used to make HttpGet (MultiGet) calls and get the responses back.
- * The responses are returned as a string.
- *
- * The helper also records number of failed responses so that the caller knows if any of the calls
- * failed to respond. The failed instance is logged for debugging.
- */
+/// This is a helper class that can be used to make HttpGet (MultiGet) calls and get the responses back.
+/// The responses are returned as a string.
+///
+/// The helper also records number of failed responses so that the caller knows if any of the calls
+/// failed to respond. The failed instance is logged for debugging.
 public class CompletionServiceHelper {
   private static final Logger LOGGER = LoggerFactory.getLogger(CompletionServiceHelper.class);
 
@@ -64,21 +62,19 @@ public class CompletionServiceHelper {
     return doMultiGetRequest(serverURLs, tableNameWithType, multiRequestPerServer, null, timeoutMs, null);
   }
 
-  /**
-   * This method makes a MultiGet call to all given URLs.
-   * @param serverURLs server urls to send GET request.
-   * @param tableNameWithType table name with type suffix
-   * @param multiRequestPerServer it's possible that need to send multiple requests to a same server.
-   *                              If multiRequestPerServer is set as false, return as long as one of the requests get
-   *                              response; If multiRequestPerServer is set as true, wait until all requests
-   *                              get response.
-   * @param requestHeaders Headers to be set when making the http calls.
-   * @param timeoutMs timeout in milliseconds to wait per request.
-   * @param useCase the use case initiating the multi-get request. If not null and an exception is thrown, only the
-   *                error message and the use case are logged instead of the full stack trace.
-   * @return CompletionServiceResponse Map of the endpoint(server instance, or full request path if
-   * multiRequestPerServer is true) to the response from that endpoint.
-   */
+  /// This method makes a MultiGet call to all given URLs.
+  /// @param serverURLs server urls to send GET request.
+  /// @param tableNameWithType table name with type suffix
+  /// @param multiRequestPerServer it's possible that need to send multiple requests to a same server.
+  ///                              If multiRequestPerServer is set as false, return as long as one of the requests get
+  ///                              response; If multiRequestPerServer is set as true, wait until all requests
+  ///                              get response.
+  /// @param requestHeaders Headers to be set when making the http calls.
+  /// @param timeoutMs timeout in milliseconds to wait per request.
+  /// @param useCase the use case initiating the multi-get request. If not null and an exception is thrown, only the
+  ///                error message and the use case are logged instead of the full stack trace.
+  /// @return CompletionServiceResponse Map of the endpoint(server instance, or full request path if
+  /// multiRequestPerServer is true) to the response from that endpoint.
   public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
       boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders, int timeoutMs,
       @Nullable String useCase) {
@@ -98,21 +94,19 @@ public class CompletionServiceHelper {
         nanoTimeDeadline);
   }
 
-  /**
-   * This method makes a MultiPost call to all given URLs and its corresponding bodies.
-   * @param serverURLsAndRequestBodies server urls to send POST request.
-   * @param tableNameWithType table name with type suffix
-   * @param multiRequestPerServer it's possible that need to send multiple requests to a same server.
-   *                              If multiRequestPerServer is set as false, return as long as one of the requests return
-   *                              response; If multiRequestPerServer is set as true, wait until all requests
-   *                              return response.
-   * @param requestHeaders Headers to be set when making the http calls.
-   * @param timeoutMs timeout in milliseconds to wait per request.
-   * @param useCase the use case initiating the multi-post request. If not null and an exception is thrown, only the
-   *                error message and the use case are logged instead of the full stack trace.
-   * @return CompletionServiceResponse Map of the endpoint(server instance, or full request path if
-   * multiRequestPerServer is true) to the response from that endpoint.
-   */
+  /// This method makes a MultiPost call to all given URLs and its corresponding bodies.
+  /// @param serverURLsAndRequestBodies server urls to send POST request.
+  /// @param tableNameWithType table name with type suffix
+  /// @param multiRequestPerServer it's possible that need to send multiple requests to a same server. If
+  ///                              multiRequestPerServer is set as false, return as long as one of the requests return
+  ///                              response; If multiRequestPerServer is set as true, wait until all requests return
+  ///                              response.
+  /// @param requestHeaders Headers to be set when making the http calls.
+  /// @param timeoutMs timeout in milliseconds to wait per request.
+  /// @param useCase the use case initiating the multi-post request. If not null and an exception is thrown, only the
+  ///                error message and the use case are logged instead of the full stack trace.
+  /// @return CompletionServiceResponse Map of the endpoint(server instance, or full request path if
+  /// multiRequestPerServer is true) to the response from that endpoint.
   public CompletionServiceResponse doMultiPostRequest(List<Pair<String, String>> serverURLsAndRequestBodies,
       String tableNameWithType, boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders,
       int timeoutMs, @Nullable String useCase) {
@@ -231,9 +225,7 @@ public class CompletionServiceHelper {
   }
 
 
-  /**
-   * Helper class to maintain the completion service response to be sent back to the caller.
-   */
+  /// Helper class to maintain the completion service response to be sent back to the caller.
   static public class CompletionServiceResponse {
     // Map of the server instance to the response from that server
     public Map<String, String> _httpResponses;

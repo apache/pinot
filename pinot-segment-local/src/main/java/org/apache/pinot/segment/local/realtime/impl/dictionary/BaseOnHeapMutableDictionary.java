@@ -24,14 +24,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 
 
-/**
- * The class <code>BaseOnHeapMutableDictionary</code> is the implementation of the mutable dictionary required by
- * REALTIME consuming segments.
- * <p>The implementation needs to be thread safe for single writer multiple readers scenario.
- * <p>We can assume the readers always first get the dictionary id for a value, then use the dictionary id to fetch the
- * value later, but not reversely. So whenever we return a valid dictionary id for a value, we need to ensure the value
- * can be fetched by the dictionary id returned.
- */
+/// The class `BaseOnHeapMutableDictionary` is the implementation of the mutable dictionary required by
+/// REALTIME consuming segments.
+///
+/// The implementation needs to be thread safe for single writer multiple readers scenario.
+///
+/// We can assume the readers always first get the dictionary id for a value, then use the dictionary id to fetch the
+/// value later, but not reversely. So whenever we return a valid dictionary id for a value, we need to ensure the value
+/// can be fetched by the dictionary id returned.
 public abstract class BaseOnHeapMutableDictionary implements MutableDictionary {
   private static final int SHIFT_OFFSET = 13;  // INITIAL_DICTIONARY_SIZE = 8192
   private static final int INITIAL_DICTIONARY_SIZE = 1 << SHIFT_OFFSET;
@@ -41,9 +41,7 @@ public abstract class BaseOnHeapMutableDictionary implements MutableDictionary {
   private final Object[][] _dictIdToValue = new Object[INITIAL_DICTIONARY_SIZE][];
   private volatile int _entriesIndexed = 0;
 
-  /**
-   * For performance, we don't validate the dictId passed in. It should be returned by index() or indexOf().
-   */
+  /// For performance, we don't validate the dictId passed in. It should be returned by index() or indexOf().
   @Override
   public Object get(int dictId) {
     return _dictIdToValue[dictId >>> SHIFT_OFFSET][dictId & MASK];
@@ -59,12 +57,11 @@ public abstract class BaseOnHeapMutableDictionary implements MutableDictionary {
       throws IOException {
   }
 
-  /**
-   * Index a single value.
-   * <p>This method will only be called by a single writer thread.
-   *
-   * @param value single value already converted to correct type.
-   */
+  /// Index a single value.
+  ///
+  /// This method will only be called by a single writer thread.
+  ///
+  /// @param value single value already converted to correct type.
   protected int indexValue(Object value) {
     Integer dictId = _valueToDictId.get(value);
     if (dictId != null) {
@@ -89,13 +86,12 @@ public abstract class BaseOnHeapMutableDictionary implements MutableDictionary {
     }
   }
 
-  /**
-   * Get the dictId of a single value.
-   * <p>This method will only be called by a single writer thread.
-   *
-   * @param value single value already converted to correct type.
-   * @return dictId of the value.
-   */
+  /// Get the dictId of a single value.
+  ///
+  /// This method will only be called by a single writer thread.
+  ///
+  /// @param value single value already converted to correct type.
+  /// @return dictId of the value.
   protected int getDictId(Object value) {
     Integer dictId = _valueToDictId.get(value);
     if (dictId == null) {

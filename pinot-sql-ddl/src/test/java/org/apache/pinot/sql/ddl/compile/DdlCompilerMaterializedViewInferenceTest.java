@@ -30,15 +30,15 @@ import static org.testng.Assert.expectThrows;
 ///
 /// Verifies that:
 ///
-///   1. Errors from the inferer surface as {@link DdlCompilationException} (not raw
+///   1. Errors from the inferer surface as [DdlCompilationException] (not raw
 ///      RuntimeException) so the controller layer can return a clean 400.
 ///   2. The legacy explicit-column path still works under the new entry point — i.e.
 ///      the dispatch in `compileCreateMaterializedView` is "branches on emptiness of
 ///      the column list" and not "always go through the inferer".
 ///
 /// Happy-path inferred-column tests with full Calcite validation live alongside the
-/// {@code MaterializedViewSchemaInferer} unit tests; they require a
-/// {@code TableCache}-backed Calcite catalog that is too heavyweight for these
+/// `MaterializedViewSchemaInferer` unit tests; they require a
+/// `TableCache`-backed Calcite catalog that is too heavyweight for these
 /// DDL-compiler entry-point smoke tests.
 public class DdlCompilerMaterializedViewInferenceTest {
 

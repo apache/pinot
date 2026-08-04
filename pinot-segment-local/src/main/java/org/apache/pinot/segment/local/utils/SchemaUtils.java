@@ -38,13 +38,10 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.function.FunctionEvaluator;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 
-/**
- * Schema utils
- */
+/// Schema utils
 public class SchemaUtils {
   private SchemaUtils() {
   }
@@ -62,16 +59,14 @@ public class SchemaUtils {
   public static final String MAP_KEY_COLUMN_SUFFIX = "__KEYS";
   public static final String MAP_VALUE_COLUMN_SUFFIX = "__VALUES";
 
-  /**
-   * Validates the schema.
-   * First checks that the schema is compatible with any provided table configs associated with it.
-   * This check is useful to ensure schema and table are compatible, in the event that schema is updated or added
-   * after the table config
-   * Then validates the schema using {@link SchemaUtils#validate(Schema schema)}
-   *
-   * @param schema schema to validate
-   * @param tableConfigs table configs associated with this schema (table configs with raw name = schema name)
-   */
+  /// Validates the schema.
+  /// First checks that the schema is compatible with any provided table configs associated with it.
+  /// This check is useful to ensure schema and table are compatible, in the event that schema is updated or added
+  /// after the table config
+  /// Then validates the schema using [SchemaUtils#validate(Schema schema)]
+  ///
+  /// @param schema schema to validate
+  /// @param tableConfigs table configs associated with this schema (table configs with raw name = schema name)
   public static void validate(Schema schema, List<TableConfig> tableConfigs) {
     validate(schema, tableConfigs, false, null);
   }
@@ -94,10 +89,8 @@ public class SchemaUtils {
     validate(schema, isIgnoreCase);
   }
 
-  /**
-   * Validates that new or changed legacy schema-level transform functions are immutable. An exact transform on the
-   * same column in the stored schema is grandfathered so unrelated updates do not strand existing schemas.
-   */
+  /// Validates that new or changed legacy schema-level transform functions are immutable. An exact transform on the
+  /// same column in the stored schema is grandfathered so unrelated updates do not strand existing schemas.
   public static void validateIngestionTransformVolatility(Schema schema, @Nullable Schema existingSchema) {
     validateIngestionTransformVolatility(schema, existingSchema, Set.of(), Set.of());
   }
@@ -131,23 +124,21 @@ public class SchemaUtils {
     }
   }
 
-  /**
-   * Validates the following:
-   * 1) Column name should not contain blank space.
-   * 2) Checks valid transform function -
-   *   for a field spec with transform function, the source column name and destination column name are exclusive i.e
-   *   . do not allow using
-   *   source column name for destination column
-   *   ensure transform function string can be used to create a {@link FunctionEvaluator}
-   * 3) Checks for chained transforms/derived transform - not supported yet
-   * TODO: Transform functions have moved to table config. Once we stop supporting them in schema, remove the
-   * validations 2 and 3
-   * 4) Checks valid timeFieldSpec - if incoming and outgoing granularity spec are different a) the names cannot be
-   * same b) cannot use
-   * SIMPLE_DATE_FORMAT for conversion
-   * 5) Checks valid dateTimeFieldSpecs - checks format and granularity string
-   * 6) Schema validations from {@link Schema#validate}
-   */
+  /// Validates the following:
+  /// 1) Column name should not contain blank space.
+  /// 2) Checks valid transform function -
+  ///   for a field spec with transform function, the source column name and destination column name are exclusive i.e
+  ///   . do not allow using
+  ///   source column name for destination column
+  ///   ensure transform function string can be used to create a [org.apache.pinot.spi.function.FunctionEvaluator]
+  /// 3) Checks for chained transforms/derived transform - not supported yet
+  /// TODO: Transform functions have moved to table config. Once we stop supporting them in schema, remove the
+  /// validations 2 and 3
+  /// 4) Checks valid timeFieldSpec - if incoming and outgoing granularity spec are different a) the names cannot be
+  /// same b) cannot use
+  /// SIMPLE_DATE_FORMAT for conversion
+  /// 5) Checks valid dateTimeFieldSpecs - checks format and granularity string
+  /// 6) Schema validations from [Schema#validate]
   public static void validate(Schema schema) {
     validate(schema, false);
   }
@@ -228,9 +219,7 @@ public class SchemaUtils {
         "JSON columns cannot be of multi-value type");
   }
 
-  /**
-   * Validates that the schema is compatible with the given table config
-   */
+  /// Validates that the schema is compatible with the given table config
   private static void validateCompatibilityWithTableConfig(Schema schema, TableConfig tableConfig) {
     try {
       // The associated table config already exists and is not being changed by schema validation. Pass it as the
@@ -244,9 +233,7 @@ public class SchemaUtils {
     }
   }
 
-  /**
-   * Checks for valid incoming and outgoing granularity spec in the time field spec
-   */
+  /// Checks for valid incoming and outgoing granularity spec in the time field spec
   private static void validateTimeFieldSpec(TimeFieldSpec timeFieldSpec) {
     TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
     TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
@@ -263,9 +250,7 @@ public class SchemaUtils {
     }
   }
 
-  /**
-   * Checks for valid format and granularity string in dateTimeFieldSpec
-   */
+  /// Checks for valid format and granularity string in dateTimeFieldSpec
   private static void validateDateTimeFieldSpec(DateTimeFieldSpec dateTimeFieldSpec) {
     DateTimeFormatSpec formatSpec;
     try {
