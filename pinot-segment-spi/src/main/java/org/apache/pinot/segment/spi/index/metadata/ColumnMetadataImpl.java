@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
@@ -409,19 +410,9 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     if (rawSparseKeys != null) {
       // The value is a JSON array string, but LegacyListDelimiterHandler splits on commas,
       // fragmenting it into a List. Rejoin before parsing.
-      String jsonStr;
-      if (rawSparseKeys instanceof List) {
-        StringBuilder sb = new StringBuilder();
-        for (Object part : (List<?>) rawSparseKeys) {
-          if (sb.length() > 0) {
-            sb.append(',');
-          }
-          sb.append(part);
-        }
-        jsonStr = sb.toString();
-      } else {
-        jsonStr = rawSparseKeys.toString();
-      }
+      String jsonStr = rawSparseKeys instanceof List
+          ? ((List<?>) rawSparseKeys).stream().map(String::valueOf).collect(Collectors.joining(","))
+          : rawSparseKeys.toString();
       try {
         List<String> sparseKeys = JsonUtils.stringToObject(jsonStr,
             new com.fasterxml.jackson.core.type.TypeReference<List<String>>() { });

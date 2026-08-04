@@ -49,42 +49,36 @@ public class SparseKeyDataSourceTest {
 
   @Test
   public void testDeclaredTypesRoundTripAndDefaultWhenAbsent() {
-    // INT
     SparseKeyDataSource intSrc = source("i", DataType.INT);
     ForwardIndexReader<?> fwd = intSrc.getForwardIndex();
     assertEquals(fwd.getInt(0, null), 7);
     assertEquals(fwd.getInt(1, null), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
     assertEquals(fwd.getInt(2, null), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
 
-    // LONG
     SparseKeyDataSource longSrc = source("l", DataType.LONG);
     fwd = longSrc.getForwardIndex();
     assertEquals(fwd.getLong(0, null), 123456789012L);
     assertEquals(fwd.getLong(1, null), (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
     assertEquals(fwd.getLong(2, null), (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
 
-    // FLOAT
     SparseKeyDataSource floatSrc = source("f", DataType.FLOAT);
     fwd = floatSrc.getForwardIndex();
     assertEquals(fwd.getFloat(0, null), 1.5f);
     assertEquals(fwd.getFloat(1, null), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
     assertEquals(fwd.getFloat(2, null), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
 
-    // DOUBLE
     SparseKeyDataSource doubleSrc = source("d", DataType.DOUBLE);
     fwd = doubleSrc.getForwardIndex();
     assertEquals(fwd.getDouble(0, null), 2.25);
     assertEquals(fwd.getDouble(1, null), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
     assertEquals(fwd.getDouble(2, null), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
 
-    // STRING
     SparseKeyDataSource strSrc = source("s", DataType.STRING);
     fwd = strSrc.getForwardIndex();
     assertEquals(fwd.getString(0, null), "hello");
     assertEquals(fwd.getString(1, null), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
     assertEquals(fwd.getString(2, null), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
 
-    // BIG_DECIMAL
     SparseKeyDataSource bdSrc = source("bd", DataType.BIG_DECIMAL);
     fwd = bdSrc.getForwardIndex();
     assertEquals(fwd.getBigDecimal(0, null), new BigDecimal("3.14"));

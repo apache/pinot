@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.datasource.BaseDataSource;
 import org.apache.pinot.segment.spi.Constants;
@@ -97,40 +98,41 @@ public class SparseKeyDataSource extends BaseDataSource {
       return node == null || node.isNull() ? null : node;
     }
 
+    private <T> T orDefault(int docId, ForwardIndexReaderContext context, Function<JsonNode, T> map, T defaultValue) {
+      JsonNode node = valueNode(docId, context);
+      return node == null ? defaultValue : map.apply(node);
+    }
+
     @Override
     public int getInt(int docId, ForwardIndexReaderContext context) {
-      JsonNode node = valueNode(docId, context);
-      return node == null ? FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT : node.asInt();
+      return orDefault(docId, context, JsonNode::asInt, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
     }
 
     @Override
     public long getLong(int docId, ForwardIndexReaderContext context) {
-      JsonNode node = valueNode(docId, context);
-      return node == null ? FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG : node.asLong();
+      return orDefault(docId, context, JsonNode::asLong, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
     }
 
     @Override
     public float getFloat(int docId, ForwardIndexReaderContext context) {
-      JsonNode node = valueNode(docId, context);
-      return node == null ? FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT : (float) node.asDouble();
+      return orDefault(docId, context, node -> (float) node.asDouble(),
+          FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
     }
 
     @Override
     public double getDouble(int docId, ForwardIndexReaderContext context) {
-      JsonNode node = valueNode(docId, context);
-      return node == null ? FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE : node.asDouble();
+      return orDefault(docId, context, JsonNode::asDouble, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
     }
 
     @Override
     public BigDecimal getBigDecimal(int docId, ForwardIndexReaderContext context) {
-      JsonNode node = valueNode(docId, context);
-      return node == null ? FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL : new BigDecimal(node.asText());
+      return orDefault(docId, context, node -> new BigDecimal(node.asText()),
+          FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL);
     }
 
     @Override
     public String getString(int docId, ForwardIndexReaderContext context) {
-      JsonNode node = valueNode(docId, context);
-      return node == null ? FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING : node.asText();
+      return orDefault(docId, context, JsonNode::asText, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
     }
 
     @Override

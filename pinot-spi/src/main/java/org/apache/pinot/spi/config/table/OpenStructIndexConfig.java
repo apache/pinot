@@ -70,6 +70,15 @@ public class OpenStructIndexConfig extends IndexConfig {
     this(!enabled, null, DEFAULT_MAX_DENSE_KEYS, null, DEFAULT_DENSE_KEY_MIN_FILL_RATE, null, null);
   }
 
+  /// @deprecated Use the 7-arg constructor accepting `sparseJsonIndex`. Kept for binary
+  /// compatibility with existing callers built against the pre-`sparseJsonIndex` signature.
+  @Deprecated
+  public OpenStructIndexConfig(Boolean disabled, @Nullable FieldConfig defaultValueFieldConfig,
+      @Nullable Integer maxDenseKeys, @Nullable Set<String> denseKeys, @Nullable Double denseKeyMinFillRate,
+      @Nullable List<FieldConfig> valueFieldConfigs) {
+    this(disabled, defaultValueFieldConfig, maxDenseKeys, denseKeys, denseKeyMinFillRate, valueFieldConfigs, null);
+  }
+
   @JsonCreator
   public OpenStructIndexConfig(
       @JsonProperty("disabled") Boolean disabled,

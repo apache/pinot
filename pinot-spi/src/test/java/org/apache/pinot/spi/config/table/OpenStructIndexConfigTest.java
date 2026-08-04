@@ -53,6 +53,21 @@ public class OpenStructIndexConfigTest {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
+  public void testDeprecatedSixArgConstructorDelegatesWithSparseJsonIndexDefault() {
+    FieldConfig keyConfig =
+        new FieldConfig("k", FieldConfig.EncodingType.RAW, (List<FieldConfig.IndexType>) null, null, null);
+    OpenStructIndexConfig config =
+        new OpenStructIndexConfig(false, keyConfig, 5, Set.of("k"), 0.25, List.of(keyConfig));
+    assertFalse(config.isSparseJsonIndex());
+    assertEquals(config.getMaxDenseKeys(), 5);
+    assertEquals(config.getDenseKeyMinFillRate(), 0.25);
+    assertEquals(config.getDenseKeys(), Set.of("k"));
+    assertEquals(config.getDefaultValueFieldConfig(), keyConfig);
+    assertEquals(config.getValueFieldConfigs(), List.of(keyConfig));
+  }
+
+  @Test
   public void testNoDictionaryKeys() {
     FieldConfig rawKey =
         new FieldConfig("raw_payload", FieldConfig.EncodingType.RAW, (List<FieldConfig.IndexType>) null, null, null);

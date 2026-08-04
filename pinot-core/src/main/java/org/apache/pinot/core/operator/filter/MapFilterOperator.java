@@ -63,11 +63,10 @@ public class MapFilterOperator extends BaseFilterOperator {
   }
 
   private final BaseFilterOperator _delegate;
-  private final DelegateType _delegateType;
+  private DelegateType _delegateType = DelegateType.PER_KEY_INDEX;
   private final String _columnName;
   private final String _keyName;
   private final Predicate _predicate;
-  private DelegateType _resolvedType = DelegateType.PER_KEY_INDEX;
 
   public MapFilterOperator(IndexSegment indexSegment, Predicate predicate, QueryContext queryContext,
       int numDocs) {
@@ -88,7 +87,6 @@ public class MapFilterOperator extends BaseFilterOperator {
     BaseFilterOperator perKey = tryPerKeyIndex(columnDs, queryContext, numDocs);
     if (perKey != null) {
       _delegate = perKey;
-      _delegateType = _resolvedType;
       return;
     }
 
@@ -272,7 +270,7 @@ public class MapFilterOperator extends BaseFilterOperator {
         : new InPredicate(keyLhs, values);
     JsonMatchFilterOperator jsonOp =
         new JsonMatchFilterOperator(jsonIndex, FilterContext.forPredicate(positive), numDocs);
-    _resolvedType = DelegateType.JSON_MATCH;
+    _delegateType = DelegateType.JSON_MATCH;
     return negated ? new NotFilterOperator(jsonOp, numDocs, false) : jsonOp;
   }
 

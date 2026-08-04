@@ -209,8 +209,6 @@ public class ImmutableOpenStructDataSourceTest {
     assertSame(ds.getDataSource("clicks"), clicksDs);
   }
 
-  // --- sparse key virtual DataSource tests ---
-
   private static DataSource mockSparseDataSource(String[] blobs) {
     DataSource ds = mock(DataSource.class);
     org.mockito.Mockito.doReturn(new FakeStringForwardIndex(blobs)).when(ds).getForwardIndex();
