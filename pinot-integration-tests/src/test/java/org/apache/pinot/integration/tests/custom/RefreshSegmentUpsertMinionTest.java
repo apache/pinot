@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests.custom;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.nio.file.Files;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +33,7 @@ import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -48,6 +48,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -71,6 +72,7 @@ public class RefreshSegmentUpsertMinionTest extends CustomDataQueryClusterIntegr
   private static final String NEW_VALUE = "new";
   private static final long OLD_CREATION_TIME = 1_000L;
   private static final long NEW_CREATION_TIME = 2_000L;
+  private static final long REBUILT_CREATION_TIME = 3_000L;
 
   @Override
   public String getTableName() {
@@ -187,31 +189,36 @@ public class RefreshSegmentUpsertMinionTest extends CustomDataQueryClusterIntegr
     SegmentMetadataImpl sourceMetadata = new SegmentMetadataImpl(sourceIndexDir);
     assertEquals(sourceMetadata.getIndexCreationTime(), OLD_CREATION_TIME);
     assertNotNull(sourceMetadata.getColumnMetadataFor(REFRESH_COLUMN));
-
-    List<GenericRow> rows = new ArrayList<>();
-    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
-      recordReader.init(sourceIndexDir, null, null);
-      while (recordReader.hasNext()) {
-        rows.add(recordReader.next(new GenericRow()));
-      }
-    }
-    assertEquals(rows.size(), 1);
+    assertPhysicalCreationTime(sourceMetadata, OLD_CREATION_TIME);
 
     Schema schema = getSharedHelixResourceManager().getSchema(TABLE_NAME);
     assertNotNull(schema);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(outputDir.getPath());
     config.setSegmentName(REBUILT_OLD_SEGMENT);
-    config.setCreationTime(String.valueOf(sourceMetadata.getIndexCreationTime()));
-    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new GenericRowRecordReader(rows));
-    driver.build();
+    config.setCreationTime(String.valueOf(REBUILT_CREATION_TIME));
+    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+      recordReader.init(sourceIndexDir, null, null);
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(config, recordReader);
+      driver.build();
+    }
 
     File rebuiltIndexDir = new File(outputDir, REBUILT_OLD_SEGMENT);
-    assertEquals(new SegmentMetadataImpl(rebuiltIndexDir).getIndexCreationTime(), OLD_CREATION_TIME);
+    SegmentMetadataImpl rebuiltMetadata = new SegmentMetadataImpl(rebuiltIndexDir);
+    assertEquals(rebuiltMetadata.getIndexCreationTime(), REBUILT_CREATION_TIME);
+    assertPhysicalCreationTime(rebuiltMetadata, OLD_CREATION_TIME);
     File tarFile = new File(tarDir, REBUILT_OLD_SEGMENT + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
     TarCompressionUtils.createCompressedTarFile(rebuiltIndexDir, tarFile);
     return tarDir;
+  }
+
+  private static void assertPhysicalCreationTime(SegmentMetadataImpl segmentMetadata, long expectedCreationTime) {
+    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(BuiltInVirtualColumn.CREATIONTIME);
+    assertNotNull(columnMetadata);
+    assertEquals(columnMetadata.getDataType(), FieldSpec.DataType.LONG);
+    assertEquals(columnMetadata.getMinValue(), expectedCreationTime);
+    assertEquals(columnMetadata.getMaxValue(), expectedCreationTime);
   }
 
   private List<String> scheduleRefresh(String tableNameWithType) {

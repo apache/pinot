@@ -22,15 +22,25 @@ import java.io.File;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -181,6 +191,74 @@ public class PinotSegmentRecordReaderTest {
       Assert.assertEquals(outputRow.getValue(M1), row.getValue(M1));
       Assert.assertEquals(outputRow.getValue(M2), row.getValue(M2));
       Assert.assertEquals(outputRow.getValue(TIME), row.getValue(TIME));
+    }
+  }
+
+  @Test
+  public void testCreationTimeMaterializedAndPreservedAcrossRewrites()
+      throws Exception {
+    SegmentMetadataImpl sourceMetadata = new SegmentMetadataImpl(_segmentIndexDir);
+    long sourceCreationTime = sourceMetadata.getIndexCreationTime();
+    Assert.assertNull(sourceMetadata.getColumnMetadataFor(BuiltInVirtualColumn.CREATIONTIME));
+
+    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+      recordReader.init(_segmentIndexDir, Set.of(BuiltInVirtualColumn.CREATIONTIME), null);
+      GenericRow row = recordReader.next();
+      Assert.assertEquals(row.getValue(BuiltInVirtualColumn.CREATIONTIME), sourceCreationTime);
+      Assert.assertFalse(row.getFieldToValueMap().containsKey(BuiltInVirtualColumn.DOCID));
+      Assert.assertFalse(row.getFieldToValueMap().containsKey(BuiltInVirtualColumn.HOSTNAME));
+      Assert.assertFalse(row.getFieldToValueMap().containsKey(BuiltInVirtualColumn.SEGMENTNAME));
+      Assert.assertFalse(row.getFieldToValueMap().containsKey(BuiltInVirtualColumn.PARTITIONID));
+    }
+
+    long firstArtifactCreationTime = sourceCreationTime + 1_000L;
+    File firstRewrite = rewriteSegment(_segmentIndexDir, "creationTimeRewrite1", firstArtifactCreationTime);
+    assertCreationTime(firstRewrite, firstArtifactCreationTime, sourceCreationTime);
+
+    long secondArtifactCreationTime = sourceCreationTime + 2_000L;
+    File secondRewrite = rewriteSegment(firstRewrite, "creationTimeRewrite2", secondArtifactCreationTime);
+    assertCreationTime(secondRewrite, secondArtifactCreationTime, sourceCreationTime);
+  }
+
+  private File rewriteSegment(File sourceIndexDir, String segmentName, long artifactCreationTime)
+      throws Exception {
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(createTableConfig(), createPinotSchema());
+    config.setOutDir(_segmentOutputDir);
+    config.setSegmentName(segmentName);
+    config.setCreationTime(String.valueOf(artifactCreationTime));
+
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(createTableConfig(), createPinotSchema());
+    ImmutableSegment sourceSegment = ImmutableSegmentLoader.load(sourceIndexDir, indexLoadingConfig, false);
+    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+      recordReader.init(sourceSegment);
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(config, recordReader);
+      driver.build();
+    } finally {
+      sourceSegment.destroy();
+    }
+    return new File(_segmentOutputDir, segmentName);
+  }
+
+  private void assertCreationTime(File indexDir, long artifactCreationTime, long sourceCreationTime)
+      throws Exception {
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(indexDir);
+    Assert.assertEquals(metadata.getIndexCreationTime(), artifactCreationTime);
+    ColumnMetadata creationTimeMetadata = metadata.getColumnMetadataFor(BuiltInVirtualColumn.CREATIONTIME);
+    Assert.assertNotNull(creationTimeMetadata);
+    Assert.assertEquals(creationTimeMetadata.getFieldType(), FieldType.DIMENSION);
+    Assert.assertEquals(creationTimeMetadata.getDataType(), DataType.LONG);
+    Assert.assertTrue(creationTimeMetadata.isSingleValue());
+    Assert.assertEquals(creationTimeMetadata.getMinValue(), sourceCreationTime);
+    Assert.assertEquals(creationTimeMetadata.getMaxValue(), sourceCreationTime);
+
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(createTableConfig(), createPinotSchema());
+    ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
+    try {
+      Assert.assertTrue(segment.getPhysicalColumnNames().contains(BuiltInVirtualColumn.CREATIONTIME));
+      Assert.assertEquals(segment.getValue(0, BuiltInVirtualColumn.CREATIONTIME), sourceCreationTime);
+    } finally {
+      segment.destroy();
     }
   }
 

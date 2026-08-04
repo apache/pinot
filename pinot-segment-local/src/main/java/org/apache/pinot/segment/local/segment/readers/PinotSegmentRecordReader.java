@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,6 +30,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.readers.sort.PinotSegmentSorter;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -37,6 +39,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +63,7 @@ public class PinotSegmentRecordReader implements RecordReader {
   private Map<String, OpenStructDataSource> _openStructDataSources;
   private int[] _sortedDocIds;
   private boolean _skipDefaultNullValues;
+  private boolean _readingPinotSegmentFile;
 
   private int _nextDocId = 0;
 
@@ -134,6 +138,7 @@ public class PinotSegmentRecordReader implements RecordReader {
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while loading the segment from: " + indexDir, e);
     }
+    _readingPinotSegmentFile = true;
     init(indexSegment, true, fieldsToRead, null, sortOrder, skipDefaultNullValues);
   }
 
@@ -141,6 +146,7 @@ public class PinotSegmentRecordReader implements RecordReader {
   ///
   /// @param indexSegment Index segment to read from
   public void init(IndexSegment indexSegment) {
+    _readingPinotSegmentFile = indexSegment instanceof ImmutableSegment;
     init(indexSegment, false, null, null, null, false);
   }
 
@@ -149,6 +155,7 @@ public class PinotSegmentRecordReader implements RecordReader {
   /// @param mutableSegment Mutable segment
   /// @param sortedDocIds Array of sorted document ids
   public void init(MutableSegment mutableSegment, @Nullable int[] sortedDocIds) {
+    _readingPinotSegmentFile = false;
     init(mutableSegment, false, null, sortedDocIds, null, false);
   }
 
@@ -171,7 +178,11 @@ public class PinotSegmentRecordReader implements RecordReader {
       _columnReaders = new ArrayList<>();
       _columnNames = new ArrayList<>();
       _openStructDataSources = new HashMap<>();
-      Set<String> columnsInSegment = _indexSegment.getPhysicalColumnNames();
+      Set<String> columnsInSegment = new HashSet<>(_indexSegment.getPhysicalColumnNames());
+      if (_readingPinotSegmentFile && fieldsToRead != null
+          && fieldsToRead.contains(BuiltInVirtualColumn.CREATIONTIME)) {
+        columnsInSegment.add(BuiltInVirtualColumn.CREATIONTIME);
+      }
       if (CollectionUtils.isEmpty(fieldsToRead)) {
         for (String column : columnsInSegment) {
           addColumnReader(column);
@@ -239,6 +250,19 @@ public class PinotSegmentRecordReader implements RecordReader {
 
   public String getSegmentName() {
     return _indexSegment.getSegmentName();
+  }
+
+  /// Returns whether this reader was initialized from a Pinot segment on disk.
+  public boolean isReadingPinotSegmentFile() {
+    return _readingPinotSegmentFile;
+  }
+
+  /// Adds `$creationTime` to this reader so a Pinot-segment rewrite can persist it as a physical column.
+  public void addCreationTimeColumn() {
+    if (_numDocs > 0 && !_columnReaderMap.containsKey(BuiltInVirtualColumn.CREATIONTIME)
+        && _indexSegment.getDataSourceNullable(BuiltInVirtualColumn.CREATIONTIME) != null) {
+      addColumnReader(BuiltInVirtualColumn.CREATIONTIME);
+    }
   }
 
   public void getRecord(int docId, GenericRow buffer) {

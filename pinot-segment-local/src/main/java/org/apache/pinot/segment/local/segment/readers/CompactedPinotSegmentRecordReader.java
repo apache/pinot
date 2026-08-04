@@ -104,6 +104,16 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
     return _pinotSegmentRecordReader.getSortedDocIds();
   }
 
+  /// Returns whether the underlying reader was initialized from a Pinot segment on disk.
+  public boolean isReadingPinotSegmentFile() {
+    return _pinotSegmentRecordReader.isReadingPinotSegmentFile();
+  }
+
+  /// Adds `$creationTime` to the underlying reader for physical materialization during segment rewrite.
+  public void addCreationTimeColumn() {
+    _pinotSegmentRecordReader.addCreationTimeColumn();
+  }
+
   @Override
   public boolean hasNext() {
     // Check if we've exhausted all documents

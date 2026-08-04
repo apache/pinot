@@ -47,8 +47,10 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.IngestionSchemaValidator;
 import org.apache.pinot.spi.data.Schema;
@@ -59,6 +61,7 @@ import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -141,8 +144,33 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   public void init(SegmentGeneratorConfig config, RecordReader recordReader)
       throws Exception {
+    if (recordReader instanceof PinotSegmentRecordReader
+        && ((PinotSegmentRecordReader) recordReader).isReadingPinotSegmentFile()) {
+      ((PinotSegmentRecordReader) recordReader).addCreationTimeColumn();
+      addCreationTimeColumn(config);
+    } else if (recordReader instanceof CompactedPinotSegmentRecordReader
+        && ((CompactedPinotSegmentRecordReader) recordReader).isReadingPinotSegmentFile()) {
+      ((CompactedPinotSegmentRecordReader) recordReader).addCreationTimeColumn();
+      addCreationTimeColumn(config);
+    }
     init(config, new RecordReaderSegmentCreationDataSource(recordReader),
         new TransformPipeline(config.getTableConfig(), config.getSchema()));
+  }
+
+  private static void addCreationTimeColumn(SegmentGeneratorConfig config) {
+    Schema schema = config.getSchema();
+    FieldSpec fieldSpec = schema.getFieldSpecFor(BuiltInVirtualColumn.CREATIONTIME);
+    if (fieldSpec != null && !fieldSpec.isVirtualColumn()) {
+      return;
+    }
+    if (fieldSpec != null) {
+      schema.removeField(BuiltInVirtualColumn.CREATIONTIME);
+    }
+    DimensionFieldSpec creationTimeFieldSpec =
+        new DimensionFieldSpec(BuiltInVirtualColumn.CREATIONTIME, FieldSpec.DataType.LONG, true);
+    schema.addField(creationTimeFieldSpec);
+    config.getIndexConfigsByColName().put(BuiltInVirtualColumn.CREATIONTIME,
+        FieldIndexConfigsUtil.fromFieldConfig(null, creationTimeFieldSpec));
   }
 
   /// Initialize the driver for columnar segment building using a ColumnReaderFactory.
