@@ -265,7 +265,7 @@ public class BenchmarkQueriesSSQE extends BaseQueriesTest {
         className = "org.apache.pinot.segment.spi.memory.unsafe.UnsafePinotBufferFactory";
         break;
       case "foreign":
-        className = "org.apache.pinot.segment.spi.memory.foreign.ForeignPinotBufferFactory";
+        className = "org.apache.pinot.segment.memory.foreign.ForeignPinotBufferFactory";
         break;
       case "bytebuffer":
         className = "org.apache.pinot.segment.spi.memory.ByteBufferPinotBufferFactory";

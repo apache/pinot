@@ -125,7 +125,7 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-segment-spi-foreign</artifactId>
+        <artifactId>pinot-foreign-buffers</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

@@ -43,7 +43,7 @@
          Java 25 module so pinot-segment-spi can stay Java 11 for driver/client consumers. -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-segment-spi-foreign</artifactId>
+      <artifactId>pinot-foreign-buffers</artifactId>
     </dependency>
 
     <!-- Lucene dependencies -->

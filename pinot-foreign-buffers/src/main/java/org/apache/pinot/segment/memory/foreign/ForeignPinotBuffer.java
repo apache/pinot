@@ -16,16 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.memory.foreign;
+package org.apache.pinot.segment.memory.foreign;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.lang.ref.Cleaner;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.memory.NonNativePinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// A [PinotDataBuffer] backed by the Foreign Function &amp; Memory API ([MemorySegment]).
@@ -48,6 +51,12 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 /// [#close()] serialises concurrent close calls on the same instance).
 public class ForeignPinotBuffer extends PinotDataBuffer {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(ForeignPinotBuffer.class);
+  /// Leak safety net for owning buffers. A shared [Arena] is not GC-managed (unlike [Arena#ofAuto()]), so if a buffer
+  /// is never closed the native memory would leak. This cleaner closes the arena on collection, mirroring the
+  /// `finalize()` safety net the `Unsafe` implementation used (but without the deprecated finalizer).
+  private static final Cleaner CLEANER = Cleaner.create();
+
   // Native-order, byte-aligned (alignment == 1) layouts. Single-byte access is always aligned.
   private static final ValueLayout.OfByte BYTE = ValueLayout.JAVA_BYTE;
   private static final ValueLayout.OfChar CHAR = ValueLayout.JAVA_CHAR_UNALIGNED;
@@ -58,10 +67,12 @@ public class ForeignPinotBuffer extends PinotDataBuffer {
   private static final ValueLayout.OfDouble DOUBLE = ValueLayout.JAVA_DOUBLE_UNALIGNED;
 
   private final MemorySegment _segment;
-  /// The arena owning the native memory, or {@code null} when this buffer is a non-owning view. Only owning buffers
-  /// close the arena on [#release()].
+  /// The cleanup action registered with the [Cleaner] for owning buffers, or {@code null} for a non-owning view.
   @Nullable
-  private final Arena _arena;
+  private final ArenaCleanup _cleanup;
+  /// The handle to the registered cleaning action, used to free eagerly (and de-register) on explicit close.
+  @Nullable
+  private final Cleaner.Cleanable _cleanable;
 
   /// Creates a buffer over the given segment.
   ///
@@ -70,7 +81,14 @@ public class ForeignPinotBuffer extends PinotDataBuffer {
   public ForeignPinotBuffer(MemorySegment segment, @Nullable Arena arena) {
     super(arena != null);
     _segment = segment;
-    _arena = arena;
+    if (arena != null) {
+      _cleanup = new ArenaCleanup(arena, segment.byteSize());
+      // The registered action (ArenaCleanup) must not reference this buffer, otherwise it would never be collected.
+      _cleanable = CLEANER.register(this, _cleanup);
+    } else {
+      _cleanup = null;
+      _cleanable = null;
+    }
   }
 
   @Override
@@ -193,7 +211,36 @@ public class ForeignPinotBuffer extends PinotDataBuffer {
 
   @Override
   public void release() {
-    if (_arena != null) {
+    if (_cleanable != null) {
+      // Explicit close: mark it so the cleaner does not emit a leak warning, then run the cleanup exactly once
+      // (Cleanable.clean() also de-registers, so it will not run again on GC).
+      _cleanup._closedExplicitly = true;
+      _cleanable.clean();
+    }
+  }
+
+  /// The action registered with the [Cleaner] that frees the native memory of an owning buffer. It is a static nested
+  /// class so it holds no implicit reference to the enclosing [ForeignPinotBuffer] (which would keep the buffer
+  /// reachable and defeat the cleaner). It closes the [Arena] on collection, warning if the buffer was leaked
+  /// (collected without an explicit close).
+  private static final class ArenaCleanup implements Runnable {
+    private final Arena _arena;
+    private final long _size;
+    // Only gates the leak warning (not the freeing, which Cleanable.clean() makes exactly-once). It is set and read on
+    // the same thread on the explicit-close path; volatile is defensive belt-and-braces, not required for correctness.
+    private volatile boolean _closedExplicitly;
+
+    ArenaCleanup(Arena arena, long size) {
+      _arena = arena;
+      _size = size;
+    }
+
+    @Override
+    public void run() {
+      if (!_closedExplicitly) {
+        LOGGER.warn("A ForeignPinotBuffer of {} bytes was garbage collected without being closed; freeing it now. "
+            + "This is a buffer leak that should be fixed.", _size);
+      }
       _arena.close();
     }
   }

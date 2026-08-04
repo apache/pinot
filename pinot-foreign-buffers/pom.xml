@@ -26,8 +26,8 @@
     <groupId>org.apache.pinot</groupId>
     <version>1.6.0-SNAPSHOT</version>
   </parent>
-  <artifactId>pinot-segment-spi-foreign</artifactId>
-  <name>Pinot Segment SPI Foreign (Panama) Buffers</name>
+  <artifactId>pinot-foreign-buffers</artifactId>
+  <name>Pinot Foreign (Panama) Buffers</name>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
