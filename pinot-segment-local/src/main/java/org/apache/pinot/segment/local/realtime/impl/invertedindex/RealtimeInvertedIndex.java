@@ -57,6 +57,19 @@ public class RealtimeInvertedIndex implements MutableInvertedIndex {
     }
   }
 
+  /// Pre-creates an empty bitmap for the next dictionary id. Used by callers that reserve a
+  /// dictionary id upfront (e.g. OPEN_STRUCT key columns reserve dictId 0 for the default null
+  /// value) so that subsequent contiguous [#add] calls stay aligned with dictionary ids.
+  public void reserveNextDictId() {
+    ThreadSafeMutableRoaringBitmap bitmap = new ThreadSafeMutableRoaringBitmap();
+    try {
+      _writeLock.lock();
+      _bitmaps.add(bitmap);
+    } finally {
+      _writeLock.unlock();
+    }
+  }
+
   @Override
   public MutableRoaringBitmap getDocIds(int dictId) {
     ThreadSafeMutableRoaringBitmap bitmap;

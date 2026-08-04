@@ -68,6 +68,12 @@ public class ThreadSafeMutableRoaringBitmap {
     return _mutableRoaringBitmap.clone();
   }
 
+  /// Cardinality of docIds in `[rangeStart, rangeEnd)`. Cheaper than cloning the bitmap just to
+  /// check range coverage.
+  public synchronized long rangeCardinality(long rangeStart, long rangeEnd) {
+    return _mutableRoaringBitmap.rangeCardinality(rangeStart, rangeEnd);
+  }
+
   /// Returns a point-in-time snapshot of the bitmap as a serialized byte array.
   /// This avoids cloning the full object clone() unlike in getMutableRoaringBitmap()
   public synchronized byte[] getBytes() {
