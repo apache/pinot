@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.openstruct;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.math.BigDecimal;
@@ -436,7 +437,7 @@ public class OpenStructColumnSplitterTest {
         V1Constants.MetadataKeys.Column.getKeyFor("metrics", V1Constants.MetadataKeys.Column.SPARSE_KEYS));
     assertNotNull(jsonManifest);
     Set<String> sparseKeys = new HashSet<>(
-        JsonUtils.stringToObject(jsonManifest, new com.fasterxml.jackson.core.type.TypeReference<List<String>>() { }));
+        JsonUtils.stringToObject(jsonManifest, new TypeReference<List<String>>() { }));
     assertEquals(sparseKeys, Set.of("region", "latencyMs"));
   }
 
@@ -459,7 +460,7 @@ public class OpenStructColumnSplitterTest {
         V1Constants.MetadataKeys.Column.getKeyFor("metrics", V1Constants.MetadataKeys.Column.SPARSE_KEYS));
     assertNotNull(jsonManifest);
     Set<String> sparseKeys = new HashSet<>(
-        JsonUtils.stringToObject(jsonManifest, new com.fasterxml.jackson.core.type.TypeReference<List<String>>() { }));
+        JsonUtils.stringToObject(jsonManifest, new TypeReference<List<String>>() { }));
     assertEquals(sparseKeys, Set.of("rare"));
   }
 

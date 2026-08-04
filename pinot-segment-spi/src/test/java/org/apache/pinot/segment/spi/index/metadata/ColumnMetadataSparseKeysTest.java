@@ -78,6 +78,8 @@ public class ColumnMetadataSparseKeysTest {
     assertEquals(metadata.getSparseKeys(), List.of("region", "latencyMs", "statusCode"));
   }
 
+  /// A single-element manifest has no comma, so LegacyListDelimiterHandler returns the raw String
+  /// on reload instead of a List — the only case exercising that branch of the rejoin logic.
   @Test
   public void testSingleSparseKeyRoundTripsThroughSaveLoad() throws Exception {
     PropertiesConfiguration config = baseParentProps();

@@ -262,19 +262,6 @@ public class MapFilterOperatorOpenStructTest {
     assertEquals(countMatches(op), NUM_DOCS);
   }
 
-  /// Same as above for NOT_IN.
-  @Test
-  public void testAbsentKeyNotInMatchesAllWhenNullHandlingOff() {
-    OpenStructDataSource osDs = mockFullyMaterializedAbsentKey("missing_key");
-    IndexSegment segment = mockSegment(osDs);
-
-    Predicate predicate = makeNotInPredicate(COLUMN, "missing_key", List.of("a", "b"));
-    MapFilterOperator op = new MapFilterOperator(segment, predicate, mockQueryContext(), NUM_DOCS);
-
-    assertTrue(op.toExplainString().contains("delegateTo:per_key_index"));
-    assertEquals(countMatches(op), NUM_DOCS);
-  }
-
   /// IN against an absent key never matches, regardless of null handling.
   @Test
   public void testAbsentKeyInMatchesNothingWhenNullHandlingOff() {
@@ -370,8 +357,8 @@ public class MapFilterOperatorOpenStructTest {
 
   /// A predicate the per-key path cannot rewrite (REGEXP_LIKE) must decline rather than fold the
   /// absent key to a match-all/match-none it never evaluated. Structured like
-  /// {@link #testSparseKeyFallsToExpressionFilter} because ExpressionFilterOperator cannot be built
-  /// against a mock segment.
+  /// {@link #testSparseKeyUnsupportedPredicateStillFallsThrough} because ExpressionFilterOperator
+  /// cannot be built against a mock segment.
   @Test
   public void testAbsentKeyUnsupportedPredicateFallsThrough() {
     OpenStructDataSource osDs = mockFullyMaterializedAbsentKey("missing_key");

@@ -23,11 +23,13 @@ import java.util.Map;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -211,8 +213,8 @@ public class ImmutableOpenStructDataSourceTest {
 
   private static DataSource mockSparseDataSource(String[] blobs) {
     DataSource ds = mock(DataSource.class);
-    org.mockito.Mockito.doReturn(new FakeStringForwardIndex(blobs)).when(ds).getForwardIndex();
-    org.mockito.Mockito.doReturn(FakeStringForwardIndex.nullVector(blobs)).when(ds).getNullValueVector();
+    doReturn(new FakeStringForwardIndex(blobs)).when(ds).getForwardIndex();
+    doReturn(FakeStringForwardIndex.nullVector(blobs)).when(ds).getNullValueVector();
     return ds;
   }
 
@@ -280,9 +282,8 @@ public class ImmutableOpenStructDataSourceTest {
   public void testGetSparseJsonIndexDelegatesToSparseDataSource() {
     String[] blobs = {"{\"x\":1}", null};
     DataSource sparseDs = mockSparseDataSource(blobs);
-    org.apache.pinot.segment.spi.index.reader.JsonIndexReader mockJsonIdx =
-        org.mockito.Mockito.mock(org.apache.pinot.segment.spi.index.reader.JsonIndexReader.class);
-    org.mockito.Mockito.doReturn(mockJsonIdx).when(sparseDs).getJsonIndex();
+    JsonIndexReader mockJsonIdx = mock(JsonIndexReader.class);
+    doReturn(mockJsonIdx).when(sparseDs).getJsonIndex();
 
     ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
         openStructSpec("event"), Map.of(), sparseDs, blobs.length, null);

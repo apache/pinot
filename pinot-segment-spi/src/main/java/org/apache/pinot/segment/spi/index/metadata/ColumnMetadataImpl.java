@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index.metadata;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.Maps;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
@@ -414,8 +415,7 @@ public class ColumnMetadataImpl implements ColumnMetadata {
           ? ((List<?>) rawSparseKeys).stream().map(String::valueOf).collect(Collectors.joining(","))
           : rawSparseKeys.toString();
       try {
-        List<String> sparseKeys = JsonUtils.stringToObject(jsonStr,
-            new com.fasterxml.jackson.core.type.TypeReference<List<String>>() { });
+        List<String> sparseKeys = JsonUtils.stringToObject(jsonStr, new TypeReference<List<String>>() { });
         builder.setSparseKeys(sparseKeys);
       } catch (Exception e) {
         throw new RuntimeException("Failed to parse sparse-key manifest: " + jsonStr, e);
