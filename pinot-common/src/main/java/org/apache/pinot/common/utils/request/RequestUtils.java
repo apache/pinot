@@ -204,14 +204,14 @@ public class RequestUtils {
     if (object instanceof Timestamp) {
       return getLiteral(((Timestamp) object).getTime());
     }
-    if (object instanceof UUID) {
-      return getLiteral(UuidUtils.toBytes((UUID) object));
-    }
     if (object instanceof String) {
       return getLiteral((String) object);
     }
     if (object instanceof byte[]) {
       return getLiteral((byte[]) object);
+    }
+    if (object instanceof UUID) {
+      return getLiteral(UuidUtils.toBytes((UUID) object));
     }
     if (object instanceof int[]) {
       return getLiteral((int[]) object);

@@ -147,6 +147,7 @@ public class LiteralContext {
     _pinotDataType = getPinotDataType(type, value);
   }
 
+  // TODO: Revisit MV support for BOOLEAN, BIG_DECIMAL, BYTES and UUID.
   @Nullable
   private static PinotDataType getPinotDataType(DataType type, @Nullable Object value) {
     if (value == null) {
