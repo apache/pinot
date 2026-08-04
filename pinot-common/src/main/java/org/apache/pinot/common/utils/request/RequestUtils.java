@@ -36,6 +36,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlKind;
@@ -58,6 +59,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
@@ -207,6 +209,9 @@ public class RequestUtils {
     }
     if (object instanceof byte[]) {
       return getLiteral((byte[]) object);
+    }
+    if (object instanceof UUID) {
+      return getLiteral(UuidUtils.toBytes((UUID) object));
     }
     if (object instanceof int[]) {
       return getLiteral((int[]) object);
