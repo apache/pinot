@@ -45,6 +45,14 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
   protected final boolean _isSortedColumn;
   protected final MutableForwardIndex _forwardIndex;
 
+  // Lazily-computed min/max for columns whose mutable segment does not track them (ingestion-aggregated metric
+  // columns). Populated on first access by scanning the sealed forward index; see computeMinMaxIfNeeded().
+  private boolean _minMaxComputed;
+  @Nullable
+  private Comparable<?> _computedMinValue;
+  @Nullable
+  private Comparable<?> _computedMaxValue;
+
   public MutableNoDictColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn) {
     _dataSourceMetadata = dataSource.getDataSourceMetadata();
     _fieldSpec = _dataSourceMetadata.getFieldSpec();
@@ -69,12 +77,75 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
 
   @Override
   public Comparable<?> getMinValue() {
-    return (Comparable<?>) _dataSourceMetadata.getMinValue();
+    Comparable<?> minValue = (Comparable<?>) _dataSourceMetadata.getMinValue();
+    if (minValue != null) {
+      return minValue;
+    }
+    computeMinMaxIfNeeded();
+    return _computedMinValue;
   }
 
   @Override
   public Comparable<?> getMaxValue() {
-    return (Comparable<?>) _dataSourceMetadata.getMaxValue();
+    Comparable<?> maxValue = (Comparable<?>) _dataSourceMetadata.getMaxValue();
+    if (maxValue != null) {
+      return maxValue;
+    }
+    computeMinMaxIfNeeded();
+    return _computedMaxValue;
+  }
+
+  /// Computes min/max by scanning the sealed forward index once, caching the result. Only invoked when the mutable
+  /// segment reports null min/max, which happens for ingestion-aggregated metric columns: their values mutate in
+  /// place during consumption, so `MutableSegmentImpl` deliberately skips min/max tracking for them. Without a value
+  /// domain the BitSliced range index creator cannot subtract the min for INT/LONG columns, so we recover it here
+  /// (the scan mirrors the one {@link #isSorted()} already performs at seal time).
+  ///
+  /// Scoped to single-value INT/LONG columns because those are the only types whose BitSliced range index reads
+  /// min/max: FLOAT/DOUBLE use the full floating-point ordinal domain, and other stored types do not support the
+  /// BitSliced range index. For every other case min/max remain null (unchanged behavior), so aggregated
+  /// FLOAT/DOUBLE and sketch columns are never scanned here.
+  ///
+  /// Not thread-safe: like the rest of this class it is only exercised on the single-threaded segment-seal path.
+  private void computeMinMaxIfNeeded() {
+    if (_minMaxComputed) {
+      return;
+    }
+    int numDocs = _dataSourceMetadata.getNumDocs();
+    if (isSingleValue() && numDocs > 0) {
+      switch (getStoredType()) {
+        case INT: {
+          int min = _forwardIndex.getInt(0);
+          int max = min;
+          for (int i = 1; i < numDocs; i++) {
+            int curr = _forwardIndex.getInt(i);
+            min = Math.min(min, curr);
+            max = Math.max(max, curr);
+          }
+          _computedMinValue = min;
+          _computedMaxValue = max;
+          break;
+        }
+        case LONG: {
+          long min = _forwardIndex.getLong(0);
+          long max = min;
+          for (int i = 1; i < numDocs; i++) {
+            long curr = _forwardIndex.getLong(i);
+            min = Math.min(min, curr);
+            max = Math.max(max, curr);
+          }
+          _computedMinValue = min;
+          _computedMaxValue = max;
+          break;
+        }
+        default:
+          // Other stored types either do not need min/max for their range index (FLOAT/DOUBLE) or do not support a
+          // BitSliced range index at all: leave min/max null (unchanged behavior).
+          break;
+      }
+    }
+    // Set last so a re-entrant call cannot observe the flag as computed while the values are still being populated.
+    _minMaxComputed = true;
   }
 
   @Nullable
