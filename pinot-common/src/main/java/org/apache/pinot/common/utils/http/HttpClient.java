@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -76,10 +75,8 @@ import org.slf4j.LoggerFactory;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * The {@code HTTPClient} wraps around a {@link CloseableHttpClient} to provide a reusable client for making
- * HTTP requests.
- */
+/// The `HTTPClient` wraps around a [CloseableHttpClient] to provide a reusable client for making
+/// HTTP requests.
 public class HttpClient implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(HttpClient.class);
 
@@ -122,11 +119,9 @@ public class HttpClient implements AutoCloseable {
   // Generic HTTP Request APIs
   // --------------------------------------------------------------------------
 
-  /**
-   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
-   *
-   * @see #sendGetRequest(URI, Map, AuthProvider)
-   */
+  /// Deprecated due to lack of auth header support. May break for deployments with auth enabled
+  ///
+  /// @see #sendGetRequest(URI, Map, AuthProvider)
   public SimpleHttpResponse sendGetRequest(URI uri)
       throws IOException {
     return sendGetRequest(uri, null, null);
@@ -150,14 +145,12 @@ public class HttpClient implements AutoCloseable {
     return sendRequest(requestBuilder.build(), GET_REQUEST_SOCKET_TIMEOUT_MS);
   }
 
-  /**
-   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
-   *
-   * @see #sendDeleteRequest(URI, Map, AuthProvider)
-   */
+  /// Deprecated due to lack of auth header support. May break for deployments with auth enabled
+  ///
+  /// @see #sendDeleteRequest(URI, Map, AuthProvider)
   public SimpleHttpResponse sendDeleteRequest(URI uri)
       throws IOException {
-    return sendDeleteRequest(uri, Collections.emptyMap());
+    return sendDeleteRequest(uri, Map.of());
   }
 
   public SimpleHttpResponse sendDeleteRequest(URI uri, @Nullable Map<String, String> headers)
@@ -178,11 +171,9 @@ public class HttpClient implements AutoCloseable {
     return sendRequest(requestBuilder.build(), DELETE_REQUEST_SOCKET_TIMEOUT_MS);
   }
 
-  /**
-   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
-   *
-   * @see #sendPostRequest(URI, HttpEntity, Map, AuthProvider)
-   */
+  /// Deprecated due to lack of auth header support. May break for deployments with auth enabled
+  ///
+  /// @see #sendPostRequest(URI, HttpEntity, Map, AuthProvider)
   public SimpleHttpResponse sendPostRequest(URI uri, @Nullable HttpEntity payload,
       @Nullable Map<String, String> headers)
       throws IOException {
@@ -205,11 +196,9 @@ public class HttpClient implements AutoCloseable {
     return sendRequest(requestBuilder.build(), DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
-  /**
-   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
-   *
-   * @see #sendPutRequest(URI, HttpEntity, Map, AuthProvider)
-   */
+  /// Deprecated due to lack of auth header support. May break for deployments with auth enabled
+  ///
+  /// @see #sendPutRequest(URI, HttpEntity, Map, AuthProvider)
   public SimpleHttpResponse sendPutRequest(URI uri, @Nullable HttpEntity payload, @Nullable Map<String, String> headers)
       throws IOException {
     return sendPutRequest(uri, payload, headers, null);
@@ -383,19 +372,17 @@ public class HttpClient implements AutoCloseable {
   // File Utils (via IOUtils)
   // --------------------------------------------------------------------------
 
-  /**
-   * Download a file using default settings, with an optional auth token
-   *
-   * @param uri URI
-   * @param connectionRequestTimeoutMs Connection request timeout (wait for connection from pool) in milliseconds
-   * @param socketTimeoutMs Socket timeout in milliseconds
-   * @param dest File destination
-   * @param authProvider auth provider
-   * @param httpHeaders http headers
-   * @return Response status code
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Download a file using default settings, with an optional auth token
+  ///
+  /// @param uri URI
+  /// @param connectionRequestTimeoutMs Connection request timeout (wait for connection from pool) in milliseconds
+  /// @param socketTimeoutMs Socket timeout in milliseconds
+  /// @param dest File destination
+  /// @param authProvider auth provider
+  /// @param httpHeaders http headers
+  /// @return Response status code
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public int downloadFile(URI uri, int connectionRequestTimeoutMs, int socketTimeoutMs, File dest,
       AuthProvider authProvider, List<Header> httpHeaders)
       throws IOException, HttpErrorStatusException {
@@ -432,38 +419,34 @@ public class HttpClient implements AutoCloseable {
     }
   }
 
-  /**
-   * Download a file using default settings, with an optional auth token
-   *
-   * @param uri URI
-   * @param socketTimeoutMs Socket timeout in milliseconds
-   * @param dest File destination
-   * @param authProvider auth provider
-   * @param httpHeaders http headers
-   * @return Response status code
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Download a file using default settings, with an optional auth token
+  ///
+  /// @param uri URI
+  /// @param socketTimeoutMs Socket timeout in milliseconds
+  /// @param dest File destination
+  /// @param authProvider auth provider
+  /// @param httpHeaders http headers
+  /// @return Response status code
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public int downloadFile(URI uri, int socketTimeoutMs, File dest, AuthProvider authProvider, List<Header> httpHeaders)
       throws IOException, HttpErrorStatusException {
     return downloadFile(uri, DEFAULT_CONNECTION_REQUEST_TIMEOUT_MS, socketTimeoutMs, dest, authProvider, httpHeaders);
   }
 
-  /**
-   * Download and untar in a streamed manner a file using default settings, with an optional auth token
-   *
-   * @param uri URI
-   * @param connectionRequestTimeoutMs Connection request timeout (wait for connection from pool) in milliseconds
-   * @param socketTimeoutMs Socket timeout in milliseconds
-   * @param dest File destination
-   * @param authProvider auth provider
-   * @param httpHeaders http headers
-   * @param maxStreamRateInByte limit the rate to write download-untar stream to disk, in bytes
-   *                  -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
-   * @return The untarred directory
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Download and untar in a streamed manner a file using default settings, with an optional auth token
+  ///
+  /// @param uri URI
+  /// @param connectionRequestTimeoutMs Connection request timeout (wait for connection from pool) in milliseconds
+  /// @param socketTimeoutMs Socket timeout in milliseconds
+  /// @param dest File destination
+  /// @param authProvider auth provider
+  /// @param httpHeaders http headers
+  /// @param maxStreamRateInByte limit the rate to write download-untar stream to disk, in bytes
+  ///                  -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
+  /// @return The untarred directory
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public File downloadUntarFileStreamed(URI uri, int connectionRequestTimeoutMs, int socketTimeoutMs, File dest,
       AuthProvider authProvider, List<Header> httpHeaders, long maxStreamRateInByte)
       throws IOException, HttpErrorStatusException {
@@ -492,20 +475,18 @@ public class HttpClient implements AutoCloseable {
     }
   }
 
-  /**
-   * Download and untar in a streamed manner a file using default settings, with an optional auth token
-   *
-   * @param uri URI
-   * @param socketTimeoutMs Socket timeout in milliseconds
-   * @param dest File destination
-   * @param authProvider auth provider
-   * @param httpHeaders http headers
-   * @param maxStreamRateInByte limit the rate to write download-untar stream to disk, in bytes
-   *                  -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
-   * @return The untarred directory
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Download and untar in a streamed manner a file using default settings, with an optional auth token
+  ///
+  /// @param uri URI
+  /// @param socketTimeoutMs Socket timeout in milliseconds
+  /// @param dest File destination
+  /// @param authProvider auth provider
+  /// @param httpHeaders http headers
+  /// @param maxStreamRateInByte limit the rate to write download-untar stream to disk, in bytes
+  ///                  -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
+  /// @return The untarred directory
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public File downloadUntarFileStreamed(URI uri, int socketTimeoutMs, File dest, AuthProvider authProvider,
       List<Header> httpHeaders, long maxStreamRateInByte)
       throws IOException, HttpErrorStatusException {

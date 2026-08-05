@@ -47,32 +47,22 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
-/**
- * The {@code QueryContext} class encapsulates all the query related information extracted from the wiring Object.
- * <p>The query engine should work on the QueryContext instead of the wiring Object for the following benefits:
- * <ul>
- *   <li>
- *     Execution layer can be decoupled from the wiring layer, so that changes for one layer won't affect the other
- *     layer.
- *   </li>
- *   <li>
- *     It is very hard to change wiring Object because it involves protocol change, so we should make it as generic as
- *     possible to support future features. Instead, QueryContext is extracted from the wiring Object within each
- *     Broker/Server, and changing it won't cause any protocol change, so we can upgrade it along with the new feature
- *     support in query engine as needed. Also, because of this, we don't have to make QueryContext very generic, which
- *     can help save the overhead of handling generic Objects (e.g. we can pre-compute the Predicates instead of the
- *     using the generic Expressions).
- *   </li>
- *   <li>
- *     In case we need to change the wiring Object (e.g. switch from Thrift to Protobuf), we don't need to change the
- *     whole query engine.
- *   </li>
- *   <li>
- *     We can also add some helper variables or methods in the context classes which can be shared for all segments to
- *     reduce the repetitive work for each segment.
- *   </li>
- * </ul>
- */
+/// The `QueryContext` class encapsulates all the query related information extracted from the wiring Object.
+///
+/// The query engine should work on the QueryContext instead of the wiring Object for the following benefits:
+///
+/// - Execution layer can be decoupled from the wiring layer, so that changes for one layer won't affect the other
+///   layer.
+/// - It is very hard to change wiring Object because it involves protocol change, so we should make it as generic as
+///   possible to support future features. Instead, QueryContext is extracted from the wiring Object within each
+///   Broker/Server, and changing it won't cause any protocol change, so we can upgrade it along with the new feature
+///   support in query engine as needed. Also, because of this, we don't have to make QueryContext very generic, which
+///   can help save the overhead of handling generic Objects (e.g. we can pre-compute the Predicates instead of the
+///   using the generic Expressions).
+/// - In case we need to change the wiring Object (e.g. switch from Thrift to Protobuf), we don't need to change the
+///   whole query engine.
+/// - We can also add some helper variables or methods in the context classes which can be shared for all segments to
+///   reduce the repetitive work for each segment.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class QueryContext {
   private final String _tableName;
@@ -151,6 +141,10 @@ public class QueryContext {
   private boolean _serverReturnFinalResultKeyUnpartitioned;
   private boolean _accurateGroupByWithoutOrderBy;
   private boolean _isUnsafeTrim;
+  /// Grouping sets for GROUP BY GROUPING SETS / ROLLUP / CUBE, as sorted column indexes into
+  /// _groupByExpressions (the union of all grouping columns). Null for a plain GROUP BY (or non-group-by)
+  /// query. Each entry is one grouping set; an empty array denotes the grand-total set ().
+  private List<int[]> _groupingSets;
   // Collection of index types to skip per column
   private Map<String, Set<FieldConfig.IndexType>> _skipIndexes;
 
@@ -192,110 +186,119 @@ public class QueryContext {
     return groupByKeyIdentSet.equals(orderByKeyIdentSet);
   }
 
-  /**
-   * Returns the table name.
-   * NOTE: on the broker side, table name might be {@code null} when subquery is available.
-   */
+  /// Returns the table name.
+  /// NOTE: on the broker side, table name might be `null` when subquery is available.
   public String getTableName() {
     return _tableName;
   }
 
-  /**
-   * Returns the subquery.
-   */
+  /// Returns the subquery.
   @Nullable
   public QueryContext getSubquery() {
     return _subquery;
   }
 
-  /**
-   * Returns a list of expressions in the SELECT clause.
-   */
+  /// Returns a list of expressions in the SELECT clause.
   public List<ExpressionContext> getSelectExpressions() {
     return _selectExpressions;
   }
 
-  /**
-   * Returns whether the query is a DISTINCT query.
-   */
+  /// Returns whether the query is a DISTINCT query.
   public boolean isDistinct() {
     return _distinct;
   }
 
-  /**
-   * Returns an unmodifiable list from the expression to its alias.
-   */
+  /// Returns an unmodifiable list from the expression to its alias.
   public List<String> getAliasList() {
     return _aliasList;
   }
 
-  /**
-   * Returns the filter in the WHERE clause, or {@code null} if there is no WHERE clause.
-   */
+  /// Returns the filter in the WHERE clause, or `null` if there is no WHERE clause.
   @Nullable
   public FilterContext getFilter() {
     return _filter;
   }
 
-  /**
-   * Returns a list of expressions in the GROUP-BY clause (aggregation keys), or {@code null} if there is no GROUP-BY
-   * clause.
-   */
+  /// Returns a list of expressions in the GROUP-BY clause (aggregation keys), or `null` if there is no GROUP-BY
+  /// clause.
   @Nullable
   public List<ExpressionContext> getGroupByExpressions() {
     return _groupByExpressions;
   }
 
-  /**
-   * Returns the filter in the HAVING clause, or {@code null} if there is no HAVING clause.
-   */
+  /// Returns the grouping sets for a GROUP BY GROUPING SETS / ROLLUP / CUBE query, or `null` for a
+  /// plain GROUP BY (or non-group-by) query. Each entry is the sorted list of column indexes into
+  /// [#getGroupByExpressions()] (the union of all grouping columns) that participate in that set; an
+  /// empty array denotes the grand-total set ().
+  @Nullable
+  public List<int[]> getGroupingSets() {
+    return _groupingSets;
+  }
+
+  public void setGroupingSets(@Nullable List<int[]> groupingSets) {
+    _groupingSets = groupingSets;
+  }
+
+  /// Returns whether this is a GROUP BY GROUPING SETS / ROLLUP / CUBE query.
+  public boolean isGroupingSets() {
+    return _groupingSets != null;
+  }
+
+  /// Returns the number of synthetic key columns appended after the group-by (union) columns: 1 for a
+  /// grouping-set query (the `$groupingId` discriminator column), 0 otherwise.
+  public int getNumExtraGroupByKeyColumns() {
+    return isGroupingSets() ? 1 : 0;
+  }
+
+  /// Returns the total number of group-by key columns in the server result / reducer row layout: the union
+  /// group-by columns plus any synthetic key columns ([#getNumExtraGroupByKeyColumns()]).
+  public int getNumGroupByKeyColumns() {
+    int numGroupByExpressions = _groupByExpressions != null ? _groupByExpressions.size() : 0;
+    return numGroupByExpressions + getNumExtraGroupByKeyColumns();
+  }
+
+  /// Returns whether group-by key columns must be serialized/deserialized through the null-aware path (null
+  /// bitmaps). True when the user enabled null handling, or for grouping-set queries, which produce NULL keys
+  /// for rolled-up columns regardless of the user's null-handling option.
+  public boolean requiresNullAwareKeySerialization() {
+    return isNullHandlingEnabled() || isGroupingSets();
+  }
+
+  /// Returns the filter in the HAVING clause, or `null` if there is no HAVING clause.
   @Nullable
   public FilterContext getHavingFilter() {
     return _havingFilter;
   }
 
-  /**
-   * Returns a list of order-by expressions in the ORDER-BY clause, or {@code null} if there is no ORDER-BY clause.
-   */
+  /// Returns a list of order-by expressions in the ORDER-BY clause, or `null` if there is no ORDER-BY clause.
   @Nullable
   public List<OrderByExpressionContext> getOrderByExpressions() {
     return _orderByExpressions;
   }
 
-  /**
-   * Returns the limit of the query.
-   */
+  /// Returns the limit of the query.
   public int getLimit() {
     return _limit;
   }
 
-  /**
-   * Returns the offset of the query.
-   */
+  /// Returns the offset of the query.
   public int getOffset() {
     return _offset;
   }
 
-  /**
-   * Returns the query options of the query.
-   */
+  /// Returns the query options of the query.
   public Map<String, String> getQueryOptions() {
     return _queryOptions;
   }
 
-  /**
-   * Returns the expression override hints.
-   */
+  /// Returns the expression override hints.
   public Map<ExpressionContext, ExpressionContext> getExpressionOverrideHints() {
     return _expressionOverrideHints;
   }
 
-  /**
-   * Returns {@code true} if the query is an EXPLAIN query, {@code false} otherwise.
-   * <p>
-   * This is just an alias on top of {@link #getExplain() != ExplainMode.NONE}
-   *
-   */
+  /// Returns `true` if the query is an EXPLAIN query, `false` otherwise.
+  ///
+  /// This is just an alias on top of [`!= ExplainMode.NONE`]\[#getExplain()\]
   public boolean isExplain() {
     return _explain != ExplainMode.NONE;
   }
@@ -309,48 +312,37 @@ public class QueryContext {
     _accurateGroupByWithoutOrderBy = enable;
   }
 
-  /**
-   * Returns the explain mode of the query.
-   */
+  /// Returns the explain mode of the query.
   public ExplainMode getExplain() {
     return _explain;
   }
 
-  /**
-   * Returns the aggregation functions for the query, or {@code null} if the query does not have any aggregation.
-   */
+  /// Returns the aggregation functions for the query, or `null` if the query does not have any aggregation.
   @Nullable
   public AggregationFunction[] getAggregationFunctions() {
     return _aggregationFunctions;
   }
 
-  /**
-   * Returns the filtered aggregation functions for a query, or {@code null} if the query does not have any aggregation.
-   */
+  /// Returns the filtered aggregation functions for a query, or `null` if the query does not have any
+  /// aggregation.
   @Nullable
   public List<Pair<AggregationFunction, FilterContext>> getFilteredAggregationFunctions() {
     return _filteredAggregationFunctions;
   }
 
-  /**
-   * Returns a map from the filtered aggregation (pair of AGGREGATION FunctionContext and FILTER FilterContext) to the
-   * index of corresponding AggregationFunction in the aggregation functions array.
-   */
+  /// Returns a map from the filtered aggregation (pair of AGGREGATION FunctionContext and FILTER FilterContext) to the
+  /// index of corresponding AggregationFunction in the aggregation functions array.
   @Nullable
   public Map<Pair<FunctionContext, FilterContext>, Integer> getFilteredAggregationsIndexMap() {
     return _filteredAggregationsIndexMap;
   }
 
-  /**
-   * Returns the filtered aggregation expressions for the query.
-   */
+  /// Returns the filtered aggregation expressions for the query.
   public boolean hasFilteredAggregations() {
     return _hasFilteredAggregations;
   }
 
-  /**
-   * Returns the columns (IDENTIFIER expressions) in the query.
-   */
+  /// Returns the columns (IDENTIFIER expressions) in the query.
   public Set<String> getColumns() {
     return _columns;
   }
@@ -547,16 +539,14 @@ public class QueryContext {
     return _sortAggregateSequentialCombineNumSegmentsThreshold;
   }
 
-  /**
-   * Gets or computes a value of type {@code V} associated with a key of type {@code K} so that it can be shared
-   * within the scope of a query.
-   * @param type the type of the value produced, guarantees type pollution is impossible.
-   * @param key the key used to determine if the value has already been computed.
-   * @param mapper A function to apply the first time a key is encountered to construct the value.
-   * @param <K> the key type
-   * @param <V> the value type
-   * @return the shared value
-   */
+  /// Gets or computes a value of type `V` associated with a key of type `K` so that it can be shared
+  /// within the scope of a query.
+  /// @param type the type of the value produced, guarantees type pollution is impossible.
+  /// @param key the key used to determine if the value has already been computed.
+  /// @param mapper A function to apply the first time a key is encountered to construct the value.
+  /// @param <K> the key type
+  /// @param <V> the value type
+  /// @return the shared value
   public <K, V> V getOrComputeSharedValue(Class<V> type, K key, Function<K, V> mapper) {
     return ((ConcurrentHashMap<K, V>) _sharedValues.apply(type)).computeIfAbsent(key, mapper);
   }
@@ -565,7 +555,31 @@ public class QueryContext {
     return _effectiveSegmentGroupTrimSize;
   }
 
+  /// Returns the PER-grouping-set segment group-trim size for a grouping-set query, or -1 to disable
+  /// per-segment trim (no ORDER BY, or trimming disabled). Unlike the global [#getEffectiveSegmentGroupTrimSize()]
+  /// (which is -1 for grouping sets), the per-segment trim for grouping
+  /// sets keeps up to this many groups WITHIN each grouping set (bucketed by the discriminator), so a global
+  /// top-K cannot starve low-magnitude sets such as the grand total. The broker still applies the final
+  /// ORDER BY + LIMIT across all sets.
+  public int getGroupingSetSegmentTrimSize() {
+    if (!isGroupingSets()) {
+      return -1;
+    }
+    int minGroupTrimSize = getMinSegmentGroupTrimSize();
+    if (getOrderByExpressions() != null && minGroupTrimSize > 0) {
+      return GroupByUtils.getTableCapacity(getLimit(), minGroupTrimSize);
+    }
+    return -1;
+  }
+
   private int calculateEffectiveSegmentGroupTrimSize() {
+    /// Grouping sets expand each input row into one group per set; a global per-segment top-K could drop
+    /// groups belonging to low-magnitude sets (e.g. the grand-total set) before they are merged. Grouping-set
+    /// queries therefore use the per-set bucketed trim (getGroupingSetSegmentTrimSize()) instead of this
+    /// global trim, which is disabled for them here.
+    if (isGroupingSets()) {
+      return -1;
+    }
     int minGroupTrimSize = getMinSegmentGroupTrimSize();
     List<OrderByExpressionContext> orderByExpressions = getOrderByExpressions();
     if (!isUnsafeTrim()) {
@@ -579,9 +593,7 @@ public class QueryContext {
     return -1;
   }
 
-  /**
-   * NOTE: For debugging only.
-   */
+  /// NOTE: For debugging only.
   @Override
   public String toString() {
     return "QueryContext{" + "_tableName='" + _tableName + '\'' + ", _subquery=" + _subquery + ", _selectExpressions="
@@ -610,14 +622,12 @@ public class QueryContext {
     return _isUnsafeTrim;
   }
 
-  /**
-   * do sort aggregate when is safeTrim (order by group keys with no having clause)
-   * and limit is smaller than threshold
-   * TODO: we also want to do sort aggregate under order by group key with having case,
-   *   in this case we can check if the calculated Server trimSize is < sortAggregateLimitThreshold
-   *   if so, we do sort aggregate and trim to trimSize during combine.
-   *   This requires extracting Server trimSize calculation logic into QueryContext as pre-req
-   */
+  /// do sort aggregate when is safeTrim (order by group keys with no having clause)
+  /// and limit is smaller than threshold
+  /// TODO: we also want to do sort aggregate under order by group key with having case,
+  ///   in this case we can check if the calculated Server trimSize is < sortAggregateLimitThreshold
+  ///   if so, we do sort aggregate and trim to trimSize during combine.
+  ///   This requires extracting Server trimSize calculation logic into QueryContext as pre-req
   public boolean shouldSortAggregateUnderSafeTrim() {
     return !isUnsafeTrim() && getLimit() < getSortAggregateLimitThreshold();
   }
@@ -630,6 +640,7 @@ public class QueryContext {
     private List<String> _aliasList;
     private FilterContext _filter;
     private List<ExpressionContext> _groupByExpressions;
+    private List<int[]> _groupingSets;
     private FilterContext _havingFilter;
     private List<OrderByExpressionContext> _orderByExpressions;
     private int _limit;
@@ -678,6 +689,14 @@ public class QueryContext {
       return this;
     }
 
+    /// Sets the grouping sets for a GROUP BY GROUPING SETS / ROLLUP / CUBE query. Each entry is the sorted
+    /// list of column indexes into `groupByExpressions` (the union of all grouping columns); an empty
+    /// array denotes the grand-total set (). Leave unset (null) for a plain GROUP BY query.
+    public Builder setGroupingSets(@Nullable List<int[]> groupingSets) {
+      _groupingSets = groupingSets;
+      return this;
+    }
+
     public Builder setHavingFilter(FilterContext havingFilter) {
       _havingFilter = havingFilter;
       return this;
@@ -708,15 +727,6 @@ public class QueryContext {
       return this;
     }
 
-    /**
-     * @deprecated Use {@link #setExplain(ExplainMode)} instead.
-     */
-    @Deprecated
-    public Builder setExplain(boolean explain) {
-      _explain = explain ? ExplainMode.DESCRIPTION : ExplainMode.NONE;
-      return this;
-    }
-
     public Builder setExplain(ExplainMode explain) {
       _explain = explain;
       return this;
@@ -726,7 +736,7 @@ public class QueryContext {
       // TODO: Add validation logic here
 
       if (_queryOptions == null) {
-        _queryOptions = Collections.emptyMap();
+        _queryOptions = Map.of();
       }
       QueryContext queryContext =
           new QueryContext(_tableName, _subquery, _selectExpressions, _distinct, _aliasList,
@@ -736,6 +746,14 @@ public class QueryContext {
       queryContext.setServerReturnFinalResult(QueryOptionsUtils.isServerReturnFinalResult(_queryOptions));
       queryContext.setServerReturnFinalResultKeyUnpartitioned(
           QueryOptionsUtils.isServerReturnFinalResultKeyUnpartitioned(_queryOptions));
+      queryContext.setGroupingSets(_groupingSets);
+      if (queryContext.isGroupingSets()) {
+        /// Phase 1: grouping-set queries always use the intermediate-result merge path. The final-result
+        /// reduce path (server.returnFinalResult) does not restore the NULL group keys that grouping sets
+        /// produce, so disable that optimization here.
+        queryContext.setServerReturnFinalResult(false);
+        queryContext.setServerReturnFinalResultKeyUnpartitioned(false);
+      }
 
       // Pre-calculate the aggregation functions and columns for the query
       generateAggregationFunctions(queryContext);
@@ -743,8 +761,10 @@ public class QueryContext {
 
       // Pre-calculate group-by configs
       if (queryContext.getGroupByExpressions() != null) {
-        queryContext._isUnsafeTrim =
-            !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
+        /// Grouping-set queries expand each row into multiple groups; force the unsafe-trim path so the
+        /// sort-aggregate fast path (which assumes a single flat grouping) is not taken.
+        queryContext._isUnsafeTrim = queryContext.isGroupingSets()
+            || !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
         Integer sortAggregateLimitThreshold = QueryOptionsUtils.getSortAggregateLimitThreshold(_queryOptions);
         if (sortAggregateLimitThreshold != null) {
           queryContext.setSortAggregateLimitThreshold(sortAggregateLimitThreshold);
@@ -765,9 +785,7 @@ public class QueryContext {
       return queryContext;
     }
 
-    /**
-     * Helper method to generate the aggregation functions for the query.
-     */
+    /// Helper method to generate the aggregation functions for the query.
     private void generateAggregationFunctions(QueryContext queryContext) {
       List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions = new ArrayList<>();
       Map<Pair<FunctionContext, FilterContext>, Integer> filteredAggregationsIndexMap = new HashMap<>();
@@ -825,9 +843,7 @@ public class QueryContext {
       }
     }
 
-    /**
-     * Helper method to extract AGGREGATION FunctionContexts and FILTER FilterContexts from the given expression.
-     */
+    /// Helper method to extract AGGREGATION FunctionContexts and FILTER FilterContexts from the given expression.
     private static void getAggregations(ExpressionContext expression,
         List<Pair<FunctionContext, FilterContext>> filteredAggregations) {
       FunctionContext function = expression.getFunction();
@@ -857,9 +873,7 @@ public class QueryContext {
       }
     }
 
-    /**
-     * Helper method to extract AGGREGATION FunctionContexts and FILTER FilterContexts from the given filter.
-     */
+    /// Helper method to extract AGGREGATION FunctionContexts and FILTER FilterContexts from the given filter.
     private static void getAggregations(FilterContext filter,
         List<Pair<FunctionContext, FilterContext>> filteredAggregations) {
       List<FilterContext> children = filter.getChildren();
@@ -872,9 +886,7 @@ public class QueryContext {
       }
     }
 
-    /**
-     * Helper method to extract the columns (IDENTIFIER expressions) for the query.
-     */
+    /// Helper method to extract the columns (IDENTIFIER expressions) for the query.
     private void extractColumns(QueryContext query) {
       Set<String> columns = new HashSet<>();
 

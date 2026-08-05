@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
@@ -59,7 +58,7 @@ public class DateTimeConversionTransformFunctionTest extends BaseTransformFuncti
 
   @BeforeTest
   public void setUp()
-  throws Exception {
+      throws Exception {
     super.setUp();
     _expBuffer.hourOfDay().roundFloor();
   }
@@ -812,7 +811,7 @@ public class DateTimeConversionTransformFunctionTest extends BaseTransformFuncti
       args.add(literal(DataType.STRING, bucketingTimeZone));
     }
 
-    function.init(args, Collections.emptyMap());
+    function.init(args, Map.of());
     return function;
   }
 
@@ -1235,21 +1234,30 @@ public class DateTimeConversionTransformFunctionTest extends BaseTransformFuncti
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
     return new Object[][]{
-        new Object[]{
+        {
             String.format("dateTimeConvert(%s,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH')", TIME_COLUMN)
-        }, new Object[]{"dateTimeConvert(5,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','1:MINUTES')"}, new Object[]{
-        String.format("dateTimeConvert(%s,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','1:MINUTES')", INT_MV_COLUMN)
-    }, new Object[]{
-        String.format("dateTimeConvert(%s,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','MINUTES:1')", TIME_COLUMN)
-    }, new Object[]{
-        String.format("dateTimeConvert(%s,%s,'1:MINUTES:EPOCH','1:MINUTES')", TIME_COLUMN, INT_SV_COLUMN)
-    }, new Object[]{
-        String.format("dateTimeConvert(%s,'1:MINUTES:EPOCH','1:MINUTES:EPOCH','1:MINUTES','aa')", TIME_COLUMN)
-    }, new Object[]{
-        String.format("dateTimeConvert(%s,'1:MINUTES:EPOCH','1:MINUTES:EPOCH','1:MINUTES','')", TIME_COLUMN)
-    }, new Object[]{
-        String.format("dateTimeConvert(%s,'1:MINUTES:EPOCH','1:MINUTES:EPOCH','1:MINUTES',null)", TIME_COLUMN)
-    }
+        },
+        {
+            "dateTimeConvert(5,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','1:MINUTES')"
+        },
+        {
+            String.format("dateTimeConvert(%s,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','1:MINUTES')", INT_MV_COLUMN)
+        },
+        {
+            String.format("dateTimeConvert(%s,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','MINUTES:1')", TIME_COLUMN)
+        },
+        {
+            String.format("dateTimeConvert(%s,%s,'1:MINUTES:EPOCH','1:MINUTES')", TIME_COLUMN, INT_SV_COLUMN)
+        },
+        {
+            String.format("dateTimeConvert(%s,'1:MINUTES:EPOCH','1:MINUTES:EPOCH','1:MINUTES','aa')", TIME_COLUMN)
+        },
+        {
+            String.format("dateTimeConvert(%s,'1:MINUTES:EPOCH','1:MINUTES:EPOCH','1:MINUTES','')", TIME_COLUMN)
+        },
+        {
+            String.format("dateTimeConvert(%s,'1:MINUTES:EPOCH','1:MINUTES:EPOCH','1:MINUTES',null)", TIME_COLUMN)
+        }
     };
   }
 

@@ -32,7 +32,6 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -149,21 +148,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Segment manager for LLC real-time table.
- * <p>Segment management APIs:
- * <ul>
- *   <li>setUpNewTable(): From any controller</li>
- *   <li>removeLLCSegments(): From any controller</li>
- *   <li>commitSegmentFile(): From lead controller only</li>
- *   <li>commitSegmentMetadata(): From lead controller only</li>
- *   <li>segmentStoppedConsuming(): From lead controller only</li>
- *   <li>ensureAllPartitionsConsuming(): From lead controller only</li>
- *   <li>uploadToDeepStoreIfMissing(): From lead controller only</li>
- * </ul>
- *
- * TODO: migrate code in this class to other places for better readability
- */
+/// Segment manager for LLC real-time table.
+///
+/// Segment management APIs:
+///
+/// - setUpNewTable(): From any controller
+/// - removeLLCSegments(): From any controller
+/// - commitSegmentFile(): From lead controller only
+/// - commitSegmentMetadata(): From lead controller only
+/// - segmentStoppedConsuming(): From lead controller only
+/// - ensureAllPartitionsConsuming(): From lead controller only
+/// - uploadToDeepStoreIfMissing(): From lead controller only
+///
+/// TODO: migrate code in this class to other places for better readability
 public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeListener {
 
   // simple field in Ideal State representing pause status for the table
@@ -183,24 +180,20 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   // Timeout for calling stream metadata provider APIs
   private static final long STREAM_FETCH_TIMEOUT_MS = 5_000L;
 
-  /**
-   * Cluster config key for the max segment completion time in milliseconds.
-   * After step 1 of segment completion is done,
-   * this is the max time until which step 3 is allowed to complete.
-   * See {@link #commitSegmentMetadataInternal(String, CommittingSegmentDescriptor, boolean)}
-   * for explanation of steps 1 2 3
-   * This includes any backoffs and retries for the steps 2 and 3
-   * The segment will be eligible for repairs by the validation manager, if the time exceeds this value
-   */
+  /// Cluster config key for the max segment completion time in milliseconds.
+  /// After step 1 of segment completion is done,
+  /// this is the max time until which step 3 is allowed to complete.
+  /// See [#commitSegmentMetadataInternal(String, CommittingSegmentDescriptor, boolean)]
+  /// for explanation of steps 1 2 3
+  /// This includes any backoffs and retries for the steps 2 and 3
+  /// The segment will be eligible for repairs by the validation manager, if the time exceeds this value
   public static final String MAX_SEGMENT_COMPLETION_TIME_MILLIS_KEY = "max.segment.completion.time.millis";
   public static final long DEFAULT_MAX_SEGMENT_COMPLETION_TIME_MILLIS = 300_000L; // 5 MINUTES
   private volatile long _maxSegmentCompletionTimeMillis = DEFAULT_MAX_SEGMENT_COMPLETION_TIME_MILLIS;
-  /**
-   * When controller asks server to upload missing LLC segment copy to deep store, it could happen that the segment
-   * retention is short time away, and RetentionManager walks in to purge the segment. To avoid this data racing issue,
-   * check the segment expiration time to see if it is about to be deleted (i.e. less than this threshold). Skip the
-   * deep store fix if necessary. RetentionManager will delete this kind of segments shortly anyway.
-   */
+  /// When controller asks server to upload missing LLC segment copy to deep store, it could happen that the segment
+  /// retention is short time away, and RetentionManager walks in to purge the segment. To avoid this data racing issue,
+  /// check the segment expiration time to see if it is about to be deleted (i.e. less than this threshold). Skip the
+  /// deep store fix if necessary. RetentionManager will delete this kind of segments shortly anyway.
   private static final long MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS = 60 * 60 * 1000L;
   private static final String REINGEST_SEGMENT_PATH = "/reingestSegment";
 
@@ -264,10 +257,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return new FileUploadDownloadClient();
   }
 
-  /**
-   * Using the ideal state and segment metadata, return a list of {@link PartitionGroupConsumptionStatus}
-   * for latest segment of each partition group.
-   */
+  /// Using the ideal state and segment metadata, return a list of [PartitionGroupConsumptionStatus]
+  /// for latest segment of each partition group.
   public List<PartitionGroupConsumptionStatus> getPartitionGroupConsumptionStatusList(IdealState idealState,
       List<StreamConfig> streamConfigs) {
     List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList = new ArrayList<>();
@@ -380,23 +371,16 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     }
   }
 
-  /**
-   * Sets up the initial segments for a new LLC real-time table.
-   * <p>NOTE: the passed in IdealState may contain HLC segments if both HLC and LLC are configured.
-   */
+  /// Sets up the initial segments for a new real-time table.
   public void setUpNewTable(TableConfig tableConfig, IdealState idealState) {
     List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
     List<StreamMetadata> streamMetadataList =
-        getNewStreamMetadataList(streamConfigs, Collections.emptyList(), idealState);
+        getNewStreamMetadataList(streamConfigs, List.of(), idealState);
     setUpNewTable(tableConfig, idealState, streamMetadataList);
   }
 
-  /**
-   * Sets up the initial segments for a new LLC real-time table.
-   * <p>NOTE: the passed in IdealState may contain HLC segments if both HLC and LLC are configured.
-   */
-  public void setUpNewTable(TableConfig tableConfig, IdealState idealState,
-      List<StreamMetadata> streamMetadataList) {
+  /// Sets up the initial segments for a new real-time table.
+  public void setUpNewTable(TableConfig tableConfig, IdealState idealState, List<StreamMetadata> streamMetadataList) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
@@ -412,7 +396,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     SegmentAssignment segmentAssignment =
         SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
-        Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
+        Map.of(InstancePartitionsType.CONSUMING, instancePartitions);
 
     long currentTimeMs = getCurrentTimeMs();
     Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
@@ -593,13 +577,11 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     }
   }
 
-  /**
-   * This method moves the segment file from another location to its permanent location.
-   * When splitCommit is enabled, segment file is uploaded to the segmentLocation in the committingSegmentDescriptor,
-   * and we need to move the segment file to its permanent location before committing the segment metadata.
-   * Modifies the segment location in committingSegmentDescriptor to the uri which the segment is moved to
-   * unless committingSegmentDescriptor has a peer download uri scheme in segment location.
-   */
+  /// This method moves the segment file from another location to its permanent location.
+  /// When splitCommit is enabled, segment file is uploaded to the segmentLocation in the committingSegmentDescriptor,
+  /// and we need to move the segment file to its permanent location before committing the segment metadata.
+  /// Modifies the segment location in committingSegmentDescriptor to the uri which the segment is moved to
+  /// unless committingSegmentDescriptor has a peer download uri scheme in segment location.
   public void commitSegmentFile(String realtimeTableName, CommittingSegmentDescriptor committingSegmentDescriptor)
       throws Exception {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
@@ -640,11 +622,9 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME.length());
   }
 
-  /**
-   * This method is invoked after the realtime segment is uploaded but before a response is sent to the server.
-   * It updates the propertystore segment metadata from IN_PROGRESS to DONE, and also creates new propertystore
-   * records for new segments, and puts them in idealstate in CONSUMING state.
-   */
+  /// This method is invoked after the realtime segment is uploaded but before a response is sent to the server.
+  /// It updates the propertystore segment metadata from IN_PROGRESS to DONE, and also creates new propertystore
+  /// records for new segments, and puts them in idealstate in CONSUMING state.
   public void commitSegmentMetadata(String realtimeTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
@@ -900,22 +880,20 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     SegmentAssignment segmentAssignment =
         SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
-        Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
+        Map.of(InstancePartitionsType.CONSUMING, instancePartitions);
 
     return updateIdealStateOnSegmentCompletion(tableConfig.getTableName(), committingSegmentName,
         newConsumingSegmentName, segmentAssignment, instancePartitionsMap);
   }
 
-  /**
-   * For pauseless ingestion, invoked after the realtime segment has been ingested but before the response is sent to
-   * the server to build the segment.
-   * <p>
-   * This method performs the following actions:
-   * 1. Adds the segment to the committing segment list.
-   * 2. Updates the segment ZK metadata status from IN_PROGRESS to COMMITTING, sets the end offset.
-   * 3. Creates a new ZK metadata for the next consuming segment.
-   * 4. Updates the ideal state to mark the committing segment as ONLINE and new segment as CONSUMING.
-   */
+  /// For pauseless ingestion, invoked after the realtime segment has been ingested but before the response is sent to
+  /// the server to build the segment.
+  ///
+  /// This method performs the following actions:
+  /// 1. Adds the segment to the committing segment list.
+  /// 2. Updates the segment ZK metadata status from IN_PROGRESS to COMMITTING, sets the end offset.
+  /// 3. Creates a new ZK metadata for the next consuming segment.
+  /// 4. Updates the ideal state to mark the committing segment as ONLINE and new segment as CONSUMING.
   public void commitSegmentMetadataToCommitting(String realtimeTableName,
       CommittingSegmentDescriptor committingSegmentDescriptor) {
     LOGGER.info("commitSegmentStartMetadata: starting segment commit for table:{}, segment: {}", realtimeTableName,
@@ -936,14 +914,12 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     }
   }
 
-  /**
-   * For pauseless ingestion, invoked after the realtime segment has been built and uploaded.
-   * <p>
-   * This method performs the following actions:
-   * 1. Updates CRC, download URL, etc. in the segment ZK metadata.
-   * 2. Removes the segment from the committing segment list.
-   * 3. Updates the flush threshold updater.
-   */
+  /// For pauseless ingestion, invoked after the realtime segment has been built and uploaded.
+  ///
+  /// This method performs the following actions:
+  /// 1. Updates CRC, download URL, etc. in the segment ZK metadata.
+  /// 2. Removes the segment from the committing segment list.
+  /// 3. Updates the flush threshold updater.
   public void commitSegmentMetadataToDone(String realtimeTableName,
       CommittingSegmentDescriptor committingSegmentDescriptor) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
@@ -996,9 +972,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     }
   }
 
-  /**
-   * Creates and persists segment ZK metadata for the new CONSUMING segment.
-   */
+  /// Creates and persists segment ZK metadata for the new CONSUMING segment.
   private void createNewSegmentZKMetadata(TableConfig tableConfig, StreamConfig streamConfig,
       LLCSegmentName newLLCSegmentName, long creationTimeMs, CommittingSegmentDescriptor committingSegmentDescriptor,
       @Nullable SegmentZKMetadata committingSegmentZKMetadata, InstancePartitions instancePartitions, int numPartitions,
@@ -1170,8 +1144,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       }
       ColumnPartitionMetadata columnPartitionMetadata =
           new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), perStreamNumPartitions,
-              Collections.singleton(streamPartitionId), columnPartitionConfig.getFunctionConfig());
-      return new SegmentPartitionMetadata(Collections.singletonMap(entry.getKey(), columnPartitionMetadata));
+              Set.of(streamPartitionId), columnPartitionConfig.getFunctionConfig());
+      return new SegmentPartitionMetadata(Map.of(entry.getKey(), columnPartitionMetadata));
     } else {
       LOGGER.warn(
           "Skip persisting partition metadata because there are other than exact one partition column for table: {}",
@@ -1205,10 +1179,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
             + streamConfig.getTopicName());
   }
 
-  /**
-   * Fetches the partition ids for the stream. Some stream (e.g. Kinesis) might not support this operation, in which
-   * case exception will be thrown.
-   */
+  /// Fetches the partition ids for the stream. Some stream (e.g. Kinesis) might not support this operation, in which
+  /// case exception will be thrown.
   @VisibleForTesting
   Set<Integer> getPartitionIds(StreamConfig streamConfig)
       throws Exception {
@@ -1310,22 +1282,18 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return new PartitionIdsWithIdealState(partitionIds, null);
   }
 
-  /**
-   * Fetches the latest state of the partition groups for all streams of the table.
-   * If any partition has reached end of life, and all messages of that partition have been consumed by the segment,
-   * it will be skipped from the result
-   */
+  /// Fetches the latest state of the partition groups for all streams of the table.
+  /// If any partition has reached end of life, and all messages of that partition have been consumed by the segment,
+  /// it will be skipped from the result
   @VisibleForTesting
   List<StreamMetadata> getNewStreamMetadataList(List<StreamConfig> streamConfigs,
       List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, IdealState idealState) {
     return getNewStreamMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState, false);
   }
 
-  /**
-   * Fetches the latest state of the partition groups for all streams of the table.
-   * If any partition has reached end of life, and all messages of that partition have been consumed by the segment,
-   * it will be skipped from the result
-   */
+  /// Fetches the latest state of the partition groups for all streams of the table.
+  /// If any partition has reached end of life, and all messages of that partition have been consumed by the segment,
+  /// it will be skipped from the result
   @VisibleForTesting
   List<StreamMetadata> getNewStreamMetadataList(List<StreamConfig> streamConfigs,
       List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, IdealState idealState,
@@ -1336,13 +1304,11 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         pauseState == null ? new ArrayList<>() : pauseState.getIndexOfInactiveTopics(), forceGetOffsetFromStream);
   }
 
-  /**
-   * An instance is reporting that it has stopped consuming a topic due to some error.
-   * If the segment is in CONSUMING state, mark the state of the segment to be OFFLINE in idealstate.
-   * When all replicas of this segment are marked offline, the
-   * {@link org.apache.pinot.controller.validation.RealtimeSegmentValidationManager},
-   * in its next run, will auto-create a new segment with the appropriate offset.
-   */
+  /// An instance is reporting that it has stopped consuming a topic due to some error.
+  /// If the segment is in CONSUMING state, mark the state of the segment to be OFFLINE in idealstate.
+  /// When all replicas of this segment are marked offline, the
+  /// [org.apache.pinot.controller.validation.RealtimeSegmentValidationManager],
+  /// in its next run, will auto-create a new segment with the appropriate offset.
   public void segmentStoppedConsuming(LLCSegmentName llcSegmentName, String instanceName) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
@@ -1385,16 +1351,14 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     // in one of the cases and not the other.
     try {
       _helixAdmin.resetPartition(_helixManager.getClusterName(), instanceName, realtimeTableName,
-          Collections.singletonList(segmentName));
+          List.of(segmentName));
     } catch (Exception e) {
       // Ignore
     }
   }
 
-  /**
-   * An instance is reporting that it cannot build segment due to non-recoverable error, usually due to size too large.
-   * Reduce the segment "segment.flush.threshold.size" to half of the current segment size target.
-   */
+  /// An instance is reporting that it cannot build segment due to non-recoverable error, usually due to size too large.
+  /// Reduce the segment "segment.flush.threshold.size" to half of the current segment size target.
   public void reduceSegmentSizeAndReset(LLCSegmentName llcSegmentName, int prevNumRows) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
     // reduce the segment size to its half
@@ -1418,12 +1382,10 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.SEGMENT_SIZE_AUTO_REDUCTION, 1L);
   }
 
-  /**
-   * Returns the latest LLC realtime segment ZK metadata for each partition.
-   *
-   * @param realtimeTableName Realtime table name
-   * @return Map from partition group id to the latest LLC realtime segment ZK metadata
-   */
+  /// Returns the latest LLC realtime segment ZK metadata for each partition.
+  ///
+  /// @param realtimeTableName Realtime table name
+  /// @return Map from partition group id to the latest LLC realtime segment ZK metadata
   private Map<Integer, SegmentZKMetadata> getLatestSegmentZKMetadataMap(String realtimeTableName) {
     List<String> segments = getLLCSegments(realtimeTableName);
 
@@ -1453,36 +1415,34 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return latestSegmentZKMetadataMap;
   }
 
-  /**
-   * Validates LLC segments in ideal state and repairs them if necessary. This method should only be called from the
-   * leader of the table.
-   *
-   * During segment commit, we update zookeeper in 3 steps
-   * Step 1: Update PROPERTYSTORE to change the old segment metadata status to DONE/COMMITTING
-   * Step 2: Update PROPERTYSTORE to create the new segment metadata with status IN_PROGRESS
-   * Step 3: Update IDEALSTATES to include new segment in CONSUMING state, and change old segment to ONLINE state.
-   *
-   * The controller may fail between these three steps.
-   * So when validation manager runs, it needs to check the following:
-   *
-   * If it fails between step-1 and step-2:
-   * Check whether there are any segments in the PROPERTYSTORE with status DONE, but no new segment in status
-   * IN_PROGRESS,
-   * and hence the status of the segment in the IDEALSTATE is still CONSUMING
-   *
-   * If it fails between step-2 and-3:
-   * Check whether there are any segments in PROPERTYSTORE with status IN_PROGRESS, that are not accounted for in
-   * idealState.
-   * If so, it should create the new segments in idealState.
-   *
-   * If the controller fails after step-3, we are fine because the idealState has the new segments.
-   * If the controller fails before step-1, the server will see this as an upload failure, and will re-try.
-   *
-   * If the consuming segment is deleted by user intentionally or by mistake:
-   * Check whether there are segments in the PROPERTYSTORE with status DONE, but no new segment in status
-   * IN_PROGRESS, and the state for the latest segment in the IDEALSTATE is ONLINE.
-   * If so, it should create a new CONSUMING segment for the partition.
-   */
+  /// Validates LLC segments in ideal state and repairs them if necessary. This method should only be called from the
+  /// leader of the table.
+  ///
+  /// During segment commit, we update zookeeper in 3 steps
+  /// Step 1: Update PROPERTYSTORE to change the old segment metadata status to DONE/COMMITTING
+  /// Step 2: Update PROPERTYSTORE to create the new segment metadata with status IN_PROGRESS
+  /// Step 3: Update IDEALSTATES to include new segment in CONSUMING state, and change old segment to ONLINE state.
+  ///
+  /// The controller may fail between these three steps.
+  /// So when validation manager runs, it needs to check the following:
+  ///
+  /// If it fails between step-1 and step-2:
+  /// Check whether there are any segments in the PROPERTYSTORE with status DONE, but no new segment in status
+  /// IN_PROGRESS,
+  /// and hence the status of the segment in the IDEALSTATE is still CONSUMING
+  ///
+  /// If it fails between step-2 and-3:
+  /// Check whether there are any segments in PROPERTYSTORE with status IN_PROGRESS, that are not accounted for in
+  /// idealState.
+  /// If so, it should create the new segments in idealState.
+  ///
+  /// If the controller fails after step-3, we are fine because the idealState has the new segments.
+  /// If the controller fails before step-1, the server will see this as an upload failure, and will re-try.
+  ///
+  /// If the consuming segment is deleted by user intentionally or by mistake:
+  /// Check whether there are segments in the PROPERTYSTORE with status DONE, but no new segment in status
+  /// IN_PROGRESS, and the state for the latest segment in the IDEALSTATE is ONLINE.
+  /// If so, it should create a new CONSUMING segment for the partition.
   public void ensureAllPartitionsConsuming(TableConfig tableConfig, List<StreamConfig> streamConfigs,
       OffsetCriteria offsetCriteria) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
@@ -1496,7 +1456,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         boolean offsetsHaveToChange = offsetCriteria != null;
         if (isTableEnabled && !isTablePaused) {
           List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
-              offsetsHaveToChange ? Collections.emptyList()
+              offsetsHaveToChange ? List.of()
                   // offsets from metadata are not valid anymore; fetch for all partitions
                   : getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
           // FIXME: Right now, we assume topics are sharing same offset criteria
@@ -1521,9 +1481,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     }
   }
 
-  /**
-   * Updates ideal state after completion of a realtime segment
-   */
+  /// Updates ideal state after completion of a realtime segment
   @VisibleForTesting
   IdealState updateIdealStateOnSegmentCompletion(String realtimeTableName, String committingSegmentName,
       String newSegmentName, SegmentAssignment segmentAssignment,
@@ -1657,12 +1615,10 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     }
   }
 
-  /**
-   * Handles segment movement between instances.
-   * If the new consuming segment is served by a different set of servers than the committed segment, notify the
-   * servers no longer serving the stream partition to remove the ingestion metrics. This can prevent servers from
-   * emitting high ingestion delay alerts on stream partitions no longer served.
-   */
+  /// Handles segment movement between instances.
+  /// If the new consuming segment is served by a different set of servers than the committed segment, notify the
+  /// servers no longer serving the stream partition to remove the ingestion metrics. This can prevent servers from
+  /// emitting high ingestion delay alerts on stream partitions no longer served.
   private void handleSegmentMovement(String realtimeTableName, Map<String, Map<String, String>> instanceStatesMap,
       String committedSegment, String newConsumingSegment) {
     Set<String> oldInstances = instanceStatesMap.get(committedSegment).keySet();
@@ -1712,10 +1668,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
    * leave it as it is, to be fixed the next time repair job triggers.
    */
 
-  /**
-   * Returns true if more than {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS} ms have
-   * elapsed since segment metadata update
-   */
+  /// Returns true if more than [PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS] ms have
+  /// elapsed since segment metadata update
   @VisibleForTesting
   protected boolean isExceededMaxSegmentCompletionTime(String realtimeTableName, String segmentName,
       long currentTimeMs) {
@@ -1774,7 +1728,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     SegmentAssignment segmentAssignment =
         SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
-        Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
+        Map.of(InstancePartitionsType.CONSUMING, instancePartitions);
 
     Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
     StreamPartitionMsgOffsetFactory offsetFactory =
@@ -2022,13 +1976,9 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       streamConfig.setOffsetCriteria(OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
 
       // Kinesis shard-split flow requires us to pass currentPartitionGroupConsumptionStatusList so that
-      // we can check if its completely consumed
-      // However the kafka implementation of computePartitionGroupMetadata() breaks if we pass the current status
-      // This leads to streamSmallestOffset set to null in selectStartOffset() method
-      // The overall dependency isn't clean and is causing the issue and requires refactor
-      // Temporarily, we are passing a boolean flag to indicate if we want to use the current status
-      // The kafka implementation of computePartitionGroupMetadata() will ignore the current status
-      // while the kinesis implementation will use it.
+      // we can check if it is completely consumed. Kafka needs stream offsets for every partition in this path, so
+      // forceGetOffsetFromStream lets its metadata provider fetch offsets from the stream instead of reusing
+      // current status offsets.
       List<StreamMetadata> streamMetadataList = getNewStreamMetadataList(
           streamConfigs, currentPartitionGroupConsumptionStatusList, idealState, true);
       streamConfig.setOffsetCriteria(originalOffsetCriteria);
@@ -2041,10 +1991,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return partitionGroupIdToSmallestOffset;
   }
 
-  /**
-   * Builds {@link PartitionGroupConsumptionStatus} list from the pre-computed latest segment ZK metadata map,
-   * avoiding an O(N) scan of all IdealState segments that {@link #getPartitionGroupConsumptionStatusList} performs.
-   */
+  /// Builds [PartitionGroupConsumptionStatus] list from the pre-computed latest segment ZK metadata map,
+  /// avoiding an O(N) scan of all IdealState segments that [#getPartitionGroupConsumptionStatusList] performs.
   @VisibleForTesting
   List<PartitionGroupConsumptionStatus> buildPartitionGroupConsumptionStatusFromZKMetadata(
       Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap, List<StreamConfig> streamConfigs) {
@@ -2113,10 +2061,9 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         lastLLCSegmentName.getSequenceNumber() + 1, creationTimeMs);
   }
 
-  /**
-   * Sets up a new partition group.
-   * <p>Persists the ZK metadata for the first CONSUMING segment, and returns the segment name.
-   */
+  /// Sets up a new partition group.
+  ///
+  /// Persists the ZK metadata for the first CONSUMING segment, and returns the segment name.
   private String setupNewPartitionGroup(TableConfig tableConfig, StreamConfig streamConfig,
       PartitionGroupMetadata partitionGroupMetadata, long creationTimeMs, InstancePartitions instancePartitions,
       int numPartitions, int numReplicas) {
@@ -2162,17 +2109,15 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     }
   }
 
-  /**
-   * Gets the total partition count for routing segment assignment.
-   *
-   * <p>For subset-partition tables, this returns the total Kafka topic partition count (not the
-   * subset size) so that RealtimeSegmentAssignment correctly routes non-contiguous partition IDs via
-   * {@code partitionId % totalPartitions}.
-   *
-   * <p>For standard tables, this equals the number of actively consumed partitions.
-   *
-   * <p>For tables with multiple streams, this sums the partition counts across all streams.
-   */
+  /// Gets the total partition count for routing segment assignment.
+  ///
+  /// For subset-partition tables, this returns the total Kafka topic partition count (not the
+  /// subset size) so that RealtimeSegmentAssignment correctly routes non-contiguous partition IDs via
+  /// `partitionId % totalPartitions`.
+  ///
+  /// For standard tables, this equals the number of actively consumed partitions.
+  ///
+  /// For tables with multiple streams, this sums the partition counts across all streams.
   private int getPartitionCountForRouting(List<StreamMetadata> streamMetadataList) {
     int totalPartitionCount = 0;
     for (StreamMetadata streamMetadata : streamMetadataList) {
@@ -2206,17 +2151,15 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     }
   }
 
-  /**
-   * Fix the missing LLC segment in deep store by asking servers to upload, and add deep store download uri in ZK.
-   * Since uploading to deep store involves expensive compression step (first tar up the segment and then upload),
-   * we don't want to retry the uploading. Segment without deep store copy can still be downloaded from peer servers.
-   *
-   * @param forceUpload if true, bypasses checks and forces upload even if deep store copy exists
-   *
-   * @see <a href="
-   * https://cwiki.apache.org/confluence/display/PINOT/By-passing+deep-store+requirement+for+Realtime+segment+completion
-   * "> By-passing deep-store requirement for Realtime segment completion:Failure cases and handling</a>
-   */
+  /// Fix the missing LLC segment in deep store by asking servers to upload, and add deep store download uri in ZK.
+  /// Since uploading to deep store involves expensive compression step (first tar up the segment and then upload),
+  /// we don't want to retry the uploading. Segment without deep store copy can still be downloaded from peer servers.
+  ///
+  /// @param forceUpload if true, bypasses checks and forces upload even if deep store copy exists
+  ///
+  /// @see <a href="
+  ///https://cwiki.apache.org/confluence/display/PINOT/By-passing+deep-store+requirement+for+Realtime+segment+completion
+  /// "> By-passing deep-store requirement for Realtime segment completion:Failure cases and handling</a>
   public void uploadToDeepStoreIfMissing(TableConfig tableConfig, List<SegmentZKMetadata> segmentsZKMetadata,
       boolean forceUpload) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
@@ -2310,9 +2253,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     }
   }
 
-  /**
-   * Overloaded method for backward compatibility. Defaults to forceUpload = false.
-   */
+  /// Overloaded method for backward compatibility. Defaults to forceUpload = false.
   public void uploadToDeepStoreIfMissing(TableConfig tableConfig, List<SegmentZKMetadata> segmentsZKMetadata) {
     uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata, false);
   }
@@ -2478,10 +2419,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return _deepStoreUploadExecutorPendingSegments.isEmpty();
   }
 
-  /**
-   * Delete tmp segments for realtime table with low level consumer, split commit and async deletion is enabled.
-   * @return number of deleted orphan temporary segments
-   */
+  /// Delete tmp segments for realtime table with low level consumer, split commit and async deletion is enabled.
+  /// @return number of deleted orphan temporary segments
   public int deleteTmpSegments(String realtimeTableName, List<SegmentZKMetadata> segmentsZKMetadata)
       throws IOException {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
@@ -2547,15 +2486,13 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return getCurrentTimeMs() - lastModified > _controllerConf.getTmpSegmentRetentionInSeconds() * 1000L;
   }
 
-  /**
-   * Force commit the current segments in consuming state and restart consumption
-   * Commit all partitions unless either partitionsToCommit or segmentsToCommit are provided.
-   *
-   * @param tableNameWithType  table name with type
-   * @param partitionGroupIdsToCommit  comma separated list of partition group IDs to commit
-   * @param segmentsToCommit  comma separated list of consuming segments to commit
-   * @return the set of consuming segments for which commit was initiated
-   */
+  /// Force commit the current segments in consuming state and restart consumption
+  /// Commit all partitions unless either partitionsToCommit or segmentsToCommit are provided.
+  ///
+  /// @param tableNameWithType  table name with type
+  /// @param partitionGroupIdsToCommit  comma separated list of partition group IDs to commit
+  /// @param segmentsToCommit  comma separated list of consuming segments to commit
+  /// @return the set of consuming segments for which commit was initiated
   public Set<String> forceCommit(String tableNameWithType, @Nullable String partitionGroupIdsToCommit,
       @Nullable String segmentsToCommit, @Nullable BatchConfig batchConfig) {
     // Validate force commit is allowed BEFORE setting pause state to avoid leaving table in paused state on failure
@@ -2680,9 +2617,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return instanceToConsumingSegments;
   }
 
-  /**
-   * Among all consuming segments, filter the ones that are in the given partitions or segments.
-   */
+  /// Among all consuming segments, filter the ones that are in the given partitions or segments.
   private Set<String> filterSegmentsToCommit(Set<String> allConsumingSegments,
       @Nullable String partitionGroupIdsToCommitStr, @Nullable String segmentsToCommitStr) {
     if (partitionGroupIdsToCommitStr == null && segmentsToCommitStr == null) {
@@ -2717,22 +2652,18 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return targetSegments;
   }
 
-  /**
-   * Pause consumption on a table by
-   *   1) update PauseState in the table ideal state and
-   *   2) sending force commit messages to servers
-   */
+  /// Pause consumption on a table by
+  ///   1) update PauseState in the table ideal state and
+  ///   2) sending force commit messages to servers
   public PauseStatusDetails pauseConsumption(String tableNameWithType, PauseState.ReasonCode reasonCode,
       @Nullable String comment) {
     return pauseConsumption(tableNameWithType, reasonCode, comment, null);
   }
 
-  /**
-   * Pause consumption on a table by
-   *   1) Validate force commit is allowed for this table (fail fast before modifying state)
-   *   2) Update PauseState in the table ideal state and
-   *   3) Sending force commit messages to servers
-   */
+  /// Pause consumption on a table by
+  ///   1) Validate force commit is allowed for this table (fail fast before modifying state)
+  ///   2) Update PauseState in the table ideal state and
+  ///   3) Sending force commit messages to servers
   public PauseStatusDetails pauseConsumption(String tableNameWithType, PauseState.ReasonCode reasonCode,
       @Nullable String comment, @Nullable BatchConfig batchConfig) {
     // Validate force commit is allowed BEFORE setting pause state to avoid leaving table in paused state on failure
@@ -2747,11 +2678,9 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         new Timestamp(System.currentTimeMillis()).toString());
   }
 
-  /**
-   * Resume consumption on a table by
-   *   1) update PauseState by clearing all pause reasons in the table ideal state and
-   *   2) triggering segment validation job to create new consuming segments in ideal states
-   */
+  /// Resume consumption on a table by
+  ///   1) update PauseState by clearing all pause reasons in the table ideal state and
+  ///   2) triggering segment validation job to create new consuming segments in ideal states
   public PauseStatusDetails resumeConsumption(String tableNameWithType, @Nullable String offsetCriteria,
       PauseState.ReasonCode reasonCode, @Nullable String comment) {
     IdealState updatedIdealState = updatePauseStateInIdealState(tableNameWithType, false, reasonCode, comment);
@@ -2840,12 +2769,10 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return extractTablePauseState(updatedIdealState);
   }
 
-  /**
-   * Validates that force commit is allowed for the given table.
-   * Throws IllegalStateException if force commit is disabled for partial-upsert tables
-   * or upsert tables with dropOutOfOrder enabled when replication > 1.
-   * Force commit is always allowed for tables without inconsistent state configs.
-   */
+  /// Validates that force commit is allowed for the given table.
+  /// Throws IllegalStateException if force commit is disabled for partial-upsert tables
+  /// or upsert tables with dropOutOfOrder enabled when replication > 1.
+  /// Force commit is always allowed for tables without inconsistent state configs.
   private void validateForceCommitAllowed(String tableNameWithType) {
     TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
     if (tableConfig == null) {
@@ -2911,19 +2838,16 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return consumingSegments;
   }
 
-  /**
-   * Return pause status:
-   *   - Information from the 'pauseState' in the table ideal state
-   *   - list of consuming segments
-   */
+  /// Return pause status:
+  ///   - Information from the 'pauseState' in the table ideal state
+  ///   - list of consuming segments
   public PauseStatusDetails getPauseStatusDetails(String tableNameWithType) {
     IdealState idealState = getIdealState(tableNameWithType);
     Set<String> consumingSegments = findConsumingSegments(idealState);
     PauseState pauseState = extractTablePauseState(idealState);
     if (pauseState != null) {
-      // TODO: add paused topics information
       return new PauseStatusDetails(pauseState.isPaused(), consumingSegments, pauseState.getReasonCode(),
-          pauseState.getComment(), pauseState.getTimeInMillis());
+          pauseState.getComment(), pauseState.getTimeInMillis(), pauseState.getIndexOfInactiveTopics());
     }
     String isTablePausedStr = idealState.getRecord().getSimpleField(IS_TABLE_PAUSED);
     return new PauseStatusDetails(Boolean.parseBoolean(isTablePausedStr), consumingSegments,
@@ -2945,18 +2869,16 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
   }
 
-  /**
-   * Repair segments in error state:
-   * Re-ingests segments that are in ERROR state in EV but ONLINE in IS with no peer copy on any server. This method
-   * will call the server reingestSegment API on one of the alive servers that are supposed to host that segment
-   * according to IdealState.
-   * <p>
-   * API signature: POST http://[serverURL]/reingestSegment/[segmentName] Request body (JSON):
-   * <p>
-   * If segment is in ERROR state in only few replicas but has download URL, we instead trigger a segment reset
-   *
-   * @param tableConfig The table config
-   */
+  /// Repair segments in error state:
+  /// Re-ingests segments that are in ERROR state in EV but ONLINE in IS with no peer copy on any server. This method
+  /// will call the server reingestSegment API on one of the alive servers that are supposed to host that segment
+  /// according to IdealState.
+  ///
+  /// API signature: POST http://\[serverURL\]/reingestSegment/\[segmentName\] Request body (JSON):
+  ///
+  /// If segment is in ERROR state in only few replicas but has download URL, we instead trigger a segment reset
+  ///
+  /// @param tableConfig The table config
   public void repairSegmentsInErrorState(TableConfig tableConfig,
       boolean repairErrorSegmentsForPartialUpsertOrDedup) {
     boolean isPauselessTable = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
@@ -3115,14 +3037,12 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return disasterRecoveryMode == DisasterRecoveryMode.ALWAYS;
   }
 
-  /**
-   * Whether to allow repairing the ERROR segments with ZK status: COMMITTING
-   * This method is only useful for pauseless ingestion with features like dedup enabled (Since repairing committing
-   * segments for such tables can lead to incorrect data).
-   * @param repairErrorSegmentsForPartialUpsertOrDedup API context flag, if true then always allow repair
-   * @param tableConfig tableConfig
-   * @return Returns true if repair is allowed
-   */
+  /// Whether to allow repairing the ERROR segments with ZK status: COMMITTING
+  /// This method is only useful for pauseless ingestion with features like dedup enabled (Since repairing committing
+  /// segments for such tables can lead to incorrect data).
+  /// @param repairErrorSegmentsForPartialUpsertOrDedup API context flag, if true then always allow repair
+  /// @param tableConfig tableConfig
+  /// @return Returns true if repair is allowed
   public boolean allowRepairOfCommittingSegments(boolean repairErrorSegmentsForPartialUpsertOrDedup,
       TableConfig tableConfig) {
     if (repairErrorSegmentsForPartialUpsertOrDedup) {
@@ -3160,12 +3080,10 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return true;
   }
 
-  /**
-   * Invokes the server's reingestSegment API via a POST request with JSON payload,
-   * using Simple HTTP APIs.
-   *
-   * POST http://[serverURL]/reingestSegment/[segmentName]
-   */
+  /// Invokes the server's reingestSegment API via a POST request with JSON payload,
+  /// using Simple HTTP APIs.
+  ///
+  /// POST http://\[serverURL\]/reingestSegment/\[segmentName\]
   private void triggerReingestion(String serverHostPort, String segmentName)
       throws IOException, URISyntaxException, HttpErrorStatusException {
     String scheme = CommonConstants.HTTP_PROTOCOL;
@@ -3184,9 +3102,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     HttpClient.wrapAndThrowHttpException(HttpClient.getInstance().sendJsonPostRequest(reingestUri, ""));
   }
 
-  /**
-   * Picks one server among a set of servers that are supposed to host the segment,
-   */
+  /// Picks one server among a set of servers that are supposed to host the segment,
   private String pickServerToReingest(Set<String> candidateServers) {
     try {
       List<String> serverList = new ArrayList<>(candidateServers);
@@ -3223,22 +3139,20 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return segmentsYetToBeCommitted;
   }
 
-  /**
-   * Synchronizes the list of committing segments for a realtime table in ZooKeeper by both adding new segments
-   * and removing segments that are no longer in COMMITTING state. This function is designed to be called periodically
-   * to maintain an up-to-date list of actively committing segments.
-   *
-   * The synchronization process works as follows:
-   * 1. For a new table (no existing ZooKeeper record), creates a fresh list with the provided segments
-   * 2. For an existing table, merges the new segments with currently committing segments while removing any
-   *    segments that are no longer in COMMITTING state
-   * 3. Maintains uniqueness of segments using a Set-based deduplication
-   *
-   * @param realtimeTableName Name of the realtime table whose committing segments list needs to be synchronized
-   * @param committingSegments List of new segment names that are currently in COMMITTING state.
-   *                          If null, returns true without making any changes to the existing list
-   * @return true if the synchronization succeeds, false if there's a failure in updating ZooKeeper
-   */
+  /// Synchronizes the list of committing segments for a realtime table in ZooKeeper by both adding new segments
+  /// and removing segments that are no longer in COMMITTING state. This function is designed to be called periodically
+  /// to maintain an up-to-date list of actively committing segments.
+  ///
+  /// The synchronization process works as follows:
+  /// 1. For a new table (no existing ZooKeeper record), creates a fresh list with the provided segments
+  /// 2. For an existing table, merges the new segments with currently committing segments while removing any
+  ///    segments that are no longer in COMMITTING state
+  /// 3. Maintains uniqueness of segments using a Set-based deduplication
+  ///
+  /// @param realtimeTableName Name of the realtime table whose committing segments list needs to be synchronized
+  /// @param committingSegments List of new segment names that are currently in COMMITTING state.
+  ///                          If null, returns true without making any changes to the existing list
+  /// @return true if the synchronization succeeds, false if there's a failure in updating ZooKeeper
   public boolean syncCommittingSegments(String realtimeTableName, List<String> committingSegments) {
     String pauselessDebugMetadataPath =
         ZKMetadataProvider.constructPropertyStorePathForPauselessDebugMetadata(realtimeTableName);
@@ -3283,16 +3197,14 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         (t, s) -> ZKMetadataProvider.getSegmentZKMetadata(propertyStore, t, s));
   }
 
-  /**
-   * Retrieves and filters the list of committing segments for a realtime table from the property store.
-   * This method:
-   * 1. Constructs the ZK path for pauseless debug metadata
-   * 2. Fetches the committing segments record from the property store
-   * 3. Filters out segments that are either deleted or already committed
-   *
-   * @param realtimeTableName The name of the realtime table to fetch committing segments for
-   * @return Filtered list of committing segments
-   */
+  /// Retrieves and filters the list of committing segments for a realtime table from the property store.
+  /// This method:
+  /// 1. Constructs the ZK path for pauseless debug metadata
+  /// 2. Fetches the committing segments record from the property store
+  /// 3. Filters out segments that are either deleted or already committed
+  ///
+  /// @param realtimeTableName The name of the realtime table to fetch committing segments for
+  /// @return Filtered list of committing segments
   private static List<String> getCommittingSegments(String realtimeTableName,
       ZkHelixPropertyStore<ZNRecord> propertyStore, BiFunction<String, String, SegmentZKMetadata> zkMetadataProvider) {
     String pauselessDebugMetadataPath =
@@ -3308,10 +3220,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return getCommittingSegments(realtimeTableName, committingSegments, zkMetadataProvider);
   }
 
-  /**
-   * Returns the list of segments that are in COMMITTING state. Filters out segments that are either deleted or no
-   * longer in COMMITTING state.
-   */
+  /// Returns the list of segments that are in COMMITTING state. Filters out segments that are either deleted or no
+  /// longer in COMMITTING state.
   private static List<String> getCommittingSegments(String realtimeTableName, Collection<String> segmentsToCheck,
       BiFunction<String, String, SegmentZKMetadata> zkMetadataProvider) {
     if (segmentsToCheck.isEmpty()) {

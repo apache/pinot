@@ -39,11 +39,11 @@ jobs:
             runner: ubuntu-24.04-arm
     steps:
       - name: Login to DockerHub
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Build ${{ matrix.type }} ${{ matrix.jdk_version }}-${{ matrix.openJdkDist }}-${{ matrix.arch }} Pinot Base Docker Image
         env:
           OPEN_JDK_DIST: ${{ matrix.openJdkDist }}
@@ -64,11 +64,11 @@ jobs:
         type: [build, runtime]
     steps:
       - name: Login to DockerHub
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Push ${{ matrix.type }} ${{ matrix.jdk_version }}-${{ matrix.openJdkDist }} Pinot Base Docker manifest
         env:
           BASE_IMAGE_TYPE: ${{ matrix.type }}

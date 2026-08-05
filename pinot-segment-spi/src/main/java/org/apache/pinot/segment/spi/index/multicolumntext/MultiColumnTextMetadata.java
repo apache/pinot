@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.spi.index.multicolumntext;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -32,11 +31,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Multi-column metadata as read from metadata.properties file.
- * Note: only settings that multi-column text index uses are parsed & stored, ignoring everything else.
- * That is to prevent storing useless data in properties file and potentially triggering unnecessary index rebuild.
- */
+/// Multi-column metadata as read from metadata.properties file.
+/// Note: only settings that multi-column text index uses are parsed & stored, ignoring everything else.
+/// That is to prevent storing useless data in properties file and potentially triggering unnecessary index rebuild.
 public class MultiColumnTextMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiColumnTextMetadata.class);
   public static final int VERSION_1 = 1;
@@ -86,8 +83,8 @@ public class MultiColumnTextMetadata {
       Map<String, Map<String, String>> perColumnProperties) {
     _version = version;
     _columns = columns;
-    _sharedProperties = sharedProperties != null ? sharedProperties : Collections.emptyMap();
-    _perColumnProperties = perColumnProperties != null ? perColumnProperties : Collections.emptyMap();
+    _sharedProperties = sharedProperties != null ? sharedProperties : Map.of();
+    _perColumnProperties = perColumnProperties != null ? perColumnProperties : Map.of();
   }
 
   public MultiColumnTextMetadata(Configuration config) {
@@ -113,7 +110,7 @@ public class MultiColumnTextMetadata {
         }
       }
     } else {
-      _sharedProperties = Collections.emptyMap();
+      _sharedProperties = Map.of();
     }
 
     Map<String, Map<String, String>> perColumnProps = null;
@@ -159,7 +156,7 @@ public class MultiColumnTextMetadata {
     }
 
     if (perColumnProps == null) {
-      perColumnProps = Collections.emptyMap();
+      perColumnProps = Map.of();
     }
     _perColumnProperties = perColumnProps;
   }
@@ -231,7 +228,7 @@ public class MultiColumnTextMetadata {
 
   private static Map<String, String> filterSharedProps(Map<String, String> sharedProps) {
     if (sharedProps == null) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     if (sharedProps.isEmpty()) {
       return sharedProps;
@@ -259,7 +256,7 @@ public class MultiColumnTextMetadata {
 
   private static Map<String, Map<String, String>> filterColumnProps(Map<String, Map<String, String>> allColumnProps) {
     if (allColumnProps == null || allColumnProps.isEmpty()) {
-      return Collections.emptyMap();
+      return Map.of();
     }
 
     Map<String, Map<String, String>> filteredAllProps = new HashMap<>(allColumnProps.size());

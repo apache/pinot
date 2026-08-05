@@ -259,12 +259,12 @@ public class LuceneMutableTextIndexTest {
   @Test
   public void testQueries() {
     TestUtils.waitForCondition(aVoid -> {
-          try {
-            return _realtimeLuceneTextIndex.getSearcherManager().isSearcherCurrent();
-          } catch (IOException e) {
-            return false;
-          }
-        }, 10000,
+      try {
+        return _realtimeLuceneTextIndex.getSearcherManager().isSearcherCurrent();
+      } catch (IOException e) {
+        return false;
+      }
+    }, 10000,
         "Background pool did not refresh the searcher manager in time");
     assertEquals(_realtimeLuceneTextIndex.getDocIds("stream"), ImmutableRoaringBitmap.bitmapOf(0));
     assertEquals(_realtimeLuceneTextIndex.getDocIds("/.*house.*/"), ImmutableRoaringBitmap.bitmapOf(1));

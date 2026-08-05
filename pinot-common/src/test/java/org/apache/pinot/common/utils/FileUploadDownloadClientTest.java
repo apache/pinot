@@ -29,7 +29,6 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.IOUtils;
@@ -105,12 +104,12 @@ public class FileUploadDownloadClientTest {
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       Header crypterClassHeader = new BasicHeader(FileUploadDownloadClient.CustomHeaders.CRYPTER, TEST_CRYPTER);
 
-      List<Header> headers = Collections.singletonList(crypterClassHeader);
+      List<Header> headers = List.of(crypterClassHeader);
       List<NameValuePair> params = null;
 
-      SimpleHttpResponse response = fileUploadDownloadClient
-          .sendSegmentUri(FileUploadDownloadClient.getUploadSegmentHttpURI(TEST_HOST, TEST_PORT), TEST_URI, headers,
-              params, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+      SimpleHttpResponse response = fileUploadDownloadClient.sendSegmentUri(
+          FileUploadDownloadClient.getUploadSegmentURI(CommonConstants.HTTP_PROTOCOL, TEST_HOST, TEST_PORT), TEST_URI,
+          headers, params, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
       Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
       Assert.assertEquals(response.getResponse(), "OK");
     }
@@ -123,8 +122,9 @@ public class FileUploadDownloadClientTest {
     segmentJson.put(CommonConstants.Segment.DOWNLOAD_URL, TEST_URI);
     String jsonString = segmentJson.toString();
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      SimpleHttpResponse response = fileUploadDownloadClient
-          .sendSegmentJson(FileUploadDownloadClient.getUploadSegmentHttpURI(TEST_HOST, TEST_PORT), jsonString);
+      SimpleHttpResponse response = fileUploadDownloadClient.sendSegmentJson(
+          FileUploadDownloadClient.getUploadSegmentURI(CommonConstants.HTTP_PROTOCOL, TEST_HOST, TEST_PORT), jsonString,
+          null, null, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
       Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
       Assert.assertEquals(response.getResponse(), "OK");
     }

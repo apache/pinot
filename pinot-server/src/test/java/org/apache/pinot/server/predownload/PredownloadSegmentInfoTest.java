@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.server.predownload;
 
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.file.Files;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -27,6 +31,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 public class PredownloadSegmentInfoTest {
@@ -68,5 +73,58 @@ public class PredownloadSegmentInfoTest {
     SegmentZKMetadata metadata = createSegmentZKMetadata();
     _predownloadSegmentInfo.updateSegmentInfo(metadata);
     assertThrows(PredownloadException.class, () -> _predownloadSegmentInfo.getSegmentDataDir(null, true));
+  }
+
+  @Test
+  public void testUpdateSegmentInfoFromLocalFile()
+      throws Exception {
+    PredownloadSegmentInfo segmentInfo = new PredownloadSegmentInfo(TABLE_NAME, SEGMENT_NAME);
+    segmentInfo.updateSegmentInfo(createSegmentZKMetadata());
+
+    File tempDir = Files.createTempDirectory("predownload-seg-test-").toFile();
+    try {
+      // Non-existent path — logs warning and returns without updating fields
+      File missingSegDir = new File(tempDir, "missing");
+      segmentInfo.updateSegmentInfoFromLocal(missingSegDir);
+      assertNull(segmentInfo.getLocalCrc());
+      assertEquals(segmentInfo.getLocalSizeBytes(), 0);
+
+      // Regular file (not a directory) — logs warning and returns without updating fields
+      File regularFile = new File(tempDir, "not-a-dir");
+      assertTrue(regularFile.createNewFile());
+      segmentInfo.updateSegmentInfoFromLocal(regularFile);
+      assertNull(segmentInfo.getLocalCrc());
+      assertEquals(segmentInfo.getLocalSizeBytes(), 0);
+
+      // Segment directory exists but has no creation.meta — fields stay at defaults
+      File segDir = new File(tempDir, SEGMENT_NAME);
+      assertTrue(segDir.mkdirs());
+      segmentInfo.updateSegmentInfoFromLocal(segDir);
+      assertNull(segmentInfo.getLocalCrc());
+      assertEquals(segmentInfo.getLocalSizeBytes(), 0);
+
+      // creation.meta present with matching CRC — fields populated, isDownloaded true
+      File creationMeta = new File(segDir, "creation.meta");
+      try (DataOutputStream dos = new DataOutputStream(new FileOutputStream(creationMeta))) {
+        dos.writeLong(CRC);
+        dos.writeLong(System.currentTimeMillis());
+      }
+      org.apache.commons.io.FileUtils.writeByteArrayToFile(new File(segDir, "columns.psf"), new byte[]{1, 2, 3});
+      segmentInfo.updateSegmentInfoFromLocal(segDir);
+      assertEquals(segmentInfo.getLocalCrc(), String.valueOf(CRC));
+      assertTrue(segmentInfo.getLocalSizeBytes() > 0);
+      assertTrue(segmentInfo.isDownloaded());
+
+      // creation.meta present with different CRC — localCrc set, isDownloaded false
+      try (DataOutputStream dos = new DataOutputStream(new FileOutputStream(creationMeta))) {
+        dos.writeLong(CRC + 1);
+        dos.writeLong(System.currentTimeMillis());
+      }
+      segmentInfo.updateSegmentInfoFromLocal(segDir);
+      assertEquals(segmentInfo.getLocalCrc(), String.valueOf(CRC + 1));
+      assertFalse(segmentInfo.isDownloaded());
+    } finally {
+      org.apache.commons.io.FileUtils.deleteQuietly(tempDir);
+    }
   }
 }

@@ -31,8 +31,10 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.client.admin.PinotAdminException;
@@ -44,9 +46,11 @@ import org.apache.pinot.common.restlet.resources.ServerRebalanceJobStatusRespons
 import org.apache.pinot.common.restlet.resources.TableSegmentsReloadCheckResponse;
 import org.apache.pinot.common.restlet.resources.TableView;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
+import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TenantConfig;
@@ -71,10 +75,9 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Shared set of common tests for cluster integration tests.
- * <p>To enable the test, override it and add @Test annotation.
- */
+/// Shared set of common tests for cluster integration tests.
+///
+/// To enable the test, override it and add @Test annotation.
 public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTestSet.class);
 
@@ -88,24 +91,18 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     setUseMultiStageQueryEngine(false);
   }
 
-  /**
-   * Can be overridden to change default setting
-   */
+  /// Can be overridden to change default setting
   protected String getQueryFileName() {
     return DEFAULT_QUERY_FILE_NAME;
   }
 
-  /**
-   * Can be overridden to change default setting
-   */
+  /// Can be overridden to change default setting
   protected int getNumQueriesToGenerate() {
     return DEFAULT_NUM_QUERIES_TO_GENERATE;
   }
 
-  /**
-   * Test hard-coded queries.
-   * @throws Exception
-   */
+  /// Test hard-coded queries.
+  /// @throws Exception
   public void testHardcodedQueries()
       throws Exception {
     testHardcodedQueriesCommon();
@@ -116,25 +113,21 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }
   }
 
-  /**
-   * Test hardcoded queries.
-   * <p>NOTE:
-   * <p>For queries with <code>LIMIT</code>, need to remove limit or add <code>LIMIT 10000</code> to the H2 SQL query
-   * because the comparison only works on exhausted result with at most 10000 rows.
-   * <ul>
-   *   <li>
-   *     Eg. <code>SELECT a FROM table LIMIT 15 -> [SELECT a FROM table LIMIT 10000]</code>
-   *   </li>
-   * </ul>
-   * <p>For group-by queries, need to add group-by columns to the select clause for H2 queries.
-   * <ul>
-   *   <li>
-   *     Eg. <code>SELECT SUM(a) FROM table GROUP BY b -> [SELECT b, SUM(a) FROM table GROUP BY b]</code>
-   *   </li>
-   * </ul>
-   * TODO: Selection queries, Aggregation Group By queries, Order By, Distinct
-   *  This list is very basic right now (aggregations only) and needs to be enriched
-   */
+  /// Test hardcoded queries.
+  ///
+  /// NOTE:
+  ///
+  /// For queries with `LIMIT`, need to remove limit or add `LIMIT 10000` to the H2 SQL query
+  /// because the comparison only works on exhausted result with at most 10000 rows.
+  ///
+  /// - Eg. `SELECT a FROM table LIMIT 15 -> [SELECT a FROM table LIMIT 10000]`
+  ///
+  /// For group-by queries, need to add group-by columns to the select clause for H2 queries.
+  ///
+  /// - Eg. `SELECT SUM(a) FROM table GROUP BY b -> [SELECT b, SUM(a) FROM table GROUP BY b]`
+  ///
+  /// TODO: Selection queries, Aggregation Group By queries, Order By, Distinct
+  ///  This list is very basic right now (aggregations only) and needs to be enriched
   private void testHardcodedQueriesCommon()
       throws Exception {
     String query;
@@ -406,9 +399,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }
   }
 
-  /**
-   * Test hardcoded queries on server partitioned data (all the segments for a partition is served by a single server).
-   */
+  /// Test hardcoded queries on server partitioned data (all the segments for a partition is served by a single server).
   public void testHardcodedServerPartitionedSqlQueries()
       throws Exception {
     // IN_PARTITIONED_SUBQUERY
@@ -430,11 +421,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }
   }
 
-  /**
-   * Test to ensure that broker response contains expected stats
-   *
-   * @throws Exception
-   */
+  /// Test to ensure that broker response contains expected stats
+  ///
+  /// @throws Exception
   public void testBrokerResponseMetadata()
       throws Exception {
     String[] queries = new String[]{
@@ -478,9 +467,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         "select $docId, $segmentName, $hostName, $partitionId from mytable where $docId > 19998 limit 50");
   }
 
-  /**
-   * Test queries from the query file.
-   */
+  /// Test queries from the query file.
   public void testQueriesFromQueryFile()
       throws Exception {
     InputStream inputStream =
@@ -516,11 +503,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }
   }
 
-  /**
-   * Test queries generated by query generator.
-   *
-   * @throws Exception
-   */
+  /// Test queries generated by query generator.
+  ///
+  /// @throws Exception
   public void testGeneratedQueries()
       throws Exception {
     // default test with MV columns, without using multistage engine
@@ -549,11 +534,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }
   }
 
-  /**
-   * Test if routing table get updated when instance is shutting down.
-   *
-   * @throws Exception
-   */
+  /// Test if routing table get updated when instance is shutting down.
+  ///
+  /// @throws Exception
   public void testInstanceShutdown()
       throws Exception {
     List<String> instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
@@ -603,6 +586,111 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       // Check that it is in the routing table
       checkForInstanceInRoutingTable(instance, true);
     }
+  }
+
+  /// Test that:
+  ///
+  /// 1. setting `queriesDisabled` via the controller API removes and re-adds a server from broker routing;
+  /// 2. concurrent field-scoped updates to `shutdownInProgress` do not clobber `queriesDisabled`;
+  /// 3. a full-record `PUT /instances/{name}` (updateInstance) does NOT clobber the operational
+  ///    `queriesDisabled` flag, even when the request body's default value is `false`.
+  public void testQueriesDisabled()
+      throws Exception {
+    List<String> instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
+    // Iterate over all servers to find one that actually appears in the routing table for {@code getTableName()}.
+    // Picking the first server unconditionally can be flaky when multiple servers exist with different tags
+    // (e.g. hybrid clusters with offline/realtime tenants).
+    String serverInstance = null;
+    for (String candidate : instances) {
+      if (!InstanceTypeUtils.isServer(candidate)) {
+        continue;
+      }
+      if (isInstanceInRoutingTable(candidate)) {
+        serverInstance = candidate;
+        break;
+      }
+    }
+    assertNotNull(serverInstance,
+        "No server instance found in routing table for table: " + getTableName() + "; instances: " + instances);
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT, getHelixClusterName())
+            .forParticipant(serverInstance).build();
+    try {
+      // Server should be in routing initially
+      checkForInstanceInRoutingTable(serverInstance, true);
+
+      // Disable query routing via the controller API
+      getOrCreateAdminClient().getInstanceClient().updateInstanceState(serverInstance, "QUERIES_DISABLE");
+
+      // Server should leave routing
+      checkForInstanceInRoutingTable(serverInstance, false);
+
+      // Re-enable query routing
+      getOrCreateAdminClient().getInstanceClient().updateInstanceState(serverInstance, "QUERIES_ENABLE");
+
+      // Server should re-enter routing
+      checkForInstanceInRoutingTable(serverInstance, true);
+
+      // Interleaving test: set queriesDisabled, then set shutdownInProgress, then clear shutdownInProgress.
+      // queriesDisabled must still be set (i.e. the server must remain out of routing) because we use
+      // field-scoped writes that do not clobber each other.
+      getOrCreateAdminClient().getInstanceClient().updateInstanceState(serverInstance, "QUERIES_DISABLE");
+      checkForInstanceInRoutingTable(serverInstance, false);
+
+      _helixAdmin.setConfig(scope,
+          Map.of(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.TRUE.toString()));
+      checkForInstanceInRoutingTable(serverInstance, false);
+
+      _helixAdmin.setConfig(scope,
+          Map.of(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.FALSE.toString()));
+
+      // queriesDisabled was set via a separate field-scoped write, so the server must still be out of routing
+      checkForInstanceInRoutingTable(serverInstance, false);
+
+      // Full-record updateInstance test: round-trip the live config through PUT /instances/{name} with the
+      // request body's {@code queriesDisabled} defaulted to false. The operational flag must NOT be cleared,
+      // since it is owned by /state?state=QUERIES_DISABLE|QUERIES_ENABLE.
+      InstanceConfig liveInstanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), serverInstance);
+      Instance instanceBody = InstanceUtils.toInstance(liveInstanceConfig);
+      // Force the request-body flag to false to simulate an operator updating host/tags/ports without realizing
+      // that queriesDisabled is operationally owned by a different API.
+      Instance updateBody = new Instance(instanceBody.getHost(), instanceBody.getPort(), instanceBody.getType(),
+          instanceBody.getTags(), instanceBody.getPools(), instanceBody.getGrpcPort(), instanceBody.getAdminPort(),
+          instanceBody.getQueryServicePort(), instanceBody.getQueryMailboxPort(), false);
+      getOrCreateAdminClient().getInstanceClient().updateInstance(serverInstance, updateBody.toJsonString());
+      // Operational flag must survive a request-body-driven update.
+      checkForInstanceInRoutingTable(serverInstance, false);
+    } finally {
+      // Defensive cleanup: restore the server to the routing-eligible state regardless of which assertion failed.
+      // Each cleanup step is wrapped so a primary assertion failure isn't masked by a cleanup throw.
+      try {
+        getOrCreateAdminClient().getInstanceClient().updateInstanceState(serverInstance, "QUERIES_ENABLE");
+      } catch (Exception ignored) {
+      }
+      try {
+        _helixAdmin.setConfig(scope,
+            Map.of(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.FALSE.toString()));
+      } catch (Exception ignored) {
+      }
+    }
+    // Verify routing is restored after cleanup.
+    checkForInstanceInRoutingTable(serverInstance, true);
+  }
+
+  /// Non-waiting check for whether `instance` appears in any routing table for the current table.
+  /// Used by [#testQueriesDisabled()] to pick a server that is actually serving queries.
+  private boolean isInstanceInRoutingTable(String instance) {
+    try {
+      JsonNode routingTables = getDebugInfo("debug/routingTable/" + getTableName());
+      for (JsonNode routingTable : routingTables) {
+        if (routingTable.has(instance)) {
+          return true;
+        }
+      }
+    } catch (Exception ignored) {
+      // Routing table not yet populated; treat as not present.
+    }
+    return false;
   }
 
   private void checkForInstanceInRoutingTable(String instance, boolean shouldExist) {
@@ -962,10 +1050,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }, 1000L, timeoutMs, "Failed to converge EV and IS for table: " + tableName);
   }
 
-  /**
-   * Helper method to perform segment moving test regarding forceCommit in rebalance with specified configuration.
-   * Changes the table tenant, executes rebalance with force commit, and verifies if segments were committed.
-   */
+  /// Helper method to perform segment moving test regarding forceCommit in rebalance with specified configuration.
+  /// Changes the table tenant, executes rebalance with force commit, and verifies if segments were committed.
   protected void performForceCommitSegmentMovingTest(RebalanceConfig rebalanceConfig, TableConfig tableConfig,
       String newTenant,
       boolean shouldCommit, long timeoutMs)
@@ -973,11 +1059,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, newTenant, shouldCommit, timeoutMs, false);
   }
 
-  /**
-   * Helper method to perform segment moving test regarding forceCommit in rebalance with EVIS convergence wait.
-   * Similar to performSegmentMovingTest but waits for external view/ideal state convergence instead of rebalance
-   * completion.
-   */
+  /// Helper method to perform segment moving test regarding forceCommit in rebalance with EVIS convergence wait.
+  /// Similar to performSegmentMovingTest but waits for external view/ideal state convergence instead of rebalance
+  /// completion.
   protected void performForceCommitSegmentMovingTestWithEVISConverge(RebalanceConfig rebalanceConfig,
       TableConfig tableConfig,
       String newTenant, boolean shouldCommit, long timeoutMs)
@@ -985,18 +1069,16 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, newTenant, shouldCommit, timeoutMs, true);
   }
 
-  /**
-   * Helper method to perform segment moving test regarding forceCommit in rebalance with specified configuration.
-   * Changes the table tenant, executes rebalance with force commit, and verifies if segments were committed.
-   *
-   * @param rebalanceConfig the rebalance configuration
-   * @param tableConfig the table configuration
-   * @param newTenant the new tenant to move segments to
-   * @param shouldCommit whether segments should be committed (affects verification)
-   * @param timeoutMs timeout in milliseconds
-   * @param waitForEVISConverge if true, waits for external view/ideal state convergence; if false, waits for
-   *                            rebalance completion
-   */
+  /// Helper method to perform segment moving test regarding forceCommit in rebalance with specified configuration.
+  /// Changes the table tenant, executes rebalance with force commit, and verifies if segments were committed.
+  ///
+  /// @param rebalanceConfig the rebalance configuration
+  /// @param tableConfig the table configuration
+  /// @param newTenant the new tenant to move segments to
+  /// @param shouldCommit whether segments should be committed (affects verification)
+  /// @param timeoutMs timeout in milliseconds
+  /// @param waitForEVISConverge if true, waits for external view/ideal state convergence; if false, waits for
+  ///                            rebalance completion
   private void performForceCommitSegmentMovingTest(RebalanceConfig rebalanceConfig, TableConfig tableConfig,
       String newTenant,
       boolean shouldCommit, long timeoutMs, boolean waitForEVISConverge)

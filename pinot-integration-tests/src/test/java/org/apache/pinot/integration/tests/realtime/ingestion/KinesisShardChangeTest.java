@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -74,10 +73,8 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     deleteStream();
   }
 
-  /**
-   * Data provider for shard split and merge tests with different offset combinations.
-   * Documentation is in the test method.
-   */
+  /// Data provider for shard split and merge tests with different offset combinations.
+  /// Documentation is in the test method.
   @DataProvider(name = "shardOffsetCombinations")
   public Object[][] shardOffsetCombinations() {
     return new Object[][]{
@@ -100,26 +97,24 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     };
   }
 
-  /**
-   * Test case to validate shard split/merge behavior with different offset combinations.
-   * The expectation is that
-   * 1. when "smallest" offset is used, the old parent shards would be consumed first.
-   *    New shards will not be consumed until RVM is run or resume() is called with lastConsumed / largest offset
-   * 2. when "largest" offset is used, only new records would be consumed and all prior records pushed to kinesis
-   *    would be skipped.
-   * 3. when "lastConsumed" offset is used, data would be consumed based on the last consumed offset.
-   * 4. when RealtimeSegmentValidationManager is triggered, the behaviour should be same as calling resume() with
-   *    "lastConsumed" offset.
-   * @param operation - "split" or "merge"
-   * @param firstOffsetCriteria - Offset criteria for the first resume call.
-   *                            If it's null, RealtimeSegmentValidationManager is triggered
-   * @param secondOffsetCriteria - Offset criteria for the second resume call.
-   *                             If it's null, RealtimeSegmentValidationManager is triggered
-   * @param firstExpectedRecords - Expected records after the first resume call
-   * @param secondExpectedRecords - Expected records after the second resume call
-   * @param expectedOnlineSegments - Expected number of online segments in the end
-   * @param expectedConsumingSegments - Expected Number of consuming segments in the end
-   */
+  /// Test case to validate shard split/merge behavior with different offset combinations.
+  /// The expectation is that
+  /// 1. when "smallest" offset is used, the old parent shards would be consumed first.
+  ///    New shards will not be consumed until RVM is run or resume() is called with lastConsumed / largest offset
+  /// 2. when "largest" offset is used, only new records would be consumed and all prior records pushed to kinesis
+  ///    would be skipped.
+  /// 3. when "lastConsumed" offset is used, data would be consumed based on the last consumed offset.
+  /// 4. when RealtimeSegmentValidationManager is triggered, the behaviour should be same as calling resume() with
+  ///    "lastConsumed" offset.
+  /// @param operation - "split" or "merge"
+  /// @param firstOffsetCriteria - Offset criteria for the first resume call.
+  ///                            If it's null, RealtimeSegmentValidationManager is triggered
+  /// @param secondOffsetCriteria - Offset criteria for the second resume call.
+  ///                             If it's null, RealtimeSegmentValidationManager is triggered
+  /// @param firstExpectedRecords - Expected records after the first resume call
+  /// @param secondExpectedRecords - Expected records after the second resume call
+  /// @param expectedOnlineSegments - Expected number of online segments in the end
+  /// @param expectedConsumingSegments - Expected Number of consuming segments in the end
   @Test(dataProvider = "shardOffsetCombinations")
   public void testShardOperationsWithOffsets(String operation, String firstOffsetCriteria, String secondOffsetCriteria,
       int firstExpectedRecords, int secondExpectedRecords, int expectedOnlineSegments,
@@ -180,10 +175,8 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     validateSegmentStates(getTableName(), expectedOnlineSegments, expectedConsumingSegments);
   }
 
-  /**
-   * Data provider for new table tests with different offset combinations.
-   * Documentation is in the test method.
-   */
+  /// Data provider for new table tests with different offset combinations.
+  /// Documentation is in the test method.
   @DataProvider(name = "initialOffsetCombinations")
   public Object[][] initialOffsetCombinations() {
     return new Object[][]{
@@ -193,11 +186,9 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     };
   }
 
-  /**
-   * Test case to split shards, then create new table and check consumption
-   * For the sake of brevity, we will only test shard split and calling Realtime Validation Manager
-   * Individually, pause and resume have been verified for shard split / merge operations
-   */
+  /// Test case to split shards, then create new table and check consumption
+  /// For the sake of brevity, we will only test shard split and calling Realtime Validation Manager
+  /// Individually, pause and resume have been verified for shard split / merge operations
   @Test(dataProvider = "initialOffsetCombinations")
   public void testNewTableAfterShardSplit(String offsetCriteria, int firstExpectedRecords, int secondExpectedRecords)
       throws Exception {
@@ -228,11 +219,9 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     dropNewSchemaAndTable(name);
   }
 
-  /**
-   * Test case to first split shards, then merge some shards.
-   * For the sake of brevity, we will only test by calling Realtime Validation Manager
-   * Individually, pause and resume have been verified for shard split / merge operations
-   */
+  /// Test case to first split shards, then merge some shards.
+  /// For the sake of brevity, we will only test by calling Realtime Validation Manager
+  /// Individually, pause and resume have been verified for shard split / merge operations
   @Test
   public void testSplitAndMergeShards()
       throws Exception {
@@ -266,10 +255,8 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     validateSegmentStates(getTableName(), 6, 2);
   }
 
-  /**
-   * Test case to continuously publish records to kinesis (in a background thread) and concurrently split shards
-   * and concurrently call pause and resume APIs or RVM and finally validate the total count of records
-   */
+  /// Test case to continuously publish records to kinesis (in a background thread) and concurrently split shards
+  /// and concurrently call pause and resume APIs or RVM and finally validate the total count of records
   @Test
   public void testConcurrentShardSplit()
       throws IOException, InterruptedException {
@@ -338,12 +325,10 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     Assert.assertEquals(consumingSegments.size(), expectedConsumingSegments);
   }
 
-  /**
-   * start and end offsets are essentially the start row index and end row index of the file
-   *
-   * @param startOffset - inclusive
-   * @param endOffset   - exclusive
-   */
+  /// start and end offsets are essentially the start row index and end row index of the file
+  ///
+  /// @param startOffset - inclusive
+  /// @param endOffset   - exclusive
   private void publishRecordsToKinesis(int startOffset, int endOffset)
       throws Exception {
     InputStream inputStream = RealtimeKinesisIntegrationTest.class.getClassLoader()
@@ -414,7 +399,7 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
 
   @Override
   public List<String> getNoDictionaryColumns() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override

@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.controller.helix.core;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -49,9 +49,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for minion status query functionality in PinotHelixTaskResourceManager
- */
+/// Unit tests for minion status query functionality in PinotHelixTaskResourceManager
 public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
 
   private PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
@@ -82,11 +80,9 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
     }
   }
 
-  /**
-   * Helper method to create a mock TaskDriver with workflows and jobs containing tasks assigned to minions
-   * @param taskAssignments Map of minion instance ID to number of RUNNING tasks
-   * @return Mocked TaskDriver
-   */
+  /// Helper method to create a mock TaskDriver with workflows and jobs containing tasks assigned to minions
+  /// @param taskAssignments Map of minion instance ID to number of RUNNING tasks
+  /// @return Mocked TaskDriver
   private TaskDriver createMockTaskDriverWithRunningTasks(Map<String, Integer> taskAssignments) {
     TaskDriver mockTaskDriver = mock(TaskDriver.class);
 
@@ -145,7 +141,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
       String minionHost = "minion-test-" + i + ".example.com";
       int minionPort = 9514;
       Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
-          Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+          List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
       PinotResourceManagerResponse addResponse = _helixResourceManager.addInstance(minionInstance, false);
       assertTrue(addResponse.isSuccessful(), "Failed to add minion instance");
     }
@@ -196,7 +192,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
       String minionHost = "minion-drain-test-" + i + ".example.com";
       int minionPort = 9514;
       Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
-          Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+          List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
       PinotResourceManagerResponse addResponse = _helixResourceManager.addInstance(minionInstance, false);
       assertTrue(addResponse.isSuccessful());
     }
@@ -270,7 +266,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
       String minionHost = "minion-filter-" + i + ".example.com";
       int minionPort = 9514;
       Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
-          Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+          List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
       PinotResourceManagerResponse addResponse = _helixResourceManager.addInstance(minionInstance, false);
       assertTrue(addResponse.isSuccessful());
     }
@@ -323,7 +319,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
     String minionHost = "minion-invalid-filter.example.com";
     int minionPort = 9514;
     Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
-        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+        List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
     _helixResourceManager.addInstance(minionInstance, false);
 
     // Create a mock TaskDriver with running tasks
@@ -352,9 +348,9 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
     int minionPort = 9514;
 
     Instance minion1 = new Instance(minionHost1, minionPort, InstanceType.MINION,
-        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+        List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
     Instance minion2 = new Instance(minionHost2, minionPort, InstanceType.MINION,
-        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+        List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
 
     _helixResourceManager.addInstance(minion1, false);
     _helixResourceManager.addInstance(minion2, false);
@@ -399,11 +395,11 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
     String minionHost = "minion-type-test.example.com";
 
     Instance brokerInstance = new Instance(brokerHost, 8099, InstanceType.BROKER,
-        Collections.singletonList("DefaultTenant_BROKER"), null, 0, 0, 0, 0, false);
+        List.of("DefaultTenant_BROKER"), null, 0, 0, 0, 0, false);
     Instance serverInstance = new Instance(serverHost, 8098, InstanceType.SERVER,
-        Collections.singletonList("DefaultTenant_OFFLINE"), null, 0, 0, 0, 0, false);
+        List.of("DefaultTenant_OFFLINE"), null, 0, 0, 0, 0, false);
     Instance minionInstance = new Instance(minionHost, 9514, InstanceType.MINION,
-        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+        List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
 
     _helixResourceManager.addInstance(brokerInstance, false);
     _helixResourceManager.addInstance(serverInstance, false);
@@ -437,7 +433,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
     int expectedPort = 9514;
 
     Instance minionInstance = new Instance(expectedHost, expectedPort, InstanceType.MINION,
-        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+        List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
     _helixResourceManager.addInstance(minionInstance, false);
 
     // Create a mock TaskDriver with running tasks
@@ -470,11 +466,11 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
     String minion3Id = "Minion_minion-running-3.example.com_9514";
 
     Instance minion1 = new Instance("minion-running-1.example.com", 9514, InstanceType.MINION,
-        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+        List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
     Instance minion2 = new Instance("minion-running-2.example.com", 9514, InstanceType.MINION,
-        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+        List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
     Instance minion3 = new Instance("minion-running-3.example.com", 9514, InstanceType.MINION,
-        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+        List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
 
     _helixResourceManager.addInstance(minion1, false);
     _helixResourceManager.addInstance(minion2, false);
@@ -524,9 +520,9 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
     String minion2Id = "Minion_minion-init-test-2.example.com_9514";
 
     Instance minion1 = new Instance("minion-init-test-1.example.com", 9514, InstanceType.MINION,
-        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+        List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
     Instance minion2 = new Instance("minion-init-test-2.example.com", 9514, InstanceType.MINION,
-        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+        List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
 
     _helixResourceManager.addInstance(minion1, false);
     _helixResourceManager.addInstance(minion2, false);
@@ -568,7 +564,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
 
     String minionId = "Minion_minion-drained-running.example.com_9514";
     Instance minion = new Instance("minion-drained-running.example.com", 9514, InstanceType.MINION,
-        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+        List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
     _helixResourceManager.addInstance(minion, false);
 
     // Drain the minion
@@ -611,7 +607,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
 
     String minionId = "Minion_minion-exception-test.example.com_9514";
     Instance minion = new Instance("minion-exception-test.example.com", 9514, InstanceType.MINION,
-        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+        List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
     _helixResourceManager.addInstance(minion, false);
 
     // Create a mock TaskDriver that throws an exception when accessing workflows
@@ -644,7 +640,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
 
     for (int i = 0; i < 4; i++) {
       Instance minion = new Instance("minion-offline-test-" + i + ".example.com", 9514, InstanceType.MINION,
-          Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+          List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
       _helixResourceManager.addInstance(minion, false);
     }
 
@@ -697,9 +693,9 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
     String minion2Id = "Minion_minion-no-tasks-2.example.com_9514";
 
     Instance minion1 = new Instance("minion-no-tasks-1.example.com", 9514, InstanceType.MINION,
-        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+        List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
     Instance minion2 = new Instance("minion-no-tasks-2.example.com", 9514, InstanceType.MINION,
-        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+        List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
 
     _helixResourceManager.addInstance(minion1, false);
     _helixResourceManager.addInstance(minion2, false);
@@ -739,7 +735,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
 
     for (int i = 0; i < 4; i++) {
       Instance minion = new Instance("minion-mixed-" + i + ".example.com", 9514, InstanceType.MINION,
-          Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+          List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
       _helixResourceManager.addInstance(minion, false);
     }
 
@@ -788,7 +784,7 @@ public class PinotHelixResourceManagerMinionStatusTest extends ControllerTest {
     String minionHost = "minion-invalid-offline.example.com";
     int minionPort = 9514;
     Instance minionInstance = new Instance(minionHost, minionPort, InstanceType.MINION,
-        Collections.singletonList(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
+        List.of(Helix.UNTAGGED_MINION_INSTANCE), null, 0, 0, 0, 0, false);
     _helixResourceManager.addInstance(minionInstance, false);
 
     TaskDriver mockTaskDriver = createMockTaskDriverWithRunningTasks(new HashMap<>());

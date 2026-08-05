@@ -52,10 +52,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * This task only tests the basic functionality of {@link PurgeTaskExecutor#convert(PinotTaskConfig, File, File)}.
- * Random test for segment purger is covered in SegmentPurgerTest.
- */
+/// This task only tests the basic functionality of [PurgeTaskExecutor#convert(PinotTaskConfig, File, File)].
+/// Random test for segment purger is covered in SegmentPurgerTest.
 public class PurgeTaskExecutorTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "PurgeTaskExecutorTest");
   private static final File ORIGINAL_SEGMENT_DIR = new File(TEMP_DIR, "originalSegment");

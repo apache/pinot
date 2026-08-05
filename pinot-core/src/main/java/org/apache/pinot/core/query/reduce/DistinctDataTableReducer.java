@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
@@ -27,6 +29,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.distinct.table.BigDecimalDistinctTable;
 import org.apache.pinot.core.query.distinct.table.BytesDistinctTable;
 import org.apache.pinot.core.query.distinct.table.DistinctTable;
@@ -41,9 +44,7 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
-/**
- * Helper class to reduce data tables and set results of distinct query into the BrokerResponseNative
- */
+/// Helper class to reduce data tables and set results of distinct query into the BrokerResponseNative
 public class DistinctDataTableReducer implements DataTableReducer {
   private final QueryContext _queryContext;
 
@@ -61,8 +62,32 @@ public class DistinctDataTableReducer implements DataTableReducer {
       brokerResponseNative.setResultTable(new ResultTable(dataSchema, List.of()));
       return;
     }
+    DistinctTable distinctTable = mergeToDistinctTable(dataSchema, dataTableMap.values());
+    brokerResponseNative.setResultTable(distinctTable.toResultTable());
+  }
+
+  @Override
+  public DataTable mergeDataTablesOnly(String tableName, DataSchema dataSchema,
+      Map<ServerRoutingInstance, DataTable> dataTableMap, DataTableReducerContext reducerContext,
+      BrokerMetrics brokerMetrics) {
+    dataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForDistinct(_queryContext, dataSchema);
+    try {
+      if (dataTableMap.isEmpty() || _queryContext.getLimit() == 0) {
+        return DataTableBuilderFactory.getDataTableBuilder(dataSchema).build();
+      }
+      DistinctTable distinctTable = mergeToDistinctTable(dataSchema, dataTableMap.values());
+      // Intermediate form: limit/sorting not applied
+      return distinctTable.toDataTable();
+    } catch (IOException e) {
+      throw new RuntimeException("Caught IOException while building merged intermediate DataTable for distinct", e);
+    }
+  }
+
+  /// Merges the per-server DataTables into a single [DistinctTable] (early-stopping once the
+  /// distinct set is satisfied). Shared by the normal reduce path and the merge-only path.
+  private DistinctTable mergeToDistinctTable(DataSchema dataSchema, Collection<DataTable> dataTables) {
     DistinctTable distinctTable = null;
-    for (DataTable dataTable : dataTableMap.values()) {
+    for (DataTable dataTable : dataTables) {
       QueryThreadContext.checkTerminationAndSampleUsage("DistinctDataTableReducer");
       if (distinctTable == null) {
         distinctTable = createDistinctTable(dataSchema, dataTable);
@@ -75,7 +100,7 @@ public class DistinctDataTableReducer implements DataTableReducer {
         }
       }
     }
-    brokerResponseNative.setResultTable(distinctTable.toResultTable());
+    return distinctTable;
   }
 
   private DistinctTable createDistinctTable(DataSchema dataSchema, DataTable dataTable) {

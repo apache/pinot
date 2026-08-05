@@ -25,7 +25,6 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ObjectBooleanPair;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -53,46 +52,30 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * Filter operator based on star tree index.
- * <p>High-level algorithm:
- * <ul>
- *   <li>
- *     Traverse the filter tree and generate a map from column to a list of {@link CompositePredicateEvaluator}s applied
- *     to it
- *   </li>
- *   <li>
- *     Traverse the star tree index, try to match as many predicates as possible, add the matching documents into a
- *     bitmap, and keep track of the remaining predicate columns and group-by columns
- *     <ul>
- *       <li>
- *         If we have predicates on the current dimension, calculate matching dictionary ids, add nodes associated with
- *         the matching dictionary ids
- *       </li>
- *       <li>If we don't have predicate but have group-by on the current dimension, add all non-star nodes</li>
- *       <li>If no predicate or group-by on the current dimension, use star node if exists, or all non-star nodes</li>
- *       <li>If all predicates and group-by are matched, add the aggregated document</li>
- *       <li>If we have remaining predicates or group-by at leaf node, add the documents from start to end</li>
- *       <li>
- *         If we have remaining predicates at leaf node, store the column because we need separate
- *         {@link BaseFilterOperator}s for it
- *       </li>
- *       <li>Generate a {@link BitmapBasedFilterOperator} using the matching documents bitmap</li>
- *     </ul>
- *   </li>
- *   <li>
- *     For each remaining predicate columns, use the list of {@link CompositePredicateEvaluator}s to generate separate
- *     {@link BaseFilterOperator}s for it
- *   </li>
- *   <li>Conjoin all {@link BaseFilterOperator}s with AND if we have multiple of them</li>
- * </ul>
- */
+/// Filter operator based on star tree index.
+///
+/// High-level algorithm:
+///
+/// - Traverse the filter tree and generate a map from column to a list of [CompositePredicateEvaluator]s
+///   applied to it
+/// - Traverse the star tree index, try to match as many predicates as possible, add the matching documents into a
+///   bitmap, and keep track of the remaining predicate columns and group-by columns
+///   - If we have predicates on the current dimension, calculate matching dictionary ids, add nodes associated with
+///     the matching dictionary ids
+///   - If we don't have predicate but have group-by on the current dimension, add all non-star nodes
+///   - If no predicate or group-by on the current dimension, use star node if exists, or all non-star nodes
+///   - If all predicates and group-by are matched, add the aggregated document
+///   - If we have remaining predicates or group-by at leaf node, add the documents from start to end
+///   - If we have remaining predicates at leaf node, store the column because we need separate
+///     [BaseFilterOperator]s for it
+///   - Generate a [BitmapBasedFilterOperator] using the matching documents bitmap
+/// - For each remaining predicate columns, use the list of [CompositePredicateEvaluator]s to generate separate
+///   [BaseFilterOperator]s for it
+/// - Conjoin all [BaseFilterOperator]s with AND if we have multiple of them
 public class StarTreeFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_STARTREE_INDEX";
 
-  /**
-   * Helper class to wrap the result from traversing the star tree.
-   */
+  /// Helper class to wrap the result from traversing the star tree.
   private static class StarTreeResult {
     final ImmutableRoaringBitmap _matchedDocIds;
     final Set<String> _remainingPredicateColumns;
@@ -122,7 +105,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     _queryContext = queryContext;
     _starTreeV2 = starTreeV2;
     _predicateEvaluatorsMap = predicateEvaluatorsMap;
-    _groupByColumns = groupByColumns != null ? groupByColumns : Collections.emptySet();
+    _groupByColumns = groupByColumns != null ? groupByColumns : Set.of();
     _scanStarTreeNodes = QueryOptionsUtils.isScanStarTreeNodes(_queryContext.getQueryOptions());
   }
 
@@ -146,16 +129,13 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
-  /**
-   * Helper method to get a filter operator that match the matchingDictIdsMap.
-   * <ul>
-   *   <li>First go over the star tree and try to match as many columns as possible</li>
-   *   <li>For the remaining columns, use other indexes to match them</li>
-   * </ul>
-   */
+  /// Helper method to get a filter operator that match the matchingDictIdsMap.
+  ///
+  /// - First go over the star tree and try to match as many columns as possible
+  /// - For the remaining columns, use other indexes to match them
   private BaseFilterOperator getFilterOperator() {
     StarTreeResult starTreeResult = traverseStarTree();
 
@@ -209,11 +189,9 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     }
   }
 
-  /**
-   * Helper method to traverse the star tree, get matching documents and keep track of all the predicate columns that
-   * are not matched. Returns {@code null} if no matching dictionary id found for a column (i.e. the result for the
-   * filter operator is empty).
-   */
+  /// Helper method to traverse the star tree, get matching documents and keep track of all the predicate columns that
+  /// are not matched. Returns `null` if no matching dictionary id found for a column (i.e. the result for the
+  /// filter operator is empty).
   @Nullable
   private StarTreeResult traverseStarTree() {
     MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
@@ -365,24 +343,18 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     }
 
     return new StarTreeResult(matchingDocIds,
-        globalRemainingPredicateColumns != null ? globalRemainingPredicateColumns : Collections.emptySet());
+        globalRemainingPredicateColumns != null ? globalRemainingPredicateColumns : Set.of());
   }
 
-  /**
-   * Helper method to get a set of matching dictionary ids from a list of composite predicate evaluators conjoined with
-   * AND.
-   * <p>When there are multiple composite predicate evaluators:
-   * <ul>
-   *   <li>
-   *     We sort all composite predicate evaluators with priority: EQ > IN > RANGE > NOT_IN/NEQ > REGEXP_LIKE > multiple
-   *     predicate evaluators conjoined with OR so that we process less dictionary ids.
-   *   </li>
-   *   <li>
-   *     For the first composite predicate evaluator, we get all the matching dictionary ids, then apply them to other
-   *     composite predicate evaluators to get the final set of matching dictionary ids.
-   *   </li>
-   * </ul>
-   */
+  /// Helper method to get a set of matching dictionary ids from a list of composite predicate evaluators conjoined with
+  /// AND.
+  ///
+  /// When there are multiple composite predicate evaluators:
+  ///
+  /// - We sort all composite predicate evaluators with priority: EQ > IN > RANGE > NOT_IN/NEQ > REGEXP_LIKE >
+  ///   multiple predicate evaluators conjoined with OR so that we process less dictionary ids.
+  /// - For the first composite predicate evaluator, we get all the matching dictionary ids, then apply them to other
+  ///   composite predicate evaluators to get the final set of matching dictionary ids.
   private IntSet getMatchingDictIds(List<CompositePredicateEvaluator> compositePredicateEvaluators) {
     int numCompositePredicateEvaluators = compositePredicateEvaluators.size();
     if (numCompositePredicateEvaluators == 1) {
@@ -444,9 +416,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     return matchingDictIds;
   }
 
-  /**
-   * Returns the matching dictionary ids for the given composite predicate evaluator.
-   */
+  /// Returns the matching dictionary ids for the given composite predicate evaluator.
   private IntSet getMatchingDictIds(CompositePredicateEvaluator compositePredicateEvaluator) {
     List<ObjectBooleanPair<PredicateEvaluator>> predicateEvaluators =
         compositePredicateEvaluator.getPredicateEvaluators();

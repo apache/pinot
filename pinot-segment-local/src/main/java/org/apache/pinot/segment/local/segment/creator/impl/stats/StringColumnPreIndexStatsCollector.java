@@ -27,7 +27,9 @@ import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 
@@ -45,6 +47,14 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   public StringColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
+    if (_fieldConfig != null && _fieldConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
+      _clpStatsCollector = new CLPStatsCollector();
+    }
+  }
+
+  public StringColumnPreIndexStatsCollector(FieldSpec fieldSpec, @Nullable FieldConfig fieldConfig,
+      @Nullable PartitionFunction partitionFunction) {
+    super(fieldSpec, fieldConfig, partitionFunction);
     if (_fieldConfig != null && _fieldConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
       _clpStatsCollector = new CLPStatsCollector();
     }

@@ -27,6 +27,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.data.manager.realtime.ConsumerCoordinator;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
+import org.apache.pinot.core.data.manager.realtime.ServerIngestionOomProtectionManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -48,6 +49,15 @@ public class FailureInjectingRealtimeTableDataManager extends RealtimeTableDataM
       BooleanSupplier isServerReadyToServeQueries,
       @Nullable FailureInjectingTableConfig failureInjectingTableConfig) {
     super(segmentBuildSemaphore, isServerReadyToServeQueries);
+    _failureInjectingTableConfig = failureInjectingTableConfig;
+  }
+
+  public FailureInjectingRealtimeTableDataManager(Semaphore segmentBuildSemaphore,
+      BooleanSupplier isServerReadyToConsumeData, BooleanSupplier isServerReadyToServeQueries,
+      ServerIngestionOomProtectionManager.ServerThrottleState serverIngestionOomProtectionThrottleState,
+      @Nullable FailureInjectingTableConfig failureInjectingTableConfig) {
+    super(segmentBuildSemaphore, isServerReadyToConsumeData, isServerReadyToServeQueries,
+        serverIngestionOomProtectionThrottleState);
     _failureInjectingTableConfig = failureInjectingTableConfig;
   }
 

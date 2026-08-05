@@ -19,14 +19,13 @@
 package org.apache.pinot.controller.workload.scheme;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
-import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -39,13 +38,10 @@ import org.apache.pinot.spi.config.workload.PropagationEntityOverrides;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
-/**
- * A {@code TablePropagationScheme} resolves instances based on table names in a propagation entity
- *
- * Currently, this requires InstancePartitions to be set up for servers, and an ExternalView for brokers.
- * TODO: Add support for resolving instances based for Balanced Instance Assignment strategy.
- *
- */
+/// A `TablePropagationScheme` resolves instances based on table names in a propagation entity
+///
+/// Currently, this requires InstancePartitions to be set up for servers, and an ExternalView for brokers.
+/// TODO: Add support for resolving instances based for Balanced Instance Assignment strategy.
 public class TablePropagationScheme implements PropagationScheme {
 
   private final PinotHelixResourceManager _pinotHelixResourceManager;
@@ -54,22 +50,19 @@ public class TablePropagationScheme implements PropagationScheme {
     _pinotHelixResourceManager = pinotHelixResourceManager;
   }
 
-  /**
-   * Resolves instances based on table names in the propagation entity and node type.
-   *
-   * <p>
-   * For BROKER nodes, all brokers serving the given table are returned.
-   * For SERVER nodes, all servers serving the given table are returned. If the table is
-   * REALTIME and overrides are provided, only the servers for the specified partition types
-   * (CONSUMING or COMPLETED) are returned.
-   * </p>
-   *
-   * Example:
-   * <pre>
-   *   ["Broker_instance_1", "Broker_instance_2"]
-   *   ["Server_instance_1", "Server_instance_2", "Server_instance_3"]
-   * </pre>
-   */
+  /// Resolves instances based on table names in the propagation entity and node type.
+  ///
+  /// For BROKER nodes, all brokers serving the given table are returned.
+  /// For SERVER nodes, all servers serving the given table are returned. If the table is
+  /// REALTIME and overrides are provided, only the servers for the specified partition types
+  /// (CONSUMING or COMPLETED) are returned.
+  ///
+  /// Example:
+  ///
+  /// ```
+  /// ["Broker_instance_1", "Broker_instance_2"]
+  /// ["Server_instance_1", "Server_instance_2", "Server_instance_3"]
+  /// ```
   @Override
   public Set<String> resolveInstances(PropagationEntity entity, NodeConfig.Type nodeType,
                                       @Nullable PropagationEntityOverrides override) {
@@ -98,23 +91,23 @@ public class TablePropagationScheme implements PropagationScheme {
     return false;
   }
 
-  /**
-   * Resolves the set of broker instances responsible for serving the given table name.
-   *
-   * Returns the first non-empty set of instances since the brokers are shared across all table types.
-   */
+  /// Resolves the set of broker instances responsible for serving the given table name.
+  /// Uses IdealState instead of ExternalView to ensure brokers that are temporarily offline
+  /// (e.g., during restart) still receive workload configuration updates.
+  ///
+  /// Returns the first non-empty set of instances since the brokers are shared across all table types.
   private Set<String> getBrokerInstances(String tableName) {
     HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
-    ExternalView brokerResource = HelixHelper.getExternalViewForResource(helixManager.getClusterManagmentTool(),
-        helixManager.getClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    // Using IdealState to include offline brokers (e.g. during rolling restart)
+    IdealState brokerIdealState = HelixHelper.getTableIdealState(helixManager,
+        CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     for (String tableWithType : expandToTablesWithType(tableName)) {
-      Set<String> instances = brokerResource.getStateMap(tableWithType) != null
-          ? brokerResource.getStateMap(tableWithType).keySet() : Collections.emptySet();
+      Set<String> instances = brokerIdealState.getInstanceSet(tableWithType);
       if (!instances.isEmpty()) {
-        return new HashSet<>(instances);
+        return instances;
       }
     }
-    return Collections.emptySet();
+    return Set.of();
   }
 
   private Set<String> getServerInstances(String tableName, @Nullable PropagationEntityOverrides override) {
@@ -154,10 +147,8 @@ public class TablePropagationScheme implements PropagationScheme {
     return instances;
   }
 
-  /**
-   * Returns REALTIME instances for the given tableWithType.
-   * If {@code type} is null, returns the union of CONSUMING and COMPLETED.
-   */
+  /// Returns REALTIME instances for the given tableWithType.
+  /// If `type` is null, returns the union of CONSUMING and COMPLETED.
   private Set<String> getRealtimeInstances(String tableWithType, @Nullable OverrideEntityType type) {
     String consumingKey =
         InstancePartitionsUtils.getInstancePartitionsName(tableWithType, InstancePartitionsType.CONSUMING);
@@ -165,10 +156,10 @@ public class TablePropagationScheme implements PropagationScheme {
         InstancePartitionsUtils.getInstancePartitionsName(tableWithType, InstancePartitionsType.COMPLETED);
     if (type == OverrideEntityType.CONSUMING) {
       Set<String> instances = getInstancesFromInstancePartitions(consumingKey);
-      return (instances == null) ? Collections.emptySet() : new HashSet<>(instances);
+      return (instances == null) ? Set.of() : new HashSet<>(instances);
     } else if (type == OverrideEntityType.COMPLETED) {
       Set<String> instances = getInstancesFromInstancePartitions(completedKey);
-      return (instances == null) ? Collections.emptySet() : new HashSet<>(instances);
+      return (instances == null) ? Set.of() : new HashSet<>(instances);
     }
 
     // Union CONSUMING + COMPLETED
@@ -185,17 +176,13 @@ public class TablePropagationScheme implements PropagationScheme {
     return union;
   }
 
-  /**
-   * Expands a raw table name into type-qualified names.
-   *
-   * <p>
-   * If the input lacks a type suffix, both {@code OFFLINE} and {@code REALTIME} variants are
-   * returned. Otherwise, the name is returned as-is.
-   * </p>
-   *
-   * @param tableName The raw or type-qualified table name.
-   * @return A list of table names with type.
-   */
+  /// Expands a raw table name into type-qualified names.
+  ///
+  /// If the input lacks a type suffix, both `OFFLINE` and `REALTIME` variants are
+  /// returned. Otherwise, the name is returned as-is.
+  ///
+  /// @param tableName The raw or type-qualified table name.
+  /// @return A list of table names with type.
   private static List<String> expandToTablesWithType(String tableName) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType == null) {
@@ -204,14 +191,14 @@ public class TablePropagationScheme implements PropagationScheme {
       list.add(TableNameBuilder.REALTIME.tableNameWithType(tableName));
       return list;
     }
-    return Collections.singletonList(tableName);
+    return List.of(tableName);
   }
 
   private Set<String> getInstancesFromInstancePartitions(String instancePartitionsName) {
     InstancePartitions instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(
         _pinotHelixResourceManager.getPropertyStore(), instancePartitionsName);
     if (instancePartitions == null) {
-      return Collections.emptySet();
+      return Set.of();
     }
     Map<String, Integer> instanceToPartitionIdMap = instancePartitions.getInstanceToPartitionIdMap();
     return instanceToPartitionIdMap.keySet();

@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import io.grpc.stub.StreamObserver;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +36,8 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
-import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.MseMeter;
+import org.apache.pinot.common.metrics.MseMetrics;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -52,11 +52,11 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.executor.OpChainCompletionListener;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.LeafOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
-import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainConverterDispatcher;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
@@ -93,9 +93,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * {@link QueryRunner} accepts a {@link StagePlan} and runs it.
- */
+/// [QueryRunner] accepts a [StagePlan] and runs it.
 public class QueryRunner {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
 
@@ -131,17 +129,19 @@ public class QueryRunner {
   private WindowOverFlowMode _windowOverflowMode;
   @Nullable
   private PhysicalTimeSeriesServerPlanVisitor _timeSeriesPhysicalPlanVisitor;
+  /// Cluster-level decision on whether to send stats over the mailbox path, driven by the `SendStatsPredicate`
+  /// at startup time. **May be overridden per-request** via the `KEY_OF_STATS_REPORTING_MODE` metadata key —
+  /// see [#effectiveSendStats(Map)].
   private BooleanSupplier _sendStats;
   private BooleanSupplier _keepPipelineBreakerStats;
 
-  /**
-   * Initializes the query runner.
-   * <p>Should be called only once and before calling any other method.
-   *
-   * @param instanceDataManager when non-null, the leaf query executor and time series visitor are initialized
-   *                            for processing leaf-stage queries. When null, only intermediate-stage execution
-   *                            is supported.
-   */
+  /// Initializes the query runner.
+  ///
+  /// Should be called only once and before calling any other method.
+  ///
+  /// @param instanceDataManager when non-null, the leaf query executor and time series visitor are initialized
+  ///                            for processing leaf-stage queries. When null, only intermediate-stage execution
+  ///                            is supported.
   public void init(PinotConfiguration serverConf, String instanceId, @Nullable InstanceDataManager instanceDataManager,
       @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats, BooleanSupplier keepPipelineBreakerStats) {
     String hostname = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
@@ -193,9 +193,10 @@ public class QueryRunner {
             Server.DEFAULT_MULTISTAGE_EXECUTOR_TYPE);
 
     ServerMetrics serverMetrics = ServerMetrics.get();
+    MseMetrics mseMetrics = MseMetrics.get();
     MetricsExecutor metricsExecutor = new MetricsExecutor(baseExecutorService,
-        serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_RUNNER_STARTED_TASKS),
-        serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_RUNNER_COMPLETED_TASKS));
+        mseMetrics.getMeteredValue(MseMeter.RUNNER_STARTED_TASKS),
+        mseMetrics.getMeteredValue(MseMeter.RUNNER_COMPLETED_TASKS));
     _executorService = QueryThreadContext.contextAwareExecutorService(metricsExecutor);
 
     int hardLimit = HardLimitExecutor.getMultiStageExecutorHardLimit(serverConf);
@@ -244,9 +245,7 @@ public class QueryRunner {
     LOGGER.info("Initialized QueryRunner with hostname: {}, port: {}", hostname, port);
   }
 
-  /**
-   * Initializes the query runner with a shared {@link MailboxService}.
-   */
+  /// Initializes the query runner with a shared [MailboxService].
   public void init(PinotConfiguration serverConf, String instanceId, @Nullable InstanceDataManager instanceDataManager,
       @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats, BooleanSupplier keepPipelineBreakerStats,
       @Nullable MailboxService sharedMailboxService) {
@@ -286,7 +285,7 @@ public class QueryRunner {
         _executorService);
   }
 
-  /// Executes a {@link StagePlan} pseudo-synchronously.
+  /// Executes a [StagePlan] pseudo-synchronously.
   ///
   /// First, the pipeline breaker is executed on the current thread. This is the blocking part of the method.
   /// If the pipeline breaker execution fails, the query runner delegates downstream error propagation to the active
@@ -298,10 +297,15 @@ public class QueryRunner {
     StageMetadata stageMetadata = stagePlan.getStageMetadata();
     Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
 
+    // The cluster-level _sendStats decision can be overridden per-request by the SubmitWithStream RPC handler via
+    // MultiStageQueryRunner.KEY_OF_STATS_REPORTING_MODE; in stream mode stats travel out-of-band
+    // and we suppress the mailbox-side path to avoid duplication.
+    boolean sendStats = effectiveSendStats(requestMetadata);
+
     // run pre-stage execution for all pipeline breakers
     PipelineBreakerResult pipelineBreakerResult = PipelineBreakerExecutor.executePipelineBreakers(
         _opChainScheduler, _mailboxService, workerMetadata, stagePlan, opChainMetadata,
-        _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
+        sendStats, _keepPipelineBreakerStats.getAsBoolean());
 
     // Send error block to all the receivers if pipeline breaker fails
     if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
@@ -314,9 +318,9 @@ public class QueryRunner {
     // run OpChain
     OpChainExecutionContext executionContext =
         OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
-            pipelineBreakerResult, _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
+            pipelineBreakerResult, sendStats, _keepPipelineBreakerStats.getAsBoolean());
+    OpChain opChain = null;
     try {
-      OpChain opChain;
       if (workerMetadata.isLeafStageWorker()) {
         Map<String, String> rlsFilters = RlsUtils.extractRlsFilters(requestMetadata);
         opChain =
@@ -328,27 +332,41 @@ public class QueryRunner {
       // This can fail if the executor rejects the task.
       _opChainScheduler.register(opChain);
     } catch (RuntimeException e) {
+      // register() can fail after the op chain was built — the query was cancelled/terminated before scheduling
+      // (checkTermination / cancelled-query cache), or the executor rejected the task (e.g. under load shedding). In
+      // those cases the op chain is never scheduled, so the scheduler's FutureCallback, which normally close()s the
+      // chain on completion, never fires — leaking any operator resources that are released only in close(). Close the
+      // built chain here (idempotent; guarded so a close failure cannot mask the original error).
+      if (opChain != null) {
+        try {
+          opChain.close();
+        } catch (RuntimeException closeError) {
+          LOGGER.warn("Failed to close op chain after scheduling failure", closeError);
+        }
+      }
       ErrorMseBlock errorBlock = ErrorMseBlock.fromException(e);
       tryPropagateErrorViaOpChainConverter(workerMetadata, stagePlan, opChainMetadata, pipelineBreakerResult,
           errorBlock);
     }
   }
 
-  /**
-   * Attempts to propagate stage failures through the active {@link OpChainConverter}.
-   */
+  /// Attempts to propagate stage failures through the active [OpChainConverter].
+  ///
+  /// Note: the cluster-level `_sendStats` decision can be overridden per-request via
+  /// [CommonConstants.MultiStageQueryRunner#KEY_OF_STATS_REPORTING_MODE] — see
+  /// [#effectiveSendStats(Map)].
   private void tryPropagateErrorViaOpChainConverter(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> opChainMetadata, @Nullable PipelineBreakerResult pipelineBreakerResult,
       ErrorMseBlock errorBlock) {
     StageMetadata stageMetadata = stagePlan.getStageMetadata();
     QueryExecutionContext queryContext = QueryThreadContext.get().getExecutionContext();
     long requestId = queryContext.getRequestId();
-    LOGGER.error("Error executing stage for request: {}, stage: {}, sending error block: {}", requestId,
-        stageMetadata.getStageId(), errorBlock);
+    // The stage/worker/server are already rendered by errorBlock.toString(); only requestId is added here.
+    LOGGER.error("Error executing stage for request: {}, sending error block: {}", requestId, errorBlock);
     try {
       OpChainExecutionContext executionContext =
           OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
-              pipelineBreakerResult, _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
+              pipelineBreakerResult, effectiveSendStats(opChainMetadata), _keepPipelineBreakerStats.getAsBoolean());
       OpChain errorOpChain = OpChainConverterDispatcher.sendEarlyError(executionContext, stagePlan, errorBlock);
       _opChainScheduler.register(errorOpChain);
     } catch (RuntimeException e) {
@@ -357,12 +375,24 @@ public class QueryRunner {
     }
   }
 
-  /**
-   * Receives a serialized plan sent by the broker, and runs it to completion, blocking the thread until the execution
-   * is complete.
-   * TODO: This design is at odds with MSE because MSE runs even the leaf stage via OpChainSchedulerService.
-   *   However, both OpChain scheduler and this method use the same ExecutorService.
-   */
+  /// Returns the effective `sendStats` flag for the current request: starts from the cluster-level
+  /// [#_sendStats] decision and forces it to `false` when
+  /// [CommonConstants.MultiStageQueryRunner#KEY_OF_STATS_REPORTING_MODE] is set to
+  /// [CommonConstants.MultiStageQueryRunner#STATS_REPORTING_MODE_STREAM] on the request metadata. The
+  /// stream-mode handler injects this key when stats are being collected out-of-band on the bidi RPC, so the
+  /// mailbox-side path can be skipped.
+  private boolean effectiveSendStats(Map<String, String> requestMetadata) {
+    String mode = requestMetadata.get(MultiStageQueryRunner.KEY_OF_STATS_REPORTING_MODE);
+    if (MultiStageQueryRunner.STATS_REPORTING_MODE_STREAM.equals(mode)) {
+      return false;
+    }
+    return _sendStats.getAsBoolean();
+  }
+
+  /// Receives a serialized plan sent by the broker, and runs it to completion, blocking the thread until the execution
+  /// is complete.
+  /// TODO: This design is at odds with MSE because MSE runs even the leaf stage via OpChainSchedulerService.
+  ///   However, both OpChain scheduler and this method use the same ExecutorService.
   public void processTimeSeriesQuery(List<String> serializedPlanFragments, Map<String, String> metadata,
       StreamObserver<Worker.TimeSeriesResponse> responseObserver) {
     // Define a common way to handle errors.
@@ -397,7 +427,7 @@ public class QueryRunner {
       TimeSeriesExecutionContext context =
           new TimeSeriesExecutionContext(metadata.get(Request.MetadataKeys.TimeSeries.LANGUAGE),
               extractTimeBuckets(metadata), deadlineMs, metadata, extractPlanToSegmentMap(metadata),
-              Collections.emptyMap());
+              Map.of());
       final List<BaseTimeSeriesOperator> fragmentOpChains = fragmentRoots.stream().map(x -> {
         return _timeSeriesPhysicalPlanVisitor.compile(x, context);
       }).collect(Collectors.toList());
@@ -523,8 +553,41 @@ public class QueryRunner {
     return _mailboxService;
   }
 
-  public Map<Integer, MultiStageQueryStats.StageStats.Closed> cancel(long requestId) {
-    return _opChainScheduler.cancel(requestId);
+  /// Cancels all opchains registered for the given request id.
+  ///
+  /// **Return-type note:** this method previously returned `Map<Integer, StageStats.Closed>`, collecting
+  /// partial per-stage stats from each opchain synchronously during cancellation. That return value was removed
+  /// because:
+  ///
+  /// - Collecting stats synchronously on the cancel path required an extra fan-out RPC to every participating
+  ///      server on every query failure — at high QPS this produced an amplified load spike on already-stressed
+  ///      servers, risking a cascade (see `QueryDispatcher.tryRecover` for full rationale).
+  /// - This change also removes the only consumer of those stats (`QueryDispatcher.tryRecover`, which on
+  ///      master merged them into the error result), so retaining the synchronous collection would be pure overhead
+  ///      with no benefit.
+  ///
+  /// Stats on the error path are now collected out-of-band via the `SubmitWithStream` stream in stream mode:
+  /// servers push `OpChainComplete` messages independently and the broker drains whatever arrived before the
+  /// cancel within the configured timeout window. Note that a cancel received over the stream promptly completes the
+  /// stream (`QueryServer.handleCancel`), so stats from opchains finishing _after_ the cancel are not
+  /// delivered — error-path coverage is whatever was already reported or in flight when the cancel landed.
+  public void cancel(long requestId) {
+    _opChainScheduler.cancel(requestId);
+  }
+
+  /// Registers an opchain completion listener for the given request id. Used by the stream-mode stats reporting path
+  /// (gRPC `SubmitWithStream`) so the [org.apache.pinot.query.service.server.QueryServer] can be notified
+  /// each time an opchain finishes and emit a corresponding `OpChainComplete` message on the broker stream.
+  ///
+  /// The listener fires once per opchain that runs on this server for the request and must be unregistered by the
+  /// caller (typically when the per-request opchain count reaches the expected total) via
+  /// [#unregisterOpChainCompletionListener(long)].
+  public void registerOpChainCompletionListener(long requestId, OpChainCompletionListener listener) {
+    _opChainScheduler.registerCompletionListener(requestId, listener);
+  }
+
+  public void unregisterOpChainCompletionListener(long requestId) {
+    _opChainScheduler.unregisterCompletionListener(requestId);
   }
 
   public StagePlan explainQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,

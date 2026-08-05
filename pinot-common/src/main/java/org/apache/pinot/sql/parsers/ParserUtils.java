@@ -29,7 +29,13 @@ public class ParserUtils {
   public static void validateFunction(String canonicalName, List<Expression> operands) {
     switch (canonicalName) {
       case "jsonextractscalar":
-        validateJsonExtractScalarFunction(operands);
+        validateJsonExtractScalarFunction("jsonExtractScalar", operands);
+        break;
+      case "jsonextractscalarfast":
+        validateJsonExtractScalarFunction("jsonExtractScalarFast", operands);
+        break;
+      case "jsonextractscalarfirstmatch":
+        validateJsonExtractScalarFunction("jsonExtractScalarFirstMatch", operands);
         break;
       case "jsonextractkey":
         validateJsonExtractKeyFunction(operands);
@@ -39,40 +45,110 @@ public class ParserUtils {
     }
   }
 
-  /**
-   * Sanitize the sql string for parsing by normalizing whitespace
-   * which is likely to cause performance issues with regex parsing.
-   * @param sql string to sanitize
-   * @return sanitized sql string
-   */
+  /// Sanitize the sql string for parsing by normalizing whitespace
+  /// which is likely to cause performance issues with regex parsing.
+  /// @param sql string to sanitize
+  /// @return sanitized sql string
   public static String sanitizeSql(String sql) {
 
-    // 1. Remove trailing whitespaces
+    // 1. Strip single-line SQL comments (-- ... to end of line).
+    // The legacy OPTIONS regex anchors at end-of-string, so without this step a query
+    // like "SELECT col1 FROM foo -- option(skipUpsert=true)" would be mistakenly matched
+    // as if skipUpsert were a real query option.
+    sql = stripSingleLineComments(sql);
 
+    // 2. Remove trailing whitespace
     int endIndex = sql.length() - 1;
     while (endIndex >= 0 && Character.isWhitespace(sql.charAt(endIndex))) {
       endIndex--;
     }
-    sql = sql.substring(0, endIndex + 1);
-
-    // Likewise extend for other improvements
-
-    return sql;
+    return sql.substring(0, endIndex + 1);
   }
 
-  private static void validateJsonExtractScalarFunction(List<Expression> operands) {
+  /// Returns the sql string with all single-line SQL comments (-- ... to end of line) removed,
+  /// respecting single-quoted string literals, double-quoted identifiers, and block comments.
+  /// A "--" found inside a block comment or a quoted context is not treated as a comment marker.
+  static String stripSingleLineComments(String sql) {
+    StringBuilder result = new StringBuilder(sql.length());
+    int len = sql.length();
+    boolean inSingleQuote = false;
+    boolean inDoubleQuote = false;
+    boolean inBlockComment = false;
+    int i = 0;
+    while (i < len) {
+      char c = sql.charAt(i);
+      if (inBlockComment) {
+        result.append(c);
+        if (c == '*' && i + 1 < len && sql.charAt(i + 1) == '/') {
+          result.append('/');
+          inBlockComment = false;
+          i += 2;
+        } else {
+          i++;
+        }
+      } else if (inSingleQuote) {
+        result.append(c);
+        if (c == '\'' && i + 1 < len && sql.charAt(i + 1) == '\'') {
+          result.append('\'');
+          i += 2; // '' escape inside a single-quoted literal
+        } else {
+          if (c == '\'') {
+            inSingleQuote = false;
+          }
+          i++;
+        }
+      } else if (inDoubleQuote) {
+        result.append(c);
+        if (c == '"' && i + 1 < len && sql.charAt(i + 1) == '"') {
+          result.append('"');
+          i += 2; // "" escape inside a double-quoted identifier
+        } else {
+          if (c == '"') {
+            inDoubleQuote = false;
+          }
+          i++;
+        }
+      } else {
+        if (c == '\'') {
+          inSingleQuote = true;
+          result.append(c);
+          i++;
+        } else if (c == '"') {
+          inDoubleQuote = true;
+          result.append(c);
+          i++;
+        } else if (c == '/' && i + 1 < len && sql.charAt(i + 1) == '*') {
+          inBlockComment = true;
+          result.append(c);
+          i++;
+        } else if (c == '-' && i + 1 < len && sql.charAt(i + 1) == '-') {
+          // Skip from here to end of line; the newline itself is kept.
+          while (i < len && sql.charAt(i) != '\n') {
+            i++;
+          }
+        } else {
+          result.append(c);
+          i++;
+        }
+      }
+    }
+    return result.toString();
+  }
+
+  private static void validateJsonExtractScalarFunction(String functionName, List<Expression> operands) {
     // Check that there are 3 or 4 arguments
     int numOperands = operands.size();
     if (numOperands != 3 && numOperands != 4) {
       throw new SqlCompilationException(
-          "Expect 3 or 4 arguments for transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', "
-              + "'resultsType', ['defaultValue'])");
+          "Expect 3 or 4 arguments for transform function: " + functionName
+              + "(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue'])");
     }
     if (!operands.get(1).isSetLiteral() || !operands.get(2).isSetLiteral() || (numOperands == 4 && !operands.get(3)
         .isSetLiteral())) {
       throw new SqlCompilationException(
-          "Expect the 2nd/3rd/4th argument of transform function: jsonExtractScalar(jsonFieldName, 'jsonPath', "
-              + "'resultsType', ['defaultValue']) to be a single-quoted literal value.");
+          "Expect the 2nd and 3rd arguments of transform function: " + functionName
+              + "(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue']) to be single-quoted literal values, "
+              + "and the optional 4th argument to be a literal value.");
     }
   }
 

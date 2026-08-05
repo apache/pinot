@@ -58,9 +58,7 @@ import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-/**
- * Configuration properties used in the creation of index segments.
- */
+/// Configuration properties used in the creation of index segments.
 public class SegmentGeneratorConfig implements Serializable {
   public enum TimeColumnType {
     EPOCH, SIMPLE_DATE
@@ -102,10 +100,8 @@ public class SegmentGeneratorConfig implements Serializable {
   private DateTimeFormatSpec _dateTimeFormatSpec = null;
   // Use on-heap or off-heap memory to generate index (currently only affect inverted index and star-tree v2)
   private boolean _onHeap = false;
-  /**
-   * Whether null handling is enabled by default. This value is only used if
-   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-   */
+  /// Whether null handling is enabled by default. This value is only used if
+  /// [Schema#isEnableColumnBasedNullHandling()] is false.
   private boolean _defaultNullHandlingEnabled = false;
   private boolean _continueOnError = false;
   private boolean _rowTimeValueCheck = false;
@@ -128,11 +124,10 @@ public class SegmentGeneratorConfig implements Serializable {
 
   // Type of the instance (SERVER/MINION) that is trying to create the segment.
   private InstanceType _instanceType;
+  private boolean _compressionStatsEnabled;
 
-  /**
-   * Constructs the SegmentGeneratorConfig with table config and schema.
-   * NOTE: The passed in table config and schema might be changed.
-   */
+  /// Constructs the SegmentGeneratorConfig with table config and schema.
+  /// NOTE: The passed in table config and schema might be changed.
   public SegmentGeneratorConfig(TableConfig tableConfig, Schema schema) {
     Preconditions.checkNotNull(tableConfig);
     Preconditions.checkNotNull(schema);
@@ -172,6 +167,7 @@ public class SegmentGeneratorConfig implements Serializable {
     setStarTreeIndexConfigs(indexingConfig.getStarTreeIndexConfigs());
     setEnableDefaultStarTree(indexingConfig.isEnableDefaultStarTree());
     _multiColumnTextIndexConfig = indexingConfig.getMultiColumnTextIndexConfig();
+    _compressionStatsEnabled = indexingConfig.isCompressionStatsEnabled();
 
     List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
     if (fieldConfigs != null) {
@@ -191,15 +187,13 @@ public class SegmentGeneratorConfig implements Serializable {
     }
   }
 
-  /**
-   * Returns the {@link TableConfig} that was used to initialize this object.
-   *
-   * Remember that this object is mutable. Therefore it may have modified since the object was created. Changes on this
-   * object may or may not modify the initial table config, so the object returned by this method may not contain the
-   * same information stored on this SegmentGeneratorConfig. For example, if someone called
-   * {@link #setTimeColumnName(String)} on the SegmentGeneratorConfig, the TableConfig returned by this method
-   * will not be modified accordingly.
-   */
+  /// Returns the [TableConfig] that was used to initialize this object.
+  ///
+  /// Remember that this object is mutable. Therefore it may have modified since the object was created. Changes on this
+  /// object may or may not modify the initial table config, so the object returned by this method may not contain the
+  /// same information stored on this SegmentGeneratorConfig. For example, if someone called
+  /// [#setTimeColumnName(String)] on the SegmentGeneratorConfig, the TableConfig returned by this method
+  /// will not be modified accordingly.
   public TableConfig getTableConfig() {
     return _tableConfig;
   }
@@ -216,9 +210,7 @@ public class SegmentGeneratorConfig implements Serializable {
     return Collections.unmodifiableMap(_columnProperties);
   }
 
-  /**
-   * Set time column details using the given time column
-   */
+  /// Set time column details using the given time column
   private void setTime(String timeColumnName, Schema schema) {
     DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
     if (dateTimeFieldSpec != null) {
@@ -339,9 +331,7 @@ public class SegmentGeneratorConfig implements Serializable {
     return _segmentNamePostfix;
   }
 
-  /**
-   * If you are adding a sequence Id to the segment, please use setSequenceId.
-   */
+  /// If you are adding a sequence Id to the segment, please use setSequenceId.
   public void setSegmentNamePostfix(String postfix) {
     _segmentNamePostfix = postfix;
   }
@@ -362,16 +352,12 @@ public class SegmentGeneratorConfig implements Serializable {
     return _sequenceId;
   }
 
-  /**
-   * Use this method to add partitionId if it is generated externally during segment upload
-   */
+  /// Use this method to add partitionId if it is generated externally during segment upload
   public void setUploadedSegmentPartitionId(int partitionId) {
     _uploadedSegmentPartitionId = partitionId;
   }
 
-  /**
-   * This method should be used instead of setPostfix if you are adding a sequence number.
-   */
+  /// This method should be used instead of setPostfix if you are adding a sequence number.
   public void setSequenceId(int sequenceId) {
     _sequenceId = sequenceId;
   }
@@ -473,10 +459,8 @@ public class SegmentGeneratorConfig implements Serializable {
     }
   }
 
-  /**
-   * Infers the segment name generator type based on segment generator config properties. Will default to simple
-   * SegmentNameGeneratorType.
-   */
+  /// Infers the segment name generator type based on segment generator config properties. Will default to simple
+  /// SegmentNameGeneratorType.
   public String inferSegmentNameGeneratorType() {
     if (_segmentName != null) {
       return BatchConfigProperties.SegmentNameGeneratorType.FIXED;
@@ -538,11 +522,9 @@ public class SegmentGeneratorConfig implements Serializable {
     return _segmentPartitionConfig;
   }
 
-  /**
-   * Returns a comma separated list of qualifying field name strings
-   * @param type FieldType to filter on
-   * @return list of qualifying fields names.
-   */
+  /// Returns a comma separated list of qualifying field name strings
+  /// @param type FieldType to filter on
+  /// @return list of qualifying fields names.
   private List<String> getQualifyingFields(FieldType type, boolean excludeVirtualColumns) {
     List<String> fields = new ArrayList<>();
 
@@ -560,42 +542,16 @@ public class SegmentGeneratorConfig implements Serializable {
     return fields;
   }
 
-  /**
-   * Whether null handling is enabled by default. This value is only used if
-   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-   *
-   * @deprecated Use {@link #isDefaultNullHandlingEnabled()} instead
-   */
-  @Deprecated
-  public boolean isNullHandlingEnabled() {
-    return _defaultNullHandlingEnabled;
-  }
-
-  /**
-   * Whether null handling is enabled by default. This value is only used if
-   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-   */
+  /// Whether null handling is enabled by default. This value is only used if
+  /// [Schema#isEnableColumnBasedNullHandling()] is false.
   public boolean isDefaultNullHandlingEnabled() {
     return _defaultNullHandlingEnabled;
   }
 
-  /**
-   * Whether null handling is enabled by default. This value is only used if
-   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-   *
-   * @deprecated Use {@link #setDefaultNullHandlingEnabled(boolean)} instead
-   */
-  @Deprecated
-  public void setNullHandlingEnabled(boolean nullHandlingEnabled) {
-    setDefaultNullHandlingEnabled(nullHandlingEnabled);
-  }
-
-  /**
-   * Whether null handling is enabled by default. This value is only used if
-   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-   */
-  public void setDefaultNullHandlingEnabled(boolean nullHandlingEnabled) {
-    _defaultNullHandlingEnabled = nullHandlingEnabled;
+  /// Whether null handling is enabled by default. This value is only used if
+  /// [Schema#isEnableColumnBasedNullHandling()] is false.
+  public void setDefaultNullHandlingEnabled(boolean defaultNullHandlingEnabled) {
+    _defaultNullHandlingEnabled = defaultNullHandlingEnabled;
   }
 
   public boolean isContinueOnError() {
@@ -720,5 +676,15 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public void setInstanceType(InstanceType instanceType) {
     _instanceType = instanceType;
+  }
+
+  /// Returns whether this segment build records compression statistics.
+  public boolean isCompressionStatsEnabled() {
+    return _compressionStatsEnabled;
+  }
+
+  /// Sets whether this segment build records compression statistics.
+  public void setCompressionStatsEnabled(boolean compressionStatsEnabled) {
+    _compressionStatsEnabled = compressionStatsEnabled;
   }
 }

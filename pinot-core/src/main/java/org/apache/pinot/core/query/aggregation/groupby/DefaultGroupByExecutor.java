@@ -40,13 +40,11 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-/**
- * This class implements group by aggregation.
- * It is optimized for performance, and uses the best possible algorithm/data-structure
- * for a given query based on the following parameters:
- * - Maximum number of group keys possible.
- * - Single/Multi valued columns.
- */
+/// This class implements group by aggregation.
+/// It is optimized for performance, and uses the best possible algorithm/data-structure
+/// for a given query based on the following parameters:
+/// - Maximum number of group keys possible.
+/// - Single/Multi valued columns.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class DefaultGroupByExecutor implements GroupByExecutor {
   // Thread local (reusable) array for single-valued group keys
@@ -87,18 +85,15 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     for (ExpressionContext groupByExpression : groupByExpressions) {
       ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
       hasMVGroupByExpression |= !columnContext.isSingleValue();
-      // DictionaryBasedGroupKeyGenerator does dict-id reads from the forward index — that requires the
-      // forward index to actually be dict-encoded. Columns with a shared dictionary on a RAW forward index
-      // (dict file exists but forward stores raw values) would otherwise be misrouted into the dict-id
-      // path; gate on forward-index encoding so they take the no-dict GROUP BY path instead.
-      // ColumnContext.getDataSource() is null for computed (non-identifier) transforms; in that case
-      // getDictionary() == null already covers them via the first condition.
-      hasNoDictionaryGroupByExpression |= columnContext.getDictionary() == null
-          || (columnContext.getDataSource() != null
-          && columnContext.getDataSource().getForwardIndex() != null
-          && !columnContext.getDataSource().getForwardIndex().isDictionaryEncoded());
+      // A column with EncodingType.RAW + explicit dictionaryIndex has a non-null dictionary but a RAW forward
+      // index that throws on readDictIds; route those through the no-dict GROUP BY generator via the explicit
+      // isDictionaryEncoded() flag rather than gating on dictionary nullness alone.
+      hasNoDictionaryGroupByExpression |= !columnContext.isDictionaryEncoded();
     }
-    _hasMVGroupByExpression = hasMVGroupByExpression;
+    /// Grouping-set queries expand each row into one group per grouping set, so they always use the
+    /// multi-value (int[][]) executor path even though the union group-by columns are single-valued.
+    boolean groupingSets = queryContext.isGroupingSets();
+    _hasMVGroupByExpression = hasMVGroupByExpression || groupingSets;
 
     // Initialize group key generator
     int numGroupsLimit = queryContext.getNumGroupsLimit();
@@ -109,6 +104,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     }
     if (groupKeyGenerator != null) {
       _groupKeyGenerator = groupKeyGenerator;
+    } else if (groupingSets) {
+      _groupKeyGenerator = new GroupingSetsGroupKeyGenerator(projectOperator, groupByExpressions,
+          queryContext.getGroupingSets(), numGroupsLimit, _nullHandlingEnabled);
     } else {
       if (hasNoDictionaryGroupByExpression || _nullHandlingEnabled) {
         if (groupByExpressions.length == 1) {
@@ -146,12 +144,10 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     }
   }
 
-  /**
-   * Retrieve the sizes of GroupBy expressions from IN an EQ predicates found in the filter context, if available.
-   * 1. If the filter context is null or lacks GroupBy expressions, return null.
-   * 2. Ensure the top-level filter context consists solely of AND-type filters; other types for example OR we cannot
-   *    guarantee deterministic sizes for GroupBy expressions.
-   */
+  /// Retrieve the sizes of GroupBy expressions from IN an EQ predicates found in the filter context, if available.
+  /// 1. If the filter context is null or lacks GroupBy expressions, return null.
+  /// 2. Ensure the top-level filter context consists solely of AND-type filters; other types for example OR we cannot
+  ///    guarantee deterministic sizes for GroupBy expressions.
   private Map<ExpressionContext, Integer> getGroupByExpressionSizesFromPredicates(QueryContext queryContext) {
     FilterContext filterContext = queryContext.getFilter();
     if (filterContext == null || queryContext.getGroupByExpressions() == null) {

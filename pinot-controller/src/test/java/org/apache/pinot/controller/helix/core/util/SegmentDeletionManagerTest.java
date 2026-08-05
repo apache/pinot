@@ -82,6 +82,11 @@ public class SegmentDeletionManagerTest {
     RETENTION_DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
   }
 
+  protected SegmentDeletionManager createDeletionManager(String dataDir, HelixAdmin helixAdmin, String clusterName,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays) {
+    return new SegmentDeletionManager(dataDir, helixAdmin, clusterName, propertyStore, deletedSegmentsRetentionInDays);
+  }
+
   HelixAdmin makeHelixAdmin() {
     HelixAdmin admin = mock(HelixAdmin.class);
     ExternalView ev = mock(ExternalView.class);
@@ -351,23 +356,23 @@ public class SegmentDeletionManagerTest {
 
     // All files should get deleted but the directory will be deleted in the next run
     TestUtils.waitForCondition((aVoid) -> {
-          try {
-            return pinotFS.listFiles(tableUri2, false).length == 0;
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-        }, 1000, 10000,
+      try {
+        return pinotFS.listFiles(tableUri2, false).length == 0;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 1000, 10000,
         "Could not delete all the files for table_2");
     Assert.assertTrue(pinotFS.exists(tableUri2));
 
     // One file that doesn't meet retention criteria, and another file due to the per attempt batch limit remains.
     TestUtils.waitForCondition((aVoid) -> {
-          try {
-            return pinotFS.listFiles(tableUri1, false).length == 2;
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-        }, 1000, 10000,
+      try {
+        return pinotFS.listFiles(tableUri1, false).length == 2;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 1000, 10000,
         "100 out of 102 files could not be deleted from tableUri1 directory");
 
     // the next run of the deletion manager should remove the empty directory as well.
@@ -387,7 +392,7 @@ public class SegmentDeletionManagerTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
     File tempDir = Files.createTempDirectory("pinot-test-").toFile();
     tempDir.deleteOnExit();
-    SegmentDeletionManager deletionManager = new SegmentDeletionManager(
+    SegmentDeletionManager deletionManager = createDeletionManager(
         tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);
 
     // create table segment files.
@@ -443,7 +448,7 @@ public class SegmentDeletionManagerTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
     File tempDir = Files.createTempDirectory("pinot-test-").toFile();
     tempDir.deleteOnExit();
-    SegmentDeletionManager deletionManager = new SegmentDeletionManager(
+    SegmentDeletionManager deletionManager = createDeletionManager(
         tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);
 
     // create table segment files.
@@ -512,7 +517,7 @@ public class SegmentDeletionManagerTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
     File tempDir = Files.createTempDirectory("pinot-test-").toFile();
     tempDir.deleteOnExit();
-    SegmentDeletionManager deletionManager = new SegmentDeletionManager(
+    SegmentDeletionManager deletionManager = createDeletionManager(
         tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);
 
     // create table segment files.
@@ -602,7 +607,7 @@ public class SegmentDeletionManagerTest {
     }
 
     @Override
-    public void removeSegmentsFromStoreInBatch(String tableNameWithType, List<String> segments,
+    public void removeSegmentsFromStoreInBatch(String tableNameWithType, Collection<String> segments,
         @Nullable Long deletedSegmentsRetentionMs) {
       _segmentsRemovedFromStore.addAll(segments);
     }

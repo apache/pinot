@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.creator;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -148,7 +147,7 @@ public class DictionaryOptimiserTest implements PinotBuffersAfterMethodCheckRule
 
     List<FieldConfig> fieldConfigList = stringColumns.stream()
         .map(x -> new FieldConfig(x.getName(), FieldConfig.EncodingType.DICTIONARY,
-        Collections.singletonList(FieldConfig.IndexType.TEXT), null, null)).collect(Collectors.toList());
+        List.of(FieldConfig.IndexType.TEXT), null, null)).collect(Collectors.toList());
 
     final SegmentGeneratorConfig segmentGenSpec =
         new SegmentGeneratorConfig(new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName)

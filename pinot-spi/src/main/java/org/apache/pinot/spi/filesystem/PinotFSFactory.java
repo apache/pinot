@@ -29,9 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This factory class initializes the PinotFS class. It creates a PinotFS object based on the URI found.
- */
+/// This factory class initializes the PinotFS class. It creates a PinotFS object based on the URI found.
 public class PinotFSFactory {
   private PinotFSFactory() {
   }
@@ -81,6 +79,17 @@ public class PinotFSFactory {
 
   public static boolean isSchemeSupported(String scheme) {
     return PINOT_FS_MAP.containsKey(scheme);
+  }
+
+  public static boolean isSchemeRegisteredWith(String scheme, Class<? extends PinotFS> pinotFSClass) {
+    PinotFS pinotFS = PINOT_FS_MAP.get(scheme);
+    if (pinotFS == null) {
+      return false;
+    }
+    if (pinotFS instanceof NoClosePinotFS) {
+      pinotFS = ((NoClosePinotFS) pinotFS)._delegate;
+    }
+    return pinotFSClass.isInstance(pinotFS);
   }
 
   public static void shutdown()

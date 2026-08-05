@@ -49,7 +49,7 @@ public class DistinctAggregationFunctionTest extends AbstractAggregationFunction
             "null",
             "null"
         ).whenQuery("select count(distinct myField) from testTable")
-        .thenResultIs("INTEGER", "1");
+        .thenResultIs("INT", "1");
   }
 
   @Test(dataProvider = "scenarios")
@@ -64,7 +64,7 @@ public class DistinctAggregationFunctionTest extends AbstractAggregationFunction
             "null",
             "null"
         ).whenQuery("select count(distinct myField) from testTable")
-        .thenResultIs("INTEGER", "0");
+        .thenResultIs("INT", "0");
   }
 
   @Test(dataProvider = "scenarios")
@@ -79,7 +79,7 @@ public class DistinctAggregationFunctionTest extends AbstractAggregationFunction
             "null",
             "null"
         ).whenQuery("select 'literal', count(distinct myField) from testTable group by 'literal'")
-        .thenResultIs("STRING | INTEGER", "literal | 1");
+        .thenResultIs("STRING | INT", "literal | 1");
   }
 
   @Test(dataProvider = "scenarios")
@@ -94,7 +94,7 @@ public class DistinctAggregationFunctionTest extends AbstractAggregationFunction
             "null",
             "null"
         ).whenQuery("select 'literal', count(distinct myField) from testTable group by 'literal'")
-        .thenResultIs("STRING | INTEGER", "literal | 0");
+        .thenResultIs("STRING | INT", "literal | 0");
   }
 
   @Test(dataProvider = "scenarios")
@@ -110,7 +110,7 @@ public class DistinctAggregationFunctionTest extends AbstractAggregationFunction
             "null",
             "null"
         ).whenQuery("select count(distinct myField) from testTable")
-        .thenResultIs("INTEGER", "3");
+        .thenResultIs("INT", "3");
   }
 
   @Test(dataProvider = "scenarios")
@@ -126,7 +126,7 @@ public class DistinctAggregationFunctionTest extends AbstractAggregationFunction
             "null",
             "null"
         ).whenQuery("select count(distinct myField) from testTable")
-        .thenResultIs("INTEGER", "2");
+        .thenResultIs("INT", "2");
   }
 
   @Test(dataProvider = "scenarios")
@@ -141,7 +141,7 @@ public class DistinctAggregationFunctionTest extends AbstractAggregationFunction
             "3",
             "2"
         ).whenQuery("select 'literal', count(distinct myField) from testTable group by 'literal'")
-        .thenResultIs("STRING | INTEGER", "literal | 3");
+        .thenResultIs("STRING | INT", "literal | 3");
   }
 
   @Test(dataProvider = "scenarios")
@@ -164,14 +164,14 @@ public class DistinctAggregationFunctionTest extends AbstractAggregationFunction
         )
         .whenQuery("select tags, count(distinct value) from testTable group by tags order by tags")
         .thenResultIs(
-            "STRING | INTEGER",
+            "STRING | INT",
             "tag1    | 2",
             "tag2    | 3",
             "tag3    | 1")
         .whenQueryWithNullHandlingEnabled("select tags, count(distinct value) from testTable group by tags "
             + "order by tags")
         .thenResultIs(
-            "STRING | INTEGER",
+            "STRING | INT",
             "tag1    | 2",
             "tag2    | 2",
             "tag3    | 0"
@@ -190,7 +190,7 @@ public class DistinctAggregationFunctionTest extends AbstractAggregationFunction
             "null",
             "null"
         ).whenQuery("select sum(distinct myField) from testTable")
-        .thenResultIs("INTEGER", "null");
+        .thenResultIs("INT", "null");
   }
 
   @Test(dataProvider = "scenarios")

@@ -46,9 +46,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 
 
-/**
- * Performance test for lookup in string dictionary.
- */
+/// Performance test for lookup in string dictionary.
 public class StringDictionaryPerfTest {
   private static final int MAX_STRING_LENGTH = 1000;
   private static final boolean USE_FIXED_SIZE_STRING = true;
@@ -69,13 +67,9 @@ public class StringDictionaryPerfTest {
   private int _dictLength;
   private Schema _schema;
 
-  /**
-   * Helper method to build a segment:
-   * <ul>
-   *   <li>Segment contains one string column</li>
-   *   <li>Row values for the column are randomly generated strings of length 1 to 100</li>
-   * </ul>
-   */
+  /// Helper method to build a segment:
+  ///   - Segment contains one string column
+  ///   - Row values for the column are randomly generated strings of length 1 to 100
   private void buildSegment(int dictLength)
       throws Exception {
     _schema = new Schema();
@@ -119,9 +113,8 @@ public class StringDictionaryPerfTest {
     System.out.println("Total time for building segment: " + (System.currentTimeMillis() - start));
   }
 
-  /**
-   * Measures the performance of string dictionary lookups by performing the provided number of lookups to random value.
-   */
+  /// Measures the performance of string dictionary lookups by performing the provided number of lookups to random
+  /// value.
   public void perfTestLookups(int numLookups)
       throws Exception {
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.heap);
@@ -138,9 +131,7 @@ public class StringDictionaryPerfTest {
     System.out.println("Total time for " + numLookups + " lookups: " + (System.currentTimeMillis() - start) + "ms");
   }
 
-  /**
-   * Measures the performance of string dictionary reads by performing the provided number of reads for random index.
-   */
+  /// Measures the performance of string dictionary reads by performing the provided number of reads for random index.
   private String[] perfTestGetValues(int numGetValues)
       throws Exception {
     Runtime r = Runtime.getRuntime();

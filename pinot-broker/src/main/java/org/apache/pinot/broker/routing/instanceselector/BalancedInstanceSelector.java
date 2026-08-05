@@ -41,7 +41,6 @@ import org.apache.pinot.common.utils.HashUtil;
 /// If AdaptiveServerSelection is disabled, the selection algorithm will always evenly distribute the traffic to all
 /// replicas of each segment, and will try to select different replica id for each segment. The algorithm is very
 /// light-weight and will do best effort to balance the number of segments served by each selected server instance.
-///
 public class BalancedInstanceSelector extends BaseInstanceSelector {
 
   @Override
@@ -86,7 +85,7 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
 
     for (Map.Entry<Integer, Integer> entry : poolToSegmentCount.entrySet()) {
       _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getValue(),
-        BrokerMetrics.getTagForPreferredPool(queryOptions), String.valueOf(entry.getKey()));
+          BrokerMetrics.getTagForPreferredPool(queryOptions), String.valueOf(entry.getKey()));
     }
     return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }

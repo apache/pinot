@@ -25,6 +25,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -235,6 +236,15 @@ public class StringFunctionsTest {
         {"hello@world.com", "Hello@world.com"},
         {"one,two,three", "One,two,three"}
     };
+  }
+
+  @Test
+  public void testToUuidBytesAcceptsMixedCaseInput() {
+    String mixedCaseUuid = "550E8400-E29B-41D4-A716-446655440000";
+    byte[] uuidBytes = StringFunctions.toUUIDBytes(mixedCaseUuid);
+
+    assertNotNull(uuidBytes);
+    assertEquals(StringFunctions.fromUUIDBytes(uuidBytes), "550e8400-e29b-41d4-a716-446655440000");
   }
 
   @DataProvider(name = "levenshteinDistanceTestCases")
@@ -567,5 +577,76 @@ public class StringFunctionsTest {
     assertNull(StringFunctions.regexpSubstr("hello", "\\d+"));
     assertEquals(StringFunctions.regexpSubstr("", "a"), null);
     assertEquals(StringFunctions.regexpSubstr("Hello World", "[A-Z][a-z]+"), "Hello");
+  }
+
+  // ==================== Tests for translate ====================
+
+  @Test
+  public void testTranslate() {
+    // Basic character replacement
+    assertEquals(StringFunctions.translate("hello", "aeiou", "AEIOU"), "hEllO");
+
+    // Replacement and deletion: 'c' has no target in 'to' → deleted
+    assertEquals(StringFunctions.translate("abc", "abc", "xy"), "xy");
+
+    // Mixed: replacement and deletion
+    assertEquals(StringFunctions.translate("abcdef", "ace", "XY"), "XbYdf");
+
+    // No characters in 'from' match → input unchanged
+    assertEquals(StringFunctions.translate("hello", "xyz", "123"), "hello");
+
+    // Empty 'from' → input unchanged
+    assertEquals(StringFunctions.translate("hello", "", "abc"), "hello");
+
+    // Empty input → empty result
+    assertEquals(StringFunctions.translate("", "abc", "xyz"), "");
+
+    // All characters deleted (to is empty)
+    assertEquals(StringFunctions.translate("abc", "abc", ""), "");
+
+    // SQL standard example: partial substitution — digits 0-3 map to z/e/r/o; digits 4-9 are deleted
+    assertEquals(StringFunctions.translate("12300", "0123456789", "zero"), "erozz");
+
+    // Duplicate characters in 'from': first occurrence wins
+    assertEquals(StringFunctions.translate("aaa", "aa", "XY"), "XXX");
+  }
+
+  // ==================== Tests for overlay ====================
+
+  @Test
+  public void testOverlay() {
+    // Basic replacement: length defaults to length of replacement
+    assertEquals(StringFunctions.overlay("hello world", "there", 7), "hello there");
+
+    // Explicit length equal to length of replacement — same result
+    assertEquals(StringFunctions.overlay("hello world", "there", 7, 5), "hello there");
+
+    // Zero-length deletion: pure insertion
+    assertEquals(StringFunctions.overlay("abcdef", "XY", 3, 0), "abXYcdef");
+
+    // Delete more than replacement length: replacement is shorter than deleted span
+    // FROM 3 FOR 4 removes positions 3-6 (cdef), nothing remains after position 6
+    assertEquals(StringFunctions.overlay("abcdef", "XY", 3, 4), "abXY");
+
+    // Replace at start (position 1)
+    assertEquals(StringFunctions.overlay("abcdef", "Z", 1, 1), "Zbcdef");
+
+    // Replace at end
+    assertEquals(StringFunctions.overlay("abcdef", "Z", 6, 1), "abcdeZ");
+
+    // Replace entire string
+    assertEquals(StringFunctions.overlay("abcdef", "XY", 1, 6), "XY");
+
+    // Empty replacement (deletion only)
+    assertEquals(StringFunctions.overlay("abcdef", "", 3, 2), "abef");
+
+    // Empty input: result is the replacement
+    assertEquals(StringFunctions.overlay("", "abc", 1), "abc");
+
+    // start beyond end: appends replacement
+    assertEquals(StringFunctions.overlay("abc", "XY", 10), "abcXY");
+
+    // length clamped: cannot delete past end of string
+    assertEquals(StringFunctions.overlay("abc", "Z", 2, 100), "aZ");
   }
 }

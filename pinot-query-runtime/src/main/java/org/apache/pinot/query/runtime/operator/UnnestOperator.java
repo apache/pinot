@@ -34,12 +34,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * UnnestOperator expands array/collection values per input row into zero or more output rows.
- * Supports multiple arrays, aligning them by index (like a zip operation).
- * If arrays have different lengths, shorter arrays are padded with null values.
- * The output schema is provided by the associated UnnestNode's data schema.
- */
+/// UnnestOperator expands array/collection values per input row into zero or more output rows.
+/// Supports multiple arrays, aligning them by index (like a zip operation).
+/// If arrays have different lengths, shorter arrays are padded with null values.
+/// The output schema is provided by the associated UnnestNode's data schema.
 public class UnnestOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UnnestOperator.class);
   private static final String EXPLAIN_NAME = "UNNEST";
@@ -50,6 +48,8 @@ public class UnnestOperator extends MultiStageOperator {
   private final boolean _withOrdinality;
   private final List<Integer> _elementIndexes;
   private final int _ordinalityIndex;
+  private final int[] _passthroughInputIndexes;
+  private final boolean _prunedPassthrough;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
   private boolean _loggedElementOverflow;
 
@@ -66,6 +66,13 @@ public class UnnestOperator extends MultiStageOperator {
     _withOrdinality = node.isWithOrdinality();
     _elementIndexes = node.getElementIndexes();
     _ordinalityIndex = node.getOrdinalityIndex();
+    // Resolve to a primitive array once so the per-row hot path avoids List.get + unboxing.
+    List<Integer> passthroughInputIndexes = node.getPassthroughInputIndexes();
+    _passthroughInputIndexes = new int[passthroughInputIndexes.size()];
+    for (int i = 0; i < _passthroughInputIndexes.length; i++) {
+      _passthroughInputIndexes[i] = passthroughInputIndexes.get(i);
+    }
+    _prunedPassthrough = node.isPrunedPassthrough();
   }
 
   @Override
@@ -96,11 +103,9 @@ public class UnnestOperator extends MultiStageOperator {
     return EXPLAIN_NAME;
   }
 
-  /**
-   * Produces zipped rows across the configured array expressions for each input row.
-   * If an expression evaluates to a scalar instead of an array/list, we intentionally treat it as a single-element
-   * array so the row still participates in UNNEST output instead of being dropped.
-   */
+  /// Produces zipped rows across the configured array expressions for each input row.
+  /// If an expression evaluates to a scalar instead of an array/list, we intentionally treat it as a single-element
+  /// array so the row still participates in UNNEST output instead of being dropped.
   @Override
   protected MseBlock getNextBlock() {
     MseBlock block = _input.nextBlock();
@@ -226,10 +231,21 @@ public class UnnestOperator extends MultiStageOperator {
   private Object[] appendElements(Object[] inputRow, List<Object> elements, int ordinality) {
     int outSize = _resultSchema.size();
     Object[] out = new Object[outSize];
-    // Copy left columns at beginning
-    System.arraycopy(inputRow, 0, out, 0, inputRow.length);
-    // Determine positions for elements. Track next free slot after the copied input row.
-    int base = inputRow.length;
+    // Copy passthrough (left) columns at the beginning of the output row.
+    int base;
+    if (_prunedPassthrough) {
+      // Only the input columns referenced downstream are retained, in output order.
+      int numPassthrough = _passthroughInputIndexes.length;
+      for (int o = 0; o < numPassthrough; o++) {
+        out[o] = inputRow[_passthroughInputIndexes[o]];
+      }
+      base = numPassthrough;
+    } else {
+      // Legacy behavior: copy the whole input row (including the unnested source array).
+      System.arraycopy(inputRow, 0, out, 0, inputRow.length);
+      base = inputRow.length;
+    }
+    // Determine positions for elements. Track next free slot after the copied passthrough columns.
     int nextFreePos = base;
     for (int i = 0; i < elements.size(); i++) {
       int elemPos = -1;
@@ -278,13 +294,9 @@ public class UnnestOperator extends MultiStageOperator {
       }
     },
     EMITTED_ROWS(StatMap.Type.LONG),
-    /**
-     * Allocated memory in bytes for this operator or its children in the same stage.
-     */
+    /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
-    /**
-     * Time spent on GC while this operator or its children in the same stage were running.
-     */
+    /// Time spent on GC while this operator or its children in the same stage were running.
     GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;

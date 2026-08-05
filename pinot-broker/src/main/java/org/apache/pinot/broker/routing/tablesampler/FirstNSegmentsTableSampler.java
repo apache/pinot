@@ -32,14 +32,11 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
 
 
-/**
- * Selects the first N segments after sorting segment names lexicographically.
- *
- * <p>Config:
- * <ul>
- *   <li>{@code properties.numSegments}: positive integer</li>
- * </ul>
- */
+/// Selects the first N segments after sorting segment names lexicographically.
+///
+/// Config:
+///
+/// - `properties.numSegments`: positive integer
 @TableSamplerProvider(name = FirstNSegmentsTableSampler.TYPE)
 public class FirstNSegmentsTableSampler implements TableSampler {
   public static final String TYPE = "firstN";
@@ -64,7 +61,7 @@ public class FirstNSegmentsTableSampler implements TableSampler {
   @Override
   public Set<String> sampleSegments(Set<String> onlineSegments) {
     if (onlineSegments.isEmpty()) {
-      return Collections.emptySet();
+      return Set.of();
     }
     if (onlineSegments.size() <= _numSegments) {
       return onlineSegments;

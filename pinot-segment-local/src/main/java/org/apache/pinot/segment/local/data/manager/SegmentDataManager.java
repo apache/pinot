@@ -18,15 +18,14 @@
  */
 package org.apache.pinot.segment.local.data.manager;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
-/**
- * Base segment data manager to maintain reference count for the segment.
- */
+/// Base segment data manager to maintain reference count for the segment.
 public abstract class SegmentDataManager {
   private final long _loadTimeMs = System.currentTimeMillis();
   private final AtomicBoolean _offloaded = new AtomicBoolean();
@@ -41,11 +40,9 @@ public abstract class SegmentDataManager {
     return _referenceCount;
   }
 
-  /**
-   * Increases the reference count. Should be called when acquiring the segment.
-   *
-   * @return Whether the segment is still valid (i.e. reference count not 0)
-   */
+  /// Increases the reference count. Should be called when acquiring the segment.
+  ///
+  /// @return Whether the segment is still valid (i.e. reference count not 0)
   public synchronized boolean increaseReferenceCount() {
     if (_referenceCount == 0) {
       return false;
@@ -55,11 +52,9 @@ public abstract class SegmentDataManager {
     }
   }
 
-  /**
-   * Decreases the reference count. Should be called when releasing or dropping the segment.
-   *
-   * @return Whether the segment can be destroyed (i.e. reference count is 0)
-   */
+  /// Decreases the reference count. Should be called when releasing or dropping the segment.
+  ///
+  /// @return Whether the segment can be destroyed (i.e. reference count is 0)
   public synchronized boolean decreaseReferenceCount() {
     if (_referenceCount <= 1) {
       _referenceCount = 0;
@@ -74,18 +69,32 @@ public abstract class SegmentDataManager {
 
   public abstract IndexSegment getSegment();
 
+  @Nullable
+  public String getTier() {
+    IndexSegment segment = getSegment();
+    return segment instanceof ImmutableSegment ? ((ImmutableSegment) segment).getTier() : null;
+  }
+
   public boolean hasMultiSegments() {
     return false;
   }
 
   public List<IndexSegment> getSegments() {
-    return Collections.emptyList();
+    return List.of();
   }
 
-  /**
-   * Offloads the segment from the metadata management (e.g. upsert metadata), but not releases the resources yet
-   * because there might be queries still accessing the segment.
-   */
+  /// The index segment(s) this manager exposes.
+  /// Defaults to the single backing segment.
+  public List<IndexSegment> getReportableSegments() {
+    return List.of(getSegment());
+  }
+
+  public String getCrc() {
+    return getSegment().getSegmentMetadata().getCrc();
+  }
+
+  /// Offloads the segment from the metadata management (e.g. upsert metadata), but not releases the resources yet
+  /// because there might be queries still accessing the segment.
   public void offload() {
     if (_offloaded.compareAndSet(false, true)) {
       doOffload();
@@ -94,13 +103,9 @@ public abstract class SegmentDataManager {
 
   public abstract void doOffload();
 
-  /**
-   * Destroys the data manager and releases all the resources allocated.
-   * The data manager can only be destroyed once.
-   */
+  /// Destroys the data manager and releases all the resources allocated.
+  /// The data manager can only be destroyed once.
   public void destroy() {
-    // NOTE: We want the test to catch the case when destroy is called without offloading, but not fail the production.
-    assert _offloaded.get() : "Cannot destroy segment data manager without offloading it first";
     offload();
 
     if (_destroyed.compareAndSet(false, true)) {

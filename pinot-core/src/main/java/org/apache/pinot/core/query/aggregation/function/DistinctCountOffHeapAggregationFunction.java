@@ -82,7 +82,7 @@ public class DistinctCountOffHeapAggregationFunction
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       // For dictionary-encoded expression, store dictionary ids into the bitmap
       if (blockValSet.isSingleValue()) {

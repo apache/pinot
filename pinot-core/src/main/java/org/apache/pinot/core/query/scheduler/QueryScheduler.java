@@ -47,10 +47,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Abstract class providing common scheduler functionality
- * including query runner and query worker pool
- */
+/// Abstract class providing common scheduler functionality
+/// including query runner and query worker pool
 public abstract class QueryScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryScheduler.class);
 
@@ -65,11 +63,9 @@ public abstract class QueryScheduler {
 
   protected volatile boolean _isRunning = false;
 
-  /**
-   * Constructor to initialize QueryScheduler
-   * @param queryExecutor QueryExecutor engine to use
-   * @param resourceManager for managing server thread resources
-   */
+  /// Constructor to initialize QueryScheduler
+  /// @param queryExecutor QueryExecutor engine to use
+  /// @param resourceManager for managing server thread resources
   public QueryScheduler(PinotConfiguration config, String instanceId, QueryExecutor queryExecutor,
       ThreadAccountant threadAccountant, LongAccumulator latestQueryTime, ResourceManager resourceManager) {
     _config = config;
@@ -84,54 +80,42 @@ public abstract class QueryScheduler {
     return _resourceManager;
   }
 
-  /**
-   * Submit a query for execution. The query will be scheduled for execution as per the scheduling algorithm
-   * @param queryRequest query to schedule for execution
-   * @return Listenable future for query result representing serialized response. It is possible that the
-   *    future may return immediately or be scheduled for execution at a later time.
-   */
+  /// Submit a query for execution. The query will be scheduled for execution as per the scheduling algorithm
+  /// @param queryRequest query to schedule for execution
+  /// @return Listenable future for query result representing serialized response. It is possible that the
+  ///    future may return immediately or be scheduled for execution at a later time.
   public abstract ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest);
 
-  /**
-   * Query scheduler name for logging
-   */
+  /// Query scheduler name for logging
   public abstract String name();
 
-  /**
-   * Start query scheduler thread
-   */
+  /// Start query scheduler thread
   public void start() {
     _isRunning = true;
   }
 
-  /**
-   * stop the scheduler and shutdown services
-   */
+  /// stop the scheduler and shutdown services
   public void stop() {
     // don't stop resourcemanager yet...we need to wait for all running queries to finish
     _isRunning = false;
   }
 
-  /**
-   * Create a future task for the query
-   * @param queryRequest incoming query request
-   * @param executorService executor service to use for parallelizing query. This is passed to the QueryExecutor.
-   *                        This is not the executor that runs the returned future task but the one that can be
-   *                        internally used to parallelize query processing.
-   * @return Future task that can be scheduled for execution on an ExecutorService. Ideally, this future
-   * should be executed on a different executor service than {@code executorService} to avoid deadlock.
-   */
+  /// Create a future task for the query
+  /// @param queryRequest incoming query request
+  /// @param executorService executor service to use for parallelizing query. This is passed to the QueryExecutor.
+  ///                        This is not the executor that runs the returned future task but the one that can be
+  ///                        internally used to parallelize query processing.
+  /// @return Future task that can be scheduled for execution on an ExecutorService. Ideally, this future
+  /// should be executed on a different executor service than `executorService` to avoid deadlock.
   protected ListenableFutureTask<byte[]> createQueryFutureTask(ServerQueryRequest queryRequest,
       ExecutorService executorService) {
     return ListenableFutureTask.create(() -> processQueryAndSerialize(queryRequest, executorService));
   }
 
-  /**
-   * Process query and serialize response
-   * @param queryRequest incoming query request
-   * @param executorService Executor service to use for parallelizing query processing
-   * @return serialized query response
-   */
+  /// Process query and serialize response
+  /// @param queryRequest incoming query request
+  /// @param executorService Executor service to use for parallelizing query processing
+  /// @return serialized query response
   @Nullable
   protected byte[] processQueryAndSerialize(ServerQueryRequest queryRequest, ExecutorService executorService) {
     QueryExecutionContext executionContext = queryRequest.toExecutionContext(_instanceId);
@@ -191,12 +175,10 @@ public abstract class QueryScheduler {
     }
   }
 
-  /**
-   * Serialize the instance response for query request
-   * @param queryRequest Server query request for which response is serialized
-   * @param instanceResponse instance response to serialize
-   * @return serialized response bytes
-   */
+  /// Serialize the instance response for query request
+  /// @param queryRequest Server query request for which response is serialized
+  /// @param instanceResponse instance response to serialize
+  /// @return serialized response bytes
   @Nullable
   private byte[] serializeResponse(ServerQueryRequest queryRequest, InstanceResponseBlock instanceResponse) {
     TimerContext timerContext = queryRequest.getTimerContext();
@@ -247,10 +229,8 @@ public abstract class QueryScheduler {
     return responseBytes;
   }
 
-  /**
-   * Error response future in case of internal error where query response is not available. This can happen if the
-   * query can not be executed.
-   */
+  /// Error response future in case of internal error where query response is not available. This can happen if the
+  /// query can not be executed.
   protected ListenableFuture<byte[]> immediateErrorResponse(ServerQueryRequest queryRequest, QueryErrorCode errorCode) {
     Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
     String workloadName = QueryOptionsUtils.getWorkloadName(queryOptions);

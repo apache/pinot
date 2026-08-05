@@ -24,12 +24,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -41,6 +39,8 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
+import org.apache.pinot.common.function.FunctionInfo;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -49,6 +49,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
@@ -58,6 +59,7 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.annotations.FunctionVolatility;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -90,11 +92,13 @@ import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
+import org.apache.pinot.spi.config.table.ingestion.SourceFieldConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.function.FunctionEvaluator;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
@@ -118,9 +122,7 @@ import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNT
 import static org.apache.pinot.segment.spi.AggregationFunctionType.SUMPRECISION;
 
 
-/**
- * Utils related to table config operations
- */
+/// Utils related to table config operations
 public final class TableConfigUtils {
   private TableConfigUtils() {
   }
@@ -134,6 +136,7 @@ public final class TableConfigUtils {
   // this is duplicate with KinesisConfig.STREAM_TYPE, while instead of use KinesisConfig.STREAM_TYPE directly, we
   // hardcode the value here to avoid pulling the entire pinot-kinesis module as dependency.
   private static final String KINESIS_STREAM_TYPE = "kinesis";
+  private static final String CONSUMING_SEGMENT_TIER = "consuming";
 
   private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES =
       ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
@@ -151,27 +154,43 @@ public final class TableConfigUtils {
     _enforcePoolBasedAssignment = enforcePoolBasedAssignment;
   }
 
-  /**
-   * @see TableConfigUtils#validate(TableConfig, Schema, String)
-   */
+  /// @see TableConfigUtils#validate(TableConfig, Schema, String)
   public static void validate(TableConfig tableConfig, Schema schema) {
     validate(tableConfig, schema, null);
   }
 
-  /**
-   * Performs table config validations. Includes validations for the following:
-   * 1. Validation config
-   * 2. IngestionConfig
-   * 3. TierConfigs
-   * 4. Indexing config
-   * 5. Field Config List
-   * 6. Instance pool and replica group, if enabled
-   *
-   * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
-   */
+  /// Performs table config validations. Includes validations for the following:
+  /// 1. Validation config
+  /// 2. IngestionConfig
+  /// 3. TierConfigs
+  /// 4. Indexing config
+  /// 5. Field Config List
+  /// 6. Instance pool and replica group, if enabled
+  ///
+  /// TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
   public static void validate(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip) {
+    validate(tableConfig, schema, typesToSkip, null);
+  }
+
+  public static void validate(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip,
+      @Nullable TableConfig existingTableConfig) {
     Preconditions.checkArgument(schema != null, "Schema should not be null for table: %s", tableConfig.getTableName());
     Set<ValidationType> skipTypes = parseTypesToSkipString(typesToSkip);
+    validateEffectiveTableConfig(tableConfig, schema, skipTypes, existingTableConfig);
+    if (skipTypes.contains(ValidationType.ALL) || !hasConsumingSegmentTierOverwriteForRealtimeTable(tableConfig)) {
+      return;
+    }
+    try {
+      TableConfig consumingTableConfig = overwriteTableConfigForConsumingSegmentTier(tableConfig);
+      validateEffectiveTableConfig(consumingTableConfig, schema, skipTypes, existingTableConfig);
+    } catch (RuntimeException e) {
+      throw new IllegalStateException(
+          "tierOverwrites.consuming produces an invalid table config: " + e.getMessage(), e);
+    }
+  }
+
+  private static void validateEffectiveTableConfig(TableConfig tableConfig, Schema schema,
+      Set<ValidationType> skipTypes, @Nullable TableConfig existingTableConfig) {
     // Sanitize the table config before validation
     sanitize(tableConfig);
 
@@ -179,9 +198,18 @@ public final class TableConfigUtils {
       return;
     }
 
+    // Schema-level transforms are active only when the table config does not override the same destination. A
+    // non-immutable transform is grandfathered only when it was already active for this table; removing an existing
+    // override must not silently activate it.
+    Set<String> overriddenColumns = getTransformColumns(tableConfig);
+    Set<String> existingOverriddenColumns = getTransformColumns(existingTableConfig);
+    Schema existingSchema = existingTableConfig != null ? schema : null;
+    SchemaUtils.validateIngestionTransformVolatility(schema, existingSchema, overriddenColumns,
+        existingOverriddenColumns);
+
     validateValidationConfig(tableConfig, schema);
     validateSegmentAssignmentConfig(tableConfig);
-    validateIngestionConfig(tableConfig, schema);
+    validateIngestionConfig(tableConfig, schema, existingTableConfig);
     if (tableConfig.getTableType() == TableType.REALTIME) {
       validateStreamConfigMaps(tableConfig);
     }
@@ -192,22 +220,20 @@ public final class TableConfigUtils {
     validateInstanceAssignmentConfigs(tableConfig);
 
     if (!skipTypes.contains(ValidationType.UPSERT)) {
-      validateUpsertAndDedupConfig(tableConfig, schema);
-      validatePartialUpsertStrategies(tableConfig, schema);
+      validateUpsertAndDedupConfig(tableConfig, schema, existingTableConfig);
     }
 
     validateTaskConfig(tableConfig);
+    validateMaterializedViewInvariants(tableConfig);
 
     if (_enforcePoolBasedAssignment) {
       validateInstancePoolsAndReplicaGroups(tableConfig);
     }
   }
 
-  /**
-   * Validates the table config is using instance pool and replica group configuration.
-   * @param tableConfig Table config to validate
-   * @return true if the table config is using instance pool and replica group configuration, false otherwise
-   */
+  /// Validates the table config is using instance pool and replica group configuration.
+  /// @param tableConfig Table config to validate
+  /// @return true if the table config is using instance pool and replica group configuration, false otherwise
   static boolean isTableUsingInstancePoolAndReplicaGroup(TableConfig tableConfig) {
     boolean status = true;
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
@@ -242,19 +268,22 @@ public final class TableConfigUtils {
         "Instance pool and replica group configurations must be enabled");
   }
 
-  public static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkip) {
-    return typesToSkip == null ? Collections.emptySet()
-        : Arrays.stream(typesToSkip.split(",")).map(s -> ValidationType.valueOf(s.toUpperCase()))
-            .collect(Collectors.toSet());
+  public static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkipStr) {
+    if (StringUtils.isBlank(typesToSkipStr)) {
+      return Set.of();
+    }
+    String[] split = StringUtils.split(typesToSkipStr, ',');
+    Set<ValidationType> typesToSkip = Sets.newHashSetWithExpectedSize(split.length);
+    for (String type : split) {
+      typesToSkip.add(ValidationType.valueOf(type.trim().toUpperCase()));
+    }
+    return typesToSkip;
   }
 
-  /**
-   * Validates the table name with the following rules:
-   * <ul>
-   *   <li>Table name can have at most one dot in it.
-   *   <li>Table name does not have whitespace.</li>
-   * </ul>
-   */
+  /// Validates the table name with the following rules:
+  ///
+  /// - Table name can have at most one dot in it.
+  /// - Table name does not have whitespace.
   public static void validateTableName(TableConfig tableConfig) {
     String tableName = tableConfig.getTableName();
     int dotCount = StringUtils.countMatches(tableName, '.');
@@ -266,11 +295,9 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates retention config. Checks for following things:
-   * - Valid segmentPushType
-   * - Valid retentionTimeUnit
-   */
+  /// Validates retention config. Checks for following things:
+  /// - Valid segmentPushType
+  /// - Valid retentionTimeUnit
   private static void validateRetentionConfig(TableConfig tableConfig) {
     SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
     String tableName = tableConfig.getTableName();
@@ -342,20 +369,18 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates the following in the validationConfig of the table
-   * 1. For REALTIME table
-   * - checks for non-null timeColumnName
-   * - checks for valid field spec for timeColumnName in schema
-   * - Validates retention config
-   *
-   * 2. For OFFLINE table
-   * - checks for valid field spec for timeColumnName in schema, if timeColumnName and schema are non-null
-   * - for Dimension tables checks the primary key requirement and incompatible segment assignment strategies
-   *
-   * 3. Checks peerDownloadSchema
-   * 4. Checks time column existence if null handling for time column is enabled
-   */
+  /// Validates the following in the validationConfig of the table
+  /// 1. For REALTIME table
+  /// - checks for non-null timeColumnName
+  /// - checks for valid field spec for timeColumnName in schema
+  /// - Validates retention config
+  ///
+  /// 2. For OFFLINE table
+  /// - checks for valid field spec for timeColumnName in schema, if timeColumnName and schema are non-null
+  /// - for Dimension tables checks the primary key requirement and incompatible segment assignment strategies
+  ///
+  /// 3. Checks peerDownloadSchema
+  /// 4. Checks time column existence if null handling for time column is enabled
   private static void validateValidationConfig(TableConfig tableConfig, Schema schema) {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     String timeColumnName = validationConfig.getTimeColumnName();
@@ -419,282 +444,450 @@ public final class TableConfigUtils {
         || CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme);
   }
 
-  /**
-   * Validates the following:
-   * 1. validity of filter function
-   * 2. checks for duplicate transform configs
-   * 3. checks for null column name or transform function in transform config
-   * 4. validity of transform function string
-   * 5. checks for source fields used in destination columns
-   * 6. ingestion type for dimension tables
-   */
+  /// Validates the table's [IngestionConfig] together with the closely related metrics-aggregation config, covering:
+  /// - Metrics aggregation (both the `aggregateMetrics` flag and ingestion `aggregationConfigs`), delegated to
+  ///   [#validateMetricsAggregation].
+  /// - Batch ingestion: each batch config map is well-formed, and a dimension table has batch ingestion configured
+  ///   with `REFRESH` segment ingestion type.
+  /// - Stream ingestion: streams are declared in only one place, at least one stream is present, and pauseless
+  ///   consumption has a valid `peerSegmentDownloadScheme`.
+  /// - Filter config: the filter function is valid and not a disabled Groovy expression.
+  /// - Source field configs: no source field is duplicated within the same complex-type phase.
+  /// - Enrichment configs: each config is valid.
+  /// - Transform configs: non-null column and function, no duplicate destination, and each destination is a schema
+  ///   column, an intermediate consumed by another transform, or an aggregation source column; the function is valid
+  ///   and does not reference its own destination.
+  /// - Complex-type config: no schema field collides with a `prefixesToRename` prefix.
+  /// - Schema-conforming transformer config.
   @VisibleForTesting
   public static void validateIngestionConfig(TableConfig tableConfig, Schema schema) {
+    validateIngestionConfig(tableConfig, schema, null);
+  }
+
+  @VisibleForTesting
+  static void validateIngestionConfig(TableConfig tableConfig, Schema schema,
+      @Nullable TableConfig existingTableConfig) {
+    // All metrics-aggregation validation lives here; it returns the columns referenced as aggregation sources, which
+    // a transform config is allowed to target as its destination (see the transform validation below).
+    Set<String> aggregationSourceColumns = validateMetricsAggregation(tableConfig, schema);
+
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig == null) {
+      return;
+    }
 
-    if (ingestionConfig != null) {
-      String tableNameWithType = tableConfig.getTableName();
+    String tableNameWithType = tableConfig.getTableName();
 
-      // Batch
-      if (ingestionConfig.getBatchIngestionConfig() != null) {
-        BatchIngestionConfig cfg = ingestionConfig.getBatchIngestionConfig();
-        List<Map<String, String>> batchConfigMaps = cfg.getBatchConfigMaps();
-        try {
-          if (CollectionUtils.isNotEmpty(batchConfigMaps)) {
-            // Validate that BatchConfig can be created
-            batchConfigMaps.forEach(b -> new BatchConfig(tableNameWithType, b));
-          }
-        } catch (Exception e) {
-          throw new IllegalStateException("Could not create BatchConfig using the batchConfig map", e);
+    // Batch
+    if (ingestionConfig.getBatchIngestionConfig() != null) {
+      BatchIngestionConfig cfg = ingestionConfig.getBatchIngestionConfig();
+      List<Map<String, String>> batchConfigMaps = cfg.getBatchConfigMaps();
+      try {
+        if (CollectionUtils.isNotEmpty(batchConfigMaps)) {
+          // Validate that BatchConfig can be created
+          batchConfigMaps.forEach(b -> new BatchConfig(tableNameWithType, b));
         }
-        if (tableConfig.isDimTable()) {
-          Preconditions.checkState(cfg.getSegmentIngestionType().equalsIgnoreCase("REFRESH"),
-              "Dimension tables must have segment ingestion type REFRESH");
-        }
+      } catch (Exception e) {
+        throw new IllegalStateException("Could not create BatchConfig using the batchConfig map", e);
       }
       if (tableConfig.isDimTable()) {
-        Preconditions.checkState(ingestionConfig.getBatchIngestionConfig() != null,
-            "Dimension tables must have batch ingestion configuration");
-      }
-
-      // Stream
-      // stream config map can either be in ingestion config or indexing config. cannot be in both places
-      if (ingestionConfig.getStreamIngestionConfig() != null) {
-        IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-        Preconditions.checkState(indexingConfig == null || MapUtils.isEmpty(indexingConfig.getStreamConfigs()),
-            "Should not use indexingConfig#getStreamConfigs if ingestionConfig#StreamIngestionConfig is provided");
-        List<Map<String, String>> streamConfigMaps = ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps();
-        Preconditions.checkState(!streamConfigMaps.isEmpty(), "Must have at least 1 stream in REALTIME table");
-        // TODO: for multiple stream configs, validate them
-
-        boolean isPauselessEnabled = ingestionConfig.getStreamIngestionConfig().isPauselessConsumptionEnabled();
-        if (isPauselessEnabled) {
-          int replication = tableConfig.getReplication();
-          // We are checking for this only when replication is greater than 1 because in test environments
-          // users still prefer to create pauseless tables with replication 1
-          if (replication > 1) {
-            String peerSegmentDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
-            Preconditions.checkState(StringUtils.isNotEmpty(peerSegmentDownloadScheme) && isValidPeerDownloadScheme(
-                    peerSegmentDownloadScheme),
-                "Must have a valid peerSegmentDownloadScheme set in validation config for pauseless consumption");
-          } else {
-            LOGGER.warn("It's not recommended to create pauseless tables with replication 1 for stability reasons.");
-          }
-        }
-      }
-
-      // Filter config
-      FilterConfig filterConfig = ingestionConfig.getFilterConfig();
-      if (filterConfig != null) {
-        String filterFunction = filterConfig.getFilterFunction();
-        if (filterFunction != null) {
-          if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(filterFunction)) {
-            throw new IllegalStateException(
-                "Groovy filter functions are disabled for table config. Found '" + filterFunction + "'");
-          }
-          try {
-            FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
-          } catch (Exception e) {
-            throw new IllegalStateException(
-                "Invalid filter function '" + filterFunction + "', exception: " + e.getMessage(), e);
-          }
-        }
-      }
-
-      // Aggregation configs
-      List<AggregationConfig> aggregationConfigs = ingestionConfig.getAggregationConfigs();
-      Set<String> aggregationSourceColumns = new HashSet<>();
-      if (CollectionUtils.isNotEmpty(aggregationConfigs)) {
-        Preconditions.checkState(!tableConfig.getIndexingConfig().isAggregateMetrics(),
-            "aggregateMetrics cannot be set with AggregationConfig");
-        Set<String> aggregationColumns = new HashSet<>();
-        for (AggregationConfig aggregationConfig : aggregationConfigs) {
-          String columnName = aggregationConfig.getColumnName();
-          String aggregationFunction = aggregationConfig.getAggregationFunction();
-          if (columnName == null || aggregationFunction == null) {
-            throw new IllegalStateException(
-                "columnName/aggregationFunction cannot be null in AggregationConfig " + aggregationConfig);
-          }
-
-          FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
-          Preconditions.checkState(fieldSpec != null,
-              "The destination column '" + columnName + "' of the aggregation function must be present in the schema");
-          Preconditions.checkState(fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC,
-              "The destination column '" + columnName + "' of the aggregation function must be a metric column");
-          DataType dataType = fieldSpec.getDataType();
-
-          if (!aggregationColumns.add(columnName)) {
-            throw new IllegalStateException("Duplicate aggregation config found for column '" + columnName + "'");
-          }
-          ExpressionContext expressionContext;
-          try {
-            expressionContext = RequestContextUtils.getExpression(aggregationConfig.getAggregationFunction());
-          } catch (Exception e) {
-            throw new IllegalStateException(
-                "Invalid aggregation function '" + aggregationFunction + "' for column '" + columnName + "'", e);
-          }
-          Preconditions.checkState(expressionContext.getType() == ExpressionContext.Type.FUNCTION,
-              "aggregation function must be a function for: %s", aggregationConfig);
-
-          FunctionContext functionContext = expressionContext.getFunction();
-          AggregationFunctionType functionType =
-              AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
-          List<ExpressionContext> arguments = functionContext.getArguments();
-          int numArguments = arguments.size();
-          if (functionType == DISTINCTCOUNTHLL) {
-            Preconditions.checkState(numArguments >= 1 && numArguments <= 2,
-                "DISTINCT_COUNT_HLL can have at most two arguments: %s", aggregationConfig);
-            if (numArguments == 2) {
-              ExpressionContext secondArgument = arguments.get(1);
-              Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
-                  "Second argument of DISTINCT_COUNT_HLL must be literal: %s", aggregationConfig);
-              String literal = secondArgument.getLiteral().getStringValue();
-              Preconditions.checkState(StringUtils.isNumeric(literal),
-                  "Second argument of DISTINCT_COUNT_HLL must be a number: %s", aggregationConfig);
-            }
-            Preconditions.checkState(dataType == DataType.BYTES, "Result type for DISTINCT_COUNT_HLL must be BYTES: %s",
-                aggregationConfig);
-          } else if (functionType == DISTINCTCOUNTHLLPLUS) {
-            Preconditions.checkState(numArguments >= 1 && numArguments <= 3,
-                "DISTINCT_COUNT_HLL_PLUS can have at most three arguments: %s", aggregationConfig);
-            if (numArguments == 2) {
-              ExpressionContext secondArgument = arguments.get(1);
-              Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
-                  "Second argument of DISTINCT_COUNT_HLL_PLUS must be literal: %s", aggregationConfig);
-              String literal = secondArgument.getLiteral().getStringValue();
-              Preconditions.checkState(StringUtils.isNumeric(literal),
-                  "Second argument of DISTINCT_COUNT_HLL_PLUS must be a number: %s", aggregationConfig);
-            }
-            if (numArguments == 3) {
-              ExpressionContext thirdArgument = arguments.get(2);
-              Preconditions.checkState(thirdArgument.getType() == ExpressionContext.Type.LITERAL,
-                  "Third argument of DISTINCT_COUNT_HLL_PLUS must be literal: %s", aggregationConfig);
-              String literal = thirdArgument.getLiteral().getStringValue();
-              Preconditions.checkState(StringUtils.isNumeric(literal),
-                  "Third argument of DISTINCT_COUNT_HLL_PLUS must be a number: %s", aggregationConfig);
-            }
-            Preconditions.checkState(dataType == DataType.BYTES,
-                "Result type for DISTINCT_COUNT_HLL_PLUS must be BYTES: %s", aggregationConfig);
-          } else if (functionType == SUMPRECISION) {
-            Preconditions.checkState(numArguments >= 2 && numArguments <= 3,
-                "SUM_PRECISION must specify precision (required), scale (optional): %s", aggregationConfig);
-            ExpressionContext secondArgument = arguments.get(1);
-            Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
-                "Second argument of SUM_PRECISION must be literal: %s", aggregationConfig);
-            String literal = secondArgument.getLiteral().getStringValue();
-            Preconditions.checkState(StringUtils.isNumeric(literal),
-                "Second argument of SUM_PRECISION must be a number: %s", aggregationConfig);
-            Preconditions.checkState(dataType == DataType.BIG_DECIMAL || dataType == DataType.BYTES,
-                "Result type for SUM_PRECISION must be BIG_DECIMAL or BYTES: %s", aggregationConfig);
-          } else {
-            Preconditions.checkState(numArguments == 1, "%s can only have one argument: %s", functionType,
-                aggregationConfig);
-          }
-          ExpressionContext firstArgument = arguments.get(0);
-          Preconditions.checkState(firstArgument.getType() == ExpressionContext.Type.IDENTIFIER,
-              "First argument of aggregation function: %s must be identifier, got: %s", functionType,
-              firstArgument.getType());
-          // Create a ValueAggregator for the aggregation function and check if it is supported for ingestion (fixed
-          // size aggregated value).
-          ValueAggregator<?, ?> valueAggregator;
-          try {
-            valueAggregator =
-                ValueAggregatorFactory.getValueAggregator(functionType, arguments.subList(1, numArguments));
-          } catch (Exception e) {
-            throw new IllegalStateException(
-                "Caught exception while creating ValueAggregator for aggregation function: " + aggregationFunction, e);
-          }
-          Preconditions.checkState(valueAggregator.isAggregatedValueFixedSize(),
-              "Aggregation function: %s must have fixed size aggregated value", aggregationFunction);
-
-          aggregationSourceColumns.add(firstArgument.getIdentifier());
-        }
-        Preconditions.checkState(new HashSet<>(schema.getMetricNames()).equals(aggregationColumns),
-            "all metric columns must be aggregated");
-
-        // This is required by MutableSegmentImpl.enableMetricsAggregationIfPossible().
-        // That code will disable ingestion aggregation if all metrics aren't noDictionaryColumns.
-        // But if you do that after the table is already created, all future aggregations will
-        // just be the default value.
-        Map<String, DictionaryIndexConfig> configPerCol = StandardIndexes.dictionary().getConfig(tableConfig, schema);
-        aggregationColumns.forEach(column -> {
-          DictionaryIndexConfig dictConfig = configPerCol.get(column);
-          Preconditions.checkState(dictConfig != null && dictConfig.isDisabled(),
-              "Aggregated column: %s must be a no-dictionary column", column);
-        });
-      }
-
-      // Enrichment configs
-      List<EnrichmentConfig> enrichmentConfigs = ingestionConfig.getEnrichmentConfigs();
-      if (enrichmentConfigs != null) {
-        for (EnrichmentConfig enrichmentConfig : enrichmentConfigs) {
-          RecordEnricherRegistry.validateEnrichmentConfig(enrichmentConfig,
-              new RecordEnricherValidationConfig(_disableGroovy));
-        }
-      }
-
-      // Transform configs
-      List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
-      if (transformConfigs != null) {
-        Set<String> transformColumns = new HashSet<>();
-        for (TransformConfig transformConfig : transformConfigs) {
-          String columnName = transformConfig.getColumnName();
-          String transformFunction = transformConfig.getTransformFunction();
-          if (columnName == null || transformFunction == null) {
-            throw new IllegalStateException(
-                "columnName/transformFunction cannot be null in TransformConfig " + transformConfig);
-          }
-          if (!transformColumns.add(columnName)) {
-            throw new IllegalStateException("Duplicate transform config found for column '" + columnName + "'");
-          }
-          Preconditions.checkState(schema.hasColumn(columnName) || aggregationSourceColumns.contains(columnName),
-              "The destination column '" + columnName
-                  + "' of the transform function must be present in the schema or as a source column for "
-                  + "aggregations");
-          FunctionEvaluator expressionEvaluator;
-          if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
-            throw new IllegalStateException(
-                "Groovy transform functions are disabled for table config. Found '" + transformFunction
-                    + "' for column '" + columnName + "'");
-          }
-          try {
-            expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
-          } catch (Exception e) {
-            throw new IllegalStateException(
-                "Invalid transform function '" + transformFunction + "' for column '" + columnName + "', exception: "
-                    + e.getMessage(), e);
-          }
-          List<String> arguments = expressionEvaluator.getArguments();
-          if (arguments.contains(columnName)) {
-            throw new IllegalStateException(
-                "Arguments of a transform function '" + arguments + "' cannot contain the destination column '"
-                    + columnName + "'");
-          }
-        }
-      }
-
-      // Complex configs
-      ComplexTypeConfig complexTypeConfig = ingestionConfig.getComplexTypeConfig();
-      if (complexTypeConfig != null) {
-        Map<String, String> prefixesToRename = complexTypeConfig.getPrefixesToRename();
-        if (MapUtils.isNotEmpty(prefixesToRename)) {
-          Set<String> fieldNames = schema.getColumnNames();
-          for (String prefix : prefixesToRename.keySet()) {
-            for (String field : fieldNames) {
-              Preconditions.checkState(!field.startsWith(prefix),
-                  "Fields in the schema may not begin with any prefix specified in the prefixesToRename"
-                      + " config. Name conflict with field: " + field + " and prefix: " + prefix);
-            }
-          }
-        }
-      }
-
-      SchemaConformingTransformerConfig schemaConformingTransformerConfig =
-          ingestionConfig.getSchemaConformingTransformerConfig();
-      if (schemaConformingTransformerConfig != null) {
-        SchemaConformingTransformer.validateSchema(schema, schemaConformingTransformerConfig);
+        Preconditions.checkState(cfg.getSegmentIngestionType().equalsIgnoreCase("REFRESH"),
+            "Dimension tables must have segment ingestion type REFRESH");
       }
     }
+    if (tableConfig.isDimTable()) {
+      Preconditions.checkState(ingestionConfig.getBatchIngestionConfig() != null,
+          "Dimension tables must have batch ingestion configuration");
+    }
+
+    // Stream
+    // stream config map can either be in ingestion config or indexing config. cannot be in both places
+    if (ingestionConfig.getStreamIngestionConfig() != null) {
+      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+      Preconditions.checkState(indexingConfig == null || MapUtils.isEmpty(indexingConfig.getStreamConfigs()),
+          "Should not use indexingConfig#getStreamConfigs if ingestionConfig#StreamIngestionConfig is provided");
+      StreamIngestionConfig streamIngestionConfig = ingestionConfig.getStreamIngestionConfig();
+      List<Map<String, String>> streamConfigMaps = streamIngestionConfig.getStreamConfigMaps();
+      Preconditions.checkState(!streamConfigMaps.isEmpty(), "Must have at least 1 stream in REALTIME table");
+      // TODO: for multiple stream configs, validate them
+
+      boolean isPauselessEnabled = streamIngestionConfig.isPauselessConsumptionEnabled();
+      if (isPauselessEnabled) {
+        int replication = tableConfig.getReplication();
+        // We are checking for this only when replication is greater than 1 because in test environments
+        // users still prefer to create pauseless tables with replication 1
+        if (replication > 1) {
+          String peerSegmentDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
+          Preconditions.checkState(
+              StringUtils.isNotEmpty(peerSegmentDownloadScheme) && isValidPeerDownloadScheme(peerSegmentDownloadScheme),
+              "Must have a valid peerSegmentDownloadScheme set in validation config for pauseless consumption");
+        } else {
+          LOGGER.warn("It's not recommended to create pauseless tables with replication 1 for stability reasons.");
+        }
+      }
+    }
+
+    // Filter config
+    FilterConfig filterConfig = ingestionConfig.getFilterConfig();
+    if (filterConfig != null) {
+      String filterFunction = filterConfig.getFilterFunction();
+      if (filterFunction != null) {
+        if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(filterFunction)) {
+          throw new IllegalStateException(
+              "Groovy filter functions are disabled for table config. Found '" + filterFunction + "'");
+        }
+        try {
+          FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
+        } catch (Exception e) {
+          throw new IllegalStateException(
+              "Invalid filter function '" + filterFunction + "', exception: " + e.getMessage(), e);
+        }
+      }
+    }
+
+    // Source field configs
+    List<SourceFieldConfig> sourceFieldConfigs = ingestionConfig.getSourceFieldConfigs();
+    if (sourceFieldConfigs != null) {
+      // A source field can be configured once per phase (pre- and post-complex-type), but not twice within the same
+      // phase, because that would yield two DataTypeTransformers targeting it in the same phase, which is ambiguous.
+      Set<String> preComplexTypeFieldNames = new HashSet<>();
+      Set<String> postComplexTypeFieldNames = new HashSet<>();
+      for (SourceFieldConfig sourceFieldConfig : sourceFieldConfigs) {
+        String name = sourceFieldConfig.getName();
+        boolean preComplexTypeTransform = sourceFieldConfig.isPreComplexTypeTransform();
+        Set<String> fieldNames = preComplexTypeTransform ? preComplexTypeFieldNames : postComplexTypeFieldNames;
+        Preconditions.checkState(fieldNames.add(name),
+            "Duplicate SourceFieldConfig found for source field: %s (preComplexTypeTransform: %s)", name,
+            preComplexTypeTransform);
+      }
+    }
+
+    // Enrichment configs
+    List<EnrichmentConfig> enrichmentConfigs = ingestionConfig.getEnrichmentConfigs();
+    if (enrichmentConfigs != null) {
+      for (EnrichmentConfig enrichmentConfig : enrichmentConfigs) {
+        RecordEnricherRegistry.validateEnrichmentConfig(enrichmentConfig,
+            new RecordEnricherValidationConfig(_disableGroovy));
+      }
+    }
+
+    // Transform configs
+    List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
+    if (transformConfigs != null) {
+      List<TransformConfig> existingTransformConfigs = getTransformConfigs(existingTableConfig);
+      // Pre-pass: collect every column referenced as a transform-function argument. A transform whose destination
+      // is not in the schema is still valid when another transform consumes it as an input - i.e. it is an
+      // intermediate ("derived") column. This enables chained / parse-once transforms, e.g.
+      //   message_obj = jsonExtractObject(message)              // intermediate, not in the schema
+      //   level       = JSONPATHSTRING(message_obj, '$.level')  // consumes the intermediate
+      // The intermediate is materialized in the record during transformation and dropped before indexing (only
+      // schema columns are indexed). Unreferenced non-schema destinations still fail below (typo protection).
+      Set<String> transformInputColumns = new HashSet<>();
+      for (TransformConfig transformConfig : transformConfigs) {
+        String transformFunction = transformConfig.getTransformFunction();
+        // Skip Groovy expressions when Groovy is disabled: do not compile them just to collect arguments (the main
+        // loop below rejects Groovy without compiling). Such a config is rejected anyway, so these columns are not
+        // needed as valid intermediate targets.
+        if (transformFunction != null && !(_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(
+            transformFunction))) {
+          try {
+            transformInputColumns.addAll(
+                FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction).getArguments());
+          } catch (Exception ignore) {
+            // Invalid functions are reported with a descriptive error in the main loop below.
+          }
+        }
+      }
+      Set<String> transformColumns = new HashSet<>();
+      for (TransformConfig transformConfig : transformConfigs) {
+        String columnName = transformConfig.getColumnName();
+        String transformFunction = transformConfig.getTransformFunction();
+        if (columnName == null || transformFunction == null) {
+          throw new IllegalStateException(
+              "columnName/transformFunction cannot be null in TransformConfig " + transformConfig);
+        }
+        if (!transformColumns.add(columnName)) {
+          throw new IllegalStateException("Duplicate transform config found for column '" + columnName + "'");
+        }
+        Preconditions.checkState(schema.hasColumn(columnName) || aggregationSourceColumns.contains(columnName)
+            || transformInputColumns.contains(columnName), "The destination column '" + columnName
+            + "' of the transform function must be present in the schema, be consumed as the input of another "
+            + "transform function, or be a source column for aggregations");
+        FunctionEvaluator expressionEvaluator;
+        if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
+          throw new IllegalStateException(
+              "Groovy transform functions are disabled for table config. Found '" + transformFunction + "' for column '"
+                  + columnName + "'");
+        }
+        try {
+          validateIngestionTransformFunctionVolatility(transformConfig, existingTransformConfigs);
+          expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
+        } catch (Exception e) {
+          throw new IllegalStateException(
+              "Invalid transform function '" + transformFunction + "' for column '" + columnName + "', exception: "
+                  + e.getMessage(), e);
+        }
+        List<String> arguments = expressionEvaluator.getArguments();
+        if (arguments.contains(columnName)) {
+          throw new IllegalStateException(
+              "Arguments of a transform function '" + arguments + "' cannot contain the destination column '"
+                  + columnName + "'");
+        }
+      }
+    }
+
+    // Complex configs
+    ComplexTypeConfig complexTypeConfig = ingestionConfig.getComplexTypeConfig();
+    if (complexTypeConfig != null) {
+      Map<String, String> prefixesToRename = complexTypeConfig.getPrefixesToRename();
+      if (MapUtils.isNotEmpty(prefixesToRename)) {
+        Set<String> fieldNames = schema.getColumnNames();
+        for (String prefix : prefixesToRename.keySet()) {
+          for (String field : fieldNames) {
+            Preconditions.checkState(!field.startsWith(prefix),
+                "Fields in the schema may not begin with any prefix specified in the prefixesToRename"
+                    + " config. Name conflict with field: " + field + " and prefix: " + prefix);
+          }
+        }
+      }
+    }
+
+    SchemaConformingTransformerConfig schemaConformingTransformerConfig =
+        ingestionConfig.getSchemaConformingTransformerConfig();
+    if (schemaConformingTransformerConfig != null) {
+      SchemaConformingTransformer.validateSchema(schema, schemaConformingTransformerConfig);
+    }
+  }
+
+  @Nullable
+  private static List<TransformConfig> getTransformConfigs(@Nullable TableConfig tableConfig) {
+    IngestionConfig ingestionConfig = tableConfig != null ? tableConfig.getIngestionConfig() : null;
+    return ingestionConfig != null ? ingestionConfig.getTransformConfigs() : null;
+  }
+
+  private static Set<String> getTransformColumns(@Nullable TableConfig tableConfig) {
+    List<TransformConfig> transformConfigs = getTransformConfigs(tableConfig);
+    return transformConfigs != null
+        ? transformConfigs.stream().map(TransformConfig::getColumnName).filter(Objects::nonNull)
+            .collect(Collectors.toSet())
+        : Set.of();
+  }
+
+  @Nullable
+  private static List<TransformConfig> getPostPartialUpsertTransformConfigs(@Nullable TableConfig tableConfig) {
+    UpsertConfig upsertConfig = tableConfig != null ? tableConfig.getUpsertConfig() : null;
+    return upsertConfig != null ? upsertConfig.getPostPartialUpsertTransformConfigs() : null;
+  }
+
+  private static void validateIngestionTransformFunctionVolatility(TransformConfig transformConfig,
+      @Nullable List<TransformConfig> existingTransformConfigs) {
+    if (hasSameTransformConfig(existingTransformConfigs, transformConfig)) {
+      return;
+    }
+    validateIngestionTransformFunctionVolatility(transformConfig.getTransformFunction());
+  }
+
+  static void validateIngestionTransformFunctionVolatility(String transformFunction) {
+    if (FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
+      return;
+    }
+    validateIngestionTransformVolatility(RequestContextUtils.getExpression(transformFunction),
+        transformFunction);
+  }
+
+  private static boolean hasSameTransformConfig(@Nullable List<TransformConfig> existingTransformConfigs,
+      TransformConfig transformConfig) {
+    if (existingTransformConfigs == null) {
+      return false;
+    }
+    for (TransformConfig existingTransformConfig : existingTransformConfigs) {
+      if (Objects.equals(existingTransformConfig.getColumnName(), transformConfig.getColumnName())
+          && Objects.equals(existingTransformConfig.getTransformFunction(), transformConfig.getTransformFunction())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static void validateIngestionTransformVolatility(ExpressionContext expression,
+      String transformFunction) {
+    if (expression.getType() != ExpressionContext.Type.FUNCTION) {
+      return;
+    }
+    FunctionContext function = expression.getFunction();
+    List<ExpressionContext> arguments = function.getArguments();
+    for (ExpressionContext argument : arguments) {
+      validateIngestionTransformVolatility(argument, transformFunction);
+    }
+    String functionName = function.getFunctionName();
+    String canonicalName = FunctionRegistry.canonicalize(functionName);
+    FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, arguments.size());
+    if (functionInfo != null && functionInfo.getVolatility() != FunctionVolatility.IMMUTABLE) {
+      throw new IllegalStateException(
+          String.format("Function '%s' has %s volatility and is not allowed in ingestion transform function: %s; "
+                  + "only IMMUTABLE functions are allowed", functionName, functionInfo.getVolatility(),
+              transformFunction));
+    }
+  }
+
+  /// Validates all metrics-aggregation configuration for both mechanisms (the `aggregateMetrics` flag and ingestion
+  /// `aggregationConfigs`) in one place, and returns the set of source columns referenced by the aggregation functions
+  /// (empty when aggregation is disabled). Consuming-segment rollup keys each row on the dictionary ids of the
+  /// dimension and time columns and mutates the aggregated value in place in the metric's raw forward index, so:
+  /// - The two mechanisms are mutually exclusive, and aggregation is incompatible with upsert / dedup.
+  /// - The schema must not contain a COMPLEX column (neither a valid key nor an aggregatable metric).
+  /// - Every dimension column must be single-valued; the rollup key holds a single dictionary id per dimension, so it
+  ///   cannot represent a row with multiple values for that column (issue #3867). No-dictionary dimensions are allowed
+  ///   — the consuming segment force-creates a dictionary for them.
+  /// - Every metric column must be single-valued and no-dictionary (aggregated values are mutated in place; a
+  ///   dictionary-encoded metric would silently disable aggregation once the table is created).
+  /// - For `aggregationConfigs`, every metric must be covered by a valid aggregation function whose aggregated value
+  ///   is fixed size.
+  private static Set<String> validateMetricsAggregation(TableConfig tableConfig, Schema schema) {
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    boolean aggregateMetrics = tableConfig.getIndexingConfig().isAggregateMetrics();
+    List<AggregationConfig> aggregationConfigs =
+        ingestionConfig != null ? ingestionConfig.getAggregationConfigs() : null;
+    boolean hasAggregationConfigs = CollectionUtils.isNotEmpty(aggregationConfigs);
+
+    Preconditions.checkState(!(aggregateMetrics && hasAggregationConfigs),
+        "Metrics aggregation cannot be enabled in the Indexing Config and Ingestion Config at the same time");
+
+    if (!aggregateMetrics && !hasAggregationConfigs) {
+      return Set.of();
+    }
+
+    Preconditions.checkState(!tableConfig.isUpsertEnabled(),
+        "Metrics aggregation and upsert cannot be enabled together");
+    Preconditions.checkState(!tableConfig.isDedupEnabled(), "Metrics aggregation and dedup cannot be enabled together");
+
+    Preconditions.checkState(CollectionUtils.isEmpty(schema.getComplexFieldSpecs()),
+        "Metrics aggregation cannot be enabled when the schema contains COMPLEX columns");
+
+    for (String dimension : schema.getDimensionNames()) {
+      Preconditions.checkState(schema.getFieldSpecFor(dimension).isSingleValueField(),
+          "Metrics aggregation cannot be enabled with multi-value dimension column: %s", dimension);
+    }
+
+    Map<String, DictionaryIndexConfig> dictConfigByCol = StandardIndexes.dictionary().getConfig(tableConfig, schema);
+    for (String metric : schema.getMetricNames()) {
+      Preconditions.checkState(schema.getFieldSpecFor(metric).isSingleValueField(),
+          "Metrics aggregation cannot be enabled with multi-value metric column: %s", metric);
+      DictionaryIndexConfig dictConfig = dictConfigByCol.get(metric);
+      Preconditions.checkState(dictConfig != null && dictConfig.isDisabled(),
+          "Metric column: %s must be a no-dictionary column when metrics aggregation is enabled", metric);
+    }
+
+    // The aggregateMetrics flag implicitly SUMs every metric; there are no per-config functions to validate.
+    if (!hasAggregationConfigs) {
+      return Set.of();
+    }
+
+    Set<String> aggregationSourceColumns = new HashSet<>();
+    Set<String> aggregationColumns = new HashSet<>();
+    for (AggregationConfig aggregationConfig : aggregationConfigs) {
+      String columnName = aggregationConfig.getColumnName();
+      String aggregationFunction = aggregationConfig.getAggregationFunction();
+      if (columnName == null || aggregationFunction == null) {
+        throw new IllegalStateException(
+            "columnName/aggregationFunction cannot be null in AggregationConfig " + aggregationConfig);
+      }
+
+      FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+      Preconditions.checkState(fieldSpec != null,
+          "The destination column '" + columnName + "' of the aggregation function must be present in the schema");
+      Preconditions.checkState(fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC,
+          "The destination column '" + columnName + "' of the aggregation function must be a metric column");
+      DataType dataType = fieldSpec.getDataType();
+
+      if (!aggregationColumns.add(columnName)) {
+        throw new IllegalStateException("Duplicate aggregation config found for column '" + columnName + "'");
+      }
+      ExpressionContext expressionContext;
+      try {
+        expressionContext = RequestContextUtils.getExpression(aggregationConfig.getAggregationFunction());
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            "Invalid aggregation function '" + aggregationFunction + "' for column '" + columnName + "'", e);
+      }
+      Preconditions.checkState(expressionContext.getType() == ExpressionContext.Type.FUNCTION,
+          "aggregation function must be a function for: %s", aggregationConfig);
+
+      FunctionContext functionContext = expressionContext.getFunction();
+      AggregationFunctionType functionType =
+          AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
+      List<ExpressionContext> arguments = functionContext.getArguments();
+      int numArguments = arguments.size();
+      if (functionType == DISTINCTCOUNTHLL) {
+        Preconditions.checkState(numArguments >= 1 && numArguments <= 2,
+            "DISTINCT_COUNT_HLL can have at most two arguments: %s", aggregationConfig);
+        if (numArguments == 2) {
+          ExpressionContext secondArgument = arguments.get(1);
+          Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
+              "Second argument of DISTINCT_COUNT_HLL must be literal: %s", aggregationConfig);
+          String literal = secondArgument.getLiteral().getStringValue();
+          Preconditions.checkState(StringUtils.isNumeric(literal),
+              "Second argument of DISTINCT_COUNT_HLL must be a number: %s", aggregationConfig);
+        }
+        Preconditions.checkState(dataType == DataType.BYTES, "Result type for DISTINCT_COUNT_HLL must be BYTES: %s",
+            aggregationConfig);
+      } else if (functionType == DISTINCTCOUNTHLLPLUS) {
+        Preconditions.checkState(numArguments >= 1 && numArguments <= 3,
+            "DISTINCT_COUNT_HLL_PLUS can have at most three arguments: %s", aggregationConfig);
+        if (numArguments == 2) {
+          ExpressionContext secondArgument = arguments.get(1);
+          Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
+              "Second argument of DISTINCT_COUNT_HLL_PLUS must be literal: %s", aggregationConfig);
+          String literal = secondArgument.getLiteral().getStringValue();
+          Preconditions.checkState(StringUtils.isNumeric(literal),
+              "Second argument of DISTINCT_COUNT_HLL_PLUS must be a number: %s", aggregationConfig);
+        }
+        if (numArguments == 3) {
+          ExpressionContext thirdArgument = arguments.get(2);
+          Preconditions.checkState(thirdArgument.getType() == ExpressionContext.Type.LITERAL,
+              "Third argument of DISTINCT_COUNT_HLL_PLUS must be literal: %s", aggregationConfig);
+          String literal = thirdArgument.getLiteral().getStringValue();
+          Preconditions.checkState(StringUtils.isNumeric(literal),
+              "Third argument of DISTINCT_COUNT_HLL_PLUS must be a number: %s", aggregationConfig);
+        }
+        Preconditions.checkState(dataType == DataType.BYTES,
+            "Result type for DISTINCT_COUNT_HLL_PLUS must be BYTES: %s", aggregationConfig);
+      } else if (functionType == SUMPRECISION) {
+        Preconditions.checkState(numArguments >= 2 && numArguments <= 3,
+            "SUM_PRECISION must specify precision (required), scale (optional): %s", aggregationConfig);
+        ExpressionContext secondArgument = arguments.get(1);
+        Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
+            "Second argument of SUM_PRECISION must be literal: %s", aggregationConfig);
+        String literal = secondArgument.getLiteral().getStringValue();
+        Preconditions.checkState(StringUtils.isNumeric(literal),
+            "Second argument of SUM_PRECISION must be a number: %s", aggregationConfig);
+        Preconditions.checkState(dataType == DataType.BIG_DECIMAL || dataType == DataType.BYTES,
+            "Result type for SUM_PRECISION must be BIG_DECIMAL or BYTES: %s", aggregationConfig);
+      } else {
+        Preconditions.checkState(numArguments == 1, "%s can only have one argument: %s", functionType,
+            aggregationConfig);
+      }
+      ExpressionContext firstArgument = arguments.get(0);
+      Preconditions.checkState(firstArgument.getType() == ExpressionContext.Type.IDENTIFIER,
+          "First argument of aggregation function: %s must be identifier, got: %s", functionType,
+          firstArgument.getType());
+      // Create a ValueAggregator for the aggregation function and check if it is supported for ingestion (fixed
+      // size aggregated value).
+      ValueAggregator<?, ?> valueAggregator;
+      try {
+        valueAggregator = ValueAggregatorFactory.getValueAggregator(functionType, arguments.subList(1, numArguments));
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            "Caught exception while creating ValueAggregator for aggregation function: " + aggregationFunction, e);
+      }
+      Preconditions.checkState(valueAggregator.isAggregatedValueFixedSize(),
+          "Aggregation function: %s must have fixed size aggregated value", aggregationFunction);
+
+      aggregationSourceColumns.add(firstArgument.getIdentifier());
+    }
+    Preconditions.checkState(new HashSet<>(schema.getMetricNames()).equals(aggregationColumns),
+        "all metric columns must be aggregated");
+    return aggregationSourceColumns;
   }
 
   private static void validateStreamConfigMaps(TableConfig tableConfig) {
@@ -790,43 +983,30 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates the upsert-related configurations
-   *  - check table type supports the configured mode
-   *  - the primary key exists on the schema
-   *  - strict replica-group is configured for routing type
-   *  - consumer type must be low-level
-   *  - comparison column exists
-   */
+  /// Validates the upsert- and dedup-related configuration. Returns early when neither is enabled; otherwise checks
+  /// the shared requirements (upsert and dedup are mutually exclusive, primary keys exist and are single-valued,
+  /// strict replica-group routing, no COMPLETED instance partitions, valid tenant tag override for REALTIME, OFFLINE
+  /// restrictions) and then, per the enabled mode:
+  /// - Upsert: no multi-tier / star-tree, comparison / delete-record / out-of-order columns are valid, deleted-keys
+  ///   compaction consistency, post-partial-upsert transforms, consistency-mode constraints, and delegates to
+  ///   [#validateTTLForUpsertConfig] and [#validatePartialUpsertStrategies]; rejects MD5 when disabled.
+  /// - Dedup: delegates to [#validateTTLForDedupConfig]; rejects MD5 when disabled.
   @VisibleForTesting
   static void validateUpsertAndDedupConfig(TableConfig tableConfig, Schema schema) {
-    if (tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE && (tableConfig.getDedupConfig() == null
-        || !tableConfig.getDedupConfig().isDedupEnabled())) {
+    validateUpsertAndDedupConfig(tableConfig, schema, null);
+  }
+
+  static void validateUpsertAndDedupConfig(TableConfig tableConfig, Schema schema,
+      @Nullable TableConfig existingTableConfig) {
+    boolean upsertEnabled = tableConfig.isUpsertEnabled();
+    boolean dedupEnabled = tableConfig.isDedupEnabled();
+    if (!upsertEnabled && !dedupEnabled) {
       return;
     }
 
-    boolean isUpsertEnabled = tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE;
-    DedupConfig dedupConfig = tableConfig.getDedupConfig();
-    boolean isDedupEnabled = dedupConfig != null && dedupConfig.isDedupEnabled();
-
     // check both upsert and dedup are not enabled simultaneously
-    Preconditions.checkState(!(isUpsertEnabled && isDedupEnabled),
+    Preconditions.checkState(!(upsertEnabled && dedupEnabled),
         "A table can have either Upsert or Dedup enabled, but not both");
-    if (tableConfig.getTableType() == TableType.OFFLINE) {
-      Preconditions.checkState(isUpsertEnabled && !isDedupEnabled,
-          "Dedup is not supported for OFFLINE table. Only upsert is supported for OFFLINE table");
-      Preconditions.checkState(tableConfig.getUpsertMode() != UpsertConfig.Mode.PARTIAL,
-          "Partial upsert is not supported for OFFLINE table");
-      // Offline upsert tables require segment partition config so that segments are assigned to servers
-      // based on partition, ensuring all segments of a partition land on the same server for correct dedup.
-      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-      SegmentPartitionConfig segmentPartitionConfig =
-          indexingConfig != null ? indexingConfig.getSegmentPartitionConfig() : null;
-      Preconditions.checkState(
-          segmentPartitionConfig != null && MapUtils.isNotEmpty(segmentPartitionConfig.getColumnPartitionMap()),
-          "Offline upsert table must have segment partition config to ensure correct partition-based "
-              + "segment assignment. Configure segmentPartitionConfig in the indexingConfig.");
-    }
     // primary key exists
     Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
         "Upsert/Dedup table must have primary key columns in the schema");
@@ -842,26 +1022,39 @@ public final class TableConfigUtils {
     Preconditions.checkState(
         tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
+
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    DedupConfig dedupConfig = tableConfig.getDedupConfig();
     if (tableConfig.getTableType() == TableType.REALTIME) {
       Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null || (
               tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming() == null
                   && tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted() == null),
           "Invalid tenant tag override used for Upsert/Dedup table");
+      Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+      Preconditions.checkState(instanceAssignmentConfigMap == null || !instanceAssignmentConfigMap.containsKey(
+              InstancePartitionsType.COMPLETED.name()),
+          "COMPLETED instance partitions can't be configured for upsert / dedup tables");
+    } else {
+      Preconditions.checkState(!dedupEnabled,
+          "Dedup is not supported for OFFLINE table. Only upsert is supported for OFFLINE table");
+      assert upsertConfig != null;
+      Preconditions.checkState(upsertConfig.getMode() != UpsertConfig.Mode.PARTIAL,
+          "Partial upsert is not supported for OFFLINE table");
+      // Offline upsert tables require segment partition config so that segments are assigned to servers
+      // based on partition, ensuring all segments of a partition land on the same server for correct dedup.
+      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+      SegmentPartitionConfig segmentPartitionConfig =
+          indexingConfig != null ? indexingConfig.getSegmentPartitionConfig() : null;
+      Preconditions.checkState(
+          segmentPartitionConfig != null && MapUtils.isNotEmpty(segmentPartitionConfig.getColumnPartitionMap()),
+          "Offline upsert table must have segment partition config to ensure correct partition-based "
+              + "segment assignment. Configure segmentPartitionConfig in the indexingConfig.");
     }
 
-    // specifically for upsert
-    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-    if (PinotMd5Mode.isPinotMd5Disabled()) {
-      if (isUpsertEnabled && upsertConfig != null && upsertConfig.getHashFunction() == HashFunction.MD5) {
-        throw new IllegalStateException(String.format(
-            "Upsert hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED));
-      }
-      if (isDedupEnabled && dedupConfig.getHashFunction() == HashFunction.MD5) {
-        throw new IllegalStateException(String.format(
-            "Dedup hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED));
-      }
-    }
-    if (upsertConfig != null) {
+    if (upsertEnabled) {
+      // specifically for upsert
+      assert upsertConfig != null;
+
       // Currently, only one tier is allowed for upsert table, as the committed segments can't be moved to other tiers.
       Preconditions.checkState(tableConfig.getTierConfigsList() == null, "The upsert table cannot have multi-tiers");
       // no startree index
@@ -893,7 +1086,7 @@ public final class TableConfigUtils {
 
       String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
       if (outOfOrderRecordColumn != null) {
-        Preconditions.checkState(!Boolean.TRUE.equals(upsertConfig.isDropOutOfOrderRecord()),
+        Preconditions.checkState(!upsertConfig.isDropOutOfOrderRecord(),
             "outOfOrderRecordColumn and dropOutOfOrderRecord shouldn't exist together for upsert table");
         FieldSpec fieldSpec = schema.getFieldSpecFor(outOfOrderRecordColumn);
         Preconditions.checkState(
@@ -932,6 +1125,8 @@ public final class TableConfigUtils {
       List<TransformConfig> postPartialUpsertTransformConfigs =
           upsertConfig.getPostPartialUpsertTransformConfigs();
       if (postPartialUpsertTransformConfigs != null) {
+        List<TransformConfig> existingPostPartialUpsertTransformConfigs =
+            getPostPartialUpsertTransformConfigs(existingTableConfig);
         Preconditions.checkState(upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL,
             "postPartialUpsertTransformConfigs can only be configured for PARTIAL upsert tables");
         Set<String> primaryKeyColumns = new HashSet<>(schema.getPrimaryKeyColumns());
@@ -965,6 +1160,8 @@ public final class TableConfigUtils {
                     + columnName + "' in postPartialUpsertTransformConfigs");
           }
           try {
+            validateIngestionTransformFunctionVolatility(transformConfig,
+                existingPostPartialUpsertTransformConfigs);
             FunctionEvaluator expressionEvaluator =
                 FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
             List<String> arguments = expressionEvaluator.getArguments();
@@ -1000,38 +1197,39 @@ public final class TableConfigUtils {
                 + "Out-of-order record marking is only supported in NONE consistency mode.",
             upsertConfig.getConsistencyMode());
       }
-    }
 
-    if (tableConfig.getTableType() == TableType.REALTIME) {
+      validateTTLForUpsertConfig(tableConfig, schema);
+      validatePartialUpsertStrategies(tableConfig, schema);
       Preconditions.checkState(
-          tableConfig.getInstanceAssignmentConfigMap() == null || !tableConfig.getInstanceAssignmentConfigMap()
-              .containsKey(InstancePartitionsType.COMPLETED.name()),
-          "COMPLETED instance partitions can't be configured for upsert / dedup tables");
+          !(PinotMd5Mode.isPinotMd5Disabled() && upsertConfig.getHashFunction() == HashFunction.MD5),
+          "Upsert hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
+    } else {
+      // specifically for dedup
+      assert dedupConfig != null;
+
+      validateTTLForDedupConfig(tableConfig, schema);
+      Preconditions.checkState(
+          !(PinotMd5Mode.isPinotMd5Disabled() && dedupConfig.getHashFunction() == HashFunction.MD5),
+          "Dedup hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
     }
-    validateAggregateMetricsForUpsertConfig(tableConfig);
-    validateTTLForUpsertConfig(tableConfig, schema);
-    validateTTLForDedupConfig(tableConfig, schema);
   }
 
-  /**
-   * Checks if a data type is valid for time-based comparison operations (upsert/dedup).
-   * Valid types include numeric types and types with stored data as a numeric type:
-   *   e.g. TIMESTAMP which is stored as LONG internally.
-   *
-   * @param dataType the data type to check
-   * @return true if the data type can be used for time-based comparison, false otherwise
-   */
+  /// Checks if a data type is valid for time-based comparison operations (upsert/dedup).
+  /// Valid types include numeric types and types with stored data as a numeric type:
+  ///   e.g. TIMESTAMP which is stored as LONG internally.
+  ///
+  /// @param dataType the data type to check
+  /// @return true if the data type can be used for time-based comparison, false otherwise
   private static boolean isValidTimeComparisonType(DataType dataType) {
     return dataType.isNumeric() || dataType.getStoredType().isNumeric();
   }
 
-  /**
-   * Validates the upsert config related to TTL.
-   */
+  /// Validates the upsert config related to TTL.
   @VisibleForTesting
   static void validateTTLForUpsertConfig(TableConfig tableConfig, Schema schema) {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-    if (upsertConfig == null || (upsertConfig.getMetadataTTL() == 0 && upsertConfig.getDeletedKeysTTL() == 0)) {
+    assert upsertConfig != null;
+    if (upsertConfig.getMetadataTTL() <= 0 && upsertConfig.getDeletedKeysTTL() <= 0) {
       return;
     }
 
@@ -1066,13 +1264,12 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates the dedup config related to TTL.
-   */
+  /// Validates the dedup config related to TTL.
   @VisibleForTesting
   static void validateTTLForDedupConfig(TableConfig tableConfig, Schema schema) {
     DedupConfig dedupConfig = tableConfig.getDedupConfig();
-    if (dedupConfig == null || (dedupConfig.getMetadataTTL() <= 0)) {
+    assert dedupConfig != null;
+    if (dedupConfig.getMetadataTTL() <= 0) {
       return;
     }
 
@@ -1125,11 +1322,9 @@ public final class TableConfigUtils {
         "MetadataTTL: %s(ms) must be smaller than the minimum segmentAge: %s(ms)", ttlInMs, minSegmentAgeInMs);
   }
 
-  /**
-   * Detects whether both InstanceAssignmentConfig and InstancePartitionsMap are set for a given
-   * instance partitions type. Validation fails because the table would ignore InstanceAssignmentConfig
-   * when the partitions are already set.
-   */
+  /// Detects whether both InstanceAssignmentConfig and InstancePartitionsMap are set for a given
+  /// instance partitions type. Validation fails because the table would ignore InstanceAssignmentConfig
+  /// when the partitions are already set.
   @VisibleForTesting
   static void validateInstancePartitionsTypeMapConfig(TableConfig tableConfig) {
     if (MapUtils.isEmpty(tableConfig.getInstancePartitionsMap()) || MapUtils.isEmpty(
@@ -1155,11 +1350,9 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Detects whether both replicaGroupStrategyConfig and replicaGroupPartitionConfig are set for a given
-   * table. Validation fails because the table would ignore replicaGroupStrategyConfig
-   * when the replicaGroupPartitionConfig is already set.
-   */
+  /// Detects whether both replicaGroupStrategyConfig and replicaGroupPartitionConfig are set for a given
+  /// table. Validation fails because the table would ignore replicaGroupStrategyConfig
+  /// when the replicaGroupPartitionConfig is already set.
   @VisibleForTesting
   static void validatePartitionedReplicaGroupInstance(TableConfig tableConfig) {
     if (tableConfig.getValidationConfig().getReplicaGroupStrategyConfig() == null || MapUtils.isEmpty(
@@ -1203,35 +1396,18 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates metrics aggregation when upsert config is enabled
-   * - Metrics aggregation cannot be enabled when Upsert Config is enabled.
-   * - Aggregation cannot be enabled in the Ingestion Config and Indexing Config at the same time.
-   */
-  private static void validateAggregateMetricsForUpsertConfig(TableConfig config) {
-    boolean isAggregateMetricsEnabledInIndexingConfig = config.getIndexingConfig().isAggregateMetrics();
-    boolean hasAggregationConfigs = config.getIngestionConfig() != null && CollectionUtils.isNotEmpty(
-        config.getIngestionConfig().getAggregationConfigs());
-    boolean bothAggregationConfigsEnabled = isAggregateMetricsEnabledInIndexingConfig && hasAggregationConfigs;
-    boolean anyOneAggregationConfigsEnabled = isAggregateMetricsEnabledInIndexingConfig || hasAggregationConfigs;
-    Preconditions.checkState(!bothAggregationConfigsEnabled,
-        "Metrics aggregation cannot be enabled in the Indexing Config and Ingestion Config at the same time");
-    Preconditions.checkState(!anyOneAggregationConfigsEnabled,
-        "Metrics aggregation and upsert cannot be enabled together");
-  }
-
-  /**
-   * Validates the partial upsert-related configurations:
-   *  - Null handling must be enabled
-   *  - Merger cannot be applied to private key columns
-   *  - Merger cannot be applied to non-existing columns
-   *  - INCREMENT merger must be applied to numeric columns
-   *  - APPEND/UNION merger cannot be applied to single-value columns
-   *  - INCREMENT merger cannot be applied to date time column
-   */
+  /// Validates the partial upsert-related configurations:
+  ///  - Null handling must be enabled
+  ///  - Merger cannot be applied to private key columns
+  ///  - Merger cannot be applied to non-existing columns
+  ///  - INCREMENT merger must be applied to numeric columns
+  ///  - APPEND/UNION merger cannot be applied to single-value columns
+  ///  - INCREMENT merger cannot be applied to date time column
   @VisibleForTesting
   static void validatePartialUpsertStrategies(TableConfig tableConfig, Schema schema) {
-    if (tableConfig.getUpsertMode() != UpsertConfig.Mode.PARTIAL) {
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    assert upsertConfig != null;
+    if (upsertConfig.getMode() != UpsertConfig.Mode.PARTIAL) {
       return;
     }
 
@@ -1239,8 +1415,6 @@ public final class TableConfigUtils {
         schema.isEnableColumnBasedNullHandling() || tableConfig.getIndexingConfig().isNullHandlingEnabled(),
         "Null handling must be enabled for partial upsert tables");
 
-    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-    assert upsertConfig != null;
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
     String partialUpsertMergerClass = upsertConfig.getPartialUpsertMergerClass();
 
@@ -1283,34 +1457,31 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates backward compatibility for table config updates.
-   * Checks critical upsert and dedup configuration fields that should not be changed.
-   *
-   * @param newConfig the new table config being applied
-   * @param existingConfig the existing table config
-   * @return list of violations (empty if no violations)
-   */
+  /// Validates backward compatibility for table config updates.
+  /// Checks critical upsert and dedup configuration fields that should not be changed.
+  ///
+  /// @param newConfig the new table config being applied
+  /// @param existingConfig the existing table config
+  /// @return list of violations (empty if no violations)
   public static List<String> validateBackwardCompatibility(TableConfig newConfig, TableConfig existingConfig) {
     List<String> violations = new ArrayList<>();
     validateUpsertConfigUpdate(newConfig, existingConfig, violations);
     validateDedupConfigUpdate(newConfig, existingConfig, violations);
+    validateMaterializedViewConfigUpdate(newConfig, existingConfig, violations);
 
     return violations;
   }
 
-  /**
-   * Validates that critical upsert configuration fields are not changed during table config update.
-   * Checks: mode, hashFunction, comparisonColumns, timeColumn (when no comparison columns),
-   * deleteRecordColumn, dropOutOfOrderRecord, outOfOrderRecordColumn.
-   *
-   * <p>Partial-upsert strategy maps and the default partial-upsert strategy are intentionally
-   * not validated here — they may be added, removed, or changed on existing tables.
-   *
-   * @param newConfig the new table config being applied
-   * @param existingConfig the existing table config
-   * @param violations list to collect violation messages
-   */
+  /// Validates that critical upsert configuration fields are not changed during table config update.
+  /// Checks: mode, hashFunction, comparisonColumns, timeColumn (when no comparison columns),
+  /// deleteRecordColumn, dropOutOfOrderRecord, outOfOrderRecordColumn.
+  ///
+  /// Partial-upsert strategy maps and the default partial-upsert strategy are intentionally
+  /// not validated here — they may be added, removed, or changed on existing tables.
+  ///
+  /// @param newConfig the new table config being applied
+  /// @param existingConfig the existing table config
+  /// @param violations list to collect violation messages
   private static void validateUpsertConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
       List<String> violations) {
     boolean existingUpsertEnabled = existingConfig.isUpsertEnabled();
@@ -1326,6 +1497,7 @@ public final class TableConfigUtils {
     } else if (existingUpsertEnabled) {
       UpsertConfig existingUpsertConfig = existingConfig.getUpsertConfig();
       UpsertConfig newUpsertConfig = newConfig.getUpsertConfig();
+      assert existingUpsertConfig != null && newUpsertConfig != null;
 
       if (existingUpsertConfig.getMode() != newUpsertConfig.getMode()) {
         violations.add(
@@ -1335,8 +1507,7 @@ public final class TableConfigUtils {
         violations.add(String.format("upsertConfig.hashFunction (%s -> %s)", existingUpsertConfig.getHashFunction(),
             newUpsertConfig.getHashFunction()));
       }
-      if (!Objects.equals(existingUpsertConfig.getComparisonColumns(),
-          newUpsertConfig.getComparisonColumns())) {
+      if (!Objects.equals(existingUpsertConfig.getComparisonColumns(), newUpsertConfig.getComparisonColumns())) {
         violations.add(
             String.format("upsertConfig.comparisonColumns (%s -> %s)", existingUpsertConfig.getComparisonColumns(),
                 newUpsertConfig.getComparisonColumns()));
@@ -1364,17 +1535,19 @@ public final class TableConfigUtils {
         violations.add(String.format("upsertConfig.outOfOrderRecordColumn (%s -> %s)",
             existingUpsertConfig.getOutOfOrderRecordColumn(), newUpsertConfig.getOutOfOrderRecordColumn()));
       }
+      if (!Objects.equals(existingUpsertConfig.getDeleteRecordColumn(), newUpsertConfig.getDeleteRecordColumn())) {
+        violations.add(String.format("upsertConfig.deleteRecordColumn (%s -> %s)",
+            existingUpsertConfig.getDeleteRecordColumn(), newUpsertConfig.getDeleteRecordColumn()));
+      }
     }
   }
 
-  /**
-   * Validates that critical dedup configuration fields are not changed during table config update.
-   * Checks: dedupEnabled, hashFunction, dedupTimeColumn, timeColumnName (when dedupTimeColumn not specified).
-   *
-   * @param newConfig the new table config being applied
-   * @param existingConfig the existing table config
-   * @param violations list to collect violation messages
-   */
+  /// Validates that critical dedup configuration fields are not changed during table config update.
+  /// Checks: dedupEnabled, hashFunction, dedupTimeColumn, timeColumnName (when dedupTimeColumn not specified).
+  ///
+  /// @param newConfig the new table config being applied
+  /// @param existingConfig the existing table config
+  /// @param violations list to collect violation messages
   private static void validateDedupConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
       List<String> violations) {
     boolean existingDedupEnabled = existingConfig.isDedupEnabled();
@@ -1414,9 +1587,72 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates task configuration to ensure no conflicting task types are configured.
-   */
+  /// Validates materialized-view table identity and task-config consistency.
+  /// Identity is declared only via [TableConfig#isMaterializedView()]; task configs alone do not
+  /// make a table an MV.
+  @VisibleForTesting
+  static void validateMaterializedViewInvariants(TableConfig tableConfig) {
+    boolean isMaterializedView = tableConfig.isMaterializedView();
+    boolean hasMvTaskWithDefinedSql = tableConfig.hasMaterializedViewTaskWithDefinedSql();
+    boolean hasMvTask = tableConfig.getMaterializedViewTaskConfigs() != null;
+
+    if (isMaterializedView) {
+      Preconditions.checkState(tableConfig.getTableType() == TableType.OFFLINE,
+          "Materialized view tables must be OFFLINE, got: %s for table: %s", tableConfig.getTableType(),
+          tableConfig.getTableName());
+      Preconditions.checkState(hasMvTaskWithDefinedSql,
+          "isMaterializedView is true but MaterializedViewTask with non-empty definedSQL is required for table: %s",
+          tableConfig.getTableName());
+      Preconditions.checkState(!tableConfig.isDimTable(),
+          "A table cannot be both isDimTable and isMaterializedView: %s", tableConfig.getTableName());
+    }
+
+    if (hasMvTaskWithDefinedSql && !isMaterializedView) {
+      throw new IllegalStateException(String.format(
+          "MaterializedViewTask is configured but isMaterializedView is not true for table: %s. "
+              + "Set \"isMaterializedView\": true or remove MaterializedViewTask.",
+          tableConfig.getTableName()));
+    }
+
+    if (hasMvTask && !hasMvTaskWithDefinedSql) {
+      throw new IllegalStateException(String.format(
+          "MaterializedViewTask is configured but definedSQL is missing or empty for table: %s",
+          tableConfig.getTableName()));
+    }
+  }
+
+  private static void validateMaterializedViewConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
+      List<String> violations) {
+    if (existingConfig.isMaterializedView() != newConfig.isMaterializedView()) {
+      violations.add(String.format("isMaterializedView (%s -> %s) cannot be changed; drop and recreate the table",
+          existingConfig.isMaterializedView(), newConfig.isMaterializedView()));
+    }
+
+    if (!existingConfig.isMaterializedView() && !newConfig.isMaterializedView()) {
+      return;
+    }
+
+    String existingDefinedSql = getDefinedSqlFromMaterializedViewTask(existingConfig);
+    String newDefinedSql = getDefinedSqlFromMaterializedViewTask(newConfig);
+    if (existingDefinedSql != null && newDefinedSql != null && !existingDefinedSql.equals(newDefinedSql)) {
+      violations.add("MaterializedViewTask.definedSQL is immutable after MV creation");
+    }
+
+    if (existingConfig.isMaterializedView() && !newConfig.hasMaterializedViewTaskWithDefinedSql()) {
+      violations.add("MaterializedViewTask with definedSQL cannot be removed from a materialized view table");
+    }
+  }
+
+  @Nullable
+  private static String getDefinedSqlFromMaterializedViewTask(TableConfig tableConfig) {
+    Map<String, String> configs = tableConfig.getMaterializedViewTaskConfigs();
+    if (configs == null) {
+      return null;
+    }
+    return configs.get(org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
+  }
+
+  /// Validates task configuration to ensure no conflicting task types are configured.
   @VisibleForTesting
   static void validateTaskConfig(TableConfig tableConfig) {
     TableTaskConfig taskConfig = tableConfig.getTaskConfig();
@@ -1445,11 +1681,9 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates the tier configs
-   * Checks for the right segmentSelectorType and its required properties
-   * Checks for the right storageType and its required properties
-   */
+  /// Validates the tier configs
+  /// Checks for the right segmentSelectorType and its required properties
+  /// Checks for the right storageType and its required properties
   private static void validateTierConfigList(@Nullable List<TierConfig> tierConfigList) {
     if (tierConfigList == null) {
       return;
@@ -1524,7 +1758,28 @@ public final class TableConfigUtils {
       }
     }
 
+    // Null value vector backfill on the time column needs the whole table config (for the time column name), so it
+    // cannot be validated by NullValueIndexType.validate which only sees one field at a time.
+    validateNullValueVectorBackfillForTimeColumn(tableConfig, schema, indexConfigsMap);
+
     validateMultiColumnTextIndex(indexingConfig.getMultiColumnTextIndexConfig());
+
+    // OPEN_STRUCT materialized child columns use a reserved separator '$' in their name. When any
+    // schema field is OPEN_STRUCT, reject ALL columns (including OPEN_STRUCT parents themselves)
+    // whose names contain '$'. This prevents naming collisions: a parent named 'a$b' would produce
+    // children 'a$b$key', which parseParentColumn() would misparse as parent 'a' and key 'b$key'.
+    // This validation runs here (with full schema access) rather than per-field because each
+    // OpenStructIndexType.validate() call only sees one field at a time.
+    boolean anyOpenStruct = schema.getAllFieldSpecs().stream()
+        .anyMatch(fs -> fs.getDataType() == DataType.OPEN_STRUCT);
+    if (anyOpenStruct) {
+      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+        Preconditions.checkState(
+            !OpenStructNaming.isMaterializedOpenStructColumn(fieldSpec.getName()),
+            "Schema column '%s' contains reserved OPEN_STRUCT separator '%s'",
+            fieldSpec.getName(), OpenStructNaming.SEPARATOR);
+      }
+    }
 
     // Star-tree index config is not managed by FieldIndexConfigs, and we need to validate it separately.
     List<StarTreeIndexConfig> starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
@@ -1571,6 +1826,32 @@ public final class TableConfigUtils {
         }
       }
     }
+  }
+
+  /// Rejects a null value vector backfill opt-in on the time column when its default null value is outside the valid
+  /// time range.
+  ///
+  /// In that case ingestion substitutes the ingestion-time current time for null rows (see
+  /// [NullValueTransformerUtils#isDefaultTimeValueInValidRange]) while the segment metadata records the field spec's
+  /// default null value. A backfill scan compares against the recorded default, so it would never match: the column
+  /// would silently keep its nulls unmarked and be recorded as containing no nulls. A time column with an explicit
+  /// in-range default null value is stored as-is and is therefore allowed.
+  private static void validateNullValueVectorBackfillForTimeColumn(TableConfig tableConfig, Schema schema,
+      Map<String, FieldIndexConfigs> indexConfigsMap) {
+    String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    if (StringUtils.isEmpty(timeColumnName)) {
+      return;
+    }
+    FieldIndexConfigs indexConfigs = indexConfigsMap.get(timeColumnName);
+    if (indexConfigs == null || !indexConfigs.getConfig(StandardIndexes.nullValueVector()).isBackfill()) {
+      return;
+    }
+    DateTimeFieldSpec timeColumnSpec = schema.getSpecForTimeColumn(timeColumnName);
+    Preconditions.checkState(timeColumnSpec != null, "Failed to find time column: %s in schema", timeColumnName);
+    Preconditions.checkState(NullValueTransformerUtils.isDefaultTimeValueInValidRange(timeColumnSpec),
+        "Null value vector backfill is not supported for time column: %s with default null value: %s outside the valid "
+            + "time range, because ingestion stores the current time for null values instead of the default null value",
+        timeColumnName, timeColumnSpec.getDefaultNullValueString());
   }
 
   private static void validateMultiColumnTextIndex(MultiColumnTextIndexConfig multiColTextIndex) {
@@ -1765,9 +2046,7 @@ public final class TableConfigUtils {
     return null;
   }
 
-  /**
-   * Ensure that the table config has the minimum number of replicas set as per cluster configs.
-   */
+  /// Ensure that the table config has the minimum number of replicas set as per cluster configs.
   public static void ensureMinReplicas(TableConfig tableConfig, int defaultTableMinReplicas) {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     int replication = tableConfig.getReplication();
@@ -1778,10 +2057,8 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Ensure the table config has storage quota set as per cluster configs.
-   * If it doesn't, set the quota config into the table config
-   */
+  /// Ensure the table config has storage quota set as per cluster configs.
+  /// If it doesn't, set the quota config into the table config
   public static void ensureStorageQuotaConstraints(TableConfig tableConfig, String maxAllowedSize) {
     // Dim tables must adhere to cluster level storage size limits
     if (tableConfig.isDimTable()) {
@@ -1810,9 +2087,7 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Consistency checks across the offline and realtime counterparts of a hybrid table
-   */
+  /// Consistency checks across the offline and realtime counterparts of a hybrid table
   public static void verifyHybridTableConfigs(String rawTableName, TableConfig offlineTableConfig,
       TableConfig realtimeTableConfig) {
     Preconditions.checkNotNull(offlineTableConfig,
@@ -1862,13 +2137,11 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Checks if the table config has inconsistent state configurations that could cause
-   * data inconsistency during force commit/reload operations.
-   *
-   * @param tableConfig the table config to check, may be null
-   * @return true if the table has inconsistent state configs, false if tableConfig is null or no issues found
-   */
+  /// Checks if the table config has inconsistent state configurations that could cause
+  /// data inconsistency during force commit/reload operations.
+  ///
+  /// @param tableConfig the table config to check, may be null
+  /// @return true if the table has inconsistent state configs, false if tableConfig is null or no issues found
   public static boolean isTableTypeInconsistentDuringConsumption(@Nullable TableConfig tableConfig) {
     if (tableConfig == null) {
       return false;
@@ -1882,14 +2155,16 @@ public final class TableConfigUtils {
   }
 
   // enum of all the skip-able validation types.
+  // ACTIVE_TASKS is retained for backward compatibility: it is still accepted as a validationTypesToSkip value so
+  // existing clients do not break, but it is no longer consumed by any production path. Active-task validation runs
+  // only on the create/update path (see PinotTableRestletResource.tableTasksValidation, gated by ignoreActiveTasks),
+  // not on the validate/tune preflight endpoints, so passing ACTIVE_TASKS there is a no-op.
   public enum ValidationType {
     ALL, TASK, UPSERT, TENANT, MINION_INSTANCES, ACTIVE_TASKS
   }
 
-  /**
-   * needsEmptySegmentPruner checks if EmptySegmentPruner is needed for a TableConfig.
-   * @param tableConfig Input table config.
-   */
+  /// needsEmptySegmentPruner checks if EmptySegmentPruner is needed for a TableConfig.
+  /// @param tableConfig Input table config.
   public static boolean needsEmptySegmentPruner(TableConfig tableConfig) {
     if (isKinesisConfigured(tableConfig)) {
       return true;
@@ -1939,13 +2214,10 @@ public final class TableConfigUtils {
     return UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES.stream().anyMatch(x -> x.equalsIgnoreCase(instanceSelectorType));
   }
 
-  /**
-   * Helper method to extract TableConfig in updated syntax from current TableConfig.
-   * <ul>
-   *   <li>Moves all index configs to FieldConfig.indexes</li>
-   *   <li>Clean up index related configs from IndexingConfig and FieldConfig.IndexTypes</li>
-   * </ul>
-   */
+  /// Helper method to extract TableConfig in updated syntax from current TableConfig.
+  ///
+  /// - Moves all index configs to FieldConfig.indexes
+  /// - Clean up index related configs from IndexingConfig and FieldConfig.IndexTypes
   public static TableConfig createTableConfigFromOldFormat(TableConfig tableConfig, Schema schema) {
     TableConfig clone = new TableConfig(tableConfig);
     for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
@@ -1965,21 +2237,16 @@ public final class TableConfigUtils {
   }
 
   public static boolean isCommitTimeCompactionEnabled(TableConfig tableConfig) {
-    if (tableConfig.getUpsertConfig() == null) {
-      return false;
-    }
-    return tableConfig.getUpsertConfig().isEnableCommitTimeCompaction();
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    return upsertConfig != null && upsertConfig.isEnableCommitTimeCompaction();
   }
 
-  /**
-   * Helper method to convert from legacy/deprecated configs into current version of TableConfig.
-   * <ul>
-   *   <li>Moves deprecated ingestion related configs into Ingestion Config.</li>
-   *   <li>The conversion happens in-place, the specified tableConfig is mutated in-place.</li>
-   * </ul>
-   *
-   * @param tableConfig Input table config.
-   */
+  /// Helper method to convert from legacy/deprecated configs into current version of TableConfig.
+  ///
+  /// - Moves deprecated ingestion related configs into Ingestion Config.
+  /// - The conversion happens in-place, the specified tableConfig is mutated in-place.
+  ///
+  /// @param tableConfig Input table config.
   @SuppressWarnings("deprecation")
   public static void convertFromLegacyTableConfig(TableConfig tableConfig) {
     // It is possible that indexing as well as ingestion configs exist, in which case we always honor ingestion config.
@@ -2014,7 +2281,7 @@ public final class TableConfigUtils {
       // Only set the new config if the deprecated one is set.
       Map<String, String> streamConfigs = indexingConfig.getStreamConfigs();
       if (MapUtils.isNotEmpty(streamConfigs)) {
-        streamIngestionConfig = new StreamIngestionConfig(Collections.singletonList(streamConfigs));
+        streamIngestionConfig = new StreamIngestionConfig(List.of(streamConfigs));
       }
     }
 
@@ -2038,99 +2305,191 @@ public final class TableConfigUtils {
     validationConfig.setSegmentPushType(null);
   }
 
-  /**
-   * Helper method to create a new TableConfig by overwriting the original TableConfig with tier specific configs, so
-   * that the consumers of TableConfig don't have to handle tier overwrites themselves. To begin with, we only
-   * consider to overwrite the index configs in `tableIndexConfig` and `fieldConfigList`, e.g.
-   *
-   * {
-   *   "tableIndexConfig": {
-   *     ... // configs allowed in IndexingConfig, for default tier
-   *     "tierOverwrites": {
-   *       "hotTier": {...}, // configs allowed in IndexingConfig, for hot tier
-   *       "coldTier": {...} // configs allowed in IndexingConfig, for cold tier
-   *     }
-   *   }
-   *   "fieldConfigList": [
-   *     {
-   *       ... // configs allowed in FieldConfig, for default tier
-   *       "tierOverwrites": {
-   *         "hotTier": {...}, // configs allowed in FieldConfig, for hot tier
-   *         "coldTier": {...} // configs allowed in FieldConfig, for cold tier
-   *       }
-   *     },
-   *     ...
-   *   ]
-   * }
-   *
-   * Overwriting is to extract tier specific configs from those `tierOverwrites` sections and replace the
-   * corresponding configs set for default tier.
-   *
-   * TODO: Other tier specific configs like segment assignment policy may be handled in this helper method too, to
-   *       keep tier overwrites transparent to consumers of TableConfig.
-   *
-   * @param tableConfig the input table config which is kept intact
-   * @param tier        the target tier to overwrite the table config
-   * @return a new table config overwritten for the tier, or the original table if overwriting doesn't happen.
-   */
+  /// Helper method to create a new TableConfig by overwriting the original TableConfig with tier specific configs, so
+  /// that the consumers of TableConfig don't have to handle tier overwrites themselves. To begin with, we only
+  /// consider to overwrite the index configs in `tableIndexConfig` and `fieldConfigList`, e.g.
+  ///
+  /// {
+  ///   "tableIndexConfig": {
+  ///     ... // configs allowed in IndexingConfig, for default tier
+  ///     "tierOverwrites": {
+  ///       "hotTier": {...}, // configs allowed in IndexingConfig, for hot tier
+  ///       "coldTier": {...} // configs allowed in IndexingConfig, for cold tier
+  ///     }
+  ///   }
+  ///   "fieldConfigList": \[
+  ///     {
+  ///       ... // configs allowed in FieldConfig, for default tier
+  ///       "tierOverwrites": {
+  ///         "hotTier": {...}, // configs allowed in FieldConfig, for hot tier
+  ///         "coldTier": {...} // configs allowed in FieldConfig, for cold tier
+  ///       }
+  ///     },
+  ///     ...
+  ///   \]
+  /// }
+  ///
+  /// Overwriting is to extract tier specific configs from those `tierOverwrites` sections and replace the
+  /// corresponding configs set for default tier.
+  ///
+  /// TODO: Other tier specific configs like segment assignment policy may be handled in this helper method too, to
+  ///       keep tier overwrites transparent to consumers of TableConfig.
+  ///
+  /// @param tableConfig the input table config which is kept intact
+  /// @param tier        the target tier to overwrite the table config
+  /// @return a new table config overwritten for the tier, or the original table if overwriting doesn't happen.
   public static TableConfig overwriteTableConfigForTier(TableConfig tableConfig, @Nullable String tier) {
     if (tier == null) {
       return tableConfig;
     }
     try {
-      boolean updated = false;
-      JsonNode tblCfgJson = tableConfig.toJsonNode();
-      // Apply tier specific overwrites for `tableIndexConfig`
-      JsonNode tblIdxCfgJson = tblCfgJson.get(TableConfig.INDEXING_CONFIG_KEY);
-      if (tblIdxCfgJson != null && tblIdxCfgJson.has(TableConfig.TIER_OVERWRITES_KEY)) {
-        JsonNode tierCfgJson = tblIdxCfgJson.get(TableConfig.TIER_OVERWRITES_KEY).get(tier);
-        if (tierCfgJson != null) {
-          LOGGER.debug("Got table index config overwrites: {} for tier: {}", tierCfgJson, tier);
-          overwriteConfig(tblIdxCfgJson, tierCfgJson);
-          updated = true;
-        }
-      }
-      // Apply tier specific overwrites for `fieldConfigList`
-      JsonNode fieldCfgListJson = tblCfgJson.get(TableConfig.FIELD_CONFIG_LIST_KEY);
-      if (fieldCfgListJson != null && fieldCfgListJson.isArray()) {
-        Iterator<JsonNode> fieldCfgListItr = fieldCfgListJson.elements();
-        while (fieldCfgListItr.hasNext()) {
-          JsonNode fieldCfgJson = fieldCfgListItr.next();
-          if (!fieldCfgJson.has(TableConfig.TIER_OVERWRITES_KEY)) {
-            continue;
-          }
-          JsonNode tierCfgJson = fieldCfgJson.get(TableConfig.TIER_OVERWRITES_KEY).get(tier);
-          if (tierCfgJson != null) {
-            LOGGER.debug("Got field index config overwrites: {} for tier: {}", tierCfgJson, tier);
-            overwriteConfig(fieldCfgJson, tierCfgJson);
-            updated = true;
-          }
-        }
-      }
-      if (updated) {
-        LOGGER.debug("Got overwritten table config: {} for tier: {}", tblCfgJson, tier);
-        return JsonUtils.jsonNodeToObject(tblCfgJson, TableConfig.class);
-      } else {
-        LOGGER.debug("No table config overwrites for tier: {}", tier);
+      IndexingConfig effectiveIndexing = applyIndexingConfigTierOverride(tableConfig.getIndexingConfig(), tier);
+      List<FieldConfig> effectiveFields = applyFieldConfigListTierOverrides(tableConfig.getFieldConfigList(), tier);
+      if (effectiveIndexing == tableConfig.getIndexingConfig()
+          && effectiveFields == tableConfig.getFieldConfigList()) {
         return tableConfig;
       }
+      TableConfig overwritten = new TableConfig(tableConfig);
+      overwritten.setIndexingConfig(effectiveIndexing);
+      overwritten.setFieldConfigList(effectiveFields);
+      return overwritten;
     } catch (IOException e) {
       LOGGER.warn("Failed to overwrite table config for tier: {} for table: {}", tier, tableConfig.getTableName(), e);
       return tableConfig;
     }
   }
 
-  private static void overwriteConfig(JsonNode oldCfg, JsonNode newCfg) {
-    for (Map.Entry<String, JsonNode> cfgEntry : newCfg.properties()) {
-      ((ObjectNode) oldCfg).set(cfgEntry.getKey(), cfgEntry.getValue());
+  private static TableConfig overwriteTableConfigForConsumingSegmentTier(TableConfig tableConfig) {
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    if (indexingConfig != null) {
+      JsonNode tierOverwrite = getTierOverwrite(indexingConfig.getTierOverwrites(), CONSUMING_SEGMENT_TIER);
+      if (tierOverwrite != null) {
+        Preconditions.checkState(tierOverwrite.isObject(),
+            "tableIndexConfig.tierOverwrites.%s must be a JSON object", CONSUMING_SEGMENT_TIER);
+      }
     }
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        JsonNode tierOverwrite = getTierOverwrite(fieldConfig.getTierOverwrites(), CONSUMING_SEGMENT_TIER);
+        if (tierOverwrite != null) {
+          Preconditions.checkState(tierOverwrite.isObject(),
+              "fieldConfigList[%s].tierOverwrites.%s must be a JSON object", fieldConfig.getName(),
+              CONSUMING_SEGMENT_TIER);
+        }
+      }
+    }
+    TableConfig overwrittenTableConfig = overwriteTableConfigForTier(tableConfig, CONSUMING_SEGMENT_TIER);
+    Preconditions.checkState(overwrittenTableConfig != tableConfig,
+        "Failed to apply tierOverwrites.consuming for table: %s", tableConfig.getTableName());
+    return overwrittenTableConfig;
   }
 
-  /**
-   * Get the partition column from tableConfig instance assignment config map.
-   * @param tableConfig table config
-   * @return partition column
-   */
+  private static IndexingConfig applyIndexingConfigTierOverride(IndexingConfig original, String tier)
+      throws IOException {
+    JsonNode tierOverwrites = original.getTierOverwrites();
+    if (tierOverwrites == null || !tierOverwrites.has(tier)) {
+      return original;
+    }
+    JsonNode override = tierOverwrites.get(tier);
+    if (!override.isObject()) {
+      return original;
+    }
+    ObjectNode merged = (ObjectNode) JsonUtils.objectToJsonNode(original);
+    for (Map.Entry<String, JsonNode> entry : override.properties()) {
+      merged.set(entry.getKey(), entry.getValue());
+    }
+    return JsonUtils.jsonNodeToObject(merged, IndexingConfig.class);
+  }
+
+  @Nullable
+  private static List<FieldConfig> applyFieldConfigListTierOverrides(@Nullable List<FieldConfig> original, String tier)
+      throws IOException {
+    if (CollectionUtils.isEmpty(original)) {
+      return original;
+    }
+    List<FieldConfig> result = null;
+    for (int i = 0; i < original.size(); i++) {
+      FieldConfig config = original.get(i);
+      FieldConfig effective = applyFieldConfigTierOverride(config, tier);
+      if (effective != config) {
+        if (result == null) {
+          result = new ArrayList<>(original);
+        }
+        result.set(i, effective);
+      }
+    }
+    return result != null ? result : original;
+  }
+
+  private static FieldConfig applyFieldConfigTierOverride(FieldConfig original, String tier)
+      throws IOException {
+    JsonNode tierOverwrites = original.getTierOverwrites();
+    if (tierOverwrites == null || !tierOverwrites.has(tier)) {
+      return original;
+    }
+    JsonNode override = tierOverwrites.get(tier);
+    if (!override.isObject()) {
+      return original;
+    }
+    ObjectNode merged = (ObjectNode) JsonUtils.objectToJsonNode(original);
+    for (Map.Entry<String, JsonNode> entry : override.properties()) {
+      merged.set(entry.getKey(), entry.getValue());
+    }
+    return JsonUtils.jsonNodeToObject(merged, FieldConfig.class);
+  }
+
+  private static boolean hasConsumingSegmentTierOverwriteForRealtimeTable(TableConfig tableConfig) {
+    if (tableConfig.getTableType() != TableType.REALTIME || (
+        CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList()) && tableConfig.getTierConfigsList()
+            .stream()
+            .anyMatch(tierConfig -> CONSUMING_SEGMENT_TIER.equals(tierConfig.getName())))) {
+      return false;
+    }
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    JsonNode tierOverwrite =
+        indexingConfig != null ? getTierOverwrite(indexingConfig.getTierOverwrites(), CONSUMING_SEGMENT_TIER) : null;
+    if (tierOverwrite != null && !tierOverwrite.isNull()) {
+      return true;
+    }
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList == null) {
+      return false;
+    }
+    for (FieldConfig fieldConfig : fieldConfigList) {
+      tierOverwrite = getTierOverwrite(fieldConfig.getTierOverwrites(), CONSUMING_SEGMENT_TIER);
+      if (tierOverwrite != null && !tierOverwrite.isNull()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Builds the [IndexLoadingConfig] for a mutable consuming segment. If the realtime table config contains
+  /// `tierOverwrites.consuming` under `tableIndexConfig` or a `fieldConfigList` entry, the index loading config is
+  /// created from the existing tier-overwrite view for that mutable consuming segment.
+  /// Tier-overwrite validation applies the override first and validates the resulting effective table config with the
+  /// normal validation path. Persisted segment commit and immutable segment load continue to use the base table config.
+  /// Real storage-tier overrides are keyed by configured tier names.
+  /// The original [IndexLoadingConfig] is left untouched so the commit path and immutable segment load path continue to
+  /// use the persisted table config and real segment tier.
+  public static IndexLoadingConfig buildConsumingSegmentIndexLoadingConfig(TableConfig tableConfig, Schema schema,
+      IndexLoadingConfig indexLoadingConfig) {
+    if (!hasConsumingSegmentTierOverwriteForRealtimeTable(tableConfig)) {
+      return indexLoadingConfig;
+    }
+    TableConfig consumingTableConfig = overwriteTableConfigForConsumingSegmentTier(tableConfig);
+    return new IndexLoadingConfig(indexLoadingConfig.getInstanceDataManagerConfig(), consumingTableConfig, schema);
+  }
+
+  @Nullable
+  private static JsonNode getTierOverwrite(@Nullable JsonNode tierOverwrites, String tier) {
+    return tierOverwrites != null && tierOverwrites.isObject() ? tierOverwrites.get(tier) : null;
+  }
+
+  /// Get the partition column from tableConfig instance assignment config map.
+  /// @param tableConfig table config
+  /// @return partition column
   public static String getPartitionColumn(TableConfig tableConfig) {
     // check InstanceAssignmentConfigMap is null or empty,
     if (!MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {

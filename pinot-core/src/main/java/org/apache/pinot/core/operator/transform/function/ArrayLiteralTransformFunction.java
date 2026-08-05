@@ -32,10 +32,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The <code>LiteralTransformFunction</code> class is a special transform function which is a wrapper on top of a
- * LITERAL. The data type is inferred from the literal string.
- */
+/// The `LiteralTransformFunction` class is a special transform function which is a wrapper on top of a
+/// LITERAL. The data type is inferred from the literal string.
 // TODO: Support BIG_DECIMAL literal type, then implement transformToBigDecimalValuesMV.
 public class ArrayLiteralTransformFunction implements TransformFunction {
   public static final String FUNCTION_NAME = "arrayValueConstructor";

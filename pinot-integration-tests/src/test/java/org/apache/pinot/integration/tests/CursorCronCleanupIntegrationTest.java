@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.File;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.response.broker.CursorResponseNative;
@@ -37,11 +36,9 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Verifies that the broker-side background cleanup scheduler automatically deletes expired cursor responses
- * without any manual DELETE API call. Uses a short expiration (3s) and aggressive cron frequency (2s) to
- * keep test runtime low.
- */
+/// Verifies that the broker-side background cleanup scheduler automatically deletes expired cursor responses
+/// without any manual DELETE API call. Uses a short expiration (3s) and aggressive cron frequency (2s) to
+/// keep test runtime low.
 public class CursorCronCleanupIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final Logger LOGGER = LoggerFactory.getLogger(CursorCronCleanupIntegrationTest.class);
   private static final int NUM_OFFLINE_SEGMENTS = 8;
@@ -89,7 +86,7 @@ public class CursorCronCleanupIntegrationTest extends BaseClusterIntegrationTest
   }
 
   protected Map<String, String> getHeaders() {
-    return Collections.emptyMap();
+    return Map.of();
   }
 
   protected String getBrokerGetAllResponseStoresApiUrl(String brokerBaseApiUrl) {
@@ -110,7 +107,7 @@ public class CursorCronCleanupIntegrationTest extends BaseClusterIntegrationTest
     // Submit a cursor query -- response will expire in ~3s
     ClusterTest.postQuery(TEST_QUERY,
         ClusterIntegrationTestUtils.getBrokerQueryApiUrl(brokerUrl, false) + "?getCursor=true&numRows=100000",
-        getHeaders(), Collections.emptyMap());
+        getHeaders(), Map.of());
 
     // Verify it was stored
     List<CursorResponseNative> afterCreate = JsonUtils.stringToObject(

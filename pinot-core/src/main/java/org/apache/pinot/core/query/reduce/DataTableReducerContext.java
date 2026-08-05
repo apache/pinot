@@ -21,9 +21,7 @@ package org.apache.pinot.core.query.reduce;
 import java.util.concurrent.ExecutorService;
 
 
-/**
- * POJO class to encapsulate DataTableReducer context information
- */
+/// POJO class to encapsulate DataTableReducer context information
 public class DataTableReducerContext {
 
   private final ExecutorService _executorService;
@@ -34,14 +32,12 @@ public class DataTableReducerContext {
   private final int _minGroupTrimSize;
   private final int _minInitialIndexedTableCapacity;
 
-  /**
-   * Constructor for the class.
-   *
-   * @param executorService Executor service to use for DataTableReducer
-   * @param maxReduceThreadsPerQuery Max number of threads to use for reduce phase
-   * @param reduceTimeOutMs Reduce Phase timeOut in ms
-   * @param groupByTrimThreshold trim threshold for SQL group by
-   */
+  /// Constructor for the class.
+  ///
+  /// @param executorService Executor service to use for DataTableReducer
+  /// @param maxReduceThreadsPerQuery Max number of threads to use for reduce phase
+  /// @param reduceTimeOutMs Reduce Phase timeOut in ms
+  /// @param groupByTrimThreshold trim threshold for SQL group by
   public DataTableReducerContext(ExecutorService executorService, int maxReduceThreadsPerQuery, long reduceTimeOutMs,
       int groupByTrimThreshold, int minGroupTrimSize, int minInitialIndexedTableCapacity) {
     _executorService = executorService;

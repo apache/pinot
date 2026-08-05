@@ -53,9 +53,7 @@ import org.apache.pinot.spi.utils.TimestampUtils;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 
 
-/**
- * PinotEvaluateLiteralRule that matches the literal only function calls and evaluates them.
- */
+/// PinotEvaluateLiteralRule that matches the literal only function calls and evaluates them.
 public class PinotEvaluateLiteralRule {
 
   public static class Project extends RelOptRule {
@@ -80,9 +78,7 @@ public class PinotEvaluateLiteralRule {
     }
   }
 
-  /**
-   * Constructs a new LogicalProject that matches the type of the old LogicalProject.
-   */
+  /// Constructs a new LogicalProject that matches the type of the old LogicalProject.
   private static LogicalProject constructNewProject(LogicalProject oldProject, LogicalProject newProject,
       RexBuilder rexBuilder) {
     List<RexNode> oldProjects = oldProject.getProjects();
@@ -128,9 +124,7 @@ public class PinotEvaluateLiteralRule {
     }
   }
 
-  /**
-   * A RexShuttle that recursively evaluates all the calls with literal only operands.
-   */
+  /// A RexShuttle that recursively evaluates all the calls with literal only operands.
   private static class EvaluateLiteralShuttle extends RexShuttle {
     final RexBuilder _rexBuilder;
 
@@ -152,10 +146,8 @@ public class PinotEvaluateLiteralRule {
     }
   }
 
-  /**
-   * Evaluates the literal only function and returns the result as a RexLiteral if it can be evaluated, or the function
-   * itself (RexCall) if it cannot be evaluated.
-   */
+  /// Evaluates the literal only function and returns the result as a RexLiteral if it can be evaluated, or the function
+  /// itself (RexCall) if it cannot be evaluated.
   private static RexNode evaluateLiteralOnlyFunction(RexCall rexCall, RexBuilder rexBuilder) {
     List<RexNode> operands = rexCall.getOperands();
     assert operands.stream().allMatch(
@@ -194,6 +186,14 @@ public class PinotEvaluateLiteralRule {
     RelDataType rexNodeType = rexCall.getType();
     if (rexNodeType.getSqlTypeName() == SqlTypeName.DECIMAL) {
       rexNodeType = convertDecimalType(rexNodeType, rexBuilder);
+    } else if (isUnsignedIntegerType(rexNodeType.getSqlTypeName())) {
+      // Pinot has no unsigned storage and Calcite cannot build a RexLiteral of an unsigned type (CALCITE-1466), so
+      // fold the constant into its signed-equivalent type. Mirrors the unsigned->signed mapping that
+      // RelToPlanNodeConverter#convertToColumnDataType applies everywhere else -- which also means an unsupported
+      // UBIGINT literal cast is rejected here too, since that method throws for UBIGINT.
+      RelDataType signedType =
+          RelToPlanNodeConverter.convertToColumnDataType(rexNodeType).toType(rexBuilder.getTypeFactory());
+      rexNodeType = rexBuilder.getTypeFactory().createTypeWithNullability(signedType, rexNodeType.isNullable());
     }
     Object resultValue;
     try {
@@ -256,6 +256,18 @@ public class PinotEvaluateLiteralRule {
     return RelToPlanNodeConverter.convertToColumnDataType(relDataType).toType(rexBuilder.getTypeFactory());
   }
 
+  private static boolean isUnsignedIntegerType(SqlTypeName sqlTypeName) {
+    switch (sqlTypeName) {
+      case UTINYINT:
+      case USMALLINT:
+      case UINTEGER:
+      case UBIGINT:
+        return true;
+      default:
+        return false;
+    }
+  }
+
   @Nullable
   private static Object getLiteralValue(RexLiteral rexLiteral) {
     Object value = rexLiteral.getValue();
@@ -290,7 +302,8 @@ public class PinotEvaluateLiteralRule {
         return TimestampUtils.toMillisSinceEpoch(resultValue.toString());
       }
     }
-    // Use BigDecimal for INTEGER / BIGINT / DECIMAL literals
+    // Use BigDecimal for INTEGER / BIGINT literals. (Unsigned integer types are normalized to their signed-equivalent
+    // type earlier in convertRexCall, so they never reach here as an unsigned SqlTypeName.)
     if (relDataType.getSqlTypeName() == SqlTypeName.INTEGER || relDataType.getSqlTypeName() == SqlTypeName.BIGINT) {
       return new BigDecimal(((Number) resultValue).longValue());
     }

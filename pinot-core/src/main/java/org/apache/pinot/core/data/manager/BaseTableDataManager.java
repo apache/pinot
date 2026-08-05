@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -82,6 +83,7 @@ import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
@@ -93,6 +95,7 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
@@ -105,6 +108,7 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -144,10 +148,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected File _resourceTmpDir;
   protected Logger _logger;
   protected SegmentReloadSemaphore _segmentReloadSemaphore;
-  /**
-   * @deprecated Use {@link #_segmentReloadExecutor} or {@link #_segmentRefreshExecutor} instead. Kept for binary
-   * compatibility with downstream extensions; refers to the shared underlying executor pool.
-   */
+  /// @deprecated Use [#_segmentReloadExecutor] or [#_segmentRefreshExecutor] instead. Kept for binary
+  /// compatibility with downstream extensions; refers to the shared underlying executor pool.
   @Deprecated
   protected ExecutorService _segmentReloadRefreshExecutor;
   protected ExecutorService _segmentReloadExecutor;
@@ -311,9 +313,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   protected abstract void doShutdown();
 
-  /**
-   * Releases and removes all segments tracked by the table data manager.
-   */
+  /// Releases and removes all segments tracked by the table data manager.
   protected void releaseAndRemoveAllSegments() {
     List<SegmentDataManager> segmentDataManagers;
     synchronized (_segmentDataManagerMap) {
@@ -357,15 +357,16 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return _segmentDataManagerMap.containsKey(segmentName);
   }
 
-  /**
-   * {@inheritDoc}
-   * <p>If one segment already exists with the same name, replaces it with the new one.
-   * <p>Ensures that reference count of the old segment (if replaced) is reduced by 1, so that the last user of the old
-   * segment (or the calling thread, if there are none) remove the segment.
-   * <p>The new segment is added with reference count of 1, so that is never removed until a drop command comes through.
-   *
-   * @param immutableSegment Immutable segment to add
-   */
+  /// {@inheritDoc}
+  ///
+  /// If one segment already exists with the same name, replaces it with the new one.
+  ///
+  /// Ensures that reference count of the old segment (if replaced) is reduced by 1, so that the last user of the old
+  /// segment (or the calling thread, if there are none) remove the segment.
+  ///
+  /// The new segment is added with reference count of 1, so that is never removed until a drop command comes through.
+  ///
+  /// @param immutableSegment Immutable segment to add
   @Override
   public void addSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
     String segmentName = immutableSegment.getSegmentName();
@@ -447,6 +448,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
+  public void onTableConfigOrSchemaRefresh() {
+    // A genuine config/schema change: refresh the cached table config and schema from ZK. The returned index loading
+    // config is not needed here; the side effect of updating the cache is the contract of this callback.
+    fetchIndexLoadingConfig();
+  }
+
+  @Override
   public void addNewOnlineSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     _logger.info("Adding new ONLINE segment: {}", zkMetadata.getSegmentName());
@@ -455,9 +463,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  /**
-   * Replaces an already loaded segment in a table if the segment has been overridden in the deep store (CRC mismatch).
-   */
+  /// Replaces an already loaded segment in a table if the segment has been overridden in the deep store (CRC mismatch).
   protected void replaceSegmentIfCrcMismatch(SegmentDataManager segmentDataManager, SegmentZKMetadata zkMetadata,
       IndexLoadingConfig indexLoadingConfig)
       throws Exception {
@@ -607,6 +613,54 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
+  public void deleteSegment(String segmentName)
+      throws Exception {
+    _logger.info("Deleting segment: {}", segmentName);
+    Lock segmentLock = getSegmentLock(segmentName);
+    segmentLock.lock();
+    try {
+      if (hasSegment(segmentName)) {
+        _logger.warn("Segment: {} is still loaded, offloading it before delete", segmentName);
+        offloadSegment(segmentName);
+      }
+      doDeleteSegment(segmentName);
+    } catch (Exception e) {
+      addSegmentError(segmentName,
+          new SegmentErrorInfo(System.currentTimeMillis(), "Caught exception while deleting segment", e));
+      throw e;
+    } finally {
+      segmentLock.unlock();
+    }
+  }
+
+  protected void doDeleteSegment(String segmentName)
+      throws Exception {
+    deleteSegmentFilesFromDisk(_tableDataDir, segmentName, _instanceDataManagerConfig);
+    _logger.info("Deleted segment: {}", segmentName);
+  }
+
+  /// Removes the segment directory locally and does tier-aware cleanup too
+  public static void deleteSegmentFilesFromDisk(String tableDataDir, String segmentName,
+      InstanceDataManagerConfig instanceConfig)
+      throws Exception {
+    File segmentDir = new File(tableDataDir, segmentName);
+    if (segmentDir.exists()) {
+      FileUtils.deleteQuietly(segmentDir);
+      LOGGER.info("Deleted segment directory {} on default tier", segmentDir);
+    }
+    SegmentDirectoryLoader segmentLoader =
+        SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(instanceConfig.getSegmentDirectoryLoader());
+    if (segmentLoader != null) {
+      LOGGER.info("Deleting segment: {} further with segment loader: {}", segmentName,
+          instanceConfig.getSegmentDirectoryLoader());
+      SegmentDirectoryLoaderContext ctx = new SegmentDirectoryLoaderContext.Builder().setSegmentName(segmentName)
+          .setTableDataDir(tableDataDir)
+          .build();
+      segmentLoader.delete(ctx);
+    }
+  }
+
+  @Override
   public void reloadSegment(String segmentName, boolean forceDownload, String reloadJobId)
       throws Exception {
     Preconditions.checkState(!_shutDown,
@@ -616,12 +670,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager != null) {
       IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
-      _segmentReloadSemaphore.acquire(segmentName, _logger);
-      try {
-        reloadSegment(segmentDataManager, indexLoadingConfig, forceDownload);
-      } finally {
-        _segmentReloadSemaphore.release();
-      }
+      reloadSegment(segmentDataManager, indexLoadingConfig, forceDownload);
     } else {
       _logger.warn("Failed to find segment: {}, skipping reloading it", segmentName);
     }
@@ -668,10 +717,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  /**
-   * Returns true if the given segment has been deleted recently. The time range is determined by
-   * {@link InstanceDataManagerConfig#getDeletedSegmentsCacheTtlMinutes()}.
-   */
+  /// Returns true if the given segment has been deleted recently. The time range is determined by
+  /// [InstanceDataManagerConfig#getDeletedSegmentsCacheTtlMinutes()].
   @Override
   public boolean isSegmentDeletedRecently(String segmentName) {
     return _recentlyDeletedSegments.getIfPresent(segmentName) != null;
@@ -771,6 +818,36 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return _segmentPreloadExecutor;
   }
 
+  public ZkHelixPropertyStore<ZNRecord> getPropertyStore() {
+    return _propertyStore;
+  }
+
+  @Nullable
+  public SegmentDataManager getSegmentDataManager(String segmentName) {
+    return _segmentDataManagerMap.get(segmentName);
+  }
+
+  public Collection<SegmentDataManager> getAllSegmentDataManagers() {
+    return Collections.unmodifiableCollection(_segmentDataManagerMap.values());
+  }
+
+  public Logger getLogger() {
+    return _logger;
+  }
+
+  public SegmentReloadSemaphore getSegmentReloadSemaphore() {
+    return _segmentReloadSemaphore;
+  }
+
+  @Nullable
+  public SegmentOperationsThrottlerSet getSegmentOperationsThrottlerSet() {
+    return _segmentOperationsThrottlerSet;
+  }
+
+  public ServerMetrics getServerMetrics() {
+    return _serverMetrics;
+  }
+
   @Override
   public boolean isDeleted() {
     return _isDeleted;
@@ -832,7 +909,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (isUpsertEnabled()) {
       return _tableUpsertMetadataManager.getPartitionToPrimaryKeyCount();
     }
-    return Collections.emptyMap();
+    return Map.of();
   }
 
   protected void handleUpsert(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
@@ -947,12 +1024,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     CompletableFuture.allOf(segmentDataManagers.stream().map(segmentDataManager -> CompletableFuture.runAsync(() -> {
       String segmentName = segmentDataManager.getSegmentName();
       try {
-        _segmentReloadSemaphore.acquire(segmentName, _logger);
-        try {
-          reloadSegment(segmentDataManager, indexLoadingConfig, forceDownload);
-        } finally {
-          _segmentReloadSemaphore.release();
-        }
+        reloadSegment(segmentDataManager, indexLoadingConfig, forceDownload);
       } catch (Throwable t) {
         _logger.error("Caught exception while reloading segment: {}", segmentName, t);
         failedSegments.add(segmentName);
@@ -994,7 +1066,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
               + "Change the cluster config: {} to `PROTECTED` for safer commit", segmentName, config.getConfigKey());
         } else {
           _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
-          ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+          _segmentReloadSemaphore.acquire(segmentName, _logger);
+          try {
+            ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+          } finally {
+            _segmentReloadSemaphore.release();
+          }
         }
       } else {
         _logger.warn("Skip reloading consuming segment: {} as configured", segmentName);
@@ -1014,9 +1091,17 @@ public abstract class BaseTableDataManager implements TableDataManager {
     indexLoadingConfig.setSegmentTier(segmentTier);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
     File indexDir = getSegmentDataDir(segmentName, segmentTier, indexLoadingConfig.getTableConfig());
+    _segmentReloadSemaphore.acquire(segmentName, _logger);
     Lock segmentLock = getSegmentLock(segmentName);
     segmentLock.lock();
     try {
+      // Re-validate under the segment lock: the caller's map read in reloadSegment(String, boolean, String) is
+      // unlocked, so a concurrent offloadSegment can remove the entry between that read and this lock acquisition.
+      // Without this guard, reload would resurrect a segment the cluster has already dropped.
+      if (_segmentDataManagerMap.get(segmentName) == null) {
+        _logger.warn("Skipping reload for segment: {} — concurrently offloaded after dispatch", segmentName);
+        return;
+      }
       /*
       Determines if a segment should be downloaded from deep storage based on:
       1. A forced download flag.
@@ -1030,12 +1115,39 @@ public abstract class BaseTableDataManager implements TableDataManager {
       - Copy the backup directory back to the original index directory.
       - Continue loading the segment from the index directory.
       */
-      boolean shouldDownload =
-          forceDownload || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, localMetadata)
+      boolean crcMatch = hasSameCRC(zkMetadata, localMetadata);
+      boolean shouldDownload = forceDownload
+          || (isSegmentStatusCompleted(zkMetadata) && !crcMatch
               && _instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad());
+      // For an upsert table with metadata TTL and snapshots enabled, a reload must not blindly re-scan the segment and
+      // re-add every primary key, as that would resurrect keys already expired (metadataTTL) or deleted
+      // (deletedKeysTTL). Instead we rebuild the upsert metadata from the persisted validDocIds snapshot (valid docs
+      // only). The snapshot is docId-position based, so it only maps to the segment being loaded when the content (CRC)
+      // is unchanged. A CRC mismatch with shouldDownload means a different (downloaded) copy will be loaded, so
+      // reusing the local snapshot could silently rebuild upsert state against the wrong docIds: fail closed in that
+      // case. When CRC checking is disabled (instance.check.crc.on.segment.load=false) a CRC-mismatched normal reload
+      // keeps the local segment (shouldDownload is false), so the local snapshot still maps and the reload proceeds.
+      UpsertContext upsertContext = isUpsertEnabled() ? _tableUpsertMetadataManager.getContext() : null;
+      boolean restoreValidDocIdsSnapshot = upsertContext != null && upsertContext.isSnapshotEnabled()
+          && (upsertContext.getMetadataTTL() > 0 || upsertContext.getDeletedKeysTTL() > 0);
+      if (restoreValidDocIdsSnapshot && !crcMatch && shouldDownload) {
+        throw new IllegalStateException(String.format(
+            "Failing reload for segment: %s of upsert table with metadata TTL: %s because the segment CRC has "
+                + "changed from: %s to: %s and the docId-based validDocIds snapshot cannot be guaranteed to map to "
+                + "the reloaded segment. Reload once the local copy matches the deep-store segment, or recreate the "
+                + "snapshot from the new segment.", segmentName, _tableNameWithType, localMetadata.getCrc(),
+            zkMetadata.getCrc()));
+      }
       if (shouldDownload) {
         // Create backup directory to handle failure of segment reloading.
         createBackup(indexDir);
+        // The validDocIds snapshot is a server-local file absent from the deep-store copy. createBackup moved it into
+        // the backup dir; capture that path so it can be copied into the freshly downloaded segment dir below (the
+        // non-download copyTo path already restores it via copyDirectory).
+        File backupValidDocIdsSnapshotFile = restoreValidDocIdsSnapshot ? new File(
+            SegmentDirectoryPaths.findSegmentDirectory(new File(indexDir.getParentFile(),
+                indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX)),
+            V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME) : null;
         if (forceDownload) {
           _logger.info("Force downloading segment: {}", segmentName);
         } else {
@@ -1043,6 +1155,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
               localMetadata.getCrc(), zkMetadata.getCrc());
         }
         indexDir = downloadSegment(zkMetadata);
+        if (backupValidDocIdsSnapshotFile != null && backupValidDocIdsSnapshotFile.exists()) {
+          FileUtils.copyFile(backupValidDocIdsSnapshotFile, new File(
+              SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+        }
       } else {
         _logger.info("Reloading existing segment: {} on tier: {}", segmentName,
             TierConfigUtils.normalizeTierName(segmentTier));
@@ -1092,6 +1208,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       throw reloadFailureException;
     } finally {
       segmentLock.unlock();
+      _segmentReloadSemaphore.release();
     }
     _logger.info("Reloaded segment: {}", segmentName);
   }
@@ -1110,42 +1227,67 @@ public abstract class BaseTableDataManager implements TableDataManager {
         && !ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig);
   }
 
-  /**
-   * _segmentDataManagerMap is used for fetching segments that need to be queried. If a new segment is created,
-   * calling this method ensures that all queries in the future can use the new segment. This method may replace an
-   * existing segment with the same name.
-   */
+  /// \_segmentDataManagerMap is used for fetching segments that need to be queried. If a new segment is created,
+  /// calling this method ensures that all queries in the future can use the new segment. This method may replace an
+  /// existing segment with the same name.
   @Nullable
-  protected SegmentDataManager registerSegment(String segmentName, SegmentDataManager segmentDataManager) {
+  public SegmentDataManager registerSegment(String segmentName, SegmentDataManager segmentDataManager) {
     SegmentDataManager oldSegmentDataManager;
     synchronized (_segmentDataManagerMap) {
       oldSegmentDataManager = _segmentDataManagerMap.put(segmentName, segmentDataManager);
     }
     _recentlyDeletedSegments.invalidate(segmentName);
+    // Fire the post-registration lifecycle hook now that the segment is swapped into the serving set
+    fireOnSegmentAdded(segmentName, segmentDataManager);
     return oldSegmentDataManager;
   }
 
-  /**
-   * De-registering a segment ensures that no query uses the given segment until a segment with that name is
-   * re-registered. There may be scenarios where the broker thinks that a segment is available even though it has
-   * been de-registered in the servers (either due to manual deletion or retention). In such cases, acquireSegments
-   * will mark those segments as missingSegments. The caller can use {@link #isSegmentDeletedRecently(String)} to
-   * identify this scenario.
-   */
+  /// Fires the post-registration lifecycle hook on the segments exposed by a newly registered segment data manager.
+  ///
+  /// The hook runs after the segment is swapped into the serving set, so a reference is held while it runs: without it
+  /// a concurrent [#replaceSegment] / [#unregisterSegment] could drop the reference count to 0 and destroy
+  /// the segment (closing its [org.apache.pinot.segment.spi.store.SegmentDirectory]) while the hook is still
+  /// using it. A manager that is already destroyed cannot take a reference and has nothing left to notify, so it is
+  /// skipped.
+  ///
+  /// Failures are contained here: the segment is already serving, so a failing hook must not fail the registration or
+  /// the enclosing Helix state transition. This also keeps a manager that exposes a null segment (possible for a
+  /// custom implementation, as the default [SegmentDataManager#getReportableSegments()] wraps
+  /// [SegmentDataManager#getSegment()]) from aborting registration.
+  private void fireOnSegmentAdded(String segmentName, SegmentDataManager segmentDataManager) {
+    if (!segmentDataManager.increaseReferenceCount()) {
+      return;
+    }
+    try {
+      for (IndexSegment segment : segmentDataManager.getReportableSegments()) {
+        if (segment != null) {
+          segment.onSegmentAdded();
+        }
+      }
+    } catch (Exception e) {
+      _logger.warn("Caught exception while firing onSegmentAdded for segment: {}", segmentName, e);
+    } finally {
+      releaseSegment(segmentDataManager);
+    }
+  }
+
+  /// De-registering a segment ensures that no query uses the given segment until a segment with that name is
+  /// re-registered. There may be scenarios where the broker thinks that a segment is available even though it has
+  /// been de-registered in the servers (either due to manual deletion or retention). In such cases, acquireSegments
+  /// will mark those segments as missingSegments. The caller can use [#isSegmentDeletedRecently(String)] to
+  /// identify this scenario.
   @Nullable
-  protected SegmentDataManager unregisterSegment(String segmentName) {
+  public SegmentDataManager unregisterSegment(String segmentName) {
     _recentlyDeletedSegments.put(segmentName, segmentName);
     synchronized (_segmentDataManagerMap) {
       return _segmentDataManagerMap.remove(segmentName);
     }
   }
 
-  /**
-   * Downloads an immutable segment into the index directory.
-   * Segment can be downloaded from deep store or from peer servers. Downloaded segment might be compressed or
-   * encrypted, and this method takes care of decompressing and decrypting the segment.
-   */
-  protected File downloadSegment(SegmentZKMetadata zkMetadata)
+  /// Downloads an immutable segment into the index directory.
+  /// Segment can be downloaded from deep store or from peer servers. Downloaded segment might be compressed or
+  /// encrypted, and this method takes care of decompressing and decrypting the segment.
+  public File downloadSegment(SegmentZKMetadata zkMetadata)
       throws Exception {
     String segmentName = zkMetadata.getSegmentName();
     String downloadUrl = zkMetadata.getDownloadUrl();
@@ -1369,14 +1511,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return tmpDir;
   }
 
-  /**
-   * Create a backup directory to handle failure of segment reloading.
-   * First rename index directory to segment backup directory so that original segment have all file
-   * descriptors point to the segment backup directory to ensure original segment serves queries properly.
-   * The original index directory is restored lazily, as depending on the conditions,
-   * it may be restored from the backup directory or segment downloaded from deep store.
-   */
-  protected void createBackup(File indexDir) {
+  /// Create a backup directory to handle failure of segment reloading.
+  /// First rename index directory to segment backup directory so that original segment have all file
+  /// descriptors point to the segment backup directory to ensure original segment serves queries properly.
+  /// The original index directory is restored lazily, as depending on the conditions,
+  /// it may be restored from the backup directory or segment downloaded from deep store.
+  public void createBackup(File indexDir) {
     if (!indexDir.exists()) {
       return;
     }
@@ -1387,13 +1527,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
         "Failed to rename index directory: %s to segment backup directory: %s", indexDir, segmentBackupDir);
   }
 
-  /**
-   * Remove the backup directory to mark the completion of segment reloading.
-   * First rename then delete is as renaming is an atomic operation, but deleting is not.
-   * When we rename the segment backup directory to segment temporary directory, we know the reload
-   * already succeeded, so that we can safely delete the segment temporary directory.
-   */
-  protected void removeBackup(File indexDir)
+  /// Remove the backup directory to mark the completion of segment reloading.
+  /// First rename then delete is as renaming is an atomic operation, but deleting is not.
+  /// When we rename the segment backup directory to segment temporary directory, we know the reload
+  /// already succeeded, so that we can safely delete the segment temporary directory.
+  public void removeBackup(File indexDir)
       throws IOException {
     File parentDir = indexDir.getParentFile();
     File segmentBackupDir = new File(parentDir, indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
@@ -1410,6 +1548,20 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public boolean tryLoadExistingSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig) {
+    ImmutableSegment segment = tryLoadExistingSegmentWithoutRegistering(zkMetadata, indexLoadingConfig);
+    if (segment == null) {
+      return false;
+    }
+    addSegment(segment, zkMetadata);
+    return true;
+  }
+
+  /// Just Loads a segment from the existing on-disk copy without registering it in `_segmentDataManagerMap` or
+  /// invoking other hooks.
+  /// Returns `null` when the on-disk copy is absent, has a stale CRC under or fails to load
+  @Nullable
+  public ImmutableSegment tryLoadExistingSegmentWithoutRegistering(SegmentZKMetadata zkMetadata,
+      IndexLoadingConfig indexLoadingConfig) {
     String segmentName = zkMetadata.getSegmentName();
     Preconditions.checkState(!_shutDown,
         "Table data manager is already shut down, cannot load existing segment: %s of table: %s", segmentName,
@@ -1442,14 +1594,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (segmentMetadata == null) {
       _logger.info("Segment: {} does not exist", segmentName);
       closeSegmentDirectoryQuietly(segmentDirectory);
-      return false;
+      return null;
     }
     if (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, segmentMetadata)) {
       _logger.warn("Segment: {} has CRC changed from: {} to: {}", segmentName, segmentMetadata.getCrc(),
           zkMetadata.getCrc());
       if (_instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad()) {
         closeSegmentDirectoryQuietly(segmentDirectory);
-        return false;
+        return null;
       }
       _logger.info("Skipping CRC check for segment: {} as configured. Proceed to load segment.", segmentName);
     }
@@ -1470,15 +1622,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
             indexLoadingConfig, zkMetadata);
       }
       ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig);
-      addSegment(segment, zkMetadata);
       _logger.info("Loaded existing segment: {} with CRC: {} on tier: {}", segmentName, zkMetadata.getCrc(),
           TierConfigUtils.normalizeTierName(segmentTier));
-      return true;
+      return segment;
     } catch (Exception e) {
       _logger.error("Failed to load existing segment: {} with CRC: {} on tier: {}", segmentName, zkMetadata.getCrc(),
           TierConfigUtils.normalizeTierName(segmentTier), e);
       closeSegmentDirectoryQuietly(segmentDirectory);
-      return false;
+      return null;
     }
   }
 
@@ -1542,8 +1693,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return staleSegments;
   }
 
-  @VisibleForTesting
-  StaleSegment isSegmentStale(IndexLoadingConfig indexLoadingConfig, SegmentDataManager segmentDataManager) {
+  public StaleSegment isSegmentStale(IndexLoadingConfig indexLoadingConfig, SegmentDataManager segmentDataManager) {
     TableConfig tableConfig = indexLoadingConfig.getTableConfig();
     Schema schema = indexLoadingConfig.getSchema();
     assert tableConfig != null && schema != null;
@@ -1825,19 +1975,18 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,
       IndexLoadingConfig indexLoadingConfig, @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
-    Map<String, String> segmentCustomConfigs = zkMetadata != null ? zkMetadata.getCustomMap() : new HashMap<>();
-    SegmentDirectoryLoaderContext loaderContext =
-        new SegmentDirectoryLoaderContext.Builder().setTableConfig(indexLoadingConfig.getTableConfig())
-            .setSchema(indexLoadingConfig.getSchema())
-            .setInstanceId(indexLoadingConfig.getInstanceId())
-            .setTableDataDir(indexLoadingConfig.getTableDataDir())
-            .setSegmentName(segmentName)
-            .setSegmentCrc(segmentCrc)
-            .setSegmentTier(indexLoadingConfig.getSegmentTier())
-            .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
-            .setSegmentDirectoryConfigs(indexLoadingConfig.getSegmentDirectoryConfigs())
-            .setSegmentCustomConfigs(segmentCustomConfigs)
-            .build();
+    SegmentDirectoryLoaderContext loaderContext = new SegmentDirectoryLoaderContext.Builder()
+        .setReadMode(indexLoadingConfig.getReadMode())
+        .setTableConfig(indexLoadingConfig.getTableConfig())
+        .setSchema(indexLoadingConfig.getSchema())
+        .setInstanceId(indexLoadingConfig.getInstanceId())
+        .setTableDataDir(indexLoadingConfig.getTableDataDir())
+        .setSegmentName(segmentName)
+        .setSegmentCrc(segmentCrc)
+        .setSegmentTier(indexLoadingConfig.getSegmentTier())
+        .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
+        .setSegmentCustomConfigs(zkMetadata != null ? zkMetadata.getCustomMap() : Map.of())
+        .build();
     SegmentDirectoryLoader segmentDirectoryLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
     File indexDir =
@@ -1847,7 +1996,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   // CRC check can be performed on both segment CRC and data CRC (if available) based on the ZK property value of
   // useDataCRC.
-  protected static boolean hasSameCRC(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
+  public static boolean hasSameCRC(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
     if (zkMetadata.getCrc() == Long.parseLong(localMetadata.getCrc())) {
       return true;
     }
@@ -1876,9 +2025,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  /**
-   * Returns the configured peer download scheme if peer-to-peer download is enabled; otherwise null.
-   */
+  /// Returns the configured peer download scheme if peer-to-peer download is enabled; otherwise null.
   @Nullable
   public String getPeerDownloadScheme() {
     return _peerDownloadScheme;

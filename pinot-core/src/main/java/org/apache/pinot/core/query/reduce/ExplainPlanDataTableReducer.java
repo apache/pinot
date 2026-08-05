@@ -99,10 +99,8 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
     brokerResponseNative.setResultTable(resultTable);
   }
 
-  /**
-   * Extract the combine node to use as the global combine step if present. If no combine node is found, return null.
-   * A combine node may not be found if all segments were pruned across all servers.
-   */
+  /// Extract the combine node to use as the global combine step if present. If no combine node is found, return null.
+  /// A combine node may not be found if all segments were pruned across all servers.
   private Object[] extractCombineNode(Map<ServerRoutingInstance, DataTable> dataTableMap) {
     if (dataTableMap.isEmpty()) {
       return null;
@@ -125,9 +123,7 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
     return combineRow;
   }
 
-  /**
-   * Extract a list of all the unique explain plans across all servers
-   */
+  /// Extract a list of all the unique explain plans across all servers
   private List<ExplainPlanRows> extractUniqueExplainPlansAcrossServers(
       Map<ServerRoutingInstance, DataTable> dataTableMap, Object[] combinedRow) {
     List<ExplainPlanRows> explainPlanRowsList = new ArrayList<>();
@@ -185,9 +181,7 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
     return explainPlanRowsList;
   }
 
-  /**
-   * Finalize and add a new explain plan to the explain plan list. Also dedupe duplicate explain plans
-   */
+  /// Finalize and add a new explain plan to the explain plan list. Also dedupe duplicate explain plans
   private void updateExplainPlanRowsList(List<ExplainPlanRows> explainPlanRowsList,
       HashSet<Integer> explainPlanHashCodeSet, ExplainPlanRows explainPlanRows) {
     if (explainPlanRows != null) {
@@ -218,11 +212,9 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
     }
   }
 
-  /**
-   * Choose the best explain plan to use when verbose mode is disabled. The precedence ordering is:
-   * - Other plan > match All plan > empty plan > no matching segment plan
-   * - Tree depth is used if more than 1 plan exists for the winning plan type from above
-   */
+  /// Choose the best explain plan to use when verbose mode is disabled. The precedence ordering is:
+  /// - Other plan > match All plan > empty plan > no matching segment plan
+  /// - Tree depth is used if more than 1 plan exists for the winning plan type from above
   private List<ExplainPlanRows> chooseBestExplainPlanToUse(List<ExplainPlanRows> explainPlanRowsList) {
     int maxOtherDepth = -1;
     int maxEmptyFilterDepth = -1;
@@ -261,14 +253,14 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
 
     // Precedence: Other > MatchAllFilter > EmptyFilter > NoMatchingSegment
     if (maxOtherIdx > -1) {
-      return Collections.singletonList(explainPlanRowsList.get(maxOtherIdx));
+      return List.of(explainPlanRowsList.get(maxOtherIdx));
     } else if (maxMatchAllFilterIdx > -1) {
-      return Collections.singletonList(explainPlanRowsList.get(maxMatchAllFilterIdx));
+      return List.of(explainPlanRowsList.get(maxMatchAllFilterIdx));
     } else if (maxEmptyFilterIdx > -1) {
-      return Collections.singletonList(explainPlanRowsList.get(maxEmptyFilterIdx));
+      return List.of(explainPlanRowsList.get(maxEmptyFilterIdx));
     }
 
-    return Collections.singletonList(explainPlanRowsList.get(maxNoMatchingSegmentIdx));
+    return List.of(explainPlanRowsList.get(maxNoMatchingSegmentIdx));
   }
 
   private void addBrokerReduceOperation(List<Object[]> resultRows) {

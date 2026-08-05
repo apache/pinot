@@ -18,24 +18,35 @@
  */
 package org.apache.pinot.common.restlet.resources;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.ServiceStatus;
 
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ValidDocIdsBitmapResponse {
   private final String _segmentName;
   private final String _segmentCrc;
+  // Server's data CRC (forward index + dictionary checksum); null when the server doesn't report it.
+  @Nullable
+  private final String _segmentDataCrc;
   private final ValidDocIdsType _validDocIdsType;
   private final byte[] _bitmap;
   private final String _instanceId;
   private final ServiceStatus.Status _serverStatus;
 
+  @JsonCreator
   public ValidDocIdsBitmapResponse(@JsonProperty("segmentName") String segmentName,
-      @JsonProperty("segmentCrc") String crc, @JsonProperty("validDocIdsType") ValidDocIdsType validDocIdsType,
-      @JsonProperty("bitmap") byte[] bitmap, @JsonProperty("instanceId") String instanceId,
+      @JsonProperty("segmentCrc") String crc, @JsonProperty("segmentDataCrc") @Nullable String segmentDataCrc,
+      @JsonProperty("validDocIdsType") ValidDocIdsType validDocIdsType, @JsonProperty("bitmap") byte[] bitmap,
+      @JsonProperty("instanceId") String instanceId,
       @JsonProperty("serverStatus") ServiceStatus.Status serverStatus) {
     _segmentName = segmentName;
     _segmentCrc = crc;
+    _segmentDataCrc = segmentDataCrc;
     _validDocIdsType = validDocIdsType;
     _bitmap = bitmap;
     _instanceId = instanceId;
@@ -48,6 +59,13 @@ public class ValidDocIdsBitmapResponse {
 
   public String getSegmentCrc() {
     return _segmentCrc;
+  }
+
+  /// Server's data CRC, or null if not reported. Omitted from the payload when null.
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Nullable
+  public String getSegmentDataCrc() {
+    return _segmentDataCrc;
   }
 
   public ValidDocIdsType getValidDocIdsType() {

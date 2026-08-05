@@ -27,7 +27,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -48,6 +47,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVe
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.forward.CompressionStatsMetadata;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.MultiColumnTextIndexHandler;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
@@ -68,6 +68,7 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.segment.spi.index.creator.ColumnarOpenStructIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
@@ -89,8 +90,6 @@ import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.FieldSpec.MaxLengthExceedStrategy;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
@@ -102,9 +101,7 @@ import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment.*;
 
 
-/**
- * Abstract base class for segment creators containing common functionality and metadata handling.
- */
+/// Abstract base class for segment creators containing common functionality and metadata handling.
 public abstract class BaseSegmentCreator implements SegmentCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSegmentCreator.class);
   // Allow at most 512 characters for the metadata property
@@ -155,10 +152,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
   }
 
-  /**
-   * Initializes a single column's dictionary and index creators.
-   * This encapsulates the common logic shared between different segment creator implementations.
-   */
+  /// Initializes a single column's dictionary and index creators.
+  /// This encapsulates the common logic shared between different segment creator implementations.
   protected ColumnIndexCreators createColIndexCreators(String columnName)
       throws Exception {
     FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
@@ -172,13 +167,18 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       Preconditions.checkState(dictEnabledColumn,
           "Cannot create inverted index for raw index column: %s", columnName);
     }
-    IndexCreationContext.Common context = getIndexCreationContext(fieldSpec, dictEnabledColumn);
-
     FieldIndexConfigs config = adaptConfig(columnName, originalConfig, columnStatistics, _config, dictEnabledColumn);
+    IndexCreationContext.Common context =
+        getIndexCreationContext(fieldSpec, dictEnabledColumn, _config.isCompressionStatsEnabled());
 
     SegmentDictionaryCreator dictionaryCreator = null;
     if (dictEnabledColumn) {
-      dictionaryCreator = getDictionaryCreator(columnName, originalConfig, context);
+      ForwardIndexConfig forwardIndexConfig = config.getConfig(StandardIndexes.forward());
+      boolean trackDictionaryValues = _config.isCompressionStatsEnabled() && forwardIndexConfig.isEnabled()
+          && forwardIndexConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY;
+      IndexCreationContext.Common dictionaryContext = trackDictionaryValues == _config.isCompressionStatsEnabled()
+          ? context : getIndexCreationContext(fieldSpec, true, trackDictionaryValues);
+      dictionaryCreator = getDictionaryCreator(columnName, originalConfig, dictionaryContext);
     }
 
     List<IndexCreator> indexCreators = getIndexCreatorsByColumn(fieldSpec, context, config, dictEnabledColumn);
@@ -187,7 +187,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
         indexCreators, getNullValueCreator(fieldSpec));
   }
 
-  private IndexCreationContext.Common getIndexCreationContext(FieldSpec fieldSpec, boolean dictEnabledColumn) {
+  private IndexCreationContext.Common getIndexCreationContext(FieldSpec fieldSpec, boolean dictEnabledColumn,
+      boolean compressionStatsEnabled) {
     ColumnStatistics columnStats = _columnStatisticsMap.get(fieldSpec.getName());
     return new IndexCreationContext.Builder(_indexDir, _config.getTableConfig(), columnStats, dictEnabledColumn)
         .withOnHeap(_config.isOnHeap())
@@ -199,6 +200,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
         .withMutableSegmentCompacted(_config.isMutableSegmentCompacted())
         .withMutableToImmutableDocIdMap(_config.getMutableToImmutableDocIdMap())
         .withContinueOnError(_config.isContinueOnError())
+        .withCompressionStatsEnabled(compressionStatsEnabled)
         .build();
   }
 
@@ -288,16 +290,12 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     return true;
   }
 
-  /**
-   * Checks if a field is nullable based on schema and config settings.
-   */
+  /// Checks if a field is nullable based on schema and config settings.
   private boolean isNullable(FieldSpec fieldSpec) {
     return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _config.isDefaultNullHandlingEnabled();
   }
 
-  /**
-   * Adapts field index configs based on column properties.
-   */
+  /// Adapts field index configs based on column properties.
   private FieldIndexConfigs adaptConfig(String columnName, FieldIndexConfigs config,
       ColumnStatistics columnStatistics, SegmentGeneratorConfig segmentCreationSpec, boolean dictEnabledColumn) {
     FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder(config);
@@ -322,12 +320,10 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     return builder.build();
   }
 
-  /**
-   * Creates the {@link IndexCreator} in a type safe way.
-   *
-   * This code needs to be in a specific method instead of inlined in the main loop in order to be able to use the
-   * limited generic capabilities of Java.
-   */
+  /// Creates the [IndexCreator] in a type safe way.
+  ///
+  /// This code needs to be in a specific method instead of inlined in the main loop in order to be able to use the
+  /// limited generic capabilities of Java.
   private <C extends IndexConfig> void tryCreateIndexCreator(Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex,
       IndexType<C, ?, ?> index, IndexCreationContext.Common context, FieldIndexConfigs fieldIndexConfigs)
       throws Exception {
@@ -338,21 +334,18 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
   }
 
-  /**
-   * Returns true if dictionary should be created for a column, false otherwise.
-   * Currently there are two sources for this config:
-   * <ul>
-   *   <li> ColumnStatistics (this is currently hard-coded to always return dictionary). </li>
-   *   <li> SegmentGeneratorConfig</li>
-   * </ul>
-   *
-   * This method gives preference to the SegmentGeneratorConfig first.
-   *
-   * @param stats Column statistics
-   * @param config Segment generation config
-   * @param spec Field spec for the column
-   * @return True if dictionary should be created for the column, false otherwise
-   */
+  /// Returns true if dictionary should be created for a column, false otherwise.
+  /// Currently there are two sources for this config:
+  ///
+  /// - ColumnStatistics (this is currently hard-coded to always return dictionary).
+  /// - SegmentGeneratorConfig
+  ///
+  /// This method gives preference to the SegmentGeneratorConfig first.
+  ///
+  /// @param stats Column statistics
+  /// @param config Segment generation config
+  /// @param spec Field spec for the column
+  /// @return True if dictionary should be created for the column, false otherwise
   private boolean createDictionaryForColumn(ColumnStatistics stats, SegmentGeneratorConfig config,
       FieldSpec spec) {
     if (spec instanceof ComplexFieldSpec) {
@@ -384,9 +377,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
         stats.getTotalNumberOfEntries());
   }
 
-  /**
-   * Calculates the raw value to be used for text index when forward index is disabled.
-   */
+  /// Calculates the raw value to be used for text index when forward index is disabled.
   @Nullable
   private Object calculateRawValueForTextIndex(boolean dictEnabledColumn, FieldIndexConfigs configs,
       FieldSpec fieldSpec) {
@@ -418,9 +409,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     return rawValue;
   }
 
-  /**
-   * Writes segment metadata to disk.
-   */
+  /// Writes segment metadata to disk.
   protected void writeMetadata()
       throws ConfigurationException {
     File metadataFile = new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
@@ -553,6 +542,69 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
           columnIndexCreators.getIndexConfigs().getConfig(StandardIndexes.forward());
       addColumnMetadataInfo(properties, column, columnStatistics, _totalDocs, _schema.getFieldSpecFor(column),
           hasDictionary, dictionaryElementSize, fwdConfig.getEncodingType(), false);
+      // When null handling is enabled for a column but it has no null values, NullValueVectorCreator.seal() writes no
+      // bitmap file. Record a metadata flag for that case so such a column is distinguishable from one that never had
+      // null handling (both lack a bitmap file), which is what the reload-time backfill relies on. Columns that do
+      // have null values are identified by the bitmap file itself and need no flag.
+      NullValueVectorCreator nullValueVectorCreator = columnIndexCreators.getNullValueVectorCreator();
+      if (nullValueVectorCreator != null && nullValueVectorCreator.isNonNull()) {
+        properties.setProperty(getKeyFor(column, IS_NON_NULL), String.valueOf(true));
+      }
+    }
+
+    if (_config.isCompressionStatsEnabled()) {
+      for (Map.Entry<String, ColumnIndexCreators> entry : _colIndexes.entrySet()) {
+        String column = entry.getKey();
+        ColumnIndexCreators colCreators = entry.getValue();
+        ForwardIndexCreator fwdCreator = colCreators.getForwardIndexCreator();
+        CompressionStatsMetadata compressionMetadata = CompressionStatsMetadata.unavailable();
+        if (fwdCreator != null && !fwdCreator.isDictionaryEncoded()) {
+          compressionMetadata = CompressionStatsMetadata.forRawForwardIndex(
+              fwdCreator.getRawForwardIndexUncompressedValueSizeInBytes(),
+              fwdCreator.getRawForwardIndexChunkCompressionType());
+        } else if (fwdCreator != null) {
+          SegmentDictionaryCreator dictCreator = colCreators.getDictionaryCreator();
+          if (dictCreator != null) {
+            FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+            DataType storedType = fieldSpec != null ? fieldSpec.getDataType().getStoredType() : null;
+            long uncompressedValueSizeInBytes;
+            if (storedType != null && storedType.isFixedWidth()) {
+              ColumnStatistics columnStatistics = _columnStatisticsMap.get(column);
+              int totalValues = columnStatistics != null ? columnStatistics.getTotalNumberOfEntries() : _totalDocs;
+              uncompressedValueSizeInBytes = (long) totalValues * storedType.size();
+            } else {
+              uncompressedValueSizeInBytes = dictCreator.getTotalVariableLengthUncompressedValueSizeInBytes();
+            }
+            compressionMetadata = CompressionStatsMetadata.forDictionary(uncompressedValueSizeInBytes);
+          }
+        }
+        compressionMetadata.applyTo(properties, column);
+      }
+    }
+
+    // OPEN_STRUCT splitters produce per-key materialized child columns (col$key, col$__sparse__) that
+    // are not in _columnStatisticsMap. Merge their pre-built metadata into the segment properties so
+    // each child appears as its own column at load time, and register them as dimensions so the V3
+    // converter and SegmentMetadataImpl discover their index files.
+    List<String> openStructChildColumns = new ArrayList<>();
+    for (ColumnIndexCreators columnIndexCreators : _colIndexes.values()) {
+      for (IndexCreator indexCreator : columnIndexCreators.getIndexCreators()) {
+        if (indexCreator instanceof ColumnarOpenStructIndexCreator) {
+          ColumnarOpenStructIndexCreator splitter = (ColumnarOpenStructIndexCreator) indexCreator;
+          for (Map.Entry<String, PropertiesConfiguration> childEntry
+              : splitter.getMaterializedColumnMetadata().entrySet()) {
+            String childCol = childEntry.getKey();
+            PropertiesConfiguration childProps = childEntry.getValue();
+            childProps.getKeys().forEachRemaining(key -> properties.setProperty(key, childProps.getProperty(key)));
+            openStructChildColumns.add(childCol);
+          }
+        }
+      }
+    }
+    if (!openStructChildColumns.isEmpty()) {
+      List<String> dimensions = new ArrayList<>(_config.getDimensions());
+      dimensions.addAll(openStructChildColumns);
+      properties.setProperty(DIMENSIONS, dimensions);
     }
 
     SegmentZKPropsConfig segmentZKPropsConfig = _config.getSegmentZKPropsConfig();
@@ -563,9 +615,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     CommonsConfigurationUtils.saveToFile(properties, metadataFile);
   }
 
-  /// Adds column metadata information to the properties configuration. The `forwardIndexEncoding` is persisted under
-  /// [V1Constants.MetadataKeys.Column#FORWARD_INDEX_ENCODING]; readers loading older segments that lack this key fall
-  /// back to inferring the encoding from `HAS_DICTIONARY`.
+  /// Adds column metadata information to the properties configuration.
   public static void addColumnMetadataInfo(PropertiesConfiguration properties, String column,
       ColumnStatistics columnStatistics, int totalDocs, FieldSpec fieldSpec, boolean hasDictionary,
       int dictionaryElementSize, FieldConfig.EncodingType forwardIndexEncoding, boolean autoGenerated) {
@@ -591,6 +641,10 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       if (storedType == DataType.STRING) {
         properties.setProperty(getKeyFor(column, IS_ASCII), String.valueOf(columnStatistics.isAscii()));
       }
+      if (!fieldSpec.isSingleValueField()) {
+        properties.setProperty(getKeyFor(column, MAX_ROW_LENGTH_IN_BYTES),
+            String.valueOf(columnStatistics.getMaxRowLengthInBytes()));
+      }
     }
     properties.setProperty(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(dictionaryElementSize));
     // TODO: When the column is raw (no dictionary), we should set BITS_PER_ELEMENT to -1 (invalid). Currently we set
@@ -600,10 +654,10 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     //       See https://github.com/apache/pinot/pull/16921 for details
     properties.setProperty(getKeyFor(column, BITS_PER_ELEMENT),
         String.valueOf(PinotDataBitSet.getNumBitsPerValue(cardinality - 1)));
-    properties.setProperty(getKeyFor(column, TOTAL_NUMBER_OF_ENTRIES),
-        String.valueOf(columnStatistics.getTotalNumberOfEntries()));
     properties.setProperty(getKeyFor(column, MAX_MULTI_VALUE_ELEMENTS),
         String.valueOf(columnStatistics.getMaxNumberOfMultiValues()));
+    properties.setProperty(getKeyFor(column, TOTAL_NUMBER_OF_ENTRIES),
+        String.valueOf(columnStatistics.getTotalNumberOfEntries()));
     if (autoGenerated) {
       properties.setProperty(getKeyFor(column, IS_AUTO_GENERATED), "true");
     }
@@ -640,21 +694,19 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
   }
 
-  /**
-   * In order to persist complex field metadata, we need to recursively add child field specs
-   * So, each complex field spec will have a property for its child field names and each child field will have its
-   * own properties of the detailed field spec.
-   * E.g. a COMPLEX type `intMap` of Map<String, Integer> has 2 child fields:
-   *   - key in STRING type and value in INT type.
-   *   Then we will have the following properties to define a COMPLEX field:
-   *     column.intMap.childFieldNames = [key, value]
-   *     column.intMap$$key.columnType = DIMENSION
-   *     column.intMap$$key.dataType = STRING
-   *     column.intMap$$key.isSingleValued = true
-   *     column.intMap$$value.columnType = DIMENSION
-   *     column.intMap$$value.dataType = INT
-   *     column.intMap$$value.isSingleValued = true
-   */
+  /// In order to persist complex field metadata, we need to recursively add child field specs
+  /// So, each complex field spec will have a property for its child field names and each child field will have its
+  /// own properties of the detailed field spec.
+  /// E.g. a COMPLEX type `intMap` of Map<String, Integer> has 2 child fields:
+  ///   - key in STRING type and value in INT type.
+  ///   Then we will have the following properties to define a COMPLEX field:
+  ///     column.intMap.childFieldNames = \[key, value\]
+  ///     column.intMap$$key.columnType = DIMENSION
+  ///     column.intMap$$key.dataType = STRING
+  ///     column.intMap$$key.isSingleValued = true
+  ///     column.intMap$$value.columnType = DIMENSION
+  ///     column.intMap$$value.dataType = INT
+  ///     column.intMap$$value.isSingleValued = true
   public static void addFieldSpec(PropertiesConfiguration properties, String column, FieldSpec fieldSpec) {
     String fieldName = fieldSpec.getName();
     if (!column.equals(fieldName)) {
@@ -701,9 +753,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
   }
 
-  /**
-   * Adds column min/max value information to the properties configuration.
-   */
+  /// Adds column min/max value information to the properties configuration.
   public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column,
       @Nullable Object minValue, @Nullable Object maxValue, DataType storedType) {
     String validMinValue = minValue != null ? getValidPropertyValue(minValue.toString(), storedType) : null;
@@ -719,11 +769,9 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
   }
 
-  /**
-   * Helper method to get the valid value for setting min/max. Returns {@code null} if the value is too long (longer
-   * than 512 characters), or is not supported in {@link PropertiesConfiguration}, e.g. contains character with
-   * surrogate.
-   */
+  /// Helper method to get the valid value for setting min/max. Returns `null` if the value is too long (longer
+  /// than 512 characters), or is not supported in [PropertiesConfiguration], e.g. contains character with
+  /// surrogate.
   @Nullable
   private static String getValidPropertyValue(String value, DataType storedType) {
     if (value.length() > METADATA_PROPERTY_LENGTH_LIMIT) {
@@ -733,9 +781,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
         : value;
   }
 
-  /**
-   * Removes column metadata information from the properties configuration.
-   */
+  /// Removes column metadata information from the properties configuration.
   public static void removeColumnMetadataInfo(PropertiesConfiguration properties, String column) {
     properties.subset(COLUMN_PROPS_KEY_PREFIX + column).clear();
   }
@@ -785,10 +831,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     LOGGER.info("Successfully created segment: {} in {}", _segmentName, _indexDir);
   }
 
-  /**
-   * Generate segment name based on configuration and statistics.
-   * @return Generated segment name
-   */
+  /// Generate segment name based on configuration and statistics.
+  /// @return Generated segment name
   private String generateSegmentName() {
     ColumnStatistics timeStats = null;
     String timeColumn = _config.getTimeColumnName();
@@ -814,9 +858,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
   }
 
-  /**
-   * Writes the individual column index files to disk.
-   */
+  /// Writes the individual column index files to disk.
   private void flushColIndexes() throws Exception {
     for (ColumnIndexCreators colIndexes : _colIndexes.values()) {
       colIndexes.seal();
@@ -855,18 +897,17 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     converter.convert(segmentDirectory);
   }
 
-  /**
-   * Build star-tree V2 index if configured.
-   */
+  /// Build star-tree V2 index if configured.
   private void buildStarTreeV2IfNecessary(File indexDir)
       throws Exception {
     List<StarTreeIndexConfig> starTreeIndexConfigs = _config.getStarTreeIndexConfigs();
     boolean enableDefaultStarTree = _config.isEnableDefaultStarTree();
     if (CollectionUtils.isNotEmpty(starTreeIndexConfigs) || enableDefaultStarTree) {
-      MultipleTreesBuilder.BuildMode buildMode =
-          _config.isOnHeap() ? MultipleTreesBuilder.BuildMode.ON_HEAP : MultipleTreesBuilder.BuildMode.OFF_HEAP;
-      MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeIndexConfigs, enableDefaultStarTree, indexDir,
-          buildMode);
+      // SegmentGeneratorConfig carries the star-tree configs, build mode, and the TableConfig +
+      // Schema needed to construct an IndexLoadingConfig so downstream readers (e.g. external-table
+      // forward-index readers backed by remote storage) can resolve table-level configs during the
+      // in-place segment load.
+      MultipleTreesBuilder builder = new MultipleTreesBuilder(indexDir, _config);
       // We don't create the builder using the try-with-resources pattern because builder.close() performs
       // some clean-up steps to roll back the star-tree index to the previous state if it exists. If this goes wrong
       // the star-tree index can be in an inconsistent state. To prevent that, when builder.close() throws an
@@ -892,24 +933,17 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
   }
 
-  /**
-   * Build multi-column text index if configured.
-   */
+  /// Build multi-column text index if configured.
   private void buildMultiColumnTextIndex(File segmentOutputDir)
       throws Exception {
     if (_config.getMultiColumnTextIndexConfig() != null) {
-      PinotConfiguration segmentDirectoryConfigs =
-          new PinotConfiguration(Map.of(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap));
-
       TableConfig tableConfig = _config.getTableConfig();
       Schema schema = _config.getSchema();
-      SegmentDirectoryLoaderContext segmentLoaderContext =
-          new SegmentDirectoryLoaderContext.Builder()
-              .setTableConfig(tableConfig)
-              .setSchema(schema)
-              .setSegmentName(_segmentName)
-              .setSegmentDirectoryConfigs(segmentDirectoryConfigs)
-              .build();
+      SegmentDirectoryLoaderContext segmentLoaderContext = new SegmentDirectoryLoaderContext.Builder()
+          .setTableConfig(tableConfig)
+          .setSchema(schema)
+          .setSegmentName(_segmentName)
+          .build();
 
       IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, tableConfig, schema);
 
@@ -924,9 +958,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
   }
 
-  /**
-   * Update indexes that are created post-segment creation.
-   */
+  /// Update indexes that are created post-segment creation.
   private void updatePostSegmentCreationIndexes(File indexDir)
       throws Exception {
     Set<IndexType> postSegCreationIndexes = IndexService.getInstance().getAllIndexes().stream()
@@ -935,19 +967,13 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
 
     if (!postSegCreationIndexes.isEmpty()) {
       // Build other indexes
-      Map<String, Object> props = new HashMap<>();
-      props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap);
-      PinotConfiguration segmentDirectoryConfigs = new PinotConfiguration(props);
-
       TableConfig tableConfig = _config.getTableConfig();
       Schema schema = _config.getSchema();
-      SegmentDirectoryLoaderContext segmentLoaderContext =
-          new SegmentDirectoryLoaderContext.Builder()
-              .setTableConfig(tableConfig)
-              .setSchema(schema)
-              .setSegmentName(_segmentName)
-              .setSegmentDirectoryConfigs(segmentDirectoryConfigs)
-              .build();
+      SegmentDirectoryLoaderContext segmentLoaderContext = new SegmentDirectoryLoaderContext.Builder()
+          .setTableConfig(tableConfig)
+          .setSchema(schema)
+          .setSegmentName(_segmentName)
+          .build();
 
       IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, tableConfig, schema);
 
@@ -986,12 +1012,10 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     return false;
   }
 
-  /**
-   * Compute CRC and creation time, and persist to segment metadata file.
-   *
-   * @param indexDir Segment index directory
-   * @throws IOException If writing metadata fails
-   */
+  /// Compute CRC and creation time, and persist to segment metadata file.
+  ///
+  /// @param indexDir Segment index directory
+  /// @throws IOException If writing metadata fails
   private void persistCreationMeta(File indexDir, long dataCrc)
       throws IOException {
     long crc = CrcUtils.computeCrc(indexDir);

@@ -33,70 +33,67 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class provides expandable off-heap implementation to store a multi-valued column across a number of rows.
- * The maximum number of values in any row must be known while invoking the constructor. Other than that, this class
- * allocates additional memory as needed to accommodate any number of rows.
- *
- * Writes into the data structure are strictly sequential, but reads can be random.
- *
- * Writes are of type:
- *
- *   setIntArray(int rowNumber, int[] values)
- *
- * It is expected that rowNumber starts with 0 and increments by 1 on each invocation, and that it is decided ahead of
- * time that the class is used to store a certain type of data structure (int arrays, or char arrays, etc.) Mix & match
- * is not allowed.
- *
- * Two kinds of data structures are used in this class.
- *
- * 1. A header (essentially an index into the other data structure) that has one entry per row. The entry has 3 integers
- *   - data buffer ID
- *   - offset in the data buffer where column values start
- *   - length (number of values in the multi-valued column).
- *
- *   New header structures are added as new rows come in. Each header class holds the same number of rows (for easy
- *   lookup)
- *
- * 2. A data buffer that has the values for the column that the header points to. Data buffers are added as needed,
- *    whenever we reach a limitation that we cannot fit the values of a column in the current buffer.
- *
- * Note that data buffers and headers grow independently.
- *
- * Data format
- * <code>
- *  HEADER SECTION 0
- *    bufferId startIndex length
- *    bufferId startIndex length
- *    bufferId startIndex length
- *    ...
- *  HEADER SECTION 1
- *    bufferId startIndex length
- *    bufferId startIndex length
- *    bufferId startIndex length
- *    ...
- *  Data BUFFER SECTION 0
- *    [set of values of row 0] [set of values of row 1]
- *     .....
- *     [set of values of row m]
- *  Data BUFFER SECTION 1
- *     [set of values of row m +1 ] [set of values of row M +2]
- *     .....
- *     [set of values of row ]
- *  Data BUFFER SECTION N
- *     [set of values of row ... ] [set of values of row ...]
- *     .....
- *     [set of values of row n]
- * </code>
- *
- */
+/// This class provides expandable off-heap implementation to store a multi-valued column across a number of rows.
+/// The maximum number of values in any row must be known while invoking the constructor. Other than that, this class
+/// allocates additional memory as needed to accommodate any number of rows.
+///
+/// Writes into the data structure are strictly sequential, but reads can be random.
+///
+/// Writes are of type:
+///
+///   setIntArray(int rowNumber, int\[\] values)
+///
+/// It is expected that rowNumber starts with 0 and increments by 1 on each invocation, and that it is decided ahead of
+/// time that the class is used to store a certain type of data structure (int arrays, or char arrays, etc.) Mix & match
+/// is not allowed.
+///
+/// Two kinds of data structures are used in this class.
+///
+/// 1. A header (essentially an index into the other data structure) that has one entry per row. The entry has 3
+///    integers
+///   - data buffer ID
+///   - offset in the data buffer where column values start
+///   - length (number of values in the multi-valued column).
+///
+///   New header structures are added as new rows come in. Each header class holds the same number of rows (for easy
+///   lookup)
+///
+/// 2. A data buffer that has the values for the column that the header points to. Data buffers are added as needed,
+///    whenever we reach a limitation that we cannot fit the values of a column in the current buffer.
+///
+/// Note that data buffers and headers grow independently.
+///
+/// Data format
+///
+/// ```
+/// HEADER SECTION 0
+///   bufferId startIndex length
+///   bufferId startIndex length
+///   bufferId startIndex length
+///   ...
+/// HEADER SECTION 1
+///   bufferId startIndex length
+///   bufferId startIndex length
+///   bufferId startIndex length
+///   ...
+/// Data BUFFER SECTION 0
+///   [set of values of row 0] [set of values of row 1]
+///    .....
+///    [set of values of row m]
+/// Data BUFFER SECTION 1
+///    [set of values of row m +1 ] [set of values of row M +2]
+///    .....
+///    [set of values of row ]
+/// Data BUFFER SECTION N
+///    [set of values of row ... ] [set of values of row ...]
+///    .....
+///    [set of values of row n]
+/// ```
 // TODO: Optimize it
 public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteMVMutableForwardIndex.class);
 
-  /**
-   * number of columns is 1, column size is variable but less than _maxNumberOfMultiValuesPerRow
-   */
+  /// number of columns is 1, column size is variable but less than \_maxNumberOfMultiValuesPerRow
 
   private static final int SIZE_OF_INT = 4;
   private static final int NUM_COLS_IN_HEADER = 3;
@@ -121,6 +118,7 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   private final String _context;
   private final boolean _isDictionaryEncoded;
   private final FieldSpec.DataType _storedType;
+  private final FieldSpec.DataType _dataType;
 
   private FixedByteSingleValueMultiColWriter _curHeaderWriter;
   private FixedByteSingleValueMultiColWriter _currentDataWriter;
@@ -132,6 +130,13 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   public FixedByteMVMutableForwardIndex(int maxNumberOfMultiValuesPerRow, int avgMultiValueCount, int rowCountPerChunk,
       int columnSizeInBytes, PinotDataBufferMemoryManager memoryManager, String context, boolean isDictionaryEncoded,
       FieldSpec.DataType storedType) {
+    this(maxNumberOfMultiValuesPerRow, avgMultiValueCount, rowCountPerChunk, columnSizeInBytes, memoryManager, context,
+        isDictionaryEncoded, storedType, storedType);
+  }
+
+  public FixedByteMVMutableForwardIndex(int maxNumberOfMultiValuesPerRow, int avgMultiValueCount, int rowCountPerChunk,
+      int columnSizeInBytes, PinotDataBufferMemoryManager memoryManager, String context, boolean isDictionaryEncoded,
+      FieldSpec.DataType storedType, FieldSpec.DataType dataType) {
     _memoryManager = memoryManager;
     _context = context;
     int initialCapacity = Math.max(maxNumberOfMultiValuesPerRow, rowCountPerChunk * avgMultiValueCount);
@@ -148,6 +153,7 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
     //init(_rowCountPerChunk, _columnSizeInBytes, _maxNumberOfMultiValuesPerRow, initialCapacity, _incrementalCapacity);
     _isDictionaryEncoded = isDictionaryEncoded;
     _storedType = storedType;
+    _dataType = dataType;
   }
 
   private void addHeaderBuffer() {
@@ -162,10 +168,8 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
         new int[]{SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT}));
   }
 
-  /**
-   * This method automatically computes the space needed based on the _columnSizeInBytes
-   * @param rowCapacity Additional capacity to be added in terms of number of rows
-   */
+  /// This method automatically computes the space needed based on the \_columnSizeInBytes
+  /// @param rowCapacity Additional capacity to be added in terms of number of rows
   private void addDataBuffer(int rowCapacity) {
     try {
       long size = (long) rowCapacity * (long) _columnSizeInBytes;
@@ -381,6 +385,37 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
+  public int getBytesMV(int docId, byte[][] valueBuffer) {
+    checkBytesMvSupported();
+    FixedByteSingleValueMultiColReader headerReader = getCurrentReader(docId);
+    int rowInCurrentHeader = getRowInCurrentHeader(docId);
+    int bufferIndex = headerReader.getInt(rowInCurrentHeader, 0);
+    int startIndex = headerReader.getInt(rowInCurrentHeader, 1);
+    int length = headerReader.getInt(rowInCurrentHeader, 2);
+    FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
+    for (int i = 0; i < length; i++) {
+      valueBuffer[i] = dataReader.getBytes(startIndex + i, 0);
+    }
+    return length;
+  }
+
+  @Override
+  public byte[][] getBytesMV(int docId) {
+    checkBytesMvSupported();
+    FixedByteSingleValueMultiColReader headerReader = getCurrentReader(docId);
+    int rowInCurrentHeader = getRowInCurrentHeader(docId);
+    int bufferIndex = headerReader.getInt(rowInCurrentHeader, 0);
+    int startIndex = headerReader.getInt(rowInCurrentHeader, 1);
+    int length = headerReader.getInt(rowInCurrentHeader, 2);
+    FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
+    byte[][] valueBuffer = new byte[length][];
+    for (int i = 0; i < length; i++) {
+      valueBuffer[i] = dataReader.getBytes(startIndex + i, 0);
+    }
+    return valueBuffer;
+  }
+
+  @Override
   public int getNumValuesMV(int docId) {
     FixedByteSingleValueMultiColReader headerReader = getCurrentReader(docId);
     int rowInCurrentHeader = getRowInCurrentHeader(docId);
@@ -421,6 +456,26 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
     int newStartIndex = updateHeader(docId, values.length);
     for (int i = 0; i < values.length; i++) {
       _currentDataWriter.setDouble(newStartIndex + i, 0, values[i]);
+    }
+  }
+
+  @Override
+  public void setBytesMV(int docId, byte[][] values) {
+    checkBytesMvSupported();
+    int newStartIndex = updateHeader(docId, values.length);
+    for (int i = 0; i < values.length; i++) {
+      byte[] value = values[i];
+      if (value.length != _columnSizeInBytes) {
+        throw new IllegalArgumentException(
+            "Expected fixed-width bytes value of length: " + _columnSizeInBytes + ", got: " + value.length);
+      }
+      _currentDataWriter.setBytes(newStartIndex + i, 0, value);
+    }
+  }
+
+  private void checkBytesMvSupported() {
+    if (_dataType != DataType.UUID) {
+      throw new UnsupportedOperationException("Unsupported data type: " + _dataType + " for raw bytes MV index");
     }
   }
 

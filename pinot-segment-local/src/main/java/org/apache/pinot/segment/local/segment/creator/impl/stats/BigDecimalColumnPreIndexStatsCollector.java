@@ -21,13 +21,15 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.math.BigDecimal;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
-/**
- * Extension of {@link AbstractColumnStatisticsCollector} for BigDecimal column type.
- */
+/// Extension of [AbstractColumnStatisticsCollector] for BigDecimal column type.
 public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
   private ObjectOpenHashSet<BigDecimal> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
   private int _minLength = Integer.MAX_VALUE;
@@ -38,6 +40,11 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
 
   public BigDecimalColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
+  }
+
+  public BigDecimalColumnPreIndexStatsCollector(FieldSpec fieldSpec, @Nullable FieldConfig fieldConfig,
+      @Nullable PartitionFunction partitionFunction) {
+    super(fieldSpec, fieldConfig, partitionFunction);
   }
 
   @Override

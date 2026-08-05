@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.client.admin;
 
-/**
- * Exception thrown by Pinot admin operations.
- */
+/// Exception thrown by Pinot admin operations.
 public class PinotAdminException extends Exception {
 
   public PinotAdminException(String message) {

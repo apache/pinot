@@ -31,17 +31,15 @@ public interface AccessControlFactory {
   default void init(PinotConfiguration pinotConfiguration) {
     // left blank
   }
-  /**
-   * Extend the original init method to support Zookeeper BasicAuthAccessControlFactory.
-   * Because ZKBasicAuthAccessControlFactory needs to acquire users' info from HelixPropertyStore.
-   * The reason why passed helixResourceManager param other than HelixPropertyStore is that
-   * we need to init UserACLConfig via helixResourceManager.
-   *
-   * @param configuration pinot configuration
-   * @param helixResourceManager Helix resource manager
-   */
+  /// Extend the original init method to support Zookeeper BasicAuthAccessControlFactory.
+  /// Because ZKBasicAuthAccessControlFactory needs to acquire users' info from HelixPropertyStore.
+  /// The reason why passed helixResourceManager param other than HelixPropertyStore is that
+  /// we need to init UserACLConfig via helixResourceManager.
+  ///
+  /// @param configuration pinot configuration
+  /// @param helixResourceManager Helix resource manager
   default void init(PinotConfiguration configuration, PinotHelixResourceManager helixResourceManager)
-    throws IOException {
+      throws IOException {
     init(configuration);
   }
 

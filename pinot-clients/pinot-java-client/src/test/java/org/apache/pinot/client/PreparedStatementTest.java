@@ -18,17 +18,14 @@
  */
 package org.apache.pinot.client;
 
-import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for prepared statement escaping
- *
- */
+/// Tests for prepared statement escaping
 public class PreparedStatementTest {
   private final DummyPinotClientTransport _dummyPinotClientTransport = new DummyPinotClientTransport();
 
@@ -57,7 +54,7 @@ public class PreparedStatementTest {
   public void testPreparedStatementEscaping() {
     // Create a prepared statement that has to quote a string appropriately
     Connection connection =
-        ConnectionFactory.fromHostList(Collections.singletonList("dummy"), _dummyPinotClientTransport);
+        ConnectionFactory.fromHostList(List.of("dummy"), _dummyPinotClientTransport);
     PreparedStatement preparedStatement = connection.prepareStatement("SELECT foo FROM bar WHERE baz = ?");
     preparedStatement.setString(0, "'hello'");
     preparedStatement.execute();

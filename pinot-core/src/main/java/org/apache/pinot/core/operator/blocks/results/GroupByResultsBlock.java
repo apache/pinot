@@ -18,26 +18,19 @@
  */
 package org.apache.pinot.core.operator.blocks.results;
 
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import it.unimi.dsi.fastutil.floats.FloatArrayList;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.utils.ArrayListUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.core.common.datatable.DataTableBuilderUtils;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
@@ -45,13 +38,10 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Results block for group-by queries.
- */
+/// Results block for group-by queries.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class GroupByResultsBlock extends BaseResultsBlock {
   private final DataSchema _dataSchema;
@@ -66,9 +56,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   private int _numResizes;
   private long _resizeTimeMs;
 
-  /**
-   * For segment level group-by results.
-   */
+  /// For segment level group-by results.
   public GroupByResultsBlock(DataSchema dataSchema, AggregationGroupByResult aggregationGroupByResult,
       QueryContext queryContext) {
     _dataSchema = dataSchema;
@@ -78,9 +66,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     _queryContext = queryContext;
   }
 
-  /**
-   * For segment level group-by results.
-   */
+  /// For segment level group-by results.
   public GroupByResultsBlock(DataSchema dataSchema, List<IntermediateRecord> intermediateRecords,
       QueryContext queryContext) {
     _dataSchema = dataSchema;
@@ -90,9 +76,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     _queryContext = queryContext;
   }
 
-  /**
-   * For instance level group-by results.
-   */
+  /// For instance level group-by results.
   public GroupByResultsBlock(Table table, QueryContext queryContext) {
     _dataSchema = table.getDataSchema();
     _aggregationGroupByResult = null;
@@ -101,9 +85,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     _queryContext = queryContext;
   }
 
-  /**
-   * For instance level empty group-by results.
-   */
+  /// For instance level empty group-by results.
   public GroupByResultsBlock(DataSchema dataSchema, QueryContext queryContext) {
     _dataSchema = dataSchema;
     _aggregationGroupByResult = null;
@@ -192,7 +174,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   @Override
   public List<Object[]> getRows() {
     if (_table == null) {
-      return Collections.emptyList();
+      return List.of();
     }
     List<Object[]> rows = new ArrayList<>(_table.size());
     Iterator<Record> iterator = _table.iterator();
@@ -214,15 +196,23 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
     List<ExpressionContext> groupByExpressions = _queryContext.getGroupByExpressions();
     assert aggregationFunctions != null && groupByExpressions != null;
-    int numKeyColumns = groupByExpressions.size();
+    /// Key columns (group-by union columns + the synthetic $groupingId discriminator for grouping sets)
+    /// precede the aggregation columns.
+    int numKeyColumns = _queryContext.getNumGroupByKeyColumns();
     Iterator<Record> iterator = _table.iterator();
     int numRowsAdded = 0;
-    if (_queryContext.isNullHandlingEnabled()) {
+    /// Grouping sets produce NULL group keys (rolled-up columns) regardless of the user's null-handling
+    /// option, so they must be serialized through the null-aware path (null bitmaps) to survive the DataTable
+    /// round-trip -- the non-null path's setNull() writes to the variable buffer that the reducer does not
+    /// read back for fixed-width key columns.
+    if (_queryContext.requiresNullAwareKeySerialization()) {
       RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
       Object[] nullPlaceholders = new Object[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {
         nullBitmaps[colId] = new RoaringBitmap();
-        nullPlaceholders[colId] = storedColumnDataTypes[colId].getNullPlaceholder();
+        // Resolved on the logical type, not the stored type: UUID overrides getNullPlaceholder() to return the nil
+        // UUID, whereas its stored type BYTES would yield a zero-length placeholder that is not a valid UUID.
+        nullPlaceholders[colId] = _dataSchema.getColumnDataType(colId).getNullPlaceholder();
       }
       int rowId = 0;
       while (iterator.hasNext()) {
@@ -243,7 +233,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
               nullBitmaps[i].add(rowId);
             }
             assert value != null;
-            setDataTableColumn(storedColumnDataTypes[i], dataTableBuilder, i, value);
+            DataTableBuilderUtils.setColumn(dataTableBuilder, storedColumnDataTypes[i], i, value);
           }
         }
         dataTableBuilder.finishRow();
@@ -265,7 +255,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
           } else if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
             dataTableBuilder.setColumn(i, aggregationFunctions[i - numKeyColumns].serializeIntermediateResult(value));
           } else {
-            setDataTableColumn(storedColumnDataTypes[i], dataTableBuilder, i, value);
+            DataTableBuilderUtils.setColumn(dataTableBuilder, storedColumnDataTypes[i], i, value);
           }
         }
         dataTableBuilder.finishRow();
@@ -275,88 +265,6 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     return dataTableBuilder.build();
   }
 
-  private void setDataTableColumn(ColumnDataType storedColumnDataType, DataTableBuilder dataTableBuilder,
-      int columnIndex, Object value)
-      throws IOException {
-    switch (storedColumnDataType) {
-      case INT:
-        dataTableBuilder.setColumn(columnIndex, (int) value);
-        break;
-      case LONG:
-        dataTableBuilder.setColumn(columnIndex, (long) value);
-        break;
-      case FLOAT:
-        dataTableBuilder.setColumn(columnIndex, (float) value);
-        break;
-      case DOUBLE:
-        dataTableBuilder.setColumn(columnIndex, (double) value);
-        break;
-      case BIG_DECIMAL:
-        dataTableBuilder.setColumn(columnIndex, (BigDecimal) value);
-        break;
-      case STRING:
-        dataTableBuilder.setColumn(columnIndex, value.toString());
-        break;
-      case BYTES:
-        dataTableBuilder.setColumn(columnIndex, (ByteArray) value);
-        break;
-      case INT_ARRAY:
-        if (value instanceof IntArrayList) {
-          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toIntArray((IntArrayList) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (int[]) value);
-        }
-        break;
-      case LONG_ARRAY:
-        if (value instanceof LongArrayList) {
-          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toLongArray((LongArrayList) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (long[]) value);
-        }
-        break;
-      case FLOAT_ARRAY:
-        if (value instanceof FloatArrayList) {
-          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toFloatArray((FloatArrayList) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (float[]) value);
-        }
-        break;
-      case DOUBLE_ARRAY:
-        if (value instanceof DoubleArrayList) {
-          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toDoubleArray((DoubleArrayList) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (double[]) value);
-        }
-        break;
-      case BIG_DECIMAL_ARRAY:
-        if (value instanceof ObjectArrayList) {
-          //noinspection unchecked
-          dataTableBuilder.setColumn(columnIndex,
-              ArrayListUtils.toBigDecimalArray((ObjectArrayList<BigDecimal>) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (BigDecimal[]) value);
-        }
-        break;
-      case STRING_ARRAY:
-        if (value instanceof ObjectArrayList) {
-          //noinspection unchecked
-          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toStringArray((ObjectArrayList<String>) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (String[]) value);
-        }
-        break;
-      case BYTES_ARRAY:
-        if (value instanceof ObjectArrayList) {
-          //noinspection unchecked
-          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toBytesArray((ObjectArrayList<ByteArray>) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (ByteArray[]) value);
-        }
-        break;
-      default:
-        throw new IllegalStateException("Unsupported stored type: " + storedColumnDataType);
-    }
-  }
 
   @Override
   public Map<String, String> getResultsMetadata() {

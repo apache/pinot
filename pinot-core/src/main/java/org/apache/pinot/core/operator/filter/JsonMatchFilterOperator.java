@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.CaseFormat;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
@@ -34,9 +33,7 @@ import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * Filter operator for JSON_MATCH. E.g. SELECT ... WHERE JSON_MATCH(column_name, filter_string)
- */
+/// Filter operator for JSON_MATCH. E.g. SELECT ... WHERE JSON_MATCH(column_name, filter_string)
 public class JsonMatchFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_JSON_INDEX";
 
@@ -44,9 +41,7 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
   private final JsonMatchPredicate _predicate;
   private final FilterContext _filterContext;
 
-  /**
-   * Constructor that takes a Json Predicate
-   */
+  /// Constructor that takes a Json Predicate
   public JsonMatchFilterOperator(JsonIndexReader jsonIndex, JsonMatchPredicate predicate, int numDocs) {
     super(numDocs, false);
     _jsonIndex = jsonIndex;
@@ -54,9 +49,7 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
     _filterContext = null;
   }
 
-  /**
-   * Constructor that takes a FilterContext
-   */
+  /// Constructor that takes a FilterContext
   public JsonMatchFilterOperator(JsonIndexReader jsonIndex, FilterContext filterContext, int numDocs) {
     super(numDocs, false);
     _jsonIndex = jsonIndex;
@@ -94,7 +87,7 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override
@@ -128,6 +121,9 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
   }
 
   private ImmutableRoaringBitmap getMatchingDocIdBitmap() {
+    // getMatchingDocIds may return a read-only bitmap backed by the index's (possibly memory-mapped) storage. This
+    // operator only iterates it (BitmapDocIdSet / BitmapCollection / getCardinality) within the segment's acquired
+    // lifetime and never mutates it, so a borrowed posting list can be consumed directly without a copy.
     if (_predicate != null) {
       return _jsonIndex.getMatchingDocIds(_predicate.getValue(), _predicate.getCountPredicate());
     } else {

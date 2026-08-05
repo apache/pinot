@@ -28,10 +28,9 @@ public class QueryTestUtils {
     // do not instantiate.
   }
 
-  /**
-   * Acquire an available port. This acquired port is subject to a race-condition - a different process/thread may
-   * bind to the same port immediately after this method return and before the port bind to the intended process/thread.
-   */
+  /// Acquire an available port. This acquired port is subject to a race-condition - a different process/thread may
+  /// bind to the same port immediately after this method return and before the port bind to the intended
+  /// process/thread.
   public static synchronized int getAvailablePort() {
     try {
       try (ServerSocket socket = new ServerSocket(0)) {

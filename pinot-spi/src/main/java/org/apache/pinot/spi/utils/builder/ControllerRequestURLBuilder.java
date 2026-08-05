@@ -409,6 +409,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tableConfigs", "validate");
   }
 
+  public String forTableConfigsTune() {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", "tune");
+  }
+
   public String forSegmentReload(String tableName, String segmentName, boolean forceDownload) {
     return StringUtil.join("/", _baseUrl, "segments", tableName, encode(segmentName),
         "reload?forceDownload=" + forceDownload);
@@ -437,15 +441,6 @@ public class ControllerRequestURLBuilder {
 
   public String forSegmentsMetadataFromServer(String tableName) {
     return forSegmentsMetadataFromServer(tableName, (List<String>) null);
-  }
-
-  @Deprecated
-  public String forSegmentsMetadataFromServer(String tableName, @Nullable String columns) {
-    String url = StringUtil.join("/", _baseUrl, "segments", tableName, "metadata");
-    if (columns != null) {
-      url += "?columns=" + columns;
-    }
-    return url;
   }
 
   public String forSegmentsMetadataFromServer(String tableName, @Nullable List<String> columns) {

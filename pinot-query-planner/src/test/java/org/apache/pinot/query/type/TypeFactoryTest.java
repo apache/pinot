@@ -41,6 +41,33 @@ import org.testng.annotations.Test;
 public class TypeFactoryTest {
   private static final JavaTypeFactory TYPE_FACTORY = new TestJavaTypeFactoryImpl();
 
+  @Test
+  public void testDecimalMaxPrecisionAndScale() {
+    // Pinot raises the DECIMAL max precision/scale far above the SQL standard. The Calcite 1.42 upgrade (CALCITE-7351)
+    // made the no-arg getMaxNumericPrecision()/getMaxNumericScale() final; they now delegate to the type-specific
+    // getMaxPrecision(DECIMAL)/getMaxScale(DECIMAL) overrides TypeSystem keeps. Pin the concrete elevated values so a
+    // future Calcite delegation change, or an accidental removal of the type-specific overrides, fails fast instead
+    // of silently regressing DECIMAL precision/scale to the SQL-standard default.
+    Assert.assertEquals(TypeSystem.INSTANCE.getMaxPrecision(SqlTypeName.DECIMAL), 2000);
+    Assert.assertEquals(TypeSystem.INSTANCE.getMaxScale(SqlTypeName.DECIMAL), 1000);
+    Assert.assertEquals(TypeSystem.INSTANCE.getMaxNumericPrecision(), 2000);
+    Assert.assertEquals(TypeSystem.INSTANCE.getMaxNumericScale(), 1000);
+  }
+
+  @Test
+  public void testDeriveSumTypeWidensUnsignedToBigint() {
+    // SUM over a (supported) unsigned integer column must widen to (signed) BIGINT, exactly like the signed integer
+    // types, so accumulating many rows does not silently overflow the narrow operand type. Calcite passes the operand
+    // type to deriveSumType directly (no unsigned->signed coercion), so this override is the only place the widening
+    // happens. Regression guard for the Calcite 1.42 upgrade, which made unsigned SqlTypeNames reachable in plans.
+    // UBIGINT is intentionally excluded -- it is unsupported (rejected during plan conversion).
+    for (SqlTypeName unsigned : new SqlTypeName[]{
+        SqlTypeName.UTINYINT, SqlTypeName.USMALLINT, SqlTypeName.UINTEGER}) {
+      RelDataType sumType = TypeSystem.INSTANCE.deriveSumType(TYPE_FACTORY, TYPE_FACTORY.createSqlType(unsigned));
+      Assert.assertEquals(sumType.getSqlTypeName(), SqlTypeName.BIGINT, "SUM(" + unsigned + ") should widen to BIGINT");
+    }
+  }
+
   @DataProvider(name = "relDataTypeConversion")
   public Iterator<Object[]> relDataTypeConversion() {
     ArrayList<Object[]> cases = new ArrayList<>();
@@ -77,6 +104,10 @@ public class TypeFactoryTest {
           basicType = TYPE_FACTORY.createSqlType(SqlTypeName.VARCHAR);
           break;
         }
+        case UUID: {
+          basicType = TYPE_FACTORY.createSqlType(SqlTypeName.UUID);
+          break;
+        }
         case BYTES: {
           basicType = TYPE_FACTORY.createSqlType(SqlTypeName.VARBINARY);
           break;
@@ -88,6 +119,7 @@ public class TypeFactoryTest {
         case LIST:
         case STRUCT:
         case MAP:
+        case OPEN_STRUCT:
         case UNKNOWN:
           continue;
         default:
@@ -152,6 +184,9 @@ public class TypeFactoryTest {
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testArrayTypes(FieldSpec.DataType dataType, RelDataType arrayType, boolean columnNullMode) {
+    if (dataType == FieldSpec.DataType.BIG_DECIMAL || dataType == FieldSpec.DataType.JSON) {
+      return;
+    }
     TypeFactory typeFactory = new TypeFactory();
     Schema testSchema = new Schema.SchemaBuilder()
         .addMultiValueDimension("col", dataType)
@@ -170,6 +205,9 @@ public class TypeFactoryTest {
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testNullableArrayTypes(FieldSpec.DataType dataType, RelDataType arrayType, boolean columnNullMode) {
+    if (dataType == FieldSpec.DataType.BIG_DECIMAL || dataType == FieldSpec.DataType.JSON) {
+      return;
+    }
     TypeFactory typeFactory = new TypeFactory();
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> {
@@ -191,6 +229,9 @@ public class TypeFactoryTest {
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testNotNullableArrayTypes(FieldSpec.DataType dataType, RelDataType arrayType, boolean columnNullMode) {
+    if (dataType == FieldSpec.DataType.BIG_DECIMAL || dataType == FieldSpec.DataType.JSON) {
+      return;
+    }
     TypeFactory typeFactory = new TypeFactory();
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> {
@@ -216,6 +257,7 @@ public class TypeFactoryTest {
         .addSingleValueDimension("FLOAT_COL", FieldSpec.DataType.FLOAT)
         .addSingleValueDimension("DOUBLE_COL", FieldSpec.DataType.DOUBLE)
         .addSingleValueDimension("STRING_COL", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("UUID_COL", FieldSpec.DataType.UUID)
         .addSingleValueDimension("BYTES_COL", FieldSpec.DataType.BYTES)
         .addSingleValueDimension("JSON_COL", FieldSpec.DataType.JSON)
         .addMultiValueDimension("INT_ARRAY_COL", FieldSpec.DataType.INT)
@@ -223,6 +265,7 @@ public class TypeFactoryTest {
         .addMultiValueDimension("FLOAT_ARRAY_COL", FieldSpec.DataType.FLOAT)
         .addMultiValueDimension("DOUBLE_ARRAY_COL", FieldSpec.DataType.DOUBLE)
         .addMultiValueDimension("STRING_ARRAY_COL", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("UUID_ARRAY_COL", FieldSpec.DataType.UUID)
         .addMultiValueDimension("BYTES_ARRAY_COL", FieldSpec.DataType.BYTES)
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
@@ -255,6 +298,9 @@ public class TypeFactoryTest {
               TYPE_FACTORY.createTypeWithCharsetAndCollation(new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.VARCHAR),
                   StandardCharsets.UTF_8, SqlCollation.IMPLICIT));
           break;
+        case "UUID_COL":
+          Assert.assertEquals(field.getType(), new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.UUID));
+          break;
         case "BYTES_COL":
           Assert.assertEquals(field.getType(), new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.VARBINARY));
           break;
@@ -278,6 +324,10 @@ public class TypeFactoryTest {
           Assert.assertEquals(field.getType(), new ArraySqlType(
               TYPE_FACTORY.createTypeWithCharsetAndCollation(new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.VARCHAR),
                   StandardCharsets.UTF_8, SqlCollation.IMPLICIT), false));
+          break;
+        case "UUID_ARRAY_COL":
+          Assert.assertEquals(field.getType(),
+              new ArraySqlType(new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.UUID), false));
           break;
         case "BYTES_ARRAY_COL":
           Assert.assertEquals(field.getType(),

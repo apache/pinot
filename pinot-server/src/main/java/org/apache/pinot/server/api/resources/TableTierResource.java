@@ -48,19 +48,16 @@ import org.apache.pinot.common.restlet.resources.TableTierInfo;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.server.starter.ServerInstance;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-/**
- * A server-side API to get the storage tiers of immutable segments of the given table from the server being requested.
- */
+/// A server-side API to get the storage tiers of immutable segments of the given table from the server being requested.
 @Api(tags = "Table", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
     @Authorization(value = DATABASE)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
@@ -102,11 +99,10 @@ public class TableTierResource {
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        if (segmentDataManager instanceof ImmutableSegmentDataManager) {
-          ImmutableSegment immutableSegment = (ImmutableSegment) segmentDataManager.getSegment();
-          segmentTiers.put(immutableSegment.getSegmentName(), immutableSegment.getTier());
-        } else {
+        if (segmentDataManager instanceof RealtimeSegmentDataManager) {
           mutableSegments.add(segmentDataManager.getSegmentName());
+        } else {
+          segmentTiers.put(segmentDataManager.getSegmentName(), segmentDataManager.getTier());
         }
       }
     } finally {
@@ -153,11 +149,10 @@ public class TableTierResource {
     Set<String> mutableSegments = new HashSet<>();
     Map<String, String> segmentTiers = new HashMap<>();
     try {
-      if (segmentDataManager instanceof ImmutableSegmentDataManager) {
-        ImmutableSegment immutableSegment = (ImmutableSegment) segmentDataManager.getSegment();
-        segmentTiers.put(immutableSegment.getSegmentName(), immutableSegment.getTier());
-      } else {
+      if (segmentDataManager instanceof RealtimeSegmentDataManager) {
         mutableSegments.add(segmentDataManager.getSegmentName());
+      } else {
+        segmentTiers.put(segmentDataManager.getSegmentName(), segmentDataManager.getTier());
       }
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);

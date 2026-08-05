@@ -29,14 +29,13 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.accounting.TrackingScope;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code DataTableHandler} is the Netty inbound handler on Pinot Broker side to handle the serialized data table
- * responses sent from Pinot Server.
- */
+/// The `DataTableHandler` is the Netty inbound handler on Pinot Broker side to handle the serialized data table
+/// responses sent from Pinot Server.
 public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataTableHandler.class);
 
@@ -86,7 +85,9 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
       }
       _threadAccountant.updateUntrackedResourceUsage(queryId, cpuTimeNs, allocatedBytes, TrackingScope.QUERY);
       // WORKLOAD scope - keyed by workload name
-      String workloadName = metadata.get(DataTable.MetadataKey.WORKLOAD_NAME.getName());
+      // Use default workload name if not present
+      String workloadName = metadata.getOrDefault(DataTable.MetadataKey.WORKLOAD_NAME.getName(),
+          CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
       _threadAccountant.updateUntrackedResourceUsage(workloadName, cpuTimeNs, allocatedBytes, TrackingScope.WORKLOAD);
     } catch (Exception e) {
       LOGGER.error("Caught exception while deserializing data table of size: {} from server: {}", responseSize,

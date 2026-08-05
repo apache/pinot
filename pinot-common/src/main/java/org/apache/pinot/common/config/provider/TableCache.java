@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.config.provider;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,76 +42,54 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Interface for caching table configs and schemas within the cluster.
- * The {@code TableCache} caches all the table configs and schemas within the cluster, and listens on ZK changes to keep
- * them in sync. It also maintains the table name map and the column name map for case-insensitive queries.
- */
+/// Interface for caching table configs and schemas within the cluster.
+/// The `TableCache` caches all the table configs and schemas within the cluster, and listens on ZK changes to
+/// keep them in sync. It also maintains the table name map and the column name map for case-insensitive queries.
 public interface TableCache extends PinotConfigProvider {
   Logger LOGGER = LoggerFactory.getLogger(TableCache.class);
 
-  /**
-   * Returns {@code true} if the TableCache is case-insensitive, {@code false} otherwise.
-   */
+  /// Returns `true` if the TableCache is case-insensitive, `false` otherwise.
   boolean isIgnoreCase();
 
-  /**
-   * Returns the actual table name for the given table name (with or without type suffix), or {@code null} if the table
-   * does not exist.
-   */
+  /// Returns the actual table name for the given table name (with or without type suffix), or `null` if the table
+  /// does not exist.
   @Nullable
   String getActualTableName(String tableName);
 
-  /**
-   * Returns the actual logical table name for the given table name, or {@code null} if table does not exist.
-   * @param logicalTableName Logical table name
-   * @return Actual logical table name
-   */
+  /// Returns the actual logical table name for the given table name, or `null` if table does not exist.
+  /// @param logicalTableName Logical table name
+  /// @return Actual logical table name
   @Nullable
   String getActualLogicalTableName(String logicalTableName);
 
-  /**
-   * Returns a map from table name to actual table name. For case-insensitive case, the keys of the map are in lower
-   * case.
-   */
+  /// Returns a map from table name to actual table name. For case-insensitive case, the keys of the map are in lower
+  /// case.
   Map<String, String> getTableNameMap();
 
-  /**
-   * Returns a map from logical table name to actual logical table name. For case-insensitive case, the keys of the map
-   * are in lower case.
-   * @return Map from logical table name to actual logical table name
-   */
+  /// Returns a map from logical table name to actual logical table name. For case-insensitive case, the keys of the map
+  /// are in lower case.
+  /// @return Map from logical table name to actual logical table name
   Map<String, String> getLogicalTableNameMap();
 
-  /**
-   * Get all dimension table names.
-   * @return List of dimension table names
-   */
+  /// Get all dimension table names.
+  /// @return List of dimension table names
   List<String> getAllDimensionTables();
 
-  /**
-   * Returns a map from column name to actual column name for the given table, or {@code null} if the table schema does
-   * not exist. For case-insensitive case, the keys of the map are in lower case.
-   */
+  /// Returns a map from column name to actual column name for the given table, or `null` if the table schema does
+  /// not exist. For case-insensitive case, the keys of the map are in lower case.
   @Nullable
   Map<String, String> getColumnNameMap(String rawTableName);
 
-  /**
-   * Returns the expression override map for the given logical or physical table, or {@code null} if no override is
-   * configured.
-   */
+  /// Returns the expression override map for the given logical or physical table, or `null` if no override is
+  /// configured.
   @Nullable
   Map<Expression, Expression> getExpressionOverrideMap(String physicalOrLogicalTableName);
 
-  /**
-   * Returns the timestamp index columns for the given table, or {@code null} if table does not exist.
-   */
+  /// Returns the timestamp index columns for the given table, or `null` if table does not exist.
   @Nullable
   Set<String> getTimestampIndexColumns(String tableNameWithType);
 
-  /**
-   * Returns the table config for the given table, or {@code null} if it does not exist.
-   */
+  /// Returns the table config for the given table, or `null` if it does not exist.
   @Nullable
   @Override
   TableConfig getTableConfig(String tableNameWithType);
@@ -124,9 +101,7 @@ public interface TableCache extends PinotConfigProvider {
   @Override
   boolean registerTableConfigChangeListener(TableConfigChangeListener tableConfigChangeListener);
 
-  /**
-   * Returns the schema for the given logical or physical table, or {@code null} if it does not exist.
-   */
+  /// Returns the schema for the given logical or physical table, or `null` if it does not exist.
   @Nullable
   @Override
   Schema getSchema(String rawTableName);
@@ -141,10 +116,8 @@ public interface TableCache extends PinotConfigProvider {
   @Override
   boolean registerLogicalTableConfigChangeListener(LogicalTableConfigChangeListener logicalTableConfigChangeListener);
 
-  /**
-   * Adds the built-in virtual columns to the schema.
-   * NOTE: The virtual column provider class is not added.
-   */
+  /// Adds the built-in virtual columns to the schema.
+  /// NOTE: The virtual column provider class is not added.
   default void addBuiltInVirtualColumns(Schema schema) {
     if (!schema.hasColumn(BuiltInVirtualColumn.DOCID)) {
       schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.DOCID, FieldSpec.DataType.INT, true));
@@ -177,7 +150,7 @@ public interface TableCache extends PinotConfigProvider {
       int mapSize = expressionOverrideMap.size();
       if (mapSize == 1) {
         Map.Entry<Expression, Expression> entry = expressionOverrideMap.entrySet().iterator().next();
-        return Collections.singletonMap(entry.getKey(), entry.getValue());
+        return Map.of(entry.getKey(), entry.getValue());
       } else if (mapSize > 1) {
         return expressionOverrideMap;
       }

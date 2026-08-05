@@ -20,7 +20,6 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -55,6 +54,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -79,7 +79,7 @@ public class StrictRealtimeSegmentAssignmentTest {
   private static final String CONSUMING_INSTANCE_PARTITIONS_NAME =
       InstancePartitionsType.CONSUMING.getInstancePartitionsName(RAW_TABLE_NAME);
 
-  private List<String> _segments;
+  private static List<String> _segments;
   private Map<InstancePartitionsType, InstancePartitions> _instancePartitionsMap;
   private InstancePartitions _newConsumingInstancePartitions;
 
@@ -141,7 +141,7 @@ public class StrictRealtimeSegmentAssignmentTest {
     TableConfigBuilder builder = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
         .setNumReplicas(NUM_REPLICAS)
         .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-        .setSegmentAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.COMPLETED.toString(),
+        .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.COMPLETED.toString(),
             new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)))
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1));
     TableConfig tableConfig;
@@ -372,7 +372,7 @@ public class StrictRealtimeSegmentAssignmentTest {
   public void testRebalanceTableToCompletedServers(String tableType) {
     SegmentAssignment segmentAssignment = createSegmentAssignment(tableType);
     String tierName = "coldTier";
-    List<Tier> sortedTiers = createSortedTiers(tierName, Collections.emptySet());
+    List<Tier> sortedTiers = createSortedTiers(tierName, Set.of());
     Map<String, InstancePartitions> tierInstancePartitionsMap = createTierInstancePartitionsMap(tierName, 3);
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
@@ -392,11 +392,9 @@ public class StrictRealtimeSegmentAssignmentTest {
     }
   }
 
-  /**
-   * Verifies the MultiTierStrictRealtimeSegmentAssignment override picks the LATEST LLC segment (highest sequence
-   * number) for the partition rather than the first one encountered, so a new CONSUMING segment is aligned with the
-   * current location of the partition after a rebalance.
-   */
+  /// Verifies the MultiTierStrictRealtimeSegmentAssignment override picks the LATEST LLC segment (highest sequence
+  /// number) for the partition rather than the first one encountered, so a new CONSUMING segment is aligned with the
+  /// current location of the partition after a rebalance.
   @Test
   public void testMultiTierAssignSegmentUsesLatestExistingAssignment() {
     SegmentAssignment segmentAssignment = createSegmentAssignment("dedup");
@@ -429,16 +427,14 @@ public class StrictRealtimeSegmentAssignmentTest {
     assertEquals(instancesAssigned, newInstances);
   }
 
-  /**
-   * Verifies the MultiTierStrictRealtimeSegmentAssignment override returns null when the latest LLC segment for the
-   * partition has been moved to a tier (ZK metadata getTier() != null). In that case the existing assignment must not
-   * be reused because tiered segments live on a different instance pool than CONSUMING segments.
-   */
+  /// Verifies the MultiTierStrictRealtimeSegmentAssignment override returns null when the latest LLC segment for the
+  /// partition has been moved to a tier (ZK metadata getTier() != null). In that case the existing assignment must not
+  /// be reused because tiered segments live on a different instance pool than CONSUMING segments.
   @Test
   public void testMultiTierAssignSegmentSkipsExistingWhenLatestOnTier() {
     String olderSegment = _segments.get(0); // partition 0, sequence 0
     String tieredSegment = _segments.get(4); // partition 0, sequence 1 — marked as tiered
-    HelixManager helixManager = createHelixManager(Collections.singleton(tieredSegment));
+    HelixManager helixManager = createHelixManager(Set.of(tieredSegment));
     SegmentAssignment segmentAssignment = createSegmentAssignment("dedup", helixManager);
 
     Map<InstancePartitionsType, InstancePartitions> newConsumingInstancePartitionMap =
@@ -494,6 +490,17 @@ public class StrictRealtimeSegmentAssignmentTest {
       }
       return record;
     });
+    // Bulk read of all segment ZK metadata, used to resolve the eligible tier of each segment once per rebalance
+    List<ZNRecord> segmentZNRecords = new ArrayList<>(_segments.size());
+    for (String segmentName : _segments) {
+      ZNRecord record = new ZNRecord(segmentName);
+      if (tieredSegments.contains(segmentName)) {
+        record.setSimpleField(Segment.TIER, "coldTier");
+      }
+      segmentZNRecords.add(record);
+    }
+    when(propertyStore.getChildren(anyString(), eq(null), eq(AccessOption.PERSISTENT), anyInt(), anyInt())).thenReturn(
+        segmentZNRecords);
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
     return helixManager;
   }

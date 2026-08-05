@@ -83,7 +83,7 @@ public class TimeConversionTransformFunctionTest extends BaseTransformFunctionTe
         String.format(
             "timeConvert(timeConvert(timeConvert(%s,'MILLISECONDS','SECONDS'),'SECONDS','HOURS'),'HOURS','DAYS')",
             TIME_COLUMN)
-    }
+        }
     };
   }
 
@@ -96,7 +96,7 @@ public class TimeConversionTransformFunctionTest extends BaseTransformFunctionTe
         String.format(
             "timeConvert(timeConvert(timeConvert(%s,'MILLISECONDS','SECONDS'),'SECONDS','HOURS'),'HOURS','DAYS')",
             TIMESTAMP_COLUMN_NULL)
-    }
+        }
     };
   }
 
@@ -113,11 +113,11 @@ public class TimeConversionTransformFunctionTest extends BaseTransformFunctionTe
             String.format("timeConvert(%s,'MILLISECONDS')", TIME_COLUMN)
         }, new Object[]{"timeConvert(5,'MILLISECONDS','DAYS')"}, new Object[]{
         String.format("timeConvert(%s,'MILLISECONDS','DAYS')", INT_MV_COLUMN)
-    }, new Object[]{
+        }, new Object[]{
         String.format("timeConvert(%s,'MILLISECONDS','1:DAYS')", TIME_COLUMN)
-    }, new Object[]{
+        }, new Object[]{
         String.format("timeConvert(%s,%s,'DAYS')", TIME_COLUMN, INT_SV_COLUMN)
-    }
+        }
     };
   }
 }

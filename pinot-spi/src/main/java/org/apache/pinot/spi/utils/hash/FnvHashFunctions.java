@@ -22,9 +22,7 @@ import java.util.Locale;
 import javax.annotation.Nullable;
 
 
-/**
- * Stateless Fowler-Noll-Vo hash helpers for stable 32-bit and 64-bit hashing.
- */
+/// Stateless Fowler-Noll-Vo hash helpers for stable 32-bit and 64-bit hashing.
 public final class FnvHashFunctions {
   private static final String ALLOWED_VARIANTS = "fnv1_32, fnv1a_32, fnv1_64 or fnv1a_64";
   private static final int FNV_32_OFFSET_BASIS = 0x811c9dc5;
@@ -66,9 +64,7 @@ public final class FnvHashFunctions {
     return value == null ? "null" : "'" + value + "'";
   }
 
-  /**
-   * Computes the 32-bit FNV-1 hash for the given bytes.
-   */
+  /// Computes the 32-bit FNV-1 hash for the given bytes.
   public static int fnv1Hash32(byte[] bytes) {
     int hash = FNV_32_OFFSET_BASIS;
     for (byte value : bytes) {
@@ -78,9 +74,7 @@ public final class FnvHashFunctions {
     return hash;
   }
 
-  /**
-   * Computes the 32-bit FNV-1a hash for the given bytes.
-   */
+  /// Computes the 32-bit FNV-1a hash for the given bytes.
   public static int fnv1aHash32(byte[] bytes) {
     int hash = FNV_32_OFFSET_BASIS;
     for (byte value : bytes) {
@@ -90,9 +84,7 @@ public final class FnvHashFunctions {
     return hash;
   }
 
-  /**
-   * Computes the 64-bit FNV-1 hash for the given bytes.
-   */
+  /// Computes the 64-bit FNV-1 hash for the given bytes.
   public static long fnv1Hash64(byte[] bytes) {
     long hash = FNV_64_OFFSET_BASIS;
     for (byte value : bytes) {
@@ -102,9 +94,7 @@ public final class FnvHashFunctions {
     return hash;
   }
 
-  /**
-   * Computes the 64-bit FNV-1a hash for the given bytes.
-   */
+  /// Computes the 64-bit FNV-1a hash for the given bytes.
   public static long fnv1aHash64(byte[] bytes) {
     long hash = FNV_64_OFFSET_BASIS;
     for (byte value : bytes) {

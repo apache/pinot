@@ -43,7 +43,7 @@ public class DistinctCountBitmapMVAggregationFunctionTest extends AbstractAggreg
         )
         // Distinct values: 1, 2, 3, 4 = 4 distinct
         .whenQuery("select distinctcountbitmap(mv) from testTable")
-        .thenResultIs("INTEGER", "4");
+        .thenResultIs("INT", "4");
   }
 
   @Test
@@ -65,7 +65,7 @@ public class DistinctCountBitmapMVAggregationFunctionTest extends AbstractAggreg
             new Object[]{"5;6", "k2"}
         )
         .whenQuery("select sv, distinctcountbitmap(mv) from testTable group by sv order by sv")
-        .thenResultIs("STRING | INTEGER",
+        .thenResultIs("STRING | INT",
             "k1 | 3",   // distinct: 1, 2, 3
             "k2 | 3");  // distinct: 4, 5, 6
   }
@@ -88,7 +88,7 @@ public class DistinctCountBitmapMVAggregationFunctionTest extends AbstractAggreg
             new Object[]{"2;3", "tag1;tag2"}
         )
         .whenQuery("select tags, distinctcountbitmap(nums) from testTable group by tags order by tags")
-        .thenResultIs("STRING | INTEGER",
+        .thenResultIs("STRING | INT",
             "tag1 | 3",   // distinct: 1, 2, 3
             "tag2 | 3");  // distinct: 1, 2, 3
   }

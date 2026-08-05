@@ -27,9 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * {@code MailboxStatusStreamObserver} is the status streaming observer used to track the status by the sender.
- */
+/// `MailboxStatusStreamObserver` is the status streaming observer used to track the status by the sender.
 public class MailboxStatusObserver implements StreamObserver<MailboxStatus> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxStatusObserver.class);
   private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 5;

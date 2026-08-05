@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -46,7 +45,7 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
 
   @Override
   public List<ExpressionContext> getInputExpressions() {
-    return Collections.singletonList(_expression);
+    return List.of(_expression);
   }
 
   @Override

@@ -23,9 +23,7 @@ import java.sql.Timestamp;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-/**
- * The class <code>ArrayCopyUtils</code> provides methods to copy values across arrays of different types.
- */
+/// The class `ArrayCopyUtils` provides methods to copy values across arrays of different types.
 public class ArrayCopyUtils {
   private ArrayCopyUtils() {
   }

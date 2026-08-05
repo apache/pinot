@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.broker;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
@@ -44,15 +43,12 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-/**
- * Zookeeper Basic Authentication based on Pinot Controller UI.
- * The user role has been distinguished by user and admin. Only admin can have access to the
- * user console page in Pinot controller UI. And admin can change user info (table permission/
- * number of tables/password etc.) or add/delete user without restarting your Pinot clusters,
- * and these changes happen immediately.
- * Users Configuration store in Helix Zookeeper and encrypted user password via Bcrypt Encryption Algorithm.
- *
- */
+/// Zookeeper Basic Authentication based on Pinot Controller UI.
+/// The user role has been distinguished by user and admin. Only admin can have access to the
+/// user console page in Pinot controller UI. And admin can change user info (table permission/
+/// number of tables/password etc.) or add/delete user without restarting your Pinot clusters,
+/// and these changes happen immediately.
+/// Users Configuration store in Helix Zookeeper and encrypted user password via Bcrypt Encryption Algorithm.
 public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
 
   private AccessControl _accessControl;
@@ -71,9 +67,7 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
     return _accessControl;
   }
 
-  /**
-   * Access Control using header-based basic http authentication
-   */
+  /// Access Control using header-based basic http authentication
   private static class BasicAuthAccessControl implements AccessControl {
     private Map<String, ZkBasicAuthPrincipal> _name2principal;
     private final AccessControlUserCache _userCache;
@@ -95,7 +89,7 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
         return TableAuthorizationResult.success();
       }
 
-      return authorize(requesterIdentity, Collections.singleton(brokerRequest.getQuerySource().getTableName()));
+      return authorize(requesterIdentity, Set.of(brokerRequest.getQuerySource().getTableName()));
     }
 
     @Override

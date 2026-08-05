@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -27,17 +26,13 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 
-/**
- * Base implementation of {@link AggregationFunction} with single input expression.
- */
+/// Base implementation of [AggregationFunction] with single input expression.
 public abstract class BaseSingleInputAggregationFunction<I, F extends Comparable> implements AggregationFunction<I, F> {
   protected final ExpressionContext _expression;
 
-  /**
-   * Constructor for the class.
-   *
-   * @param expression Expression to aggregate on.
-   */
+  /// Constructor for the class.
+  ///
+  /// @param expression Expression to aggregate on.
   public BaseSingleInputAggregationFunction(ExpressionContext expression) {
     _expression = expression;
   }
@@ -49,7 +44,7 @@ public abstract class BaseSingleInputAggregationFunction<I, F extends Comparable
 
   @Override
   public List<ExpressionContext> getInputExpressions() {
-    return Collections.singletonList(_expression);
+    return List.of(_expression);
   }
 
   @Override

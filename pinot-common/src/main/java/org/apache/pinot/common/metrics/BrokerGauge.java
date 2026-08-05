@@ -18,14 +18,10 @@
  */
 package org.apache.pinot.common.metrics;
 
-import io.netty.buffer.PooledByteBufAllocatorMetric;
 import org.apache.pinot.common.Utils;
 
 
-/**
- * Enumeration containing all the gauges exposed by the Pinot broker.
- *
- */
+/// Enumeration containing all the gauges exposed by the Pinot broker.
 public enum BrokerGauge implements AbstractMetrics.Gauge {
   VERSION("version", true),
   QUERY_QUOTA_CAPACITY_UTILIZATION_RATE("tables", false),
@@ -42,48 +38,35 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   NETTY_POOLED_ARENAS_DIRECT("arenas", true),
   NETTY_POOLED_ARENAS_HEAP("arenas", true),
 
-  /**
-   * The size of the small cache.
-   * See {@link PooledByteBufAllocatorMetric#smallCacheSize()}
-   */
+  /// The size of the small cache.
+  /// See [io.netty.buffer.PooledByteBufAllocatorMetric#smallCacheSize()]
   NETTY_POOLED_CACHE_SIZE_SMALL("bytes", true),
-  /**
-   * The size of the normal cache.
-   * See {@link PooledByteBufAllocatorMetric#normalCacheSize()}
-   */
+  /// The size of the normal cache.
+  /// See [io.netty.buffer.PooledByteBufAllocatorMetric#normalCacheSize()]
   NETTY_POOLED_CACHE_SIZE_NORMAL("bytes", true),
-  /**
-   * The cache size used by the allocator for normal arenas
-   */
+  /// The cache size used by the allocator for normal arenas
   NETTY_POOLED_THREADLOCALCACHE("bytes", true),
   NETTY_POOLED_CHUNK_SIZE("bytes", true),
 
-  /**
-   * The type of Adaptive Server Selector.
-   * See {@link org.apache.pinot.spi.utils.CommonConstants.Broker.AdaptiveServerSelector.Type}
-   */
+  /// The type of Adaptive Server Selector.
+  /// See [org.apache.pinot.spi.utils.CommonConstants.Broker.AdaptiveServerSelector.Type]
   ADAPTIVE_SERVER_SELECTOR_TYPE("adaptiveServerSelectorType", true),
 
-  /**
-   * Per-server adaptive routing stats exported as metrics.
-   */
+  /// Per-server adaptive routing stats exported as metrics (SSE / single-stage engine).
   ADAPTIVE_SERVER_NUM_IN_FLIGHT_REQUESTS("adaptiveServerNumInFlightRequests", false),
   ADAPTIVE_SERVER_LATENCY_EMA("adaptiveServerLatencyEma", false),
   ADAPTIVE_SERVER_HYBRID_SCORE("adaptiveServerHybridScore", false),
 
-  /**
-   * The queue size of ServerRoutingStatsManager main executor service.
-   */
+  /// Per-server adaptive routing stats exported as metrics (MSE / multi-stage engine).
+  ADAPTIVE_SERVER_MSE_NUM_IN_FLIGHT_REQUESTS("adaptiveServerMseNumInFlightRequests", false),
+
+  /// The queue size of ServerRoutingStatsManager main executor service.
   ROUTING_STATS_MANAGER_QUEUE_SIZE("routingStatsManagerQueueSize", true),
 
-  /**
-   * The ZooKeeper jute.maxbuffer size in bytes.
-   */
+  /// The ZooKeeper jute.maxbuffer size in bytes.
   ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true),
 
-  /**
-   * The estimated number of query server threads for all currently running multi-stage queries.
-   */
+  /// The estimated number of query server threads for all currently running multi-stage queries.
   ESTIMATED_MSE_SERVER_THREADS("number", true),
 
   // gRPC Netty buffer metrics
@@ -106,6 +89,10 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   MAILBOX_SERVER_THREADLOCALCACHE("bytes", true),
   MAILBOX_SERVER_CHUNK_SIZE("bytes", true),
 
+  // MailboxService gRPC client (outbound to peer mailboxes) memory metrics
+  MAILBOX_CLIENT_USED_DIRECT_MEMORY("bytes", true),
+  MAILBOX_CLIENT_USED_HEAP_MEMORY("bytes", true),
+
   /// Exports the max amount of direct memory that can be allocated by the shaded Netty code used by gRPC
   /// It is basically an adaptor for io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent.maxDirectMemory()
   ///
@@ -113,7 +100,14 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   GRPC_TOTAL_MAX_DIRECT_MEMORY("bytes", true),
   /// Exports the total amount of direct memory allocated by the shaded Netty code used by gRPC
   /// It is basically an adaptor for io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent.usedDirectMemory()
-  GRPC_TOTAL_USED_DIRECT_MEMORY("bytes", true);
+  GRPC_TOTAL_USED_DIRECT_MEMORY("bytes", true),
+  /// Number of MV definition+runtime entries the broker currently holds in
+  /// `MaterializedViewMetadataCache`.  Operators monitor this to confirm the cache is not
+  /// growing unboundedly: a cluster with K MVs should plateau near K; sustained growth
+  /// signals a leak in the ZK listener / drop path.
+  MATERIALIZED_VIEW_CACHE_ENTRY_COUNT("materializedViewCacheEntries", true),
+  // Workload config fetch status: 1 = success, 0 = failure
+  WORKLOAD_CONFIG_FETCH_STATUS("status", true);
 
   private final String _brokerGaugeName;
   private final String _unit;
@@ -135,11 +129,9 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
     return _unit;
   }
 
-  /**
-   * Returns true if the gauge is global (not attached to a particular resource)
-   *
-   * @return true if the gauge is global
-   */
+  /// Returns true if the gauge is global (not attached to a particular resource)
+  ///
+  /// @return true if the gauge is global
   @Override
   public boolean isGlobal() {
     return _global;

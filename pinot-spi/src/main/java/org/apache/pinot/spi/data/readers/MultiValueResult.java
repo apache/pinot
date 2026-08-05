@@ -22,40 +22,36 @@ import java.util.BitSet;
 import javax.annotation.Nullable;
 
 
-/**
- * Result wrapper for multi-value column reads that tracks element-level nulls.
- *
- * <p>This class addresses a limitation where bulk reads from columnar formats (like Arrow)
- * don't check the validity bitmap for null elements. By returning both the values array
- * and a nulls BitSet, callers can properly handle null elements within multi-value columns.
- *
- * <p><b>BitSet Semantics:</b>
- * <ul>
- *   <li>Set bit (1) = null element</li>
- *   <li>Unset bit (0) = valid/non-null element</li>
- *   <li>Null nulls BitSet = no nulls in the range (fast path)</li>
- * </ul>
- *
- * <p><b>Usage Example:</b>
- * <pre>{@code
- * MultiValueResult<int[]> result = columnReader.nextIntMV();
- * int[] values = result.getValues();
- *
- * if (result.hasNulls()) {
- *   for (int i = 0; i < values.length; i++) {
- *     if (result.isNull(i)) {
- *       // Handle null element - values[i] contains default value (0 for int)
- *     } else {
- *       // Use values[i]
- *     }
- *   }
- * } else {
- *   // Fast path: no nulls, use values array directly
- * }
- * }</pre>
- *
- * @param <T> The array type (int[], long[], float[], double[])
- */
+/// Result wrapper for multi-value column reads that tracks element-level nulls.
+///
+/// This class addresses a limitation where bulk reads from columnar formats (like Arrow) don't check the validity
+/// bitmap for null elements. By returning both the values array and a nulls BitSet, callers can properly handle null
+/// elements within multi-value columns.
+///
+/// **BitSet semantics:**
+/// - Set bit (1) = null element
+/// - Unset bit (0) = valid / non-null element
+/// - Null nulls BitSet = no nulls in the range (fast path)
+///
+/// **Usage example:**
+/// ```
+/// MultiValueResult<int[]> result = columnReader.getIntMV(docId);
+/// int[] values = result.getValues();
+///
+/// if (result.hasNulls()) {
+///   for (int i = 0; i < values.length; i++) {
+///     if (result.isNull(i)) {
+///       // Handle null element - values[i] contains default value (0 for int)
+///     } else {
+///       // Use values[i]
+///     }
+///   }
+/// } else {
+///   // Fast path: no nulls, use values array directly
+/// }
+/// ```
+///
+/// @param <T> The array type (int[], long[], float[], double[])
 public class MultiValueResult<T> {
   private final T _values;
   @Nullable
@@ -66,56 +62,46 @@ public class MultiValueResult<T> {
     _nulls = nulls;
   }
 
-  /**
-   * Create a MultiValueResult with optional nulls information.
-   *
-   * @param values The values array (int[], long[], float[], double[])
-   * @param nulls BitSet where set bits indicate null elements,
-   *              or null if no nulls exist in the range
-   * @param <T> The array type
-   * @return A new MultiValueResult instance
-   */
+  /// Create a MultiValueResult with optional nulls information.
+  ///
+  /// @param values The values array (int\[\], long\[\], float\[\], double\[\])
+  /// @param nulls BitSet where set bits indicate null elements,
+  ///              or null if no nulls exist in the range
+  /// @param <T> The array type
+  /// @return A new MultiValueResult instance
   public static <T> MultiValueResult<T> of(T values, @Nullable BitSet nulls) {
     return new MultiValueResult<>(values, nulls);
   }
 
-  /**
-   * Check if any elements in this result are null.
-   *
-   * @return true if there are null elements, false otherwise
-   */
+  /// Check if any elements in this result are null.
+  ///
+  /// @return true if there are null elements, false otherwise
   public boolean hasNulls() {
     return _nulls != null;
   }
 
-  /**
-   * Check if a specific element is null.
-   *
-   * @param index The index of the element to check
-   * @return true if the element is null, false if it's valid
-   */
+  /// Check if a specific element is null.
+  ///
+  /// @param index The index of the element to check
+  /// @return true if the element is null, false if it's valid
   public boolean isNull(int index) {
     return _nulls != null && _nulls.get(index);
   }
 
-  /**
-   * Get the values array.
-   *
-   * <p>Note: If {@link #hasNulls()} returns true, some elements in this array
-   * may contain default values (0 for numeric types) for null positions.
-   * Use {@link #isNull(int)} to check individual elements.
-   *
-   * @return The values array
-   */
+  /// Get the values array.
+  ///
+  /// Note: If [#hasNulls()] returns true, some elements in this array
+  /// may contain default values (0 for numeric types) for null positions.
+  /// Use [#isNull(int)] to check individual elements.
+  ///
+  /// @return The values array
   public T getValues() {
     return _values;
   }
 
-  /**
-   * Get the nulls BitSet.
-   *
-   * @return The nulls BitSet where set bits indicate null elements, or null if no nulls exist
-   */
+  /// Get the nulls BitSet.
+  ///
+  /// @return The nulls BitSet where set bits indicate null elements, or null if no nulls exist
   @Nullable
   public BitSet getNulls() {
     return _nulls;

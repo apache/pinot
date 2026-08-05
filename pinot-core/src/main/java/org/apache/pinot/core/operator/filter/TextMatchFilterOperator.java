@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.CaseFormat;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
@@ -34,10 +33,8 @@ import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * Filter operator for supporting the execution of text search
- * queries: WHERE TEXT_MATCH(column_name, query_string, options_string)
- */
+/// Filter operator for supporting the execution of text search
+/// queries: WHERE TEXT_MATCH(column_name, query_string, options_string)
 public class TextMatchFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_TEXT_INDEX";
 
@@ -106,7 +103,7 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override

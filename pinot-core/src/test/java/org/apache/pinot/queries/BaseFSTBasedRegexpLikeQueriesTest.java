@@ -23,7 +23,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -102,9 +101,7 @@ public abstract class BaseFSTBasedRegexpLikeQueriesTest extends BaseQueriesTest 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
-  /**
-   * Abstract method to be implemented by derived classes to specify index type.
-   */
+  /// Abstract method to be implemented by derived classes to specify index type.
   protected abstract String getIndexType();
 
   @Override
@@ -239,6 +236,6 @@ public abstract class BaseFSTBasedRegexpLikeQueriesTest extends BaseQueriesTest 
   protected void testInterSegmentsCountQuery(String query, long expectedCount) {
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query),
         new ResultTable(new DataSchema(new String[]{"count(*)"}, new ColumnDataType[]{ColumnDataType.LONG}),
-            Collections.singletonList(new Object[]{expectedCount})));
+            List.<Object[]>of(new Object[]{expectedCount})));
   }
 }

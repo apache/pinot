@@ -30,31 +30,33 @@ import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Scheduler implementation that supports query admission control based on workload-specific budgets.
- *
- * <p>This class integrates with the {@link WorkloadBudgetManager} to apply CPU and memory budget enforcement
- * for different workloads, including primary and secondary workloads.</p>
- *
- * <p>Secondary workload configuration is used for queries tagged as "secondary". Queries that exceed their budget
- * will be rejected.</p>
- *
- */
+/// Scheduler implementation that supports query admission control based on workload-specific budgets.
+///
+/// This class integrates with the [WorkloadBudgetManager] to apply CPU and memory budget enforcement
+/// for different workloads, including primary and secondary workloads.
+///
+/// Secondary workload configuration is used for queries tagged as "secondary". Queries that exceed their budget
+/// will be rejected.
 public class WorkloadScheduler extends QueryScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadScheduler.class);
 
   private final WorkloadBudgetManager _workloadBudgetManager;
+  private final String _secondaryWorkloadName;
 
   public WorkloadScheduler(PinotConfiguration config, String instanceId, QueryExecutor queryExecutor,
       ThreadAccountant threadAccountant, LongAccumulator latestQueryTime) {
     super(config, instanceId, queryExecutor, threadAccountant, latestQueryTime, new UnboundedResourceManager(config));
-    _workloadBudgetManager = WorkloadBudgetManager.get();
+    _workloadBudgetManager = WorkloadBudgetManagerFactory.get();
+    _secondaryWorkloadName =
+        config.getProperty(Accounting.Keys.SECONDARY_WORKLOAD_NAME, Accounting.DEFAULT_SECONDARY_WORKLOAD_NAME);
   }
 
   @Override
@@ -72,17 +74,18 @@ public class WorkloadScheduler extends QueryScheduler {
     // This is for backward compatibility, where we want to honor the isSecondary query option to use the secondary
     // workload budget.
     String workloadName = isSecondary
-        ? _workloadBudgetManager.getSecondaryWorkloadName()
+        ? _secondaryWorkloadName
         : QueryOptionsUtils.getWorkloadName(queryRequest.getQueryContext().getQueryOptions());
+    String tableName = queryRequest.getTableNameWithType();
+    _serverMetrics.addMeteredValue(workloadName, ServerMeter.WORKLOAD_QUERIES, 1L);
     if (!_workloadBudgetManager.canAdmitQuery(workloadName)) {
       // TODO: Explore queuing the query instead of rejecting it.
-      String tableName = TableNameBuilder.extractRawTableName(queryRequest.getTableNameWithType());
       LOGGER.warn("Workload budget exceeded for workload: {} query: {} table: {}", workloadName,
           queryRequest.getRequestId(), tableName);
       _serverMetrics.addMeteredValue(workloadName, ServerMeter.WORKLOAD_BUDGET_EXCEEDED, 1L);
       _serverMetrics.addMeteredTableValue(tableName, ServerMeter.WORKLOAD_BUDGET_EXCEEDED, 1L);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.WORKLOAD_BUDGET_EXCEEDED, 1L);
-      return outOfCapacity(queryRequest);
+      return immediateErrorResponse(queryRequest, QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED);
     }
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
     QueryExecutorService executorService = _resourceManager.getExecutorService(queryRequest, null);

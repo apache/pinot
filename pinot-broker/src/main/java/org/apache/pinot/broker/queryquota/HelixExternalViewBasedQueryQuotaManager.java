@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.RateLimiter;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -58,23 +57,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class is to support the qps quota feature.
- * It allows performing qps quota check at table level, database and application level.
- * For table level check it depends on the broker source change to update the dynamic rate limit,
- *  which means it gets updated when a new table added or a broker restarted.
- * For database level check it depends on the broker as well as cluster config and database config change
- * to update the dynamic rate limit, which means it gets updated when
- * - the default query quota at cluster config is updated
- * - the database config is updated
- * - new table is assigned to the broker (rate limiter is created if not present)
- * - broker added or removed from cluster
- * For application level check it depends on the broker as well as cluster config and application quota change
- * to update the dynamic rate limit, which means it gets updated when
- * - the default query quota at cluster config is updated
- * - the application quota is updated (e.g. via rest api)
- * - broker added or removed from cluster
- */
+/// This class is to support the qps quota feature.
+/// It allows performing qps quota check at table level, database and application level.
+/// For table level check it depends on the broker source change to update the dynamic rate limit,
+///  which means it gets updated when a new table added or a broker restarted.
+/// For database level check it depends on the broker as well as cluster config and database config change
+/// to update the dynamic rate limit, which means it gets updated when
+/// - the default query quota at cluster config is updated
+/// - the database config is updated
+/// - new table is assigned to the broker (rate limiter is created if not present)
+/// - broker added or removed from cluster
+/// For application level check it depends on the broker as well as cluster config and application quota change
+/// to update the dynamic rate limit, which means it gets updated when
+/// - the default query quota at cluster config is updated
+/// - the application quota is updated (e.g. via rest api)
+/// - broker added or removed from cluster
 public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHandler, QueryQuotaManager {
 
   // Maximum 'disabled' value for app quota. If actual value is equal or less than this, it is considered as
@@ -197,11 +194,9 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     initOrUpdateTableQueryQuota(tableConfig, brokerResourceEV);
   }
 
-  /**
-   * Initialize or update dynamic rate limiter with table query quota.
-   * @param tableConfig table config.
-   * @param brokerResourceEV broker resource which stores all the broker states of each table.
-   */
+  /// Initialize or update dynamic rate limiter with table query quota.
+  /// @param tableConfig table config.
+  /// @param brokerResourceEV broker resource which stores all the broker states of each table.
   public void initOrUpdateTableQueryQuota(TableConfig tableConfig, ExternalView brokerResourceEV) {
     if (tableConfig == null) {
       LOGGER.info("No query quota to update since table config is null");
@@ -215,28 +210,23 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     createOrUpdateRateLimiter(tableNameWithType, brokerResourceEV, tableConfig.getQuotaConfig(), stat);
   }
 
-  /**
-   * Drop table query quota.
-   * @param physicalOrLogicalTable physical or logical table name.
-   */
+  /// Drop table query quota.
+  /// @param physicalOrLogicalTable physical or logical table name.
   public void dropTableQueryQuota(String physicalOrLogicalTable) {
     LOGGER.info("Dropping rate limiter for table {}", physicalOrLogicalTable);
     removeRateLimiter(physicalOrLogicalTable);
   }
 
-  /** Remove or update rate limiter if another table with the same raw table name but different type is still using
-   * the quota config.
-   * @param physicalOrLogicalTable physical or logical table name.
-   */
+  /// Remove or update rate limiter if another table with the same raw table name but different type is still using
+  /// the quota config.
+  /// @param physicalOrLogicalTable physical or logical table name.
   private void removeRateLimiter(String physicalOrLogicalTable) {
     _rateLimiterMap.remove(physicalOrLogicalTable);
   }
 
-  /**
-   * Get QuotaConfig from property store.
-   * @param tableNameWithType table name with table type.
-   * @return QuotaConfig, which could be null.
-   */
+  /// Get QuotaConfig from property store.
+  /// @param tableNameWithType table name with table type.
+  /// @return QuotaConfig, which could be null.
   private QuotaConfig getQuotaConfigFromPropertyStore(String tableNameWithType) {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     if (tableConfig == null) {
@@ -245,13 +235,11 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     return tableConfig.getQuotaConfig();
   }
 
-  /**
-   * Create or update a rate limiter for a table.
-   * @param physicalOrLogicalTableName physical or logical table name.
-   * @param brokerResource broker resource which stores all the broker states of each table.
-   * @param quotaConfig quota config of the table.
-   * @param tableStat stat of the table config.
-   */
+  /// Create or update a rate limiter for a table.
+  /// @param physicalOrLogicalTableName physical or logical table name.
+  /// @param brokerResource broker resource which stores all the broker states of each table.
+  /// @param quotaConfig quota config of the table.
+  /// @param tableStat stat of the table config.
   private void createOrUpdateRateLimiter(String physicalOrLogicalTableName, ExternalView brokerResource,
       QuotaConfig quotaConfig, Stat tableStat) {
     if (quotaConfig == null || quotaConfig.getMaxQueriesPerSecond() == null) {
@@ -324,22 +312,18 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     }
   }
 
-  /**
-   * Updates the database rate limiter if it already exists. Will not create a new database rate limiter.
-   * @param databaseName database name for which rate limiter needs to be updated
-   */
+  /// Updates the database rate limiter if it already exists. Will not create a new database rate limiter.
+  /// @param databaseName database name for which rate limiter needs to be updated
   public void updateDatabaseRateLimiter(String databaseName) {
     if (!_databaseRateLimiterMap.containsKey(databaseName)) {
       return;
     }
-    createOrUpdateDatabaseRateLimiter(Collections.singletonList(databaseName));
+    createOrUpdateDatabaseRateLimiter(List.of(databaseName));
   }
 
-  /**
-   * Updates the application rate limiter if it already exists. It won't  create a new rate limiter.
-   *
-   * @param applicationName application name for which rate limiter needs to be updated
-   */
+  /// Updates the application rate limiter if it already exists. It won't  create a new rate limiter.
+  ///
+  /// @param applicationName application name for which rate limiter needs to be updated
   public void updateApplicationRateLimiter(String applicationName) {
     if (!_applicationRateLimiterMap.containsKey(applicationName)) {
       return;
@@ -375,23 +359,21 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   }
 
   public synchronized void createOrUpdateApplicationRateLimiter(String applicationName) {
-    createOrUpdateApplicationRateLimiter(Collections.singletonList(applicationName), DISABLED_APP_QUOTA);
+    createOrUpdateApplicationRateLimiter(List.of(applicationName), DISABLED_APP_QUOTA);
   }
 
   public synchronized void createOrUpdateApplicationRateLimiter(String applicationName, double newQps) {
-    createOrUpdateApplicationRateLimiter(Collections.singletonList(applicationName), newQps);
+    createOrUpdateApplicationRateLimiter(List.of(applicationName), newQps);
   }
 
   private synchronized void createOrUpdateApplicationRateLimiter(List<String> applicationNames) {
     createOrUpdateApplicationRateLimiter(applicationNames, DISABLED_APP_QUOTA);
   }
 
-  /**
-   * Caller method need not worry about getting lock on _applicationRateLimiterMap
-   *  as this method will do idempotent updates to the application rate limiters
-   * @param applicationNames application names for which to update the rate limiter
-   * @param newQps - if > 0, fixed value to use for rate limiter(s), otherwise value is fetched from ZK.
-   */
+  /// Caller method need not worry about getting lock on \_applicationRateLimiterMap
+  ///  as this method will do idempotent updates to the application rate limiters
+  /// @param applicationNames application names for which to update the rate limiter
+  /// @param newQps - if > 0, fixed value to use for rate limiter(s), otherwise value is fetched from ZK.
   private synchronized void createOrUpdateApplicationRateLimiter(List<String> applicationNames, double newQps) {
     ExternalView brokerResource = getBrokerResource();
     Map<String, Double> quotas = null;
@@ -473,12 +455,10 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     return HelixHelper.getOnlineInstanceFromExternalView(brokerResource).size();
   }
 
-  /**
-   * Utility to get the effective query quota being imposed on a database.
-   * It is computed based on the default quota set at cluster config and override set at database config
-   * @param databaseName database name to get the query quota on.
-   * @return effective query quota limit being applied
-   */
+  /// Utility to get the effective query quota being imposed on a database.
+  /// It is computed based on the default quota set at cluster config and override set at database config
+  /// @param databaseName database name to get the query quota on.
+  /// @return effective query quota limit being applied
   private double getEffectiveQueryQuotaOnDatabase(String databaseName) {
     DatabaseConfig databaseConfig =
         ZKMetadataProvider.getDatabaseConfig(_helixManager.getHelixPropertyStore(), databaseName);
@@ -489,22 +469,18 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     return _defaultQpsQuotaForDatabase;
   }
 
-  /**
-   * Creates a new database rate limiter. Will not update the database rate limiter if it already exists.
-   * @param databaseName database name for which rate limiter needs to be created
-   */
+  /// Creates a new database rate limiter. Will not update the database rate limiter if it already exists.
+  /// @param databaseName database name for which rate limiter needs to be created
   public void createDatabaseRateLimiter(String databaseName) {
     if (_databaseRateLimiterMap.containsKey(databaseName)) {
       return;
     }
-    createOrUpdateDatabaseRateLimiter(Collections.singletonList(databaseName));
+    createOrUpdateDatabaseRateLimiter(List.of(databaseName));
   }
 
-  /**
-   * Creates a new database rate limiter. Will not update the database rate limiter if it already exists.
-   *
-   * @param applicationName database name for which rate limiter needs to be created
-   */
+  /// Creates a new database rate limiter. Will not update the database rate limiter if it already exists.
+  ///
+  /// @param applicationName database name for which rate limiter needs to be created
   public void createApplicationRateLimiter(String applicationName) {
     if (_applicationRateLimiterMap.containsKey(applicationName)) {
       return;
@@ -512,10 +488,8 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     createOrUpdateApplicationRateLimiter(applicationName);
   }
 
-  /**
-   * Build an empty rate limiter in the new query quota entity, or set the rate limiter to null in an existing query
-   * quota entity.
-   */
+  /// Build an empty rate limiter in the new query quota entity, or set the rate limiter to null in an existing query
+  /// quota entity.
   private void buildEmptyOrResetDatabaseRateLimiter(String databaseName) {
     QueryQuotaEntity queryQuotaEntity = _databaseRateLimiterMap.get(databaseName);
     if (queryQuotaEntity == null) {
@@ -529,10 +503,8 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     }
   }
 
-  /**
-   * Build an empty rate limiter in the new query quota entity, or set the rate limiter to null in an existing query
-   * quota entity.
-   */
+  /// Build an empty rate limiter in the new query quota entity, or set the rate limiter to null in an existing query
+  /// quota entity.
   private void buildEmptyOrResetApplicationRateLimiter(String applicationName) {
     QueryQuotaEntity quotaEntity = _applicationRateLimiterMap.get(applicationName);
     if (quotaEntity == null) {
@@ -546,10 +518,8 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     }
   }
 
-  /**
-   * Build an empty rate limiter in the new query quota entity, or set the rate limiter to null in an existing query
-   * quota entity.
-   */
+  /// Build an empty rate limiter in the new query quota entity, or set the rate limiter to null in an existing query
+  /// quota entity.
   private void buildEmptyOrResetRateLimiterInQueryQuotaEntity(String physicalOrLogicalTableName) {
     QueryQuotaEntity queryQuotaEntity = _rateLimiterMap.get(physicalOrLogicalTableName);
     if (queryQuotaEntity == null) {
@@ -565,18 +535,14 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     addQueryQuotaCapacityUtilizationRateTableGaugeIfNeeded(physicalOrLogicalTableName, queryQuotaEntity);
   }
 
-  /**
-   * Add the max burst QPS callback table gauge to the metric system if it doesn't exist.
-   */
+  /// Add the max burst QPS callback table gauge to the metric system if it doesn't exist.
   private void addMaxBurstQPSCallbackTableGaugeIfNeeded(String tableNameWithType, QueryQuotaEntity queryQuotaEntity) {
     final QueryQuotaEntity finalQueryQuotaEntity = queryQuotaEntity;
     _brokerMetrics.addCallbackTableGaugeIfNeeded(tableNameWithType, BrokerGauge.MAX_BURST_QPS,
         () -> (long) finalQueryQuotaEntity.getMaxQpsTracker().getMaxCountPerBucket());
   }
 
-  /**
-   * Add the query quota capacity utilization rate table gauge to the metric system if the qps quota is specified.
-   */
+  /// Add the query quota capacity utilization rate table gauge to the metric system if the qps quota is specified.
   private void addQueryQuotaCapacityUtilizationRateTableGaugeIfNeeded(String tableNameWithType,
       QueryQuotaEntity queryQuotaEntity) {
     if (queryQuotaEntity.getRateLimiter() != null) {
@@ -649,12 +615,12 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     return quotaEntity == null || quotaEntity.getRateLimiter() == null ? 0 : quotaEntity.getRateLimiter().getRate();
   }
 
-  /**
-   * {@inheritDoc}
-   * <p>Acquires a token from rate limiter based on the table name.
-   *
-   * @return true if there is no query quota specified for the table or a token can be acquired, otherwise return false.
-   */
+  /// {@inheritDoc}
+  ///
+  /// Acquires a token from rate limiter based on the table name.
+  ///
+  /// @return true if there is no query quota specified for the table or a token can be acquired, otherwise return
+  ///         false.
   @Override
   public boolean acquire(String tableName) {
     // Return true if query quota is disabled in the current broker.
@@ -704,12 +670,10 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     return true;
   }
 
-  /**
-   * Try to acquire token from rate limiter. Emit the utilization of the qps quota if broker metric isn't null.
-   * @param resourceName resource name to acquire.
-   * @param queryQuotaEntity query quota entity for type-specific table.
-   * @return true if there's no qps quota for that table, or a token is acquired successfully.
-   */
+  /// Try to acquire token from rate limiter. Emit the utilization of the qps quota if broker metric isn't null.
+  /// @param resourceName resource name to acquire.
+  /// @param queryQuotaEntity query quota entity for type-specific table.
+  /// @return true if there's no qps quota for that table, or a token is acquired successfully.
   private boolean tryAcquireToken(String resourceName, QueryQuotaEntity queryQuotaEntity) {
     // Use hit counter to count the number of hits.
     queryQuotaEntity.getQpsTracker().hit();
@@ -753,9 +717,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     _rateLimiterMap.clear();
   }
 
-  /**
-   * Process query quota change when number of online brokers has changed.
-   */
+  /// Process query quota change when number of online brokers has changed.
   public void processQueryRateLimitingExternalViewChange(ExternalView currentBrokerResourceEV) {
     LOGGER.info("Start processing qps quota change.");
     long startTime = System.currentTimeMillis();
@@ -880,9 +842,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
         (endTime - startTime), numRebuilt, _rateLimiterMap.size());
   }
 
-  /**
-   * Process query quota state change when cluster config gets changed
-   */
+  /// Process query quota state change when cluster config gets changed
   public void processQueryRateLimitingClusterConfigChange() {
     double oldDatabaseQpsQuota = _defaultQpsQuotaForDatabase;
     _defaultQpsQuotaForDatabase = getDefaultQueryQuotaForDatabase();
@@ -906,7 +866,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
         .forCluster(_helixManager.getClusterName()).build();
     return Double.parseDouble(helixAdmin.getConfig(configScope,
-            Collections.singletonList(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND))
+            List.of(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND))
             .getOrDefault(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND, "-1"));
   }
 
@@ -915,7 +875,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
         .forCluster(_helixManager.getClusterName()).build();
     String value = helixAdmin.getConfig(configScope,
-            Collections.singletonList(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND))
+            List.of(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND))
         .get(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND);
     if (value != null) {
       return Double.parseDouble(value);
@@ -924,9 +884,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     }
   }
 
-  /**
-   * Process query quota state change when instance config gets changed
-   */
+  /// Process query quota state change when instance config gets changed
   public void processQueryRateLimitingInstanceConfigChange() {
     getQueryQuotaEnabledFlagFromInstanceConfig();
   }
@@ -952,10 +910,8 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     return _queryRateLimitDisabled;
   }
 
-  /**
-   * Construct table config path
-   * @param tableNameWithType table name with table type
-   */
+  /// Construct table config path
+  /// @param tableNameWithType table name with table type
   private String constructTableConfigPath(String tableNameWithType) {
     return "/CONFIGS/TABLE/" + tableNameWithType;
   }

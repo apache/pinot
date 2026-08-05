@@ -19,7 +19,8 @@
 package org.apache.pinot.broker.broker.helix;
 
 import com.google.common.util.concurrent.Uninterruptibles;
-import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -36,19 +37,17 @@ import static org.mockito.Mockito.mock;
 public class ClusterChangeMediatorTest {
   private final Lock _lock = new ReentrantLock();
 
-  /**
-   * Tests the potential deadlock between Helix callback handling thread and ClusterChangeMediator change handling
-   * thread when the ClusterChangeMediator is stopped.
-   * The deadlock chain is as following:
-   * - ClusterChangeMediator.stop() is called and waiting for the change handling thread to stop
-   * - Helix callback handling thread acquires a lock, then send a cluster change to the mediator which is blocked
-   *   ClusterChangeMediator.stop() (both stop() and enqueueChange() are synchronized)
-   * - The change handling thread waits on the lock held by the Helix callback handling thread
-   */
+  /// Tests the potential deadlock between Helix callback handling thread and ClusterChangeMediator change handling
+  /// thread when the ClusterChangeMediator is stopped.
+  /// The deadlock chain is as following:
+  /// - ClusterChangeMediator.stop() is called and waiting for the change handling thread to stop
+  /// - Helix callback handling thread acquires a lock, then send a cluster change to the mediator which is blocked
+  ///   ClusterChangeMediator.stop() (both stop() and enqueueChange() are synchronized)
+  /// - The change handling thread waits on the lock held by the Helix callback handling thread
   @Test
   public void testDeadLock() {
     ClusterChangeMediator mediator = new ClusterChangeMediator(
-        Collections.singletonMap(ChangeType.IDEAL_STATE, Collections.singletonList(new Handler())),
+        Map.of(ChangeType.IDEAL_STATE, List.of(new Handler())),
         mock(BrokerMetrics.class));
     mediator.start();
 
@@ -65,7 +64,7 @@ public class ClusterChangeMediatorTest {
   private void sendClusterChange(ClusterChangeMediator mediator) {
     _lock.lock();
     try {
-      mediator.onIdealStateChange(Collections.emptyList(), mock(NotificationContext.class));
+      mediator.onIdealStateChange(List.of(), mock(NotificationContext.class));
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     } finally {

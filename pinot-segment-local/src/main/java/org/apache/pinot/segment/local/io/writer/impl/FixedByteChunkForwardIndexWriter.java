@@ -19,32 +19,28 @@
 package org.apache.pinot.segment.local.io.writer.impl;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 
 
-/**
- * Chunk-based raw (non-dictionary-encoded) forward index writer where each chunk contains fixed number of docs, and
- * each entry has fixed number of bytes.
- */
+/// Chunk-based raw (non-dictionary-encoded) forward index writer where each chunk contains fixed number of docs, and
+/// each entry has fixed number of bytes.
 @NotThreadSafe
 public class FixedByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter {
   private int _chunkDataOffset;
 
-  /**
-   * Constructor for the class.
-   *
-   * @param file File to write to.
-   * @param compressionType Type of compression to use.
-   * @param totalDocs Total number of docs to write.
-   * @param numDocsPerChunk Number of documents per chunk.
-   * @param sizeOfEntry Size of entry (in bytes)
-   * @param writerVersion writer format version
-   * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is not found.
-   * @throws IOException Throws {@link IOException} if there are any errors mapping the underlying ByteBuffer.
-   */
+  /// Constructor for the class.
+  ///
+  /// @param file File to write to.
+  /// @param compressionType Type of compression to use.
+  /// @param totalDocs Total number of docs to write.
+  /// @param numDocsPerChunk Number of documents per chunk.
+  /// @param sizeOfEntry Size of entry (in bytes)
+  /// @param writerVersion writer format version
+  /// @throws java.io.FileNotFoundException Throws [java.io.FileNotFoundException] if the specified file is not
+  /// found.
+  /// @throws IOException Throws [IOException] if there are any errors mapping the underlying ByteBuffer.
   public FixedByteChunkForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
       int numDocsPerChunk, int sizeOfEntry, int writerVersion)
       throws IOException {
@@ -78,7 +74,17 @@ public class FixedByteChunkForwardIndexWriter extends BaseChunkForwardIndexWrite
   }
 
   @Override
+  public long getRawForwardIndexUncompressedValueSizeInBytes() {
+    // Include in-flight bytes from the current unflushed chunk so callers reading
+    // before close() (e.g., writeMetadata()) get the correct total.
+    return _trackUncompressedValueSize ? _uncompressedValueSize + _chunkDataOffset : -1;
+  }
+
+  @Override
   protected void writeChunk() {
+    if (_trackUncompressedValueSize) {
+      _uncompressedValueSize += _chunkDataOffset;
+    }
     super.writeChunk();
     _chunkDataOffset = 0;
   }

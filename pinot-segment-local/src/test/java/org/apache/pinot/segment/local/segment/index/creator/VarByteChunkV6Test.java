@@ -36,10 +36,8 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for V6 forward index format. Inherits all write/read tests from {@link VarByteChunkV5Test}
- * and adds a compression ratio validation test for delta-encoded chunk headers.
- */
+/// Tests for V6 forward index format. Inherits all write/read tests from [VarByteChunkV5Test]
+/// and adds a compression ratio validation test for delta-encoded chunk headers.
 public class VarByteChunkV6Test extends VarByteChunkV5Test {
   private static final Random RANDOM = new Random();
 

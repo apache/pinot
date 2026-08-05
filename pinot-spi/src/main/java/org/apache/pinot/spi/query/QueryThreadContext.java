@@ -169,7 +169,7 @@ public class QueryThreadContext implements AutoCloseable {
     }
   }
 
-  /// Closes the {@link QueryThreadContext} and removes it from the thread-local storage and MDC context.
+  /// Closes the [QueryThreadContext] and removes it from the thread-local storage and MDC context.
   @Override
   public void close() {
     _accountant.clear();

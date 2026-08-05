@@ -44,9 +44,7 @@ public class PredicateUtils {
   // dictionary
   private static final int MAX_INITIAL_DICT_ID_SET_SIZE = 1000;
 
-  /**
-   * Converts the given predicate value to the stored value based on the data type.
-   */
+  /// Converts the given predicate value to the stored value based on the data type.
   public static String getStoredValue(String value, DataType dataType) {
     switch (dataType) {
       case BOOLEAN:
@@ -58,23 +56,17 @@ public class PredicateUtils {
     }
   }
 
-  /**
-   * Converts the given boolean predicate value to the inner representation (int).
-   */
+  /// Converts the given boolean predicate value to the inner representation (int).
   public static String getStoredBooleanValue(String booleanValue) {
     return Integer.toString(BooleanUtils.toInt(booleanValue));
   }
 
-  /**
-   * Converts the given timestamp predicate value to the inner representation (millis since epoch).
-   */
+  /// Converts the given timestamp predicate value to the inner representation (millis since epoch).
   public static String getStoredTimestampValue(String timestampValue) {
     return Long.toString(TimestampUtils.toMillisSinceEpoch(timestampValue));
   }
 
-  /**
-   * Returns a dictionary id set of the values in the given IN/NOT_IN predicate.
-   */
+  /// Returns a dictionary id set of the values in the given IN/NOT_IN predicate.
   public static IntSet getDictIdSet(BaseInPredicate inPredicate, Dictionary dictionary, DataType dataType,
       @Nullable QueryContext queryContext) {
     List<String> values = inPredicate.getValues();

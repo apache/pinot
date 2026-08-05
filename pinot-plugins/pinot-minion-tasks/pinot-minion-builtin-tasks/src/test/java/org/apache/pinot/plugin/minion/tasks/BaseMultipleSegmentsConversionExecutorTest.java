@@ -202,7 +202,7 @@ public class BaseMultipleSegmentsConversionExecutorTest {
     boolean foundAuth = headers.stream().anyMatch(h -> h.getName().equals("Authorization")
         && h.getValue().equals("Bearer fallback-token"));
     Assert.assertTrue(foundAuth, "Expected explicit AUTH_TOKEN to be used"
-  + " when runtime provider is null/NullAuthProvider");
+        + " when runtime provider is null/NullAuthProvider");
   }
 
   @Test

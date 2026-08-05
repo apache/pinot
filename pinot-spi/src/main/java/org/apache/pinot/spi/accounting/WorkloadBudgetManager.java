@@ -19,246 +19,56 @@
 package org.apache.pinot.spi.accounting;
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants.Accounting;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+/// Interface for managing workload budgets.
+public interface WorkloadBudgetManager {
+  /// Adds or updates budget for a workload (Thread-Safe).
+  void addOrUpdateWorkload(String workload, long cpuBudgetNs, long memoryBudgetBytes);
 
-public class WorkloadBudgetManager {
-  private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadBudgetManager.class);
+  /// Deletes a workload and its associated budget (Thread-Safe).
+  void deleteWorkload(String workload);
 
-  // TODO: Pass it as a regular instance instead of a static singleton.
-  private static WorkloadBudgetManager _instance;
+  /// Collects workload stats for CPU and memory usage.
+  void collectWorkloadStats(String workload, BudgetStats stats);
 
-  public static void set(WorkloadBudgetManager instance) {
-    _instance = instance;
-  }
+  /// Gets the type name of the workload budget manager.
+  String getWorkloadTypeName();
 
-  public static WorkloadBudgetManager get() {
-    return _instance;
-  }
+  /// Attempts to charge CPU and memory usage against the workload budget (Thread-Safe).
+  /// Returns the remaining budget for CPU and memory after charge.
+  BudgetStats tryCharge(String workload, long cpuUsedNs, long memoryUsedBytes);
 
-  private final String _secondaryWorkloadName;
-  private long _enforcementWindowMs;
-  private ConcurrentHashMap<String, Budget> _workloadBudgets;
-  private final ScheduledExecutorService _resetScheduler = Executors.newSingleThreadScheduledExecutor();
-  private volatile boolean _enabled;
+  /// Retrieves the budget stats for a specific workload
+  /// Returns null if the workload does not exist or if the manager is disabled.
+  BudgetStats getBudgetStats(String workload);
 
-  public WorkloadBudgetManager(PinotConfiguration accountingConfig) {
-    _secondaryWorkloadName = accountingConfig.getProperty(Accounting.Keys.SECONDARY_WORKLOAD_NAME,
-        Accounting.DEFAULT_SECONDARY_WORKLOAD_NAME);
-    _enabled = accountingConfig.getProperty(Accounting.Keys.WORKLOAD_ENABLE_COST_COLLECTION,
-        Accounting.DEFAULT_WORKLOAD_ENABLE_COST_COLLECTION);
-    // Return an object even if disabled. All functionalities of this class will be noops.
-    if (!_enabled) {
-      LOGGER.info("WorkloadBudgetManager is disabled. Creating a no-op instance.");
-      return;
-    }
-    _workloadBudgets = new ConcurrentHashMap<>();
-    _enforcementWindowMs = accountingConfig.getProperty(Accounting.Keys.WORKLOAD_ENFORCEMENT_WINDOW_MS,
-        Accounting.DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS);
-    initSecondaryWorkloadBudget(accountingConfig);
-    startBudgetResetTask();
-    LOGGER.info("WorkloadBudgetManager initialized with enforcement window: {}ms", _enforcementWindowMs);
-  }
+  Map<String, BudgetStats> getAllBudgetStats();
 
-  public String getSecondaryWorkloadName() {
-    return _secondaryWorkloadName;
-  }
+  void shutdown();
 
-  public boolean isEnabled() {
-    return _enabled;
-  }
+  /// Determines whether a query for the given workload can be admitted under CPU-only budgets.
+  ///
+  /// Admission rules:
+  ///
+  /// 1. If the manager is disabled or no budget exists for the workload, always admit.
+  /// 2. If CPU budget remains above zero, admit immediately.
+  /// 3. Otherwise, reject (return false).
+  ///
+  /// Note: This method currently uses a strict check, where CPU and memory budgets must be above zero.
+  /// This may be relaxed in the future to allow for a percentage of other remaining budget to be used. At that point,
+  /// we can have different admission policies like: Strict, Stealing, etc.
+  ///
+  /// @param workload the workload identifier to check budget for
+  /// @return true if the query may be accepted; false if budget is insufficient
+  boolean canAdmitQuery(String workload);
 
-  /**
-   * This budget is primarily meant to be used for queries that need to be issued in a low priority manner.
-   * This is fixed budget allocated during host startup and used across all secondary queries.
-   */
-  private void initSecondaryWorkloadBudget(PinotConfiguration config) {
-    double secondaryCpuPercentage = config.getProperty(Accounting.Keys.SECONDARY_WORKLOAD_CPU_PERCENTAGE,
-        Accounting.DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE);
+  boolean isCostCollectionEnabled();
 
-    // Don't create a secondary workload if cpu percentage is non-zero.
-    if (secondaryCpuPercentage <= 0.0) {
-      return;
-    }
-
-    // The Secondary CPU budget is based on the CPU percentage allocated for secondary workload.
-    // The memory budget is set to Long.MAX_VALUE for now, since we do not have a specific memory budget for
-    // secondary queries.
-    int availableProcessors = Runtime.getRuntime().availableProcessors();
-    // Total CPU capacity available in one enforcement window:
-    // window(ms) × 1_000_000 (ns per ms) × number of logical processors
-    long totalCpuCapacityNs = _enforcementWindowMs * 1_000_000L * availableProcessors;
-    long secondaryCpuBudget = (long) (secondaryCpuPercentage * totalCpuCapacityNs);
-    // TODO: Add memory budget for secondary workload queries
-    addOrUpdateWorkload(_secondaryWorkloadName, secondaryCpuBudget, Long.MAX_VALUE);
-  }
-
-  public void shutdown() {
-    if (!_enabled) {
-      return;
-    }
-    _enabled = false;
-    _resetScheduler.shutdownNow();
-    try {
-      if (!_resetScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
-        LOGGER.warn("Reset scheduler did not terminate in time");
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
-    LOGGER.info("WorkloadBudgetManager has been shut down.");
-  }
-
-  /**
-   * Adds or updates budget for a workload (Thread-Safe).
-   */
-  public void addOrUpdateWorkload(String workload, long cpuBudgetNs, long memoryBudgetBytes) {
-    if (!_enabled) {
-      LOGGER.info("WorkloadBudgetManager is disabled. Not adding/updating workload: {}", workload);
-      return;
-    }
-
-    _workloadBudgets.compute(workload, (key, existingBudget) -> new Budget(cpuBudgetNs, memoryBudgetBytes));
-    LOGGER.info("Updated budget for workload: {} -> CPU: {}ns, Memory: {} bytes", workload, cpuBudgetNs,
-        memoryBudgetBytes);
-  }
-
-  public void deleteWorkload(String workload) {
-    if (!_enabled) {
-      LOGGER.info("WorkloadBudgetManager is disabled. Not deleting workload: {}", workload);
-      return;
-    }
-    _workloadBudgets.remove(workload);
-    LOGGER.info("Removed workload: {}", workload);
-  }
-
-  /**
-   * Collects workload stats for CPU and memory usage.
-   * Could be overridden for custom implementations
-   */
-  protected void collectWorkloadStats(String workload, BudgetStats stats) {
-    // Default implementation does nothing.
-  }
-
-  /**
-   * Attempts to charge CPU and memory usage against the workload budget (Thread-Safe).
-   * Returns the remaining budget for CPU and memory after charge.
-   */
-  public BudgetStats tryCharge(String workload, long cpuUsedNs, long memoryUsedBytes) {
-    if (!_enabled) {
-      return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
-    }
-
-    Budget budget = _workloadBudgets.get(workload);
-    if (budget == null) {
-      LOGGER.warn("No budget found for workload: {}", workload);
-      return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
-    }
-    return budget.tryCharge(cpuUsedNs, memoryUsedBytes);
-  }
-
-  /**
-   * Retrieves the initial and remaining budget for a workload.
-   */
-  public BudgetStats getBudgetStats(String workload) {
-    if (!_enabled) {
-      return null;
-    }
-    Budget budget = _workloadBudgets.get(workload);
-    return budget != null ? budget.getStats() : null;
-  }
-
-  /**
-   * Retrieves the total remaining budget across all workloads (Thread-Safe).
-   */
-  public BudgetStats getRemainingBudgetAcrossAllWorkloads() {
-    if (!_enabled) {
-      return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
-    }
-    long totalCpuBudget =
-        _workloadBudgets.values().stream().mapToLong(budget -> budget.getStats()._initialCpuBudget).sum();
-    long totalMemoryBudget =
-        _workloadBudgets.values().stream().mapToLong(budget -> budget.getStats()._initialMemoryBudget).sum();
-    long totalCpuRemaining =
-        _workloadBudgets.values().stream().mapToLong(budget -> budget.getStats()._cpuRemaining).sum();
-    long totalMemRemaining =
-        _workloadBudgets.values().stream().mapToLong(budget -> budget.getStats()._memoryRemaining).sum();
-    return new BudgetStats(totalCpuBudget, totalMemoryBudget, totalCpuRemaining, totalMemRemaining);
-  }
-
-  /**
-   * Periodically resets budgets at the end of each enforcement window (Thread-Safe).
-   */
-  private void startBudgetResetTask() {
-    LOGGER.debug("Starting budget reset task with enforcement window: {}ms", _enforcementWindowMs);
-    _resetScheduler.scheduleAtFixedRate(() -> {
-      LOGGER.debug("Resetting all workload budgets.");
-      // Also print the budget used in the last enforcement window.
-      _workloadBudgets.forEach((workload, budget) -> {
-        BudgetStats stats = budget.getStats();
-        LOGGER.debug("Workload: {} -> CPU: {}ns, Memory: {} bytes", workload, stats._cpuRemaining,
-            stats._memoryRemaining);
-        collectWorkloadStats(workload, stats);
-        // Reset the budget.
-        budget.reset();
-      });
-    }, _enforcementWindowMs, _enforcementWindowMs, TimeUnit.MILLISECONDS);
-  }
-
-  /**
-   * Determines whether a query for the given workload can be admitted under CPU-only budgets.
-   *
-   * <p>Admission rules:
-   * <ol>
-   *   <li>If the manager is disabled or no budget exists for the workload, always admit.</li>
-   *   <li>If CPU budget remains above zero, admit immediately.</li>
-   *   <li>Otherwise, reject (return false).</li>
-   * </ol>
-   *
-   * <p>Note: This method currently uses a strict check, where CPU and memory budgets must be above zero.
-   * This may be relaxed in the future to allow for a percentage of other remaining budget to be used. At that point,
-   * we can have different admission policies like: Strict, Stealing, etc.
-   *
-   * @param workload the workload identifier to check budget for
-   * @return true if the query may be accepted; false if budget is insufficient
-   */
-  public boolean canAdmitQuery(String workload) {
-    // If disabled or no budget configured, always admit
-    if (!_enabled) {
-      return true;
-    }
-    Budget budget = _workloadBudgets.get(workload);
-    if (budget == null) {
-      LOGGER.debug("No budget found for workload: {}", workload);
-      return true;
-    }
-    BudgetStats stats = budget.getStats();
-    return stats._cpuRemaining > 0 && stats._memoryRemaining > 0;
-  }
-
-  public Map<String, BudgetStats> getAllBudgetStats() {
-    if (!_enabled) {
-      return null;
-    }
-    Map<String, BudgetStats> allStats = new ConcurrentHashMap<>();
-    _workloadBudgets.forEach((workload, budget) -> allStats.put(workload, budget.getStats()));
-    return allStats;
-  }
-
-  /**
-   * Internal class representing budget statistics.
-   * It contains initial CPU and memory budgets that are configured during workload registration,
-   * as well as the remaining CPU and memory budgets during runtime in an enforcement window.
-   */
-  public static class BudgetStats {
+  /// Internal class representing budget statistics.
+  /// It contains initial CPU and memory budgets that are configured during workload registration,
+  /// as well as the remaining CPU and memory budgets during runtime in an enforcement window.
+  class BudgetStats {
     public final long _initialCpuBudget;
     public final long _initialMemoryBudget;
 
@@ -273,10 +83,8 @@ public class WorkloadBudgetManager {
     }
   }
 
-  /**
-   * Internal class representing a budget with CPU and memory constraints.
-   */
-  public class Budget {
+  /// Internal class representing a budget with CPU and memory constraints.
+  class Budget {
     private final long _initialCpuBudget;
     private final long _initialMemoryBudget;
 
@@ -290,11 +98,9 @@ public class WorkloadBudgetManager {
       _memoryRemaining = new AtomicLong(memoryBudgetBytes);
     }
 
-    /**
-     * Attempts to charge CPU and memory usage independently.
-     * This method is not atomic across CPU and memory.
-     * If either budget is insufficient, the caller is expected to cancel the query.
-     */
+    /// Attempts to charge CPU and memory usage independently.
+    /// This method is not atomic across CPU and memory.
+    /// If either budget is insufficient, the caller is expected to cancel the query.
     public BudgetStats tryCharge(long cpuUsedNs, long memoryUsedBytes) {
       // Charge the budget. It is possible that memory or CPU remaining goes negative.
       _memoryRemaining.addAndGet(-memoryUsedBytes);
@@ -303,17 +109,13 @@ public class WorkloadBudgetManager {
       return new BudgetStats(_initialCpuBudget, _initialMemoryBudget, _cpuRemaining.get(), _memoryRemaining.get());
     }
 
-    /**
-     * Resets the budget back to its original limits.
-     */
+    /// Resets the budget back to its original limits.
     public void reset() {
       _cpuRemaining.set(_initialCpuBudget);
       _memoryRemaining.set(_initialMemoryBudget);
     }
 
-    /**
-     * Gets the budget stats that provides initial and remaining CPU and memory budgets.
-     */
+    /// Gets the budget stats that provides initial and remaining CPU and memory budgets.
     public BudgetStats getStats() {
       return new BudgetStats(_initialCpuBudget, _initialMemoryBudget, _cpuRemaining.get(), _memoryRemaining.get());
     }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.datatable;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.io.DataInput;
@@ -26,30 +27,29 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * A map that stores statistics.
- * <p>
- * Statistics must be keyed by an enum that implements {@link StatMap.Key}.
- * <p>
- * A stat map efficiently store, serialize and deserialize these statistics.
- * <p>
- * Serialization and deserialization is backward and forward compatible as long as the only change in the keys are:
- * <ul>
- *   <li>Adding new keys</li>
- *   <li>Change the name of the keys</li>
- * </ul>
- *
- * Any other change (like changing the type of key, changing their literal order or removing keys)
- * are backward incompatible changes.
- * @param <K>
- */
+/// A map that stores statistics.
+///
+/// Statistics must be keyed by an enum that implements [StatMap.Key].
+///
+/// A stat map efficiently store, serialize and deserialize these statistics.
+///
+/// Serialization and deserialization is backward and forward compatible as long as the only change in the keys are:
+///
+/// - Adding new keys
+/// - Change the name of the keys
+///
+/// Any other change (like changing the type of key, changing their literal order or removing keys)
+/// are backward incompatible changes.
+/// @param <K>
 public class StatMap<K extends Enum<K> & StatMap.Key> {
   private final Class<K> _keyClass;
   private final Map<K, Object> _map;
@@ -149,11 +149,27 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     return this;
   }
 
-  /**
-   * Returns the value associated with the key.
-   * <p>
-   * Primitives will be boxed, so it is recommended to use the specific methods for each type.
-   */
+  public Set<String> getStringSet(K key) {
+    Preconditions.checkArgument(key.getType() == Type.STRING_SET, "Key %s is of type %s, not STRING_SET", key,
+        key.getType());
+    Object o = _map.get(key);
+    return o == null ? Set.of() : (Set<String>) o;
+  }
+
+  public StatMap<K> merge(K key, Set<String> value) {
+    Set<String> oldValue = getStringSet(key);
+    Set<String> newValue = key.merge(oldValue, value);
+    if (newValue.isEmpty()) {
+      _map.remove(key);
+    } else {
+      _map.put(key, Collections.unmodifiableSet(new LinkedHashSet<>(newValue)));
+    }
+    return this;
+  }
+
+  /// Returns the value associated with the key.
+  ///
+  /// Primitives will be boxed, so it is recommended to use the specific methods for each type.
   public Object getAny(K key) {
     switch (key.getType()) {
       case BOOLEAN:
@@ -164,21 +180,21 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         return getLong(key);
       case STRING:
         return getString(key);
+      case STRING_SET:
+        return getStringSet(key);
       default:
         throw new IllegalArgumentException("Unsupported type: " + key.getType());
     }
   }
 
-  /**
-   * Returns the value associated with the key name.
-   *
-   * In general, it is better to use the type-specific getters with the enum key directly, but sometimes it is
-   * impossible or requires complex to read code (like complex unsafe casts).
-   *
-   * @param keyName The name of the key.
-   * @param defaultValue The default value to return if the key is not found.
-   * @throws ClassCastException if the value cannot be cast to the same static type as the default value.
-   */
+  /// Returns the value associated with the key name.
+  ///
+  /// In general, it is better to use the type-specific getters with the enum key directly, but sometimes it is
+  /// impossible or requires complex to read code (like complex unsafe casts).
+  ///
+  /// @param keyName The name of the key.
+  /// @param defaultValue The default value to return if the key is not found.
+  /// @throws ClassCastException if the value cannot be cast to the same static type as the default value.
   public <E> E getUnsafe(String keyName, E defaultValue)
       throws ClassCastException {
     K key = getKey(keyName);
@@ -188,12 +204,10 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     return (E) getAny(key);
   }
 
-  /**
-   * Modifies this object to merge the values of the other object.
-   *
-   * @param other The object to merge with. This argument will not be modified.
-   * @return this object once it is modified.
-   */
+  /// Modifies this object to merge the values of the other object.
+  ///
+  /// @param other The object to merge with. This argument will not be modified.
+  /// @return this object once it is modified.
   public StatMap<K> merge(StatMap<K> other) {
     Preconditions.checkState(_keyClass.equals(other._keyClass),
         "Different key classes %s and %s", _keyClass, other._keyClass);
@@ -215,6 +229,9 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
           break;
         case STRING:
           merge(key, (String) value);
+          break;
+        case STRING_SET:
+          merge(key, (Set<String>) value);
           break;
         default:
           throw new IllegalArgumentException("Unsupported type: " + key.getType());
@@ -260,6 +277,14 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
           break;
         case STRING:
           merge(key, input.readUTF());
+          break;
+        case STRING_SET:
+          int size = input.readInt();
+          LinkedHashSet<String> values = new LinkedHashSet<>(size);
+          for (int j = 0; j < size; j++) {
+            values.add(input.readUTF());
+          }
+          merge(key, values);
           break;
         default:
           throw new IllegalStateException("Unknown type " + key.getType());
@@ -309,6 +334,18 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
             }
           } else {
             node.put(key.getStatName(), (String) value);
+          }
+          break;
+        case STRING_SET:
+          if (value == null) {
+            if (key.includeDefaultInJson()) {
+              node.putArray(key.getStatName());
+            }
+          } else {
+            ArrayNode arrayNode = node.putArray(key.getStatName());
+            for (String stringValue : (Set<String>) value) {
+              arrayNode.add(stringValue);
+            }
           }
           break;
         default:
@@ -366,6 +403,18 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
           }
           break;
         }
+        case STRING_SET: {
+          Set<String> value = getStringSet(key);
+          if (!value.isEmpty()) {
+            writtenKeys++;
+            output.writeByte(ordinal);
+            output.writeInt(value.size());
+            for (String stringValue : value) {
+              output.writeUTF(stringValue);
+            }
+          }
+          break;
+        }
         default:
           throw new IllegalStateException("Unknown type " + key.getType());
       }
@@ -396,6 +445,12 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         case STRING:
           if (value == null) {
             throw new IllegalStateException("String value must be non-null but null is stored for key " + key);
+          }
+          break;
+        case STRING_SET:
+          if (value == null || ((Set<String>) value).isEmpty()) {
+            throw new IllegalStateException("String set value must be non-empty but " + value + " is stored for key "
+                + key);
           }
           break;
         default:
@@ -470,9 +525,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   public interface Key {
     String name();
 
-    /**
-     * The name of the stat used to report it. Names must be unique on the same key family.
-     */
+    /// The name of the stat used to report it. Names must be unique on the same key family.
     default String getStatName() {
       return getDefaultStatName(this);
     }
@@ -493,9 +546,13 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       return value2 != null ? value2 : value1;
     }
 
-    /**
-     * The type of the values associated to this key.
-     */
+    default Set<String> merge(Set<String> value1, Set<String> value2) {
+      LinkedHashSet<String> merged = new LinkedHashSet<>(value1);
+      merged.addAll(value2);
+      return merged;
+    }
+
+    /// The type of the values associated to this key.
     Type getType();
 
     default boolean includeDefaultInJson() {
@@ -540,6 +597,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     BOOLEAN,
     INT,
     LONG,
-    STRING
+    STRING,
+    STRING_SET
   }
 }

@@ -24,26 +24,26 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 public class CsvParserTest {
-    @Test
-    public void testEscapeTrueTrimFalse() {
-        String input = " \\,.\n\t()[]{}\"':=-_$\\?@&|#+/,:=[]$@&|#";
-        List<String> actualParsedOutput = CsvParser.parse(input, true, false);
-        List<String> expectedParsedOutput = Arrays.asList(" ,.\n\t()[]{}\"':=-_$\\?@&|#+/", ":=[]$@&|#");
-        Assert.assertEquals(actualParsedOutput, expectedParsedOutput);
-        Assert.assertEquals(CsvParser.serialize(actualParsedOutput, true, false), input);
-    }
+  @Test
+  public void testEscapeTrueTrimFalse() {
+    String input = " \\,.\n\t()[]{}\"':=-_$\\?@&|#+/,:=[]$@&|#";
+    List<String> actualParsedOutput = CsvParser.parse(input, true, false);
+    List<String> expectedParsedOutput = Arrays.asList(" ,.\n\t()[]{}\"':=-_$\\?@&|#+/", ":=[]$@&|#");
+    Assert.assertEquals(actualParsedOutput, expectedParsedOutput);
+    Assert.assertEquals(CsvParser.serialize(actualParsedOutput, true, false), input);
+  }
 
-    @Test
-    public void testEscapeTrueTrimTrue() {
-        String input = " \\,.\n\t()[]{}\"':=-_$\\?@&|#+/,:=[]$@&|#";
-        List<String> expectedOutput = Arrays.asList(",.\n\t()[]{}\"':=-_$\\?@&|#+/", ":=[]$@&|#");
-        Assert.assertEquals(CsvParser.parse(input, true, true), expectedOutput);
-    }
+  @Test
+  public void testEscapeTrueTrimTrue() {
+    String input = " \\,.\n\t()[]{}\"':=-_$\\?@&|#+/,:=[]$@&|#";
+    List<String> expectedOutput = Arrays.asList(",.\n\t()[]{}\"':=-_$\\?@&|#+/", ":=[]$@&|#");
+    Assert.assertEquals(CsvParser.parse(input, true, true), expectedOutput);
+  }
 
-    @Test
-    public void testEscapeFalseTrimTrue() {
-        String input = "abc\\,def.ghi, abc.def.ghi\n";
-        List<String> expectedOutput = Arrays.asList("abc\\", "def.ghi", "abc.def.ghi");
-        Assert.assertEquals(CsvParser.parse(input, false, true), expectedOutput);
-    }
+  @Test
+  public void testEscapeFalseTrimTrue() {
+    String input = "abc\\,def.ghi, abc.def.ghi\n";
+    List<String> expectedOutput = Arrays.asList("abc\\", "def.ghi", "abc.def.ghi");
+    Assert.assertEquals(CsvParser.parse(input, false, true), expectedOutput);
+  }
 }

@@ -23,10 +23,8 @@ import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
 
 
-/**
- * Operators that implements this interface can define how to be sorted in an AND, as defined in
- * {@link FilterOperatorUtils.Implementation#}.
- */
+/// Operators that implements this interface can define how to be sorted in an AND, as defined in
+/// [FilterOperatorUtils.Implementation#].
 public interface PrioritizedFilterOperator<T extends Block> extends Operator<T> {
 
   int HIGH_PRIORITY = 0;
@@ -38,15 +36,13 @@ public interface PrioritizedFilterOperator<T extends Block> extends Operator<T> 
   int EXPRESSION_PRIORITY = 1000;
   int UNKNOWN_FILTER_PRIORITY = 10000;
 
-  /**
-   * Priority is a number that is used to compare different filters. Some predicates, like AND, sort their sub
-   * predicates in order to first apply the ones that should be more efficient.
-   *
-   * For example, {@link SortedIndexBasedFilterOperator} is assigned to {@link #HIGH_PRIORITY},
-   * {@link BitmapBasedFilterOperator} is assigned to {@link #MEDIUM_PRIORITY} and {@link H3IndexFilterOperator} to
-   * {@link #LOW_PRIORITY}
-   *
-   * @return the priority of this filter operator or an empty optional if no special priority should be used.
-   */
+  /// Priority is a number that is used to compare different filters. Some predicates, like AND, sort their sub
+  /// predicates in order to first apply the ones that should be more efficient.
+  ///
+  /// For example, [SortedIndexBasedFilterOperator] is assigned to [#HIGH_PRIORITY],
+  /// [BitmapBasedFilterOperator] is assigned to [#MEDIUM_PRIORITY] and [H3IndexFilterOperator] to
+  /// [#LOW_PRIORITY]
+  ///
+  /// @return the priority of this filter operator or an empty optional if no special priority should be used.
   OptionalInt getPriority();
 }

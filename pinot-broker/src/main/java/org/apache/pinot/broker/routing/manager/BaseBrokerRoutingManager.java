@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -31,6 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -39,6 +39,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import org.apache.commons.collections4.CollectionUtils;
@@ -105,28 +106,25 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code RoutingManager} manages the routing of all tables hosted by the broker instance. It listens to the cluster
- * changes and updates the routing components accordingly.
- * <p>The following methods are provided:
- * <ul>
- *   <li>{@link #buildRouting(String)}: Builds/rebuilds the routing for a table</li>
- *   <li>{@link #removeRouting(String)}: Removes the routing for a table</li>
- *   <li>{@link #refreshSegment(String, String)}: Refreshes the metadata for a segment</li>
- *   <li>{@link #routingExists(String)}: Returns whether the routing exists for a table</li>
- *   <li>{@link #getRoutingTable(BrokerRequest, long)}: Returns the routing table for a query</li>
- *   <li>{@link #getTimeBoundaryInfo(String)}: Returns the time boundary info for a table</li>
- *   <li>{@link #getQueryTimeoutMs(String)}: Returns the table-level query timeout in milliseconds for a table</li>
- * </ul>
- *
- * LOCK ORDERING RULE: Always acquire locks in this order to prevent deadlocks:
- * 1. _globalLock (read or write)
- * 2. _routingTableBuildLocks (per rawTableName, grouping OFFLINE and REALTIME tables under a single lock)
- * Never hold table locks when trying to acquire global lock.
- *
- * TODO: Expose RoutingEntry class to get a consistent view in the broker request handler and save the redundant map
- *       lookups.
- */
+/// The `RoutingManager` manages the routing of all tables hosted by the broker instance. It listens to the
+/// cluster changes and updates the routing components accordingly.
+///
+/// The following methods are provided:
+///   - [#buildRouting(String)]: Builds/rebuilds the routing for a table
+///   - [#removeRouting(String)]: Removes the routing for a table
+///   - [#refreshSegment(String, String)]: Refreshes the metadata for a segment
+///   - [#routingExists(String)]: Returns whether the routing exists for a table
+///   - [#getRoutingTable(BrokerRequest, long)]: Returns the routing table for a query
+///   - [#getTimeBoundaryInfo(String)]: Returns the time boundary info for a table
+///   - [#getQueryTimeoutMs(String)]: Returns the table-level query timeout in milliseconds for a table
+///
+/// LOCK ORDERING RULE: Always acquire locks in this order to prevent deadlocks:
+/// 1. \_globalLock (read or write)
+/// 2. \_routingTableBuildLocks (per rawTableName, grouping OFFLINE and REALTIME tables under a single lock)
+/// Never hold table locks when trying to acquire global lock.
+///
+/// TODO: Expose RoutingEntry class to get a consistent view in the broker request handler and save the redundant map
+///       lookups.
 public abstract class BaseBrokerRoutingManager implements RoutingManager, ClusterChangeHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRoutingManager.class);
 
@@ -138,9 +136,18 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final PinotConfiguration _pinotConfig;
   private final boolean _enablePartitionMetadataManager;
+  private final long _newSegmentExpirationMs;
   private final ExecutorService _executorService;
   @Nullable
   private Consumer<ServerInstance> _serverReenableCallback;
+
+  // Providers of extra per-table segment ZK metadata fetch listeners, registered alongside the built-in segment
+  // pruners on every table's routing entry. Each provider is invoked once per table (with the table name with type)
+  // and may return null to skip that table. Lets deployments attach routing-adjacent metadata caches that observe the
+  // same ZNRecords the routing manager already fetches, without extra ZK reads. CopyOnWriteArrayList because providers
+  // are added once at startup but iterated concurrently across per-table routing builds.
+  private final List<Function<String, SegmentZkMetadataFetchListener>> _extraFetchListenerProviders =
+      new CopyOnWriteArrayList<>();
 
   // Global read-write lock for protecting the global data structures such as _enabledServerInstanceMap,
   // _excludedServers, and _routableServerInstanceMap. Write lock must be held if any of these are modified, read lock
@@ -166,7 +173,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   /// servers: its `keySet()` is passed to `InstanceSelector` for per-table selection, and callers that pick workers
   /// outside of per-table instance selection (MSE intermediate-stage worker picking) read the map directly so that
   /// FailureDetector-driven exclusions are honored.
-  private volatile Map<String, ServerInstance> _routableServerInstanceMap = Collections.emptyMap();
+  private volatile Map<String, ServerInstance> _routableServerInstanceMap = Map.of();
 
   // Process assignment change timestamp. Used to check if buildRouting needs to be re-run for a given table to avoid
   // race conditions with processSegmentAssignmentChange()
@@ -180,6 +187,9 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     _enablePartitionMetadataManager =
         pinotConfig.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER,
             CommonConstants.Broker.DEFAULT_ENABLE_PARTITION_METADATA_MANAGER);
+    _newSegmentExpirationMs = TimeUnit.SECONDS.toMillis(
+        pinotConfig.getProperty(CommonConstants.Broker.CONFIG_OF_NEW_SEGMENT_EXPIRATION_SECONDS,
+            CommonConstants.Broker.DEFAULT_VALUE_OF_NEW_SEGMENT_EXPIRATION_SECONDS));
     int processSegmentAssignmentChangeNumThreads =
         pinotConfig.getProperty(CommonConstants.Broker.CONFIG_OF_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM,
             CommonConstants.Broker.DEFAULT_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM);
@@ -197,12 +207,18 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     _propertyStore = helixManager.getHelixPropertyStore();
   }
 
-  /**
-   * Sets a callback to be invoked when a server is re-enabled after being excluded.
-   * This is useful for resetting gRPC channel state to avoid exponential backoff delays.
-   */
+  /// Sets a callback to be invoked when a server is re-enabled after being excluded.
+  /// This is useful for resetting gRPC channel state to avoid exponential backoff delays.
   public void setServerReenableCallback(Consumer<ServerInstance> callback) {
     _serverReenableCallback = callback;
+  }
+
+  /// Registers a provider of an extra [SegmentZkMetadataFetchListener] that is attached to every table's routing
+  /// entry, alongside the built-in segment pruners. The provider is invoked once per table with the table name with
+  /// type and may return `null` to skip a table. Must be called before routing is built (i.e. before the cluster
+  /// change mediator starts) so that all tables pick it up.
+  public void addSegmentZkMetadataFetchListenerProvider(Function<String, SegmentZkMetadataFetchListener> provider) {
+    _extraFetchListenerProviders.add(provider);
   }
 
   private Object getRoutingTableBuildLock(String tableNameWithType) {
@@ -214,10 +230,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     return _routingTableBuildStartTimeMs.computeIfAbsent(tableNameWithType, k -> Long.MIN_VALUE);
   }
 
-  /**
-   * This method is called from a method which is synchronized to prevent multiple calls to process cluster changes
-   * Thus, this cannot have contention with itself, but it can have contention with other methods in this class
-   */
+  /// This method is called from a method which is synchronized to prevent multiple calls to process cluster changes
+  /// Thus, this cannot have contention with itself, but it can have contention with other methods in this class
   @Override
   public void processClusterChange(ChangeType changeType) {
     if (changeType == ChangeType.IDEAL_STATE || changeType == ChangeType.EXTERNAL_VIEW) {
@@ -343,10 +357,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     }
   }
 
-  /**
-   * Returns true if the IS / EV version has changed (irrespective of whether the routing entry was updated), otherwise
-   * return false
-   */
+  /// Returns true if the IS / EV version has changed (irrespective of whether the routing entry was updated), otherwise
+  /// return false
   private boolean processAssignmentChangeForTable(int idealStateVersion, int externalViewVersion,
       RoutingEntry routingEntry) {
     // Table lock must be held prior to calling this helper method
@@ -509,9 +521,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     return true;
   }
 
-  /**
-   * Excludes a server from the routing.
-   */
+  /// Excludes a server from the routing.
   public void excludeServerFromRouting(String instanceId) {
     _globalLock.writeLock().lock();
     try {
@@ -537,7 +547,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     Map<String, ServerInstance> routableServerInstanceMap = new HashMap<>(_routableServerInstanceMap);
     routableServerInstanceMap.remove(instanceId);
     _routableServerInstanceMap = routableServerInstanceMap;
-    List<String> changedServers = Collections.singletonList(instanceId);
+    List<String> changedServers = List.of(instanceId);
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
       String tableNameWithType = routingEntry.getTableNameWithType();
       try {
@@ -554,9 +564,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
         System.currentTimeMillis() - startTimeMs, _routingEntryMap.size());
   }
 
-  /**
-   * Includes a previous excluded server to the routing.
-   */
+  /// Includes a previous excluded server to the routing.
   public void includeServerToRouting(String instanceId) {
     _globalLock.writeLock().lock();
     try {
@@ -586,7 +594,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     Map<String, ServerInstance> routableServerInstanceMap = new HashMap<>(_routableServerInstanceMap);
     routableServerInstanceMap.put(instanceId, serverInstance);
     _routableServerInstanceMap = routableServerInstanceMap;
-    List<String> changedServers = Collections.singletonList(instanceId);
+    List<String> changedServers = List.of(instanceId);
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
       String tableNameWithType = routingEntry.getTableNameWithType();
       try {
@@ -603,10 +611,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
         System.currentTimeMillis() - startTimeMs, _routingEntryMap.size());
   }
 
-  /**
-   * Builds the routing for a logical table. This method is called when a logical table is created or updated.
-   * @param logicalTableName the name of the logical table
-   */
+  /// Builds the routing for a logical table. This method is called when a logical table is created or updated.
+  /// @param logicalTableName the name of the logical table
   public void buildRoutingForLogicalTable(String logicalTableName) {
     _globalLock.readLock().lock();
     try {
@@ -681,10 +687,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     }
   }
 
-  /**
-   * Builds the routing for a table.
-   * @param tableNameWithType the name of the table
-   */
+  /// Builds the routing for a table.
+  /// @param tableNameWithType the name of the table
   public void buildRouting(String tableNameWithType) {
     _globalLock.readLock().lock();
     try {
@@ -807,9 +811,9 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
                 columnPartitionMap.entrySet().iterator().next();
             LOGGER.info("Enabling SegmentPartitionMetadataManager for table: {} on partition column: {}",
                 tableNameWithType, partitionConfig.getKey());
-            partitionMetadataManager =
-                new SegmentPartitionMetadataManager(tableNameWithType, partitionConfig.getKey(),
-                    partitionConfig.getValue().getFunctionName(), partitionConfig.getValue().getNumPartitions());
+            partitionMetadataManager = new SegmentPartitionMetadataManager(tableNameWithType, partitionConfig.getKey(),
+                partitionConfig.getValue().getFunctionName(), partitionConfig.getValue().getNumPartitions(),
+                _newSegmentExpirationMs);
           } else {
             LOGGER.warn(
                 "Cannot enable SegmentPartitionMetadataManager for table: {} with multiple partition columns: {}",
@@ -828,6 +832,12 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       }
       if (partitionMetadataManager != null) {
         segmentZkMetadataFetcher.register(partitionMetadataManager);
+      }
+      for (Function<String, SegmentZkMetadataFetchListener> provider : _extraFetchListenerProviders) {
+        SegmentZkMetadataFetchListener listener = provider.apply(tableNameWithType);
+        if (listener != null) {
+          segmentZkMetadataFetcher.register(listener);
+        }
       }
       segmentZkMetadataFetcher.init(idealState, externalView, preSelectedOnlineSegments);
 
@@ -920,9 +930,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     }
   }
 
-  /**
-   * Returns the online segments (with ONLINE/CONSUMING instances) in the given ideal state.
-   */
+  /// Returns the online segments (with ONLINE/CONSUMING instances) in the given ideal state.
   private static Set<String> getOnlineSegments(IdealState idealState) {
     Map<String, Map<String, String>> segmentAssignment = idealState.getRecord().getMapFields();
     Set<String> onlineSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
@@ -936,9 +944,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     return onlineSegments;
   }
 
-  /**
-   * Removes the routing for the given table.
-   */
+  /// Removes the routing for the given table.
   public void removeRouting(String tableNameWithType) {
     _globalLock.readLock().lock();
     try {
@@ -990,9 +996,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     }
   }
 
-  /**
-   * Removes routing for logical tables
-   */
+  /// Removes routing for logical tables
   public void removeRoutingForLogicalTable(String logicalTableName) {
     _globalLock.readLock().lock();
     try {
@@ -1043,9 +1047,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     }
   }
 
-  /**
-   * Refreshes the metadata for the given segment (called when segment is getting refreshed).
-   */
+  /// Refreshes the metadata for the given segment (called when segment is getting refreshed).
   public void refreshSegment(String tableNameWithType, String segment) {
     _globalLock.readLock().lock();
     try {
@@ -1069,19 +1071,15 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     }
   }
 
-  /**
-   * Returns {@code true} if the routing exists for the given table.
-   */
+  /// Returns `true` if the routing exists for the given table.
   @Override
   public boolean routingExists(String tableNameWithType) {
     return _routingEntryMap.containsKey(tableNameWithType);
   }
 
-  /**
-   * Returns whether the given table is enabled
-   * @param tableNameWithType Table name with type
-   * @return Whether the given table is enabled
-   */
+  /// Returns whether the given table is enabled
+  /// @param tableNameWithType Table name with type
+  /// @return Whether the given table is enabled
   @Override
   public boolean isTableDisabled(String tableNameWithType) {
     RoutingEntry routingEntry = _routingEntryMap.getOrDefault(tableNameWithType, null);
@@ -1092,11 +1090,10 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     }
   }
 
-  /**
-   * Returns the routing table (a map from server instance to list of segments hosted by the server, and a list of
-   * unavailable segments) based on the broker request, or {@code null} if the routing does not exist.
-   * <p>NOTE: The broker request should already have the table suffix (_OFFLINE or _REALTIME) appended.
-   */
+  /// Returns the routing table (a map from server instance to list of segments hosted by the server, and a list of
+  /// unavailable segments) based on the broker request, or `null` if the routing does not exist.
+  ///
+  /// NOTE: The broker request should already have the table suffix (\_OFFLINE or \_REALTIME) appended.
   @Nullable
   @Override
   public RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId) {
@@ -1194,7 +1191,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     assert ((ReentrantReadWriteLock) _globalLock).isWriteLockedByCurrentThread()
         : "buildRoutableServerInstanceMap must be called under _globalLock.writeLock()";
     if (routableServers.isEmpty()) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     Map<String, ServerInstance> map = Maps.newHashMapWithExpectedSize(routableServers.size());
     for (String instanceId : routableServers) {
@@ -1214,11 +1211,10 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     return _externalViewPathPrefix + tableNameWithType;
   }
 
-  /**
-   * Returns the time boundary info for the given offline table, or {@code null} if the routing or time boundary does
-   * not exist.
-   * <p>NOTE: Time boundary info is only available for the offline part of the hybrid table.
-   */
+  /// Returns the time boundary info for the given offline table, or `null` if the routing or time boundary does
+  /// not exist.
+  ///
+  /// NOTE: Time boundary info is only available for the offline part of the hybrid table.
   @Nullable
   @Override
   public TimeBoundaryInfo getTimeBoundaryInfo(String offlineTableName) {
@@ -1262,10 +1258,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     return routingEntry._instanceSelector.getServingInstances();
   }
 
-  /**
-   * Returns the table-level query timeout in milliseconds for the given table, or {@code null} if the timeout is not
-   * configured in the table config.
-   */
+  /// Returns the table-level query timeout in milliseconds for the given table, or `null` if the timeout is not
+  /// configured in the table config.
   @Nullable
   public Long getQueryTimeoutMs(String tableNameWithType) {
     RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
@@ -1459,8 +1453,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
         selectionResult.setNumPrunedSegments(numPrunedSegments);
         return selectionResult;
       } else {
-        return new InstanceSelector.SelectionResult(Pair.of(Collections.emptyMap(), Collections.emptyMap()),
-            Collections.emptyList(), numPrunedSegments);
+        return new InstanceSelector.SelectionResult(Pair.of(Map.of(), Map.of()),
+            List.of(), numPrunedSegments);
       }
     }
 

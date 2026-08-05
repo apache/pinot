@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.index.range;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,7 +58,7 @@ public class RangeIndexType
     extends AbstractIndexType<RangeIndexConfig, RangeIndexReader, CombinedInvertedIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "range";
   private static final List<String> EXTENSIONS =
-      Collections.singletonList(V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION);
+      List.of(V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION);
 
   protected RangeIndexType() {
     super(StandardIndexes.RANGE_ID);
@@ -110,7 +109,7 @@ public class RangeIndexType
     ColumnConfigDeserializer<RangeIndexConfig> fromRangeIndexColumns = (tableConfig, schema) -> {
       List<String> rangeIndexColumns = tableConfig.getIndexingConfig().getRangeIndexColumns();
       if (rangeIndexColumns == null) {
-        return Collections.emptyMap();
+        return Map.of();
       }
       int rangeVersion = tableConfig.getIndexingConfig().getRangeIndexVersion();
       if (rangeVersion == 0) {

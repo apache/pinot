@@ -21,9 +21,7 @@ package org.apache.pinot.core.operator.transform.transformer.timeunit;
 import java.util.concurrent.TimeUnit;
 
 
-/**
- * Implementation of {@link TimeUnitTransformer} to handle time units defined in {@link TimeUnit}.
- */
+/// Implementation of [TimeUnitTransformer] to handle time units defined in [TimeUnit].
 public class JavaTimeUnitTransformer implements TimeUnitTransformer {
   private final TimeUnit _inputTimeUnit;
   private final TimeUnit _outputTimeUnit;

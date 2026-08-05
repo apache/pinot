@@ -47,16 +47,14 @@ public class ControllerZkHelixUtils {
     // Utility class
   }
 
-  /**
-   * Adds a new job metadata entry for a controller job like table rebalance or segment reload into ZK
-   *
-   * @param propertyStore the ZK property store to write to
-   * @param jobId job's UUID
-   * @param jobMetadata the job metadata
-   * @param jobType the controller job type
-   * @param prevJobMetadataChecker to check the previous job metadata before adding new one
-   * @return boolean representing success / failure of the ZK write step
-   */
+  /// Adds a new job metadata entry for a controller job like table rebalance or segment reload into ZK
+  ///
+  /// @param propertyStore the ZK property store to write to
+  /// @param jobId job's UUID
+  /// @param jobMetadata the job metadata
+  /// @param jobType the controller job type
+  /// @param prevJobMetadataChecker to check the previous job metadata before adding new one
+  /// @return boolean representing success / failure of the ZK write step
   public static boolean addControllerJobToZK(ZkHelixPropertyStore<ZNRecord> propertyStore, String jobId,
       Map<String, String> jobMetadata, ControllerJobType jobType,
       Predicate<Map<String, String>> prevJobMetadataChecker) {
@@ -83,13 +81,11 @@ public class ControllerZkHelixUtils {
     }
   }
 
-  /**
-   * Get all controller jobs from ZK for a given set of job types.
-   * @param jobTypes the set of job types to filter
-   * @param jobMetadataChecker a predicate to filter the job metadata
-   * @param propertyStore the ZK property store to read from
-   * @return a map of jobId to job metadata for all the jobs that match the given job types and metadata checker
-   */
+  /// Get all controller jobs from ZK for a given set of job types.
+  /// @param jobTypes the set of job types to filter
+  /// @param jobMetadataChecker a predicate to filter the job metadata
+  /// @param propertyStore the ZK property store to read from
+  /// @return a map of jobId to job metadata for all the jobs that match the given job types and metadata checker
   public static Map<String, Map<String, String>> getAllControllerJobs(Set<ControllerJobType> jobTypes,
       Predicate<Map<String, String>> jobMetadataChecker, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     Map<String, Map<String, String>> controllerJobs = new HashMap<>();
@@ -113,14 +109,12 @@ public class ControllerZkHelixUtils {
     return controllerJobs;
   }
 
-  /**
-   * Expires controller jobs in ZK if the number of jobs exceeds the configured limit for the job type.
-   * The jobs are sorted by submission time, and the oldest inactive jobs are removed first.
-   *
-   * @param jobMetadataMap the map of job metadata entries
-   * @param jobType the controller job type
-   * @return the updated map of job metadata entries after expiring old inactive jobs
-   */
+  /// Expires controller jobs in ZK if the number of jobs exceeds the configured limit for the job type.
+  /// The jobs are sorted by submission time, and the oldest inactive jobs are removed first.
+  ///
+  /// @param jobMetadataMap the map of job metadata entries
+  /// @param jobType the controller job type
+  /// @return the updated map of job metadata entries after expiring old inactive jobs
   @VisibleForTesting
   static Map<String, Map<String, String>> expireControllerJobsInZk(Map<String, Map<String, String>> jobMetadataMap,
       ControllerJobType jobType) {

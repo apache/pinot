@@ -23,16 +23,18 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.DataSchema;
@@ -45,14 +47,19 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * Helper class for trimming and sorting records in the IndexedTable, based on the order by information
- */
+/// Helper class for trimming and sorting records in the IndexedTable, based on the order by information
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class TableResizer {
   private final DataSchema _dataSchema;
   private final boolean _hasFinalInput;
   private final int _numGroupByExpressions;
+  /// Number of key columns preceding the aggregation columns in a record: the group-by (union) columns plus
+  /// the synthetic $groupingId column for grouping-set queries. Equals _numGroupByExpressions otherwise.
+  private final int _numKeyColumns;
+  /// Per grouping set (in ordinal order), the participating union-column indexes; null when the query has no
+  /// grouping sets. Read by the GROUPING()/GROUPING_ID() ORDER BY extractor.
+  @Nullable
+  private final List<int[]> _groupingSets;
   private final Map<ExpressionContext, Integer> _groupByExpressionIndexMap;
   private final AggregationFunction[] _aggregationFunctions;
   private final Map<Pair<FunctionContext, FilterContext>, Integer> _filteredAggregationIndexMap;
@@ -74,6 +81,8 @@ public class TableResizer {
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
     _numGroupByExpressions = groupByExpressions.size();
+    _numKeyColumns = queryContext.getNumGroupByKeyColumns();
+    _groupingSets = queryContext.getGroupingSets();
     _groupByExpressionIndexMap = new HashMap<>();
     for (int i = 0; i < _numGroupByExpressions; i++) {
       _groupByExpressionIndexMap.put(groupByExpressions.get(i), i);
@@ -96,7 +105,9 @@ public class TableResizer {
       comparators[i] = orderByExpression.isAsc() ? Comparator.naturalOrder() : Comparator.reverseOrder();
       nullComparisonResults[i] = orderByExpression.isNullsLast() ? -1 : 1;
     }
-    boolean nullHandlingEnabled = queryContext.isNullHandlingEnabled();
+    /// Grouping-set queries produce genuine null group-key values for rolled-up columns regardless of the
+    /// user's null-handling option, so ORDER BY over a grouping column must use the null-safe comparator.
+    boolean nullHandlingEnabled = queryContext.requiresNullAwareKeySerialization();
     if (nullHandlingEnabled) {
       _intermediateRecordComparator = (o1, o2) -> {
         for (int i = 0; i < _numOrderByExpressions; i++) {
@@ -130,9 +141,7 @@ public class TableResizer {
     }
   }
 
-  /**
-   * Helper method to construct a OrderByValueExtractor based on the given expression.
-   */
+  /// Helper method to construct a OrderByValueExtractor based on the given expression.
   private OrderByValueExtractor getOrderByValueExtractor(ExpressionContext expression) {
     if (expression.getType() == ExpressionContext.Type.LITERAL) {
       return new LiteralExtractor(expression.getLiteral().getStringValue());
@@ -145,6 +154,13 @@ public class TableResizer {
     FunctionContext function = expression.getFunction();
     Preconditions.checkState(function != null, "Failed to find ORDER-BY expression: %s in the GROUP-BY clause",
         expression);
+    String functionName = function.getFunctionName();
+    if (GroupingSets.isGroupingFunction(functionName)) {
+      /// GROUPING(col, ...) / GROUPING_ID(col, ...): computed from the synthetic $groupingId discriminator
+      /// column, mirroring PostAggregationHandler. Without this, the generic post-aggregation path below would
+      /// fail to resolve these context-dependent functions when building the ORDER BY comparator.
+      return new GroupingExtractor(function);
+    }
     FunctionContext aggregation;
     FilterContext filter;
     if (function.getType() == FunctionContext.Type.AGGREGATION) {
@@ -163,13 +179,11 @@ public class TableResizer {
 
     int index = _filteredAggregationIndexMap.get(Pair.of(aggregation, filter));
     // For final aggregate result, we can handle it the same way as group key
-    return _hasFinalInput ? new GroupByExpressionExtractor(_numGroupByExpressions + index)
+    return _hasFinalInput ? new GroupByExpressionExtractor(_numKeyColumns + index)
         : new AggregationFunctionExtractor(index);
   }
 
-  /**
-   * Constructs an IntermediateRecord by extracting the order-by values from the record.
-   */
+  /// Constructs an IntermediateRecord by extracting the order-by values from the record.
   private IntermediateRecord getIntermediateRecord(Key key, Record record) {
     Comparable[] orderByValues = new Comparable[_numOrderByExpressions];
     for (int i = 0; i < _numOrderByExpressions; i++) {
@@ -178,9 +192,7 @@ public class TableResizer {
     return new IntermediateRecord(key, record, orderByValues);
   }
 
-  /**
-   * Resizes the recordsMap to the given size.
-   */
+  /// Resizes the recordsMap to the given size.
   public void resizeRecordsMap(Map<Key, Record> recordsMap, int size) {
     int numRecordsToEvict = recordsMap.size() - size;
     if (numRecordsToEvict <= 0) {
@@ -204,9 +216,7 @@ public class TableResizer {
     }
   }
 
-  /**
-   * Returns a heap of the top records from the recordsMap.
-   */
+  /// Returns a heap of the top records from the recordsMap.
   private IntermediateRecord[] getTopRecordsHeap(Map<Key, Record> recordsMap, int size,
       Comparator<IntermediateRecord> comparator) {
     // Should not reach here when map size <= heap size because there is no need to create a heap
@@ -234,9 +244,7 @@ public class TableResizer {
     return heap;
   }
 
-  /**
-   * Borrowed from {@link it.unimi.dsi.fastutil.objects.ObjectHeaps}.
-   */
+  /// Borrowed from [it.unimi.dsi.fastutil.objects.ObjectHeaps].
   private static void makeHeap(IntermediateRecord[] heap, int size, Comparator<IntermediateRecord> c) {
     int i = size >>> 1;
     while (i-- != 0) {
@@ -244,9 +252,7 @@ public class TableResizer {
     }
   }
 
-  /**
-   * Borrowed from {@link it.unimi.dsi.fastutil.objects.ObjectHeaps} without the redundant checks.
-   */
+  /// Borrowed from [it.unimi.dsi.fastutil.objects.ObjectHeaps] without the redundant checks.
   private static void downHeap(IntermediateRecord[] heap, int size, int i, Comparator<IntermediateRecord> c) {
     IntermediateRecord e = heap[i];
     int child;
@@ -266,9 +272,7 @@ public class TableResizer {
     heap[i] = e;
   }
 
-  /**
-   * Returns the top records from the recordsMap.
-   */
+  /// Returns the top records from the recordsMap.
   public Collection<Record> getTopRecords(Map<Key, Record> recordsMap, int size, boolean sort) {
     return sort ? getSortedTopRecords(recordsMap, size) : getUnsortedTopRecords(recordsMap, size);
   }
@@ -277,7 +281,7 @@ public class TableResizer {
   List<Record> getSortedTopRecords(Map<Key, Record> recordsMap, int size) {
     int numRecords = recordsMap.size();
     if (numRecords == 0) {
-      return Collections.emptyList();
+      return List.of();
     }
     if (numRecords <= size) {
       // Use quick sort if all the records are top records
@@ -321,10 +325,8 @@ public class TableResizer {
     }
   }
 
-  /**
-   * Trims the aggregation results using a heap and returns the top records.
-   * This method is to be called from individual segment if the intermediate results need to be trimmed.
-   */
+  /// Trims the aggregation results using a heap and returns the top records.
+  /// This method is to be called from individual segment if the intermediate results need to be trimmed.
   public List<IntermediateRecord> sortInSegmentResults(GroupKeyGenerator groupKeyGenerator,
       GroupByResultHolder[] groupByResultHolders, int size) {
     // getNumKeys() does not count nulls
@@ -341,10 +343,8 @@ public class TableResizer {
     return arr;
   }
 
-  /**
-   * Trims the aggregation results using a heap and returns the top records.
-   * This method is to be called from individual segment if the intermediate results need to be trimmed.
-   */
+  /// Trims the aggregation results using a heap and returns the top records.
+  /// This method is to be called from individual segment if the intermediate results need to be trimmed.
   public List<IntermediateRecord> trimInSegmentResults(GroupKeyGenerator groupKeyGenerator,
       GroupByResultHolder[] groupByResultHolders, int size, boolean sortOutput) {
     // Should not reach here when numGroups <= heap size because there is no need to create a heap
@@ -384,42 +384,70 @@ public class TableResizer {
     return result;
   }
 
-  /**
-   * Constructs an IntermediateRecord for the given group.
-   */
+  /// Trims the per-segment aggregation results for a GROUP BY GROUPING SETS / ROLLUP / CUBE query, keeping the
+  /// top `perSetSize` groups WITHIN each grouping set, bucketed by the `discriminatorColumnIndex`
+  /// column (the $groupingId value). This keeps each grouping set's own top candidates so that a global
+  /// top-K cannot starve low-magnitude sets (e.g. the grand total). Records across all sets are returned
+  /// unsorted; the broker applies the final ORDER BY + LIMIT across sets.
+  ///
+  /// Like plain GROUP BY segment trim, this is opt-in (it only runs when `minSegmentGroupTrimSize > 0`;
+  /// disabled by default, in which case the segment returns all groups and results are exact) and is an
+  /// approximation: a group ranking below `perSetSize` within its set ON THIS SEGMENT may still be
+  /// globally in the top-K once partial aggregates merge across segments/servers. The per-set bucketing only
+  /// bounds across-set starvation, not this within-set pre-merge approximation inherent to any segment trim.
+  public List<IntermediateRecord> trimInSegmentResultsByGroupingSet(GroupKeyGenerator groupKeyGenerator,
+      GroupByResultHolder[] groupByResultHolders, int perSetSize, int discriminatorColumnIndex) {
+    /// _intermediateRecordComparator orders the best records first. A bounded per-bucket min-heap keyed on
+    /// the reversed comparator keeps its WORST kept record at the head, so it retains the top 'perSetSize'.
+    Comparator<IntermediateRecord> worstFirst = _intermediateRecordComparator.reversed();
+    Map<Integer, PriorityQueue<IntermediateRecord>> bucketsByGroupingId = new HashMap<>();
+    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupKeyGenerator.getGroupKeys();
+    while (groupKeyIterator.hasNext()) {
+      IntermediateRecord record = getIntermediateRecord(groupKeyIterator.next(), groupByResultHolders);
+      int groupingId = ((Number) record._record.getValues()[discriminatorColumnIndex]).intValue();
+      PriorityQueue<IntermediateRecord> heap =
+          bucketsByGroupingId.computeIfAbsent(groupingId, k -> new PriorityQueue<>(worstFirst));
+      if (heap.size() < perSetSize) {
+        heap.offer(record);
+      } else if (_intermediateRecordComparator.compare(record, heap.peek()) < 0) {
+        /// 'record' ranks ahead of this set's current worst kept record: replace it.
+        heap.poll();
+        heap.offer(record);
+      }
+    }
+    List<IntermediateRecord> result = new ArrayList<>();
+    for (PriorityQueue<IntermediateRecord> heap : bucketsByGroupingId.values()) {
+      result.addAll(heap);
+    }
+    return result;
+  }
+
+  /// Constructs an IntermediateRecord for the given group.
   private IntermediateRecord getIntermediateRecord(GroupKeyGenerator.GroupKey groupKey,
       GroupByResultHolder[] groupByResultHolders) {
     int numAggregationFunctions = _aggregationFunctions.length;
-    int numColumns = numAggregationFunctions + _numGroupByExpressions;
+    int numColumns = numAggregationFunctions + _numKeyColumns;
     Object[] keys = groupKey._keys;
     Object[] values = Arrays.copyOf(keys, numColumns);
     int groupId = groupKey._groupId;
     for (int i = 0; i < numAggregationFunctions; i++) {
-      values[_numGroupByExpressions + i] =
+      values[_numKeyColumns + i] =
           _aggregationFunctions[i].extractGroupByResult(groupByResultHolders[i], groupId);
     }
     return getIntermediateRecord(new Key(keys), new Record(values));
   }
 
-  /**
-   * Extractor for the order-by value from a Record.
-   */
+  /// Extractor for the order-by value from a Record.
   private interface OrderByValueExtractor {
 
-    /**
-     * Returns the ColumnDataType of the value extracted.
-     */
+    /// Returns the ColumnDataType of the value extracted.
     ColumnDataType getValueType();
 
-    /**
-     * Extracts the value from the given Record.
-     */
+    /// Extracts the value from the given Record.
     Comparable extract(Record record);
   }
 
-  /**
-   * Extractor for a literal.
-   */
+  /// Extractor for a literal.
   private static class LiteralExtractor implements OrderByValueExtractor {
     final String _literal;
 
@@ -438,9 +466,7 @@ public class TableResizer {
     }
   }
 
-  /**
-   * Extractor for a group-by expression.
-   */
+  /// Extractor for a group-by expression.
   private class GroupByExpressionExtractor implements OrderByValueExtractor {
     final int _index;
 
@@ -459,15 +485,15 @@ public class TableResizer {
     }
   }
 
-  /**
-   * Extractor for an aggregation function.
-   */
+  /// Extractor for an aggregation function.
   private class AggregationFunctionExtractor implements OrderByValueExtractor {
     final int _index;
     final AggregationFunction _aggregationFunction;
 
     AggregationFunctionExtractor(int aggregationFunctionIndex) {
-      _index = aggregationFunctionIndex + _numGroupByExpressions;
+      /// Aggregation columns follow all key columns, which for grouping-set queries include the synthetic
+      /// $groupingId column (_numKeyColumns == _numGroupByExpressions for non-grouping-set queries).
+      _index = aggregationFunctionIndex + _numKeyColumns;
       _aggregationFunction = _aggregationFunctions[aggregationFunctionIndex];
     }
 
@@ -482,9 +508,49 @@ public class TableResizer {
     }
   }
 
-  /**
-   * Extractor for a post-aggregation function.
-   */
+  /// Extractor for `GROUPING(col, ...)` / `GROUPING_ID(col, ...)` in ORDER BY. Mirrors
+  /// `PostAggregationHandler.GroupingValueExtractor`: the value is fully determined by the grouping set
+  /// a row belongs to, so it is precomputed per grouping-set ordinal at construction (first argument = most
+  /// significant bit, PostgreSQL semantics) and extraction is a single lookup on the synthetic
+  /// `$groupingId` ordinal column (immediately after the union group-by columns). Returns 0 when the
+  /// query has no grouping sets (no column is rolled up).
+  private class GroupingExtractor implements OrderByValueExtractor {
+    @Nullable
+    final int[] _valuesByOrdinal;
+    final int _discriminatorIndex;
+
+    GroupingExtractor(FunctionContext function) {
+      List<ExpressionContext> arguments = function.getArguments();
+      Preconditions.checkState(!arguments.isEmpty(), "GROUPING requires at least one argument");
+      int[] argUnionIndexes = new int[arguments.size()];
+      for (int i = 0; i < arguments.size(); i++) {
+        Integer index = _groupByExpressionIndexMap.get(arguments.get(i));
+        Preconditions.checkState(index != null, "GROUPING argument must be a grouping column, got: %s",
+            arguments.get(i));
+        argUnionIndexes[i] = index;
+      }
+      /// The $groupingId column sits right after the union columns; it is absent for non-grouping-set queries.
+      _discriminatorIndex = _numKeyColumns > _numGroupByExpressions ? _numGroupByExpressions : -1;
+      _valuesByOrdinal =
+          _groupingSets != null ? GroupingSets.groupingValuesByOrdinal(_groupingSets, argUnionIndexes) : null;
+    }
+
+    @Override
+    public ColumnDataType getValueType() {
+      return ColumnDataType.INT;
+    }
+
+    @Override
+    public Comparable extract(Record record) {
+      if (_discriminatorIndex < 0 || _valuesByOrdinal == null) {
+        return 0;
+      }
+      int ordinal = ((Number) record.getValues()[_discriminatorIndex]).intValue();
+      return _valuesByOrdinal[ordinal];
+    }
+  }
+
+  /// Extractor for a post-aggregation function.
   private class PostAggregationFunctionExtractor implements OrderByValueExtractor {
     final Object[] _arguments;
     final OrderByValueExtractor[] _argumentExtractors;

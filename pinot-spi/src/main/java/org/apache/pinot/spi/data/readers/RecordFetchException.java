@@ -21,16 +21,14 @@ package org.apache.pinot.spi.data.readers;
 import java.io.IOException;
 
 
-/**
- * Exception indicating an I/O or data fetch error that may prevent the RecordReader
- * from advancing its pointer to the next record. This exception should be thrown when
- * the RecordReader encounters an error during data fetching that prevents it from
- * moving forward, potentially causing an infinite loop if the same record is repeatedly
- * attempted.
- * <p>
- * When this exception is thrown and continueOnError is enabled, it will count toward
- * the consecutive failure threshold to prevent infinite loops.
- */
+/// Exception indicating an I/O or data fetch error that may prevent the RecordReader
+/// from advancing its pointer to the next record. This exception should be thrown when
+/// the RecordReader encounters an error during data fetching that prevents it from
+/// moving forward, potentially causing an infinite loop if the same record is repeatedly
+/// attempted.
+///
+/// When this exception is thrown and continueOnError is enabled, it will count toward
+/// the consecutive failure threshold to prevent infinite loops.
 public class RecordFetchException extends IOException {
 
   private static final long serialVersionUID = 1L;

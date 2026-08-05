@@ -41,12 +41,10 @@ import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
 
-/**
- * {@code BrokerRequestHandlerDelegate} delegates the inbound broker request to one of the enabled
- * {@link BrokerRequestHandler} based on the requested handle type.
- *
- * {@see: @CommonConstant
- */
+/// `BrokerRequestHandlerDelegate` delegates the inbound broker request to one of the enabled
+/// [BrokerRequestHandler] based on the requested handle type.
+///
+/// {@see: @CommonConstant
 public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   private final BaseSingleStageBrokerRequestHandler _singleStageBrokerRequestHandler;
   private final MultiStageBrokerRequestHandler _multiStageBrokerRequestHandler;
@@ -165,7 +163,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       throws Exception {
     if (_multiStageBrokerRequestHandler != null && _multiStageBrokerRequestHandler.cancelQuery(
         queryId, timeoutMs, executor, connMgr, serverResponses)) {
-        return true;
+      return true;
     }
     return _singleStageBrokerRequestHandler.cancelQuery(queryId, timeoutMs, executor, connMgr, serverResponses);
   }

@@ -21,10 +21,9 @@ package org.apache.pinot.core.query.killing;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
-/**
- * Immutable snapshot of a query-kill event
- */
+/// Immutable snapshot of a query-kill event
 public final class QueryKillReport {
+  private final long _requestId;
   private final String _queryId;
   private final String _tableName;
   private final String _strategyName;
@@ -37,20 +36,20 @@ public final class QueryKillReport {
   private final long _snapshotEntriesScannedPostFilter;
   private final long _elapsedTimeMs;
 
-  /**
-   * Creates a {@code QueryKillReport} by snapshotting the current state of {@code context}.
-   *
-   * @param queryId          unique identifier of the killed query
-   * @param tableName        fully-qualified table name (e.g. {@code myTable_OFFLINE})
-   * @param strategyName     name of the kill strategy that triggered the kill
-   * @param triggeringMetric name of the metric that exceeded the threshold
-   * @param actualValue      observed metric value at kill time
-   * @param thresholdValue   configured threshold that was exceeded
-   * @param configSource     source of the threshold config (e.g. {@code TABLE_CONFIG})
-   * @param context          live scan-cost context; values are snapshotted immediately
-   */
-  public QueryKillReport(String queryId, String tableName, String strategyName, String triggeringMetric,
+  /// Creates a `QueryKillReport` by snapshotting the current state of `context`.
+  ///
+  /// @param requestId        server request ID for tracing
+  /// @param queryId          unique identifier of the killed query
+  /// @param tableName        fully-qualified table name (e.g. `myTable_OFFLINE`)
+  /// @param strategyName     name of the kill strategy that triggered the kill
+  /// @param triggeringMetric name of the metric that exceeded the threshold
+  /// @param actualValue      observed metric value at kill time
+  /// @param thresholdValue   configured threshold that was exceeded
+  /// @param configSource     source of the threshold config (e.g. `TABLE_CONFIG`)
+  /// @param context          live scan-cost context; values are snapshotted immediately
+  public QueryKillReport(long requestId, String queryId, String tableName, String strategyName, String triggeringMetric,
       long actualValue, long thresholdValue, String configSource, QueryScanCostContext context) {
+    _requestId = requestId;
     _queryId = queryId;
     _tableName = tableName;
     _strategyName = strategyName;
@@ -66,6 +65,10 @@ public final class QueryKillReport {
   }
 
   // ----- Getters -----
+
+  public long getRequestId() {
+    return _requestId;
+  }
 
   public String getQueryId() {
     return _queryId;
@@ -113,35 +116,31 @@ public final class QueryKillReport {
 
   // ----- Message formatters -----
 
-  /**
-   * Returns a user-facing message describing why the query was killed and what action to take.
-   *
-   * <p>Numbers are formatted with commas (e.g. {@code 1,234,567}) for readability.
-   * Includes actionable advice about adding a missing index to reduce scan cost.</p>
-   */
+  /// Returns a user-facing message describing why the query was killed and what action to take.
+  ///
+  /// Numbers are formatted with commas (e.g. `1,234,567`) for readability.
+  /// Includes actionable advice about adding a missing index to reduce scan cost.
   public String toCustomerMessage() {
     return String.format(
-        "Query '%s' on table '%s' was killed because '%s' (%,d) exceeded the threshold (%,d) "
+        "Query '%s' (requestId=%d) on table '%s' was killed because '%s' (%,d) exceeded the threshold (%,d) "
             + "configured in %s. "
             + "At kill time: entriesScannedInFilter=%,d, docsScanned=%,d, "
             + "entriesScannedPostFilter=%,d, elapsedMs=%d. "
             + "To reduce scan cost, consider adding a missing index (e.g. inverted or range index) "
             + "on the filter columns.",
-        _queryId, _tableName, _triggeringMetric, _actualValue, _thresholdValue, _configSource,
+        _queryId, _requestId, _tableName, _triggeringMetric, _actualValue, _thresholdValue, _configSource,
         _snapshotEntriesScannedInFilter, _snapshotDocsScanned, _snapshotEntriesScannedPostFilter, _elapsedTimeMs);
   }
 
-  /**
-   * Returns a structured log line suitable for grep and alerting pipelines.
-   *
-   * <p>Format: {@code QUERY_KILLED key=value ...} with plain (non-comma-formatted) numbers.</p>
-   */
+  /// Returns a structured log line suitable for grep and alerting pipelines.
+  ///
+  /// Format: `QUERY_KILLED key=value ...` with plain (non-comma-formatted) numbers.
   public String toInternalLogMessage() {
     return String.format(
-        "QUERY_KILLED queryId=%s table=%s strategy=%s metric=%s actual=%d threshold=%d "
+        "QUERY_KILLED requestId=%d queryId=%s table=%s strategy=%s metric=%s actual=%d threshold=%d "
             + "configSource=%s entriesScannedInFilter=%d docsScanned=%d "
             + "entriesScannedPostFilter=%d elapsedMs=%d",
-        _queryId, _tableName, _strategyName, _triggeringMetric, _actualValue, _thresholdValue,
+        _requestId, _queryId, _tableName, _strategyName, _triggeringMetric, _actualValue, _thresholdValue,
         _configSource, _snapshotEntriesScannedInFilter, _snapshotDocsScanned,
         _snapshotEntriesScannedPostFilter, _elapsedTimeMs);
   }

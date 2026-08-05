@@ -43,10 +43,8 @@ public class TimeSeriesResponseMapper {
   private TimeSeriesResponseMapper() {
   }
 
-  /**
-   * Creates a BrokerResponseNativeV2 from a TimeSeriesBlock.
-   * This method converts the time series data into a format compatible with the broker response.
-   */
+  /// Creates a BrokerResponseNativeV2 from a TimeSeriesBlock.
+  /// This method converts the time series data into a format compatible with the broker response.
   public static BrokerResponse toBrokerResponse(TimeSeriesBlock timeSeriesBlock) {
     BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     if (timeSeriesBlock == null) {
@@ -77,8 +75,8 @@ public class TimeSeriesResponseMapper {
   private static DataSchema deriveDataSchemaFromTimeSeriesBlock(TimeSeriesBlock timeSeriesBlock) {
     List<String> columnNames = new ArrayList<>(List.of(TS_COLUMN, VALUES_COLUMN, NAME_COLUMN));
     List<DataSchema.ColumnDataType> columnTypes = new ArrayList<>(List.of(
-      DataSchema.ColumnDataType.LONG_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY,
-      DataSchema.ColumnDataType.STRING));
+        DataSchema.ColumnDataType.LONG_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY,
+        DataSchema.ColumnDataType.STRING));
 
     // Add tag columns if any series exist
     if (!timeSeriesBlock.getSeriesMap().isEmpty()) {
@@ -97,7 +95,7 @@ public class TimeSeriesResponseMapper {
   }
 
   private static List<Object[]> deriveRowsFromTimeSeriesBlock(TimeSeriesBlock timeSeriesBlock,
-    String[] columnNames) {
+      String[] columnNames) {
     List<Object[]> rows = new ArrayList<>();
     if (columnNames.length == 0) {
       return rows;

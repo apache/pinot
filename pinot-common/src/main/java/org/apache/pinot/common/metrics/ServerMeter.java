@@ -22,11 +22,10 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.spi.metrics.PinotMeter;
 
 
-/**
- * Enumeration containing all the meters exposed by the Pinot server.
- */
+/// Enumeration containing all the meters exposed by the Pinot server.
 public enum ServerMeter implements AbstractMetrics.Meter {
   QUERIES("queries", true),
+  QUERIES_ON_TABLE("queries", false),
   UNCAUGHT_EXCEPTIONS("exceptions", true),
   REQUEST_DESERIALIZATION_EXCEPTIONS("exceptions", true),
   RESPONSE_SERIALIZATION_EXCEPTIONS("exceptions", true),
@@ -144,11 +143,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   RESPONSE_SER_MEM_ALLOCATED_BYTES("bytes", false),
   TOTAL_MEM_ALLOCATED_BYTES("bytes", false),
   LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false),
-  /**
-   * Size of the initially serialized query response in bytes.
-   * Note: This may differ from the final response actually sent to the broker if the response
-   * is later replaced (for example, when exceeding the configured max response size).
-   */
+  /// Size of the initially serialized query response in bytes.
+  /// Note: This may differ from the final response actually sent to the broker if the response
+  /// is later replaced (for example, when exceeding the configured max response size).
   QUERY_RESPONSE_SIZE("bytes", false,
       "Size of the initially serialized query response in bytes (may differ from final response sent to broker)"),
 
@@ -159,52 +156,36 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   TABLE_CONFIG_AND_SCHEMA_REFRESH_FAILURES("tables", true, "Number of failures to refresh table config and schema"),
 
   // Multi-stage
-  /**
-   * Number of times the max number of rows in the hash table has been reached.
-   * It is increased at most one by one each time per stage.
-   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
-   * But if a single query has 2 different join operators and each one reaches the limit, this will be increased by 2.
-   */
+  /// Number of times the max number of rows in the hash table has been reached.
+  /// It is increased at most one by one each time per stage.
+  /// That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
+  /// But if a single query has 2 different join operators and each one reaches the limit, this will be increased by 2.
   HASH_JOIN_TIMES_MAX_ROWS_REACHED("times", true),
-  /**
-   * Number of times group by results were trimmed.
-   * It is increased in one by each worker that reaches the limit within the stage.
-   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
-   */
+  /// Number of times group by results were trimmed.
+  /// It is increased in one by each worker that reaches the limit within the stage.
+  /// That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
   AGGREGATE_TIMES_GROUPS_TRIMMED("times", true),
-  /**
-   * Number of times the max number of groups has been reached.
-   * It is increased in one by each worker that reaches the limit within the stage.
-   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
-   */
+  /// Number of times the max number of groups has been reached.
+  /// It is increased in one by each worker that reaches the limit within the stage.
+  /// That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
   AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED("times", true),
-  /**
-   * Number of times the warning threshold for number of groups has been reached.
-   * It is increased in one by each worker that reaches the limit within the stage.
-   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
-   */
+  /// Number of times the warning threshold for number of groups has been reached.
+  /// It is increased in one by each worker that reaches the limit within the stage.
+  /// That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
   AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED("times", true),
-  /**
-   * The number of blocks that have been sent to the next stage without being serialized.
-   * This is the sum of all blocks sent by all workers in the stage.
-   */
+  /// The number of blocks that have been sent to the next stage without being serialized.
+  /// This is the sum of all blocks sent by all workers in the stage.
   MULTI_STAGE_IN_MEMORY_MESSAGES("messages", true),
-  /**
-   * The number of blocks that have been sent to the next stage in serialized format.
-   * This is the sum of all blocks sent by all workers in the stage.
-   */
+  /// The number of blocks that have been sent to the next stage in serialized format.
+  /// This is the sum of all blocks sent by all workers in the stage.
   MULTI_STAGE_RAW_MESSAGES("messages", true),
-  /**
-   * The number of bytes that have been sent to the next stage in serialized format.
-   * This is the sum of all bytes sent by all workers in the stage.
-   */
+  /// The number of bytes that have been sent to the next stage in serialized format.
+  /// This is the sum of all bytes sent by all workers in the stage.
   MULTI_STAGE_RAW_BYTES("bytes", true),
-  /**
-   * Number of times the max number of rows in window has been reached.
-   * It is increased at most one by one each time per stage.
-   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
-   * But if a single query has 2 different window operators and each one reaches the limit, this will be increased by 2.
-   */
+  /// Number of times the max number of rows in window has been reached. It is increased at most one by one each time
+  /// per stage. That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
+  /// But if a single query has 2 different window operators and each one reaches the limit, this will be increased by
+  /// 2.
   WINDOW_TIMES_MAX_ROWS_REACHED("times", true),
 
   /// Number of tasks started by the MSE query runner
@@ -221,6 +202,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   PREDOWNLOAD_SEGMENT_DOWNLOAD_FAILURE_COUNT("predownloadSegmentFailureCount", true),
   PREDOWNLOAD_SUCCEED("predownloadSucceed", true),
   PREDOWNLOAD_FAILED("predownloadFailed", true),
+  PREDOWNLOAD_PEER_SEGMENT_DOWNLOAD_COUNT("predownloadPeerSegmentCount", true),
+  PREDOWNLOAD_PEER_SEGMENT_DOWNLOAD_FAILURE_COUNT("predownloadPeerSegmentFailureCount", false),
+  PREDOWNLOAD_DEEPSTORE_DOWNLOAD_COUNT("predownloadDeepstoreDownloadCount", true),
 
   // reingestion metrics
   SEGMENT_REINGESTION_FAILURE("segments", false),
@@ -244,12 +228,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   COMMIT_TIME_COMPACTION_BUILD_TIME_MS("milliseconds", false,
       "Additional time spent in commit-time compaction processing"),
 
-  /**
-   * Approximate heap bytes used by the mutable JSON index at the time of index close.
-   */
+  /// Approximate heap bytes used by the mutable JSON index at the time of index close.
   MUTABLE_JSON_INDEX_MEMORY_USAGE("bytes", false),
-  // Workload Budget exceeded counter
-  WORKLOAD_BUDGET_EXCEEDED("workloadBudgetExceeded", false, "Number of times workload budget exceeded"),
   INGESTION_DELAY_TRACKING_ERRORS("errors", false,
       "Indicates the count of errors encountered while tracking ingestion delay."),
   INGESTION_DELAY_LATEST_OFFSET_FETCH_ERRORS("errors", false,
@@ -259,6 +239,11 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   TRANSFORMATION_ERROR_COUNT("rows", false),
   DROPPED_RECORD_COUNT("rows", false),
   CORRUPTED_RECORD_COUNT("rows", false),
+  OPEN_STRUCT_TYPE_COERCION_FAILURES("values", false,
+      "Number of OPEN_STRUCT values dropped because the value could not be coerced to the key's inferred type"),
+  // Workload related metrics
+  WORKLOAD_BUDGET_EXCEEDED("workloadBudgetExceeded", true, "Number of times workload budget exceeded"),
+  WORKLOAD_QUERIES("queries", false),
 
   /// Number of multi-stage execution opchains started.
   /// This is equal to the number of stages times the average parallelism
@@ -308,11 +293,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
     return _unit;
   }
 
-  /**
-   * Returns true if the metric is global (not attached to a particular resource)
-   *
-   * @return true if the metric is global
-   */
+  /// Returns true if the metric is global (not attached to a particular resource)
+  ///
+  /// @return true if the metric is global
   @Override
   public boolean isGlobal() {
     return _global;

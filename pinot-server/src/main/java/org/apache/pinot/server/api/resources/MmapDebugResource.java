@@ -27,8 +27,8 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -52,9 +52,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-/**
- * Debug endpoint to check memory allocation.
- */
+/// Debug endpoint to check memory allocation.
 @Api(value = "debug", description = "Debug information", tags = "Debug",
     authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
         @Authorization(value = DATABASE)})
@@ -113,6 +111,6 @@ public class MmapDebugResource {
     }
 
     long memoryConsumed = realtimeTableDataManager.getStatsHistory().getLatestSegmentMemoryConsumed();
-    return ResourceUtils.convertToJsonString(Collections.singletonMap("offheapMemoryConsumed", memoryConsumed));
+    return ResourceUtils.convertToJsonString(Map.of("offheapMemoryConsumed", memoryConsumed));
   }
 }

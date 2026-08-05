@@ -26,11 +26,9 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
-/**
- * A class to hold the details regarding a request and the statistics.
- * This object can be used to publish the query processing statistics to a stream for
- * post-processing at a finer level than metrics.
- */
+/// A class to hold the details regarding a request and the statistics.
+/// This object can be used to publish the query processing statistics to a stream for
+/// post-processing at a finer level than metrics.
 public class DefaultRequestContext implements RequestScope {
 
   private static final String DEFAULT_TABLE_NAME = "NotYetParsed";
@@ -505,6 +503,11 @@ public class DefaultRequestContext implements RequestScope {
   @Override
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _isNumGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  @Override
+  public void setMseLiteLeafStageLimitReached(boolean mseLiteLeafStageLimitReached) {
+    // No-op: not tracked in default context
   }
 
   @Override

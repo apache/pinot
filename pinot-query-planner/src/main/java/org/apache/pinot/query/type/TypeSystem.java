@@ -25,24 +25,24 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 
 
-/**
- * The {@code TypeSystem} overwrites Calcite type system with Pinot specific logics.
- */
+/// The `TypeSystem` overwrites Calcite type system with Pinot specific logics.
 public class TypeSystem extends RelDataTypeSystemImpl {
   public static final TypeSystem INSTANCE = new TypeSystem();
 
   private static final int MAX_DECIMAL_SCALE = 1000;
   private static final int MAX_DECIMAL_PRECISION = 2000;
 
-  /**
-   * Default precision for derived arithmetic decimal types(plus/multiply/divide/mod). We won't allow the return
-   * precision to be larger than this value majorly due to the following reasons:
-   * <ul><li>1. Precision computation is very costly, it should be explicitly specified</li>
-   * <li>2. Work around the type hoist issue when doing de-correlation decimal type mismatch. See:
-   * <a href="https://github.com/apache/pinot/pull/11151">Derive SUM return type to be PostgreSQL compatible</a>
-   * for more details
-   * </li></ul>
-   */
+  // Pinot stores TIMESTAMP as epoch-millis (LONG), i.e. millisecond precision (3 fractional digits). This is also
+  // Calcite's MAX_DATETIME_PRECISION, so 3 is both the default and the max for TIMESTAMP and no clamping occurs.
+  private static final int TIMESTAMP_PRECISION_MILLIS = 3;
+
+  /// Default precision for derived arithmetic decimal types(plus/multiply/divide/mod). We won't allow the return
+  /// precision to be larger than this value majorly due to the following reasons:
+  ///
+  /// - 1. Precision computation is very costly, it should be explicitly specified
+  /// - 2. Work around the type hoist issue when doing de-correlation decimal type mismatch. See:
+  ///   [Derive SUM return type to be PostgreSQL compatible](https://github.com/apache/pinot/pull/11151)
+  ///   for more details
   private static final int DERIVED_DECIMAL_PRECISION = 19;
   private static final int DERIVED_DECIMAL_SCALE = 1;
 
@@ -62,14 +62,14 @@ public class TypeSystem extends RelDataTypeSystemImpl {
     return true;
   }
 
+  // Pinot raises the max DECIMAL precision/scale far above the SQL standard via the type-specific
+  // getMaxScale(DECIMAL)/getMaxPrecision(DECIMAL) overrides below. The no-arg getMaxNumericScale()/
+  // getMaxNumericPrecision() became final in Calcite 1.42.0 (CALCITE-7351) and now delegate to
+  // getMaxScale(DECIMAL)/getMaxPrecision(DECIMAL), so overriding them is no longer possible - and no longer
+  // necessary, since that delegation already yields MAX_DECIMAL_SCALE/MAX_DECIMAL_PRECISION.
   @Override
   public int getMaxScale(SqlTypeName typeName) {
     return typeName == SqlTypeName.DECIMAL ? MAX_DECIMAL_SCALE : super.getMaxScale(typeName);
-  }
-
-  @Override
-  public int getMaxNumericScale() {
-    return MAX_DECIMAL_SCALE;
   }
 
   @Override
@@ -83,13 +83,17 @@ public class TypeSystem extends RelDataTypeSystemImpl {
   }
 
   @Override
-  public int getMaxNumericPrecision() {
-    return MAX_DECIMAL_PRECISION;
-  }
-
-  @Override
   public int getDefaultPrecision(SqlTypeName typeName) {
-    return typeName == SqlTypeName.DECIMAL ? MAX_DECIMAL_PRECISION : super.getDefaultPrecision(typeName);
+    if (typeName == SqlTypeName.DECIMAL) {
+      return MAX_DECIMAL_PRECISION;
+    }
+    if (typeName == SqlTypeName.TIMESTAMP) {
+      // Calcite's default TIMESTAMP precision is 0 (whole seconds), which truncates sub-second epoch-millis literals
+      // during constant folding (RexBuilder.clean -> TimestampString.round). Pin it to millisecond precision so folded
+      // TIMESTAMP literals preserve millis and round-trip Pinot's LONG storage. See issue #18881.
+      return TIMESTAMP_PRECISION_MILLIS;
+    }
+    return super.getDefaultPrecision(typeName);
   }
 
   @Override
@@ -118,6 +122,15 @@ public class TypeSystem extends RelDataTypeSystemImpl {
       case SMALLINT:
       case INTEGER:
       case BIGINT:
+      // Calcite 1.41+ (CALCITE-1466) makes unsigned integer types reachable under BABEL conformance. Widen the
+      // supported ones to (signed) BIGINT for SUM exactly like their signed counterparts; Calcite passes the operand
+      // type to deriveSumType directly (no unsigned->signed coercion), so without these arms a SUM over a sub-64-bit
+      // unsigned column would keep its narrow type and silently overflow a 32-bit INT when accumulating many rows.
+      // UBIGINT is intentionally omitted: it is unsupported (rejected during plan conversion) because no signed type
+      // holds its full 0..2^64-1 range.
+      case UTINYINT:
+      case USMALLINT:
+      case UINTEGER:
         return typeFactory.createTypeWithNullability(typeFactory.createSqlType(SqlTypeName.BIGINT),
             argumentType.isNullable());
       default:

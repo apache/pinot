@@ -36,30 +36,27 @@ import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 
 
-/**
- * This class is a hackish way to adapt Pinot explain plan into Calcite explain plan.
- *
- * While in Calcite both logical and physical operators are represented by classes that extend RelNode, in multi-stage
- * Pinot plans we first optimize {@link RelNode RelNodes} at logical level in the broker and then we transform send
- * these RelNodes to the server (using {@code org.apache.pinot.query.planner.plannode.PlanNode} as intermediate format).
- *
- * Servers then extract leaf nodes from the stage, trying to execute as much as possible in a leaf operator. In that
- * leaf operator is where nodes are compiled into single-stage physical operators
- * (aka {@link org.apache.pinot.core.operator.BaseOperator}), which include important information like whether indexes
- * are being used or not.
- *
- * {@link PinotExplainedRelNode} is a way to represent these single-stage operators in Calcite.
- * <b>They are not meant to be executed</b>.
- * Instead, when physical explain is required, the broker ask for the final plan to each server. They return
- * a PlanNode and the broker then converts these PlanNodes into a PinotExplainedRelNode. The logical plan is then
- * modified to substitute the nodes that were converted into single-stage physical plans with the corresponding
- * PinotExplainedRelNode.
- */
+/// This class is a hackish way to adapt Pinot explain plan into Calcite explain plan.
+///
+/// While in Calcite both logical and physical operators are represented by classes that extend RelNode, in
+/// multi-stage Pinot plans we first optimize [`RelNodes`]\[RelNode\] at logical level in the broker and then
+/// we transform send these RelNodes to the server (using
+/// `org.apache.pinot.query.planner.plannode.PlanNode` as intermediate format).
+///
+/// Servers then extract leaf nodes from the stage, trying to execute as much as possible in a leaf operator. In that
+/// leaf operator is where nodes are compiled into single-stage physical operators
+/// (aka [org.apache.pinot.core.operator.BaseOperator]), which include important information like whether indexes
+/// are being used or not.
+///
+/// [PinotExplainedRelNode] is a way to represent these single-stage operators in Calcite.
+/// **They are not meant to be executed**.
+/// Instead, when physical explain is required, the broker ask for the final plan to each server. They return
+/// a PlanNode and the broker then converts these PlanNodes into a PinotExplainedRelNode. The logical plan is then
+/// modified to substitute the nodes that were converted into single-stage physical plans with the corresponding
+/// PinotExplainedRelNode.
 public class PinotExplainedRelNode extends AbstractRelNode {
 
-  /**
-   * The name of this node, whose role is like a title in the explain plan.
-   */
+  /// The name of this node, whose role is like a title in the explain plan.
   private final String _type;
   private final Map<String, Plan.ExplainNode.AttributeValue> _attributes;
   private final List<RelNode> _inputs;

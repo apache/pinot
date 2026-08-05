@@ -46,6 +46,13 @@
     <module name="AnnotationUseStyle">
       <property name="elementStyle" value="ignore"/>
     </module>
+    <!-- Method annotations belong on their own line before modifiers -->
+    <module name="AnnotationLocation">
+      <property name="tokens" value="METHOD_DEF"/>
+      <property name="allowSamelineSingleParameterlessAnnotation" value="false"/>
+      <property name="allowSamelineParameterizedAnnotation" value="false"/>
+      <property name="allowSamelineMultipleAnnotations" value="false"/>
+    </module>
     <!-- Ensure @Override is present when {@inheritDoc} Javadoc tag is present -->
     <module name="MissingOverride"/>
     <!-- Package level annotations belong in package-info.java -->
@@ -202,7 +209,23 @@
 
     <!-- JAVADOC COMMENTS -->
 
-    <!-- If you have a Javadoc comment, make sure it is properly formed -->
+    <!-- Doc comments must use the /// markdown form (JEP 467), not /** */.
+         The pattern deliberately does not match:
+           - the ASF license header, identified by its text rather than its position, since a
+             handful of files place it below the package/import statements
+           - /*** ... ***/ decorative separators, which are not documentation
+           - /** appearing mid-line, e.g. inside a SQL string literal in a test -->
+    <module name="Regexp">
+      <property name="format"
+                value="(?m)^[ \t]*/\*\*(?!\*)(?![\s\S]{0,60}?Licensed to the Apache Software Foundation)"/>
+      <property name="illegalPattern" value="true"/>
+      <property name="message"
+                value="Use /// markdown doc comments (JEP 467) instead of /** */ Javadoc."/>
+    </module>
+
+    <!-- If you have a Javadoc comment, make sure it is properly formed.
+         NOTE: this only inspects /** */ comments, so it no longer applies to the /// doc
+         comments that the codebase now uses. -->
     <module name="JavadocStyle">
       <property name="checkFirstSentence" value="false"/>
     </module>
@@ -245,6 +268,14 @@
 
     <!-- WHITESPACE -->
 
+    <module name="Indentation">
+      <property name="basicOffset" value="2"/>
+      <property name="braceAdjustment" value="0"/>
+      <property name="caseIndent" value="2"/>
+      <property name="throwsIndent" value="4"/>
+      <property name="lineWrappingIndentation" value="4"/>
+      <property name="arrayInitIndent" value="2"/>
+    </module>
     <module name="GenericWhitespace"/>
     <module name="MethodParamPad"/>
     <module name="NoWhitespaceAfter">
@@ -341,5 +372,19 @@
   <module name="RegexpSingleline">
     <property name="format" value="StringUtils\.replace\("/>
     <property name="message" value="StringUtils.replace() is deprecated. Use Strings.CS.replace() instead."/>
+  </module>
+
+  <!-- Modern Java collection guards: use Java immutable collection factories for empty collection literals. -->
+  <module name="RegexpSingleline">
+    <property name="format" value="Collections(\.|::)emptyList\b"/>
+    <property name="message" value="java.util.Collections empty list factory is disallowed. Use List.of() instead."/>
+  </module>
+  <module name="RegexpSingleline">
+    <property name="format" value="Collections(\.|::)emptySet\b"/>
+    <property name="message" value="java.util.Collections empty set factory is disallowed. Use Set.of() instead."/>
+  </module>
+  <module name="RegexpSingleline">
+    <property name="format" value="Collections(\.|::)emptyMap\b"/>
+    <property name="message" value="java.util.Collections empty map factory is disallowed. Use Map.of() instead."/>
   </module>
 </module>

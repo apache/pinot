@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,10 +37,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.builder.UrlBuilderUtils;
 
 
-/**
- * Client for segment administration operations.
- * Provides methods to manage and query Pinot segments.
- */
+/// Client for segment administration operations.
+/// Provides methods to manage and query Pinot segments.
 public class SegmentAdminClient extends BaseServiceAdminClient {
 
   public SegmentAdminClient(PinotAdminTransport transport, String controllerAddress,
@@ -49,40 +46,34 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     super(transport, controllerAddress, headers);
   }
 
-  /**
-   * Lists all segments for a table.
-   *
-   * @param tableName Name of the table
-   * @param excludeReplacedSegments Whether to exclude replaced segments
-   * @return List of segment names
-   * @throws PinotAdminException If the request fails
-   */
+  /// Lists all segments for a table.
+  ///
+  /// @param tableName Name of the table
+  /// @param excludeReplacedSegments Whether to exclude replaced segments
+  /// @return List of segment names
+  /// @throws PinotAdminException If the request fails
   public List<String> listSegments(String tableName, boolean excludeReplacedSegments)
       throws PinotAdminException {
     return listSegments(tableName, null, excludeReplacedSegments);
   }
 
-  /**
-   * Lists all segments for a table (including replaced segments).
-   *
-   * @param tableName Name of the table
-   * @return List of segment names
-   * @throws PinotAdminException If the request fails
-   */
+  /// Lists all segments for a table (including replaced segments).
+  ///
+  /// @param tableName Name of the table
+  /// @return List of segment names
+  /// @throws PinotAdminException If the request fails
   public List<String> listSegments(String tableName)
       throws PinotAdminException {
     return listSegments(tableName, null, false);
   }
 
-  /**
-   * Lists segments for a table with optional table type filtering.
-   *
-   * @param tableName Name of the table
-   * @param tableType Table type (OFFLINE/REALTIME), nullable
-   * @param excludeReplacedSegments Whether to exclude replaced segments
-   * @return List of segment names
-   * @throws PinotAdminException If the request fails
-   */
+  /// Lists segments for a table with optional table type filtering.
+  ///
+  /// @param tableName Name of the table
+  /// @param tableType Table type (OFFLINE/REALTIME), nullable
+  /// @param excludeReplacedSegments Whether to exclude replaced segments
+  /// @return List of segment names
+  /// @throws PinotAdminException If the request fails
   public List<String> listSegments(String tableName, String tableType, boolean excludeReplacedSegments)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
@@ -98,13 +89,11 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return parseSegmentList(response);
   }
 
-  /**
-   * Gets a map from server to segments hosted by the server for a table.
-   *
-   * @param tableName Name of the table
-   * @return Server to segments map
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets a map from server to segments hosted by the server for a table.
+  ///
+  /// @param tableName Name of the table
+  /// @return Server to segments map
+  /// @throws PinotAdminException If the request fails
   public String getServerToSegmentsMap(String tableName)
       throws PinotAdminException {
     JsonNode response =
@@ -112,21 +101,17 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Lists segment lineage for a table in chronologically sorted order.
-   *
-   * @param tableName Name of the table
-   * @return Segment lineage as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Lists segment lineage for a table in chronologically sorted order.
+  ///
+  /// @param tableName Name of the table
+  /// @return Segment lineage as JSON string
+  /// @throws PinotAdminException If the request fails
   public String listSegmentLineage(String tableName)
       throws PinotAdminException {
     return listSegmentLineage(tableName, null);
   }
 
-  /**
-   * Lists segment lineage for a table in chronologically sorted order with explicit table type.
-   */
+  /// Lists segment lineage for a table in chronologically sorted order with explicit table type.
   public String listSegmentLineage(String tableName, String tableType)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
@@ -139,13 +124,11 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Gets a map from segment to CRC of the segment (only for OFFLINE tables).
-   *
-   * @param tableName Name of the table
-   * @return Segment to CRC map
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets a map from segment to CRC of the segment (only for OFFLINE tables).
+  ///
+  /// @param tableName Name of the table
+  /// @return Segment to CRC map
+  /// @throws PinotAdminException If the request fails
   public Map<String, String> getSegmentToCrcMap(String tableName)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/segments/" + tableName + "/crc", null, _headers);
@@ -154,22 +137,20 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
       crcNode = response;
     }
     if (crcNode == null || crcNode.isNull()) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     Map<String, String> crcMap =
         PinotAdminTransport.getObjectMapper().convertValue(crcNode, new TypeReference<Map<String, String>>() {
         });
-    return crcMap != null ? crcMap : Collections.emptyMap();
+    return crcMap != null ? crcMap : Map.of();
   }
 
-  /**
-   * Gets a map from server to segments hosted by the server for a table.
-   *
-   * @param tableName Name of the table
-   * @param tableType Table type (OFFLINE/REALTIME), nullable
-   * @return Server to segments map
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets a map from server to segments hosted by the server for a table.
+  ///
+  /// @param tableName Name of the table
+  /// @param tableType Table type (OFFLINE/REALTIME), nullable
+  /// @return Server to segments map
+  /// @throws PinotAdminException If the request fails
   public Map<String, List<String>> getServerToSegmentsMapAsMap(String tableName, String tableType)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
@@ -180,12 +161,12 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
         queryParams.isEmpty() ? null : queryParams, _headers);
 
     if (response == null || !response.isArray() || response.isEmpty()) {
-      return Collections.emptyMap();
+      return Map.of();
     }
 
     JsonNode serversMapNode = response.get(0).get("serverToSegmentsMap");
     if (serversMapNode == null || !serversMapNode.isObject()) {
-      return Collections.emptyMap();
+      return Map.of();
     }
 
     Map<String, List<String>> result = new HashMap<>();
@@ -200,15 +181,13 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return result;
   }
 
-  /**
-   * Gets the metadata for a specific segment.
-   *
-   * @param tableName Name of the table
-   * @param segmentName Name of the segment
-   * @param columns Specific columns to include (optional)
-   * @return Segment metadata
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets the metadata for a specific segment.
+  ///
+  /// @param tableName Name of the table
+  /// @param segmentName Name of the segment
+  /// @param columns Specific columns to include (optional)
+  /// @return Segment metadata
+  /// @throws PinotAdminException If the request fails
   public Map<String, Object> getSegmentMetadata(String tableName, String segmentName,
       List<String> columns)
       throws PinotAdminException {
@@ -219,14 +198,12 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
         });
   }
 
-  /**
-   * Downloads a segment tarball for the given table and segment.
-   *
-   * @param tableName Name of the table (with or without type suffix)
-   * @param segmentName Name of the segment
-   * @return Segment tarball bytes
-   * @throws PinotAdminException If the request fails
-   */
+  /// Downloads a segment tarball for the given table and segment.
+  ///
+  /// @param tableName Name of the table (with or without type suffix)
+  /// @param segmentName Name of the segment
+  /// @return Segment tarball bytes
+  /// @throws PinotAdminException If the request fails
   public byte[] downloadSegment(String tableName, String segmentName)
       throws PinotAdminException {
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
@@ -234,14 +211,12 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return _transport.executeGetBinary(_controllerAddress, path, null, _headers);
   }
 
-  /**
-   * Gets metadata for all segments of a table, optionally filtered by table type.
-   *
-   * @param tableName Name of the table
-   * @param tableType Optional table type (OFFLINE/REALTIME)
-   * @return Segment metadata map as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets metadata for all segments of a table, optionally filtered by table type.
+  ///
+  /// @param tableName Name of the table
+  /// @param tableType Optional table type (OFFLINE/REALTIME)
+  /// @return Segment metadata map as JSON string
+  /// @throws PinotAdminException If the request fails
   public String getSegmentsMetadata(String tableName, String tableType)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
@@ -253,9 +228,7 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Gets metadata for all segments of a table with only table type specified.
-   */
+  /// Gets metadata for all segments of a table with only table type specified.
   public String getSegmentsMetadata(String tableNameWithType)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/segments/" + tableNameWithType + "/metadata", null,
@@ -263,16 +236,14 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Gets metadata for all segments of a table with optional column and segment filters.
-   *
-   * @param tableName Name of the table
-   * @param columns Optional list of columns to include
-   * @param segments Optional list of segments to include
-   * @param tableType Optional table type (OFFLINE/REALTIME)
-   * @return Segment metadata map as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets metadata for all segments of a table with optional column and segment filters.
+  ///
+  /// @param tableName Name of the table
+  /// @param columns Optional list of columns to include
+  /// @param segments Optional list of segments to include
+  /// @param tableType Optional table type (OFFLINE/REALTIME)
+  /// @return Segment metadata map as JSON string
+  /// @throws PinotAdminException If the request fails
   public String getSegmentsMetadata(String tableName, List<String> columns, List<String> segments, String tableType)
       throws PinotAdminException {
     JsonNode response =
@@ -281,15 +252,13 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Resets a segment by disabling it, waiting for external view to stabilize, and enabling it again.
-   *
-   * @param tableNameWithType Table name with type suffix
-   * @param segmentName Name of the segment
-   * @param targetInstance Target instance to reset (optional)
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Resets a segment by disabling it, waiting for external view to stabilize, and enabling it again.
+  ///
+  /// @param tableNameWithType Table name with type suffix
+  /// @param segmentName Name of the segment
+  /// @param targetInstance Target instance to reset (optional)
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String resetSegment(String tableNameWithType, String segmentName, String targetInstance)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
@@ -302,22 +271,18 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Resets all segments or error segments only for a table.
-   *
-   * @param tableNameWithType Table name with type suffix
-   * @param errorSegmentsOnly Whether to reset only error segments
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Resets all segments or error segments only for a table.
+  ///
+  /// @param tableNameWithType Table name with type suffix
+  /// @param errorSegmentsOnly Whether to reset only error segments
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String resetSegments(String tableNameWithType, boolean errorSegmentsOnly)
       throws PinotAdminException {
     return resetSegments(tableNameWithType, errorSegmentsOnly, null);
   }
 
-  /**
-   * Resets all segments or error segments only for a table, optionally scoped to a target instance.
-   */
+  /// Resets all segments or error segments only for a table, optionally scoped to a target instance.
   public String resetSegments(String tableNameWithType, boolean errorSegmentsOnly, String targetInstance)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
@@ -331,15 +296,13 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Deletes a specific segment.
-   *
-   * @param tableName Name of the table
-   * @param segmentName Name of the segment
-   * @param retentionPeriod Retention period for the segment (optional)
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Deletes a specific segment.
+  ///
+  /// @param tableName Name of the table
+  /// @param segmentName Name of the segment
+  /// @param retentionPeriod Retention period for the segment (optional)
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String deleteSegment(String tableName, String segmentName, String retentionPeriod)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
@@ -352,25 +315,21 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Deletes multiple segments specified in query parameters or all segments if none specified.
-   *
-   * @param tableName Name of the table
-   * @param segmentNames Comma-separated list of segment names to delete (optional)
-   * @param retentionPeriod Retention period for the segments (optional)
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Deletes multiple segments specified in query parameters or all segments if none specified.
+  ///
+  /// @param tableName Name of the table
+  /// @param segmentNames Comma-separated list of segment names to delete (optional)
+  /// @param retentionPeriod Retention period for the segments (optional)
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String deleteMultipleSegments(String tableName, String segmentNames,
       String retentionPeriod)
       throws PinotAdminException {
     return deleteMultipleSegments(tableName, null, segmentNames, retentionPeriod);
   }
 
-  /**
-   * Deletes multiple segments specified in query parameters or all segments if none specified, with explicit table
-   * type support.
-   */
+  /// Deletes multiple segments specified in query parameters or all segments if none specified, with explicit table
+  /// type support.
   public String deleteMultipleSegments(String tableName, String tableType, String segmentNames,
       String retentionPeriod)
       throws PinotAdminException {
@@ -405,14 +364,12 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return deleteMultipleSegments(tableName, tableType, segmentNames, retentionPeriod);
   }
 
-  /**
-   * Deletes segments specified in JSON array payload.
-   *
-   * @param tableName Name of the table
-   * @param segmentDeleteRequest Segment delete request as JSON string
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Deletes segments specified in JSON array payload.
+  ///
+  /// @param tableName Name of the table
+  /// @param segmentDeleteRequest Segment delete request as JSON string
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String deleteSegments(String tableName, String segmentDeleteRequest)
       throws PinotAdminException {
     JsonNode response = _transport.executePost(_controllerAddress, "/segments/" + tableName + "/delete",
@@ -420,9 +377,7 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Deletes segments within a time window.
-   */
+  /// Deletes segments within a time window.
   public String deleteSegmentsByTimeWindow(String tableName, String tableType, long startTimestampMs,
       long endTimestampMs, boolean excludeOverlapping, boolean excludeReplacedSegments, String retentionPeriod)
       throws PinotAdminException {
@@ -448,55 +403,50 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return deleteSegmentsByTimeWindow(tableName, null, startTimestampMs, endTimestampMs, true, false, null);
   }
 
-  /**
-   * Selects segments based on time range criteria.
-   *
-   * @param tableName Name of the table
-   * @param startTimestampMs Start timestamp in milliseconds (inclusive)
-   * @param endTimestampMs End timestamp in milliseconds (exclusive)
-   * @param excludeReplacedSegments Whether to exclude replaced segments
-   * @return Selected segments as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Selects segments based on time range criteria.
+  ///
+  /// @param tableName Name of the table
+  /// @param startTimestampMs Start timestamp in milliseconds (inclusive)
+  /// @param endTimestampMs End timestamp in milliseconds (exclusive)
+  /// @param excludeReplacedSegments Whether to exclude replaced segments
+  /// @return Selected segments as JSON string
+  /// @throws PinotAdminException If the request fails
   public String selectSegments(String tableName, long startTimestampMs, long endTimestampMs,
       boolean excludeReplacedSegments)
       throws PinotAdminException {
     return selectSegments(tableName, null, startTimestampMs, endTimestampMs, excludeReplacedSegments);
   }
 
-  /**
-   * Selects segments for a table within a time window with an optional table type filter.
-   *
-   * @param tableName Name of the table
-   * @param tableType Optional table type (OFFLINE or REALTIME)
-   * @param startTimestampMs Start timestamp in milliseconds (inclusive)
-   * @param endTimestampMs End timestamp in milliseconds (exclusive)
-   * @param excludeReplacedSegments Whether to exclude replaced segments
-   * @return Selected segments as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Selects segments for a table within a time window with an optional table type filter.
+  ///
+  /// @param tableName Name of the table
+  /// @param tableType Optional table type (OFFLINE or REALTIME)
+  /// @param startTimestampMs Start timestamp in milliseconds (inclusive)
+  /// @param endTimestampMs End timestamp in milliseconds (exclusive)
+  /// @param excludeReplacedSegments Whether to exclude replaced segments
+  /// @return Selected segments as JSON string
+  /// @throws PinotAdminException If the request fails
   public String selectSegments(String tableName, @Nullable String tableType, long startTimestampMs,
       long endTimestampMs, boolean excludeReplacedSegments)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
-    queryParams.put("startTimestampMs", String.valueOf(startTimestampMs));
-    queryParams.put("endTimestampMs", String.valueOf(endTimestampMs));
+    /// Controller reads startTimestamp/endTimestamp (ms); see PinotSegmentRestletResource#getSegments.
+    queryParams.put("startTimestamp", String.valueOf(startTimestampMs));
+    queryParams.put("endTimestamp", String.valueOf(endTimestampMs));
     queryParams.put("excludeReplacedSegments", String.valueOf(excludeReplacedSegments));
     if (tableType != null) {
       queryParams.put("type", tableType);
     }
-    JsonNode response = _transport.executeGet(_controllerAddress, "/segments/" + tableName + "/select",
+    JsonNode response = _transport.executeGet(_controllerAddress, "/segments/" + tableName,
         queryParams, _headers);
     return response.toString();
   }
 
-  /**
-   * Gets server metadata for all table segments.
-   *
-   * @param tableName Name of the table
-   * @return Server metadata as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets server metadata for all table segments.
+  ///
+  /// @param tableName Name of the table
+  /// @return Server metadata as JSON string
+  /// @throws PinotAdminException If the request fails
   public String getServerMetadata(String tableName)
       throws PinotAdminException {
     JsonNode response =
@@ -504,15 +454,13 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Reloads all segments for a table.
-   *
-   * @param tableName Name of the table
-   * @param tableType Table type (OFFLINE/REALTIME)
-   * @param forceDownload Whether to force download of segments
-   * @return Reload response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Reloads all segments for a table.
+  ///
+  /// @param tableName Name of the table
+  /// @param tableType Table type (OFFLINE/REALTIME)
+  /// @param forceDownload Whether to force download of segments
+  /// @return Reload response
+  /// @throws PinotAdminException If the request fails
   public String reloadTable(String tableName, String tableType, boolean forceDownload)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
@@ -526,14 +474,12 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Checks whether a reload is needed for a table.
-   *
-   * @param tableNameWithType Table name with type suffix
-   * @param verbose Whether to return verbose information
-   * @return Reload check response with per-server details
-   * @throws PinotAdminException If the request fails
-   */
+  /// Checks whether a reload is needed for a table.
+  ///
+  /// @param tableNameWithType Table name with type suffix
+  /// @param verbose Whether to return verbose information
+  /// @return Reload check response with per-server details
+  /// @throws PinotAdminException If the request fails
   public TableSegmentsReloadCheckResponse checkIfReloadIsNeeded(String tableNameWithType, boolean verbose)
       throws PinotAdminException {
     Map<String, String> queryParams = Map.of("verbose", String.valueOf(verbose));
@@ -547,15 +493,13 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     }
   }
 
-  /**
-   * Reloads a specific segment for a table.
-   *
-   * @param tableName Name of the table
-   * @param segmentName Name of the segment
-   * @param forceDownload Whether to force download
-   * @return Reload response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Reloads a specific segment for a table.
+  ///
+  /// @param tableName Name of the table
+  /// @param segmentName Name of the segment
+  /// @param forceDownload Whether to force download
+  /// @return Reload response
+  /// @throws PinotAdminException If the request fails
   public String reloadSegment(String tableName, String segmentName, boolean forceDownload)
       throws PinotAdminException {
     Map<String, String> queryParams = Map.of("forceDownload", String.valueOf(forceDownload));
@@ -565,13 +509,11 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Gets the status of a segment reload job.
-   *
-   * @param jobId Job id returned from the reload request
-   * @return Reload status response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets the status of a segment reload job.
+  ///
+  /// @param jobId Job id returned from the reload request
+  /// @return Reload status response
+  /// @throws PinotAdminException If the request fails
   public String getSegmentReloadStatus(String jobId)
       throws PinotAdminException {
     JsonNode response =
@@ -579,9 +521,7 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Gets the status of a segment reload job as a {@link PinotTableReloadStatusResponse}.
-   */
+  /// Gets the status of a segment reload job as a [PinotTableReloadStatusResponse].
   public PinotTableReloadStatusResponse getSegmentReloadStatusObject(String jobId)
       throws PinotAdminException {
     JsonNode response =
@@ -593,13 +533,11 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     }
   }
 
-  /**
-   * Gets a list of segments that are stale from servers hosting the table.
-   *
-   * @param tableNameWithType Table name with type suffix
-   * @return Stale segments response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets a list of segments that are stale from servers hosting the table.
+  ///
+  /// @param tableNameWithType Table name with type suffix
+  /// @return Stale segments response
+  /// @throws PinotAdminException If the request fails
   public String getStaleSegments(String tableNameWithType)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/segments/" + tableNameWithType + "/isStale",
@@ -607,9 +545,7 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Gets stale segments as a typed response object.
-   */
+  /// Gets stale segments as a typed response object.
   public <T> T getStaleSegments(String tableNameWithType, TypeReference<T> responseType)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/segments/" + tableNameWithType + "/isStale",
@@ -617,29 +553,26 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     return PinotAdminTransport.getObjectMapper().convertValue(response, responseType);
   }
 
-  /**
-   * Gets the Zookeeper metadata for all table segments.
-   *
-   * @param tableName Name of the table
-   * @return Zookeeper metadata
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets the Zookeeper metadata for all table segments.
+  ///
+  /// @param tableName Name of the table
+  /// @return Zookeeper metadata
+  /// @throws PinotAdminException If the request fails
   public Map<String, Map<String, String>> getZookeeperMetadata(String tableName)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/segments/" + tableName + "/zkmetadata",
         null, _headers);
-    return PinotAdminTransport.getObjectMapper().convertValue(response.get("zkMetadata"),
+    /// GET /segments/{tableName}/zkmetadata returns a bare map of segment name -> metadata, not a wrapper object.
+    return PinotAdminTransport.getObjectMapper().convertValue(response,
         new TypeReference<Map<String, Map<String, String>>>() {
         });
   }
 
-  /**
-   * Gets storage tier for all segments in the given table.
-   *
-   * @param tableName Name of the table
-   * @return Table tier information
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets storage tier for all segments in the given table.
+  ///
+  /// @param tableName Name of the table
+  /// @return Table tier information
+  /// @throws PinotAdminException If the request fails
   public TableTierInfo getStorageTiers(String tableName)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/segments/" + tableName + "/tiers", null, _headers);
@@ -650,15 +583,13 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     }
   }
 
-  /**
-   * Gets storage tiers for a specific segment.
-   *
-   * @param tableName Name of the table
-   * @param segmentName Name of the segment
-   * @param tableType Table type (OFFLINE or REALTIME)
-   * @return Table tier information for the segment
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets storage tiers for a specific segment.
+  ///
+  /// @param tableName Name of the table
+  /// @param segmentName Name of the segment
+  /// @param tableType Table type (OFFLINE or REALTIME)
+  /// @return Table tier information for the segment
+  /// @throws PinotAdminException If the request fails
   public TableTierInfo getSegmentStorageTiers(String tableName, String segmentName, String tableType)
       throws PinotAdminException {
     Map<String, String> queryParams = Map.of("type", tableType);
@@ -675,9 +606,7 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
 
   // Async versions of key methods
 
-  /**
-   * Lists all segments for a table (async).
-   */
+  /// Lists all segments for a table (async).
   public CompletableFuture<List<String>> listSegmentsAsync(String tableName, boolean excludeReplacedSegments) {
     Map<String, String> queryParams = Map.of("excludeReplacedSegments", String.valueOf(excludeReplacedSegments));
 
@@ -685,9 +614,7 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
         .thenApply(this::parseSegmentList);
   }
 
-  /**
-   * Gets the metadata for a specific segment (async).
-   */
+  /// Gets the metadata for a specific segment (async).
   public CompletableFuture<Map<String, Object>> getSegmentMetadataAsync(String tableName, String segmentName,
       List<String> columns) {
     return _transport.executeGetAsync(_controllerAddress, buildSegmentMetadataPath(tableName, segmentName, columns),
@@ -697,9 +624,7 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
             }));
   }
 
-  /**
-   * Deletes a specific segment (async).
-   */
+  /// Deletes a specific segment (async).
   public CompletableFuture<String> deleteSegmentAsync(String tableName, String segmentName,
       String retentionPeriod) {
     Map<String, String> queryParams = new HashMap<>();
@@ -712,12 +637,10 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
         .thenApply(JsonNode::toString);
   }
 
-  /**
-   * Parses the segment list from the controller response, handling both legacy and current formats.
-   */
+  /// Parses the segment list from the controller response, handling both legacy and current formats.
   private List<String> parseSegmentList(JsonNode response) {
     if (response == null || response.isNull()) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     if (response.has("segments")) {
@@ -738,7 +661,7 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
       return segments;
     }
 
-    return Collections.emptyList();
+    return List.of();
   }
 
   private static String encodePath(String value) {

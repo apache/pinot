@@ -18,21 +18,20 @@
  */
 package org.apache.pinot.calcite.rel.hint;
 
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
+import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rel.hint.RelHint;
 
 
-/**
- * {@code PinotHintOptions} specified the supported hint options by Pinot based a particular type of relation node.
- *
- * <p>for each {@link RelNode} type we support an option hint name.</p>
- * <p>for each option hint name there's a corresponding {@link RelHint} that supported only key-value option stored
- * in {@link RelHint#kvOptions}</p>
- */
+/// `PinotHintOptions` specified the supported hint options by Pinot based a particular type of relation node.
+///
+/// for each [org.apache.calcite.rel.RelNode] type we support an option hint name.
+///
+/// for each option hint name there's a corresponding [RelHint] that supported only key-value option stored
+/// in [RelHint#kvOptions]
 public class PinotHintOptions {
   private PinotHintOptions() {
   }
@@ -41,25 +40,26 @@ public class PinotHintOptions {
   public static final String JOIN_HINT_OPTIONS = "joinOptions";
   public static final String TABLE_HINT_OPTIONS = "tableOptions";
   public static final String WINDOW_HINT_OPTIONS = "windowOptions";
+  public static final String SET_OP_HINT_OPTIONS = "setOpOptions";
 
   public static class AggregateOptions {
     public static final String IS_PARTITIONED_BY_GROUP_BY_KEYS = "is_partitioned_by_group_by_keys";
     public static final String IS_LEAF_RETURN_FINAL_RESULT = "is_leaf_return_final_result";
     public static final String IS_SKIP_LEAF_STAGE_GROUP_BY = "is_skip_leaf_stage_group_by";
 
-    /** Enables trimming of aggregation intermediate results by pushing down order by and limit,
-     * down to leaf stage if possible. */
+    /// Enables trimming of aggregation intermediate results by pushing down order by and limit,
+    /// down to leaf stage if possible.
     public static final String IS_ENABLE_GROUP_TRIM = "is_enable_group_trim";
 
-    /** Minimum number of records that MSQE aggregation results, after sorting, should be retained. Non-positive value
-     *  disables trimming. */
+    /// Minimum number of records that MSQE aggregation results, after sorting, should be retained. Non-positive value
+    /// disables trimming.
     public static final String MSE_MIN_GROUP_TRIM_SIZE = "mse_min_group_trim_size";
 
     // TODO: Apply this to leaf stage as well
-    /** Throw an exception on reaching num_groups_limit instead of just setting a flag. */
+    /// Throw an exception on reaching num_groups_limit instead of just setting a flag.
     public static final String ERROR_ON_NUM_GROUPS_LIMIT = "error_on_num_groups_limit";
 
-    /** Max number of keys produced by MSQE aggregation. */
+    /// Max number of keys produced by MSQE aggregation.
     public static final String NUM_GROUPS_LIMIT = "num_groups_limit";
 
     public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "max_initial_result_holder_capacity";
@@ -67,16 +67,49 @@ public class PinotHintOptions {
   }
 
   public static class WindowHintOptions {
-    /**
-     * Max rows allowed to cache the rows in window for further processing.
-     */
+    /// Max rows allowed to cache the rows in window for further processing.
     public static final String MAX_ROWS_IN_WINDOW = "max_rows_in_window";
-    /**
-     * Mode when window overflow happens, supported values: THROW or BREAK.
-     *   THROW(default): Break window cache build process, and throw exception, no further WINDOW operation performed.
-     *   BREAK: Break window cache build process, continue to perform WINDOW operation, results might be partial.
-     */
+    /// Mode when window overflow happens, supported values: THROW or BREAK.
+    ///   THROW(default): Break window cache build process, and throw exception, no further WINDOW operation performed.
+    ///   BREAK: Break window cache build process, continue to perform WINDOW operation, results might be partial.
     public static final String WINDOW_OVERFLOW_MODE = "window_overflow_mode";
+
+    /// Indicates that the input to the window is already partitioned by the window keys, so we should avoid shuffling
+    /// to repartition.
+    public static final String IS_PARTITIONED_BY_WINDOW_KEYS = "is_partitioned_by_window_keys";
+
+    @Nullable
+    public static Boolean isPartitionedByWindowKeys(Window window) {
+      String hint =
+          PinotHintStrategyTable.getHintOption(window.getHints(), WINDOW_HINT_OPTIONS, IS_PARTITIONED_BY_WINDOW_KEYS);
+      return hint != null ? Boolean.parseBoolean(hint) : null;
+    }
+  }
+
+  /// Hint options for set operations (UNION / UNION ALL / INTERSECT / EXCEPT).
+  public static class SetOpHintOptions {
+    /// Forces (or disables) a colocated, pre-partitioned exchange on every input of a set operation
+    /// (UNION / UNION ALL / INTERSECT / EXCEPT), so the inputs are processed in place without a network shuffle.
+    ///
+    /// This is opt-in and honored only by the default (V1) query planner; the V2 physical planner determines
+    /// colocation on its own. Like the join hint [JoinHintOptions#IS_COLOCATED_BY_JOIN_KEYS], it trusts the user:
+    /// `'true'` forces a pre-partitioned exchange and bypasses the planner's automatic detection, while
+    /// `'false'` forces a normal shuffle even when the planner would otherwise detect pre-partitioning. A set
+    /// operation matches rows on the entire output row, so forcing `'true'` is only correct when all inputs are
+    /// partitioned the same way (same partition function and count) on one or more of the projected columns, so that
+    /// rows which are equal across all projected columns are guaranteed to land on the same worker. Forcing it when
+    /// that does not hold silently produces wrong results for INTERSECT, EXCEPT and distinct UNION; UNION ALL only
+    /// concatenates and is unaffected.
+    public static final String IS_COLOCATED_BY_SET_OP_KEYS = "is_colocated_by_set_op_keys";
+
+    /// Reads the hint from a hint list. Unlike [JoinHintOptions#isColocatedByJoinKeys], this takes the hint list
+    /// directly because the hint can attach either to the set operation itself or to one of its inputs (see
+    /// `PinotSetOpExchangeNodeInsertRule`), and the caller resolves which one applies.
+    @Nullable
+    public static Boolean isColocatedBySetOpKeys(List<RelHint> hints) {
+      String hint = PinotHintStrategyTable.getHintOption(hints, SET_OP_HINT_OPTIONS, IS_COLOCATED_BY_SET_OP_KEYS);
+      return hint != null ? Boolean.parseBoolean(hint) : null;
+    }
   }
 
   public static class JoinHintOptions {
@@ -91,26 +124,18 @@ public class PinotHintOptions {
     public static final String LEFT_DISTRIBUTION_TYPE = "left_distribution_type";
     public static final String RIGHT_DISTRIBUTION_TYPE = "right_distribution_type";
 
-    /**
-     * Max rows allowed to build the right table hash collection.
-     */
+    /// Max rows allowed to build the right table hash collection.
     public static final String MAX_ROWS_IN_JOIN = "max_rows_in_join";
 
-    /**
-     * Mode when join overflow happens, supported values: THROW or BREAK.
-     *   THROW(default): Break right table build process, and throw exception, no JOIN with left table performed.
-     *   BREAK: Break right table build process, continue to perform JOIN operation, results might be partial.
-     */
+    /// Mode when join overflow happens, supported values: THROW or BREAK.
+    ///   THROW(default): Break right table build process, and throw exception, no JOIN with left table performed.
+    ///   BREAK: Break right table build process, continue to perform JOIN operation, results might be partial.
     public static final String JOIN_OVERFLOW_MODE = "join_overflow_mode";
 
-    /**
-     * Indicates that the join operator(s) within a certain selection scope are colocated
-     */
+    /// Indicates that the join operator(s) within a certain selection scope are colocated
     public static final String IS_COLOCATED_BY_JOIN_KEYS = "is_colocated_by_join_keys";
 
-    /**
-     * Indicates that the semi join right project should be appended with a distinct
-     */
+    /// Indicates that the semi join right project should be appended with a distinct
     public static final String APPEND_DISTINCT_TO_SEMI_JOIN_PROJECT = "append_distinct_to_semi_join_project";
 
     @Nullable
@@ -145,9 +170,8 @@ public class PinotHintOptions {
     }
   }
 
-  /**
-   * Similar to {@link RelDistribution.Type}, it contains the distribution types to be used to shuffle data.
-   */
+  /// Similar to [org.apache.calcite.rel.RelDistribution.Type], it contains the distribution types to be used
+  /// to shuffle data.
   public enum DistributionType {
     LOCAL,      // Distribute data locally without ser/de
     HASH,       // Distribute data by hash partitioning
@@ -182,36 +206,28 @@ public class PinotHintOptions {
 
   public static class TableHintOptions {
 
-    /**
-     * Indicates the key to partition the table by.
-     * This must be equal to the keyset in {@code tableIndexConfig.segmentPartitionConfig.columnPartitionMap}.
-     */
+    /// Indicates the key to partition the table by.
+    /// This must be equal to the keyset in `tableIndexConfig.segmentPartitionConfig.columnPartitionMap`.
     public static final String PARTITION_KEY = "partition_key";
 
-    /**
-     * The function to use to partition the table.
-     * This must be equal to {@code functionName} in {@code tableIndexConfig.segmentPartitionConfig.columnPartitionMap}.
-     */
+    /// The function to use to partition the table.
+    /// This must be equal to `functionName` in
+    /// `tableIndexConfig.segmentPartitionConfig.columnPartitionMap`.
     public static final String PARTITION_FUNCTION = "partition_function";
 
-    /**
-     * The size of each partition.
-     * This must be equal to {@code numPartition} in {@code tableIndexConfig.segmentPartitionConfig.columnPartitionMap}.
-     */
+    /// The size of each partition.
+    /// This must be equal to `numPartition` in
+    /// `tableIndexConfig.segmentPartitionConfig.columnPartitionMap`.
     public static final String PARTITION_SIZE = "partition_size";
 
-    /**
-     * The number of workers per partition.
-     * How many threads to use in the following stage after partition is joined.
-     * When partition info is set, each partition is processed as a separate query in the leaf stage.
-     * When partition info is not set, we count all data processed in the leaf stage as the same partition.
-     */
+    /// The number of workers per partition.
+    /// How many threads to use in the following stage after partition is joined.
+    /// When partition info is set, each partition is processed as a separate query in the leaf stage.
+    /// When partition info is not set, we count all data processed in the leaf stage as the same partition.
     public static final String PARTITION_PARALLELISM = "partition_parallelism";
 
-    /**
-     * Indicates whether the table is replicated across all workers. When table is replicated across all workers, we can
-     * execute the same query on all workers to achieve broadcast without network shuffle.
-     */
+    /// Indicates whether the table is replicated across all workers. When table is replicated across all workers,
+    /// we can execute the same query on all workers to achieve broadcast without network shuffle.
     public static final String IS_REPLICATED = "is_replicated";
   }
 }

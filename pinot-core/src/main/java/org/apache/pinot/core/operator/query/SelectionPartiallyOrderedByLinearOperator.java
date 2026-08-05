@@ -28,17 +28,16 @@ import org.apache.pinot.core.operator.DocIdOrderedOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
-/**
- * The operator used when selecting with order-by on a way that the segment layout can be used to prune results.
- *
- * This requires that the first order-by expression is on a column that is sorted in the segment and:
- * 1. The order-by is ASC
- * 2. The order-by is DESC and the input operators support descending iteration (e.g. full scan)
- *
- * @see LinearSelectionOrderByOperator
- */
+/// The operator used when selecting with order-by on a way that the segment layout can be used to prune results.
+///
+/// This requires that the first order-by expression is on a column that is sorted in the segment and:
+/// 1. The order-by is ASC
+/// 2. The order-by is DESC and the input operators support descending iteration (e.g. full scan)
+///
+/// @see LinearSelectionOrderByOperator
 public class SelectionPartiallyOrderedByLinearOperator extends LinearSelectionOrderByOperator {
 
   private static final String EXPLAIN_NAME = "SELECT_PARTIAL_ORDER_BY_LINEAR";
@@ -70,6 +69,12 @@ public class SelectionPartiallyOrderedByLinearOperator extends LinearSelectionOr
       IntFunction<Object[]> rowFetcher = fetchBlock(valueBlock, blockValSets);
       int numDocsFetched = valueBlock.getNumDocs();
       _numDocsScanned += numDocsFetched;
+      QueryScanCostContext scanCost = getScanCostContext();
+      if (scanCost != null) {
+        scanCost.addDocsScanned(numDocsFetched);
+        scanCost.addEntriesScannedPostFilter(
+            (long) numDocsFetched * _projectOperator.getNumColumnsProjected());
+      }
       for (int i = 0; i < numDocsFetched; i++) {
         if (listBuilder.add(rowFetcher.apply(i))) {
           return listBuilder.build();

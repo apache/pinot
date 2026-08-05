@@ -20,7 +20,6 @@ package org.apache.pinot.broker.broker.helix;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -42,16 +41,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Multi-cluster broker starter that extends the base Helix broker functionality
- * to support federation across multiple Pinot clusters.
- *
- * This class handles:
- * - Connection to remote clusters via separate ZooKeeper instances
- * - Federated routing across primary and remote clusters
- * - Cross-cluster query federation
- * - Cluster change monitoring for remote clusters
- */
+/// Multi-cluster broker starter that extends the base Helix broker functionality
+/// to support federation across multiple Pinot clusters.
+///
+/// This class handles:
+/// - Connection to remote clusters via separate ZooKeeper instances
+/// - Federated routing across primary and remote clusters
+/// - Cross-cluster query federation
+/// - Cluster change monitoring for remote clusters
 @SuppressWarnings("unused")
 public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiClusterHelixBrokerStarter.class);
@@ -133,7 +130,7 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
     }
 
     LOGGER.info("[multi-cluster] Initializing spectator Helix managers for {} remote clusters",
-      _remoteZkServers.size());
+        _remoteZkServers.size());
     _remoteSpectatorHelixManager = new HashMap<>();
 
     for (Map.Entry<String, String> entry : _remoteZkServers.entrySet()) {
@@ -141,7 +138,7 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
       String zkServers = entry.getValue();
       try {
         HelixManager helixManager = HelixManagerFactory.getZKHelixManager(
-          clusterName, _instanceId, InstanceType.SPECTATOR, zkServers);
+            clusterName, _instanceId, InstanceType.SPECTATOR, zkServers);
         helixManager.connect();
         _remoteSpectatorHelixManager.put(clusterName, helixManager);
         LOGGER.info("[multi-cluster] Connected to remote cluster '{}' at ZK: {}", clusterName, zkServers);
@@ -154,10 +151,10 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
 
     if (_remoteSpectatorHelixManager.isEmpty()) {
       LOGGER.warn("[multi-cluster] Failed to connect to any remote clusters - "
-        + "multi-cluster will not be functional");
+          + "multi-cluster will not be functional");
     } else {
       LOGGER.info("[multi-cluster] Connected to {}/{} remote clusters: {}", _remoteSpectatorHelixManager.size(),
-        _remoteZkServers.size(), _remoteSpectatorHelixManager.keySet());
+          _remoteZkServers.size(), _remoteSpectatorHelixManager.keySet());
     }
     if (!_unavailableClusters.isEmpty()) {
       LOGGER.warn("[multi-cluster] The following clusters are unavailable and will generate warnings "
@@ -341,9 +338,9 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
       try {
         Map<ChangeType, List<ClusterChangeHandler>> handlers = new HashMap<>();
         handlers.put(ChangeType.CLUSTER_CONFIG, new ArrayList<>());
-        handlers.put(ChangeType.IDEAL_STATE, Collections.singletonList(routingManager));
-        handlers.put(ChangeType.EXTERNAL_VIEW, Collections.singletonList(routingManager));
-        handlers.put(ChangeType.INSTANCE_CONFIG, Collections.singletonList(routingManager));
+        handlers.put(ChangeType.IDEAL_STATE, List.of(routingManager));
+        handlers.put(ChangeType.EXTERNAL_VIEW, List.of(routingManager));
+        handlers.put(ChangeType.INSTANCE_CONFIG, List.of(routingManager));
 
         ClusterChangeMediator mediator = new ClusterChangeMediator(handlers, _brokerMetrics);
         mediator.start();
@@ -367,7 +364,7 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
   @Override
   protected MultiClusterRoutingContext getMultiClusterRoutingContext() {
     initRemoteClusterFederationProvider(_tableCache,
-      _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE));
+        _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE));
     return _multiClusterRoutingContext;
   }
 

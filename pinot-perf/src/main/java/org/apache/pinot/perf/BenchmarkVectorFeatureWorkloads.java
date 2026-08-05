@@ -34,6 +34,7 @@ import org.apache.pinot.segment.local.realtime.impl.vector.MutableVectorIndex;
 import org.apache.pinot.segment.local.segment.index.readers.vector.HnswVectorIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfFlatVectorIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.vector.IvfPqVectorIndexReader;
+import org.apache.pinot.segment.local.segment.index.vector.IvfCombinedBuffers;
 import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
 import org.apache.pinot.segment.local.segment.index.vector.IvfPqVectorIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
@@ -41,13 +42,11 @@ import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
 import org.apache.pinot.segment.spi.index.reader.EfSearchAware;
 
 
-/**
- * Feature workload benchmark for Pinot-specific runtime surfaces.
- *
- * <p>This suite focuses on the feature areas that do not show up in broad ANN frontiers:
- * quantized IVF build/search trade-offs, HNSW runtime knobs on immutable and mutable indexes,
- * mutable ingestion cost, and mixed immutable/mutable candidate fan-out.</p>
- */
+/// Feature workload benchmark for Pinot-specific runtime surfaces.
+///
+/// This suite focuses on the feature areas that do not show up in broad ANN frontiers:
+/// quantized IVF build/search trade-offs, HNSW runtime knobs on immutable and mutable indexes,
+/// mutable ingestion cost, and mixed immutable/mutable candidate fan-out.
 public final class BenchmarkVectorFeatureWorkloads {
   private static final String COLUMN_NAME = "embedding";
   private static final long SEED = 20260412L;
@@ -124,7 +123,8 @@ public final class BenchmarkVectorFeatureWorkloads {
         BenchmarkVectorIndex.BuildMetrics buildMetrics =
             BenchmarkVectorIndex.measureBuild(corpus.length, () -> buildIvfFlatIndex(indexDir, corpus, config));
         long sizeBytes = BenchmarkVectorIndex.ivfIndexSize(indexDir);
-        try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME, indexDir, config)) {
+        try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME,
+            IvfCombinedBuffers.mapCombined(indexDir, COLUMN_NAME, config, "bench-vector"), config)) {
           reader.setNprobe(NPROBE);
           long[] latencies = measureLatencies(queries, query -> reader.getDocIds(query, TOP_K));
           double recall10 = measureRecall(truth, queries, query -> BenchmarkVectorIndex.bitmapToSet(reader.getDocIds(
@@ -145,7 +145,8 @@ public final class BenchmarkVectorFeatureWorkloads {
         BenchmarkVectorIndex.BuildMetrics buildMetrics =
             BenchmarkVectorIndex.measureBuild(corpus.length, () -> buildIvfPqIndex(indexDir, corpus, config));
         long sizeBytes = FileUtils.sizeOfDirectory(indexDir);
-        try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME, indexDir, config)) {
+        try (IvfPqVectorIndexReader reader = new IvfPqVectorIndexReader(COLUMN_NAME,
+            IvfCombinedBuffers.mapCombined(indexDir, COLUMN_NAME, config, "bench-vector"), config)) {
           reader.setNprobe(NPROBE);
           long[] latencies = measureLatencies(queries, query -> reader.getDocIds(query, TOP_K));
           double recall10 = measureRecall(truth, queries, query -> BenchmarkVectorIndex.bitmapToSet(reader.getDocIds(

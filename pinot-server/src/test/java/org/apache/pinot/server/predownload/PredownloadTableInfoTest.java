@@ -18,25 +18,20 @@
  */
 package org.apache.pinot.server.predownload;
 
-import java.io.IOException;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.file.Files;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
-import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.mockito.MockedStatic;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.server.predownload.PredownloadTestUtil.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -68,59 +63,48 @@ public class PredownloadTableInfoTest {
   @Test
   public void testLoadSegmentFromLocal()
       throws Exception {
-    PredownloadSegmentInfo predownloadSegmentInfo = new PredownloadSegmentInfo(TABLE_NAME, SEGMENT_NAME);
-    SegmentZKMetadata metadata = createSegmentZKMetadata();
-    predownloadSegmentInfo.updateSegmentInfo(metadata);
-    InstanceDataManagerConfig instanceDataManagerConfig = spy(new HelixInstanceDataManagerConfig(_pinotConfiguration));
+    File tempDir = Files.createTempDirectory("predownload-table-test-").toFile();
+    try {
+      PredownloadSegmentInfo predownloadSegmentInfo = new PredownloadSegmentInfo(TABLE_NAME, SEGMENT_NAME);
+      SegmentZKMetadata metadata = createSegmentZKMetadata();
+      predownloadSegmentInfo.updateSegmentInfo(metadata);
 
-    SegmentDirectoryLoader segmentDirectoryLoader = mock(SegmentDirectoryLoader.class);
-    SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
-    SegmentMetadataImpl segmentMetadataImpl = mock(SegmentMetadataImpl.class);
-    when(segmentDirectory.getSegmentMetadata()).thenReturn(segmentMetadataImpl);
-    when(segmentDirectory.getDiskSizeBytes()).thenReturn(DISK_SIZE_BYTES);
-    when(segmentDirectoryLoader.load(any(), any())).thenReturn(segmentDirectory);
+      when(_tableConfig.getTableName()).thenReturn(TABLE_NAME);
+      when(_instanceDataManagerConfig.getInstanceDataDir()).thenReturn(tempDir.getAbsolutePath());
+      when(_instanceDataManagerConfig.getTierConfigs()).thenReturn(null);
 
-    // Has segment with same CRC
-    try (MockedStatic<SegmentDirectoryLoaderRegistry> segmentDirectoryLoaderRegistryMockedStatic = mockStatic(
-        SegmentDirectoryLoaderRegistry.class)) {
-      segmentDirectoryLoaderRegistryMockedStatic.when(
-              () -> SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(anyString()))
-          .thenReturn(segmentDirectoryLoader);
-      when(segmentMetadataImpl.getCrc()).thenReturn(String.valueOf(CRC));
+      // Segment directory does not exist — returns false
+      assertFalse(_predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo));
+      assertFalse(predownloadSegmentInfo.isDownloaded());
 
+      // Segment directory exists but no creation.meta — returns false
+      File segDir = new File(tempDir, TABLE_NAME + "/" + SEGMENT_NAME);
+      segDir.mkdirs();
+      assertFalse(_predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo));
+      assertFalse(predownloadSegmentInfo.isDownloaded());
+
+      // creation.meta present with matching CRC — returns true and populates size
+      File creationMeta = new File(segDir, "creation.meta");
+      try (DataOutputStream dos = new DataOutputStream(new FileOutputStream(creationMeta))) {
+        dos.writeLong(CRC);
+        dos.writeLong(System.currentTimeMillis());
+      }
+      org.apache.commons.io.FileUtils.writeByteArrayToFile(new File(segDir, "columns.psf"), new byte[]{1, 2, 3});
       assertTrue(_predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo));
       assertEquals(predownloadSegmentInfo.getLocalCrc(), String.valueOf(CRC));
       assertTrue(predownloadSegmentInfo.isDownloaded());
-      assertEquals(predownloadSegmentInfo.getLocalSizeBytes(), DISK_SIZE_BYTES);
-    }
+      assertTrue(predownloadSegmentInfo.getLocalSizeBytes() > 0);
 
-    // Has segment with different CRC
-    try (MockedStatic<SegmentDirectoryLoaderRegistry> segmentDirectoryLoaderRegistryMockedStatic = mockStatic(
-        SegmentDirectoryLoaderRegistry.class)) {
-      segmentDirectoryLoaderRegistryMockedStatic.when(
-              () -> SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(anyString()))
-          .thenReturn(segmentDirectoryLoader);
-      long newCrc = CRC + 1;
-      when(segmentMetadataImpl.getCrc()).thenReturn(String.valueOf(newCrc));
-
+      // creation.meta present with different CRC — returns false
+      try (DataOutputStream dos = new DataOutputStream(new FileOutputStream(creationMeta))) {
+        dos.writeLong(CRC + 1);
+        dos.writeLong(System.currentTimeMillis());
+      }
       assertFalse(_predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo));
-      assertEquals(predownloadSegmentInfo.getLocalCrc(), String.valueOf(newCrc));
+      assertEquals(predownloadSegmentInfo.getLocalCrc(), String.valueOf(CRC + 1));
       assertFalse(predownloadSegmentInfo.isDownloaded());
-      assertEquals(predownloadSegmentInfo.getLocalSizeBytes(), DISK_SIZE_BYTES);
-    }
-
-    // Does not have segment
-    try (MockedStatic<SegmentDirectoryLoaderRegistry> segmentDirectoryLoaderRegistryMockedStatic = mockStatic(
-        SegmentDirectoryLoaderRegistry.class)) {
-      segmentDirectoryLoaderRegistryMockedStatic.when(
-              () -> SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(anyString()))
-          .thenReturn(segmentDirectoryLoader);
-      when(segmentMetadataImpl.getCrc()).thenReturn(null);
-      doThrow(IOException.class).when(segmentDirectory).close();
-
-      assertFalse(_predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo));
-      assertFalse(predownloadSegmentInfo.isDownloaded());
-      assertEquals(predownloadSegmentInfo.getLocalSizeBytes(), DISK_SIZE_BYTES);
+    } finally {
+      org.apache.commons.io.FileUtils.deleteQuietly(tempDir);
     }
   }
 }

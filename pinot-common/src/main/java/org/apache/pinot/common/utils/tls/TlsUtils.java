@@ -36,6 +36,7 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -52,9 +53,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Utility class for shared TLS configuration logic
- */
+/// Utility class for shared TLS configuration logic
 public final class TlsUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(TlsUtils.class);
 
@@ -81,27 +80,23 @@ public final class TlsUtils {
     // left blank
   }
 
-  /**
-   * Extract a TlsConfig instance from a namespaced set of configuration keys.
-   *
-   * @param pinotConfig pinot configuration
-   * @param namespace namespace prefix
-   *
-   * @return TlsConfig instance
-   */
+  /// Extract a TlsConfig instance from a namespaced set of configuration keys.
+  ///
+  /// @param pinotConfig pinot configuration
+  /// @param namespace namespace prefix
+  ///
+  /// @return TlsConfig instance
   public static TlsConfig extractTlsConfig(PinotConfiguration pinotConfig, String namespace) {
     return extractTlsConfig(pinotConfig, namespace, new TlsConfig());
   }
 
-  /**
-   * Extract a TlsConfig instance from a namespaced set of configuration keys, based on a default config
-   *
-   * @param pinotConfig pinot configuration
-   * @param namespace namespace prefix
-   * @param defaultConfig TLS config defaults
-   *
-   * @return TlsConfig instance
-   */
+  /// Extract a TlsConfig instance from a namespaced set of configuration keys, based on a default config
+  ///
+  /// @param pinotConfig pinot configuration
+  /// @param namespace namespace prefix
+  /// @param defaultConfig TLS config defaults
+  ///
+  /// @return TlsConfig instance
   public static TlsConfig extractTlsConfig(PinotConfiguration pinotConfig, String namespace, TlsConfig defaultConfig) {
     TlsConfig tlsConfig = new TlsConfig(defaultConfig);
     tlsConfig.setClientAuthEnabled(
@@ -142,26 +137,22 @@ public final class TlsUtils {
     return tlsConfig;
   }
 
-  /**
-   * Create a KeyManagerFactory instance for a given TlsConfig
-   *
-   * @param tlsConfig TLS config
-   *
-   * @return KeyManagerFactory
-   */
+  /// Create a KeyManagerFactory instance for a given TlsConfig
+  ///
+  /// @param tlsConfig TLS config
+  ///
+  /// @return KeyManagerFactory
   public static KeyManagerFactory createKeyManagerFactory(TlsConfig tlsConfig) {
     return createKeyManagerFactory(tlsConfig.getKeyStorePath(), tlsConfig.getKeyStorePassword(),
         tlsConfig.getKeyStoreType());
   }
 
-  /**
-   * Create a KeyManagerFactory instance for a given path and key password
-   *
-   * @param keyStorePath store path
-   * @param keyStorePassword password
-   * @param keyStoreType keystore type for keystore
-   * @return KeyManagerFactory
-   */
+  /// Create a KeyManagerFactory instance for a given path and key password
+  ///
+  /// @param keyStorePath store path
+  /// @param keyStorePassword password
+  /// @param keyStoreType keystore type for keystore
+  /// @return KeyManagerFactory
   public static KeyManagerFactory createKeyManagerFactory(String keyStorePath, String keyStorePassword,
       String keyStoreType) {
     Preconditions.checkNotNull(keyStorePath, "key store path must not be null");
@@ -182,13 +173,11 @@ public final class TlsUtils {
     }
   }
 
-  /**
-   * Create a TrustManagerFactory instance from a given TlsConfig.
-   *
-   * @param tlsConfig TLS config
-   *
-   * @return TrustManagerFactory
-   */
+  /// Create a TrustManagerFactory instance from a given TlsConfig.
+  ///
+  /// @param tlsConfig TLS config
+  ///
+  /// @return TrustManagerFactory
   public static TrustManagerFactory createTrustManagerFactory(TlsConfig tlsConfig) {
     if (tlsConfig.isInsecure()) {
       return InsecureTrustManagerFactory.INSTANCE;
@@ -198,14 +187,12 @@ public final class TlsUtils {
     }
   }
 
-  /**
-   * Create a TrustManagerFactory instance from a given path and key password
-   *
-   * @param trustStorePath store path
-   * @param trustStorePassword password
-   * @param trustStoreType keystore type for truststore
-   * @return TrustManagerFactory
-   */
+  /// Create a TrustManagerFactory instance from a given path and key password
+  ///
+  /// @param trustStorePath store path
+  /// @param trustStorePassword password
+  /// @param trustStoreType keystore type for truststore
+  /// @return TrustManagerFactory
   public static TrustManagerFactory createTrustManagerFactory(String trustStorePath, String trustStorePassword,
       String trustStoreType) {
     Preconditions.checkNotNull(trustStorePath, "trust store path must not be null");
@@ -227,53 +214,78 @@ public final class TlsUtils {
     }
   }
 
-  /**
-   * Installs a default TLS socket factory for all HttpsURLConnection instances based on a given TlsConfig (1 or 2-way)
-   *
-   * @param tlsConfig TLS config
-   */
+  /// Installs a default TLS socket factory for all HttpsURLConnection instances based on a given TlsConfig (1 or 2-way)
+  ///
+  /// @param tlsConfig TLS config
   public static void installDefaultSSLSocketFactory(TlsConfig tlsConfig) {
     installDefaultSSLSocketFactory(tlsConfig.getKeyStoreType(), tlsConfig.getKeyStorePath(),
         tlsConfig.getKeyStorePassword(), tlsConfig.getTrustStoreType(), tlsConfig.getTrustStorePath(),
         tlsConfig.getTrustStorePassword());
   }
 
-  /**
-   * Installs a default TLS socket factory for all HttpsURLConnection instances based on a given set of key and trust
-   * store paths and passwords
-   * @param keyStoreType keystore type for keystore
-   * @param keyStorePath key store path
-   * @param keyStorePassword key password
-   * @param trustStoreType keystore type for truststore
-   * @param trustStorePath trust store path
-   * @param trustStorePassword trust password
-   */
+  /// Installs a default TLS socket factory for all HttpsURLConnection instances based on a given set of key and trust
+  /// store paths and passwords
+  /// @param keyStoreType keystore type for keystore
+  /// @param keyStorePath key store path
+  /// @param keyStorePassword key password
+  /// @param trustStoreType keystore type for truststore
+  /// @param trustStorePath trust store path
+  /// @param trustStorePassword trust password
   public static void installDefaultSSLSocketFactory(String keyStoreType, String keyStorePath, String keyStorePassword,
       String trustStoreType, String trustStorePath, String trustStorePassword) {
+    SSLContext sc = createSslContext(keyStoreType, keyStorePath, keyStorePassword, trustStoreType, trustStorePath,
+        trustStorePassword);
+    // HttpsURLConnection
+    HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+    setSslContext(sc);
+    logTlsDiagnosticsOnce("https.default", sc, null, false);
+  }
+
+  /// Creates a client-side SSL context from key/trust store settings without mutating JVM defaults.
+  ///
+  /// If both store paths are null, the returned context uses default key and trust managers. If either store path is
+  /// provided, its type and password must also be provided. File-backed stores are auto-renewed.
+  public static SSLContext createSslContext(@Nullable String keyStoreType, @Nullable String keyStorePath,
+      @Nullable String keyStorePassword, @Nullable String trustStoreType, @Nullable String trustStorePath,
+      @Nullable String trustStorePassword) {
+    return createSslContext(keyStoreType, keyStorePath, keyStorePassword, trustStoreType, trustStorePath,
+        trustStorePassword, true);
+  }
+
+  /// Creates a client-side SSL context without enabling file-store auto-renewal.
+  ///
+  /// This is intended for short-lived clients whose owners can close the HTTP client but do not own the renewal
+  /// executors/watch services created by auto-renewal.
+  public static SSLContext createSslContextWithoutAutoRenewal(@Nullable String keyStoreType,
+      @Nullable String keyStorePath, @Nullable String keyStorePassword, @Nullable String trustStoreType,
+      @Nullable String trustStorePath, @Nullable String trustStorePassword) {
+    return createSslContext(keyStoreType, keyStorePath, keyStorePassword, trustStoreType, trustStorePath,
+        trustStorePassword, false);
+  }
+
+  private static SSLContext createSslContext(@Nullable String keyStoreType, @Nullable String keyStorePath,
+      @Nullable String keyStorePassword, @Nullable String trustStoreType, @Nullable String trustStorePath,
+      @Nullable String trustStorePassword, boolean enableAutoRenewal) {
     try {
       SecureRandom secureRandom = new SecureRandom();
-      SSLContext sc;
       if (keyStorePath == null && trustStorePath == null) {
         // When neither keyStorePath nor trustStorePath is provided, a SSLFactory cannot be created. create SSLContext
         // directly and use the default key manager and trust manager.
-        sc = SSLContext.getInstance(SSL_CONTEXT_PROTOCOL);
-        sc.init(null, null, secureRandom);
-      } else {
-        SSLFactory sslFactory =
-            RenewableTlsUtils.createSSLFactory(keyStoreType, keyStorePath, keyStorePassword, trustStoreType,
-                trustStorePath, trustStorePassword, SSL_CONTEXT_PROTOCOL, secureRandom, true, false);
-        if (isKeyOrTrustStorePathNullOrHasFileScheme(keyStorePath) && isKeyOrTrustStorePathNullOrHasFileScheme(
-            trustStorePath)) {
-          RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, keyStoreType, keyStorePath,
-              keyStorePassword, trustStoreType, trustStorePath, trustStorePassword, SSL_CONTEXT_PROTOCOL, secureRandom,
-              PinotInsecureMode::isPinotInInsecureMode);
-        }
-        sc = sslFactory.getSslContext();
+        SSLContext sslContext = SSLContext.getInstance(SSL_CONTEXT_PROTOCOL);
+        sslContext.init(null, null, secureRandom);
+        return sslContext;
       }
-      // HttpsURLConnection
-      HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
-      setSslContext(sc);
-      logTlsDiagnosticsOnce("https.default", sc, null, false);
+
+      SSLFactory sslFactory =
+          RenewableTlsUtils.createSSLFactory(keyStoreType, keyStorePath, keyStorePassword, trustStoreType,
+              trustStorePath, trustStorePassword, SSL_CONTEXT_PROTOCOL, secureRandom, true, false);
+      if (enableAutoRenewal && isKeyOrTrustStorePathNullOrHasFileScheme(keyStorePath)
+          && isKeyOrTrustStorePathNullOrHasFileScheme(trustStorePath)) {
+        RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, keyStoreType, keyStorePath,
+            keyStorePassword, trustStoreType, trustStorePath, trustStorePassword, SSL_CONTEXT_PROTOCOL, secureRandom,
+            PinotInsecureMode::isPinotInInsecureMode);
+      }
+      return sslFactory.getSslContext();
     } catch (GenericSSLContextException | GeneralSecurityException e) {
       throw new IllegalStateException("Could not initialize SSL support", e);
     }
@@ -295,46 +307,37 @@ public final class TlsUtils {
     return inputUri.toURL();
   }
 
-  /**
-   * Get the SSL context, see: {@link SSLContextHolder} for more details.
-   * @return the SSL context.
-   */
+  /// Get the SSL context, see: [SSLContextHolder] for more details.
+  /// @return the SSL context.
   public static SSLContext getSslContext() {
     return SSLContextHolder.SSL_CONTEXT;
   }
 
-  /**
-   * Set the SSL context, see: {@link SSLContextHolder} for more details.
-   * @param sslContext the SSL context to be set.
-   */
+  /// Set the SSL context, see: [SSLContextHolder] for more details.
+  /// @param sslContext the SSL context to be set.
   public static void setSslContext(SSLContext sslContext) {
     if (!SSL_CONTEXT_REF.compareAndSet(null, sslContext)) {
       LOGGER.warn("SSL Context has already been set.");
     }
   }
 
-  /**
-   * SSL Context Holder that holds static reference SSL_CONTEXT, reference via {@link SSLContextHolder#SSL_CONTEXT}.
-   *
-   * this context is set via the {@link TlsUtils#SSL_CONTEXT_REF} which can at most once override the default
-   * SSLContext object. The advantage of this design is:
-   * <ul>
-   *   <li>any override registration is thread safe - it only occur lazily when access SSLContextHolder.SSL_CONTEXT.
-   *   <li>mutable until first use.
-   *   <li>synchronization, at most once initialisation guaranteed by the classloader
-   *   <li>after initialisation, the SSLContext is constant which can drive optimisations like constant folding.
-   * </ul>
-   */
+  /// SSL Context Holder that holds static reference SSL_CONTEXT, reference via [SSLContextHolder#SSL_CONTEXT].
+  ///
+  /// this context is set via the [TlsUtils#SSL_CONTEXT_REF] which can at most once override the default
+  /// SSLContext object. The advantage of this design is:
+  ///
+  /// - any override registration is thread safe - it only occur lazily when access SSLContextHolder.SSL_CONTEXT.
+  /// - mutable until first use.
+  /// - synchronization, at most once initialisation guaranteed by the classloader
+  /// - after initialisation, the SSLContext is constant which can drive optimisations like constant folding.
   private static final class SSLContextHolder {
     static final SSLContext SSL_CONTEXT = SSL_CONTEXT_REF.get() == null ? SSLContexts.createDefault()
         : SSL_CONTEXT_REF.get();
   }
 
-  /**
-   * Builds client side SslContext based on a given TlsConfig.
-   *
-   * @param tlsConfig TLS config
-   */
+  /// Builds client side SslContext based on a given TlsConfig.
+  ///
+  /// @param tlsConfig TLS config
   public static SslContext buildClientContext(TlsConfig tlsConfig) {
     SSLFactory sslFactory =
         RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(
@@ -359,11 +362,9 @@ public final class TlsUtils {
     }
   }
 
-  /**
-   * Builds server side SslContext based on a given TlsConfig.
-   *
-   * @param tlsConfig TLS config
-   */
+  /// Builds server side SslContext based on a given TlsConfig.
+  ///
+  /// @param tlsConfig TLS config
   public static SslContext buildServerContext(TlsConfig tlsConfig) {
     if (tlsConfig.getKeyStorePath() == null) {
       throw new IllegalArgumentException("Must provide key store path for secured server");
@@ -397,11 +398,9 @@ public final class TlsUtils {
     return new SSLConnectionSocketFactory(getSslContext());
   }
 
-  /**
-   * check if the key store or trust store path is null or has file scheme.
-   *
-   * @param keyOrTrustStorePath key store or trust store path in String format.
-   */
+  /// check if the key store or trust store path is null or has file scheme.
+  ///
+  /// @param keyOrTrustStorePath key store or trust store path in String format.
   static boolean isKeyOrTrustStorePathNullOrHasFileScheme(String keyOrTrustStorePath) {
     try {
       return keyOrTrustStorePath == null
@@ -428,13 +427,11 @@ public final class TlsUtils {
     }
   }
 
-  /**
-   * Log (once) the JSSE provider/protocol actually used at runtime for the given TLS config.
-   * <p>
-   * This is intended as a lightweight runtime self-check for Platform-FIPS-JDK deployments: Pinot generally uses the
-   * JDK TLS stack (JSSE), and the platform/JDK decides which provider is active via {@code java.security} and other JVM
-   * settings. This method helps surface misconfiguration early without enforcing behavior.
-   */
+  /// Log (once) the JSSE provider/protocol actually used at runtime for the given TLS config.
+  ///
+  /// This is intended as a lightweight runtime self-check for Platform-FIPS-JDK deployments: Pinot generally uses the
+  /// JDK TLS stack (JSSE), and the platform/JDK decides which provider is active via `java.security` and other
+  /// JVM settings. This method helps surface misconfiguration early without enforcing behavior.
   public static void logJsseDiagnosticsOnce(String contextName, SSLFactory sslFactory, TlsConfig tlsConfig) {
     if (sslFactory == null) {
       return;
@@ -449,9 +446,7 @@ public final class TlsUtils {
     }
   }
 
-  /**
-   * Emit a warning when a non-JDK TLS stack is configured.
-   */
+  /// Emit a warning when a non-JDK TLS stack is configured.
   public static void warnIfNonJdkProviderConfigured(String contextName, TlsConfig tlsConfig) {
     warnIfNonJdkProviderConfiguredInternal(contextName, tlsConfig);
   }

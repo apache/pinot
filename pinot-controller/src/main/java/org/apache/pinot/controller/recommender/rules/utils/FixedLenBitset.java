@@ -20,16 +20,13 @@ package org.apache.pinot.controller.recommender.rules.utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.controller.recommender.rules.impl.InvertedSortedIndexJointRule;
 
 
-/**
- * A simple bitset implementation for performance, to hold the candidate dimensions for indices.
- * For fast enumeration of the power set of dimension set in the index recommendation across all queries
- * in {@link InvertedSortedIndexJointRule#findOptimalCombination(List)}.
- */
+/// A simple bitset implementation for performance, to hold the candidate dimensions for indices. For fast enumeration
+/// of the power set of dimension set in the index recommendation across all queries in
+/// [org.apache.pinot.controller.recommender.rules.impl.InvertedSortedIndexJointRule#findOptimalCombination(List)]
+/// .
 public class FixedLenBitset {
   public static final int NO_INDEX_APPLICABLE = 0;
   private long[] _bytes;
@@ -53,7 +50,7 @@ public class FixedLenBitset {
 
   public List<Integer> getOffsets() {
     if (isEmpty()) {
-      return Collections.emptyList();
+      return List.of();
     }
     List<Integer> ret = new ArrayList<>();
     for (int i = 0; i < _size; i++) {
@@ -64,11 +61,9 @@ public class FixedLenBitset {
     return ret;
   }
 
-  /**
-   * Fast algorithm to compute the number of bits set in a long
-   * @param num long
-   * @return the number of bits set in num
-   */
+  /// Fast algorithm to compute the number of bits set in a long
+  /// @param num long
+  /// @return the number of bits set in num
   static int countSetBitsRec(long num) {
     int ret = 0;
     while (num != 0) {
@@ -83,10 +78,7 @@ public class FixedLenBitset {
     return _size;
   }
 
-  /**
-   *
-   * @return number of bits set in the current bitset
-   */
+  /// @return number of bits set in the current bitset
   public int getCardinality() {
     return _cardinality;
   }
@@ -98,10 +90,8 @@ public class FixedLenBitset {
     _cardinality = 0;
   }
 
-  /**
-   * Add an integer to this set.
-   * @param n integer to add, should be 0 <= n < _size
-   */
+  /// Add an integer to this set.
+  /// @param n integer to add, should be 0 <= n < \_size
   public void add(int n) {
     if (n >= 0 && n < _size && !contains(n)) {
       _bytes[n / SIZE_OF_LONG] |= 1L << (n % SIZE_OF_LONG);
@@ -109,10 +99,8 @@ public class FixedLenBitset {
     }
   }
 
-  /**
-   * Test if an integer exists in the current set
-   * @param n integer to test
-   */
+  /// Test if an integer exists in the current set
+  /// @param n integer to test
   public boolean contains(int n) {
     return (_bytes[n / SIZE_OF_LONG] & 1L << (n % SIZE_OF_LONG)) != 0;
   }
@@ -121,9 +109,7 @@ public class FixedLenBitset {
     return _cardinality != 0;
   }
 
-  /**
-   * To test if this set contains(>=) another set b
-   */
+  /// To test if this set contains(>=) another set b
   public boolean contains(FixedLenBitset b) {
     if (b._cardinality == NO_INDEX_APPLICABLE) {
       return true;
@@ -136,11 +122,9 @@ public class FixedLenBitset {
     return true;
   }
 
-  /**
-   * The or of this and another bitset b. Results in current bitset.
-   * @param b another bitset
-   * @return this bitset
-   */
+  /// The or of this and another bitset b. Results in current bitset.
+  /// @param b another bitset
+  /// @return this bitset
   public FixedLenBitset union(FixedLenBitset b) {
     if (b._cardinality == NO_INDEX_APPLICABLE) {
       return this;

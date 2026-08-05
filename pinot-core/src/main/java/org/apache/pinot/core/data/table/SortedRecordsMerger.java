@@ -42,7 +42,7 @@ public class SortedRecordsMerger {
 
   public SortedRecordsMerger(QueryContext queryContext, int resultSize, Comparator<Record> comparator) {
     assert queryContext.getGroupByExpressions() != null;
-    _numKeyColumns = queryContext.getGroupByExpressions().size();
+    _numKeyColumns = queryContext.getNumGroupByKeyColumns();
     _aggregationFunctions = queryContext.getAggregationFunctions();
     _resultSize = resultSize;
     _comparator = comparator;

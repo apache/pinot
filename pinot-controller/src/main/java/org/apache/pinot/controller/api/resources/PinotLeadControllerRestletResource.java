@@ -29,7 +29,6 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -153,7 +152,7 @@ public class PinotLeadControllerRestletResource {
     String leadControllerId =
         getParticipantInstanceIdFromExternalView(leadControllerResourceExternalView, partitionName);
     LeadControllerEntry leadControllerEntry =
-        new LeadControllerEntry(leadControllerId, Collections.singletonList(tableName));
+        new LeadControllerEntry(leadControllerId, List.of(tableName));
     leadControllerEntryMap.put(partitionName, leadControllerEntry);
     return new LeadControllerResponse(true, leadControllerEntryMap);
   }
@@ -172,6 +171,11 @@ public class PinotLeadControllerRestletResource {
     Map<String, String> partitionStateMap = leadControllerResourceExternalView.getStateMap(partitionName);
 
     // Gets master host from partition map. Returns null if no master found.
+    if (partitionStateMap == null) {
+      LOGGER.warn("Partition state map for partition: {} is null in lead controller resource external view",
+          partitionName);
+      return null;
+    }
     for (Map.Entry<String, String> entry : partitionStateMap.entrySet()) {
       if (MasterSlaveSMD.States.MASTER.name().equals(entry.getValue())) {
         // Found the controller in master state.

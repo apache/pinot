@@ -20,7 +20,6 @@ package org.apache.pinot.core.auth;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,11 +32,9 @@ import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * Utility for extracting and constructing BasicAuth principals
- * from configuration and user metadata, including permissions,
- * table access rules, and row-level security (RLS) filters.
- */
+/// Utility for extracting and constructing BasicAuth principals
+/// from configuration and user metadata, including permissions,
+/// table access rules, and row-level security (RLS) filters.
 public final class BasicAuthPrincipalUtils {
   private static final String PASSWORD = "password";
   private static final String PERMISSIONS = "permissions";
@@ -50,23 +47,21 @@ public final class BasicAuthPrincipalUtils {
     // left blank
   }
 
-  /**
-   * Parse a pinot configuration namespace for access control settings, e.g. "controller.admin.access.control
-   * .principals".
-   *
-   * <pre>
-   *     Example:
-   *     my.prefix.access.control.principals=admin123,user456
-   *     my.prefix.access.control.principals.admin123.password=verysecret
-   *     my.prefix.access.control.principals.user456.password=kindasecret
-   *     my.prefix.access.control.principals.user456.tables=stuff,lessImportantStuff
-   *     my.prefix.access.control.principals.user456.permissions=read,update
-   * </pre>
-   *
-   * @param configuration pinot configuration
-   * @param prefix configuration namespace
-   * @return list of BasicAuthPrincipals
-   */
+  /// Parse a pinot configuration namespace for access control settings, e.g. "controller.admin.access.control
+  /// .principals".
+  ///
+  /// ```
+  /// Example:
+  /// my.prefix.access.control.principals=admin123,user456
+  /// my.prefix.access.control.principals.admin123.password=verysecret
+  /// my.prefix.access.control.principals.user456.password=kindasecret
+  /// my.prefix.access.control.principals.user456.tables=stuff,lessImportantStuff
+  /// my.prefix.access.control.principals.user456.permissions=read,update
+  /// ```
+  ///
+  /// @param configuration pinot configuration
+  /// @param prefix configuration namespace
+  /// @return list of BasicAuthPrincipals
   public static List<BasicAuthPrincipal> extractBasicAuthPrincipals(PinotConfiguration configuration, String prefix) {
     String principalNames = configuration.getProperty(prefix);
     Preconditions.checkArgument(StringUtils.isNotBlank(principalNames), "must provide principals");
@@ -116,13 +111,13 @@ public final class BasicAuthPrincipalUtils {
           String role = user.getRoleType().toString();
 
           Set<String> tables = Optional.ofNullable(user.getTables())
-              .orElseGet(() -> Collections.emptyList())
+              .orElseGet(() -> List.of())
               .stream().collect(Collectors.toSet());
           Set<String> excludeTables = Optional.ofNullable(user.getExcludeTables())
-              .orElseGet(() -> Collections.emptyList())
+              .orElseGet(() -> List.of())
               .stream().collect(Collectors.toSet());
           Set<String> permissions = Optional.ofNullable(user.getPermissions())
-              .orElseGet(() -> Collections.emptyList())
+              .orElseGet(() -> List.of())
               .stream().map(x -> x.toString())
               .collect(Collectors.toSet());
           //todo: Handle RLS filters properly
@@ -137,6 +132,6 @@ public final class BasicAuthPrincipalUtils {
     if (StringUtils.isNotBlank(input) && !ALL.equals(input)) {
       return Arrays.stream(input.split(",")).map(String::trim).collect(Collectors.toSet());
     }
-    return Collections.emptySet();
+    return Set.of();
   }
 }

@@ -21,7 +21,11 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
@@ -32,6 +36,11 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
 
   public IntColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
+  }
+
+  public IntColumnPreIndexStatsCollector(FieldSpec fieldSpec, @Nullable FieldConfig fieldConfig,
+      @Nullable PartitionFunction partitionFunction) {
+    super(fieldSpec, fieldConfig, partitionFunction);
   }
 
   @Override

@@ -334,7 +334,7 @@ public class ImmutableDictionaryTypeConversionTest implements PinotBuffersAfterM
     try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
         new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
         OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(buffer, NUM_VALUES, STRING_LENGTH,
-        null, null)) {
+            null, null)) {
       testStringDictionary(onHeapStringDictionary);
     }
   }
@@ -345,14 +345,14 @@ public class ImmutableDictionaryTypeConversionTest implements PinotBuffersAfterM
     try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
         new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
         OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(buffer, NUM_VALUES, STRING_LENGTH,
-        STRING_INTERNER, BYTE_INTERNER)) {
+            STRING_INTERNER, BYTE_INTERNER)) {
       testStringDictionary(onHeapStringDictionary);
     }
 
     try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
         new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
         OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(buffer, NUM_VALUES, STRING_LENGTH,
-        STRING_INTERNER, BYTE_INTERNER)) {
+            STRING_INTERNER, BYTE_INTERNER)) {
       testStringDictionary(onHeapStringDictionary);
     }
   }

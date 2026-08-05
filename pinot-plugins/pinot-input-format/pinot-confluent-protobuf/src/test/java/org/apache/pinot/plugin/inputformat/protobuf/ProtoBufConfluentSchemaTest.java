@@ -24,7 +24,6 @@ import com.google.protobuf.Message;
 import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -99,7 +98,7 @@ public class ProtoBufConfluentSchemaTest {
     consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
     consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "foo_bar");
     KafkaConsumer<byte[], byte[]> kafkaConsumer = new KafkaConsumer<>(consumerProps);
-    kafkaConsumer.subscribe(Collections.singletonList(TOPIC_PROTO));
+    kafkaConsumer.subscribe(List.of(TOPIC_PROTO));
     ConsumerRecords<byte[], byte[]> consumerRecords = kafkaConsumer.poll(Duration.ofMillis(1000));
     Iterator<ConsumerRecord<byte[], byte[]>> iter = consumerRecords.iterator();
 

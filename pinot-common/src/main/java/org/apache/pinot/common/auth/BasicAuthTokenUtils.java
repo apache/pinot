@@ -25,9 +25,7 @@ import org.apache.commons.lang3.Strings;
 import org.apache.pinot.common.utils.BcryptUtils;
 
 
-/**
- * Utility for configuring basic auth and parsing related http tokens
- */
+/// Utility for configuring basic auth and parsing related http tokens
 public final class BasicAuthTokenUtils {
   private static final String ALL = "*";
 
@@ -35,13 +33,11 @@ public final class BasicAuthTokenUtils {
     // left blank
   }
 
-  /**
-   * Convert a pair of name and password into a http header-compliant base64 encoded token
-   *
-   * @param name user name
-   * @param password password
-   * @return base64 encoded basic auth token
-   */
+  /// Convert a pair of name and password into a http header-compliant base64 encoded token
+  ///
+  /// @param name user name
+  /// @param password password
+  /// @return base64 encoded basic auth token
   @Nullable
   public static String toBasicAuthToken(String name, String password) {
     if (StringUtils.isBlank(name)) {
@@ -71,12 +67,10 @@ public final class BasicAuthTokenUtils {
     return StringUtils.split(decodedString, ":")[1];
   }
 
-  /**
-   * Convert http header-compliant base64 encoded token to password-encrypted base64 token
-   *
-   * @param auth http base64 token
-   * @return base64 encoded basic auth token
-   */
+  /// Convert http header-compliant base64 encoded token to password-encrypted base64 token
+  ///
+  /// @param auth http base64 token
+  /// @return base64 encoded basic auth token
   public static String toEncryptBasicAuthToken(String auth) {
     if (StringUtils.isBlank(auth)) {
       return null;
@@ -91,12 +85,10 @@ public final class BasicAuthTokenUtils {
     return toBasicAuthToken(rawUsername, encryptedPassword);
   }
 
-  /**
-   * Normalize a base64 encoded auth token by stripping redundant padding (spaces, '=')
-   *
-   * @param token base64 encoded auth token
-   * @return normalized auth token
-   */
+  /// Normalize a base64 encoded auth token by stripping redundant padding (spaces, '=')
+  ///
+  /// @param token base64 encoded auth token
+  /// @return normalized auth token
   @Nullable
   public static String normalizeBase64Token(String token) {
     if (token == null) {

@@ -54,9 +54,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for BOOLEAN data type with nullHandlingEnabled.
- */
+/// Queries test for BOOLEAN data type with nullHandlingEnabled.
 public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "BooleanNullEnabledQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";
@@ -343,7 +341,7 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       }
     }
     {
-        String query = "SELECT booleanColumn FROM testTable WHERE booleanColumn";
+      String query = "SELECT booleanColumn FROM testTable WHERE booleanColumn";
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();

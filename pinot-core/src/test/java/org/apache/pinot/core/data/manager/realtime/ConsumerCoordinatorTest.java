@@ -81,18 +81,18 @@ public class ConsumerCoordinatorTest {
         RealtimeTableDataManager realtimeTableDataManager) {
       super(enforceConsumptionInOrder, realtimeTableDataManager);
       Map<String, String> serverSegmentStatusMap = new HashMap<>() {{
-        put("server_1", "ONLINE");
-        put("server_3", "ONLINE");
-      }};
+          put("server_1", "ONLINE");
+          put("server_3", "ONLINE");
+        }};
       _segmentAssignmentMap = new HashMap<>() {{
-        put("tableTest_REALTIME__1__101__20250304T0035Z", serverSegmentStatusMap);
-        put("tableTest_REALTIME__2__101__20250304T0035Z", serverSegmentStatusMap);
-        put("tableTest_REALTIME__2__100__20250304T0035Z", serverSegmentStatusMap);
-        put("tableTest_REALTIME__1__1__20250304T0035Z", serverSegmentStatusMap);
-        put("tableTest_REALTIME__1__14__20250304T0035Z", serverSegmentStatusMap);
-        put("tableTest_REALTIME__1__91__20250304T0035Z", serverSegmentStatusMap);
-        put("tableTest_REALTIME__1__90__20250304T0035Z", serverSegmentStatusMap);
-      }};
+          put("tableTest_REALTIME__1__101__20250304T0035Z", serverSegmentStatusMap);
+          put("tableTest_REALTIME__2__101__20250304T0035Z", serverSegmentStatusMap);
+          put("tableTest_REALTIME__2__100__20250304T0035Z", serverSegmentStatusMap);
+          put("tableTest_REALTIME__1__1__20250304T0035Z", serverSegmentStatusMap);
+          put("tableTest_REALTIME__1__14__20250304T0035Z", serverSegmentStatusMap);
+          put("tableTest_REALTIME__1__91__20250304T0035Z", serverSegmentStatusMap);
+          put("tableTest_REALTIME__1__90__20250304T0035Z", serverSegmentStatusMap);
+        }};
     }
 
     @Override
@@ -149,9 +149,9 @@ public class ConsumerCoordinatorTest {
     ReentrantLock lock = (ReentrantLock) consumerCoordinator.getLock();
     RealtimeSegmentDataManager mockedRealtimeSegmentDataManager = getMockedRealtimeSegmentDataManager();
     Map<String, String> serverSegmentStatusMap = new HashMap<>() {{
-      put("server_1", "ONLINE");
-      put("server_3", "ONLINE");
-    }};
+        put("server_1", "ONLINE");
+        put("server_3", "ONLINE");
+      }};
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(100), serverSegmentStatusMap);
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(102), serverSegmentStatusMap);
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(104), serverSegmentStatusMap);
@@ -360,9 +360,9 @@ public class ConsumerCoordinatorTest {
 
     // 3. test that segment 103 will be blocked.
     Map<String, String> serverSegmentStatusMap = new HashMap<>() {{
-      put("server_1", "ONLINE");
-      put("server_3", "ONLINE");
-    }};
+        put("server_1", "ONLINE");
+        put("server_3", "ONLINE");
+      }};
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(102), serverSegmentStatusMap);
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(103), serverSegmentStatusMap);
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(104), serverSegmentStatusMap);
@@ -439,8 +439,8 @@ public class ConsumerCoordinatorTest {
 
     consumerCoordinator.getSegmentAssignment().clear();
     Map<String, String> serverSegmentStatusMap = new HashMap<>() {{
-      put("server_3", "ONLINE");
-    }};
+        put("server_3", "ONLINE");
+      }};
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(100), serverSegmentStatusMap);
     previousSegmentSequenceNumber = consumerCoordinator.getPreviousSegmentSequenceNumberFromIdealState(llcSegmentName);
     Assert.assertEquals(previousSegmentSequenceNumber, -1);

@@ -19,8 +19,8 @@
 package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections4.CollectionUtils;
@@ -65,13 +65,16 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
         comparisonColumns = List.of(timeColumnName);
       } else {
         // No comparison column and no time column: use segment creation time for comparison
-        comparisonColumns = Collections.emptyList();
+        comparisonColumns = List.of();
       }
     }
 
-    PartialUpsertHandler partialUpsertHandler = null;
+    // PartialUpsertHandler is not thread safe, so hand each partition a factory rather than one shared instance.
+    Supplier<PartialUpsertHandler> partialUpsertHandlerSupplier = null;
     if (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
-      partialUpsertHandler = new PartialUpsertHandler(tableConfig, schema, comparisonColumns, upsertConfig);
+      List<String> handlerComparisonColumns = comparisonColumns;
+      partialUpsertHandlerSupplier =
+          () -> new PartialUpsertHandler(tableConfig, schema, handlerComparisonColumns, upsertConfig);
     }
 
     boolean enableSnapshot = upsertConfig.getSnapshot()
@@ -129,7 +132,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
         .setPrimaryKeyColumns(primaryKeyColumns)
         .setHashFunction(upsertConfig.getHashFunction())
         .setComparisonColumns(comparisonColumns)
-        .setPartialUpsertHandler(partialUpsertHandler)
+        .setPartialUpsertHandlerSupplier(partialUpsertHandlerSupplier)
         .setDeleteRecordColumn(upsertConfig.getDeleteRecordColumn())
         .setDropOutOfOrderRecord(upsertConfig.isDropOutOfOrderRecord())
         .setOutOfOrderRecordColumn(upsertConfig.getOutOfOrderRecordColumn())
@@ -149,10 +152,8 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     initCustomVariables();
   }
 
-  /**
-   * Can be overridden to initialize custom variables after other variables are set but before preload starts. This is
-   * needed because preload will load segments which might require these custom variables.
-   */
+  /// Can be overridden to initialize custom variables after other variables are set but before preload starts. This is
+  /// needed because preload will load segments which might require these custom variables.
   protected void initCustomVariables() {
   }
 

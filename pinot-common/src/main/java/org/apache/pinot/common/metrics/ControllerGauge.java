@@ -21,9 +21,7 @@ package org.apache.pinot.common.metrics;
 import org.apache.pinot.common.Utils;
 
 
-/**
- * Controller gauges.
- */
+/// Controller gauges.
 public enum ControllerGauge implements AbstractMetrics.Gauge {
   VERSION("version", true),
 
@@ -71,7 +69,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // TODO: Unify below subtask metrics into a single metric with status label
   NUM_MINION_TASKS_IN_PROGRESS("NumMinionTasksInProgress", true),
   NUM_MINION_SUBTASKS_WAITING("NumMinionSubtasksWaiting", true),
+  MAX_SUBTASK_WAIT_TIME_MS("MaxSubtaskWaitTimeMs", false),
   NUM_MINION_SUBTASKS_RUNNING("NumMinionSubtasksRunning", true),
+  MAX_SUBTASK_RUNNING_TIME_MS("MaxSubtaskRunningTimeMs", false),
   NUM_MINION_SUBTASKS_ERROR("NumMinionSubtasksError", true),
   NUM_MINION_SUBTASKS_UNKNOWN("NumMinionSubtasksUnknown", true),
   NUM_MINION_SUBTASKS_DROPPED("NumMinionSubtasksDropped", true),
@@ -113,6 +113,15 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
 
   // Percentage of segments we failed to get size for
   TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT("TableStorageEstMissingSegmentPercent", false),
+
+  // Uncompressed-value to forward-index-and-dictionary storage ratio scaled by 100 (e.g., 4.5x becomes 450).
+  TABLE_COMPRESSION_STATS_RATIO_PERCENT("percent", false),
+
+  // Uncompressed column-value size represented by compression statistics, per replica
+  TABLE_COMPRESSION_STATS_UNCOMPRESSED_VALUE_SIZE_PER_REPLICA("bytes", false),
+
+  // Forward-index and dictionary size represented by compression statistics, per replica
+  TABLE_COMPRESSION_STATS_FORWARD_INDEX_AND_DICTIONARY_STORAGE_SIZE_PER_REPLICA("bytes", false),
 
   // Number of scheduled Cron jobs
   CRON_SCHEDULER_JOB_SCHEDULED("cronSchedulerJobScheduled", false),
@@ -223,6 +232,17 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
 
   // The progress of a certain table rebalance job of a table
   TABLE_REBALANCE_JOB_PROGRESS_PERCENT("percent", false),
+
+  // Mapping metric for table-to-tenant attribution. One gauge per (tenantType, tenantName) pair; always set to 1.
+  // The compound key "<tenantType>.<tenantName>" is embedded as extra segments in the JMX metric name so that
+  // Prometheus can extract both as labels and join them onto other table-scoped metrics via group_left.
+  // tenantType values: "server" (server tenant), "broker" (broker tenant), "tier" (tier server tenant).
+  // JMX name pattern: pinot.controller.tableTenantInfo.<tableNameWithType>.<tenantType>.<tenantName>
+  // NOTE: this gauge is exempt from the standard ControllerGauge.values() loop in removeMetricsForTable because its
+  // registered name includes extra key segments. Removal is handled explicitly via _tableTenantMap in
+  // SegmentStatusChecker.
+  TABLE_TENANT_INFO("info", false),
+
   // HTTP thread utilization
   HTTP_THREAD_UTILIZATION("httpThreadUtilization", true),
   // Track the concurrent executions of the API resources that use @ManagedAsync
@@ -249,11 +269,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
     return _unit;
   }
 
-  /**
-   * Returns true if the gauge is global (not attached to a particular resource)
-   *
-   * @return true if the gauge is global
-   */
+  /// Returns true if the gauge is global (not attached to a particular resource)
+  ///
+  /// @return true if the gauge is global
   @Override
   public boolean isGlobal() {
     return _global;

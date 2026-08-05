@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.queries;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -53,10 +52,8 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-/**
- * all special tests that doesn't fit into {@link org.apache.pinot.query.runtime.queries.ResourceBasedQueriesTest}
- * pattern goes here.
- */
+/// all special tests that doesn't fit into [org.apache.pinot.query.runtime.queries.ResourceBasedQueriesTest]
+/// pattern goes here.
 public class QueryRunnerTest extends QueryRunnerTestBase {
   //@formatter:off
   public static final Object[][] ROWS = new Object[][]{
@@ -94,7 +91,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   }
 
   protected Map<String, Object> getConfiguration() {
-    return Collections.emptyMap();
+    return Map.of();
   }
 
   @BeforeClass
@@ -166,21 +163,17 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     _mailboxService.shutdown();
   }
 
-  /**
-   * Test compares with expected row count only.
-   */
+  /// Test compares with expected row count only.
   @Test(dataProvider = "testDataWithSqlToFinalRowCount")
   public void testSqlWithFinalRowCountChecker(String sql, int expectedRows) {
     ResultTable resultTable = queryRunner(sql, false).getResultTable();
     Assert.assertEquals(resultTable.getRows().size(), expectedRows);
   }
 
-  /**
-   * Test automatically compares against H2.
-   *
-   * @deprecated do not add to this test set. this class will be broken down and clean up.
-   *   add your test to the appropriate files in {@link org.apache.pinot.query.runtime.queries} instead.
-   */
+  /// Test automatically compares against H2.
+  ///
+  /// @deprecated do not add to this test set. this class will be broken down and clean up.
+  ///   add your test to the appropriate files in [org.apache.pinot.query.runtime.queries] instead.
   @Test(dataProvider = "testSql")
   public void testSqlWithH2Checker(String sql)
       throws Exception {
@@ -190,9 +183,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     compareRowEquals(resultTable, expectedRows);
   }
 
-  /**
-   * Test compares against its desired exceptions.
-   */
+  /// Test compares against its desired exceptions.
   @Test(dataProvider = "testDataWithSqlExecutionExceptions")
   public void testSqlWithExceptionMsgChecker(String sql, @Language("regexp") String expectedError) {
     try {
@@ -332,6 +323,23 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     //    - checked "Illegal Json Path" as col1 is not actually a json string, but the call is correctly triggered.
     testCases.add(
         new Object[]{"SELECT CAST(jsonExtractScalar(col1, 'path', 'INT') AS INT) FROM a", "Cannot resolve JSON path"});
+    //    - a constant-foldable jsonPath must be folded by PinotEvaluateLiteralRule and then applied like a literal.
+    //      Reaching "Cannot resolve JSON path" (rather than ParserUtils' "single-quoted literal values") is what
+    //      proves the fold happened, so this pins the reason jsonPath does not require a literal in
+    //      TransformFunctionType#jsonExtractScalarOperandTypeChecker.
+    testCases.add(new Object[]{
+        "SELECT CAST(jsonExtractScalar(col1, CONCAT('pa', 'th'), 'INT') AS INT) FROM a", "Cannot resolve JSON path"});
+    //    - the flip side: a jsonPath that cannot fold to a literal is still rejected, on the leaf stage rather than
+    //      during validation. Covers all three variants, which share the operand type checker.
+    for (String jsonExtractScalar : new String[]{
+        "jsonExtractScalar", "jsonExtractScalarFast", "jsonExtractScalarFirstMatch"
+    }) {
+      testCases.add(new Object[]{
+          "SELECT " + jsonExtractScalar + "(col1, col2, 'INT') FROM a",
+          "Expect the 2nd and 3rd arguments of transform function: " + jsonExtractScalar
+              + "(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue']) to be single-quoted literal values"
+      });
+    }
     //    - checked function cannot be found b/c there's no intermediate stage impl for json_extract_scalar
     testCases.add(new Object[]{
         "SELECT CAST(json_extract_scalar(a.col1, b.col2, 'INT') AS INT) FROM a JOIN b ON a.col1 = b.col1",

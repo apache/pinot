@@ -27,13 +27,12 @@ import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexCreator;
+import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Holds all the index creators and metadata for a single column during segment creation.
- * This is used by ColumnarSegmentCreator to avoid hashmap lookups when processing columns.
- */
+/// Holds all the index creators and metadata for a single column during segment creation.
+/// This is used by ColumnarSegmentCreator to avoid hashmap lookups when processing columns.
 public class ColumnIndexCreators implements Closeable {
   private final String _columnName;
   private final FieldSpec _fieldSpec;
@@ -90,6 +89,17 @@ public class ColumnIndexCreators implements Closeable {
   /// RAW by the dictionary optimizer even though the original config said DICTIONARY).
   public FieldIndexConfigs getIndexConfigs() {
     return _indexConfigs;
+  }
+
+  /// Returns the [ForwardIndexCreator] for this column, or `null` if no forward index was created.
+  @Nullable
+  public ForwardIndexCreator getForwardIndexCreator() {
+    for (IndexCreator creator : _indexCreators) {
+      if (creator instanceof ForwardIndexCreator) {
+        return (ForwardIndexCreator) creator;
+      }
+    }
+    return null;
   }
 
   public void seal() throws IOException {

@@ -39,15 +39,13 @@ import org.apache.pinot.spi.utils.FixedIntArray;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Implementation of {@link GroupKeyGenerator} interface using actual value based
- * group keys, instead of dictionary ids. This implementation is used for group-by key
- * generation when one or more of the group-by columns do not have dictionary.
- *
- * TODO:
- * 1. Add support for multi-valued group-by columns.
- * 2. Add support for trimming group-by results.
- */
+/// Implementation of [GroupKeyGenerator] interface using actual value based
+/// group keys, instead of dictionary ids. This implementation is used for group-by key
+/// generation when one or more of the group-by columns do not have dictionary.
+///
+/// TODO:
+/// 1. Add support for multi-valued group-by columns.
+/// 2. Add support for trimming group-by results.
 public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerator {
   private static final int ID_FOR_NULL = INVALID_ID - 1;
 
@@ -78,7 +76,11 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       ExpressionContext groupByExpression = groupByExpressions[i];
       ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
       _storedTypes[i] = columnContext.getDataType().getStoredType();
-      Dictionary dictionary = _nullHandlingEnabled ? null : columnContext.getDictionary();
+      // Take the dict-id path only when the forward index is dict-encoded. A column with EncodingType.RAW +
+      // dictionaryIndex exposes a Dictionary but BlockValSet#getDictionaryIdsSV throws on its RAW forward
+      // index — fall back to an on-the-fly dictionary on raw values for that case.
+      Dictionary dictionary = _nullHandlingEnabled || !columnContext.isDictionaryEncoded() ? null
+          : columnContext.getDictionary();
       if (dictionary != null) {
         _dictionaries[i] = dictionary;
       } else {
@@ -428,12 +430,10 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
     return new GroupKeyIterator();
   }
 
-  /**
-   * Helper method to get or create group-id for a group key.
-   *
-   * @param keyList Group key, that is a list of objects to be grouped
-   * @return Group id
-   */
+  /// Helper method to get or create group-id for a group key.
+  ///
+  /// @param keyList Group key, that is a list of objects to be grouped
+  /// @return Group id
   private int getGroupIdForKey(FixedIntArray keyList) {
     int numGroups = _groupKeyMap.size();
     if (numGroups < _numGroupsLimit) {
@@ -443,12 +443,10 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
     }
   }
 
-  /**
-   * Helper method to get or create a list of group-id for a list of group key.
-   *
-   * @param keysList Group keys, that is a list of list of objects to be grouped
-   * @return Group ids
-   */
+  /// Helper method to get or create a list of group-id for a list of group key.
+  ///
+  /// @param keysList Group keys, that is a list of list of objects to be grouped
+  /// @return Group ids
   private int[] getGroupIdsForKeys(int[][] keysList) {
     IntArrayList groupIds = new IntArrayList();
     getGroupIdsForKeyHelper(keysList, new int[keysList.length], 0, groupIds);
@@ -473,9 +471,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
     return _groupKeyMap.size();
   }
 
-  /**
-   * Iterator for {@link GroupKey}.
-   */
+  /// Iterator for [GroupKey].
   private class GroupKeyIterator implements Iterator<GroupKey> {
     private final ObjectIterator<Object2IntMap.Entry<FixedIntArray>> _iterator;
     private final GroupKey _groupKey;

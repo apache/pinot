@@ -36,8 +36,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.commons.lang3.StringUtils;
@@ -57,6 +59,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
@@ -93,9 +96,7 @@ public class RequestUtils {
     return sqlNodeAndOptions;
   }
 
-  /**
-   * Sets extra options for the given query.
-   */
+  /// Sets extra options for the given query.
   @VisibleForTesting
   public static void setOptions(SqlNodeAndOptions sqlNodeAndOptions, JsonNode jsonRequest) {
     Map<String, String> queryOptions = new HashMap<>();
@@ -208,6 +209,9 @@ public class RequestUtils {
     }
     if (object instanceof byte[]) {
       return getLiteral((byte[]) object);
+    }
+    if (object instanceof UUID) {
+      return getLiteral(UuidUtils.toBytes((UUID) object));
     }
     if (object instanceof int[]) {
       return getLiteral((int[]) object);
@@ -333,9 +337,7 @@ public class RequestUtils {
     return getLiteralExpression(getLiteral(object));
   }
 
-  /**
-   * Returns the value of the given literal.
-   */
+  /// Returns the value of the given literal.
   @Nullable
   public static Object getLiteralValue(Literal literal) {
     Literal._Fields type = literal.getSetField();
@@ -453,9 +455,7 @@ public class RequestUtils {
     }
   }
 
-  /**
-   * Returns the string representation of the given literal.
-   */
+  /// Returns the string representation of the given literal.
   public static String getLiteralString(Literal literal) {
     Literal._Fields type = literal.getSetField();
     switch (type) {
@@ -486,9 +486,16 @@ public class RequestUtils {
     return getLiteralString(literal);
   }
 
+  /// Creates a `Function` with the given operands. The operand list stored in the returned function
+  /// is always a mutable `ArrayList`: if `operands` is not already an `ArrayList` (e.g. an immutable
+  /// `List.of(...)`), it is copied into one. Downstream query rewriters and filter optimizers mutate
+  /// operands in place (via `getOperands().replaceAll(...)`, `set(...)`, or `add(...)`), so an
+  /// immutable list would otherwise throw `UnsupportedOperationException` far from where it was
+  /// created.
   public static Function getFunction(String canonicalName, List<Expression> operands) {
     Function function = new Function(canonicalName);
-    function.setOperands(operands);
+    // Ensure a mutable ArrayList so downstream rewriters can modify operands in place.
+    function.setOperands(operands instanceof ArrayList ? operands : new ArrayList<>(operands));
     return function;
   }
 
@@ -522,18 +529,7 @@ public class RequestUtils {
     return getFunctionExpression(getFunction(canonicalName, operands));
   }
 
-  @Deprecated
-  public static Expression getFunctionExpression(String canonicalName) {
-    assert canonicalName.equalsIgnoreCase(canonicalizeFunctionNamePreservingSpecialKey(canonicalName));
-    Expression expression = new Expression(ExpressionType.FUNCTION);
-    Function function = new Function(canonicalName);
-    expression.setFunctionCall(function);
-    return expression;
-  }
-
-  /**
-   * Converts the function name into its canonical form.
-   */
+  /// Converts the function name into its canonical form.
   public static String canonicalizeFunctionName(String functionName) {
     return StringUtils.remove(functionName, '_').toLowerCase();
   }
@@ -542,13 +538,66 @@ public class RequestUtils {
       Map.copyOf(Arrays.stream(FilterKind.values())
           .collect(Collectors.toMap(f -> canonicalizeFunctionName(f.name()), Enum::name)));
 
-  /**
-   * Converts the function name into its canonical form, but preserving the special keys.
-   * - Keep FilterKind.name() as is because we need to read the FilterKind via FilterKind.valueOf().
-   */
+  /// Converts the function name into its canonical form, but preserving the special keys.
+  /// - Keep FilterKind.name() as is because we need to read the FilterKind via FilterKind.valueOf().
   public static String canonicalizeFunctionNamePreservingSpecialKey(String functionName) {
     String canonicalName = canonicalizeFunctionName(functionName);
     return CANONICAL_NAME_TO_SPECIAL_KEY_MAP.getOrDefault(canonicalName, canonicalName);
+  }
+
+  /// Returns true iff `expression` is an `AS`-wrapped function call
+  /// (i.e. shaped like `expr AS alias` after Calcite parsing).
+  ///
+  /// Centralises the shape check that was previously open-coded in several places
+  /// (alias appliers, MV analyzer, query-context converters).  Callers that need the
+  /// alias name or the underlying expression should use [#unwrapAlias(Expression)]
+  /// or [#extractAliasOrIdentifierName(Expression)] rather than re-implementing
+  /// this check inline.
+  public static boolean isAliased(@Nullable Expression expression) {
+    if (expression == null) {
+      return false;
+    }
+    Function function = expression.getFunctionCall();
+    return function != null && SqlKind.AS.lowerName.equals(function.getOperator());
+  }
+
+  /// Strips the `AS alias` wrapper from a SELECT-list expression and returns the
+  /// underlying source expression.  When `expression` is not aliased the original
+  /// expression is returned unchanged, so this method is safe to call unconditionally
+  /// while iterating SELECT items.
+  ///
+  /// Mirrors the local helper that previously lived in
+  /// `MaterializedViewAnalyzer#extractSourceExpression`; callers that walk a
+  /// SELECT list to inspect the aggregate / transform under each alias should use this
+  /// method instead of re-implementing the same operand-zero indirection.
+  public static Expression unwrapAlias(Expression expression) {
+    return isAliased(expression) ? expression.getFunctionCall().getOperands().get(0) : expression;
+  }
+
+  /// Extracts the user-facing column name a SELECT-list expression resolves to:
+  ///
+  ///   - `expr AS alias` ⇒ `alias`
+  ///   - bare identifier (`col`) ⇒ `col`
+  ///   - any other shape (function/literal without an alias) ⇒
+  ///     [IllegalStateException]
+  ///
+  /// Used by callers that need to map SELECT items to schema columns (e.g. MV schema
+  /// coverage checks, MV column inference).  The error message lists the offending
+  /// expression in pretty-printed form so the operator can fix their SQL without
+  /// reaching for AST internals.
+  public static String extractAliasOrIdentifierName(Expression expression) {
+    if (isAliased(expression)) {
+      Expression aliasExpr = expression.getFunctionCall().getOperands().get(1);
+      Preconditions.checkState(aliasExpr.getType() == ExpressionType.IDENTIFIER,
+          "AS alias must be an identifier, got: %s", prettyPrint(aliasExpr));
+      return aliasExpr.getIdentifier().getName();
+    }
+    if (expression.getType() == ExpressionType.IDENTIFIER) {
+      return expression.getIdentifier().getName();
+    }
+    throw new IllegalStateException(
+        "Expression '" + prettyPrint(expression)
+            + "' must be a bare column or use AS <alias> to map to a schema column");
   }
 
   public static String prettyPrint(@Nullable Expression expression) {
@@ -629,11 +678,6 @@ public class RequestUtils {
 
   public static Set<String> getTableNames(PinotQuery pinotQuery) {
     return getTableNames(pinotQuery.getDataSource());
-  }
-
-  @Deprecated
-  public static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
-    return getOptionsFromString(request.get(optionsKey).asText());
   }
 
   public static Map<String, String> getOptionsFromString(String optionStr) {

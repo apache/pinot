@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.index.vector.IvfCombinedBuffers;
 import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -34,12 +35,10 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for the filter-aware (FILTER_THEN_ANN) functionality of {@link IvfFlatVectorIndexReader}.
- *
- * <p>Verifies that pre-filter ANN search correctly restricts results to the filtered document set
- * and returns correct top-K results across various filter selectivities.</p>
- */
+/// Tests for the filter-aware (FILTER_THEN_ANN) functionality of [IvfFlatVectorIndexReader].
+///
+/// Verifies that pre-filter ANN search correctly restricts results to the filtered document set
+/// and returns correct top-K results across various filter selectivities.
 public class IvfFlatFilterAwareTest {
   private static final String COLUMN_NAME = "vectorCol";
   private static final long TEST_SEED = 42L;
@@ -69,7 +68,8 @@ public class IvfFlatFilterAwareTest {
     createIndex(vectors, dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
 
     VectorIndexConfig config = createConfig(dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
-    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       // Create a pre-filter that only includes even-numbered docs
       MutableRoaringBitmap preFilter = new MutableRoaringBitmap();
       for (int i = 0; i < numVectors; i += 2) {
@@ -106,7 +106,8 @@ public class IvfFlatFilterAwareTest {
     createIndex(vectors, dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
 
     VectorIndexConfig config = createConfig(dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
-    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       MutableRoaringBitmap emptyFilter = new MutableRoaringBitmap();
       float[] queryVector = vectors[0];
       ImmutableRoaringBitmap result = reader.getDocIds(queryVector, 5, emptyFilter);
@@ -125,7 +126,8 @@ public class IvfFlatFilterAwareTest {
     createIndex(vectors, dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
 
     VectorIndexConfig config = createConfig(dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
-    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       MutableRoaringBitmap singleDocFilter = new MutableRoaringBitmap();
       singleDocFilter.add(5);
 
@@ -154,7 +156,8 @@ public class IvfFlatFilterAwareTest {
     createIndex(vectors, dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
 
     VectorIndexConfig config = createConfig(dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
-    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       // Include all docs except doc 0
       MutableRoaringBitmap highSelectFilter = new MutableRoaringBitmap();
       for (int i = 1; i < numVectors; i++) {
@@ -185,7 +188,8 @@ public class IvfFlatFilterAwareTest {
     createIndex(vectors, dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
 
     VectorIndexConfig config = createConfig(dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
-    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       reader.setNprobe(nlist); // Probe all centroids to ensure we find filtered docs
 
       // Only include 3 docs
@@ -219,7 +223,8 @@ public class IvfFlatFilterAwareTest {
     createIndex(vectors, dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
 
     VectorIndexConfig config = createConfig(dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
-    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       MutableRoaringBitmap fullFilter = new MutableRoaringBitmap();
       for (int i = 0; i < numVectors; i++) {
         fullFilter.add(i);
@@ -254,7 +259,8 @@ public class IvfFlatFilterAwareTest {
     createIndex(vectors, dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
 
     VectorIndexConfig config = createConfig(dimension, nlist, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
-    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME, _tempDir, config)) {
+    try (IvfFlatVectorIndexReader reader = new IvfFlatVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, config, "test-vector"), config)) {
       Assert.assertTrue(reader.supportsPreFilter(), "IvfFlatVectorIndexReader should support pre-filter");
     }
   }

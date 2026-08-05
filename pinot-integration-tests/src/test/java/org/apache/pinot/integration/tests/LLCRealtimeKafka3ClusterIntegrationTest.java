@@ -38,9 +38,7 @@ import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test for low-level Kafka3 consumer.
- */
+/// Integration test for low-level Kafka3 consumer.
 public class LLCRealtimeKafka3ClusterIntegrationTest extends LLCRealtimeClusterIntegrationTest {
 
   @Override

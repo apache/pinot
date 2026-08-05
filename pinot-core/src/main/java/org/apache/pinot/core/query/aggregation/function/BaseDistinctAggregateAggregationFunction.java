@@ -46,11 +46,9 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
-/**
- * Base class for Distinct Aggregate functions that require collecting all distinct elements in a set before
- * performing the aggregate computation. This is used by DistinctSum, DistinctAvg and DistinctCount aggregation
- * functions.
- */
+/// Base class for Distinct Aggregate functions that require collecting all distinct elements in a set before
+/// performing the aggregate computation. This is used by DistinctSum, DistinctAvg and DistinctCount aggregation
+/// functions.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class BaseDistinctAggregateAggregationFunction<T extends Comparable>
     extends NullableSingleInputAggregationFunction<Set, T> {
@@ -181,9 +179,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     return ObjectSerDeUtils.deserialize(customObject);
   }
 
-  /**
-   * Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
-   */
+  /// Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
   protected static RoaringBitmap getDictIdBitmap(AggregationResultHolder aggregationResultHolder,
       Dictionary dictionary) {
     DictIdsWrapper dictIdsWrapper = aggregationResultHolder.getResult();
@@ -194,12 +190,10 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     return dictIdsWrapper._dictIdBitmap;
   }
 
-  /**
-   * Performs aggregation for a SV column
-   */
+  /// Performs aggregation for a SV column
   protected void svAggregate(BlockValSet blockValSet, int length, AggregationResultHolder aggregationResultHolder) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
@@ -288,12 +282,10 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     }
   }
 
-  /**
-   * Performs aggregation for a MV column
-   */
+  /// Performs aggregation for a MV column
   protected void mvAggregate(BlockValSet blockValSet, int length, AggregationResultHolder aggregationResultHolder) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
@@ -401,13 +393,11 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     }
   }
 
-  /**
-   * Performs aggregation for a SV column with group by on a SV column.
-   */
+  /// Performs aggregation for a SV column with group by on a SV column.
   protected void svAggregateGroupBySV(BlockValSet blockValSet, int length, int[] groupKeyArray,
       GroupByResultHolder groupByResultHolder) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
 
@@ -495,13 +485,11 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     }
   }
 
-  /**
-   * Performs aggregation for a MV column with group by on a SV column.
-   */
+  /// Performs aggregation for a MV column with group by on a SV column.
   protected void mvAggregateGroupBySV(BlockValSet blockValSet, int length, int[] groupKeyArray,
       GroupByResultHolder groupByResultHolder) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -613,13 +601,11 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     }
   }
 
-  /**
-   * Performs aggregation for a SV column with group by on a MV column.
-   */
+  /// Performs aggregation for a SV column with group by on a MV column.
   protected void svAggregateGroupByMV(BlockValSet blockValSet, int length, int[][] groupKeysArray,
       GroupByResultHolder groupByResultHolder) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
 
@@ -703,13 +689,11 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     }
   }
 
-  /**
-   * Performs aggregation for a MV column with group by on a MV column.
-   */
+  /// Performs aggregation for a MV column with group by on a MV column.
   protected void mvAggregateGroupByMV(BlockValSet blockValSet, int length, int[][] groupKeysArray,
       GroupByResultHolder groupByResultHolder) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
 
@@ -836,9 +820,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     }
   }
 
-  /**
-   * Returns the value set from the result holder or creates a new one if it does not exist.
-   */
+  /// Returns the value set from the result holder or creates a new one if it does not exist.
   protected static Set getValueSet(AggregationResultHolder aggregationResultHolder, DataType valueType) {
     Set valueSet = aggregationResultHolder.getResult();
     if (valueSet == null) {
@@ -848,9 +830,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     return valueSet;
   }
 
-  /**
-   * Helper method to create a value set for the given value type.
-   */
+  /// Helper method to create a value set for the given value type.
   private static Set getValueSet(DataType valueType) {
     switch (valueType) {
       case INT:
@@ -870,9 +850,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     }
   }
 
-  /**
-   * Returns the dictionary id bitmap for the given group key or creates a new one if it does not exist.
-   */
+  /// Returns the dictionary id bitmap for the given group key or creates a new one if it does not exist.
   protected static RoaringBitmap getDictIdBitmap(GroupByResultHolder groupByResultHolder, int groupKey,
       Dictionary dictionary) {
     DictIdsWrapper dictIdsWrapper = groupByResultHolder.getResult(groupKey);
@@ -883,9 +861,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     return dictIdsWrapper._dictIdBitmap;
   }
 
-  /**
-   * Returns the value set for the given group key or creates a new one if it does not exist.
-   */
+  /// Returns the value set for the given group key or creates a new one if it does not exist.
   protected static Set getValueSet(GroupByResultHolder groupByResultHolder, int groupKey, DataType valueType) {
     Set valueSet = groupByResultHolder.getResult(groupKey);
     if (valueSet == null) {
@@ -895,9 +871,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     return valueSet;
   }
 
-  /**
-   * Helper method to set dictionary id for the given group keys into the result holder.
-   */
+  /// Helper method to set dictionary id for the given group keys into the result holder.
   private static void setDictIdForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys,
       Dictionary dictionary, int dictId) {
     for (int groupKey : groupKeys) {
@@ -905,72 +879,56 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     }
   }
 
-  /**
-   * Helper method to set INT value for the given group keys into the result holder.
-   */
+  /// Helper method to set INT value for the given group keys into the result holder.
   private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, int value) {
     for (int groupKey : groupKeys) {
       ((IntOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.INT)).add(value);
     }
   }
 
-  /**
-   * Helper method to set LONG value for the given group keys into the result holder.
-   */
+  /// Helper method to set LONG value for the given group keys into the result holder.
   private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, long value) {
     for (int groupKey : groupKeys) {
       ((LongOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.LONG)).add(value);
     }
   }
 
-  /**
-   * Helper method to set FLOAT value for the given group keys into the result holder.
-   */
+  /// Helper method to set FLOAT value for the given group keys into the result holder.
   private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, float value) {
     for (int groupKey : groupKeys) {
       ((FloatOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.FLOAT)).add(value);
     }
   }
 
-  /**
-   * Helper method to set DOUBLE value for the given group keys into the result holder.
-   */
+  /// Helper method to set DOUBLE value for the given group keys into the result holder.
   private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, double value) {
     for (int groupKey : groupKeys) {
       ((DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.DOUBLE)).add(value);
     }
   }
 
-  /**
-   * Helper method to set BIG_DECIMAL value for the given group keys into the result holder.
-   */
+  /// Helper method to set BIG_DECIMAL value for the given group keys into the result holder.
   private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, BigDecimal value) {
     for (int groupKey : groupKeys) {
       ((ObjectOpenHashSet<BigDecimal>) getValueSet(groupByResultHolder, groupKey, DataType.BIG_DECIMAL)).add(value);
     }
   }
 
-  /**
-   * Helper method to set STRING value for the given group keys into the result holder.
-   */
+  /// Helper method to set STRING value for the given group keys into the result holder.
   private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, String value) {
     for (int groupKey : groupKeys) {
       ((ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKey, DataType.STRING)).add(value);
     }
   }
 
-  /**
-   * Helper method to set BYTES value for the given group keys into the result holder.
-   */
+  /// Helper method to set BYTES value for the given group keys into the result holder.
   private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, ByteArray value) {
     for (int groupKey : groupKeys) {
       ((ObjectOpenHashSet<ByteArray>) getValueSet(groupByResultHolder, groupKey, DataType.BYTES)).add(value);
     }
   }
 
-  /**
-   * Helper method to read dictionary and convert dictionary ids to values for dictionary-encoded expression.
-   */
+  /// Helper method to read dictionary and convert dictionary ids to values for dictionary-encoded expression.
   private static Set convertToValueSet(DictIdsWrapper dictIdsWrapper) {
     Dictionary dictionary = dictIdsWrapper._dictionary;
     RoaringBitmap dictIdBitmap = dictIdsWrapper._dictIdBitmap;

@@ -20,8 +20,6 @@ package org.apache.pinot.spi.stream;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,106 +30,63 @@ import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
-/**
- * Interface for provider of stream metadata such as partition count, partition offsets
- */
+/// Interface for provider of stream metadata such as partition count, partition offsets
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface StreamMetadataProvider extends Closeable {
 
-  /**
-   * Fetches the number of partitions for a topic given the stream configs
-   * @param timeoutMillis Fetch timeout
-   * @return number of partitions
-   */
+  /// Fetches the number of partitions for a topic given the stream configs
+  /// @param timeoutMillis Fetch timeout
+  /// @return number of partitions
   int fetchPartitionCount(long timeoutMillis);
 
-  /**
-   * Fetches the partition ids for a topic given the stream configs.
-   */
+  /// Fetches the partition ids for a topic given the stream configs.
   default Set<Integer> fetchPartitionIds(long timeoutMillis) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Fetches the latest offset for a set of given partition Ids.
-   * Implementations may not be thread-safe. Callers that need concurrent access
-   * should use a thread-safe wrapper.
-   *
-   * @param partitionIds partition Ids of the stream
-   * @param timeoutMillis fetch timeout
-   * @return latest {@link StreamPartitionMsgOffset} for each partition Id.
-   */
+  /// Fetches the latest offset for a set of given partition Ids.
+  /// Implementations may not be thread-safe. Callers that need concurrent access
+  /// should use a thread-safe wrapper.
+  ///
+  /// @param partitionIds partition Ids of the stream
+  /// @param timeoutMillis fetch timeout
+  /// @return latest [StreamPartitionMsgOffset] for each partition Id.
   default Map<Integer, StreamPartitionMsgOffset> fetchLatestStreamOffset(Set<Integer> partitionIds,
       long timeoutMillis) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Fetches the offset for a given partition and offset criteria
-   * @param offsetCriteria offset criteria to fetch{@link StreamPartitionMsgOffset}.
-   *                       Depends on the semantics of the stream e.g. smallest, largest for Kafka
-   * @param timeoutMillis fetch timeout
-   * @return {@link StreamPartitionMsgOffset} based on the offset criteria provided
-   * @throws TimeoutException if timed out trying to connect and fetch from stream
-   */
+  /// Fetches the offset for a given partition and offset criteria
+  /// @param offsetCriteria offset criteria to fetch[StreamPartitionMsgOffset].
+  ///                       Depends on the semantics of the stream e.g. smallest, largest for Kafka
+  /// @param timeoutMillis fetch timeout
+  /// @return [StreamPartitionMsgOffset] based on the offset criteria provided
+  /// @throws TimeoutException if timed out trying to connect and fetch from stream
   StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis)
       throws TimeoutException;
 
-  /**
-   * Computes the list of {@link PartitionGroupMetadata} for the latest state of the stream, using the current
-   * {@link PartitionGroupConsumptionStatus}
-   *
-   * Default behavior is the one for the Kafka stream, where each partition group contains only one partition
-   * @param partitionGroupConsumptionStatuses list of {@link PartitionGroupConsumptionStatus} for current partition
-   *                                          groups
-   */
-  default List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
+  /// Computes the list of [PartitionGroupMetadata] for the latest state of the stream, using the current
+  /// [PartitionGroupConsumptionStatus].
+  ///
+  /// Implementations must define how stream partitions map to Pinot partition groups.
+  ///
+  /// @param partitionGroupConsumptionStatuses list of [PartitionGroupConsumptionStatus] for current partition groups
+  List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis)
-      throws IOException, TimeoutException {
-    int partitionCount = fetchPartitionCount(timeoutMillis);
-    List<PartitionGroupMetadata> newPartitionGroupMetadataList = new ArrayList<>(partitionCount);
+      throws IOException, TimeoutException;
 
-    // Add a PartitionGroupMetadata into the list, foreach partition already present in current.
-    // Setting endOffset (exclusive) as the startOffset for new partition group.
-    // If partition group is still in progress, this value will be null
-    for (PartitionGroupConsumptionStatus currentPartitionGroupConsumptionStatus : partitionGroupConsumptionStatuses) {
-      newPartitionGroupMetadataList.add(
-          new PartitionGroupMetadata(currentPartitionGroupConsumptionStatus.getStreamPartitionGroupId(),
-              currentPartitionGroupConsumptionStatus.getEndOffset()));
-    }
-    // Add PartitionGroupMetadata for new partitions
-    // Use offset criteria from stream config
-    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
-    for (int i = partitionGroupConsumptionStatuses.size(); i < partitionCount; i++) {
-      try (StreamMetadataProvider partitionMetadataProvider = streamConsumerFactory.createPartitionMetadataProvider(
-          StreamConsumerFactory.getUniqueClientId(clientId), i)) {
-        StreamPartitionMsgOffset streamPartitionMsgOffset =
-            partitionMetadataProvider.fetchStreamPartitionOffset(streamConfig.getOffsetCriteria(), timeoutMillis);
-        newPartitionGroupMetadataList.add(new PartitionGroupMetadata(i, streamPartitionMsgOffset));
-      }
-    }
-    return newPartitionGroupMetadataList;
-  }
-
-  /**
-   * @param forceGetOffsetFromStream - the flag is a workaround to not use partitionGroupConsumptionStatuses.
-   *                                  This is required because PinotLLCRealtimeSegmentManager.selectStartOffset()
-   *                                  actually requires the offsets from the stream, but was originally relying on
-   *                                  passing an empty partitionGroupConsumptionStatuses to the method.
-   *                                  The change for <a href="https://github.com/apache/pinot/issues/15608">...</a>
-   *                                  required to pass the actual partitionGroupConsumptionStatuses
-   *                                  TODO - Remove the flag and fix the clients calling computePartitionGroupMetadata()
-   */
+  /// Computes partition group metadata with the option to force offsets to be fetched from the stream instead of
+  /// derived from [PartitionGroupConsumptionStatus].
+  ///
+  /// @param forceGetOffsetFromStream whether the implementation should ignore current consumption statuses when
+  /// selecting start offsets
   default List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis,
       boolean forceGetOffsetFromStream)
       throws IOException, TimeoutException {
-    if (forceGetOffsetFromStream) {
-      return computePartitionGroupMetadata(clientId, streamConfig, Collections.emptyList(), timeoutMillis);
-    } else {
-      return computePartitionGroupMetadata(clientId, streamConfig, partitionGroupConsumptionStatuses, timeoutMillis);
-    }
+    return computePartitionGroupMetadata(clientId, streamConfig,
+        forceGetOffsetFromStream ? List.of() : partitionGroupConsumptionStatuses, timeoutMillis);
   }
 
   default Map<String, PartitionLagState> getCurrentPartitionLagState(
@@ -157,24 +112,18 @@ public interface StreamMetadataProvider extends Closeable {
     return null;
   }
 
-  /**
-   * Fetches the list of available topics/streams
-   *
-   * @return List of topics
-   */
+  /// Fetches the list of available topics/streams
+  ///
+  /// @return List of topics
   default List<TopicMetadata> getTopics() {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * @return true if the stream supports computing ingestion lag by subtracting the last consumed offset from the
-   * latest offset.
-   */
+  /// @return true if the stream supports computing ingestion lag by subtracting the last consumed offset from the
+  /// latest offset.
   boolean supportsOffsetLag();
 
-  /**
-   * Represents the metadata of a topic. This can be used to represent the topic name and other metadata in the future.
-   */
+  /// Represents the metadata of a topic. This can be used to represent the topic name and other metadata in the future.
   interface TopicMetadata {
     String getName();
   }

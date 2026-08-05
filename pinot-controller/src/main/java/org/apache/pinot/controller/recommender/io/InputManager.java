@@ -48,7 +48,6 @@ import org.apache.pinot.controller.recommender.rules.io.params.PartitionRulePara
 import org.apache.pinot.controller.recommender.rules.io.params.RangeIndexRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.RealtimeProvisioningRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.SegmentSizeRuleParams;
-import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -71,9 +70,7 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.FlagQueryRuleParams.ERROR_INVALID_QUERY;
 
 
-/**
- * To deserialize and mange the input Json to the recommender
- */
+/// To deserialize and mange the input Json to the recommender
 @SuppressWarnings("unused")
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.NONE)
 public class InputManager {
@@ -129,24 +126,22 @@ public class InputManager {
   Map<String, Triple<Double, BrokerRequest, QueryContext>> _parsedQueries = new HashMap<>();
 
   Map<FieldSpec.DataType, Integer> _dataTypeSizeMap = new HashMap<FieldSpec.DataType, Integer>() {{
-    put(FieldSpec.DataType.INT, Integer.BYTES);
-    put(FieldSpec.DataType.LONG, Long.BYTES);
-    put(FieldSpec.DataType.TIMESTAMP, Long.BYTES);
-    put(FieldSpec.DataType.FLOAT, Float.BYTES);
-    put(FieldSpec.DataType.DOUBLE, Double.BYTES);
-    put(FieldSpec.DataType.BYTES, Byte.BYTES);
-    put(FieldSpec.DataType.STRING, Character.BYTES);
-    put(FieldSpec.DataType.JSON, Character.BYTES);
-    put(FieldSpec.DataType.BOOLEAN, Integer.BYTES); // Stored internally as an INTEGER
-    put(null, DEFAULT_NULL_SIZE);
-  }};
+      put(FieldSpec.DataType.INT, Integer.BYTES);
+      put(FieldSpec.DataType.LONG, Long.BYTES);
+      put(FieldSpec.DataType.TIMESTAMP, Long.BYTES);
+      put(FieldSpec.DataType.FLOAT, Float.BYTES);
+      put(FieldSpec.DataType.DOUBLE, Double.BYTES);
+      put(FieldSpec.DataType.BYTES, Byte.BYTES);
+      put(FieldSpec.DataType.STRING, Character.BYTES);
+      put(FieldSpec.DataType.JSON, Character.BYTES);
+      put(FieldSpec.DataType.BOOLEAN, Integer.BYTES); // Stored internally as an INTEGER
+      put(null, DEFAULT_NULL_SIZE);
+    }};
   protected final QueryOptimizer _queryOptimizer = new QueryOptimizer();
 
-  /**
-   * Process the dependencies incurred by overwritten configs.
-   * E.g. we will subtract the dimensions with overwritten indices from _dimNames to get _dimNamesIndexApplicable
-   * This ensures we do not recommend indices on those dimensions
-   */
+  /// Process the dependencies incurred by overwritten configs.
+  /// E.g. we will subtract the dimensions with overwritten indices from \_dimNames to get \_dimNamesIndexApplicable
+  /// This ensures we do not recommend indices on those dimensions
   public void init()
       throws InvalidInputException {
     LOGGER.info("Preprocessing Input:");
@@ -155,10 +150,9 @@ public class InputManager {
     validateQueries();
   }
 
-  /**
-   * Cardinalities provided by users are relative to number of records per push, but we might end up creating multiple
-   * segments for each push. Using this methods, cardinalities will be capped by the provided number of rows in segment.
-   */
+  /// Cardinalities provided by users are relative to number of records per push, but we might end up creating multiple
+  /// segments for each push. Using this methods, cardinalities will be capped by the provided number of rows in
+  /// segment.
   public void capCardinalities(int numRecordsInSegment) {
     _metaDataMap.keySet().forEach(colName -> {
       int cardinality = Math.min(numRecordsInSegment, _metaDataMap.get(colName).getCardinality());
@@ -430,10 +424,8 @@ public class InputManager {
     return _segmentFlushTime;
   }
 
-  /**
-   * Get the number of dimensions we can apply Inverted Sorted indices on.
-   * @return total number of dimensions minus number of dimensions with overwritten indices
-   */
+  /// Get the number of dimensions we can apply Inverted Sorted indices on.
+  /// @return total number of dimensions minus number of dimensions with overwritten indices
   public int getNumColumnsInvertedSortedApplicable() {
     return _columnNamesInvertedSortedIndexApplicable.size();
   }
@@ -555,28 +547,22 @@ public class InputManager {
         < DEFAULT_AVERAGE_NUM_VALUES_PER_ENTRY + EPSILON);
   }
 
-  /**
-   * Map a index-applicable dimension name to an 0 <= integer < getNumDimsInvertedSortedApplicable,
-   * to be used with {@link FixedLenBitset}
-   * @param colName a dimension with no overwritten index
-   * @return a unique integer id
-   */
+  /// Map a index-applicable dimension name to an 0 <= integer < getNumDimsInvertedSortedApplicable,
+  /// to be used with [org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset]
+  /// @param colName a dimension with no overwritten index
+  /// @return a unique integer id
   public int colNameToInt(String colName) {
     return _colNameToIntMap.getOrDefault(colName, NO_SUCH_COL);
   }
 
-  /**
-   * A reverse process of colNameToInt
-   * @param colID a unique integer id
-   * @return column name
-   */
+  /// A reverse process of colNameToInt
+  /// @param colID a unique integer id
+  /// @return column name
   public String intToColName(int colID) {
     return _intToColNameMap[colID];
   }
 
-  /**
-   * Test if colName is a valid dimension name
-   */
+  /// Test if colName is a valid dimension name
   public boolean isDim(String colName) {
     return _dimNames.contains(colName);
   }
@@ -594,11 +580,9 @@ public class InputManager {
     LOGGER.info("*Estimated size per record {} bytes", _sizePerRecord);
   }
 
-  /**
-   * Get the raw size without dictionary config.
-   * Not applicable to MV column right now because they are always dictionary encoded.
-   * @return byte length
-   */
+  /// Get the raw size without dictionary config.
+  /// Not applicable to MV column right now because they are always dictionary encoded.
+  /// @return byte length
   public long getColRawSizePerDoc(String colName)
       throws InvalidInputException {
     FieldSpec.DataType dataType = getFieldType(colName);

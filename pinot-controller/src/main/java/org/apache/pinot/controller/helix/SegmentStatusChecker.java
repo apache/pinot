@@ -43,6 +43,7 @@ import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ControllerTimer;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -54,6 +55,7 @@ import org.apache.pinot.controller.util.ServerQueryInfoFetcher.ServerQueryInfo;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -61,14 +63,13 @@ import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Manages the segment status metrics, regarding tables with fewer replicas than requested
- * and segments in error state.
- */
+/// Manages the segment status metrics, regarding tables with fewer replicas than requested
+/// and segments in error state.
 public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusChecker.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStatusChecker.class);
   private static final ZNRecordSerializer RECORD_SERIALIZER = new ZNRecordSerializer();
@@ -81,20 +82,22 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   private final int _waitForPushTimeSeconds;
   private final TableSizeReader _tableSizeReader;
   private final Set<String> _tierBackendGauges = new HashSet<>();
+  // Maps tableNameWithType -> set of compound tenant keys ("server.tenantName", "broker.tenantName",
+  // "tier.tenantName"), so stale gauges can be removed when a table's tenant assignment changes.
+  // Accessed only from the single-threaded periodic task execution loop (processTable / removeMetricsForTable).
+  private final Map<String, Set<String>> _tableTenantMap = new HashMap<>();
 
   private long _lastDisabledTableLogTimestamp = 0;
 
-  /**
-   * Constructs the segment status checker.
-   * @param pinotHelixResourceManager The resource checker used to interact with Helix
-   * @param config The controller configuration object
-   */
+  /// Constructs the segment status checker.
+  /// @param pinotHelixResourceManager The resource checker used to interact with Helix
+  /// @param config The controller configuration object
   public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
       TableSizeReader tableSizeReader) {
     super("SegmentStatusChecker", config.getStatusCheckerFrequencyInSeconds(),
-        config.getStatusCheckerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
-        controllerMetrics);
+            config.getStatusCheckerInitialDelayInSeconds(), config.getStatusCheckerCronExpression(),
+        pinotHelixResourceManager, leadControllerManager, controllerMetrics);
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
     _tableSizeReader = tableSizeReader;
   }
@@ -116,8 +119,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     try {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       updateTableConfigMetrics(tableNameWithType, tableConfig, context);
-      updateSegmentMetrics(tableNameWithType, tableConfig, context);
-      updateTableSizeMetrics(tableNameWithType);
+      if (updateSegmentMetrics(tableNameWithType, tableConfig, context)) {
+        updateTableSizeMetrics(tableNameWithType, tableConfig);
+      }
     } catch (Exception e) {
       LOGGER.error("Caught exception while updating segment status for table {}", tableNameWithType, e);
       // Remove the metric for this table
@@ -162,14 +166,18 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     });
   }
 
-  /**
-   * Updates metrics related to the table config.
-   * If table config not found, resets the metrics
-   */
+  /// Updates metrics related to the table config.
+  /// If table config not found, resets the metrics
   private void updateTableConfigMetrics(String tableNameWithType, TableConfig tableConfig, Context context) {
     if (tableConfig == null) {
       LOGGER.warn("Found null table config for table: {}. Resetting table config metrics.", tableNameWithType);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.REPLICATION_FROM_CONFIG, 0);
+      Set<String> tenantKeys = _tableTenantMap.remove(tableNameWithType);
+      if (tenantKeys != null) {
+        for (String key : tenantKeys) {
+          _controllerMetrics.removeTableGauge(tableNameWithType, key, ControllerGauge.TABLE_TENANT_INFO);
+        }
+      }
       return;
     }
     if (tableConfig.getTableType() == TableType.OFFLINE) {
@@ -194,18 +202,77 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
     int replication = tableConfig.getReplication();
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.REPLICATION_FROM_CONFIG, replication);
+
+    updateTenantInfoGauge(tableNameWithType, tableConfig);
   }
 
-  private void updateTableSizeMetrics(String tableNameWithType)
+  /// Emits one `tableTenantInfo` gauge per (tenantType, tenantName) pair for a table so Prometheus can extract
+  /// both as labels and join them onto other table-scoped metrics.  Every gauge is always set to `1`.
+  /// TenantType values: `"server"` (server tenant), `"broker"` (broker tenant), `"tier"` (tier
+  /// server tenant).  The compound key `"<tenantType>.<tenantName>"` is embedded in the JMX metric name.
+  /// Gauges are only written on first registration or when the tenant assignment changes, not on every periodic cycle.
+  /// When assignments change, new gauges are registered before stale ones are removed to avoid a scrape-window gap.
+  private void updateTenantInfoGauge(String tableNameWithType, TableConfig tableConfig) {
+    TenantConfig tenantConfig = tableConfig.getTenantConfig();
+
+    Set<String> newKeys = new HashSet<>();
+    String serverTenant = (tenantConfig != null && tenantConfig.getServer() != null)
+        ? tenantConfig.getServer() : TagNameUtils.DEFAULT_TENANT_NAME;
+    newKeys.add("server." + serverTenant);
+
+    String brokerTenant = (tenantConfig != null && tenantConfig.getBroker() != null)
+        ? tenantConfig.getBroker() : TagNameUtils.DEFAULT_TENANT_NAME;
+    newKeys.add("broker." + brokerTenant);
+
+    List<TierConfig> tierConfigs = tableConfig.getTierConfigsList();
+    if (tierConfigs != null) {
+      for (TierConfig tierConfig : tierConfigs) {
+        String serverTag = tierConfig.getServerTag();
+        if (serverTag != null && serverTag.contains("_")) {
+          newKeys.add("tier." + TagNameUtils.getTenantFromTag(serverTag));
+        }
+      }
+    }
+
+    Set<String> previousKeys = _tableTenantMap.put(tableNameWithType, newKeys);
+    if (newKeys.equals(previousKeys)) {
+      return;
+    }
+    for (String key : newKeys) {
+      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, key, ControllerGauge.TABLE_TENANT_INFO, 1L);
+    }
+    if (previousKeys != null) {
+      for (String key : previousKeys) {
+        if (!newKeys.contains(key)) {
+          _controllerMetrics.removeTableGauge(tableNameWithType, key, ControllerGauge.TABLE_TENANT_INFO);
+        }
+      }
+    }
+  }
+
+  void updateTableSizeMetrics(String tableNameWithType, TableConfig tableConfig)
       throws InvalidConfigException {
-    _tableSizeReader.getTableSizeDetails(tableNameWithType, TABLE_CHECKER_TIMEOUT_MS, true);
+    TableSizeReader.TableSizeDetails tableSizeDetails =
+        _tableSizeReader.getTableSizeDetails(tableNameWithType, TABLE_CHECKER_TIMEOUT_MS, true,
+            TableSizeReader.CompressionStatsMode.AGGREGATE_SUMMARY);
+    boolean compressionStatsEnabled = tableConfig != null && tableConfig.getIndexingConfig() != null
+        && tableConfig.getIndexingConfig().isCompressionStatsEnabled();
+    if (!compressionStatsEnabled || tableSizeDetails == null) {
+      _tableSizeReader.clearCompressionMetrics(tableNameWithType);
+      return;
+    }
+    TableSizeReader.TableSubTypeSizeDetails subTypeSizeDetails = tableConfig.getTableType() == TableType.OFFLINE
+        ? tableSizeDetails._offlineSegments : tableSizeDetails._realtimeSegments;
+    if (subTypeSizeDetails != null) {
+      _tableSizeReader.updateCompressionMetrics(tableNameWithType, subTypeSizeDetails);
+    } else {
+      _tableSizeReader.clearCompressionMetrics(tableNameWithType);
+    }
   }
 
-  /**
-   * Runs a segment status pass over the given table.
-   * TODO: revisit the logic and reduce the ZK access
-   */
-  private void updateSegmentMetrics(String tableNameWithType, TableConfig tableConfig, Context context) {
+  /// Runs a segment status pass over the given table.
+  /// TODO: revisit the logic and reduce the ZK access
+  private boolean updateSegmentMetrics(String tableNameWithType, TableConfig tableConfig, Context context) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
 
     ServerQueryInfoFetcher serverQueryInfoFetcher = new ServerQueryInfoFetcher(_pinotHelixResourceManager);
@@ -215,7 +282,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     if (idealState == null) {
       LOGGER.warn("Table {} has null ideal state. Skipping segment status checks", tableNameWithType);
       removeMetricsForTable(tableNameWithType);
-      return;
+      return false;
     }
 
     if (!idealState.isEnabled()) {
@@ -224,7 +291,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       }
       removeMetricsForTable(tableNameWithType);
       context._disabledTables.add(tableNameWithType);
-      return;
+      return false;
     }
 
     if (PinotLLCRealtimeSegmentManager.isTablePaused(idealState)) {
@@ -280,7 +347,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, 100);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS, 0);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_COMPRESSED_SIZE, 0);
-      return;
+      return true;
     }
 
     long evSnapshotTimestamp = System.currentTimeMillis();
@@ -341,18 +408,24 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         tableCompressedSize += sizeInBytes;
       }
 
-      // NOTE: We want to skip segments that are just created/pushed to avoid false alerts because it is expected for
-      //       servers to take some time to load them. For consuming (IN_PROGRESS) segments, we use creation time from
-      //       the ZK metadata; for pushed segments, we use push time from the ZK metadata. Both of them are the time
-      //       when segment is newly created. For committed segments from real-time table, push time doesn't exist, and
-      //       creationTimeMs will be Long.MIN_VALUE, which is fine because we want to include them in the check.
+      // NOTE: We want to skip segments that were recently created/committed/pushed to avoid false alerts, because it
+      //       is expected for servers to take some time to load them. We use the segment ZK znode's modification time
+      //       (mtime), which tracks the last state change: creation for consuming (IN_PROGRESS) segments, the
+      //       CONSUMING -> COMMITTING -> ONLINE commit transition for real-time (LLC) segments, and the push time for
+      //       offline segments. Creation time is not a correct proxy for a COMMITTING/DONE segment: it marks when
+      //       consumption STARTED, which can be long before commit, so a segment still transitioning to ONLINE would
+      //       be flagged. If the znode stat is unavailable we fall back to creation time (mtime == creation for a
+      //       freshly created IN_PROGRESS segment).
+      //       The grace window is _waitForPushTimeSeconds. Once a segment is older than it and still
+      //       under-replicated, it is checked normally, so genuinely stuck commits and real replica losses still alert.
       //       The comparison uses evSnapshotTimestamp instead of System.currentTimeMillis() because for large tables
       //       with many segments, the status check can take several minutes. A segment updated after
       //       the EV snapshot was taken but before this individual segment check runs could be incorrectly flagged as
       //       OFFLINE when using current time.
-      long creationTimeMs = segmentZKMetadata.getStatus() == Status.IN_PROGRESS ? segmentZKMetadata.getCreationTime()
-          : segmentZKMetadata.getPushTime();
-      if (creationTimeMs > evSnapshotTimestamp - _waitForPushTimeSeconds * 1000L) {
+      Stat segmentStat = propertyStore == null ? null : propertyStore.getStat(
+          ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segment), AccessOption.PERSISTENT);
+      long refTimeMs = segmentStat != null ? segmentStat.getMtime() : segmentZKMetadata.getCreationTime();
+      if (refTimeMs > evSnapshotTimestamp - _waitForPushTimeSeconds * 1000L) {
         continue;
       }
 
@@ -477,6 +550,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       new MissingConsumingSegmentFinder(tableNameWithType, propertyStore, _controllerMetrics,
           streamConfigs, idealState).findAndEmitMetrics(idealState);
     }
+    return true;
   }
 
   private boolean isServerQueryable(ServerQueryInfo serverInfo) {
@@ -500,6 +574,13 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
   private void removeMetricsForTable(String tableNameWithType) {
     LOGGER.info("Removing metrics from {} given it is not a table known by Helix", tableNameWithType);
+    Set<String> tenantKeys = _tableTenantMap.remove(tableNameWithType);
+    if (tenantKeys != null) {
+      for (String key : tenantKeys) {
+        _controllerMetrics.removeTableGauge(tableNameWithType, key, ControllerGauge.TABLE_TENANT_INFO);
+      }
+    }
+    _tableSizeReader.clearCompressionMetrics(tableNameWithType);
     for (ControllerGauge metric : ControllerGauge.values()) {
       if (!metric.isGlobal()) {
         _controllerMetrics.removeTableGauge(tableNameWithType, metric);

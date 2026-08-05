@@ -23,9 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-/**
- * Unit tests for CursorResultSetGroup class.
- */
+/// Unit tests for CursorResultSetGroup class.
 public class CursorResultSetGroupTest {
 
   @Test
@@ -87,4 +85,4 @@ public class CursorResultSetGroupTest {
     Assert.assertEquals(cursorResultSetGroup.getPageSize(), 20);
     Assert.assertEquals(cursorResultSetGroup.getNumRowsResultSet(), Long.valueOf(500));
   }
-  }
+}

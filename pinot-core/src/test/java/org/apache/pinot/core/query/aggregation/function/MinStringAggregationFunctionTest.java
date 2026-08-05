@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -43,11 +43,9 @@ import static org.testng.Assert.fail;
 
 public class MinStringAggregationFunctionTest extends AbstractAggregationFunctionTest {
 
-  /**
-   * Helper method to create a FluentQueryTest builder for a table with a single String field.
-   * This is used to simulate the DataTypeScenario concept from numeric aggregation tests,
-   * but fixed for the STRING data type.
-   */
+  /// Helper method to create a FluentQueryTest builder for a table with a single String field.
+  /// This is used to simulate the DataTypeScenario concept from numeric aggregation tests,
+  /// but fixed for the STRING data type.
   protected FluentQueryTest.DeclaringTable getDeclaringTable(boolean enableColumnBasedNullHandling) {
     return FluentQueryTest.withBaseDir(_baseDir)
         .givenTable(
@@ -61,7 +59,7 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
   @Test
   public void testNumericColumnExceptioninAggregateMethod() {
     ExpressionContext expression = RequestContextUtils.getExpression("column");
-    MinStringAggregationFunction function = new MinStringAggregationFunction(Collections.singletonList(expression),
+    MinStringAggregationFunction function = new MinStringAggregationFunction(List.of(expression),
         false);
 
     AggregationResultHolder resultHolder = function.createAggregationResultHolder();
@@ -81,7 +79,7 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
   @Test
   public void testNumericColumnExceptioninAggregateGroupBySVMethod() {
     ExpressionContext expression = RequestContextUtils.getExpression("column");
-    MinStringAggregationFunction function = new MinStringAggregationFunction(Collections.singletonList(expression),
+    MinStringAggregationFunction function = new MinStringAggregationFunction(List.of(expression),
         false);
 
     GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
@@ -100,7 +98,7 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
   @Test
   public void testNumericColumnExceptioninAggregateGroupByMVMethod() {
     ExpressionContext expression = RequestContextUtils.getExpression("column");
-    MinStringAggregationFunction function = new MinStringAggregationFunction(Collections.singletonList(expression),
+    MinStringAggregationFunction function = new MinStringAggregationFunction(List.of(expression),
         false);
 
     GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
@@ -119,7 +117,7 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
   @Test
   public void testFunctionBasics() {
     ExpressionContext expression = RequestContextUtils.getExpression("column");
-    MinStringAggregationFunction function = new MinStringAggregationFunction(Collections.singletonList(expression),
+    MinStringAggregationFunction function = new MinStringAggregationFunction(List.of(expression),
         false);
 
     // Test function type

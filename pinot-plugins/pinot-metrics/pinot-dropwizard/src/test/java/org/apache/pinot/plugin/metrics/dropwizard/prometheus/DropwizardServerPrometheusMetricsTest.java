@@ -19,6 +19,8 @@
 
 package org.apache.pinot.plugin.metrics.dropwizard.prometheus;
 
+import org.apache.pinot.common.metrics.MseMeter;
+import org.apache.pinot.common.metrics.MseTimer;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerTimer;
@@ -28,9 +30,7 @@ import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
 import org.testng.annotations.Test;
 
 
-/**
- * Disabling tests as Pinot currently uses Yammer and these tests fail for for {@link DropwizardMetricsFactory}
- */
+/// Disabling tests as Pinot currently uses Yammer and these tests fail for [DropwizardMetricsFactory]
 @Test(enabled = false) // enabled=false on class level doesn't seem to work in intellij
 public class DropwizardServerPrometheusMetricsTest extends ServerPrometheusMetricsTest {
 
@@ -58,5 +58,15 @@ public class DropwizardServerPrometheusMetricsTest extends ServerPrometheusMetri
   @Test(dataProvider = "serverGauges", enabled = false)
   public void gaugeTest(ServerGauge serverGauge) {
     super.gaugeTest(serverGauge);
+  }
+
+  @Test(dataProvider = "mseMeters", enabled = false)
+  public void mseMeterExportedFromServerJmx(MseMeter meter) {
+    super.mseMeterExportedFromServerJmx(meter);
+  }
+
+  @Test(dataProvider = "mseTimers", enabled = false)
+  public void mseTimerExportedFromServerJmx(MseTimer timer) {
+    super.mseTimerExportedFromServerJmx(timer);
   }
 }

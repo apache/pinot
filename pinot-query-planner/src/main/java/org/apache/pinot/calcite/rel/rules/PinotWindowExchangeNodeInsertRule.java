@@ -19,7 +19,6 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
@@ -43,18 +42,17 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelBuilderFactory;
+import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 
 
-/**
- * Special rule for Pinot, this rule is fixed to always insert an exchange or sort exchange below the WINDOW node.
- * TODO:
- *     1. Add support for more than one window group
- *     2. Add support for functions other than:
- *        a. Aggregation functions (AVG, COUNT, MAX, MIN, SUM, BOOL_AND, BOOL_OR)
- *        b. Ranking functions (ROW_NUMBER, RANK, DENSE_RANK)
- */
+/// Special rule for Pinot, this rule is fixed to always insert an exchange or sort exchange below the WINDOW node.
+/// TODO:
+///     1. Add support for more than one window group
+///     2. Add support for functions other than:
+///        a. Aggregation functions (AVG, COUNT, MAX, MIN, SUM, BOOL_AND, BOOL_OR)
+///        b. Ranking functions (ROW_NUMBER, RANK, DENSE_RANK)
 public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
   public static final PinotWindowExchangeNodeInsertRule INSTANCE =
       new PinotWindowExchangeNodeInsertRule(PinotRuleUtils.PINOT_REL_FACTORY);
@@ -119,11 +117,12 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
       // Assess whether this is a PARTITION BY only query or not (includes queries of the type where PARTITION BY and
       // ORDER BY key(s) are the same)
       boolean isPartitionByOnly = isPartitionByOnlyQuery(windowGroup);
-
+      // Force pre-partitioned exchange when 'is_partitioned_by_window_keys' hint is provided
+      Boolean prePartitioned = PinotHintOptions.WindowHintOptions.isPartitionedByWindowKeys(window);
       if (isPartitionByOnly) {
         // Only PARTITION BY or PARTITION BY and ORDER BY on the same key(s)
         // Add an Exchange hashed on the partition by keys
-        exchange = PinotLogicalExchange.create(input, RelDistributions.hash(windowGroup.keys.toList()));
+        exchange = PinotLogicalExchange.create(input, RelDistributions.hash(windowGroup.keys.toList()), prePartitioned);
       } else {
         // PARTITION BY and ORDER BY on different key(s)
         // Add a LogicalSortExchange hashed on the partition by keys and collation based on order by keys
@@ -132,7 +131,7 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         //       sorting on the receiver side can be a no-op. Add support for this hint and pass it on. Until sender
         //       side sorting is implemented, setting this hint will throw an error on execution.
         exchange = PinotLogicalSortExchange.create(input, RelDistributions.hash(windowGroup.keys.toList()),
-            windowGroup.orderKeys, false, true);
+            windowGroup.orderKeys, false, true, prePartitioned);
       }
     }
     // NOTE: Need to create a new LogicalWindow to use the modified window group.
@@ -154,33 +153,31 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     return isPartitionByOnly;
   }
 
-  /**
-   * Only empty OVER() type queries using window functions that take no columns as arguments can result in a situation
-   * where the LogicalProject below the LogicalWindow is an empty LogicalProject (i.e. no columns are projected).
-   * The 'ProjectWindowTransposeRule' looks at the columns present in the LogicalProject above the LogicalWindow and
-   * LogicalWindow to decide what to add to the lower LogicalProject when it does the transpose and for such queries
-   * if nothing is referenced an empty LogicalProject gets created. Some example queries where this can occur are:
-   *
-   * SELECT COUNT(*) OVER() from tableName
-   * SELECT 42, COUNT(*) OVER() from tableName
-   * SELECT ROW_NUMBER() OVER() from tableName
-   *
-   * This function modifies the empty LogicalProject below the LogicalWindow to add a literal and adds a LogicalProject
-   * above LogicalWindow to remove the additional literal column from being projected any further. This also handles
-   * the addition of the Exchange under the LogicalWindow.
-   *
-   * TODO: Explore an option to handle empty LogicalProject by actually projecting empty rows for each entry. This way
-   *       there will no longer be a need to add a literal to the empty LogicalProject, but just traverse the number of
-   *       rows
-   */
+  /// Only empty OVER() type queries using window functions that take no columns as arguments can result in a situation
+  /// where the LogicalProject below the LogicalWindow is an empty LogicalProject (i.e. no columns are projected).
+  /// The 'ProjectWindowTransposeRule' looks at the columns present in the LogicalProject above the LogicalWindow and
+  /// LogicalWindow to decide what to add to the lower LogicalProject when it does the transpose and for such queries
+  /// if nothing is referenced an empty LogicalProject gets created. Some example queries where this can occur are:
+  ///
+  /// SELECT COUNT(\*) OVER() from tableName
+  /// SELECT 42, COUNT(\*) OVER() from tableName
+  /// SELECT ROW_NUMBER() OVER() from tableName
+  ///
+  /// This function modifies the empty LogicalProject below the LogicalWindow to add a literal and adds a LogicalProject
+  /// above LogicalWindow to remove the additional literal column from being projected any further. This also handles
+  /// the addition of the Exchange under the LogicalWindow.
+  ///
+  /// TODO: Explore an option to handle empty LogicalProject by actually projecting empty rows for each entry. This way
+  ///       there will no longer be a need to add a literal to the empty LogicalProject, but just traverse the number of
+  ///       rows
   private RelNode handleEmptyProjectBelowWindow(Window window, Project project) {
     RelOptCluster cluster = window.getCluster();
     RexBuilder rexBuilder = cluster.getRexBuilder();
 
     // Construct the project that goes below the window (which projects a literal)
-    final List<RexNode> expsForProjectBelowWindow = Collections.singletonList(
+    final List<RexNode> expsForProjectBelowWindow = List.of(
         rexBuilder.makeLiteral(0, cluster.getTypeFactory().createSqlType(SqlTypeName.INTEGER)));
-    final List<String> expsFieldNamesBelowWindow = Collections.singletonList("winLiteral");
+    final List<String> expsFieldNamesBelowWindow = List.of("winLiteral");
     Project projectBelowWindow =
         LogicalProject.create(project.getInput(), project.getHints(), expsForProjectBelowWindow,
             expsFieldNamesBelowWindow);
@@ -193,7 +190,7 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     // This scenario is only possible for empty OVER() which uses functions that have no arguments such as COUNT(*) or
     // ROW_NUMBER(). Add an Exchange with empty hash distribution list
     PinotLogicalExchange exchange =
-        PinotLogicalExchange.create(projectBelowWindow, RelDistributions.hash(Collections.emptyList()));
+        PinotLogicalExchange.create(projectBelowWindow, RelDistributions.hash(List.of()));
     Window newWindow = new LogicalWindow(window.getCluster(), window.getTraitSet(), exchange, window.getConstants(),
         outputBuilder.build(), window.groups);
 

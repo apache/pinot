@@ -19,13 +19,12 @@
 package org.apache.pinot.core.periodictask;
 
 import java.util.Properties;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 
 
-/**
- * An interface to describe the functionality of periodic task. Periodic tasks will be added to a list, scheduled
- * and run in the periodic task scheduler with the fixed interval time.
- */
+/// An interface to describe the functionality of periodic task. Periodic tasks will be added to a list, scheduled
+/// and run in the periodic task scheduler with the fixed interval time.
 @ThreadSafe
 public interface PeriodicTask extends Runnable {
 
@@ -33,46 +32,37 @@ public interface PeriodicTask extends Runnable {
   String PROPERTY_KEY_REQUEST_ID = "requestId";
   String PROPERTY_KEY_TABLE_NAME = "tableNameWithType";
 
-  /**
-   * Returns the periodic task name.
-   * @return task name.
-   */
+  /// Returns the periodic task name.
+  /// @return task name.
   String getTaskName();
 
-  /**
-   * Returns the interval time of running the same task.
-   * @return the interval time in seconds.
-   */
+  /// Returns the interval time of running the same task.
+  /// @return the interval time in seconds.
   long getIntervalInSeconds();
 
-  /**
-   * Returns the initial delay of the fist run.
-   * @return initial delay in seconds.
-   */
+  /// Returns the initial delay of the fist run.
+  /// @return initial delay in seconds.
   long getInitialDelayInSeconds();
 
-  /**
-   * Performs necessary setups and starts the periodic task. Should be called before scheduling the periodic task. Can
-   * be called after calling {@link #stop()} to restart the periodic task.
-   */
+  /// Returns the CRON expression for absolute scheduling, or null if fixed-delay scheduling should be used.
+  /// @return Cron expression
+  @Nullable
+  String getCronExpression();
+
+  /// Performs necessary setups and starts the periodic task. Should be called before scheduling the periodic task. Can
+  /// be called after calling [#stop()] to restart the periodic task.
   void start();
 
-  /**
-   * Executes the task. This method should be called only after {@link #start()} getting called but before
-   * {@link #stop()} getting called.
-   */
+  /// Executes the task. This method should be called only after [#start()] getting called but before
+  /// [#stop()] getting called.
   @Override
   void run();
 
-  /**
-   * Execute the task with specified {@link Properties}.
-   * @param periodicTaskProperties Properties used by {@link PeriodicTask} during execution.
-   */
+  /// Execute the task with specified [Properties].
+  /// @param periodicTaskProperties Properties used by [PeriodicTask] during execution.
   void run(Properties periodicTaskProperties);
 
-  /**
-   * Stops the periodic task and performs necessary cleanups. Should be called after removing the periodic task from the
-   * scheduler. Should be called after {@link #start()} getting called.
-   */
+  /// Stops the periodic task and performs necessary cleanups. Should be called after removing the periodic task
+  /// from the scheduler. Should be called after [#start()] getting called.
   void stop();
 }

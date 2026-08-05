@@ -48,35 +48,33 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The WindowAggregateOperator is used to compute window function aggregations over a set of optional
- * PARTITION BY keys, ORDER BY keys and a FRAME clause. The output data will include the projected
- * columns and in addition will add the aggregation columns to the output data.
- * [input columns, aggregate result1, ... aggregate resultN]
- *
- * The window functions supported today are:
- * Aggregation: SUM/COUNT/MIN/MAX/AVG/BOOL_OR/BOOL_AND aggregations [RANGE window type only]
- * Ranking: ROW_NUMBER [ROWS window type only], RANK, DENSE_RANK [RANGE window type only] ranking functions
- * Value: [none]
- *
- * Unlike the AggregateOperator which will output one row per group, the WindowAggregateOperator
- * will output as many rows as input rows.
- *
- * For queries using an 'ORDER BY' clause within the 'OVER()', this WindowAggregateOperator expects that the incoming
- * keys are already ordered based on the 'ORDER BY' keys. No ordering is performed in this operator. The planner
- * should handle adding a 'SortExchange' to do the ordering prior to pipelining the data to the upstream operators
- * wherever ordering is required.
- *
- * Note: This class performs aggregation over the double value of input.
- * If the input is single value, the output type will be input type. Otherwise, the output type will be double.
- *
- * TODO:
- *     1. Add support for additional rank window functions
- *     2. Add support for value window functions
- *     3. Add support for custom frames (including ROWS support)
- *     4. Add support for null direction handling (even for PARTITION BY only queries with custom null direction)
- *     5. Add support for multiple window groups (each WindowAggregateOperator should still work on a single group)
- */
+/// The WindowAggregateOperator is used to compute window function aggregations over a set of optional
+/// PARTITION BY keys, ORDER BY keys and a FRAME clause. The output data will include the projected
+/// columns and in addition will add the aggregation columns to the output data.
+/// \[input columns, aggregate result1, ... aggregate resultN\]
+///
+/// The window functions supported today are:
+/// Aggregation: SUM/COUNT/MIN/MAX/AVG/BOOL_OR/BOOL_AND aggregations \[RANGE window type only\]
+/// Ranking: ROW_NUMBER \[ROWS window type only\], RANK, DENSE_RANK \[RANGE window type only\] ranking functions
+/// Value: \[none\]
+///
+/// Unlike the AggregateOperator which will output one row per group, the WindowAggregateOperator
+/// will output as many rows as input rows.
+///
+/// For queries using an 'ORDER BY' clause within the 'OVER()', this WindowAggregateOperator expects that the incoming
+/// keys are already ordered based on the 'ORDER BY' keys. No ordering is performed in this operator. The planner
+/// should handle adding a 'SortExchange' to do the ordering prior to pipelining the data to the upstream operators
+/// wherever ordering is required.
+///
+/// Note: This class performs aggregation over the double value of input.
+/// If the input is single value, the output type will be input type. Otherwise, the output type will be double.
+///
+/// TODO:
+///     1. Add support for additional rank window functions
+///     2. Add support for value window functions
+///     3. Add support for custom frames (including ROWS support)
+///     4. Add support for null direction handling (even for PARTITION BY only queries with custom null direction)
+///     5. Add support for multiple window groups (each WindowAggregateOperator should still work on a single group)
 public class WindowAggregateOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "WINDOW";
   private static final Logger LOGGER = LoggerFactory.getLogger(WindowAggregateOperator.class);
@@ -96,15 +94,11 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
   // Below are specific parameters to protect the window cache from growing too large.
   // Once the window cache reaches the limit, we will throw exception or break the cache build process.
-  /**
-   * Max rows allowed to build the right table hash collection.
-   */
+  /// Max rows allowed to build the right table hash collection.
   private final int _maxRowsInWindowCache;
-  /**
-   * Mode when window overflow happens, supported values: THROW or BREAK.
-   * THROW(default): Break window cache build process, and throw exception, no WINDOW operation performed.
-   * BREAK: Break window cache build process, continue to perform WINDOW operation, results might be partial or wrong.
-   */
+  /// Mode when window overflow happens, supported values: THROW or BREAK.
+  /// THROW(default): Break window cache build process, and throw exception, no WINDOW operation performed.
+  /// BREAK: Break window cache build process, continue to perform WINDOW operation, results might be partial or wrong.
   private final WindowOverFlowMode _windowOverflowMode;
 
   private int _numRows;
@@ -123,7 +117,8 @@ public class WindowAggregateOperator extends MultiStageOperator {
     for (int i = 0; i < numKeys; i++) {
       _keys[i] = keys.get(i);
     }
-    WindowFrame windowFrame = new WindowFrame(node.getWindowFrameType(), node.getLowerBound(), node.getUpperBound());
+    WindowFrame windowFrame =
+        new WindowFrame(node.getWindowFrameType(), node.getLowerBound(), node.getUpperBound(), node.getExclude());
     Preconditions.checkState(
         windowFrame.isRowType() || ((windowFrame.isUnboundedPreceding() || windowFrame.isLowerBoundCurrentRow()) && (
             windowFrame.isUnboundedFollowing() || windowFrame.isUpperBoundCurrentRow())),
@@ -206,9 +201,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
     return computeBlocks();
   }
 
-  /**
-   * @return the final block, which must be either an end of stream or an error.
-   */
+  /// @return the final block, which must be either an end of stream or an error.
   private MseBlock computeBlocks() {
     Map<Key, List<Object[]>> partitionRows = new HashMap<>();
     MseBlock block = _input.nextBlock();
@@ -313,13 +306,9 @@ public class WindowAggregateOperator extends MultiStageOperator {
         return Math.max(value1, value2);
       }
     },
-    /**
-     * Allocated memory in bytes for this operator or its children in the same stage.
-     */
+    /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
-    /**
-     * Time spent on GC while this operator or its children in the same stage were running.
-     */
+    /// Time spent on GC while this operator or its children in the same stage were running.
     GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;

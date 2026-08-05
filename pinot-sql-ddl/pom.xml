@@ -1,0 +1,98 @@
+<?xml version="1.0"?>
+<!--
+
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <artifactId>pinot</artifactId>
+    <groupId>org.apache.pinot</groupId>
+    <version>1.6.0-SNAPSHOT</version>
+  </parent>
+  <artifactId>pinot-sql-ddl</artifactId>
+  <name>Pinot SQL DDL</name>
+  <description>SQL DDL compiler for Apache Pinot. Translates Pinot-native CREATE/DROP/SHOW TABLE
+    statements parsed by pinot-common into Pinot Schema + TableConfig metadata for execution by
+    the controller.</description>
+  <url>https://pinot.apache.org/</url>
+  <properties>
+    <pinot.root>${basedir}/..</pinot.root>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-spi</artifactId>
+    </dependency>
+    <!--
+      pinot-query-planner gives the MV schema inferer access to Calcite's full validator
+      via QueryEnvironment.  The validator surfaces SQL-shape errors (column typos,
+      function arity, type compatibility, multi-source FROM, etc.) at DDL-compile time
+      instead of letting them through to the analyzer's create-time checks, which is the
+      "MSE-aligned inference" decision recorded in DESIGN.md.
+
+      Note: pinot-controller — the only production caller of pinot-sql-ddl — already
+      depends on pinot-query-planner, so this is not a new transitive at deploy time.
+      Tests in this module instantiate QueryEnvironment with a Mockito-backed TableCache,
+      which keeps unit tests free of the heavy controller test fixtures.
+    -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-query-planner</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.calcite</groupId>
+      <artifactId>calcite-babel</artifactId>
+    </dependency>
+
+    <!-- Test -->
+    <dependency>
+      <groupId>org.testng</groupId>
+      <artifactId>testng</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Test-only: the MaterializedViewDdlAnalyzerIntegrationTest needs the real
+         MaterializedViewAnalyzer to validate that DDL-compiled artifacts (TableConfig,
+         Schema, taskConfigs, definedSQL) reach the analyzer's full validation chain
+         without the controller's stubbing layer that sits in front of it. Production code
+         in pinot-sql-ddl never references pinot-materialized-view — the analyzer is
+         invoked at runtime by the controller via TaskConfigUtils, not from the DDL
+         compiler itself. -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-materialized-view</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

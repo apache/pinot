@@ -196,7 +196,7 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
             // `FIXED_LEN_BYTE_ARRAY(16) + UUID` → [UUID] (always converted; the downstream type
             // transformer adapts to the Pinot column's storage type). UUID wire bytes are big-endian
             // per RFC 4122.
-            return UuidUtils.fromBytes(binaryBytes);
+            return UuidUtils.toUUID(binaryBytes);
           }
           return binaryBytes;
         default:

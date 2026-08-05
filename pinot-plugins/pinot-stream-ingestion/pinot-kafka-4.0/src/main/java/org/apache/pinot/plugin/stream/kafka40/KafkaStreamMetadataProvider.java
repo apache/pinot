@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -48,9 +49,8 @@ import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLagState;
+import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.StreamConsumerFactory;
-import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -64,10 +64,8 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     implements StreamMetadataProvider {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaStreamMetadataProvider.class);
-  /**
-   * Immutable partition ID subset from table config. Read once at construction; does not change during the
-   * provider's lifetime. Empty when no subset is configured (consume all partitions).
-   */
+  /// Immutable partition ID subset from table config. Read once at construction; does not change during the
+  /// provider's lifetime. Empty when no subset is configured (consume all partitions).
   private final List<Integer> _partitionIdSubset;
 
   public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
@@ -122,30 +120,43 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   public List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis)
       throws IOException, java.util.concurrent.TimeoutException {
-    if (_partitionIdSubset.isEmpty()) {
-      return StreamMetadataProvider.super.computePartitionGroupMetadata(clientId, streamConfig,
-          partitionGroupConsumptionStatuses, timeoutMillis);
-    }
     Map<Integer, StreamPartitionMsgOffset> partitionIdToEndOffset =
         new HashMap<>(partitionGroupConsumptionStatuses.size());
     for (PartitionGroupConsumptionStatus s : partitionGroupConsumptionStatuses) {
       partitionIdToEndOffset.put(s.getStreamPartitionGroupId(), s.getEndOffset());
     }
-    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
-    List<PartitionGroupMetadata> result = new ArrayList<>(_partitionIdSubset.size());
-    for (Integer partitionId : _partitionIdSubset) {
-      StreamPartitionMsgOffset endOffset = partitionIdToEndOffset.get(partitionId);
-      StreamPartitionMsgOffset startOffset;
-      if (endOffset == null) {
-        try (StreamMetadataProvider partitionMetadataProvider =
-            streamConsumerFactory.createPartitionMetadataProvider(
-                StreamConsumerFactory.getUniqueClientId(clientId), partitionId)) {
-          startOffset = partitionMetadataProvider.fetchStreamPartitionOffset(
-              streamConfig.getOffsetCriteria(), timeoutMillis);
-        }
-      } else {
-        startOffset = endOffset;
+
+    List<Integer> partitionIds;
+    if (_partitionIdSubset.isEmpty()) {
+      int partitionCount = fetchPartitionCount(timeoutMillis);
+      partitionIds = new ArrayList<>(partitionCount);
+      for (int partitionId = 0; partitionId < partitionCount; partitionId++) {
+        partitionIds.add(partitionId);
       }
+    } else {
+      partitionIds = _partitionIdSubset;
+    }
+
+    // Partitions already covered by a consumption status reuse its offset; the remaining partitions have their
+    // offsets fetched from the stream in a single batched call. Kafka's beginningOffsets/endOffsets/offsetsForTimes
+    // accept a collection of partitions and resolve them in one broker round-trip, so we avoid creating a fresh
+    // consumer per partition (previously hundreds of serial ~1s consumer creations on high-partition tables, all
+    // executed inside the controller's ideal-state update lock).
+    List<Integer> partitionIdsToFetch = new ArrayList<>(partitionIds.size());
+    for (Integer partitionId : partitionIds) {
+      if (!partitionIdToEndOffset.containsKey(partitionId)) {
+        partitionIdsToFetch.add(partitionId);
+      }
+    }
+    Map<Integer, StreamPartitionMsgOffset> fetchedOffsets =
+        fetchOffsetsForPartitions(partitionIdsToFetch, streamConfig.getOffsetCriteria(), timeoutMillis);
+
+    List<PartitionGroupMetadata> result = new ArrayList<>(partitionIds.size());
+    for (Integer partitionId : partitionIds) {
+      // fetchOffsetsForPartitions returns an offset for every requested partition (or throws), so the lookup below
+      // is non-null for the partitions that were fetched.
+      StreamPartitionMsgOffset startOffset = partitionIdToEndOffset.containsKey(partitionId)
+          ? partitionIdToEndOffset.get(partitionId) : fetchedOffsets.get(partitionId);
       result.add(new PartitionGroupMetadata(partitionId, startOffset));
     }
     return result;
@@ -176,44 +187,81 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   @Override
   public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     Preconditions.checkNotNull(offsetCriteria);
-    long offset;
+    // fetchOffsetsForPartitions throws if the stream returns no offset for _partition, so the result is non-null.
+    return fetchOffsetsForPartitions(List.of(_partition), offsetCriteria, timeoutMillis).get(_partition);
+  }
+
+  /// Fetches the offset matching `offsetCriteria` for the given partitions in a single batched call to the stream.
+  /// Kafka's `beginningOffsets`/`endOffsets`/`offsetsForTimes` all accept a collection of partitions, so this issues
+  /// one broker round-trip regardless of the number of partitions (these calls do not require the consumer to be
+  /// assigned to the partitions).
+  ///
+  /// @return an offset for every requested partition
+  /// @throws TransientConsumerException if the stream returns no offset for a requested partition (so the caller
+  ///         retries rather than treating the partition as absent)
+  private Map<Integer, StreamPartitionMsgOffset> fetchOffsetsForPartitions(Collection<Integer> partitionIds,
+      OffsetCriteria offsetCriteria, long timeoutMillis) {
+    Preconditions.checkNotNull(offsetCriteria);
+    if (partitionIds.isEmpty()) {
+      return Map.of();
+    }
+    List<TopicPartition> topicPartitions = new ArrayList<>(partitionIds.size());
+    for (Integer partitionId : partitionIds) {
+      topicPartitions.add(new TopicPartition(_topic, partitionId));
+    }
+    Duration timeout = Duration.ofMillis(timeoutMillis);
     try {
+      Map<TopicPartition, Long> topicPartitionToOffset;
       if (offsetCriteria.isLargest()) {
-        offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
-            .get(_topicPartition);
+        topicPartitionToOffset = _consumer.endOffsets(topicPartitions, timeout);
       } else if (offsetCriteria.isSmallest()) {
-        offset =
-            _consumer.beginningOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
-                .get(_topicPartition);
-      } else if (offsetCriteria.isPeriod()) {
-        OffsetAndTimestamp offsetAndTimestamp = _consumer.offsetsForTimes(Collections.singletonMap(_topicPartition,
-                Clock.systemUTC().millis() - TimeUtils.convertPeriodToMillis(offsetCriteria.getOffsetString())))
-            .get(_topicPartition);
-        if (offsetAndTimestamp == null) {
-          offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
-              .get(_topicPartition);
-          LOGGER.warn(
-              "initial offset type is period and its value evaluates to null hence proceeding with offset {} for "
-                  + "topic {} partition {}", offset, _topicPartition.topic(), _topicPartition.partition());
-        } else {
-          offset = offsetAndTimestamp.offset();
+        topicPartitionToOffset = _consumer.beginningOffsets(topicPartitions, timeout);
+      } else if (offsetCriteria.isPeriod() || offsetCriteria.isTimestamp()) {
+        long timestampMillis = offsetCriteria.isPeriod()
+            ? Clock.systemUTC().millis() - TimeUtils.convertPeriodToMillis(offsetCriteria.getOffsetString())
+            : TimeUtils.convertTimestampToMillis(offsetCriteria.getOffsetString());
+        Map<TopicPartition, Long> timestampToSearch = new HashMap<>(topicPartitions.size());
+        for (TopicPartition topicPartition : topicPartitions) {
+          timestampToSearch.put(topicPartition, timestampMillis);
         }
-      } else if (offsetCriteria.isTimestamp()) {
-        OffsetAndTimestamp offsetAndTimestamp = _consumer.offsetsForTimes(Collections.singletonMap(_topicPartition,
-            TimeUtils.convertTimestampToMillis(offsetCriteria.getOffsetString()))).get(_topicPartition);
-        if (offsetAndTimestamp == null) {
-          offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
-              .get(_topicPartition);
-          LOGGER.warn(
-              "initial offset type is timestamp and its value evaluates to null hence proceeding with offset {} for "
-                  + "topic {} partition {}", offset, _topicPartition.topic(), _topicPartition.partition());
-        } else {
-          offset = offsetAndTimestamp.offset();
+        Map<TopicPartition, OffsetAndTimestamp> offsetsForTimes = _consumer.offsetsForTimes(timestampToSearch, timeout);
+        topicPartitionToOffset = new HashMap<>(topicPartitions.size());
+        // Partitions with no message at/after the requested time return a null offset; fall back to their end
+        // offset in a single batched call, preserving the per-partition fallback behavior.
+        List<TopicPartition> fallbackPartitions = new ArrayList<>();
+        for (TopicPartition topicPartition : topicPartitions) {
+          OffsetAndTimestamp offsetAndTimestamp = offsetsForTimes.get(topicPartition);
+          if (offsetAndTimestamp != null) {
+            topicPartitionToOffset.put(topicPartition, offsetAndTimestamp.offset());
+          } else {
+            fallbackPartitions.add(topicPartition);
+          }
+        }
+        if (!fallbackPartitions.isEmpty()) {
+          topicPartitionToOffset.putAll(_consumer.endOffsets(fallbackPartitions, timeout));
+          LOGGER.warn("Initial offset type is {} and evaluated to null for topic: {} partitions: {}; proceeding "
+              + "with their end offsets", offsetCriteria, _topic, fallbackPartitions);
         }
       } else {
         throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
       }
-      return new LongMsgOffset(offset);
+      Map<Integer, StreamPartitionMsgOffset> result = new HashMap<>(topicPartitionToOffset.size());
+      for (Map.Entry<TopicPartition, Long> entry : topicPartitionToOffset.entrySet()) {
+        if (entry.getValue() != null) {
+          result.put(entry.getKey().partition(), new LongMsgOffset(entry.getValue()));
+        }
+      }
+      // Every requested partition must resolve to an offset. If the stream returned none for a partition, fail the
+      // whole fetch with a transient error so PartitionGroupMetadataFetcher retries it on the next run, rather than
+      // returning a partial map: a missing partition would be misread downstream as having reached end of life (its
+      // CONSUMING segment marked ONLINE with no successor) and would shrink the derived partition count.
+      for (Integer partitionId : partitionIds) {
+        if (!result.containsKey(partitionId)) {
+          throw new TransientConsumerException(new RuntimeException(
+              "No offset returned for topic: " + _topic + " partition: " + partitionId));
+        }
+      }
+      return result;
     } catch (TimeoutException e) {
       throw new TransientConsumerException(e);
     }
@@ -228,17 +276,21 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       // Compute records-lag
       StreamPartitionMsgOffset currentOffset = partitionState.getCurrentOffset();
       StreamPartitionMsgOffset upstreamLatest = partitionState.getUpstreamLatestOffset();
-      String offsetLagString = "UNKNOWN";
+      String offsetLagString = PartitionLagState.NOT_CALCULATED;
 
       if (currentOffset instanceof LongMsgOffset && upstreamLatest instanceof LongMsgOffset) {
         long offsetLag = ((LongMsgOffset) upstreamLatest).getOffset() - ((LongMsgOffset) currentOffset).getOffset();
         offsetLagString = String.valueOf(offsetLag);
       }
 
-      // Compute record-availability
-      String availabilityLagMs = "UNKNOWN";
+      // Compute record-availability. Only when both the last-processed wall-clock time and the record's upstream
+      // ingestion time are valid; otherwise a missing/invalid ingestion time (e.g. records without a Kafka
+      // timestamp) would turn the subtraction into an epoch-sized value that leaks to the metric and UI. Keep the
+      // NOT_CALCULATED sentinel in that case so the lag is reported as not-calculated rather than a bogus number.
+      String availabilityLagMs = PartitionLagState.NOT_CALCULATED;
       StreamMessageMetadata lastProcessedMessageMetadata = partitionState.getLastProcessedRowMetadata();
-      if (lastProcessedMessageMetadata != null && partitionState.getLastProcessedTimeMs() > 0) {
+      if (lastProcessedMessageMetadata != null && partitionState.getLastProcessedTimeMs() > 0
+          && lastProcessedMessageMetadata.getRecordIngestionTimeMs() > 0) {
         long availabilityLag =
             partitionState.getLastProcessedTimeMs() - lastProcessedMessageMetadata.getRecordIngestionTimeMs();
         availabilityLagMs = String.valueOf(availabilityLag);
@@ -255,7 +307,7 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       AdminClient adminClient = getOrCreateSharedAdminClient();
       ListTopicsResult result = adminClient.listTopics();
       if (result == null) {
-        return Collections.emptyList();
+        return List.of();
       }
       return result.names()
           .get()
@@ -382,7 +434,7 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
 
     if (lastError != null) {
       if (topicMissing) {
-        throw new RuntimeException("Topic does not exist: " + _topic);
+        throw new PermanentConsumerException(new RuntimeException("Topic does not exist: " + _topic));
       }
       if (lastError instanceof TransientConsumerException) {
         throw (TransientConsumerException) lastError;

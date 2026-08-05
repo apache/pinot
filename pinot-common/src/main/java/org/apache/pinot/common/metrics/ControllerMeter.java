@@ -21,9 +21,7 @@ package org.apache.pinot.common.metrics;
 import org.apache.pinot.common.Utils;
 
 
-/**
- * Meters for the controller.
- */
+/// Meters for the controller.
 public enum ControllerMeter implements AbstractMetrics.Meter {
   HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
   HEALTHCHECK_OK_CALLS("healthcheck", true),
@@ -83,7 +81,19 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   AUDIT_RESPONSE_FAILURES("failures", true),
   AUDIT_REQUEST_PAYLOAD_TRUNCATED("count", true),
   // Upsert compact merge task metrics
-  UPSERT_COMPACT_MERGE_SEGMENT_SKIPPED_CONSENSUS_FAILURE("UpsertCompactMergeSegmentsSkipped", false);
+  UPSERT_COMPACT_MERGE_SEGMENT_SKIPPED_CONSENSUS_FAILURE("UpsertCompactMergeSegmentsSkipped", false),
+  // Query workload propagation metrics
+  QUERY_WORKLOAD_PROPAGATION_COUNT("count", true),
+  QUERY_WORKLOAD_PROPAGATION_ERROR("count", true),
+  QUERY_WORKLOAD_MESSAGES_COUNT("count", true),
+  QUERY_WORKLOAD_MESSAGES_ERROR("count", true),
+  QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_COUNT("count", true),
+  QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_ERROR("count", true),
+  QUERY_WORKLOAD_LISTENER_CHANGES_COUNT("count", true),
+  QUERY_WORKLOAD_REQUEST_DROPPED("count", true),
+  QUERY_WORKLOAD_HTTP_CALLBACK_DROPPED("count", true),
+  // Number of segment-delete requests rejected because the targets participate in a live segment lineage entry.
+  LINEAGE_BLOCKED_DELETE_COUNT("LineageBlockedDeleteCount", false);
 
   private final String _brokerMeterName;
   private final String _unit;
@@ -105,11 +115,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
     return _unit;
   }
 
-  /**
-   * Returns true if the metric is global (not attached to a particular resource)
-   *
-   * @return true if the metric is global
-   */
+  /// Returns true if the metric is global (not attached to a particular resource)
+  ///
+  /// @return true if the metric is global
   @Override
   public boolean isGlobal() {
     return _global;

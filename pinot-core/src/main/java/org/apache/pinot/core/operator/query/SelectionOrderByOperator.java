@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.query;
 import com.google.common.base.CaseFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -52,27 +51,23 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Operator for selection order-by queries.
- * <p>The operator uses a priority queue to sort the rows and return the top rows based on the order-by expressions.
- * <p>It is optimized to fetch only the values needed for the ordering purpose and the final result:
- * <ul>
- *   <li>
- *     When all the output expressions are ordered, the operator fetches all the output expressions and insert them into
- *     the priority queue because all the values are needed for ordering.
- *   </li>
- *   <li>
- *     Otherwise, the operator fetches only the order-by expressions and the virtual document id column and insert them
- *     into the priority queue. After getting the top rows, the operator does a second round scan only on the document
- *     ids for the top rows for the non-order-by output expressions. This optimization can significantly reduce the
- *     scanning and improve the query performance when most/all of the output expressions are not ordered (e.g. SELECT *
- *     FROM table ORDER BY col).
- *   </li>
- * </ul>
- */
+/// Operator for selection order-by queries.
+///
+/// The operator uses a priority queue to sort the rows and return the top rows based on the order-by expressions.
+///
+/// It is optimized to fetch only the values needed for the ordering purpose and the final result:
+///
+/// - When all the output expressions are ordered, the operator fetches all the output expressions and insert them
+///   into the priority queue because all the values are needed for ordering.
+/// - Otherwise, the operator fetches only the order-by expressions and the virtual document id column and insert
+///   them into the priority queue. After getting the top rows, the operator does a second round scan only on the
+///   document ids for the top rows for the non-order-by output expressions. This optimization can significantly
+///   reduce the scanning and improve the query performance when most/all of the output expressions are not ordered
+///   (e.g. SELECT \* FROM table ORDER BY col).
 public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock> {
   private static final String EXPLAIN_NAME = "SELECT_ORDERBY";
 
@@ -151,9 +146,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     }
   }
 
-  /**
-   * Helper method to compute the result when all the output expressions are ordered.
-   */
+  /// Helper method to compute the result when all the output expressions are ordered.
   private SelectionResultsBlock computeAllOrdered() {
     int numExpressions = _expressions.size();
 
@@ -189,6 +182,11 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
         }
       }
       _numDocsScanned += numDocsFetched;
+      QueryScanCostContext scanCost = getScanCostContext();
+      if (scanCost != null) {
+        scanCost.addDocsScanned(numDocsFetched);
+        scanCost.addEntriesScannedPostFilter((long) numDocsFetched * numColumnsProjected);
+      }
     }
     _numEntriesScannedPostFilter = (long) _numDocsScanned * numColumnsProjected;
 
@@ -205,9 +203,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator, _queryContext);
   }
 
-  /**
-   * Helper method to compute the result when not all the output expressions are ordered.
-   */
+  /// Helper method to compute the result when not all the output expressions are ordered.
   private SelectionResultsBlock computePartiallyOrdered() {
     int numExpressions = _expressions.size();
     int numOrderByExpressions = _orderByExpressions.size();
@@ -253,6 +249,11 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
         }
       }
       _numDocsScanned += numDocsFetched;
+      QueryScanCostContext scanCost2 = getScanCostContext();
+      if (scanCost2 != null) {
+        scanCost2.addDocsScanned(numDocsFetched);
+        scanCost2.addEntriesScannedPostFilter((long) numDocsFetched * numColumnsProjected);
+      }
     }
     _numEntriesScannedPostFilter = (long) _numDocsScanned * numColumnsProjected;
 
@@ -353,7 +354,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.singletonList(_projectOperator);
+    return List.of(_projectOperator);
   }
 
   @Override

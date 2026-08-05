@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.broker.broker;
 
-import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -52,7 +52,7 @@ public class BrokerManagedAsyncExecutorProviderTest {
   public void setUp() {
     _brokerMetrics = new BrokerMetrics(CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX,
         PinotMetricUtils.getPinotMetricsRegistry(new PinotConfiguration()),
-        CommonConstants.Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS, Collections.emptyList());
+        CommonConstants.Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS, List.of());
   }
 
   @Test

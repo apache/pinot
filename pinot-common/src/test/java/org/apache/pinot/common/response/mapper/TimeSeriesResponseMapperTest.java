@@ -19,7 +19,6 @@
 package org.apache.pinot.common.response.mapper;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,7 +72,7 @@ public class TimeSeriesResponseMapperTest {
 
   @Test
   public void toBrokerResponseWithEmptySeriesEmptyRowsBaseSchema() {
-    when(_block.getSeriesMap()).thenReturn(Collections.emptyMap());
+    when(_block.getSeriesMap()).thenReturn(Map.of());
     when(_timeBuckets.getTimeBuckets()).thenReturn(new Long[]{100L, 200L, 300L});
     when(_block.getTimeBuckets()).thenReturn(_timeBuckets);
 
@@ -97,21 +96,21 @@ public class TimeSeriesResponseMapperTest {
     when(_block.getTimeBuckets()).thenReturn(_timeBuckets);
     // first series decides tag columns: region, host
     TimeSeries s1 = new TimeSeries(
-      "id1",
-      null,
-      _timeBuckets,
-      new Double[]{1.0, 2.0},
-      Arrays.asList("region", "host"),
-      new Object[]{"us-west", "h1"}
+        "id1",
+        null,
+        _timeBuckets,
+        new Double[]{1.0, 2.0},
+        Arrays.asList("region", "host"),
+        new Object[]{"us-west", "h1"}
     );
     // another list under same metric with different extra tag "zone"
     TimeSeries s2 = new TimeSeries(
-      "id2",
-      null,
-      _timeBuckets,
-      new Double[]{3.0, 4.5}, // mixed types: Integer and String
-      Arrays.asList("region", "zone"),
-      new Object[]{"us-west", "z1"}
+        "id2",
+        null,
+        _timeBuckets,
+        new Double[]{3.0, 4.5}, // mixed types: Integer and String
+        Arrays.asList("region", "zone"),
+        new Object[]{"us-west", "z1"}
     );
 
     Map<Long, List<TimeSeries>> seriesMap = new LinkedHashMap<>();

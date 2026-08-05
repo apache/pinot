@@ -47,18 +47,16 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * Implementation of {@link PartitionUpsertMetadataManager} that is backed by a {@link ConcurrentHashMap} and ensures
- * consistent deletions. This should be used when the table is configured with 'enableDeletedKeysCompactionConsistency'
- * set to true.
- *
- * Consistent deletion ensures that when deletedKeysTTL is enabled with UpsertCompaction, the key metadata is
- * removed from the HashMap only after all other records in the old segments are compacted. This guarantees
- * data consistency. Without this, there can be a scenario where a deleted record is compacted first, while an
- * old record remains non-compacted in a previous segment. During a server restart, this could lead to the old
- * record reappearing. For the end-user, this would result in a data loss or inconsistency scenario, as the
- * record was marked for deletion.
- */
+/// Implementation of [PartitionUpsertMetadataManager] that is backed by a [ConcurrentHashMap] and ensures
+/// consistent deletions. This should be used when the table is configured with 'enableDeletedKeysCompactionConsistency'
+/// set to true.
+///
+/// Consistent deletion ensures that when deletedKeysTTL is enabled with UpsertCompaction, the key metadata is
+/// removed from the HashMap only after all other records in the old segments are compacted. This guarantees
+/// data consistency. Without this, there can be a scenario where a deleted record is compacted first, while an
+/// old record remains non-compacted in a previous segment. During a server restart, this could lead to the old
+/// record reappearing. For the end-user, this would result in a data loss or inconsistency scenario, as the
+/// record was marked for deletion.
 @SuppressWarnings({"rawtypes", "unchecked"})
 @ThreadSafe
 public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
@@ -90,7 +88,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
   protected void doAddOrReplaceSegment(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator,
       @Nullable IndexSegment oldSegment, @Nullable MutableRoaringBitmap validDocIdsForOldSegment) {
-    if (_partialUpsertHandler == null) {
+    if (_partialUpsertHandler != null) {
+      recordInfoIterator = resolveComparisonTies(recordInfoIterator, _hashFunction);
+    } else {
       // for full upsert, we are de-duping primary key once here to make sure that we are not adding
       // primary-key multiple times and subtracting just once in removeSegment.
       // for partial-upsert, we call this method in base class.
@@ -298,18 +298,17 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
         if (queryableDocIds == null && _deleteRecordColumn != null) {
           queryableDocIds = new ThreadSafeMutableRoaringBitmap();
         }
-        addOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, recordInfoIterator,
+        doAddOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, recordInfoIterator,
             oldSegment, validDocIdsForOldSegment);
       }
       if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
-        if (_context.isTableTypeInconsistentDuringConsumption()) {
-          if (shouldRevertMetadataOnInconsistency(oldSegment)) {
-            revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
-            return;
-          } else {
-            logInconsistentResults(segmentName, validDocIdsForOldSegment.getCardinality());
-          }
+        if (shouldRevertMetadataOnInconsistency(oldSegment)) {
+          revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
+          return;
         }
+        _logger.warn("Found {} primary keys not replaced for segment: {}",
+            validDocIdsForOldSegment.getCardinality(), segmentName);
+        updateInconsistentRowsMetric(segmentName, validDocIdsForOldSegment.getCardinality());
       }
       // we want to always remove a segment in case of enableDeletedKeysCompactionConsistency = true
       // this is to account for the removal of primary-key in the to-be-removed segment and reduce

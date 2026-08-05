@@ -20,22 +20,19 @@ package org.apache.pinot.core.util;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.spi.utils.Pairs;
 import org.apache.pinot.spi.utils.Pairs.IntPair;
 
 
-/**
- * Utility to perform intersection of sorted ranges
- */
+/// Utility to perform intersection of sorted ranges
 public class SortedRangeIntersection {
   private SortedRangeIntersection() {
   }
 
   public static List<IntPair> intersectSortedRangeSets(List<List<IntPair>> sortedRangeSetList) {
     if (sortedRangeSetList == null || sortedRangeSetList.isEmpty()) {
-      return Collections.emptyList();
+      return List.of();
     }
     if (sortedRangeSetList.size() == 1) {
       return sortedRangeSetList.get(0);
@@ -43,7 +40,7 @@ public class SortedRangeIntersection {
     // if any list is empty return empty
     for (List<IntPair> rangeSet : sortedRangeSetList) {
       if (rangeSet.isEmpty()) {
-        return Collections.emptyList();
+        return List.of();
       }
     }
     int[] currentRangeSetIndex = new int[sortedRangeSetList.size()];

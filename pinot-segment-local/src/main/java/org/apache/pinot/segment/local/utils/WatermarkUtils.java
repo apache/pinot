@@ -28,18 +28,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Utils methods to manage the TTL watermark for dedup and upsert tables, as both share very similar logic.
- */
+/// Utils methods to manage the TTL watermark for dedup and upsert tables, as both share very similar logic.
 public class WatermarkUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(WatermarkUtils.class);
 
   private WatermarkUtils() {
   }
 
-  /**
-   * Loads watermark from the file if exists.
-   */
+  /// Loads watermark from the file if exists.
   public static double loadWatermark(File watermarkFile, double defaultWatermark) {
     if (watermarkFile.exists()) {
       try {
@@ -54,9 +50,7 @@ public class WatermarkUtils {
     return defaultWatermark;
   }
 
-  /**
-   * Persists watermark to the file.
-   */
+  /// Persists watermark to the file.
   public static void persistWatermark(double watermark, File watermarkFile) {
     try {
       if (watermarkFile.exists()) {
@@ -75,9 +69,7 @@ public class WatermarkUtils {
     }
   }
 
-  /**
-   * Deletes the watermark file.
-   */
+  /// Deletes the watermark file.
   public static void deleteWatermark(File watermarkFile) {
     if (watermarkFile.exists()) {
       if (!FileUtils.deleteQuietly(watermarkFile)) {

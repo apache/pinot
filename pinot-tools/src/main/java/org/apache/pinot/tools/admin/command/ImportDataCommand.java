@@ -26,7 +26,6 @@ import java.net.URI;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,9 +55,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class to implement ImportData command.
- */
+/// Class to implement ImportData command.
 @SuppressWarnings("unused")
 @CommandLine.Command(name = "ImportData", mixinStandardHelpOptions = true)
 public class ImportDataCommand extends AbstractDatabaseBaseAdminCommand implements Command {
@@ -246,7 +243,7 @@ public class ImportDataCommand extends AbstractDatabaseBaseAdminCommand implemen
 
     // set PinotFSSpecs
     List<PinotFSSpec> pinotFSSpecs = new ArrayList<>();
-    pinotFSSpecs.add(getPinotFSSpec("file", "org.apache.pinot.spi.filesystem.LocalPinotFS", Collections.emptyMap()));
+    pinotFSSpecs.add(getPinotFSSpec("file", "org.apache.pinot.spi.filesystem.LocalPinotFS", Map.of()));
     String inputFileScheme = dataFileURI.getScheme();
     if ((inputFileScheme != null) && (!PinotFSFactory.isSchemeSupported(inputFileScheme))) {
       pinotFSSpecs.add(getPinotFSSpec(inputFileScheme, getPinotFSClassName(inputFileScheme, additionalConfigs),
@@ -346,7 +343,7 @@ public class ImportDataCommand extends AbstractDatabaseBaseAdminCommand implemen
 
   private Map<String, String> getAdditionalConfigs(List<String> additionalConfigs) {
     if (additionalConfigs == null) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     Map<String, String> recordReaderConfigs = new HashMap<>();
     for (String kvPair : additionalConfigs) {

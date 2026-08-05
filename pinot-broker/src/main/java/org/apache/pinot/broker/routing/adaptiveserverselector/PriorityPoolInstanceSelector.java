@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.routing.adaptiveserverselector;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -32,84 +31,78 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.broker.routing.instanceselector.SegmentInstanceCandidate;
 
 
-/**
- * A server selector that implements priority-based server selection based on pools.
- * This selector works in conjunction with an {@link AdaptiveServerSelector} to provide
- * a two-level selection strategy:
- * <ol>
- *   <li>First level: Select servers based on pool priorities</li>
- *   <li>Second level: Use adaptive selection within the chosen pool</li>
- * </ol>
- *
- * <p>The selector maintains the following invariants:</p>
- * <ul>
- *   <li>Servers from preferred pools are always selected before non-preferred pools</li>
- *   <li>Within each pools, servers are selected using adaptive selection criteria</li>
- *   <li>When no preferred pools are available, falls back to non-preferred pools</li>
- * </ul>
- */
+/// A server selector that implements priority-based server selection based on pools.
+/// This selector works in conjunction with an [AdaptiveServerSelector] to provide
+/// a two-level selection strategy:
+///
+/// 1. First level: Select servers based on pool priorities
+/// 2. Second level: Use adaptive selection within the chosen pool
+///
+/// The selector maintains the following invariants:
+///
+/// - Servers from preferred pools are always selected before non-preferred pools
+/// - Within each pools, servers are selected using adaptive selection criteria
+/// - When no preferred pools are available, falls back to non-preferred pools
 public class PriorityPoolInstanceSelector {
 
-  /** The underlying adaptive server selector used for selection within pools */
+  /// The underlying adaptive server selector used for selection within pools
   private final AdaptiveServerSelector _adaptiveServerSelector;
 
-  /** Sentinel value used to pool all non-preferred servers together */
+  /// Sentinel value used to pool all non-preferred servers together
   private static final int SENTINEL_POOL_OF_NON_PREFERRED_SERVERS = Integer.MAX_VALUE;
 
-  /**
-   * Creates a new priority pool instance selector with the given adaptive server selector.
-   *
-   * @param adaptiveServerSelector the adaptive server selector to use for selection within pools
-   * @throws IllegalArgumentException if adaptiveServerSelector is null
-   */
+  /// Creates a new priority pool instance selector with the given adaptive server selector.
+  ///
+  /// @param adaptiveServerSelector the adaptive server selector to use for selection within pools
+  /// @throws IllegalArgumentException if adaptiveServerSelector is null
   public PriorityPoolInstanceSelector(AdaptiveServerSelector adaptiveServerSelector) {
     assert adaptiveServerSelector != null;
     _adaptiveServerSelector = adaptiveServerSelector;
   }
 
-  /**
-   * Selects a server instance from the given candidates based on pool preferences.
-   * The selection process follows these steps:
-   * <ol>
-   *   <li>pools all candidates by their pool</li>
-   *   <li>Iterates through the ordered preferred pools in priority order</li>
-   *   <li>For the first pool that has available servers, uses adaptiveServerSelector to choose one</li>
-   *   <li>If no preferred pools have servers, falls back to selecting from remaining servers</li>
-   * </ol>
-   *
-   * <p>Example 1 - Preferred pool has servers:</p>
-   * <pre>
-   *   Candidates:
-   *     - server1 (pool 1)
-   *     - server2 (pool 2)
-   *     - server3 (pool 1)
-   *   Preferred pools: [2, 1]
-   *   Result: server2 is selected (from pool 2, highest priority)
-   * </pre>
-   *
-   * <p>Example 2 - Fallback to second preferred pool:</p>
-   * <pre>
-   *   Candidates:
-   *     - server1 (pool 1)
-   *     - server3 (pool 1)
-   *     - server4 (pool 3)
-   *   Preferred pools: [2, 1]
-   *   Result: adaptiveServerSelector chooses between server1 and server3 (from pool 1)
-   * </pre>
-   *
-   * <p>Example 3 - Fallback to non-preferred pool:</p>
-   * <pre>
-   *   Candidates:
-   *     - server4 (pool 3)
-   *     - server5 (pool 3)
-   *   Preferred pools: [2, 1]
-   *   Result: adaptiveServerSelector chooses between server4 and server5 (from pool 3)
-   * </pre>
-   *
-   * @param ctx the server selection context containing ordered preferred pools
-   * @param candidates the list of server candidates to choose from
-   * @return the selected server instance as a SegmentInstanceCandidate, or null if no candidates are available
-   */
+  /// Selects a server instance from the given candidates based on pool preferences.
+  /// The selection process follows these steps:
+  ///
+  /// 1. pools all candidates by their pool
+  /// 2. Iterates through the ordered preferred pools in priority order
+  /// 3. For the first pool that has available servers, uses adaptiveServerSelector to choose one
+  /// 4. If no preferred pools have servers, falls back to selecting from remaining servers
+  ///
+  /// Example 1 - Preferred pool has servers:
+  ///
+  /// ```
+  /// Candidates:
+  ///   - server1 (pool 1)
+  ///   - server2 (pool 2)
+  ///   - server3 (pool 1)
+  /// Preferred pools: [2, 1]
+  /// Result: server2 is selected (from pool 2, highest priority)
+  /// ```
+  ///
+  /// Example 2 - Fallback to second preferred pool:
+  ///
+  /// ```
+  /// Candidates:
+  ///   - server1 (pool 1)
+  ///   - server3 (pool 1)
+  ///   - server4 (pool 3)
+  /// Preferred pools: [2, 1]
+  /// Result: adaptiveServerSelector chooses between server1 and server3 (from pool 1)
+  /// ```
+  ///
+  /// Example 3 - Fallback to non-preferred pool:
+  ///
+  /// ```
+  /// Candidates:
+  ///   - server4 (pool 3)
+  ///   - server5 (pool 3)
+  /// Preferred pools: [2, 1]
+  /// Result: adaptiveServerSelector chooses between server4 and server5 (from pool 3)
+  /// ```
+  ///
+  /// @param ctx the server selection context containing ordered preferred pools
+  /// @param candidates the list of server candidates to choose from
+  /// @return the selected server instance as a SegmentInstanceCandidate, or null if no candidates are available
   @Nullable
   public SegmentInstanceCandidate select(ServerSelectionContext ctx,
       @Nullable List<SegmentInstanceCandidate> candidates) {
@@ -149,36 +142,35 @@ public class PriorityPoolInstanceSelector {
     return null;
   }
 
-  /**
-   * Invoke adaptiveServerSelector to get the original ranking the servers (min first). Reorder the servers based on
-   * the pool preference. The head of the OrderedPreferredPools list is the most preferred pool.
-   * The servers in the same pool are ranked by the original ranking.
-   *
-   * <p>Example:</p>
-   * <pre>
-   * Given:
-   *   - Server candidates:
-   *     - server1 (pool 1, score 80)
-   *     - server2 (pool 2, score 70)
-   *     - server3 (pool 1, score 90)
-   *     - server4 (pool 3, score 60)
-   *   - Ordered preferred pools: [2, 1]
-   *
-   * Original ranking by score would be: [server4, server2, server1, server3]
-   * Final ranking after pool preference: [server2, server1, server3, server4]
-   * Because:
-   *   1. pool 2 servers come first (server2)
-   *   2. pool 1 servers come next, maintaining their relative order (server1, server3)
-   *   3. Remaining servers come last (server4)
-   * </pre>
-   *
-   * @param ctx the server selection context containing ordered preferred pools
-   * @param serverCandidates the server candidates to be ranked
-   * @return the ranked servers, ordered by pool preference and then by original ranking within each pool
-   */
+  /// Invoke adaptiveServerSelector to get the original ranking the servers (min first). Reorder the servers based on
+  /// the pool preference. The head of the OrderedPreferredPools list is the most preferred pool.
+  /// The servers in the same pool are ranked by the original ranking.
+  ///
+  /// Example:
+  ///
+  /// ```
+  /// Given:
+  ///   - Server candidates:
+  ///     - server1 (pool 1, score 80)
+  ///     - server2 (pool 2, score 70)
+  ///     - server3 (pool 1, score 90)
+  ///     - server4 (pool 3, score 60)
+  ///   - Ordered preferred pools: [2, 1]
+  ///
+  /// Original ranking by score would be: [server4, server2, server1, server3]
+  /// Final ranking after pool preference: [server2, server1, server3, server4]
+  /// Because:
+  ///   1. pool 2 servers come first (server2)
+  ///   2. pool 1 servers come next, maintaining their relative order (server1, server3)
+  ///   3. Remaining servers come last (server4)
+  /// ```
+  ///
+  /// @param ctx the server selection context containing ordered preferred pools
+  /// @param serverCandidates the server candidates to be ranked
+  /// @return the ranked servers, ordered by pool preference and then by original ranking within each pool
   public List<String> rank(ServerSelectionContext ctx, List<SegmentInstanceCandidate> serverCandidates) {
     if (serverCandidates == null || serverCandidates.isEmpty()) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     // TODO: return the pos of the selected server in the input array rather than the server instance id.

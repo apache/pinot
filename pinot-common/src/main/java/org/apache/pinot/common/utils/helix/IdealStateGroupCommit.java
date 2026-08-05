@@ -42,18 +42,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * IdealStateGroupCommit is a utility class to commit group updates to IdealState.
- * It is designed to be used in a multi-threaded environment where multiple threads
- * may try to update the same IdealState concurrently.
- * The implementation is shamelessly borrowed from (<a href=
- * "https://github.com/apache/helix/blob/helix-1.4.1/helix-core/src/main/java/org/apache/helix/GroupCommit.java"
- * >HelixGroupCommit</a>).
- * This is especially useful for updating large IdealState, which each update may
- * take a long time, e.g. to update one IdealState with 100k segments may take
- * ~4 seconds, then 15 updates will take 1 minute and cause other requests
- * (e.g. Segment upload, realtime segment commit, segment deletion, etc) timeout.
- */
+/// IdealStateGroupCommit is a utility class to commit group updates to IdealState.
+/// It is designed to be used in a multi-threaded environment where multiple threads
+/// may try to update the same IdealState concurrently.
+/// The implementation is shamelessly borrowed from ([HelixGroupCommit][ref1].
+/// This is especially useful for updating large IdealState, which each update may
+/// take a long time, e.g. to update one IdealState with 100k segments may take
+/// ~4 seconds, then 15 updates will take 1 minute and cause other requests
+/// (e.g. Segment upload, realtime segment commit, segment deletion, etc) timeout.
+///
+/// [ref1]: https://github.com/apache/helix/blob/helix-1.4.1/helix-core/src/main/java/org/apache/helix/GroupCommit.java)
 public class IdealStateGroupCommit {
   private static final Logger LOGGER = LoggerFactory.getLogger(IdealStateGroupCommit.class);
 
@@ -73,6 +71,11 @@ public class IdealStateGroupCommit {
     IdealState _updatedIdealState = null;
     AtomicBoolean _sent = new AtomicBoolean(false);
     Throwable _exception;
+    // Set to true when the entry's owning thread (the leader of a failed batch) wants the next
+    // leader to skip this entry instead of applying it. Read in the iteration loop. Volatile so
+    // the next leader sees it without synchronization. This is the O(1) alternative to calling
+    // ConcurrentLinkedQueue.remove(entry) (which is O(n)) in the catch path.
+    volatile boolean _cancelled = false;
 
     Entry(String resourceName, Function<IdealState, IdealState> updater) {
       _resourceName = resourceName;
@@ -82,9 +85,7 @@ public class IdealStateGroupCommit {
 
   private final Queue[] _queues = new Queue[100];
 
-  /**
-   * Set up a group committer and its associated queues
-   */
+  /// Set up a group committer and its associated queues
   public IdealStateGroupCommit() {
     // Don't use Arrays.fill();
     for (int i = 0; i < _queues.length; i++) {
@@ -100,14 +101,12 @@ public class IdealStateGroupCommit {
     _minNumCharsInISToTurnOnCompression = minNumChars;
   }
 
-  /**
-   * Do a group update for idealState associated with a given resource key
-   * @param helixManager helixManager with the ability to pull from the current data\
-   * @param resourceName the resource name to be updated
-   * @param updater the idealState updater to be applied
-   * @return IdealState if the update is successful, exception if the update fails and null if interrupted while
-   * committing change
-   */
+  /// Do a group update for idealState associated with a given resource key
+  /// @param helixManager helixManager with the ability to pull from the current data\
+  /// @param resourceName the resource name to be updated
+  /// @param updater the idealState updater to be applied
+  /// @return IdealState if the update is successful, exception if the update fails and null if interrupted while
+  /// committing change
   public IdealState commit(HelixManager helixManager, String resourceName, Function<IdealState, IdealState> updater,
       RetryPolicy retryPolicy, boolean noChangeOk) {
     Queue queue = getQueue(resourceName);
@@ -123,7 +122,7 @@ public class IdealStateGroupCommit {
             // All pending entries have been processed, the updatedIdealState should be set.
             return entry._updatedIdealState;
           }
-          IdealState response = updateIdealState(helixManager, resourceName, idealState -> {
+          updateIdealState(helixManager, resourceName, idealState -> {
             IdealState updatedIdealState = idealState;
             if (!processed.isEmpty()) {
               queue._pending.addAll(processed);
@@ -135,6 +134,15 @@ public class IdealStateGroupCommit {
               if (!ent._resourceName.equals(resourceName)) {
                 continue;
               }
+              if (ent._cancelled) {
+                // Cancelled by a previous failed batch's leader (its commit() catch). Skip and
+                // remove so this batch never applies an updater whose owner has already given up.
+                // Without this, the owner's catch (e.g. cleanup of a newly-created segment ZK
+                // metadata in the pauseless commit path) races against this batch's CAS write
+                // and produces an "in IdealState, no ZK metadata" orphan.
+                it.remove();
+                continue;
+              }
               processed.add(ent);
               it.remove();
               updatedIdealState = ent._updater.apply(updatedIdealState);
@@ -143,15 +151,19 @@ public class IdealStateGroupCommit {
             }
             return updatedIdealState;
           }, retryPolicy, noChangeOk);
-          if (response == null) {
-            RuntimeException ex = new RuntimeException("Failed to update IdealState");
-            for (Entry ent : processed) {
-              ent._exception = ex;
-              ent._updatedIdealState = null;
-            }
-            throw ex;
-          }
         } catch (Throwable e) {
+          // If this leader's own entry was never iterated by the failed batch, it's still
+          // sitting in _pending. Without cancelling it, the NEXT leader will iterate it and
+          // apply its updater -- after this thread's caller has already concluded the commit
+          // failed and run its cleanup (e.g., cleanup of a newly-created segment's ZK metadata
+          // in the pauseless commit path). That race produces an "in IdealState, no ZK
+          // metadata" orphan. We set the cancellation flag (O(1)) instead of calling
+          // ConcurrentLinkedQueue.remove (O(n)); the next leader's iteration check skips and
+          // removes any cancelled entry. If our entry was iterated (already in `processed`),
+          // the flag is harmless. We don't add `entry` to `processed` because nothing reads
+          // its _exception or waits on its _sent: the owner thread IS this thread, and it's
+          // about to exit commit() via the throw below.
+          entry._cancelled = true;
           // If there is an exception, set the exception for all processed entries
           for (Entry ent : processed) {
             ent._exception = e;
@@ -192,14 +204,12 @@ public class IdealStateGroupCommit {
     IdealState _idealState;
   }
 
-  /**
-   * Updates the ideal state, retrying if necessary in case of concurrent updates to the ideal state.
-   *
-   * @param helixManager The HelixManager used to interact with the Helix cluster
-   * @param resourceName The resource for which to update the ideal state
-   * @param updater A function that returns an updated ideal state given an input ideal state
-   * @return updated ideal state if successful, null if not
-   */
+  /// Updates the ideal state, retrying if necessary in case of concurrent updates to the ideal state.
+  ///
+  /// @param helixManager The HelixManager used to interact with the Helix cluster
+  /// @param resourceName The resource for which to update the ideal state
+  /// @param updater A function that returns an updated ideal state given an input ideal state
+  /// @return updated ideal state if successful, null if not
   private static IdealState updateIdealState(HelixManager helixManager, String resourceName,
       Function<IdealState, IdealState> updater, RetryPolicy policy, boolean noChangeOk) {
     // NOTE: ControllerMetrics could be null because this method might be invoked by Broker.
@@ -231,9 +241,14 @@ public class IdealStateGroupCommit {
 
           // If there are changes to apply, apply them
           if (updatedIdealState != null && !idealState.equals(updatedIdealState)) {
-            ZNRecord updatedZNRecord = updatedIdealState.getRecord();
+            // Disable batch message mode if set
+            if (updatedIdealState.getBatchMessageMode()) {
+              LOGGER.warn("Disabling batch message mode for resource: {}", resourceName);
+              updatedIdealState.setBatchMessageMode(false);
+            }
 
             // Update number of partitions
+            ZNRecord updatedZNRecord = updatedIdealState.getRecord();
             int numPartitions = updatedZNRecord.getMapFields().size();
             updatedIdealState.setNumPartitions(numPartitions);
 

@@ -32,7 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/** Factory class for creating message handlers for incoming helix messages. */
+/// Factory class for creating message handlers for incoming helix messages.
 public class ControllerUserDefinedMessageHandlerFactory implements MessageHandlerFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerUserDefinedMessageHandlerFactory.class);
   private static final String USER_DEFINED_MSG_STRING = Message.MessageType.USER_DEFINE_MSG.toString();
@@ -67,7 +67,7 @@ public class ControllerUserDefinedMessageHandlerFactory implements MessageHandle
   public void reset() {
   }
 
-  /** Message handler for {@link RunPeriodicTaskMessage} message. */
+  /// Message handler for [RunPeriodicTaskMessage] message.
   private static class RunPeriodicTaskMessageHandler extends MessageHandler {
     private final String _periodicTaskRequestId;
     private final String _periodicTaskName;
@@ -122,7 +122,7 @@ public class ControllerUserDefinedMessageHandlerFactory implements MessageHandle
     }
   }
 
-  /** Message handler for unknown messages */
+  /// Message handler for unknown messages
   private static class NoOpMessageHandler extends MessageHandler {
     NoOpMessageHandler(Message message, NotificationContext context) {
       super(message, context);

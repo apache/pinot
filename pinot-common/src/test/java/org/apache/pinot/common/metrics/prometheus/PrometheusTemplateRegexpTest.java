@@ -31,14 +31,12 @@ import org.testng.annotations.Test;
 import org.yaml.snakeyaml.Yaml;
 
 
-/**
- * Verifies that the Prometheus JMX template regexp patterns defined in the docker config YAML files
- * are valid Java regexps and match expected JMX metric name strings with correct capture groups.
- *
- * Config files under test: docker/images/pinot/etc/jmx_prometheus_javaagent/configs/
- *
- * @see <a href="https://github.com/apache/pinot/issues/13588">Issue #13588</a>
- */
+/// Verifies that the Prometheus JMX template regexp patterns defined in the docker config YAML files
+/// are valid Java regexps and match expected JMX metric name strings with correct capture groups.
+///
+/// Config files under test: docker/images/pinot/etc/jmx_prometheus_javaagent/configs/
+///
+/// @see <a href="https://github.com/apache/pinot/issues/13588">Issue #13588</a>
 public class PrometheusTemplateRegexpTest {
 
   private static final String CONFIG_BASE_PATH =
@@ -55,9 +53,7 @@ public class PrometheusTemplateRegexpTest {
     };
   }
 
-  /**
-   * Verifies every pattern in each YAML config file compiles as a valid Java regexp.
-   */
+  /// Verifies every pattern in each YAML config file compiles as a valid Java regexp.
   @Test(dataProvider = "configFiles")
   public void testAllPatternsAreValidRegexp(String configFile)
       throws Exception {
@@ -76,10 +72,8 @@ public class PrometheusTemplateRegexpTest {
 
   // ---- Broker patterns ----
 
-  /**
-   * broker.yml: meters/timers scoped to tableNameWithType.
-   * e.g. pinot.broker.myTable_REALTIME.queries
-   */
+  /// broker.yml: meters/timers scoped to tableNameWithType.
+  /// e.g. pinot.broker.myTable_REALTIME.queries
   @Test
   public void testBrokerTableWithTypeMeterPattern()
       throws Exception {
@@ -95,10 +89,8 @@ public class PrometheusTemplateRegexpTest {
     Assert.assertEquals(m.group(7), "Count");
   }
 
-  /**
-   * broker.yml: meters/timers scoped to tableNameWithType with database prefix.
-   * e.g. pinot.broker.myDb.myTable_OFFLINE.queries
-   */
+  /// broker.yml: meters/timers scoped to tableNameWithType with database prefix.
+  /// e.g. pinot.broker.myDb.myTable_OFFLINE.queries
   @Test
   public void testBrokerTableWithTypeMeterPatternWithDatabase()
       throws Exception {
@@ -115,10 +107,8 @@ public class PrometheusTemplateRegexpTest {
     Assert.assertEquals(m.group(7), "Count");
   }
 
-  /**
-   * broker.yml: meters/timers scoped to rawTableName.
-   * e.g. pinot.broker.myTable.queries
-   */
+  /// broker.yml: meters/timers scoped to rawTableName.
+  /// e.g. pinot.broker.myTable.queries
   @Test
   public void testBrokerRawTableNameMeterPattern()
       throws Exception {
@@ -133,28 +123,36 @@ public class PrometheusTemplateRegexpTest {
     Assert.assertEquals(m.group(6), "Count");
   }
 
-  /**
-   * broker.yml: global gauge/meter/timer (no table scope).
-   * e.g. pinot.broker.totalDocuments
-   */
+  /// broker.yml: global gauge/meter/timer (no table scope). The catch-all is group-flexible at the
+  /// prefix so non-broker MBean groups registered in the broker JVM (e.g. pinot.mse.\*) are also
+  /// exported with this rule.
+  /// e.g. pinot.broker.totalDocuments, pinot.mse.queries
   @Test
   public void testBrokerGlobalMeterPattern()
       throws Exception {
-    String pattern = loadPatternByName("broker.yml", "pinot_broker_$1_$2");
-    Matcher m = Pattern.compile(pattern).matcher(
+    String pattern = loadPatternByName("broker.yml", "pinot_$1_$2_$3");
+    Pattern compiled = Pattern.compile(pattern);
+
+    Matcher brokerMatch = compiled.matcher(
         "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", "
             + "name=\"pinot.broker.totalDocuments\"><>Value");
-    Assert.assertTrue(m.matches(), "Pattern should match global broker gauge");
-    Assert.assertEquals(m.group(1), "totalDocuments");
-    Assert.assertEquals(m.group(2), "Value");
+    Assert.assertTrue(brokerMatch.matches(), "Pattern should match global broker gauge");
+    Assert.assertEquals(brokerMatch.group(1), "broker");
+    Assert.assertEquals(brokerMatch.group(2), "totalDocuments");
+    Assert.assertEquals(brokerMatch.group(3), "Value");
+
+    Matcher mseMatch = compiled.matcher(
+        "\"org.apache.pinot.common.metrics\"<type=\"MseMetrics\", name=\"pinot.mse.queries\"><>Count");
+    Assert.assertTrue(mseMatch.matches(), "Pattern should also match pinot.mse.* mbeans on broker JVMs");
+    Assert.assertEquals(mseMatch.group(1), "mse");
+    Assert.assertEquals(mseMatch.group(2), "queries");
+    Assert.assertEquals(mseMatch.group(3), "Count");
   }
 
   // ---- Server patterns ----
 
-  /**
-   * server.yml: meters/timers scoped to tableNameWithType.
-   * e.g. pinot.server.myTable_OFFLINE.segmentUploadFailure
-   */
+  /// server.yml: meters/timers scoped to tableNameWithType.
+  /// e.g. pinot.server.myTable_OFFLINE.segmentUploadFailure
   @Test
   public void testServerTableWithTypeMeterPattern()
       throws Exception {
@@ -169,10 +167,8 @@ public class PrometheusTemplateRegexpTest {
     Assert.assertEquals(m.group(6), "Count");
   }
 
-  /**
-   * server.yml: gauge scoped to tableNameWithType with partition.
-   * e.g. pinot.server.queries.myTable_REALTIME.3
-   */
+  /// server.yml: gauge scoped to tableNameWithType with partition.
+  /// e.g. pinot.server.queries.myTable_REALTIME.3
   @Test
   public void testServerTableWithTypeAndPartitionGaugePattern()
       throws Exception {
@@ -190,10 +186,8 @@ public class PrometheusTemplateRegexpTest {
 
   // ---- Controller patterns ----
 
-  /**
-   * controller.yml: minion task-type gauge.
-   * e.g. pinot.controller.numMinionTasksInProgress.SegmentGenerationAndPush
-   */
+  /// controller.yml: minion task-type gauge.
+  /// e.g. pinot.controller.numMinionTasksInProgress.SegmentGenerationAndPush
   @Test
   public void testControllerTaskTypeGaugePattern()
       throws Exception {
@@ -207,10 +201,8 @@ public class PrometheusTemplateRegexpTest {
     Assert.assertEquals(m.group(3), "Value");
   }
 
-  /**
-   * controller.yml: meters/timers scoped to tableNameWithType.
-   * e.g. pinot.controller.myTable_OFFLINE.segmentUploadFailure
-   */
+  /// controller.yml: meters/timers scoped to tableNameWithType.
+  /// e.g. pinot.controller.myTable_OFFLINE.segmentUploadFailure
   @Test
   public void testControllerTableWithTypeMeterPattern()
       throws Exception {
@@ -228,10 +220,8 @@ public class PrometheusTemplateRegexpTest {
 
   // ---- Minion patterns ----
 
-  /**
-   * minion.yml: meters/timers scoped to tableNameWithType and taskType.
-   * e.g. pinot.minion.myTable_REALTIME.SegmentGenerationAndPush.segmentUploadFailure
-   */
+  /// minion.yml: meters/timers scoped to tableNameWithType and taskType.
+  /// e.g. pinot.minion.myTable_REALTIME.SegmentGenerationAndPush.segmentUploadFailure
   @Test
   public void testMinionTableWithTypeAndTaskTypeMeterPattern()
       throws Exception {
@@ -247,10 +237,8 @@ public class PrometheusTemplateRegexpTest {
     Assert.assertEquals(m.group(7), "Count");
   }
 
-  /**
-   * minion.yml: meters/timers accepting either rawTableName or tableNameWithType.
-   * e.g. pinot.minion.myTable.queries
-   */
+  /// minion.yml: meters/timers accepting either rawTableName or tableNameWithType.
+  /// e.g. pinot.minion.myTable.queries
   @Test
   public void testMinionTableOrIdScopedMeterPattern()
       throws Exception {
@@ -264,12 +252,10 @@ public class PrometheusTemplateRegexpTest {
     Assert.assertEquals(m.group(3), "Value");
   }
 
-  /**
-   * Returns the pattern string for the rule whose {@code name} field equals {@code ruleName}.
-   * Keying off the rule name survives YAML rule reorderings — inserting or moving a rule in
-   * the config file will not silently shift the index and cause this test to assert against
-   * the wrong pattern.
-   */
+  /// Returns the pattern string for the rule whose `name` field equals `ruleName`.
+  /// Keying off the rule name survives YAML rule reorderings — inserting or moving a rule in
+  /// the config file will not silently shift the index and cause this test to assert against
+  /// the wrong pattern.
   @SuppressWarnings("unchecked")
   private String loadPatternByName(String configFile, String ruleName)
       throws Exception {

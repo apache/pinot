@@ -80,12 +80,10 @@ public class LogicalTableExecutionInfo implements TableExecutionInfo {
         .anyMatch(tableExecutionInfo -> tableExecutionInfo.getTableDataManager() instanceof RealtimeTableDataManager);
   }
 
-  /**
-   * Returns selected segments and contexts for the logical table. Unlike single-table execution, this collects
-   * all segments from every physical table, runs segment pruning once on the combined list (cross-table prune),
-   * then resolves segment contexts per table. This allows pruners such as SelectionQuerySegmentPruner (ORDER BY +
-   * LIMIT) to prune effectively across the logical table rather than per physical table.
-   */
+  /// Returns selected segments and contexts for the logical table. Unlike single-table execution, this collects
+  /// all segments from every physical table, runs segment pruning once on the combined list (cross-table prune),
+  /// then resolves segment contexts per table. This allows pruners such as SelectionQuerySegmentPruner (ORDER BY +
+  /// LIMIT) to prune effectively across the logical table rather than per physical table.
   @Override
   public SelectedSegmentsInfo getSelectedSegmentsInfo(QueryContext queryContext, TimerContext timerContext,
       ExecutorService executorService, SegmentPrunerService segmentPrunerService) {

@@ -79,6 +79,35 @@ public class PinotQueryResourceTest {
     Assert.assertFalse(response.contains("retry the query using the multi-stage query engine"));
   }
 
+  @Test
+  public void testDdlOnQueryEndpointReturnsValidationError() {
+    String response = streamingOutputToString(
+        _pinotQueryResource.handleGetSql("CREATE TABLE t (id INT) TABLE_TYPE = OFFLINE", null, null, null)
+    );
+    Assert.assertTrue(response.contains(String.valueOf(QueryErrorCode.QUERY_VALIDATION.getId())));
+    Assert.assertTrue(response.contains("/sql/ddl"));
+  }
+
+  @Test
+  public void testDdlOnQueryEndpointWithMseOptionReturnsValidationError() {
+    String response = streamingOutputToString(
+        _pinotQueryResource.handleGetSql("CREATE TABLE t (id INT) TABLE_TYPE = OFFLINE", null,
+            "useMultistageEngine=true", null)
+    );
+    Assert.assertTrue(response.contains(String.valueOf(QueryErrorCode.QUERY_VALIDATION.getId())));
+    Assert.assertTrue(response.contains("/sql/ddl"));
+  }
+
+  @Test
+  public void testDdlOnQueryEndpointWithSetMseOptionReturnsValidationError() {
+    String response = streamingOutputToString(
+        _pinotQueryResource.handleGetSql(
+            "SET useMultistageEngine = 'true'; CREATE TABLE t (id INT) TABLE_TYPE = OFFLINE", null, null, null)
+    );
+    Assert.assertTrue(response.contains(String.valueOf(QueryErrorCode.QUERY_VALIDATION.getId())));
+    Assert.assertTrue(response.contains("/sql/ddl"));
+  }
+
   public static String streamingOutputToString(StreamingOutput streamingOutput) {
     try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()) {
       streamingOutput.write(byteArrayOutputStream);

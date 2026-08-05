@@ -32,22 +32,17 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * BinaryOperatorTransformFunctionTest abstracts common test methods for EqualsTransformFunctionTest,
- * NotEqualsTransformFunctionTest, GreaterThanOrEqualTransformFunctionTest, GreaterThanTransformFunctionTest,
- * LessThanOrEqualTransformFunctionTest, LessThanTransformFunctionTest
- *
- */
+/// BinaryOperatorTransformFunctionTest abstracts common test methods for EqualsTransformFunctionTest,
+/// NotEqualsTransformFunctionTest, GreaterThanOrEqualTransformFunctionTest, GreaterThanTransformFunctionTest,
+/// LessThanOrEqualTransformFunctionTest, LessThanTransformFunctionTest
 public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformFunctionTest {
 
   abstract boolean getExpectedValue(int compareResult);
 
   abstract String getFunctionName();
 
-  /**
-   * For columns with dictionary, BinaryOperatorTransformFunction will automatically use the internal
-   * predicateEvaluator for expression evaluation.
-   */
+  /// For columns with dictionary, BinaryOperatorTransformFunction will automatically use the internal
+  /// predicateEvaluator for expression evaluation.
   @Test
   public void testBinaryOperatorTransformFunction() {
     String functionName = getFunctionName();
@@ -153,10 +148,8 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
   }
 
-  /**
-   * Different than the testBinaryOperatorTransformFunction, this test will hit a different code path of
-   * BinaryOperatorTransformFunction, which the left side block has no dictionary nor predicateEvaluator.
-   */
+  /// Different than the testBinaryOperatorTransformFunction, this test will hit a different code path of
+  /// BinaryOperatorTransformFunction, which the left side block has no dictionary nor predicateEvaluator.
   @Test
   public void testBinaryOperatorTransformFunctionNoDict() {
     String functionName = getFunctionName();
@@ -276,7 +269,7 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
             String.format("%s(%s)", getFunctionName(), INT_SV_COLUMN)
         }, new Object[]{
         String.format("%s(%s, %s, %s)", getFunctionName(), LONG_SV_COLUMN, INT_SV_COLUMN, STRING_SV_COLUMN)
-    }
+        }
     };
   }
 }

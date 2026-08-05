@@ -31,10 +31,19 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -202,6 +211,93 @@ public class MultiHttpRequestTest {
     Assert.assertEquals(result.getSuccess(), 3);
     Assert.assertEquals(result.getErrors(), 1);
     Assert.assertEquals(result.getTimeouts(), 1);
+  }
+
+  @Test
+  public void testBufferedExecutionSubmitsAndPollsRequests()
+      throws Exception {
+    String url = "http://localhost:" + (_portStart + 3) + URI_PATH;
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+    try (MultiHttpRequest.BufferedRequestExecution execution =
+        new MultiHttpRequest(executor, connectionManager).createBufferedExecution(TIMEOUT_MS)) {
+      for (String body : List.of("b0", "b1", "b2")) {
+        HttpPost request = new HttpPost(url);
+        request.setEntity(new StringEntity(body));
+        execution.submit(request);
+      }
+      for (int i = 0; i < 3; i++) {
+        Future<MultiHttpRequestBufferedResponse> completed = execution.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        Assert.assertNotNull(completed);
+        Assert.assertEquals(completed.get().getResponseBody(), SUCCESS_MSG);
+      }
+    } finally {
+      executor.shutdownNow();
+      connectionManager.close();
+    }
+  }
+
+  @Test
+  public void testBufferedExecutionRejectsOperationsAfterClose()
+      throws Exception {
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+    try {
+      MultiHttpRequest.BufferedRequestExecution execution =
+          new MultiHttpRequest(executor, connectionManager).createBufferedExecution(TIMEOUT_MS);
+      execution.close();
+      Assert.expectThrows(IllegalStateException.class,
+          () -> execution.poll(1, TimeUnit.MILLISECONDS));
+      Assert.expectThrows(IllegalStateException.class, execution::take);
+      Assert.expectThrows(IllegalStateException.class,
+          () -> execution.submit(new HttpPost("http://localhost:" + (_portStart + 3) + URI_PATH)));
+    } finally {
+      executor.shutdownNow();
+      connectionManager.close();
+    }
+  }
+
+  @Test
+  public void testBufferedExecutionCancelsAcceptedRequestAfterSubmissionFailure()
+      throws Exception {
+    AtomicReference<Runnable> acceptedTask = new AtomicReference<>();
+    AtomicInteger handledRequests = new AtomicInteger();
+    String rollbackPath = "/rollback";
+    HttpServer server = _servers.get(3);
+    server.createContext(rollbackPath, exchange -> {
+      handledRequests.incrementAndGet();
+      exchange.sendResponseHeaders(SUCCESS_CODE, 0);
+      exchange.close();
+    });
+    Executor rejectingExecutor = task -> {
+      if (!acceptedTask.compareAndSet(null, task)) {
+        throw new RejectedExecutionException("reject second request");
+      }
+    };
+    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+    String url = "http://localhost:" + (_portStart + 3) + rollbackPath;
+    try {
+      MultiHttpRequest.BufferedRequestExecution execution =
+          new MultiHttpRequest(rejectingExecutor, connectionManager).createBufferedExecution(TIMEOUT_MS);
+      try {
+        HttpPost first = new HttpPost(url);
+        first.setEntity(new StringEntity("first"));
+        execution.submit(first);
+        HttpPost second = new HttpPost(url);
+        second.setEntity(new StringEntity("second"));
+        Assert.expectThrows(RejectedExecutionException.class, () -> execution.submit(second));
+      } finally {
+        execution.close();
+      }
+
+      // Running the accepted task after close must be a no-op because its Future was cancelled.
+      Assert.assertNotNull(acceptedTask.get());
+      acceptedTask.get().run();
+      Assert.assertEquals(handledRequests.get(), 0);
+    } finally {
+      server.removeContext(rollbackPath);
+      connectionManager.close();
+    }
   }
 
   private TestResult collectResult(CompletionService<MultiHttpRequestResponse> completionService, int size) {

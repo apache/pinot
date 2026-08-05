@@ -64,6 +64,7 @@ import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.query.QueryExecutionContext.QueryType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
@@ -263,10 +264,8 @@ public class PinotBrokerDebug {
     }
   }
 
-  /**
-   * API to get a snapshot of ServerRoutingStatsEntry for all the servers.
-   * @return String containing server name and the associated routing stats.
-   */
+  /// API to get a snapshot of ServerRoutingStatsEntry for all the servers.
+  /// @return String containing server name and the associated routing stats.
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/debug/serverRoutingStats")
@@ -277,9 +276,12 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 404, message = "Server routing Stats not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Map<String, ServerRoutingStatsEntry> getServerRoutingStats() {
+  public Map<String, ServerRoutingStatsEntry> getServerRoutingStats(
+      @ApiParam(value = "Query engine type (SSE or MSE)", allowableValues = "SSE, MSE")
+      @QueryParam("queryType") String queryTypeStr) {
     if (_serverRoutingStatsManager.isEnabled()) {
-      return _serverRoutingStatsManager.getServerRoutingStats();
+      QueryType queryType = queryTypeStr == null ? QueryType.SSE : QueryType.valueOf(queryTypeStr);
+      return _serverRoutingStatsManager.getServerRoutingStats(queryType);
     } else {
       throw new WebApplicationException("Server routing stats is not enabled", Response.Status.NOT_FOUND);
     }

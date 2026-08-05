@@ -28,7 +28,6 @@ import java.nio.BufferOverflowException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +52,7 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.core.data.manager.SegmentOperationsTaskContext;
 import org.apache.pinot.core.data.manager.SegmentOperationsTaskType;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
@@ -69,9 +69,11 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -122,9 +124,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Segment data manager for low level consumer realtime segments, which manages consumption and segment completion.
- */
+/// Segment data manager for low level consumer realtime segments, which manages consumption and segment completion.
 @SuppressWarnings("jol")
 public class RealtimeSegmentDataManager extends SegmentDataManager {
 
@@ -267,6 +267,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
   private final BooleanSupplier _isReadyToConsumeData;
+  private ServerIngestionOomProtectionManager _serverIngestionOomProtectionManager;
   private final MutableSegmentImpl _realtimeSegment;
   private volatile StreamPartitionMsgOffset _currentOffset; // Next offset to be consumed
   private volatile State _state;
@@ -337,10 +338,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private String _stopReason = null;
   private final Semaphore _segBuildSemaphore;
   private final boolean _isOffHeap;
-  /**
-   * Whether null handling is enabled by default. This value is only used if
-   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-   */
+  /// Whether null handling is enabled by default. This value is only used if
+  /// [Schema#isEnableColumnBasedNullHandling()] is false.
   private final boolean _defaultNullHandlingEnabled;
   private final SegmentCommitterFactory _segmentCommitterFactory;
   private final ConsumptionRateLimiter _partitionRateLimiter;
@@ -444,6 +443,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
+  private boolean shouldStopWaitingForOomProtection() {
+    if (_shouldStop || _state != State.INITIAL_CONSUMING) {
+      return true;
+    }
+    return now() >= _consumeEndTime || _numRowsIndexed >= _segmentMaxRowCount || _endOfPartitionGroup
+        || _forceCommitMessageReceived || !canAddMore();
+  }
+
   private void handleTransientStreamErrors(Exception e)
       throws Exception {
     _consecutiveErrorCount++;
@@ -483,6 +490,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     _segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
     while (!_shouldStop && !endCriteriaReached()) {
+      if (_state == State.INITIAL_CONSUMING && _serverIngestionOomProtectionManager != null) {
+        boolean waitedForOomProtection =
+            _serverIngestionOomProtectionManager.waitIfProtectionNeeded(this::shouldStopWaitingForOomProtection);
+        if (_shouldStop || endCriteriaReached()) {
+          break;
+        }
+        if (waitedForOomProtection) {
+          _idleTimer.markStreamCreated();
+        }
+      }
       _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 1);
       // Consume for the next readTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
@@ -581,12 +598,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return true;
   }
 
-  /**
-   * @param messageBatch batch of messages to process
-   * @param idlePipeSleepTimeMillis wait time in case no messages were read
-   * @return returns <code>true</code> if the process loop ended before processing the batch, <code>false</code>
-   * otherwise
-   */
+  /// @param messageBatch batch of messages to process
+  /// @param idlePipeSleepTimeMillis wait time in case no messages were read
+  /// @return returns `true` if the process loop ended before processing the batch, `false`
+  /// otherwise
   private boolean processStreamEvents(MessageBatch messageBatch, long idlePipeSleepTimeMillis) {
     int messageCount = messageBatch.getMessageCount();
     _partitionRateLimiter.throttle(messageBatch);
@@ -760,6 +775,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   @VisibleForTesting
   boolean canAddMore() {
     return _realtimeSegment.canAddMore();
+  }
+
+  @VisibleForTesting
+  void setServerIngestionOomProtectionManager(
+      ServerIngestionOomProtectionManager serverIngestionOomProtectionManager) {
+    _serverIngestionOomProtectionManager = serverIngestionOomProtectionManager;
   }
 
   public class PartitionConsumer implements Runnable {
@@ -1100,43 +1121,33 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /**
-   * Returns the current offset for the partition group.
-   */
+  /// Returns the current offset for the partition group.
   public Map<String, String> getPartitionToCurrentOffset() {
-    return Collections.singletonMap(String.valueOf(_partitionGroupId), _currentOffset.toString());
+    return Map.of(String.valueOf(_partitionGroupId), _currentOffset.toString());
   }
 
-  /**
-   * Returns the state of the consumer.
-   */
+  /// Returns the state of the consumer.
   public ConsumerState getConsumerState() {
     return _state == State.ERROR ? ConsumerState.NOT_CONSUMING : ConsumerState.CONSUMING;
   }
 
-  /**
-   * Returns the timestamp of the last consumed message.
-   */
+  /// Returns the timestamp of the last consumed message.
   public long getLastConsumedTimestamp() {
     return _lastConsumedTimestampMs;
   }
 
-  /**
-   * Returns the {@link ConsumerPartitionState} for the partition group.
-   */
+  /// Returns the [ConsumerPartitionState] for the partition group.
   public Map<String, ConsumerPartitionState> getConsumerPartitionState(
       @Nullable StreamPartitionMsgOffset latestMsgOffset) {
     String partitionGroupId = String.valueOf(_partitionGroupId);
-    return Collections.singletonMap(partitionGroupId,
+    return Map.of(partitionGroupId,
         new ConsumerPartitionState(partitionGroupId, getCurrentOffset(), getLastConsumedTimestamp(), latestMsgOffset,
             _lastRowMetadata));
   }
 
-  /**
-   * Checks and reports if the consumer is going through data loss.
-   *
-   * @param messageBatch Message batch to validate
-   */
+  /// Checks and reports if the consumer is going through data loss.
+  ///
+  /// @param messageBatch Message batch to validate
   private void reportDataLoss(MessageBatch messageBatch) {
     if (messageBatch.hasDataLoss()) {
       _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.STREAM_DATA_LOSS, 1L);
@@ -1371,6 +1382,21 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   protected boolean buildSegmentAndReplace()
       throws Exception {
+    return buildSegmentAndReplace(null);
+  }
+
+  /// Builds the segment from the in-memory rows and replaces the CONSUMING segment with the local copy.
+  ///
+  /// A locally-built segment can diverge in CRC from the one the winning replica committed (e.g. different docId
+  /// ordering); swapping in a divergent copy corrupts upsert metadata and leaves replicas inconsistent otherwise. So
+  /// when `committedSegmentZKMetadata` carries a CRC, a mismatch discards the local build (returns `false`) and the
+  /// caller downloads the committed segment. Skipped for pauseless tables and segments whose CRC is not yet set (the
+  /// COMMITTING window), so we never download a not-yet-uploaded segment (see PR #17885).
+  ///
+  /// @param committedSegmentZKMetadata committed ZK metadata carrying the CRC, or `null` to skip the check
+  /// @return `true` if built and replaced locally; `false` if the build failed or was rejected on a CRC mismatch
+  protected boolean buildSegmentAndReplace(@Nullable SegmentZKMetadata committedSegmentZKMetadata)
+      throws Exception {
     SegmentBuildDescriptor descriptor;
     try {
       descriptor = buildSegmentInternal(false);
@@ -1380,8 +1406,32 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (descriptor == null) {
       return false;
     }
-    _realtimeTableDataManager.replaceConsumingSegment(_segmentNameStr, _segmentZKMetadata);
+    boolean crcCheckEnabled = committedSegmentZKMetadata != null && committedSegmentZKMetadata.getCrc() >= 0
+        && !PauselessConsumptionUtils.isPauselessEnabled(_tableConfig);
+    if (crcCheckEnabled && !isLocalSegmentCrcMatchingZk(committedSegmentZKMetadata)) {
+      _segmentLogger.warn("Locally-built segment: {} CRC does not match committed CRC: {} in zk. "
+          + "Skipping local build to replace", _segmentNameStr, committedSegmentZKMetadata.getCrc());
+      return false;
+    }
+    // On a CRC match use the committed metadata; otherwise the construction-time metadata.
+    _realtimeTableDataManager.replaceConsumingSegment(_segmentNameStr,
+        crcCheckEnabled ? committedSegmentZKMetadata : _segmentZKMetadata);
     return true;
+  }
+
+  /// Whether the just-built local segment's CRC matches the committed CRC in ZK. Returns `false` if the local metadata
+  /// cannot be read, so the caller downloads the committed segment rather than failing the transition.
+  @VisibleForTesting
+  protected boolean isLocalSegmentCrcMatchingZk(SegmentZKMetadata committedSegmentZKMetadata) {
+    File indexDir = new File(_resourceDataDir, _segmentNameStr);
+    try {
+      SegmentMetadataImpl localMetadata = new SegmentMetadataImpl(indexDir);
+      return BaseTableDataManager.hasSameCRC(committedSegmentZKMetadata, localMetadata);
+    } catch (Exception e) {
+      _segmentLogger.warn("Failed to read CRC of locally-built segment: {}; treating as CRC mismatch to download the "
+          + "committed segment", _segmentNameStr, e);
+      return false;
+    }
   }
 
   private void closeStreamConsumer() {
@@ -1418,15 +1468,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /**
-   * Cleans up the metrics that reflects the state of the realtime segment.
-   * This step is essential as the instance may not be the target location for some of the partitions.
-   * E.g. if the number of partitions increases, or a host swap is needed, the target location for some partitions
-   * may change,
-   * and the current host remains to run. In this case, the current server would still keep the state of the old
-   * partitions,
-   * which no longer resides in this host any more, thus causes false positive information to the metric system.
-   */
+  /// Cleans up the metrics that reflects the state of the realtime segment.
+  /// This step is essential as the instance may not be the target location for some of the partitions.
+  /// E.g. if the number of partitions increases, or a host swap is needed, the target location for some partitions
+  /// may change,
+  /// and the current host remains to run. In this case, the current server would still keep the state of the old
+  /// partitions,
+  /// which no longer resides in this host any more, thus causes false positive information to the metric system.
   private void cleanupMetrics() {
     _serverMetrics.removeTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING);
     _serverMetrics.removeTableGauge(_clientId, ServerGauge.STREAM_DATA_LOSS);
@@ -1439,7 +1487,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     Thread.sleep(SegmentCompletionProtocol.MAX_HOLD_TIME_MS);
   }
 
-  private static class ConsumptionStopIndicator {
+  @VisibleForTesting
+  static class ConsumptionStopIndicator {
     final StreamPartitionMsgOffset _offset;
     final String _segmentName;
     final String _instanceId;
@@ -1473,13 +1522,42 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     ConsumptionStopIndicator indicator = new ConsumptionStopIndicator(_currentOffset,
         _segmentNameStr, _instanceId, _protocolHandler, reason, _segmentLogger);
     do {
-      SegmentCompletionProtocol.Response response = indicator.postSegmentStoppedConsuming();
+      SegmentCompletionProtocol.Response response = postSegmentStoppedConsuming(indicator);
       if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED) {
         break;
       }
       Uninterruptibles.sleepUninterruptibly(10, TimeUnit.SECONDS);
       _segmentLogger.info("Retrying after response {}", response.toJsonString());
     } while (!_shouldStop);
+  }
+
+  @VisibleForTesting
+  void postStopConsumedMsgForInitializationError() {
+    if (hasDifferentSegmentDataManagerRegistered()) {
+      _segmentLogger.info(
+          "Skip segmentStoppedConsuming for segment: {}, another segment data manager is already registered",
+          _segmentNameStr);
+      return;
+    }
+    postStopConsumedMsg("Consuming segment initialization error");
+  }
+
+  @VisibleForTesting
+  SegmentCompletionProtocol.Response postSegmentStoppedConsuming(ConsumptionStopIndicator indicator) {
+    return indicator.postSegmentStoppedConsuming();
+  }
+
+  /// Returns true when another manager is currently registered for this segment.
+  @VisibleForTesting
+  boolean hasDifferentSegmentDataManagerRegistered() {
+    if (_realtimeTableDataManager == null) {
+      return false;
+    }
+    SegmentDataManager segmentDataManager = _realtimeTableDataManager.getSegmentDataManager(_segmentNameStr);
+    if (segmentDataManager == null) {
+      return false;
+    }
+    return segmentDataManager != this;
   }
 
   public StreamMetadataProvider getPartitionMetadataProvider() {
@@ -1584,7 +1662,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           } else if (_currentOffset.compareTo(endOffset) == 0) {
             _segmentLogger.info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset,
                 endOffset);
-            if (!buildSegmentAndReplace()) {
+            if (!buildSegmentAndReplace(segmentZKMetadata)) {
               _segmentLogger.warn("Failed to build the segment: {} and replace. Downloading to replace",
                   _segmentNameStr);
               downloadSegmentAndReplace(segmentZKMetadata);
@@ -1605,7 +1683,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
             if (success) {
               _segmentLogger.info("Caught up to offset {}", _currentOffset);
-              if (!buildSegmentAndReplace()) {
+              // After catching up the offset matches zk; apply the same CRC guard as the matched-offset case.
+              if (!buildSegmentAndReplace(segmentZKMetadata)) {
                 _segmentLogger.warn("Failed to build the segment: {} after catchup. Downloading to replace",
                     _segmentNameStr);
                 downloadSegmentAndReplace(segmentZKMetadata);
@@ -1693,16 +1772,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _consumerThread.start();
   }
 
-  /**
-   * Stop the consuming thread.
-   *
-   * This method is invoked in 2 places:
-   * 1. By the Helix thread when handling the segment state transition from CONSUMING to ONLINE. When this method is
-   *    invoked, Helix thread should already hold the segment lock, and the consumer thread is not building the segment.
-   *    We can safely interrupt the consumer thread and wait for it to join.
-   * 2. By either the Helix thread or consumer thread to offload the segment. In this case, we can also safely interrupt
-   *    the consumer thread because there is no need to build the segment.
-   */
+  /// Stop the consuming thread.
+  ///
+  /// This method is invoked in 2 places:
+  /// 1. By the Helix thread when handling the segment state transition from CONSUMING to ONLINE. When this method is
+  ///    invoked, Helix thread should already hold the segment lock, and the consumer thread is not building the
+  ///    segment. We can safely interrupt the consumer thread and wait for it to join.
+  /// 2. By either the Helix thread or consumer thread to offload the segment. In this case, we can also safely
+  ///    interrupt the consumer thread because there is no need to build the segment.
   public void stop()
       throws InterruptedException {
     _shouldStop = true;
@@ -1742,6 +1819,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
     _partitionDedupMetadataManager = partitionDedupMetadataManager;
     _isReadyToConsumeData = isReadyToConsumeData;
+    _serverIngestionOomProtectionManager = realtimeTableDataManager.getServerIngestionOomProtectionManager();
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     _instanceId = _realtimeTableDataManager.getInstanceId();
     _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_tableNameWithType);
@@ -1821,9 +1899,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _isOffHeap = indexLoadingConfig.isRealtimeOffHeapAllocation();
     _defaultNullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
 
-    // Start new realtime segment
+    // Start new realtime segment. Use a mutable-only tier-overwritten index loading view when consuming tier overrides
+    // are configured; committed segments continue to use the base table config.
     String consumerDir = realtimeTableDataManager.getConsumerDir();
-    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder = new RealtimeSegmentConfig.Builder(indexLoadingConfig)
+    IndexLoadingConfig consumingIndexLoadingConfig =
+        TableConfigUtils.buildConsumingSegmentIndexLoadingConfig(_tableConfig, _schema, indexLoadingConfig);
+    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
+        new RealtimeSegmentConfig.Builder(consumingIndexLoadingConfig);
+    realtimeSegmentConfigBuilder
         .setTableNameWithType(_tableNameWithType)
         .setSegmentName(_segmentNameStr)
         .setStreamName(streamTopic)
@@ -1841,7 +1924,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
         .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
         .setConsumerDir(consumerDir)
-        .setTextIndexConfig(_tableConfig.getIndexingConfig().getMultiColumnTextIndexConfig())
+        .setTextIndexConfig(consumingIndexLoadingConfig.getMultiColTextIndexConfig())
         .setDropRecordOnPartitionMismatch(ingestionConfig != null
             && ingestionConfig.getStreamIngestionConfig() != null
             && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch());
@@ -1912,7 +1995,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         // we are about to receive an ERROR->OFFLINE state transition once we call
         // postSegmentStoppedConsuming() method.
         Uninterruptibles.sleepUninterruptibly(30, TimeUnit.SECONDS);
-        postStopConsumedMsg("Consuming segment initialization error");
+        postStopConsumedMsgForInitializationError();
       }).start();
       throw t;
     }
@@ -2017,29 +2100,32 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         ColumnPartitionConfig columnPartitionConfig = entry.getValue();
         String partitionFunctionName = columnPartitionConfig.getFunctionName();
 
-        // NOTE: Here we compare the number of partitions from the config and the stream, and log a warning and emit a
-        //       metric when they don't match, but use the one from the stream. The mismatch could happen when the
-        //       stream partitions are changed, but the table config has not been updated to reflect the change.
-        //       In such case, picking the number of partitions from the stream can keep the segment properly
-        //       partitioned as long as the partition function is not changed.
+        // NOTE: Here we compare the number of partitions from the config and the stream, and log a warning when they
+        //       don't match, but use the one from the stream. The mismatch could happen when the stream partitions are
+        //       changed, but the table config has not been updated to reflect the change. In such case, picking the
+        //       number of partitions from the stream can keep the segment properly partitioned as long as the
+        //       partition function is not changed.
         int numPartitions = columnPartitionConfig.getNumPartitions();
         try {
-          // TODO: currentPartitionGroupConsumptionStatus should be fetched from idealState + segmentZkMetadata,
-          //  so that we get back accurate partitionGroups info
-          //  However this is not an issue for Kafka, since partitionGroups never expire and every partitionGroup has
-          //  a single partition
-          //  Fix this before opening support for partitioning in Kinesis
-          int numPartitionGroups = _partitionMetadataProvider.computePartitionGroupMetadata(_clientId, _streamConfig,
-              Collections.emptyList(), /*maxWaitTimeMs=*/15000).size();
+          // Use the total stream partition count as the partition function divisor. The upstream producer hashed each
+          // key over the full partition count, so the divisor must match that count for the per-segment partition
+          // metadata (and the partition pruning that relies on it) to be correct. fetchPartitionCount() returns that
+          // full count; computePartitionGroupMetadata().size() does not - when the table consumes only a subset of
+          // stream partitions it returns the subset size, which is wrong here.
+          // TODO: This is correct for Kafka, where partition ids are a stable contiguous range. It does not make
+          //   partitioning work for Kinesis, where shards split/merge and ids are not a contiguous 0..N range -
+          //   fetchPartitionCount() returns the total shard count there. Fix this before opening support for
+          //   partitioning in Kinesis.
+          int numStreamPartitions = _partitionMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs=*/10_000);
 
-          if (numPartitionGroups != numPartitions) {
-            _segmentLogger.info(
+          if (numStreamPartitions != numPartitions) {
+            _segmentLogger.warn(
                 "Number of stream partitions: {} does not match number of partitions in the partition config: {}, "
-                    + "using number of stream " + "partitions", numPartitionGroups, numPartitions);
-            numPartitions = numPartitionGroups;
+                    + "using number of stream " + "partitions", numStreamPartitions, numPartitions);
+            numPartitions = numStreamPartitions;
           }
         } catch (Exception e) {
-          _segmentLogger.warn("Failed to get number of stream partitions in 5s, "
+          _segmentLogger.error("Failed to get number of stream partitions in 10s, "
               + "using number of partitions in the partition config: {}", numPartitions, e);
           createPartitionMetadataProvider("Timeout getting number of stream partitions");
         }
@@ -2055,9 +2141,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /**
-   * Creates a new stream consumer
-   */
+  /// Creates a new stream consumer
   private void makeStreamConsumer(String reason) {
     if (_partitionGroupConsumer != null) {
       closePartitionGroupConsumer();
@@ -2075,10 +2159,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /**
-   * Checkpoints existing consumer before creating a new consumer instance
-   * Assumes there is a valid instance of {@link PartitionGroupConsumer}
-   */
+  /// Checkpoints existing consumer before creating a new consumer instance
+  /// Assumes there is a valid instance of [PartitionGroupConsumer]
   private void recreateStreamConsumer(String reason) {
     _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
     _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
@@ -2096,9 +2178,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /**
-   * Creates a new stream metadata provider
-   */
+  /// Creates a new stream metadata provider
   private void createPartitionMetadataProvider(String reason) {
     closePartitionMetadataProvider();
     _segmentLogger.info("Creating new partition metadata provider, reason: {}", reason);
@@ -2117,10 +2197,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /**
-   * Sets ingestion delay to zero in situations where we are caught up processing events.
-   * TODO: Revisit if we should preserve the offset info.
-   */
+  /// Sets ingestion delay to zero in situations where we are caught up processing events.
+  /// TODO: Revisit if we should preserve the offset info.
   private void setIngestionDelayToZero() {
     long currentTimeMs = System.currentTimeMillis();
     _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId, currentTimeMs, currentTimeMs,
@@ -2161,12 +2239,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /**
-   * Creates a {@link StreamMessageDecoder} using properties in {@link StreamConfig}.
-   *
-   * @param fieldsToRead The fields to read from the source stream
-   * @return The initialized StreamMessageDecoder
-   */
+  /// Creates a [StreamMessageDecoder] using properties in [StreamConfig].
+  ///
+  /// @param fieldsToRead The fields to read from the source stream
+  /// @return The initialized StreamMessageDecoder
   private StreamMessageDecoder createMessageDecoder(Set<String> fieldsToRead) {
     String decoderClass = _streamConfig.getDecoderClass();
     try {
@@ -2198,13 +2274,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return _consumerSemaphoreAcquired;
   }
 
-  /**
-   * Parses the stopOnDecodeError configuration with proper validation and type safety.
-   * Implements the suggested improvement from code review to add input validation.
-   *
-   * @param streamConfig The stream configuration to parse
-   * @return true if stopOnDecodeError is enabled, false otherwise
-   */
+  /// Parses the stopOnDecodeError configuration with proper validation and type safety.
+  /// Implements the suggested improvement from code review to add input validation.
+  ///
+  /// @param streamConfig The stream configuration to parse
+  /// @return true if stopOnDecodeError is enabled, false otherwise
   private boolean parseStopOnDecodeErrorConfig(StreamConfig streamConfig) {
     String stopOnDecodeErrorConfig = streamConfig.getStreamConfigsMap().get(STOP_ON_DECODE_ERROR_CONFIG);
     boolean stopOnDecodeError;

@@ -23,11 +23,11 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -386,10 +386,10 @@ public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodChec
       assertEquals(sfd.getColumnsWithIndex(StandardIndexes.forward()),
           new HashSet<>(Arrays.asList("col1", "col3")));
       assertEquals(sfd.getColumnsWithIndex(StandardIndexes.dictionary()),
-          new HashSet<>(Collections.singletonList("col2")));
+          new HashSet<>(List.of("col2")));
       assertEquals(sfd.getColumnsWithIndex(StandardIndexes.inverted()),
-          new HashSet<>(Collections.singletonList("col4")));
-      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.h3()), new HashSet<>(Collections.singletonList("col5")));
+          new HashSet<>(List.of("col4")));
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.h3()), new HashSet<>(List.of("col5")));
       assertEquals(sfd.getColumnsWithIndex(StandardIndexes.text()), new HashSet<>(Arrays.asList("foo", "bar")));
 
       sfd.removeIndex("col1", StandardIndexes.forward());
@@ -399,13 +399,13 @@ public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodChec
       sfd.removeIndex("col111", StandardIndexes.dictionary());
 
       assertEquals(sfd.getColumnsWithIndex(StandardIndexes.forward()),
-          new HashSet<>(Collections.singletonList("col3")));
-      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.dictionary()), new HashSet<>(Collections.emptySet()));
+          new HashSet<>(List.of("col3")));
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.dictionary()), new HashSet<>(Set.of()));
       assertEquals(sfd.getColumnsWithIndex(StandardIndexes.inverted()),
-          new HashSet<>(Collections.singletonList("col4")));
-      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.h3()), new HashSet<>(Collections.emptySet()));
+          new HashSet<>(List.of("col4")));
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.h3()), new HashSet<>(Set.of()));
       assertEquals(sfd.getColumnsWithIndex(StandardIndexes.text()),
-          new HashSet<>(Collections.singletonList("bar")));
+          new HashSet<>(List.of("bar")));
     }
   }
 }

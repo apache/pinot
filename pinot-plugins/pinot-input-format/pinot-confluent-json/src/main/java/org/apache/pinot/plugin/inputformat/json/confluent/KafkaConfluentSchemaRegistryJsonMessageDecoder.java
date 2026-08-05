@@ -28,8 +28,8 @@ import io.confluent.kafka.schemaregistry.json.JsonSchemaProvider;
 import io.confluent.kafka.serializers.json.KafkaJsonSchemaDeserializer;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -63,17 +63,13 @@ public class KafkaConfluentSchemaRegistryJsonMessageDecoder implements StreamMes
   @Nullable
   private final Consumer<Map<String, Object>> _onMessage;
 
-  /**
-   * Creates a new instance of this decoder. This constructor with no argument is usually called by reflection
-   */
+  /// Creates a new instance of this decoder. This constructor with no argument is usually called by reflection
   public KafkaConfluentSchemaRegistryJsonMessageDecoder() {
     _onMessage = null;
   }
 
-  /**
-   * Creates a new instance of this decoder. This constructor with a Consumer argument is used by test to be able to
-   * analyze the received message.
-   */
+  /// Creates a new instance of this decoder. This constructor with a Consumer argument is used by test to be able to
+  /// analyze the received message.
   @VisibleForTesting
   KafkaConfluentSchemaRegistryJsonMessageDecoder(@Nullable Consumer<Map<String, Object>> onMessage) {
     _onMessage = onMessage;
@@ -119,7 +115,7 @@ public class KafkaConfluentSchemaRegistryJsonMessageDecoder implements StreamMes
             props.getOrDefault(CACHED_SCHEMA_MAP_CAPACITY, DEFAULT_CACHED_SCHEMA_MAP_CAPACITY));
     SchemaRegistryClient schemaRegistryClient =
         new CachedSchemaRegistryClient(createRestService(schemaRegistryUrl, props), identityMapCapacity,
-                Collections.singletonList(jsonSchemaProvider), props, null);
+                List.of(jsonSchemaProvider), props, null);
 
     _deserializer = new KafkaJsonSchemaDeserializer(schemaRegistryClient);
     Preconditions.checkNotNull(topicName, "Topic must be provided");
@@ -150,12 +146,10 @@ public class KafkaConfluentSchemaRegistryJsonMessageDecoder implements StreamMes
     return decode(payload, destination);
   }
 
-  /**
-   * This method handles specific serialisation exceptions. If the exception cannot be ignored the method
-   * re-throws the exception.
-   *
-   * @param e exception to handle
-   */
+  /// This method handles specific serialisation exceptions. If the exception cannot be ignored the method
+  /// re-throws the exception.
+  ///
+  /// @param e exception to handle
   private void ignoreOrRethrowException(RuntimeException e) {
     if (isUnknownMagicByte(e) || isUnknownMagicByte(e.getCause())) {
       // Do nothing, the message is not an JSON message and can't be decoded

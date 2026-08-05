@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator;
 
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
@@ -27,11 +26,10 @@ import org.roaringbitmap.ImmutableBitmapDataProvider;
 import org.roaringbitmap.IntIterator;
 
 
-/**
- * The <code>BitmapDocIdSetOperator</code> takes a bitmap of document ids and returns blocks of document ids.
- * <p>Should call {@link #nextBlock()} multiple times until it returns <code>null</code> (already exhausts all the
- * documents) or already gathered enough documents (for selection queries).
- */
+/// The `BitmapDocIdSetOperator` takes a bitmap of document ids and returns blocks of document ids.
+///
+/// Should call [#nextBlock()] multiple times until it returns `null` (already exhausts all the
+/// documents) or already gathered enough documents (for selection queries).
 public class BitmapDocIdSetOperator extends BaseDocIdSetOperator {
   private static final String EXPLAIN_NAME = "DOC_ID_SET_BITMAP";
 
@@ -102,7 +100,7 @@ public class BitmapDocIdSetOperator extends BaseDocIdSetOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override

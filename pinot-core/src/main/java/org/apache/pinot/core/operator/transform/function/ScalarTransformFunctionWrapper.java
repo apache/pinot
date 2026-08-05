@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionUtils;
@@ -35,11 +36,10 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.PinotDataType;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
-/**
- * Wrapper transform function on the annotated scalar function.
- */
+/// Wrapper transform function on the annotated scalar function.
 public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   private final String _name;
   private final QueryFunctionInvoker _functionInvoker;
@@ -103,7 +103,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
             break;
           case INT:
             _scalarArguments[i] =
-                parameterTypes[i].convert(literalTransformFunction.getIntLiteral(), PinotDataType.INTEGER);
+                parameterTypes[i].convert(literalTransformFunction.getIntLiteral(), PinotDataType.INT);
             break;
           case LONG:
             _scalarArguments[i] =
@@ -374,16 +374,14 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     return _stringValuesMV;
   }
 
-  /**
-   * Helper method to fetch values for the non-literal transform functions based on the parameter types.
-   */
+  /// Helper method to fetch values for the non-literal transform functions based on the parameter types.
   private void getNonLiteralValues(ValueBlock valueBlock) {
     PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
     for (int i = 0; i < _numNonLiteralArguments; i++) {
       PinotDataType parameterType = parameterTypes[_nonLiteralIndices[i]];
       TransformFunction transformFunction = _nonLiteralFunctions[i];
       switch (parameterType) {
-        case INTEGER:
+        case INT:
           _nonLiteralValues[i] = ArrayUtils.toObject(transformFunction.transformToIntValuesSV(valueBlock));
           break;
         case LONG:
@@ -424,6 +422,16 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         case BYTES:
           _nonLiteralValues[i] = transformFunction.transformToBytesValuesSV(valueBlock);
           break;
+        case UUID: {
+          byte[][] bytesValues = transformFunction.transformToBytesValuesSV(valueBlock);
+          int numValues = bytesValues.length;
+          UUID[] uuidValues = new UUID[numValues];
+          for (int j = 0; j < numValues; j++) {
+            uuidValues[j] = UuidUtils.toUUID(bytesValues[j]);
+          }
+          _nonLiteralValues[i] = uuidValues;
+          break;
+        }
         case PRIMITIVE_INT_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToIntValuesMV(valueBlock);
           break;

@@ -109,7 +109,7 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
   }
 
   /* NOTE: This test cases is inactive since {@link JsonStatementOptimizer} is currently disabled. */
-  /** Test that a json path expression in GROUP BY clause is properly converted into a JSON_EXTRACT_SCALAR function. */
+  /// Test that a json path expression in GROUP BY clause is properly converted into a JSON_EXTRACT_SCALAR function.
   @Test(dataProvider = "nativeJsonColumns", enabled = false)
   public void testJsonGroupBy(String column) {
     Object[][] expecteds1 =
@@ -121,7 +121,7 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
   }
 
   /* NOTE: This test cases is inactive since {@link JsonStatementOptimizer} is currently disabled. */
-  /** Test that a json path expression in HAVING clause is properly converted into a JSON_EXTRACT_SCALAR function. */
+  /// Test that a json path expression in HAVING clause is properly converted into a JSON_EXTRACT_SCALAR function.
   @Test(dataProvider = "nativeJsonColumns", enabled = false)
   public void testJsonGroupByHaving(String column) {
     Object[][] expecteds1 = {{"mouse", 8L}};
@@ -132,7 +132,7 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
   }
 
   /* NOTE: This test cases is inactive since {@link JsonStatementOptimizer} is currently disabled. */
-  /** Test a complex SQL statement with json path expression in SELECT, WHERE, and GROUP BY clauses. */
+  /// Test a complex SQL statement with json path expression in SELECT, WHERE, and GROUP BY clauses.
   @Test(dataProvider = "nativeJsonColumns", enabled = false)
   public void testJsonSelectFilterGroupBy(String column) {
     Object[][] expecteds1 = {{"duck", 4L}};
@@ -143,7 +143,7 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
   }
 
   /* NOTE: This test cases is inactive since {@link JsonStatementOptimizer} is currently disabled. */
-  /** Test a numerical function over json path expression in SELECT clause. */
+  /// Test a numerical function over json path expression in SELECT clause.
   @Test(dataProvider = "nativeJsonColumns", enabled = false)
   public void testNumericalFunctionOverJsonPathSelectExpression(String column) {
 
@@ -189,6 +189,29 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
             {19, 0L} // when enableNullHandling is false, null is treated as 0 for LONG type
         }
     );
+  }
+
+  @Test(dataProvider = "allJsonColumns")
+  public void testColumnToColumnComparison(String column) {
+    // A JSON last name ("duck", "mouse", ...) is compared as a STRING against stringColumn ("daffy duck",
+    // "mickey mouse", ...). The two are never equal, so '=' matches no row and '!=' matches every row.
+    String lastName = "json_extract_scalar(" + column + ", '$.name.last', 'STRING', '')";
+    checkResult("SELECT intColumn FROM testTable WHERE " + lastName + " = stringColumn", new Object[][]{});
+    checkResult("SELECT intColumn FROM testTable WHERE " + lastName + " != stringColumn LIMIT 3",
+        new Object[][]{{1}, {2}, {3}});
+
+    // A JSON id (101, 111, 121, ... for the first rows) is compared numerically against intColumn (1, 2, 3, ...).
+    // The id is never equal to the row's intColumn, and for the leading rows it is the larger value.
+    String id = "json_extract_scalar(" + column + ", '$.id', 'INT', '0')";
+    checkResult("SELECT intColumn FROM testTable WHERE " + id + " = intColumn", new Object[][]{});
+    checkResult("SELECT intColumn FROM testTable WHERE " + id + " > intColumn LIMIT 3",
+        new Object[][]{{1}, {2}, {3}});
+
+    // Mixed numeric/string comparison: an INT column against a non-numeric STRING column. The old minus()-based
+    // rewrite coerced both operands to DOUBLE and threw NumberFormatException on the non-numeric string, failing the
+    // whole query. The type-safe rewrite evaluates per-row, treating an unparseable comparison as no-match, so the
+    // query runs and simply returns no rows instead of erroring.
+    checkResult("SELECT intColumn FROM testTable WHERE intColumn = stringColumn", new Object[][]{});
   }
 
   @Test

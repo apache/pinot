@@ -19,6 +19,7 @@
 package org.apache.pinot.client.admin;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,10 +28,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Client for instance administration operations.
- * Provides methods to create, update, delete, and manage Pinot instances.
- */
+/// Client for instance administration operations.
+/// Provides methods to create, update, delete, and manage Pinot instances.
 public class InstanceAdminClient extends BaseServiceAdminClient {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceAdminClient.class);
 
@@ -39,77 +38,66 @@ public class InstanceAdminClient extends BaseServiceAdminClient {
     super(transport, controllerAddress, headers);
   }
 
-  /**
-   * Lists all instances in the cluster.
-   *
-   * @return List of instance names
-   * @throws PinotAdminException If the request fails
-   */
+  /// Lists all instances in the cluster.
+  ///
+  /// @return List of instance names
+  /// @throws PinotAdminException If the request fails
   public List<String> listInstances()
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/instances", null, _headers);
     return _transport.parseStringArray(response, "instances");
   }
 
-  /**
-   * Lists all live instances in the cluster.
-   *
-   * @return List of live instance names
-   * @throws PinotAdminException If the request fails
-   */
+  /// Lists all live instances in the cluster.
+  ///
+  /// @return List of live instance names
+  /// @throws PinotAdminException If the request fails
   public List<String> listLiveInstances()
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/liveinstances", null, _headers);
-    return _transport.parseStringArray(response, "liveInstances");
+    /// GET /liveinstances returns an Instances wrapper serialized as {"instances": [...]}.
+    return _transport.parseStringArray(response, "instances");
   }
 
-  /**
-   * Gets information about a specific instance.
-   *
-   * @param instanceName Name of the instance
-   * @return Instance information as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets information about a specific instance.
+  ///
+  /// @param instanceName Name of the instance
+  /// @return Instance information as JSON string
+  /// @throws PinotAdminException If the request fails
   public String getInstance(String instanceName)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/instances/" + instanceName, null, _headers);
     return response.toString();
   }
 
-  /**
-   * Gets the tags for a specific instance.
-   *
-   * @param instanceName Name of the instance
-   * @return Instance tags
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets the tags for a specific instance.
+  ///
+  /// @param instanceName Name of the instance
+  /// @return Instance tags
+  /// @throws PinotAdminException If the request fails
   public List<String> getInstanceTags(String instanceName)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/instances/" + instanceName, null, _headers);
     return _transport.parseStringArraySafe(response, "tags");
   }
 
-  /**
-   * Creates a new instance.
-   *
-   * @param instanceConfig Instance configuration as JSON string
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Creates a new instance.
+  ///
+  /// @param instanceConfig Instance configuration as JSON string
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String createInstance(String instanceConfig)
       throws PinotAdminException {
     JsonNode response = _transport.executePost(_controllerAddress, "/instances", instanceConfig, null, _headers);
     return response.toString();
   }
 
-  /**
-   * Enables or disables an instance.
-   *
-   * @param instanceName Name of the instance
-   * @param enabled Whether to enable or disable the instance
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Enables or disables an instance.
+  ///
+  /// @param instanceName Name of the instance
+  /// @param enabled Whether to enable or disable the instance
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String setInstanceState(String instanceName, boolean enabled)
       throws PinotAdminException {
     JsonNode response = _transport.executePut(_controllerAddress, "/instances/" + instanceName + "/state",
@@ -117,14 +105,12 @@ public class InstanceAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Enables, disables, or drops an instance.
-   *
-   * @param instanceName Name of the instance
-   * @param state State to set (enable, disable, or drop)
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Enables, disables, or drops an instance.
+  ///
+  /// @param instanceName Name of the instance
+  /// @param state State to set (enable, disable, or drop)
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String setInstanceState(String instanceName, String state)
       throws PinotAdminException {
     JsonNode response = _transport.executePost(_controllerAddress, "/instances/" + instanceName + "/state",
@@ -132,15 +118,17 @@ public class InstanceAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Enables, disables, or drains an instance via PUT with a state query parameter.
-   * DRAIN state is only applicable to minion instances.
-   *
-   * @param instanceName Name of the instance
-   * @param state State to set (enable, disable, or drop, drain)
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Changes the operational state of an instance via PUT with a state query parameter.
+  ///
+  /// Supported states: `enable`, `disable`, `drain`, `queries_disable`, `queries_enable`.
+  /// - `DRAIN` is only applicable to minion instances.
+  /// - `QUERIES_DISABLE` / `QUERIES_ENABLE` are only applicable to server instances and control
+  ///   whether brokers route queries to the server.
+  ///
+  /// @param instanceName Name of the instance
+  /// @param state State to set (`enable`, `disable`, `drain`, `queries_disable`, `queries_enable`)
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String updateInstanceState(String instanceName, String state)
       throws PinotAdminException {
     Map<String, String> queryParams = Map.of("state", state);
@@ -149,27 +137,23 @@ public class InstanceAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Drops (deletes) an instance.
-   *
-   * @param instanceName Name of the instance to drop
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Drops (deletes) an instance.
+  ///
+  /// @param instanceName Name of the instance to drop
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String dropInstance(String instanceName)
       throws PinotAdminException {
     JsonNode response = _transport.executeDelete(_controllerAddress, "/instances/" + instanceName, null, _headers);
     return response.toString();
   }
 
-  /**
-   * Updates an existing instance.
-   *
-   * @param instanceName Name of the instance to update
-   * @param instanceConfig New instance configuration as JSON string
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Updates an existing instance.
+  ///
+  /// @param instanceName Name of the instance to update
+  /// @param instanceConfig New instance configuration as JSON string
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String updateInstance(String instanceName, String instanceConfig)
       throws PinotAdminException {
     JsonNode response = _transport.executePut(_controllerAddress, "/instances/" + instanceName, instanceConfig,
@@ -177,14 +161,12 @@ public class InstanceAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Updates the tags of a specific instance.
-   *
-   * @param instanceName Name of the instance
-   * @param tags Tags to set, as a comma-separated string
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Updates the tags of a specific instance.
+  ///
+  /// @param instanceName Name of the instance
+  /// @param tags Tags to set, as a comma-separated string
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String updateInstanceTags(String instanceName, String tags)
       throws PinotAdminException {
     Map<String, String> queryParams = Map.of("tags", tags);
@@ -193,9 +175,7 @@ public class InstanceAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Updates the tags of a specific instance.
-   */
+  /// Updates the tags of a specific instance.
   public String updateInstanceTags(String instanceName, List<String> tags, boolean updateBrokerResource)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
@@ -212,13 +192,11 @@ public class InstanceAdminClient extends BaseServiceAdminClient {
     return updateInstanceTags(instanceName, tags, false);
   }
 
-  /**
-   * Updates the tables served by a broker instance in the broker resource.
-   *
-   * @param instanceName Name of the broker instance
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Updates the tables served by a broker instance in the broker resource.
+  ///
+  /// @param instanceName Name of the broker instance
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String updateBrokerResource(String instanceName)
       throws PinotAdminException {
     JsonNode response =
@@ -227,13 +205,11 @@ public class InstanceAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Validates whether it's safe to drop the given instances.
-   *
-   * @param instanceNames Comma-separated list of instance names to validate
-   * @return Validation response as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Validates whether it's safe to drop the given instances.
+  ///
+  /// @param instanceNames Comma-separated list of instance names to validate
+  /// @return Validation response as JSON string
+  /// @throws PinotAdminException If the request fails
   public String validateDropInstances(String instanceNames)
       throws PinotAdminException {
     Map<String, String> queryParams = Map.of("instanceNames", instanceNames);
@@ -243,32 +219,47 @@ public class InstanceAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Validates whether it's safe to update the tags of the given instances.
-   *
-   * @param instanceNames Comma-separated list of instance names to validate
-   * @param newTags New tags to assign
-   * @return Validation response as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Validates whether it's safe to update the tags of the given instances.
+  ///
+  /// The controller endpoint reads a `List<InstanceTagUpdateRequest>` from the request body (not query
+  /// params). This method builds one request per instance name, all sharing the given tags. Use
+  /// [#validateInstanceTagUpdates(String)] when you need to supply per-instance tags.
+  ///
+  /// @param instanceNames Comma-separated list of instance names to validate
+  /// @param newTags Comma-separated list of tags to assign to every listed instance
+  /// @return Validation response as JSON string
+  /// @throws PinotAdminException If the request fails
   public String validateUpdateInstanceTags(String instanceNames, String newTags)
       throws PinotAdminException {
-    Map<String, String> queryParams = new HashMap<>();
-    queryParams.put("instanceNames", instanceNames);
-    queryParams.put("newTags", newTags);
+    List<String> tags = new ArrayList<>();
+    for (String tag : newTags.split(",")) {
+      String trimmedTag = tag.trim();
+      if (!trimmedTag.isEmpty()) {
+        tags.add(trimmedTag);
+      }
+    }
+    List<Map<String, Object>> requestBody = new ArrayList<>();
+    for (String instanceName : instanceNames.split(",")) {
+      String trimmedName = instanceName.trim();
+      if (trimmedName.isEmpty()) {
+        continue;
+      }
+      Map<String, Object> request = new HashMap<>();
+      request.put("instanceName", trimmedName);
+      request.put("newTags", tags);
+      requestBody.add(request);
+    }
 
     JsonNode response = _transport.executePost(_controllerAddress, "/instances/updateTags/validate",
-        null, queryParams, _headers);
+        requestBody, null, _headers);
     return response.toString();
   }
 
-  /**
-   * Validates whether it's safe to update the tags of the given instances using a request payload.
-   *
-   * @param requestBody Validation request body
-   * @return Validation response as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Validates whether it's safe to update the tags of the given instances using a request payload.
+  ///
+  /// @param requestBody Validation request body
+  /// @return Validation response as JSON string
+  /// @throws PinotAdminException If the request fails
   public String validateInstanceTagUpdates(String requestBody)
       throws PinotAdminException {
     JsonNode response =
@@ -278,33 +269,25 @@ public class InstanceAdminClient extends BaseServiceAdminClient {
 
   // Async versions of key methods
 
-  /**
-   * Lists all instances in the cluster (async).
-   */
+  /// Lists all instances in the cluster (async).
   public CompletableFuture<List<String>> listInstancesAsync() {
     return _transport.executeGetAsync(_controllerAddress, "/instances", null, _headers)
         .thenApply(response -> _transport.parseStringArraySafe(response, "instances"));
   }
 
-  /**
-   * Gets information about a specific instance (async).
-   */
+  /// Gets information about a specific instance (async).
   public CompletableFuture<String> getInstanceAsync(String instanceName) {
     return _transport.executeGetAsync(_controllerAddress, "/instances/" + instanceName, null, _headers)
         .thenApply(JsonNode::toString);
   }
 
-  /**
-   * Creates a new instance (async).
-   */
+  /// Creates a new instance (async).
   public CompletableFuture<String> createInstanceAsync(String instanceConfig) {
     return _transport.executePostAsync(_controllerAddress, "/instances", instanceConfig, null, _headers)
         .thenApply(JsonNode::toString);
   }
 
-  /**
-   * Enables or disables an instance (async).
-   */
+  /// Enables or disables an instance (async).
   public CompletableFuture<String> setInstanceStateAsync(String instanceName, boolean enabled) {
     return _transport.executePutAsync(_controllerAddress, "/instances/" + instanceName + "/state",
             enabled ? "enable" : "disable", null, _headers)

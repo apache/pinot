@@ -43,9 +43,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Record reader for CSV file.
- */
+/// Record reader for CSV file.
 @NotThreadSafe
 public class CSVRecordReader implements RecordReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(CSVRecordReader.class);

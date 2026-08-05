@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -27,10 +26,8 @@ import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-/**
- * The <code>EmptyAggregationOperator</code> provides a way to short circuit aggregation only queries (no group by)
- * with a LIMIT of zero.
- */
+/// The `EmptyAggregationOperator` provides a way to short circuit aggregation only queries (no group by)
+/// with a LIMIT of zero.
 public class EmptyAggregationOperator extends BaseOperator<AggregationResultsBlock> {
 
   private static final String EXPLAIN_NAME = "AGGREGATE_EMPTY";
@@ -44,12 +41,12 @@ public class EmptyAggregationOperator extends BaseOperator<AggregationResultsBlo
 
   @Override
   protected AggregationResultsBlock getNextBlock() {
-    return new AggregationResultsBlock(_queryContext.getAggregationFunctions(), Collections.emptyList(), _queryContext);
+    return new AggregationResultsBlock(_queryContext.getAggregationFunctions(), List.of(), _queryContext);
   }
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override

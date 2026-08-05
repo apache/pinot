@@ -329,9 +329,7 @@ public class LLCSegmentCompletionHandlers {
     return _segmentCompletionManager.reduceSegmentSizeAndReset(requestParams).toJsonString();
   }
 
-  /**
-   * Extracts the segment file from the form into a local temporary file under file upload temporary directory.
-   */
+  /// Extracts the segment file from the form into a local temporary file under file upload temporary directory.
   private static File extractSegmentFromFormToLocalTempFile(FormDataMultiPart form, String segmentName)
       throws IOException {
     try {
@@ -356,10 +354,8 @@ public class LLCSegmentCompletionHandlers {
     }
   }
 
-  /**
-   * Extracts the segment metadata from the local segment file. Use the untarred file temporary directory to store the
-   * metadata files temporarily.
-   */
+  /// Extracts the segment metadata from the local segment file. Use the untarred file temporary directory to store the
+  /// metadata files temporarily.
   private static SegmentMetadataImpl extractMetadataFromLocalSegmentFile(File segmentFile)
       throws Exception {
     File tempIndexDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(
@@ -384,10 +380,8 @@ public class LLCSegmentCompletionHandlers {
     }
   }
 
-  /**
-   * Extracts the segment metadata from the form. Use the untarred file temporary directory to store the metadata files
-   * temporarily.
-   */
+  /// Extracts the segment metadata from the form. Use the untarred file temporary directory to store the metadata files
+  /// temporarily.
   private static SegmentMetadataImpl extractSegmentMetadataFromForm(FormDataMultiPart form, String segmentName)
       throws IOException, ConfigurationException {
     File tempIndexDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(
@@ -410,9 +404,7 @@ public class LLCSegmentCompletionHandlers {
     }
   }
 
-  /**
-   * Extracts a file from the form into the given directory.
-   */
+  /// Extracts a file from the form into the given directory.
   private static void extractFileFromForm(FormDataMultiPart form, String fileName, File outputDir)
       throws IOException {
     FormDataBodyPart bodyPart = form.getField(fileName);

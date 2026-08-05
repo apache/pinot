@@ -27,9 +27,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-/**
- * Test serialization and deserialization.
- */
+/// Test serialization and deserialization.
 public class GroovyStaticAnalyzerConfigTest {
   @Test
   public void testEmptyConfig()

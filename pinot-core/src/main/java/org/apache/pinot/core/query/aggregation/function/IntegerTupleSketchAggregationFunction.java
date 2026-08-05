@@ -19,14 +19,13 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
+import java.lang.foreign.MemorySegment;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.datasketches.memory.Memory;
-import org.apache.datasketches.tuple.Sketch;
-import org.apache.datasketches.tuple.Sketches;
+import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
@@ -46,62 +45,55 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * The {@code IntegerTupleSketchAggregationFunction} is the base class for all integer-based Tuple Sketch aggregations.
- * Apache Datasketches Tuple Sketches are an extension of the Apache Datasketches Theta Sketch. Tuple sketches store an
- * additional summary value with each retained entry which makes the sketch ideal for summarizing attributes
- * such as impressions or clicks.
- *
- * Tuple sketches are interoperable with the Theta Sketch and enable set operations over a stream of data, and can
- * also be used for cardinality estimation.
- *
- * Note: The current implementation of this aggregation function is limited to binary columns that contain sketches
- * built outside of Pinot.
- *
- * Usage examples:
- * <ul>
- *   <li>
- *     Simple union (1 or 2 arguments): main expression to aggregate on, followed by an optional Tuple sketch size
- *     argument. The second argument is the sketch lgK – the given log_base2 of k, and defaults to 16.
- *     The "raw" equivalents return serialised sketches in base64-encoded strings.
- *     <p>DISTINCT_COUNT_TUPLE_SKETCH(col)</p>
- *     <p>DISTINCT_COUNT_TUPLE_SKETCH(col, 12)</p>
- *     <p>DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col)</p>
- *     <p>DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col, 12)</p>
- *   <li>
- *     Extracting a cardinality estimate from a CPC sketch:
- *     <p>GET_INT_TUPLE_SKETCH_ESTIMATE(sketch_bytes)</p>
- *     <p>GET_INT_TUPLE_SKETCH_ESTIMATE(DISTINCT_COUNT_RAW_TUPLE_SKETCH(col))</p>
- *   </li>
- *   <li>
- *     Union between two sketches summaries are merged using addition for hash keys in common:
- *     <p>
- *       INT_SUM_TUPLE_SKETCH_UNION(
- *         DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col1),
- *         DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col2)
- *       )
- *     </p>
- *   </li>
- *   <li>
- *     Union between two sketches summaries are merged using maximum for hash keys in common:
- *     <p>
- *       INT_MAX_TUPLE_SKETCH_UNION(
- *         DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col1),
- *         DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col2)
- *       )
- *     </p>
- *   </li>
- *   <li>
- *     Union between two sketches summaries are merged using minimum for hash keys in common:
- *     <p>
- *       INT_MIN_TUPLE_SKETCH_UNION(
- *         DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col1),
- *         DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col2)
- *       )
- *     </p>
- *  </li>
- * </ul>
- */
+/// The `IntegerTupleSketchAggregationFunction` is the base class for all integer-based Tuple Sketch aggregations.
+/// Apache Datasketches Tuple Sketches are an extension of the Apache Datasketches Theta Sketch. Tuple sketches store an
+/// additional summary value with each retained entry which makes the sketch ideal for summarizing attributes
+/// such as impressions or clicks.
+///
+/// Tuple sketches are interoperable with the Theta Sketch and enable set operations over a stream of data, and can
+/// also be used for cardinality estimation.
+///
+/// Note: The current implementation of this aggregation function is limited to binary columns that contain sketches
+/// built outside of Pinot.
+///
+/// Usage examples:
+///
+/// - Simple union (1 or 2 arguments): main expression to aggregate on, followed by an optional Tuple sketch size
+///   argument. The second argument is the sketch lgK – the given log_base2 of k, and defaults to 16.
+///   The "raw" equivalents return serialised sketches in base64-encoded strings.
+///
+///   DISTINCT_COUNT_TUPLE_SKETCH(col)
+///
+///   DISTINCT_COUNT_TUPLE_SKETCH(col, 12)
+///
+///   DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col)
+///
+///   DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col, 12)
+/// - Extracting a cardinality estimate from a CPC sketch:
+///
+///   GET_INT_TUPLE_SKETCH_ESTIMATE(sketch_bytes)
+///
+///   GET_INT_TUPLE_SKETCH_ESTIMATE(DISTINCT_COUNT_RAW_TUPLE_SKETCH(col))
+/// - Union between two sketches summaries are merged using addition for hash keys in common:
+///
+///     INT_SUM_TUPLE_SKETCH_UNION(
+///      DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col1),
+///      DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col2)
+///     )
+///
+/// - Union between two sketches summaries are merged using maximum for hash keys in common:
+///
+///     INT_MAX_TUPLE_SKETCH_UNION(
+///      DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col1),
+///      DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col2)
+///     )
+///
+/// - Union between two sketches summaries are merged using minimum for hash keys in common:
+///
+///     INT_MIN_TUPLE_SKETCH_UNION(
+///      DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col1),
+///      DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col2)
+///     )
 @SuppressWarnings({"rawtypes"})
 public class IntegerTupleSketchAggregationFunction
     extends BaseSingleInputAggregationFunction<TupleIntSketchAccumulator, Comparable> {
@@ -165,8 +157,8 @@ public class IntegerTupleSketchAggregationFunction
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         TupleIntSketchAccumulator tupleIntSketchAccumulator = getAccumulator(aggregationResultHolder);
-        Sketch<IntegerSummary>[] sketches = deserializeSketches(bytesValues, length);
-        for (Sketch<IntegerSummary> sketch : sketches) {
+        TupleSketch<IntegerSummary>[] sketches = deserializeSketches(bytesValues, length);
+        for (TupleSketch<IntegerSummary> sketch : sketches) {
           tupleIntSketchAccumulator.apply(sketch);
         }
       } catch (Exception e) {
@@ -189,10 +181,10 @@ public class IntegerTupleSketchAggregationFunction
     if (storedType == FieldSpec.DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
-        Sketch<IntegerSummary>[] sketches = deserializeSketches(bytesValues, length);
+        TupleSketch<IntegerSummary>[] sketches = deserializeSketches(bytesValues, length);
         for (int i = 0; i < length; i++) {
           TupleIntSketchAccumulator tupleIntSketchAccumulator = getAccumulator(groupByResultHolder, groupKeyArray[i]);
-          Sketch<IntegerSummary> sketch = sketches[i];
+          TupleSketch<IntegerSummary> sketch = sketches[i];
           tupleIntSketchAccumulator.apply(sketch);
         }
       } catch (Exception e) {
@@ -216,7 +208,7 @@ public class IntegerTupleSketchAggregationFunction
     if (singleValue && storedType == FieldSpec.DataType.BYTES) {
       byte[][] bytesValues = blockValSetMap.get(_expression).getBytesValuesSV();
       try {
-        Sketch<IntegerSummary>[] sketches = deserializeSketches(bytesValues, length);
+        TupleSketch<IntegerSummary>[] sketches = deserializeSketches(bytesValues, length);
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
             getAccumulator(groupByResultHolder, groupKey).apply(sketches[i]);
@@ -314,9 +306,7 @@ public class IntegerTupleSketchAggregationFunction
     return _nominalEntries <= starTreeNominalEntries;
   }
 
-  /**
-   * Returns the accumulator from the result holder or creates a new one if it does not exist.
-   */
+  /// Returns the accumulator from the result holder or creates a new one if it does not exist.
   private TupleIntSketchAccumulator getAccumulator(AggregationResultHolder aggregationResultHolder) {
     TupleIntSketchAccumulator accumulator = aggregationResultHolder.getResult();
     if (accumulator == null) {
@@ -326,9 +316,7 @@ public class IntegerTupleSketchAggregationFunction
     return accumulator;
   }
 
-  /**
-   * Returns the accumulator for the given group key or creates a new one if it does not exist.
-   */
+  /// Returns the accumulator for the given group key or creates a new one if it does not exist.
   private TupleIntSketchAccumulator getAccumulator(GroupByResultHolder groupByResultHolder, int groupKey) {
     TupleIntSketchAccumulator accumulator = groupByResultHolder.getResult(groupKey);
     if (accumulator == null) {
@@ -338,22 +326,19 @@ public class IntegerTupleSketchAggregationFunction
     return accumulator;
   }
 
-  /**
-   * Deserializes the sketches from the bytes.
-   */
+  /// Deserializes the sketches from the bytes.
   @SuppressWarnings({"unchecked"})
-  private Sketch<IntegerSummary>[] deserializeSketches(byte[][] serializedSketches, int length) {
-    Sketch<IntegerSummary>[] sketches = new Sketch[length];
+  private TupleSketch<IntegerSummary>[] deserializeSketches(byte[][] serializedSketches, int length) {
+    TupleSketch<IntegerSummary>[] sketches = new TupleSketch[length];
     for (int i = 0; i < length; i++) {
-      sketches[i] = Sketches.heapifySketch(Memory.wrap(serializedSketches[i]), new IntegerSummaryDeserializer());
+      sketches[i] =
+          TupleSketch.heapifySketch(MemorySegment.ofArray(serializedSketches[i]), new IntegerSummaryDeserializer());
     }
     return sketches;
   }
 
-  /**
-   * Helper class to wrap the tuple-sketch parameters.  The initial values for the parameters are set to the
-   * same defaults in the Apache Datasketches library.
-   */
+  /// Helper class to wrap the tuple-sketch parameters.  The initial values for the parameters are set to the
+  /// same defaults in the Apache Datasketches library.
   private static class Parameters {
     private static final char PARAMETER_DELIMITER = ';';
     private static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';

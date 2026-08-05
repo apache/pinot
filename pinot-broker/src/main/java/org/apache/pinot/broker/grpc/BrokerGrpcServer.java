@@ -156,9 +156,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
     LOGGER.info("Initialized BrokerGrpcServer on port: {}", portToUse);
   }
 
-  /**
-   * Registers buffer metrics for the given allocator.
-   */
+  /// Registers buffer metrics for the given allocator.
   private void registerBufferMetrics(PooledByteBufAllocator bufAllocator, BrokerMetrics brokerMetrics) {
     PooledByteBufAllocatorMetric metric = bufAllocator.metric();
     brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.GRPC_NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
@@ -245,6 +243,20 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.GRPC_BYTES_SENT, errorBlock.getSerializedSize());
       responseObserver.onCompleted();
       return;
+    }
+
+    /// The MV minion executor sets this request-metadata flag to force-disable materialized-view
+    /// rewrite for its materialization query. Apply it as an override AFTER parsing so it cannot be
+    /// defeated by an `enableMaterializedViewRewrite` option present in the (user-authored) query
+    /// text: the parser keeps the last value for a duplicated SET, and SQL options otherwise outrank
+    /// request options. The materialization query reads the base table and must never be rewritten
+    /// back onto an MV (its own or a sibling). Safe to force from request metadata — disabling MV
+    /// rewrite only forgoes an optimization and never changes results.
+    String mvRewriteOverride =
+        metadataMap.get(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_MATERIALIZED_VIEW_REWRITE);
+    if (mvRewriteOverride != null) {
+      sqlNodeAndOptions.getOptions()
+          .put(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_MATERIALIZED_VIEW_REWRITE, mvRewriteOverride);
     }
 
     RequesterIdentity requesterIdentify = GrpcRequesterIdentity.fromRequest(request);

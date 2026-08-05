@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -58,18 +57,16 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit test for GroupBy Trim functionalities.
- * - Builds a segment with random data.
- * - Uses AggregationGroupByOrderByPlanNode class to construct an AggregationGroupByOrderByOperator
- * - Perform aggregationGroupBy and OrderBy on the data
- * - Also computes those results itself.
- * - Asserts that the aggregation results returned by the class are the same as
- *   returned by the local computations.
- *
- * Currently tests 'max' functions, and can be easily extended to
- * test other conditions such as GroupBy without OrderBy
- */
+/// Unit test for GroupBy Trim functionalities.
+/// - Builds a segment with random data.
+/// - Uses AggregationGroupByOrderByPlanNode class to construct an AggregationGroupByOrderByOperator
+/// - Perform aggregationGroupBy and OrderBy on the data
+/// - Also computes those results itself.
+/// - Asserts that the aggregation results returned by the class are the same as
+///   returned by the local computations.
+///
+/// Currently tests 'max' functions, and can be easily extended to
+/// test other conditions such as GroupBy without OrderBy
 public class GroupByTrimTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "GroupByTrimTest");
   private static final String SEGMENT_NAME = "testSegment";
@@ -83,13 +80,11 @@ public class GroupByTrimTest {
   private double[][] _inputData;
   private Map<Double, Double> _resultMap;
 
-  /**
-   * Initializations prior to the test:
-   * - Build a segment with metric columns (that will be aggregated and grouped) containing
-   *  randomly generated data.
-   *
-   * @throws Exception
-   */
+  /// Initializations prior to the test:
+  /// - Build a segment with metric columns (that will be aggregated and grouped) containing
+  ///  randomly generated data.
+  ///
+  /// @throws Exception
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -108,9 +103,7 @@ public class GroupByTrimTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  /**
-   * Test the GroupBy OrderBy query and compute the expected results to match
-   */
+  /// Test the GroupBy OrderBy query and compute the expected results to match
   @Test(dataProvider = "groupByTrimTestDataProvider")
   void testGroupByTrim(QueryContext queryContext, int minSegmentGroupTrimSize, int minServerGroupTrimSize,
       List<Pair<Double, Double>> expectedResult)
@@ -123,7 +116,7 @@ public class GroupByTrimTest {
     Operator<GroupByResultsBlock> groupByOperator =
         new GroupByPlanNode(new SegmentContext(_indexSegment), queryContext).run();
     GroupByCombineOperator combineOperator =
-        new GroupByCombineOperator(Collections.singletonList(groupByOperator), queryContext, _executorService);
+        new GroupByCombineOperator(List.of(groupByOperator), queryContext, _executorService);
 
     // Execute the query
     GroupByResultsBlock resultsBlock = (GroupByResultsBlock) combineOperator.nextBlock();
@@ -134,14 +127,12 @@ public class GroupByTrimTest {
     Assert.assertEquals(extractedResult, expectedResult);
   }
 
-  /**
-   * Helper method to setup the index segment on which to perform aggregation tests.
-   * - Generates a segment with {@link #NUM_COLUMNS} and {@link #NUM_ROWS}
-   * - Random 'double' data filled in the metric columns. The data is also populated
-   *   into the _inputData[], so it can be used to test the results.
-   *
-   * @throws Exception
-   */
+  /// Helper method to setup the index segment on which to perform aggregation tests.
+  /// - Generates a segment with [#NUM_COLUMNS] and [#NUM_ROWS]
+  /// - Random 'double' data filled in the metric columns. The data is also populated
+  ///   into the \_inputData\[\], so it can be used to test the results.
+  ///
+  /// @throws Exception
   private void setupSegment()
       throws Exception {
     // Segment Config
@@ -175,11 +166,9 @@ public class GroupByTrimTest {
     _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, driver.getSegmentName()), ReadMode.heap);
   }
 
-  /**
-   * Helper method to build schema for the segment on which aggregation tests will be run.
-   *
-   * @return table schema
-   */
+  /// Helper method to build schema for the segment on which aggregation tests will be run.
+  ///
+  /// @return table schema
   private Schema buildSchema() {
     Schema schema = new Schema();
 
@@ -192,10 +181,7 @@ public class GroupByTrimTest {
     return schema;
   }
 
-  /**
-   * Helper method to compute the aggregation result grouped by the key
-   *
-   */
+  /// Helper method to compute the aggregation result grouped by the key
   private void computeMaxResult(double key, double value) {
     Double currentValue = _resultMap.get(key);
     if (currentValue == null || currentValue < value) {
@@ -203,11 +189,9 @@ public class GroupByTrimTest {
     }
   }
 
-  /**
-   * Helper method to extract the result from IntermediateResultsBlock
-   *
-   * @return A list of expected results
-   */
+  /// Helper method to extract the result from IntermediateResultsBlock
+  ///
+  /// @return A list of expected results
   private List<Pair<Double, Double>> extractTestResult(Table table) {
     int numRows = table.size();
     List<Pair<Double, Double>> result = new ArrayList<>(numRows);
@@ -252,11 +236,9 @@ public class GroupByTrimTest {
     return data.toArray(new Object[data.size()][]);
   }
 
-  /**
-   * Helper method to compute the expected result
-   *
-   * @return A list of expected results
-   */
+  /// Helper method to compute the expected result
+  ///
+  /// @return A list of expected results
   private List<Pair<Double, Double>> computeExpectedResult() {
     List<Pair<Double, Double>> result = new ArrayList<>(_resultMap.size());
     for (Map.Entry<Double, Double> entry : _resultMap.entrySet()) {

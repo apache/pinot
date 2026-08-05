@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.prefetch;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -38,9 +37,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 
 
 public class DefaultFetchPlanner implements FetchPlanner {
-  /**
-   * Get BloomFilter for columns present in EQ and IN predicates.
-   */
+  /// Get BloomFilter for columns present in EQ and IN predicates.
   @Override
   public FetchContext planFetchForPruning(IndexSegment indexSegment, QueryContext queryContext) {
     // Extract columns in EQ/IN predicates.
@@ -50,7 +47,7 @@ public class DefaultFetchPlanner implements FetchPlanner {
     for (String column : eqInColumns) {
       DataSource dataSource = indexSegment.getDataSourceNullable(column);
       if (dataSource != null && dataSource.getBloomFilter() != null) {
-        columnToIndexList.put(column, Collections.singletonList(StandardIndexes.bloomFilter()));
+        columnToIndexList.put(column, List.of(StandardIndexes.bloomFilter()));
       }
     }
     return new FetchContext(UUID.randomUUID(), indexSegment.getSegmentName(), columnToIndexList);
@@ -85,9 +82,7 @@ public class DefaultFetchPlanner implements FetchPlanner {
     }
   }
 
-  /**
-   * Fetch all kinds of index for columns accessed by the query.
-   */
+  /// Fetch all kinds of index for columns accessed by the query.
   @Override
   public FetchContext planFetchForProcessing(IndexSegment indexSegment, QueryContext queryContext) {
     return new FetchContext(UUID.randomUUID(), indexSegment.getSegmentName(), getColumns(indexSegment, queryContext));

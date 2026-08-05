@@ -44,9 +44,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 
 
-/**
- * Utility class to compress/de-compress tar files compressed using various compressors.
- */
+/// Utility class to compress/de-compress tar files compressed using various compressors.
 public class TarCompressionUtils {
   public static final long NO_DISK_WRITE_RATE_LIMIT = -1;
   /* Don't limit write rate to disk. The OS will buffer multiple writes and can write up to several GBs
@@ -69,11 +67,9 @@ public class TarCompressionUtils {
   private TarCompressionUtils() {
   }
 
-  /**
-   * This generic compressed tar file extension does not bind to a particular compressor. Decompression determines the
-   * appropriate compressor at run-time based on the file's magic number irrespective of the file extension.
-   * Compression uses the default compressor automatically if this generic extension is used.
-   */
+  /// This generic compressed tar file extension does not bind to a particular compressor. Decompression determines the
+  /// appropriate compressor at run-time based on the file's magic number irrespective of the file extension.
+  /// Compression uses the default compressor automatically if this generic extension is used.
   public static final String TAR_COMPRESSED_FILE_EXTENSION = ".tar.compressed";
   public static final String TAR_GZ_FILE_EXTENSION = ".tar.gz";
   public static final String TAR_LZ4_FILE_EXTENSION = ".tar.lz4";
@@ -91,19 +87,15 @@ public class TarCompressionUtils {
     }
   }
 
-  /**
-   * Creates a compressed tar file from the input file/directory to the output file. The output file must have
-   * a supported compressed tar file extension as the file extension such as ".tar.gz" or ".tar.zst"
-   */
+  /// Creates a compressed tar file from the input file/directory to the output file. The output file must have
+  /// a supported compressed tar file extension as the file extension such as ".tar.gz" or ".tar.zst"
   public static void createCompressedTarFile(File inputFile, File outputFile)
       throws IOException {
     createCompressedTarFile(new File[]{inputFile}, outputFile);
   }
 
-  /**
-   * Creates a compressed tar file from a list of input file/directories to the output file. The output file must have
-   * a supported file extension such as "tar.gz" or "tar.zst"
-   */
+  /// Creates a compressed tar file from a list of input file/directories to the output file. The output file must have
+  /// a supported file extension such as "tar.gz" or "tar.zst"
   public static void createCompressedTarFile(File[] inputFiles, File outputFile)
       throws IOException {
     if (outputFile.getName().endsWith(TAR_COMPRESSED_FILE_EXTENSION)) {
@@ -144,10 +136,8 @@ public class TarCompressionUtils {
     }
   }
 
-  /**
-   * Helper method to write a file into the compressed tar file output stream. The base entry name is the relative
-   * path of the file to the root directory.
-   */
+  /// Helper method to write a file into the compressed tar file output stream. The base entry name is the relative
+  /// path of the file to the root directory.
   private static void addFileToCompressedTar(ArchiveOutputStream tarOut, File file, String baseEntryName)
       throws IOException {
     String entryName = baseEntryName + file.getName();
@@ -170,10 +160,9 @@ public class TarCompressionUtils {
     }
   }
 
-  /**
-   * Un-tars a compressed tar file into a directory, returns all the untarred files/directories.
-   * <p>For security reason, the untarred files must reside in the output directory.
-   */
+  /// Un-tars a compressed tar file into a directory, returns all the untarred files/directories.
+  ///
+  /// For security reason, the untarred files must reside in the output directory.
   public static List<File> untar(File inputFile, File outputDir)
       throws IOException {
     try (InputStream fileIn = Files.newInputStream(inputFile.toPath())) {
@@ -181,20 +170,18 @@ public class TarCompressionUtils {
     }
   }
 
-  /**
-   * Un-tars an inputstream of a compressed tar file into a directory, returns all the untarred files/directories.
-   * <p>For security reason, the untarred files must reside in the output directory.
-   */
+  /// Un-tars an inputstream of a compressed tar file into a directory, returns all the untarred files/directories.
+  ///
+  /// For security reason, the untarred files must reside in the output directory.
   public static List<File> untar(InputStream inputStream, File outputDir)
       throws IOException {
     return untarWithRateLimiter(inputStream, outputDir, NO_DISK_WRITE_RATE_LIMIT);
   }
 
-  /**
-   * Un-tars an inputstream of a compressed tar file into a directory, returns all the untarred files/directories.
-   * RateLimit limits the untar rate
-   * <p>For security reason, the untarred files must reside in the output directory.
-   */
+  /// Un-tars an inputstream of a compressed tar file into a directory, returns all the untarred files/directories.
+  /// RateLimit limits the untar rate
+  ///
+  /// For security reason, the untarred files must reside in the output directory.
   public static List<File> untarWithRateLimiter(InputStream inputStream, File outputDir, long maxStreamRateInByte)
       throws IOException {
     String outputDirCanonicalPath = outputDir.getCanonicalPath();
@@ -255,9 +242,7 @@ public class TarCompressionUtils {
     return untarredFiles;
   }
 
-  /**
-   * Un-tars one single file with the given file name from a compressed tar file.
-   */
+  /// Un-tars one single file with the given file name from a compressed tar file.
   public static void untarOneFile(File inputFile, String fileName, File outputFile)
       throws IOException {
     try (InputStream fileIn = Files.newInputStream(inputFile.toPath());

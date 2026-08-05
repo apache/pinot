@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.reduce;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
@@ -33,9 +32,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 
 
-/**
- * Helper class to reduce and set Selection results into the BrokerResponseNative
- */
+/// Helper class to reduce and set Selection results into the BrokerResponseNative
 public class SelectionDataTableReducer implements DataTableReducer {
   private final QueryContext _queryContext;
 
@@ -43,9 +40,7 @@ public class SelectionDataTableReducer implements DataTableReducer {
     _queryContext = queryContext;
   }
 
-  /**
-   * Reduces data tables and sets selection results into ResultTable.
-   */
+  /// Reduces data tables and sets selection results into ResultTable.
   @Override
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
       Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
@@ -54,7 +49,7 @@ public class SelectionDataTableReducer implements DataTableReducer {
         SelectionOperatorUtils.getResultTableDataSchemaAndColumnIndices(_queryContext, dataSchema);
     int limit = _queryContext.getLimit();
     if (dataTableMap.isEmpty() || limit == 0) {
-      brokerResponseNative.setResultTable(new ResultTable(pair.getLeft(), Collections.emptyList()));
+      brokerResponseNative.setResultTable(new ResultTable(pair.getLeft(), List.of()));
       return;
     }
     if (_queryContext.getOrderByExpressions() == null) {

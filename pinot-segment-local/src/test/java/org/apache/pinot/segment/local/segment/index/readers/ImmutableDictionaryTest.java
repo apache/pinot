@@ -340,7 +340,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
     try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
         new File(TEMP_DIR, BIG_DECIMAL_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
         BigDecimalDictionary bigDecimalDictionary = new BigDecimalDictionary(buffer, NUM_VALUES,
-        _bigDecimalByteLength)) {
+            _bigDecimalByteLength)) {
       testBigDecimalDictionary(bigDecimalDictionary);
     }
   }
@@ -470,14 +470,12 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
     }
   }
 
-  /**
-   * Regression test for old segments (pre-1.6.0) that have a STRING column with all-empty values:
-   * the segment lacks LENGTH_OF_LONGEST_ELEMENT (introduced in 1.6.0) and has DICTIONARY_ELEMENT_SIZE=0
-   * (the longest entry length is zero when every entry is empty). The metadata loader must canonicalize
-   * the longest-element length to 0 here; otherwise it leaves the field at the UNAVAILABLE sentinel
-   * (-1), which propagates into StringDictionary.getBuffer() as `new byte[-1]` and fails query
-   * execution with NegativeArraySizeException.
-   */
+  /// Regression test for old segments (pre-1.6.0) that have a STRING column with all-empty values:
+  /// the segment lacks LENGTH_OF_LONGEST_ELEMENT (introduced in 1.6.0) and has DICTIONARY_ELEMENT_SIZE=0
+  /// (the longest entry length is zero when every entry is empty). The metadata loader must canonicalize
+  /// the longest-element length to 0 here; otherwise it leaves the field at the UNAVAILABLE sentinel
+  /// (-1), which propagates into StringDictionary.getBuffer() as `new byte\[-1\]` and fails query
+  /// execution with NegativeArraySizeException.
   @Test
   public void testStringDictionaryReadOnPre16OldSegmentMetadata()
       throws Exception {

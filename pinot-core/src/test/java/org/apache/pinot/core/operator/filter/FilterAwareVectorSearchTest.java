@@ -37,13 +37,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 
-/**
- * Tests for filter-aware vector search (FILTER_THEN_ANN) support.
- *
- * <p>Verifies that the {@link FilterAwareVectorIndexReader} interface is correctly
- * dispatched by {@link VectorSimilarityFilterOperator}, and that the
- * {@link VectorSearchMode} enum works as expected.</p>
- */
+/// Tests for filter-aware vector search (FILTER_THEN_ANN) support.
+///
+/// Verifies that the [FilterAwareVectorIndexReader] interface is correctly
+/// dispatched by [VectorSimilarityFilterOperator], and that the
+/// [VectorSearchMode] enum works as expected.
 public class FilterAwareVectorSearchTest {
 
   // -----------------------------------------------------------------------

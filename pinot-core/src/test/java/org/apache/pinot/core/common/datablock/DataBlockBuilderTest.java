@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.BitSet;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +32,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -195,6 +195,28 @@ public class DataBlockBuilderTest {
     runColumnBlockTest(type, 25_000);
   }
 
+  /// A null in a UUID column must serialize as the nil UUID, not as the zero-length placeholder its stored type
+  /// (BYTES) supplies. The value is normally masked by the null bitmap, but it must still decode as a valid 16-byte
+  /// UUID for any consumer that renders the raw column, and [UuidUtils#toString] rejects any other width.
+  @Test
+  void testUuidNullPlaceholderIsNilUuid()
+      throws IOException {
+    ByteArray uuid = new ByteArray(UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440000"));
+    DataSchema dataSchema = new DataSchema(new String[]{"uuidCol"}, new ColumnDataType[]{ColumnDataType.UUID});
+    Object[] column = {uuid, null};
+    List<Object[]> rows = List.of(new Object[]{uuid}, new Object[]{null});
+
+    List<DataBlock> blocks = List.of(DataBlockBuilder.buildFromRows(rows, dataSchema),
+        DataBlockBuilder.buildFromColumns(List.<Object[]>of(column), dataSchema));
+    for (DataBlock block : blocks) {
+      assertEquals(block.getNumberOfRows(), 2);
+      assertEquals(new ByteArray(block.getBytes(0, 0).getBytes()), uuid);
+      // Row 1 is null: the bitmap flags it, and the placeholder underneath still renders as the nil UUID.
+      assertEquals(block.getNullRowIds(0), RoaringBitmap.bitmapOf(1));
+      assertEquals(UuidUtils.toString(block.getBytes(1, 0).getBytes()), "00000000-0000-0000-0000-000000000000");
+    }
+  }
+
   private void runColumnBlockTest(ColumnDataType type, int numRows)
       throws IOException {
     Object[] column = generateColumns(type, numRows);
@@ -204,7 +226,7 @@ public class DataBlockBuilderTest {
       aggFunctions = new AggregationFunction[]{mock(AggregationFunction.class)};
     }
     DataBlock rowDataBlock =
-        DataBlockBuilder.buildFromColumns(Collections.singletonList(column), dataSchema, aggFunctions);
+        DataBlockBuilder.buildFromColumns(List.<Object[]>of(column), dataSchema, aggFunctions);
     assertEquals(rowDataBlock.getNumberOfRows(), numRows);
     checkEquals(type, rowDataBlock, i -> column[i]);
   }

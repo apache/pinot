@@ -52,18 +52,15 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
-/**
- * Factory class to create instances of aggregation function of the given name.
- */
+/// Factory class to create instances of aggregation function of the given name.
 @SuppressWarnings("rawtypes")
 public class AggregationFunctionFactory {
   private AggregationFunctionFactory() {
   }
 
-  /**
-   * Given the function information, returns a new instance of the corresponding aggregation function.
-   * <p>NOTE: Underscores in the function name are ignored.
-   */
+  /// Given the function information, returns a new instance of the corresponding aggregation function.
+  ///
+  /// NOTE: Underscores in the function name are ignored.
   public static AggregationFunction getAggregationFunction(FunctionContext function, boolean nullHandlingEnabled) {
     try {
       String upperCaseFunctionName =

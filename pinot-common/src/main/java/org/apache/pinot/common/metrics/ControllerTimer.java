@@ -21,10 +21,7 @@ package org.apache.pinot.common.metrics;
 import org.apache.pinot.common.Utils;
 
 
-/**
- * Enumeration containing all the timers exposed by the Pinot controller.
- *
- */
+/// Enumeration containing all the timers exposed by the Pinot controller.
 public enum ControllerTimer implements AbstractMetrics.Timer {
   TABLE_REBALANCE_EXECUTION_TIME_MS("tableRebalanceExecutionTimeMs", false),
   CRON_SCHEDULER_JOB_EXECUTION_TIME_MS("cronSchedulerJobExecutionTimeMs", false),
@@ -39,9 +36,10 @@ public enum ControllerTimer implements AbstractMetrics.Timer {
   // Audit logging timers
   AUDIT_REQUEST_PROCESSING_TIME("auditRequestProcessingTime", true),
   AUDIT_RESPONSE_PROCESSING_TIME("auditResponseProcessingTime", true),
-  // Log subtask waiting (until not started) and running (until not completed) time
-  SUBTASK_WAITING_TIME("subtaskWaitingTime", false),
-  SUBTASK_RUNNING_TIME("subtaskRunningTime", false);
+  // Query workload propagation metrics
+  QUERY_WORKLOAD_PROPAGATE_TIME_MS("queryWorkloadPropagateTimeMs", false),
+  QUERY_WORKLOAD_SEND_MESSAGE_TIME_MS("queryWorkloadSendMessageTimeMs", false),
+  QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_TIME_MS("queryWorkloadUpdateResourceTimeMs", true);
 
 
   private final String _timerName;
@@ -57,11 +55,9 @@ public enum ControllerTimer implements AbstractMetrics.Timer {
     return _timerName;
   }
 
-  /**
-   * Returns true if the timer is global (not attached to a particular resource)
-   *
-   * @return true if the timer is global
-   */
+  /// Returns true if the timer is global (not attached to a particular resource)
+  ///
+  /// @return true if the timer is global
   @Override
   public boolean isGlobal() {
     return _global;

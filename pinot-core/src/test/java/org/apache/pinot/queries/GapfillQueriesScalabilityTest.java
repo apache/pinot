@@ -47,9 +47,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Scalability Queries test for Gapfill queries.
- */
+/// Scalability Queries test for Gapfill queries.
 public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "PostAggregationGapfillQueriesTest");
   private static final String RAW_TABLE_NAME = "parkingData";
@@ -108,7 +106,7 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
     for (int i = 0; i < 15; i++) {
       for (int j = 0; j < NUM_LOTS; j++) {
         for (int k = 0; k < 4; k++) {
-            records.add(createRow(start + i * 3600_000, k, i * NUM_LOTS + j, true));
+          records.add(createRow(start + i * 3600_000, k, i * NUM_LOTS + j, true));
         }
       }
     }

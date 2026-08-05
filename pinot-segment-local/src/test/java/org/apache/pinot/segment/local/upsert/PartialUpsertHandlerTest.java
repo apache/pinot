@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.upsert;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -192,7 +191,7 @@ public class PartialUpsertHandlerTest {
       upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.IGNORE);
       TableConfig tableConfig = createTableConfig(schema, upsertConfig);
       PartialUpsertHandler handler =
-          spy(new PartialUpsertHandler(tableConfig, schema, Collections.singletonList("hoursSinceEpoch"),
+          spy(new PartialUpsertHandler(tableConfig, schema, List.of("hoursSinceEpoch"),
               upsertConfig));
 
       ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
@@ -232,7 +231,7 @@ public class PartialUpsertHandlerTest {
           upsertConfig)).thenReturn(customMerger);
       TableConfig tableConfig = createTableConfig(schema, upsertConfig);
       PartialUpsertHandler handler =
-          new PartialUpsertHandler(tableConfig, schema, Collections.singletonList("hoursSinceEpoch"), upsertConfig);
+          new PartialUpsertHandler(tableConfig, schema, List.of("hoursSinceEpoch"), upsertConfig);
       HashMap<String, Object> reuseMergerResult = new HashMap<>();
       handler.merge(prevRecord, newRecord, reuseMergerResult);
       assertEquals(newRecord, expectedRecord);

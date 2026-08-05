@@ -63,6 +63,12 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   // (and KafkaPartitionLevelConsumerTest.testConsumer) does exercise arbitrary
   // re-seeks, so we preserve that behaviour.
   private long _lastFetchStartOffset = Long.MIN_VALUE;
+  // Whether the previous successful poll returned any records from Kafka. When the caller
+  // repeats the same startOffset after a non-empty fetch, the records may have been fetched
+  // but not processed by RealtimeSegmentDataManager because an end criterion fired before
+  // index 0. In that case we must re-seek and replay the batch instead of continuing from
+  // _nextReadOffset.
+  private boolean _lastFetchReturnedRecords;
   // Cached true iff stream.kafka.isolation.level == read_committed. Computed once at
   // construction (the value is final per consumer) and reused on every fetch instead of
   // re-resolving the StreamConfig each time.
@@ -85,27 +91,32 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     }
     // Seek when:
     //   (a) we have not yet positioned the consumer (initial state), OR
-    //   (b) the caller passed a startOffset different from the previous call AND
-    //       different from the consumer's current _nextReadOffset (i.e. a fresh
-    //       caller-requested seek that doesn't already match where we are).
-    // We do NOT seek when the caller passed the SAME startOffset as the previous call --
-    // that is the read_committed empty-poll case, where RealtimeSegmentDataManager.
-    // _currentOffset didn't advance on our last empty batch and so calls us with the same
-    // startOffset again. Seeking back to that startOffset would undo the consumer's
-    // progress through the filtered (aborted) region and wedge consumption forever; this
-    // was the dominant CI flake mode for ExactlyOnceKafkaRealtimeClusterIntegrationTest.
-    boolean explicitNewStartOffset = startOffset != _lastFetchStartOffset && startOffset != _nextReadOffset;
-    if (_nextReadOffset < 0 || explicitNewStartOffset) {
+    //   (b) the caller-requested startOffset differs from _nextReadOffset, except for
+    //       the repeated-startOffset-after-empty-fetch case described below.
+    //
+    // We only suppress a re-seek when the caller passed the same startOffset after the
+    // previous successful fetch returned zero records. That is the read_committed
+    // empty-poll case: RealtimeSegmentDataManager._currentOffset did not advance, but
+    // KafkaConsumer.position() may have advanced through aborted records. Seeking back to
+    // startOffset would undo that progress and wedge consumption forever.
+    //
+    // If the previous poll returned records, a repeated startOffset means the caller did
+    // not process them (for example, the segment time limit fired before index 0). We must
+    // seek back and replay those records; otherwise CATCH_UP can skip an already-fetched
+    // batch and falsely report data loss.
+    boolean repeatedStartOffsetAfterEmptyFetch = startOffset == _lastFetchStartOffset && !_lastFetchReturnedRecords;
+    if (_nextReadOffset < 0 || (startOffset != _nextReadOffset && !repeatedStartOffsetAfterEmptyFetch)) {
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Seeking to offset: {}", startOffset);
       }
       _consumer.seek(_topicPartition, startOffset);
       _nextReadOffset = startOffset;
     }
-    _lastFetchStartOffset = startOffset;
 
     ConsumerRecords<Bytes, Bytes> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMs));
     List<ConsumerRecord<Bytes, Bytes>> records = consumerRecords.records(_topicPartition);
+    _lastFetchStartOffset = startOffset;
+    _lastFetchReturnedRecords = !records.isEmpty();
     List<BytesStreamMessage> filteredRecords = new ArrayList<>(records.size());
     long firstOffset = -1;
     StreamMessageMetadata lastMessageMetadata = null;

@@ -21,7 +21,7 @@ package org.apache.pinot.plugin.stream.kafka30;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.IOException;
-import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -48,11 +48,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * KafkaPartitionLevelConnectionHandler provides low level APIs to access Kafka partition level information.
- * E.g. partition counts, offsets per partition.
- *
- */
+/// KafkaPartitionLevelConnectionHandler provides low level APIs to access Kafka partition level information.
+/// E.g. partition counts, offsets per partition.
 public abstract class KafkaPartitionLevelConnectionHandler {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConnectionHandler.class);
@@ -85,7 +82,7 @@ public abstract class KafkaPartitionLevelConnectionHandler {
       _consumer = createConsumer(_consumerProp, retryPolicy);
     }
     _topicPartition = new TopicPartition(_topic, _partition);
-    _consumer.assign(Collections.singletonList(_topicPartition));
+    _consumer.assign(List.of(_topicPartition));
   }
 
   private Properties buildProperties(StreamConfig streamConfig) {
@@ -101,14 +98,12 @@ public abstract class KafkaPartitionLevelConnectionHandler {
     return consumerProp;
   }
 
-  /**
-   * Filter properties to only include the specified Kafka configurations.
-   * This prevents "was supplied but isn't a known config" warnings from Kafka clients.
-   *
-   * @param props The properties to filter
-   * @param validConfigNames The set of valid configuration names for the target Kafka client
-   * @return A new Properties object containing only the valid configurations
-   */
+  /// Filter properties to only include the specified Kafka configurations.
+  /// This prevents "was supplied but isn't a known config" warnings from Kafka clients.
+  ///
+  /// @param props The properties to filter
+  /// @param validConfigNames The set of valid configuration names for the target Kafka client
+  /// @return A new Properties object containing only the valid configurations
   private Properties filterKafkaProperties(Properties props, Set<String> validConfigNames) {
     Properties filteredProps = new Properties();
     for (String key : props.stringPropertyNames()) {
@@ -147,24 +142,20 @@ public abstract class KafkaPartitionLevelConnectionHandler {
     return retry(() -> AdminClient.create(filterKafkaProperties(_consumerProp, ADMIN_CLIENT_CONFIG_NAMES)), 5);
   }
 
-  /**
-   * Gets or creates a reusable admin client instance. The admin client is lazily initialized
-   * and reused across multiple calls to avoid the overhead of creating new connections.
-   *
-   * @return the admin client instance
-   */
+  /// Gets or creates a reusable admin client instance. The admin client is lazily initialized
+  /// and reused across multiple calls to avoid the overhead of creating new connections.
+  ///
+  /// @return the admin client instance
   @Deprecated
   protected AdminClient getOrCreateAdminClient() {
     return createAdminClient();
   }
 
-  /**
-   * Gets or creates a shared admin client instance that can be reused across multiple
-   * connection handlers connecting to the same Kafka cluster. This provides better
-   * resource efficiency when multiple consumers/producers connect to the same bootstrap servers.
-   *
-   * @return the shared admin client instance
-   */
+  /// Gets or creates a shared admin client instance that can be reused across multiple
+  /// connection handlers connecting to the same Kafka cluster. This provides better
+  /// resource efficiency when multiple consumers/producers connect to the same bootstrap servers.
+  ///
+  /// @return the shared admin client instance
   protected AdminClient getOrCreateSharedAdminClient() {
     return getOrCreateSharedAdminClientInternal(false);
   }

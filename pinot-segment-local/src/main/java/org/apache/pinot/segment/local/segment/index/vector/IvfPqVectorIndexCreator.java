@@ -31,36 +31,42 @@ import java.util.Map;
 import java.util.Random;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Creates an IVF_PQ (Inverted File with residual Product Quantization) index for immutable segments.
- *
- * <p>Uses a two-pass design to bound memory usage. During {@link #add}, vectors are spilled to a
- * temporary file while a reservoir sample is kept in memory for training. During {@link #seal},
- * centroids and PQ codebooks are trained from the sample, then all vectors are streamed from
- * the spill file for assignment and encoding.</p>
- *
- * <p>Peak heap usage is O(trainSampleSize * dimension) instead of O(numVectors * dimension).</p>
- *
- * <h3>Thread safety</h3>
- * <p>This class is not thread-safe. It is intended for single-threaded offline segment creation.</p>
- */
+/// Creates an IVF_PQ (Inverted File with residual Product Quantization) index for immutable segments.
+///
+/// Uses a two-pass design to bound memory usage. During [#add], vectors are spilled to a
+/// temporary file while a reservoir sample is kept in memory for training. During [#seal],
+/// centroids and PQ codebooks are trained from the sample, then all vectors are streamed from
+/// the spill file for assignment and encoding.
+///
+/// Peak heap usage is O(trainSampleSize \* dimension) instead of O(numVectors \* dimension).
+///
+/// ## Thread safety
+///
+/// This class is not thread-safe. It is intended for single-threaded offline segment creation.
 public class IvfPqVectorIndexCreator implements VectorIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(IvfPqVectorIndexCreator.class);
 
-  /** Magic bytes identifying an IVF_PQ index file: ASCII "IVPQ". */
+  /// Magic bytes identifying an IVF_PQ index file: ASCII "IVPQ".
   public static final int MAGIC = IvfPqIndexFormat.MAGIC;
 
-  /** Current file format version. */
+  /// Current file format version.
   public static final int FORMAT_VERSION = IvfPqIndexFormat.FORMAT_VERSION;
 
-  /** On-disk file extension for the IVF_PQ index. */
+  /// On-disk file extension for the legacy IVF_PQ sidecar file (when `storeInSegmentFile=false`).
   public static final String INDEX_FILE_EXTENSION = IvfPqIndexFormat.INDEX_FILE_EXTENSION;
+
+  /// On-disk file extension for the combined-form IVF_PQ sidecar file produced when
+  /// `storeInSegmentFile=true`. The V2→V3 converter packs the bytes into `columns.psf`
+  /// via the standard `copyIndexIfExists` path and removes the file.
+  public static final String COMBINED_INDEX_FILE_EXTENSION =
+      V1Constants.Indexes.VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION;
 
   private final String _column;
   private final File _indexDir;
@@ -71,6 +77,7 @@ public class IvfPqVectorIndexCreator implements VectorIndexCreator {
   private final int _trainSampleSize;
   private final long _trainingSeed;
   private final VectorIndexConfig.VectorDistanceFunction _distanceFunction;
+  private final boolean _storeInSegmentFile;
 
   // Spill file for raw vectors: sequential float arrays, _dimension floats per vector.
   private final File _spillFile;
@@ -83,13 +90,11 @@ public class IvfPqVectorIndexCreator implements VectorIndexCreator {
   private boolean _sealed;
   private boolean _spillOutClosed;
 
-  /**
-   * Creates a new IVF_PQ creator.
-   *
-   * @param column the column name
-   * @param indexDir the index directory
-   * @param config vector index configuration
-   */
+  /// Creates a new IVF_PQ creator.
+  ///
+  /// @param column the column name
+  /// @param indexDir the index directory
+  /// @param config vector index configuration
   public IvfPqVectorIndexCreator(String column, File indexDir, VectorIndexConfig config)
       throws IOException {
     _column = column;
@@ -122,13 +127,19 @@ public class IvfPqVectorIndexCreator implements VectorIndexCreator {
     _reservoirRng = new Random(_trainingSeed);
     _numVectors = 0;
     _spillOutClosed = false;
+    _storeInSegmentFile = config.isStoreInSegmentFile();
 
     _spillFile = new File(indexDir, column + INDEX_FILE_EXTENSION + ".spill");
     _spillOut = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(_spillFile), 1 << 16));
 
     LOGGER.info("Creating IVF_PQ index for column: {} in dir: {}, dimension={}, nlist={}, pqM={}, pqNbits={}, "
-            + "distance={}", column, indexDir.getAbsolutePath(), _dimension, _nlist, _pqM, _pqNbits,
-        _distanceFunction);
+            + "distance={}, storeInSegmentFile={}", column, indexDir.getAbsolutePath(), _dimension, _nlist, _pqM,
+        _pqNbits, _distanceFunction, _storeInSegmentFile);
+  }
+
+  /// Returns the on-disk extension this creator will write to, based on the flag.
+  private String outputExtension() {
+    return _storeInSegmentFile ? COMBINED_INDEX_FILE_EXTENSION : INDEX_FILE_EXTENSION;
   }
 
   @Override
@@ -186,7 +197,7 @@ public class IvfPqVectorIndexCreator implements VectorIndexCreator {
         for (int m = 0; m < _pqM; m++) {
           emptyCodebooks[m] = new float[0][subvectorLengths[m]];
         }
-        IvfPqIndexFormat.write(new File(_indexDir, _column + INDEX_FILE_EXTENSION), _dimension, 0, _pqM, _pqNbits,
+        IvfPqIndexFormat.write(new File(_indexDir, _column + outputExtension()), _dimension, 0, _pqM, _pqNbits,
             _trainSampleSize, _trainingSeed, _distanceFunction, new float[0][0], emptyCodebooks, subvectorLengths,
             new int[0][], new byte[0][]);
         success = true;
@@ -266,7 +277,7 @@ public class IvfPqVectorIndexCreator implements VectorIndexCreator {
         }
       }
 
-      IvfPqIndexFormat.write(new File(_indexDir, _column + INDEX_FILE_EXTENSION), _dimension, _numVectors, _pqM,
+      IvfPqIndexFormat.write(new File(_indexDir, _column + outputExtension()), _dimension, _numVectors, _pqM,
           _pqNbits, _trainSampleSize, _trainingSeed, _distanceFunction, centroids, codebooks, subvectorLengths,
           listDocIds, listCodes);
       LOGGER.info("IVF_PQ index sealed for column: {}. {} vectors across {} centroids.", _column, _numVectors,
@@ -315,17 +326,13 @@ public class IvfPqVectorIndexCreator implements VectorIndexCreator {
     return Long.parseLong(properties.get(key));
   }
 
-  /**
-   * Maps a distance function to a stable on-disk ID that is independent of enum ordinal order.
-   * This ensures existing index files remain valid if the enum is reordered or extended.
-   */
+  /// Maps a distance function to a stable on-disk ID that is independent of enum ordinal order.
+  /// This ensures existing index files remain valid if the enum is reordered or extended.
   public static int distanceFunctionToStableId(VectorIndexConfig.VectorDistanceFunction distanceFunction) {
     return IvfPqIndexFormat.distanceFunctionToStableId(distanceFunction);
   }
 
-  /**
-   * Maps a stable on-disk ID back to the corresponding distance function.
-   */
+  /// Maps a stable on-disk ID back to the corresponding distance function.
   public static VectorIndexConfig.VectorDistanceFunction stableIdToDistanceFunction(int id) {
     return IvfPqIndexFormat.stableIdToDistanceFunction(id);
   }

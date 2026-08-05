@@ -25,11 +25,9 @@ import java.lang.annotation.Target;
 import org.apache.pinot.common.metrics.ControllerGauge;
 
 
-/**
- * A method-level annotation for tracking inflight request metrics using {@link InflightRequestMetricsInterceptor}.
- * The gauge specified by this annotation will be incremented when the request starts and decremented once the request
- * has completed processing.
- */
+/// A method-level annotation for tracking inflight request metrics using [InflightRequestMetricsInterceptor].
+/// The gauge specified by this annotation will be incremented when the request starts and decremented once the request
+/// has completed processing.
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface TrackedByGauge {

@@ -57,17 +57,34 @@ public class UpsertUtils {
         : (useEmptyForNull ? new MutableRoaringBitmap() : null);
   }
 
-  /**
-   * Returns whether the segment has no queryable documents, when no delete record column we look into validDocIds
-   * for an upsert table
-   */
-  public static boolean hasNoQueryableDocs(IndexSegment segment) {
-    ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
-    if (queryableDocIds != null) {
-      return queryableDocIds.isEmpty();
+  /// Unlike [#getQueryableDocIdsSnapshotFromSegment], never falls back to preferring queryable docs.
+  @Nullable
+  public static MutableRoaringBitmap getValidDocIdsSnapshotFromSegment(IndexSegment segment) {
+    return getValidDocIdsSnapshotFromSegment(segment, false);
+  }
+
+  /// Shared by `ImmutableSegmentImpl`/`MutableSegmentImpl`'s `hasNoValidDocs()`. Mirrors
+  /// `hasNoQueryableDocs()`'s consistency-mode-aware/live-fallback split, against the valid-docs cache instead.
+  public static boolean hasNoValidDocs(@Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      IndexSegment segment) {
+    if (partitionUpsertMetadataManager == null) {
+      return false;
+    }
+    UpsertViewManager viewManager = partitionUpsertMetadataManager.getUpsertViewManager();
+    if (viewManager != null) {
+      MutableRoaringBitmap validDocIdsSnapshot = viewManager.getValidDocIdsSnapshot(segment);
+      return validDocIdsSnapshot != null && validDocIdsSnapshot.isEmpty();
     }
     ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
     return validDocIds != null && validDocIds.isEmpty();
+  }
+
+  @Nullable
+  public static MutableRoaringBitmap getValidDocIdsSnapshotFromSegment(IndexSegment segment,
+      boolean useEmptyForNull) {
+    ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+    return validDocIds != null ? validDocIds.getMutableRoaringBitmap()
+        : (useEmptyForNull ? new MutableRoaringBitmap() : null);
   }
 
   public static void doReplaceDocId(ThreadSafeMutableRoaringBitmap validDocIds,
@@ -99,9 +116,7 @@ public class UpsertUtils {
     }
   }
 
-  /**
-   * Returns an iterator of {@link RecordInfo} for all the documents from the segment.
-   */
+  /// Returns an iterator of [RecordInfo] for all the documents from the segment.
   public static Iterator<RecordInfo> getRecordInfoIterator(RecordInfoReader recordInfoReader, int numDocs) {
     return new Iterator<RecordInfo>() {
       private int _docId = 0;
@@ -118,9 +133,7 @@ public class UpsertUtils {
     };
   }
 
-  /**
-   * Returns an iterator of {@link RecordInfo} for the valid documents from the segment.
-   */
+  /// Returns an iterator of [RecordInfo] for the valid documents from the segment.
   public static Iterator<RecordInfo> getRecordInfoIterator(RecordInfoReader recordInfoReader,
       MutableRoaringBitmap validDocIds) {
     return new Iterator<RecordInfo>() {
@@ -138,9 +151,7 @@ public class UpsertUtils {
     };
   }
 
-  /**
-   * Returns an iterator of {@link PrimaryKey} for the valid documents from the segment.
-   */
+  /// Returns an iterator of [PrimaryKey] for the valid documents from the segment.
   public static Iterator<PrimaryKey> getPrimaryKeyIterator(PrimaryKeyReader primaryKeyReader,
       MutableRoaringBitmap validDocIds) {
     return new Iterator<>() {
@@ -157,9 +168,7 @@ public class UpsertUtils {
     };
   }
 
-  /**
-   * Returns an iterator of {@link PrimaryKey} for all the documents from the segment.
-   */
+  /// Returns an iterator of [PrimaryKey] for all the documents from the segment.
   public static Iterator<PrimaryKey> getPrimaryKeyIterator(PrimaryKeyReader primaryKeyReader,
       int numDocs) {
     return new Iterator<>() {
@@ -196,9 +205,7 @@ public class UpsertUtils {
     };
   }
 
-  /**
-   * Returns an iterator of docId and {@link PrimaryKey} for all the documents from the segment.
-   */
+  /// Returns an iterator of docId and [PrimaryKey] for all the documents from the segment.
   public static Iterator<Map.Entry<Integer, PrimaryKey>> getRecordIterator(PrimaryKeyReader primaryKeyReader,
       int numDocs) {
     return new Iterator<>() {
@@ -237,10 +244,8 @@ public class UpsertUtils {
       }
     }
 
-    /**
-     * Constructor that uses a constant comparison value for all records.
-     * Used when no comparison columns are configured and segment creation time is used as the comparison value.
-     */
+    /// Constructor that uses a constant comparison value for all records.
+    /// Used when no comparison columns are configured and segment creation time is used as the comparison value.
     public RecordInfoReader(IndexSegment segment, List<String> primaryKeyColumns,
         Comparable constantComparisonValue, @Nullable String deleteRecordColumn) {
       _primaryKeyReader = new PrimaryKeyReader(segment, primaryKeyColumns);
@@ -334,10 +339,8 @@ public class UpsertUtils {
     }
   }
 
-  /**
-   * A comparison column reader that returns a constant value for all records.
-   * Used when no comparison columns are configured and segment creation time is used as the comparison value.
-   */
+  /// A comparison column reader that returns a constant value for all records.
+  /// Used when no comparison columns are configured and segment creation time is used as the comparison value.
   public static class ConstantComparisonColumnReader implements ComparisonColumnReader {
     private final Comparable _constantValue;
 

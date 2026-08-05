@@ -49,9 +49,7 @@ public class PinotSortExchangeCopyRule extends RelRule<PinotSortExchangeCopyRule
       TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER));
   private final int _fetchLimitThreshold;
 
-  /**
-   * Creates a PinotSortExchangeCopyRule.
-   */
+  /// Creates a [PinotSortExchangeCopyRule].
   protected PinotSortExchangeCopyRule(Config config) {
     super(config);
     _fetchLimitThreshold = config.getFetchLimitThreshold();
@@ -113,7 +111,8 @@ public class PinotSortExchangeCopyRule extends RelRule<PinotSortExchangeCopyRule
                 .oneInput(b1 -> b1.operand(PinotLogicalSortExchange.class).anyInputs()))
         .build();
 
-    @Override default PinotSortExchangeCopyRule toRule() {
+    @Override
+    default PinotSortExchangeCopyRule toRule() {
       return new PinotSortExchangeCopyRule(this);
     }
 

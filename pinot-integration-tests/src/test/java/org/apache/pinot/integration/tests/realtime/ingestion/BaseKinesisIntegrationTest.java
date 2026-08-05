@@ -27,8 +27,8 @@ import cloud.localstack.docker.command.Command;
 import java.io.File;
 import java.net.URI;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -61,9 +61,7 @@ import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 import software.amazon.awssdk.utils.AttributeMap;
 
 
-/**
- * Creates all dependencies (docker image, kinesis server, kinesis client, configs) for all tests requiring kinesis
- */
+/// Creates all dependencies (docker image, kinesis server, kinesis client, configs) for all tests requiring kinesis
 @LocalstackDockerProperties(services = {ServiceName.KINESIS}, imageTag = BaseKinesisIntegrationTest.LOCALSTACK_IMAGE)
 abstract class BaseKinesisIntegrationTest extends BaseClusterIntegrationTest {
 
@@ -220,7 +218,7 @@ abstract class BaseKinesisIntegrationTest extends BaseClusterIntegrationTest {
   private static class DockerInfoCommand extends Command {
 
     public void execute() {
-      String dockerInfo = dockerExe.execute(Collections.singletonList("info"));
+      String dockerInfo = dockerExe.execute(List.of("info"));
 
       if (dockerInfo.toLowerCase().contains("error")) {
         throw new IllegalStateException("Docker daemon is not running!");

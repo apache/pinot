@@ -31,29 +31,24 @@ import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The <code>CoalesceTransformFunction</code> implements the Coalesce operator.
- *
- * The result is first non-null value in the argument list.
- * If all arguments are null, return null.
- *
- * Note: arguments have to be compatible type.
- * Number of arguments has to be greater than 0.
- *
- * Expected result:
- * Coalesce(nullColumn, columnA): columnA
- * Coalesce(columnA, nullColumn): columnA
- * Coalesce(nullColumnA, nullColumnB): null
- *
- */
+/// The `CoalesceTransformFunction` implements the Coalesce operator.
+///
+/// The result is first non-null value in the argument list.
+/// If all arguments are null, return null.
+///
+/// Note: arguments have to be compatible type.
+/// Number of arguments has to be greater than 0.
+///
+/// Expected result:
+/// Coalesce(nullColumn, columnA): columnA
+/// Coalesce(columnA, nullColumn): columnA
+/// Coalesce(nullColumnA, nullColumnB): null
 public class CoalesceTransformFunction extends BaseTransformFunction {
   private TransformFunction[] _transformFunctions;
   private DataType _dataType;
   private TransformResultMetadata _resultMetadata;
 
-  /**
-   * Returns a bit map of corresponding column. Returns an empty bitmap by default if null option is disabled.
-   */
+  /// Returns a bit map of corresponding column. Returns an empty bitmap by default if null option is disabled.
   private static RoaringBitmap[] getNullBitMaps(ValueBlock valueBlock, TransformFunction[] transformFunctions) {
     RoaringBitmap[] roaringBitmaps = new RoaringBitmap[transformFunctions.length];
     for (int i = 0; i < roaringBitmaps.length; i++) {
@@ -63,15 +58,13 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     return roaringBitmaps;
   }
 
-  /**
-   * Get compatible data type of left and right.
-   * When left or right is numerical, we check both data types are numerical and widen the type.
-   * Otherwise, return string type.
-   *
-   * @param left  data type
-   * @param right data type
-   * @return compatible data type.
-   */
+  /// Get compatible data type of left and right.
+  /// When left or right is numerical, we check both data types are numerical and widen the type.
+  /// Otherwise, return string type.
+  ///
+  /// @param left  data type
+  /// @param right data type
+  /// @return compatible data type.
   private static DataType getCompatibleType(DataType left, DataType right) {
     if (left.isNumeric() && right.isNumeric()) {
       if (left == DataType.BIG_DECIMAL || right == DataType.BIG_DECIMAL) {
@@ -97,9 +90,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     return DataType.STRING;
   }
 
-  /**
-   * Get transform int results based on store type.
-   */
+  /// Get transform int results based on store type.
   private int[] getIntTransformResults(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
     initIntValuesSV(length);
@@ -127,9 +118,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     return _intValuesSV;
   }
 
-  /**
-   * Get transform long results based on store type.
-   */
+  /// Get transform long results based on store type.
   private long[] getLongTransformResults(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
     initLongValuesSV(length);
@@ -157,9 +146,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     return _longValuesSV;
   }
 
-  /**
-   * Get transform float results based on store type.
-   */
+  /// Get transform float results based on store type.
   private float[] getFloatTransformResults(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
     initFloatValuesSV(length);
@@ -187,9 +174,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     return _floatValuesSV;
   }
 
-  /**
-   * Get transform double results based on store type.
-   */
+  /// Get transform double results based on store type.
   private double[] getDoubleTransformResults(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
     initDoubleValuesSV(length);
@@ -217,9 +202,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     return _doubleValuesSV;
   }
 
-  /**
-   * Get transform BigDecimal results based on store type.
-   */
+  /// Get transform BigDecimal results based on store type.
   private BigDecimal[] getBigDecimalTransformResults(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
     initBigDecimalValuesSV(length);
@@ -247,9 +230,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     return _bigDecimalValuesSV;
   }
 
-  /**
-   * Get transform String results based on store type.
-   */
+  /// Get transform String results based on store type.
   private String[] getStringTransformResults(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
     initStringValuesSV(length);

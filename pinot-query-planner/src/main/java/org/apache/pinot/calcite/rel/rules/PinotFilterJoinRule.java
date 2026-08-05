@@ -40,9 +40,7 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 
-/**
- * Similar to {@link FilterJoinRule} but do not push down filter into right side of lookup join.
- */
+/// Similar to [FilterJoinRule] but do not push down filter into right side of lookup join.
 public abstract class PinotFilterJoinRule<C extends FilterJoinRule.Config> extends FilterJoinRule<C> {
 
   private PinotFilterJoinRule(C config) {
@@ -234,7 +232,7 @@ public abstract class PinotFilterJoinRule<C extends FilterJoinRule.Config> exten
         new PinotJoinConditionPushRule(JoinConditionPushRuleConfig.DEFAULT);
 
     public static PinotJoinConditionPushRule instanceWithDescription(String description) {
-        return new PinotJoinConditionPushRule(
+      return new PinotJoinConditionPushRule(
             (JoinConditionPushRuleConfig) JoinConditionPushRuleConfig.DEFAULT.withDescription(description));
     }
 

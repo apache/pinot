@@ -21,13 +21,15 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.Arrays;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * Extension of {@link AbstractColumnStatisticsCollector} for byte[] column type.
- */
+/// Extension of [AbstractColumnStatisticsCollector] for byte\[\] column type.
 public class BytesColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
   private Set<ByteArray> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
   private int _minLength = Integer.MAX_VALUE;
@@ -38,6 +40,11 @@ public class BytesColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
 
   public BytesColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
+  }
+
+  public BytesColumnPreIndexStatsCollector(FieldSpec fieldSpec, @Nullable FieldConfig fieldConfig,
+      @Nullable PartitionFunction partitionFunction) {
+    super(fieldSpec, fieldConfig, partitionFunction);
   }
 
   @Override
@@ -65,7 +72,12 @@ public class BytesColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
       addressSorted(value);
       if (_values.add(value)) {
         if (isPartitionEnabled()) {
-          updatePartition(value.toString());
+          // Use DataType.toString so UUID columns get their canonical RFC 4122 form (with dashes) rather
+          // than the bare hex from ByteArray.toString(). The runtime ingest path (MutableSegmentImpl) and
+          // every partition function (Murmur, Uuid) expect this canonical form; passing bare hex here
+          // produces a different partition value than runtime — silently breaking partition pruning — and
+          // throws for the Uuid partition function (UuidUtils.toBytes rejects no-dash strings).
+          updatePartition(_fieldSpec.getDataType().toString(entry));
         }
         int length = value.length();
         _minLength = Math.min(_minLength, length);

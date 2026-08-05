@@ -43,16 +43,14 @@ import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * Same as {@link PinotAggregateExchangeNodeInsertRule}, with the following differences:
- * <ol>
- *   <li>We don't generate project under the aggregate.</li>
- *   <li>We don't generate exchange and merely generate a PinotLogicalAggregate.</li>
- *   <li>We don't convert Agg Calls.</li>
- * </ol>
- * All of these will be done in the Physical Planning phase instead, since that is when we will know whether the
- * aggregate has been split or not. (e.g. project under aggregate is required when you skip partial aggregate).
- */
+/// Same as [PinotAggregateExchangeNodeInsertRule], with the following differences:
+///
+/// 1. We don't generate project under the aggregate.
+/// 2. We don't generate exchange and merely generate a PinotLogicalAggregate.
+/// 3. We don't convert Agg Calls.
+///
+/// All of these will be done in the Physical Planning phase instead, since that is when we will know whether the
+/// aggregate has been split or not. (e.g. project under aggregate is required when you skip partial aggregate).
 public class PinotLogicalAggregateRule {
   public static class SortProjectAggregate extends RelOptRule {
     public static final SortProjectAggregate INSTANCE = new SortProjectAggregate(PinotRuleUtils.PINOT_REL_FACTORY);
@@ -88,10 +86,7 @@ public class PinotLogicalAggregateRule {
           return;
         }
       }
-      int limit = 0;
-      if (sortRel.fetch != null) {
-        limit = RexLiteral.intValue(sortRel.fetch);
-      }
+      int limit = getGroupTrimLimit(sortRel);
       if (limit <= 0) {
         // Cannot enable group trim when there is no limit.
         return;
@@ -125,10 +120,7 @@ public class PinotLogicalAggregateRule {
 
       Sort sortRel = call.rel(0);
       List<RelFieldCollation> collations = sortRel.getCollation().getFieldCollations();
-      int limit = 0;
-      if (sortRel.fetch != null) {
-        limit = RexLiteral.intValue(sortRel.fetch);
-      }
+      int limit = getGroupTrimLimit(sortRel);
       if (limit <= 0) {
         // Cannot enable group trim when there is no limit.
         return;
@@ -139,10 +131,8 @@ public class PinotLogicalAggregateRule {
     }
   }
 
-  /**
-   * Convert any remaining LogicalAggregate to PinotLogicalAggregate. Some nodes may already be converted as part of
-   * the aggregate group-trim rules above.
-   */
+  /// Convert any remaining LogicalAggregate to PinotLogicalAggregate. Some nodes may already be converted as part of
+  /// the aggregate group-trim rules above.
   public static class PinotLogicalAggregateConverter extends RelOptRule {
     public static final PinotLogicalAggregateConverter INSTANCE = new PinotLogicalAggregateConverter(
         PinotRuleUtils.PINOT_REL_FACTORY);
@@ -160,6 +150,26 @@ public class PinotLogicalAggregateRule {
 
   private static PinotLogicalAggregate createWithNoGroupTrim(Aggregate aggRel) {
     return createPlan(aggRel, null, 0);
+  }
+
+  /// Returns the limit to push down into the aggregate for group trim, or 0 if group trim should not be applied.
+  /// The pushed-down limit is `offset + fetch` so that the leaf/intermediate aggregate retains enough groups to
+  /// cover the outer `OFFSET ... FETCH` window. Adding only `fetch` would trim away rows that the offset
+  /// window still needs, under-counting paginated queries.
+  private static int getGroupTrimLimit(Sort sortRel) {
+    if (sortRel.fetch == null) {
+      return 0;
+    }
+    int limit = RexLiteral.intValue(sortRel.fetch);
+    if (limit <= 0) {
+      return 0;
+    }
+    if (sortRel.offset != null) {
+      // Clamp to avoid int overflow. Integer.MAX_VALUE is safe downstream: GroupByUtils.getTableCapacity uses long
+      // arithmetic.
+      limit = (int) Math.min(Integer.MAX_VALUE, (long) limit + RexLiteral.intValue(sortRel.offset));
+    }
+    return limit;
   }
 
   private static PinotLogicalAggregate createPlan(Aggregate aggRel, @Nullable List<RelFieldCollation> collations,

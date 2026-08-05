@@ -38,15 +38,14 @@ import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * Broker response for single-stage engine.
- * This class can be used to serialize/deserialize the broker response.
- */
+/// Broker response for single-stage engine.
+/// This class can be used to serialize/deserialize the broker response.
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
     "numGroupsWarningLimitReached", "maxRowsInDistinctReached", "maxRowsWithoutChangeInDistinctReached",
     "maxExecutionTimeInDistinctReached", "timeUsedMs",
-    "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs", "numEntriesScannedInFilter",
+    "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs",
+    "numEntriesScannedInFilter",
     "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded", "numSegmentsQueried",
     "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed",
     "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker",
@@ -57,7 +56,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "pools", "rlsFiltersApplied", "groupsTrimmed"
+    "pools", "rlsFiltersApplied", "groupsTrimmed", "materializedViewQueried", "serverStats"
 })
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class BrokerResponseNative implements BrokerResponse {
@@ -122,6 +121,12 @@ public class BrokerResponseNative implements BrokerResponse {
   private Set<Integer> _pools = Set.of();
   private boolean _rlsFiltersApplied = false;
 
+  @Nullable
+  private String _materializedViewQueried;
+
+  @Nullable
+  private String _serverStats;
+
   public BrokerResponseNative() {
   }
 
@@ -143,7 +148,7 @@ public class BrokerResponseNative implements BrokerResponse {
     return brokerResponse;
   }
 
-  /** Generate EXPLAIN PLAN output when queries are evaluated by Broker without going to the Server. */
+  /// Generate EXPLAIN PLAN output when queries are evaluated by Broker without going to the Server.
   private static BrokerResponseNative getBrokerResponseExplainPlanOutput() {
     BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
     List<Object[]> rows = new ArrayList<>();
@@ -152,9 +157,7 @@ public class BrokerResponseNative implements BrokerResponse {
     return brokerResponse;
   }
 
-  /**
-   * Get a new empty {@link BrokerResponseNative}.
-   */
+  /// Get a new empty [BrokerResponseNative].
   public static BrokerResponseNative empty() {
     return new BrokerResponseNative();
   }
@@ -631,5 +634,30 @@ public class BrokerResponseNative implements BrokerResponse {
   @Override
   public boolean getRLSFiltersApplied() {
     return _rlsFiltersApplied;
+  }
+
+  @JsonProperty("materializedViewQueried")
+  public void setMaterializedViewQueried(@Nullable String materializedViewQueried) {
+    _materializedViewQueried = materializedViewQueried;
+  }
+
+  @Nullable
+  @JsonProperty("materializedViewQueried")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Override
+  public String getMaterializedViewQueried() {
+    return _materializedViewQueried;
+  }
+
+  @JsonProperty("serverStats")
+  public void setServerStats(@Nullable String serverStats) {
+    _serverStats = serverStats;
+  }
+
+  @Nullable
+  @JsonProperty("serverStats")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public String getServerStats() {
+    return _serverStats;
   }
 }

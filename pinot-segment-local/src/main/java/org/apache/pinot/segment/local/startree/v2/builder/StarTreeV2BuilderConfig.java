@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.startree.v2.builder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,9 +43,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * The {@code StarTreeV2BuilderConfig} class contains the configuration for star-tree builder.
- */
+/// The `StarTreeV2BuilderConfig` class contains the configuration for star-tree builder.
 public class StarTreeV2BuilderConfig {
   public static final int DEFAULT_MAX_LEAF_RECORDS = 10_000;
 
@@ -69,7 +66,7 @@ public class StarTreeV2BuilderConfig {
           "Can not skip star-node creation for dimensions not in the split order, dimensionsSplitOrder: %s, "
               + "skipStarNodeCreationForDimensions: %s", dimensionsSplitOrder, skipStarNodeCreationForDimensions);
     } else {
-      skipStarNodeCreationForDimensions = Collections.emptySet();
+      skipStarNodeCreationForDimensions = Set.of();
     }
     TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = new TreeMap<>();
     if (indexConfig.getFunctionColumnPairs() != null) {
@@ -110,23 +107,16 @@ public class StarTreeV2BuilderConfig {
         starTreeV2Metadata.getMaxLeafRecords());
   }
 
-  /**
-   * Generates default config based on the segment metadata.
-   * <ul>
-   *   <li>
-   *     All dictionary-encoded single-value dimensions with cardinality smaller or equal to the threshold will be
-   *     included in the split order, sorted by their cardinality in descending order.
-   *   </li>
-   *   <li>
-   *     All dictionary-encoded Time/DateTime columns will be appended to the split order following the dimensions,
-   *     sorted by their cardinality in descending order. Here we assume that time columns will be included in most
-   *     queries as the range filter column and/or the group by column, so for better performance, we always include
-   *     them as the last elements in the split order.
-   *   </li>
-   *   <li>Use COUNT(*) and SUM for all numeric metrics as function column pairs</li>
-   *   <li>Use default value for max leaf records</li>
-   * </ul>
-   */
+  /// Generates default config based on the segment metadata.
+  ///
+  /// - All dictionary-encoded single-value dimensions with cardinality smaller or equal to the threshold will be
+  ///   included in the split order, sorted by their cardinality in descending order.
+  /// - All dictionary-encoded Time/DateTime columns will be appended to the split order following the dimensions,
+  ///   sorted by their cardinality in descending order. Here we assume that time columns will be included in most
+  ///   queries as the range filter column and/or the group by column, so for better performance, we always include
+  ///   them as the last elements in the split order.
+  /// - Use COUNT(\*) and SUM for all numeric metrics as function column pairs
+  /// - Use default value for max leaf records
   public static StarTreeV2BuilderConfig generateDefaultConfig(SegmentMetadata segmentMetadata) {
     Schema schema = segmentMetadata.getSchema();
     List<ColumnMetadata> dimensionColumnMetadataList = new ArrayList<>();
@@ -183,7 +173,7 @@ public class StarTreeV2BuilderConfig {
           AggregationSpec.DEFAULT);
     }
 
-    return new StarTreeV2BuilderConfig(dimensionsSplitOrder, Collections.emptySet(), aggregationSpecs,
+    return new StarTreeV2BuilderConfig(dimensionsSplitOrder, Set.of(), aggregationSpecs,
         DEFAULT_MAX_LEAF_RECORDS);
   }
 
@@ -249,7 +239,7 @@ public class StarTreeV2BuilderConfig {
           AggregationSpec.DEFAULT);
     }
 
-    return new StarTreeV2BuilderConfig(dimensionsSplitOrder, Collections.emptySet(), aggregationSpecs,
+    return new StarTreeV2BuilderConfig(dimensionsSplitOrder, Set.of(), aggregationSpecs,
         DEFAULT_MAX_LEAF_RECORDS);
   }
 
@@ -290,9 +280,7 @@ public class StarTreeV2BuilderConfig {
     return _maxLeafRecords;
   }
 
-  /**
-   * Writes the metadata which is used to initialize the {@link StarTreeV2Metadata} when loading the segment.
-   */
+  /// Writes the metadata which is used to initialize the [StarTreeV2Metadata] when loading the segment.
   public void writeMetadata(Configuration metadataProperties, int totalDocs) {
     StarTreeV2Metadata.writeMetadata(metadataProperties, totalDocs, _dimensionsSplitOrder, _aggregationSpecs,
         _maxLeafRecords, _skipStarNodeCreationForDimensions);

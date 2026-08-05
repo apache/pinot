@@ -24,11 +24,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
-/**
- * Abstract {@link SchedulerGroup} class that provides common facilities like
- * managing pending queries as a Linked queue of requests and provides basic accounting
- * by tracking running queries, reserved threads and in-use threads
- */
+/// Abstract [SchedulerGroup] class that provides common facilities like
+/// managing pending queries as a Linked queue of requests and provides basic accounting
+/// by tracking running queries, reserved threads and in-use threads
 public abstract class AbstractSchedulerGroup implements SchedulerGroup {
   // Queue of pending queries for this group
   protected final ConcurrentLinkedQueue<SchedulerQueryContext> _pendingQueries = new ConcurrentLinkedQueue<>();

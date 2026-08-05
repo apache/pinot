@@ -25,8 +25,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -41,6 +41,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.segment.uploader.SegmentUploader;
@@ -53,10 +54,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A driver for the ingestion process of the provided file.
- * Responsible for copying the file locally, building a segment and uploading it to the controller.
- */
+/// A driver for the ingestion process of the provided file.
+/// Responsible for copying the file locally, building a segment and uploading it to the controller.
 public class FileIngestionHelper {
   private static final Logger LOGGER = LoggerFactory.getLogger(FileIngestionHelper.class);
   private static final String SEGMENT_UPLOADER_CLASS = "org.apache.pinot.plugin.segmentuploader.SegmentUploaderDefault";
@@ -73,20 +72,20 @@ public class FileIngestionHelper {
   private final URI _controllerUri;
   private final File _ingestionDir;
   private final AuthProvider _authProvider;
+  private final boolean _allowLocalFileSystemInUri;
 
   public FileIngestionHelper(TableConfig tableConfig, Schema schema, Map<String, String> batchConfigMap,
-      URI controllerUri, File ingestionDir, AuthProvider authProvider) {
+      URI controllerUri, File ingestionDir, AuthProvider authProvider, boolean allowLocalFileSystemInUri) {
     _tableConfig = tableConfig;
     _schema = schema;
     _batchConfigMap = batchConfigMap;
     _controllerUri = controllerUri;
     _ingestionDir = ingestionDir;
     _authProvider = authProvider;
+    _allowLocalFileSystemInUri = allowLocalFileSystemInUri;
   }
 
-  /**
-   * Creates a segment using the provided data file/URI and uploads to Pinot
-   */
+  /// Creates a segment using the provided data file/URI and uploads to Pinot
   public SuccessResponse buildSegmentAndPush(DataPayload payload)
       throws Exception {
     String tableNameWithType = _tableConfig.getTableName();
@@ -112,7 +111,7 @@ public class FileIngestionHelper {
       File inputFile = new File(inputDir, String.format(
           "%s.%s", DATA_FILE_PREFIX, _batchConfigMap.get(BatchConfigProperties.INPUT_FORMAT).toLowerCase()));
       if (payload._payloadType == PayloadType.URI) {
-        copyURIToLocal(_batchConfigMap, payload._uri, inputFile);
+        copyURIToLocal(_batchConfigMap, payload._uri, inputFile, _allowLocalFileSystemInUri);
         LOGGER.info("Copied from URI: {} to local file: {}", payload._uri, inputFile.getAbsolutePath());
       } else {
         copyMultipartToLocal(payload._multiPart, inputFile);
@@ -133,7 +132,7 @@ public class FileIngestionHelper {
         batchConfigMapOverride.put(segmentNamePostfixProp, String.valueOf(System.currentTimeMillis()));
       }
       BatchIngestionConfig batchIngestionConfigOverride =
-          new BatchIngestionConfig(Collections.singletonList(batchConfigMapOverride),
+          new BatchIngestionConfig(List.of(batchConfigMapOverride),
               IngestionConfigUtils.getBatchSegmentIngestionType(_tableConfig),
               IngestionConfigUtils.getBatchSegmentIngestionFrequency(_tableConfig));
 
@@ -171,22 +170,52 @@ public class FileIngestionHelper {
     }
   }
 
-  /**
-   * Copy the file from given URI to local file
-   */
+  /// Copy the file from given URI to local file
   public static void copyURIToLocal(Map<String, String> batchConfigMap, URI sourceFileURI, File destFile)
       throws Exception {
+    copyURIToLocal(batchConfigMap, sourceFileURI, destFile, true);
+  }
+
+  public static void copyURIToLocal(Map<String, String> batchConfigMap, URI sourceFileURI, File destFile,
+      boolean allowLocalFileSystem)
+      throws Exception {
     String sourceFileURIScheme = sourceFileURI.getScheme();
+    Preconditions.checkArgument(allowLocalFileSystem || StringUtils.isNotBlank(sourceFileURIScheme),
+        "Source URI must include a scheme: %s", sourceFileURI);
+    Preconditions.checkArgument(allowLocalFileSystem
+            || !PinotFSFactory.LOCAL_PINOT_FS_SCHEME.equalsIgnoreCase(sourceFileURIScheme),
+        "Local filesystem URIs are not allowed for /ingestFromURI: %s", sourceFileURI);
     if (!PinotFSFactory.isSchemeSupported(sourceFileURIScheme)) {
-      PinotFSFactory.register(sourceFileURIScheme, batchConfigMap.get(BatchConfigProperties.INPUT_FS_CLASS),
-          IngestionConfigUtils.getInputFsProps(batchConfigMap));
+      String inputFsClassName = batchConfigMap.get(BatchConfigProperties.INPUT_FS_CLASS);
+      Preconditions.checkArgument(StringUtils.isNotBlank(inputFsClassName),
+          "Must provide %s for unsupported scheme: %s", BatchConfigProperties.INPUT_FS_CLASS, sourceFileURIScheme);
+      Preconditions.checkArgument(allowLocalFileSystem || !isLocalPinotFSClassName(inputFsClassName),
+          "Local filesystem implementation is not allowed for /ingestFromURI: %s", inputFsClassName);
+      try {
+        PinotFSFactory.register(sourceFileURIScheme, inputFsClassName,
+            IngestionConfigUtils.getInputFsProps(batchConfigMap));
+      } catch (RuntimeException e) {
+        throw new IllegalArgumentException(
+            String.format("Invalid %s for /ingestFromURI: %s", BatchConfigProperties.INPUT_FS_CLASS,
+                inputFsClassName), e);
+      }
     }
+    Preconditions.checkArgument(allowLocalFileSystem
+            || !PinotFSFactory.isSchemeRegisteredWith(sourceFileURIScheme, LocalPinotFS.class),
+        "Local filesystem implementation is not allowed for /ingestFromURI: %s", sourceFileURIScheme);
     PinotFSFactory.create(sourceFileURIScheme).copyToLocalFile(sourceFileURI, destFile);
   }
 
-  /**
-   * Copy the file from the uploaded multipart to a local file
-   */
+  private static boolean isLocalPinotFSClassName(String className) {
+    String rawClassName = className;
+    int pluginSeparatorIndex = className.indexOf(':');
+    if (pluginSeparatorIndex >= 0) {
+      rawClassName = className.substring(pluginSeparatorIndex + 1);
+    }
+    return LocalPinotFS.class.getName().equals(PluginManager.loadClassWithBackwardCompatibleCheck(rawClassName));
+  }
+
+  /// Copy the file from the uploaded multipart to a local file
   public static void copyMultipartToLocal(FormDataMultiPart multiPart, File destFile)
       throws IOException {
     FormDataBodyPart formDataBodyPart = multiPart.getFields().values().iterator().next().get(0);
@@ -198,16 +227,12 @@ public class FileIngestionHelper {
     }
   }
 
-  /**
-   * Enum to identify the source of ingestion file
-   */
+  /// Enum to identify the source of ingestion file
   private enum PayloadType {
     URI, FILE
   }
 
-  /**
-   * Wrapper around file payload
-   */
+  /// Wrapper around file payload
   public static class DataPayload {
     PayloadType _payloadType;
     FormDataMultiPart _multiPart;

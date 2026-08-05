@@ -33,11 +33,9 @@ import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * A {@link BlockValSet} implementation backed by row major data.
- *
- * TODO: Support MV
- */
+/// A [BlockValSet] implementation backed by row major data.
+///
+/// TODO: Support MV
 public class RowBasedBlockValSet implements BlockValSet {
   private final DataType _dataType;
   private final DataType _storedType;
@@ -94,6 +92,12 @@ public class RowBasedBlockValSet implements BlockValSet {
   @Override
   public Dictionary getDictionary() {
     return null;
+  }
+
+  /// Row-based value sets never carry a dictionary; the dict-id read methods below always throw.
+  @Override
+  public boolean isDictionaryEncoded() {
+    return false;
   }
 
   @Override

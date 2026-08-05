@@ -34,12 +34,14 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils.IndexKey;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils.IndexValue;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataKey;
@@ -52,13 +54,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code MultipleTreesBuilder} class is the top level star-tree builder that takes a list of
- * {@link StarTreeIndexConfig}s and a boolean flag for the default star-tree, and builds multiple star-trees with the
- * given {@link BuildMode} ({@code ON_HEAP} or {@code OFF_HEAP}).
- * <p>The indexes for all star-trees will be stored in a single index file, and there will be an extra index map file to
- * mark the offset and size of each index in the index file.
- */
+/// The `MultipleTreesBuilder` class is the top level star-tree builder that takes a list of
+/// [StarTreeIndexConfig]s and a boolean flag for the default star-tree, and builds multiple star-trees with the
+/// given [BuildMode] (`ON_HEAP` or `OFF_HEAP`).
+///
+/// The indexes for all star-trees will be stored in a single index file, and there will be an extra index map file to
+/// mark the offset and size of each index in the index file.
 public class MultipleTreesBuilder implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultipleTreesBuilder.class);
 
@@ -77,14 +78,18 @@ public class MultipleTreesBuilder implements Closeable {
     ON_HEAP, OFF_HEAP
   }
 
-  /**
-   * Constructor for the multiple star-trees builder.
-   *
-   * @param builderConfigs List of builder configs (should already be deduplicated)
-   * @param indexDir Index directory
-   * @param buildMode Build mode (ON_HEAP or OFF_HEAP)
-   */
+  /// Constructor for the multiple star-trees builder.
+  ///
+  /// @param builderConfigs List of builder configs (should already be deduplicated)
+  /// @param indexDir Index directory
+  /// @param buildMode Build mode (ON_HEAP or OFF_HEAP)
   public MultipleTreesBuilder(List<StarTreeV2BuilderConfig> builderConfigs, File indexDir, BuildMode buildMode)
+      throws Exception {
+    this(builderConfigs, indexDir, buildMode, null);
+  }
+
+  public MultipleTreesBuilder(List<StarTreeV2BuilderConfig> builderConfigs, File indexDir, BuildMode buildMode,
+      @Nullable IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     Preconditions.checkArgument(CollectionUtils.isNotEmpty(builderConfigs), "Must provide star-tree builder configs");
     _builderConfigs = builderConfigs;
@@ -103,20 +108,53 @@ public class MultipleTreesBuilder implements Closeable {
       }
       LOGGER.debug(logUpdatedStarTrees.toString());
     }
-    _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
+    _segment = loadSegment(indexDir, indexLoadingConfig);
     _starTreeCreationFailed = false;
   }
 
-  /**
-   * Constructor for the multiple star-trees builder.
-   *
-   * @param indexConfigs List of index configs
-   * @param enableDefaultStarTree Whether to enable the default star-tree
-   * @param indexDir Index directory
-   * @param buildMode Build mode (ON_HEAP or OFF_HEAP)
-   */
+  private static ImmutableSegment loadSegment(File indexDir, @Nullable IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
+    if (indexLoadingConfig != null && indexLoadingConfig.getTableConfig() != null) {
+      // Minimal IndexLoadingConfig carrying only TableConfig. Schema is intentionally null so the
+      // segment loader uses the segment's own column set rather than filtering against an in-flight
+      // schema (e.g. one that adds/removes columns during pre-processing). Also do NOT propagate
+      // segmentTier/segmentDirectoryLoader from the parent — a tier loader would treat this as a
+      // tier-resolution event and relocate the segment mid-build. TableConfig threads table-level
+      // config to downstream readers (e.g. external-storage forward-index readers).
+      IndexLoadingConfig localConfig = new IndexLoadingConfig(indexLoadingConfig.getTableConfig(), null);
+      localConfig.setReadMode(ReadMode.mmap);
+      return ImmutableSegmentLoader.load(indexDir, localConfig, false);
+    }
+    return ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
+  }
+
+  /// Constructor for the multiple star-trees builder.
+  ///
+  /// @param indexConfigs List of index configs
+  /// @param enableDefaultStarTree Whether to enable the default star-tree
+  /// @param indexDir Index directory
+  /// @param buildMode Build mode (ON_HEAP or OFF_HEAP)
   public MultipleTreesBuilder(@Nullable List<StarTreeIndexConfig> indexConfigs, boolean enableDefaultStarTree,
       File indexDir, BuildMode buildMode)
+      throws Exception {
+    this(indexConfigs, enableDefaultStarTree, indexDir, buildMode, null);
+  }
+
+  /// Constructor for star-tree build invoked during segment creation. Derives the star-tree index
+  /// configs, enable-default flag, build mode, and (optional) IndexLoadingConfig from the supplied
+  /// [SegmentGeneratorConfig] so downstream readers (e.g. external-table forward-index readers
+  /// backed by remote storage) can resolve table-level configs during the in-place segment load.
+  public MultipleTreesBuilder(File indexDir, SegmentGeneratorConfig segmentGeneratorConfig)
+      throws Exception {
+    this(segmentGeneratorConfig.getStarTreeIndexConfigs(), segmentGeneratorConfig.isEnableDefaultStarTree(), indexDir,
+        segmentGeneratorConfig.isOnHeap() ? BuildMode.ON_HEAP : BuildMode.OFF_HEAP,
+        (segmentGeneratorConfig.getTableConfig() != null && segmentGeneratorConfig.getSchema() != null)
+            ? new IndexLoadingConfig(segmentGeneratorConfig.getTableConfig(), segmentGeneratorConfig.getSchema())
+            : null);
+  }
+
+  public MultipleTreesBuilder(@Nullable List<StarTreeIndexConfig> indexConfigs, boolean enableDefaultStarTree,
+      File indexDir, BuildMode buildMode, @Nullable IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     Preconditions.checkArgument(CollectionUtils.isNotEmpty(indexConfigs) || enableDefaultStarTree,
         "Must provide star-tree index configs or enable default star-tree");
@@ -126,7 +164,7 @@ public class MultipleTreesBuilder implements Closeable {
     _metadataProperties =
         CommonsConfigurationUtils.fromFile(new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
     Preconditions.checkState(!_metadataProperties.containsKey(MetadataKey.STAR_TREE_COUNT), "Star-tree already exists");
-    _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
+    _segment = loadSegment(indexDir, indexLoadingConfig);
     try {
       _builderConfigs = StarTreeBuilderUtils.generateBuilderConfigs(indexConfigs, enableDefaultStarTree,
           _segment.getSegmentMetadata());
@@ -174,9 +212,7 @@ public class MultipleTreesBuilder implements Closeable {
     }
   }
 
-  /**
-   * Builds the star-trees.
-   */
+  /// Builds the star-trees.
   public void build()
       throws Exception {
     long startTime = System.currentTimeMillis();
@@ -237,13 +273,11 @@ public class MultipleTreesBuilder implements Closeable {
         System.currentTimeMillis() - startTime);
   }
 
-  /**
-   * Helper utility to move the individual star-tree files to the {@param starTreeIndexDir} from where it will be picked
-   * by the combiner to merge them into the single star-tree index file. The method also takes care of updating the
-   * {@param metadataProperties} for the star-tree.
-   * Returns {@code false} if the star-tree is not present in the existing star-trees, otherwise returns {@code true}
-   * upon successful transfer completion
-   */
+  /// Helper utility to move the individual star-tree files to the {@param starTreeIndexDir} from where it will be
+  /// picked by the combiner to merge them into the single star-tree index file. The method also takes care of updating
+  /// the {@param metadataProperties} for the star-tree.
+  /// Returns `false` if the star-tree is not present in the existing star-trees, otherwise returns `true`
+  /// upon successful transfer completion
   private boolean handleExistingStarTreeAddition(File starTreeIndexDir, Configuration metadataProperties,
       StarTreeV2BuilderConfig builderConfig)
       throws IOException {

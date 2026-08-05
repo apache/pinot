@@ -30,7 +30,6 @@ import java.sql.DriverManager;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -58,7 +57,6 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
-import org.apache.pinot.client.PinotClientTransportFactory;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
@@ -101,9 +99,7 @@ import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
 
 
-/**
- * Shared implementation details of the cluster integration tests.
- */
+/// Shared implementation details of the cluster integration tests.
 public abstract class BaseClusterIntegrationTest extends ClusterTest {
   // Default settings
   protected static final String DEFAULT_TABLE_NAME = "mytable";
@@ -127,7 +123,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected static final String DEFAULT_SORTED_COLUMN = "Carrier";
   protected static final List<String> DEFAULT_INVERTED_INDEX_COLUMNS = Arrays.asList("FlightNum", "Origin", "Quarter");
   private static final List<String> DEFAULT_BLOOM_FILTER_COLUMNS = Arrays.asList("FlightNum", "Origin");
-  private static final List<String> DEFAULT_RANGE_INDEX_COLUMNS = Collections.singletonList("Origin");
+  private static final List<String> DEFAULT_RANGE_INDEX_COLUMNS = List.of("Origin");
   protected static final int DEFAULT_NUM_REPLICAS = 1;
   protected static final boolean DEFAULT_NULL_HANDLING_ENABLED = false;
 
@@ -141,9 +137,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected Connection _h2Connection;
   protected QueryGenerator _queryGenerator;
 
-  /**
-   * The following getters can be overridden to change default settings.
-   */
+  /// The following getters can be overridden to change default settings.
 
   protected String getTableName() {
     return DEFAULT_TABLE_NAME;
@@ -186,9 +180,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return useKafkaTransaction() ? DEFAULT_TRANSACTION_NUM_KAFKA_BROKERS : DEFAULT_LLC_NUM_KAFKA_BROKERS;
   }
 
-  /**
-   * Override to pass extra Kafka broker config properties when starting the embedded Kafka cluster.
-   */
+  /// Override to pass extra Kafka broker config properties when starting the embedded Kafka cluster.
   protected Properties getKafkaExtraProperties() {
     return new Properties();
   }
@@ -314,9 +306,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return null;
   }
 
-  /**
-   * Creates a new schema.
-   */
+  /// Creates a new schema.
   protected Schema createSchema()
       throws IOException {
     Schema schema = createSchema(getSchemaFileName());
@@ -350,9 +340,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return JsonUtils.inputStreamToObject(inputStream, TableConfig.class);
   }
 
-  /**
-   * Creates a new OFFLINE table config.
-   */
+  /// Creates a new OFFLINE table config.
   protected TableConfig createOfflineTableConfig() {
     // @formatter:off
     return new TableConfigBuilder(TableType.OFFLINE)
@@ -379,9 +367,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     // @formatter:on
   }
 
-  /**
-   * Returns the OFFLINE table config in the cluster.
-   */
+  /// Returns the OFFLINE table config in the cluster.
   protected TableConfig getOfflineTableConfig() {
     return getOfflineTableConfig(getTableName());
   }
@@ -435,17 +421,13 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return builder.toString();
   }
 
-  /**
-   * Creates a new REALTIME table config.
-   */
+  /// Creates a new REALTIME table config.
   protected TableConfig createRealtimeTableConfig(File sampleAvroFile) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
     return getTableConfigBuilder(TableType.REALTIME).build();
   }
 
-  /**
-   * Creates a LogicalTableConfig backed by the OFFLINE and REALTIME physical tables.
-   */
+  /// Creates a LogicalTableConfig backed by the OFFLINE and REALTIME physical tables.
   protected LogicalTableConfig createLogicalTableConfig() {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
@@ -465,10 +447,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .build();
   }
 
-  /**
-   * Registers a logical table backed by the OFFLINE and REALTIME physical tables.
-   * The schema for the logical table should be created separately before calling this method.
-   */
+  /// Registers a logical table backed by the OFFLINE and REALTIME physical tables.
+  /// The schema for the logical table should be created separately before calling this method.
   protected void createLogicalTable()
       throws Exception {
     LogicalTableConfig logicalTableConfig = createLogicalTableConfig();
@@ -503,9 +483,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setReplicaGroupStrategyConfig(getReplicaGroupStrategyConfig());
   }
 
-  /**
-   * Creates a new Upsert enabled table config.
-   */
+  /// Creates a new Upsert enabled table config.
   protected TableConfig createUpsertTableConfig(File sampleAvroFile, String primaryKeyColumn, String deleteColumn,
       int numPartitions) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
@@ -545,9 +523,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return csvDecoderProperties;
   }
 
-  /**
-   * Creates a new Upsert enabled table config.
-   */
+  /// Creates a new Upsert enabled table config.
   protected TableConfig createCSVUpsertTableConfig(String tableName, @Nullable String kafkaTopicName, int numPartitions,
       Map<String, String> streamDecoderProperties, UpsertConfig upsertConfig, String primaryKeyColumn) {
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
@@ -580,9 +556,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setUpsertConfig(upsertConfig).build();
   }
 
-  /**
-   * Creates a new Dedup enabled table config
-   */
+  /// Creates a new Dedup enabled table config
   protected TableConfig createDedupTableConfig(File sampleAvroFile, String primaryKeyColumn, int numPartitions) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
@@ -608,26 +582,20 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .build();
   }
 
-  /**
-   * Returns the REALTIME table config in the cluster.
-   */
+  /// Returns the REALTIME table config in the cluster.
   protected TableConfig getRealtimeTableConfig() {
     return getRealtimeTableConfig(getTableName());
   }
 
-  /**
-   * Returns the headers to be used for the connection to Pinot cluster.
-   * {@link PinotClientTransportFactory}
-   */
+  /// Returns the headers to be used for the connection to Pinot cluster.
+  /// [org.apache.pinot.client.PinotClientTransportFactory]
   protected Map<String, String> getPinotClientTransportHeaders() {
     return Map.of();
   }
 
-  /**
-   * Get the Pinot connection.
-   *
-   * @return Pinot connection
-   */
+  /// Get the Pinot connection.
+  ///
+  /// @return Pinot connection
   protected org.apache.pinot.client.Connection getPinotConnection() {
     // TODO: This code is assuming getPinotConnectionProperties() will always return the same values
     if (useMultiStageQueryEngine()) {
@@ -641,7 +609,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
     if (_pinotConnection == null) {
       JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory()
-        .withConnectionProperties(getPinotConnectionProperties());
+          .withConnectionProperties(getPinotConnectionProperties());
       factory.setHeaders(getPinotClientTransportHeaders());
       _pinotConnection = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(),
           factory.buildTransport());
@@ -655,29 +623,23 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return properties;
   }
 
-  /**
-   * Get the H2 connection. H2 connection must be set up before calling this method.
-   *
-   * @return H2 connection
-   */
+  /// Get the H2 connection. H2 connection must be set up before calling this method.
+  ///
+  /// @return H2 connection
   protected Connection getH2Connection() {
     Assert.assertNotNull(_h2Connection, "H2 Connection has not been initialized");
     return _h2Connection;
   }
 
-  /**
-   * Get the query generator. Query generator must be set up before calling this method.
-   *
-   * @return Query generator.
-   */
+  /// Get the query generator. Query generator must be set up before calling this method.
+  ///
+  /// @return Query generator.
   protected QueryGenerator getQueryGenerator() {
     Assert.assertNotNull(_queryGenerator, "Query Generator has not been initialized");
     return _queryGenerator;
   }
 
-  /**
-   * Sets up the H2 connection
-   */
+  /// Sets up the H2 connection
   protected void setUpH2Connection()
       throws Exception {
     Assert.assertNull(_h2Connection);
@@ -685,18 +647,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     _h2Connection = DriverManager.getConnection("jdbc:h2:mem:");
   }
 
-  /**
-   * Sets up the H2 connection to a table with pre-loaded data.
-   */
+  /// Sets up the H2 connection to a table with pre-loaded data.
   protected void setUpH2Connection(List<File> avroFiles)
       throws Exception {
     setUpH2Connection();
     ClusterIntegrationTestUtils.setUpH2TableWithAvro(avroFiles, getTableName(), _h2Connection);
   }
 
-  /**
-   * Sets up the query generator using the given Avro files.
-   */
+  /// Sets up the query generator using the given Avro files.
   protected void setUpQueryGenerator(List<File> avroFiles) {
     Assert.assertNull(_queryGenerator);
     String tableName = getTableName();
@@ -708,14 +666,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return unpackTarData(getAvroTarFileName(), outputDir);
   }
 
-  /**
-   * Unpack the tarred data into the given directory.
-   *
-   * @param tarFileName Input tar filename
-   * @param outputDir Output directory
-   * @return List of files unpacked.
-   * @throws Exception
-   */
+  /// Unpack the tarred data into the given directory.
+  ///
+  /// @param tarFileName Input tar filename
+  /// @param outputDir Output directory
+  /// @return List of files unpacked.
+  /// @throws Exception
   protected List<File> unpackTarData(String tarFileName, File outputDir)
       throws Exception {
     InputStream inputStream = getClass().getClassLoader().getResourceAsStream(tarFileName);
@@ -818,7 +774,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     EmbeddedKafkaCluster cluster = new EmbeddedKafkaCluster();
     cluster.init(props);
     cluster.start();
-    _kafkaStarters = Collections.singletonList(cluster);
+    _kafkaStarters = List.of(cluster);
     try {
       waitForKafkaClusterReady(getKafkaBrokerList(), requestedBrokers, useKafkaTransaction());
     } catch (RuntimeException e) {
@@ -958,7 +914,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
     try (AdminClient adminClient = AdminClient.create(adminProps)) {
       TopicDescription topicDescription =
-          adminClient.describeTopics(Collections.singletonList(topic)).allTopicNames().get(5, TimeUnit.SECONDS)
+          adminClient.describeTopics(List.of(topic)).allTopicNames().get(5, TimeUnit.SECONDS)
               .get(topic);
       if (topicDescription.partitions().size() < expectedPartitions) {
         return false;
@@ -1001,11 +957,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
   }
 
-  /**
-   * Get current result for "SELECT COUNT(*)".
-   *
-   * @return Current count start result
-   */
+  /// Get current result for "SELECT COUNT(\*)".
+  ///
+  /// @return Current count start result
   protected long getCurrentCountStarResult() {
     return getCurrentCountStarResult(getTableName());
   }
@@ -1048,12 +1002,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return getSegments(tableNameWithType).size();
   }
 
-  /**
-   * Wait for all documents to get loaded.
-   *
-   * @param timeoutMs Timeout in milliseconds
-   * @throws Exception
-   */
+  /// Wait for all documents to get loaded.
+  ///
+  /// @param timeoutMs Timeout in milliseconds
+  /// @throws Exception
   protected void waitForAllDocsLoaded(long timeoutMs)
       throws Exception {
     waitForAllDocsLoaded(getTableName(), timeoutMs);
@@ -1105,9 +1057,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return consumingPartitions.size();
   }
 
-  /**
-   * Wait for servers to remove the table data manager after the table is deleted.
-   */
+  /// Wait for servers to remove the table data manager after the table is deleted.
   protected void waitForTableDataManagerRemoved(String tableNameWithType) {
     TestUtils.waitForCondition(aVoid -> {
       for (BaseServerStarter serverStarter : _serverStarters) {
@@ -1119,9 +1069,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }, 60_000L, "Failed to remove table data manager for table: " + tableNameWithType);
   }
 
-  /**
-   * Reset table utils.
-   */
+  /// Reset table utils.
   protected void resetTable(String tableName, TableType tableType, @Nullable String targetInstance)
       throws IOException {
     try {
@@ -1132,26 +1080,20 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
   }
 
-  /**
-   * Run equivalent Pinot and H2 query and compare the results.
-   */
+  /// Run equivalent Pinot and H2 query and compare the results.
   protected void testQuery(@Language("sql") String query)
       throws Exception {
     testQuery(query, query);
   }
 
-  /**
-   * Run equivalent Pinot and H2 query and compare the results.
-   */
+  /// Run equivalent Pinot and H2 query and compare the results.
   protected void testQuery(@Language("sql") String pinotQuery, @Language("sql") String h2Query)
       throws Exception {
     ClusterIntegrationTestUtils.testQuery(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(), h2Query,
         getH2Connection(), null, getExtraQueryProperties(), useMultiStageQueryEngine());
   }
 
-  /**
-   * Run equivalent Pinot and H2 query and compare the results.
-   */
+  /// Run equivalent Pinot and H2 query and compare the results.
   protected void testQueryWithMatchingRowCount(@Language("sql") String pinotQuery, @Language("sql") String h2Query)
       throws Exception {
     ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(),
@@ -1178,9 +1120,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return JsonUtils.objectToJsonNode(metadata).get("columnIndexSizeMap").get(column);
   }
 
-  /**
-   * Get all segment names for a given tableName and tableType.
-   */
+  /// Get all segment names for a given tableName and tableType.
   protected List<String> getSegmentNames(String tableName, @Nullable String tableType)
       throws Exception {
     return getOrCreateAdminClient().getSegmentClient().listSegments(tableName, tableType, true);

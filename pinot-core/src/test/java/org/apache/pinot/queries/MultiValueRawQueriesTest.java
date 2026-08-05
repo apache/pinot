@@ -164,12 +164,10 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  /**
-   * Helper method to generate records based on the given base value.
-   *
-   * All columns will have the same value but different data types (BYTES values are encoded STRING values).
-   * For the {i}th unique record, the value will be {baseValue + i}.
-   */
+  /// Helper method to generate records based on the given base value.
+  ///
+  /// All columns will have the same value but different data types (BYTES values are encoded STRING values).
+  /// For the {i}th unique record, the value will be {baseValue + i}.
   private List<GenericRow> generateRecords(int baseValue) {
     List<GenericRow> uniqueRecords = new ArrayList<>(NUM_UNIQUE_RECORDS_PER_SEGMENT);
     for (int i = 0; i < NUM_UNIQUE_RECORDS_PER_SEGMENT; i++) {
@@ -384,10 +382,8 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
     }
   }
 
-  /**
-   * Today selection ORDER BY only on MV columns (irrespective of whether it's dictionary based or raw) doesn't work
-   * as the semantics of how such queries should behave isn't clear. Such queries should always fail.
-   */
+  /// Today selection ORDER BY only on MV columns (irrespective of whether it's dictionary based or raw) doesn't work
+  /// as the semantics of how such queries should behave isn't clear. Such queries should always fail.
   @Test
   public void testSelectionOrderBy() {
     {
@@ -2100,7 +2096,7 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       ResultTable resultTable = getBrokerResponse(query).getResultTable();
 
       DataSchema dataSchema = new DataSchema(new String[]{"countmv(valuein(mvRawStringCol2,'" + val1 + "','" + val2
-          + "'))"},
+            + "'))"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG});
       assertEquals(resultTable.getDataSchema(), dataSchema);
 

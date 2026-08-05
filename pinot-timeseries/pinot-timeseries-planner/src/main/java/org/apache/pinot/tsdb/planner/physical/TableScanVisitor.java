@@ -79,19 +79,17 @@ public class TableScanVisitor {
     }
   }
 
-  /**
-   * Adds table type information (offline/realtime) to the plan node.
-   * If the plan node is a leaf node, it retrieves the table route info and updates the table name with type.
-   * If the plan node has child nodes, it recursively processes each child node.
-   *
-   * @param planNode The {@link BaseTimeSeriesPlanNode} to process.
-   * @return The updated {@link BaseTimeSeriesPlanNode} with table type information.
-   */
+  /// Adds table type information (offline/realtime) to the plan node.
+  /// If the plan node is a leaf node, it retrieves the table route info and updates the table name with type.
+  /// If the plan node has child nodes, it recursively processes each child node.
+  ///
+  /// @param planNode The [BaseTimeSeriesPlanNode] to process.
+  /// @return The updated [BaseTimeSeriesPlanNode] with table type information.
   public BaseTimeSeriesPlanNode addTableTypeInfoToPlan(BaseTimeSeriesPlanNode planNode, RequestContext requestContext) {
     if (planNode instanceof LeafTimeSeriesPlanNode) {
       LeafTimeSeriesPlanNode sfpNode = (LeafTimeSeriesPlanNode) planNode;
       TableRouteInfo routeInfo = _tableRouteProvider.getTableRouteInfo(sfpNode.getTableName(), _tableCache,
-        _routingManager);
+          _routingManager);
       String tableNameWithType = getTableNameWithType(routeInfo);
       Preconditions.checkNotNull(tableNameWithType, "Table not found for table name: " + sfpNode.getTableName());
       requestContext.setTableName(tableNameWithType);
@@ -106,16 +104,14 @@ public class TableScanVisitor {
   }
 
 
-  /**
-   * Returns the table name with type (offline/realtime) if the table exists, otherwise returns null.
-   *
-   * @param routeInfo The {@link TableRouteInfo} for the table.
-   * @return The table name with type, or null if the table does not exist.
-   */
+  /// Returns the table name with type (offline/realtime) if the table exists, otherwise returns null.
+  ///
+  /// @param routeInfo The [TableRouteInfo] for the table.
+  /// @return The table name with type, or null if the table does not exist.
   @Nullable
   private String getTableNameWithType(TableRouteInfo routeInfo) {
     Preconditions.checkState(!routeInfo.isHybrid(),
-      "Hybrid tables are not supported yet for timeseries queries");
+        "Hybrid tables are not supported yet for timeseries queries");
     if (routeInfo.isOffline()) {
       return routeInfo.getOfflineTableName();
     }

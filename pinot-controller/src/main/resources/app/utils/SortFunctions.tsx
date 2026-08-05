@@ -24,8 +24,29 @@ import app_state from "../app_state";
 // table sorting requires a 1/-1 result. This helper function helps calculate this
 // from any two results.
 const valuesToResultNumber = (aRes: any, bRes: any, order: boolean): number => {
+    if (aRes === bRes) {
+        return 0;
+    }
     const result = order ? aRes > bRes : aRes < bRes;
     return result ? 1 : -1;
+}
+
+const getCellValue = (row: any, column: string, index: number): any => {
+    const cellValue = row[column+app_state.columnNameSeparator+index];
+    if (cellValue && typeof cellValue === "object" && "value" in cellValue) {
+        return cellValue.value;
+    }
+    return cellValue;
+}
+
+const normalizeCellValue = (value: any): string | number => {
+    if (typeof value === "number") {
+        return value;
+    }
+    if (value === null || value === undefined) {
+        return "";
+    }
+    return value.toString().toLowerCase();
 }
 
 export const sortNumberOfSegments: TableSortFunction = (a: any, b: any, column: string, index: number, order: boolean) => {
@@ -46,4 +67,10 @@ export const sortBytes: TableSortFunction = (a: any, b: any, column: string, ind
     } else {
         return valuesToResultNumber(aUnitIndex, bUnitIndex, order);
     }
+}
+
+export const sortCellValue: TableSortFunction = (a: any, b: any, column: string, index: number, order: boolean) => {
+    const aValue = normalizeCellValue(getCellValue(a, column, index));
+    const bValue = normalizeCellValue(getCellValue(b, column, index));
+    return valuesToResultNumber(aValue, bValue, order);
 }

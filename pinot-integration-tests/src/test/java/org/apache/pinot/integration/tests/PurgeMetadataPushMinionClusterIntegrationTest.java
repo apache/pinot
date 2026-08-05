@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.integration.tests;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.core.common.MinionConstants;
@@ -28,11 +27,9 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.testng.annotations.Test;
 
 
-/**
- * Integration test that runs the Purge minion task with METADATA {@link
- * org.apache.pinot.spi.ingestion.batch.BatchConfigProperties.SegmentPushType} to verify the full flow.
- * Only {@link #testFirstRunPurge()} is enabled; other tests from the base class are disabled.
- */
+/// Integration test that runs the Purge minion task with METADATA
+/// [org.apache.pinot.spi.ingestion.batch.BatchConfigProperties.SegmentPushType] to verify the full flow.
+/// Only [#testFirstRunPurge()] is enabled; other tests from the base class are disabled.
 public class PurgeMetadataPushMinionClusterIntegrationTest extends PurgeMinionClusterIntegrationTest {
 
   @Override
@@ -41,7 +38,7 @@ public class PurgeMetadataPushMinionClusterIntegrationTest extends PurgeMinionCl
     tableTaskConfigs.put(MinionConstants.PurgeTask.LAST_PURGE_TIME_THREESOLD_PERIOD, "1d");
     tableTaskConfigs.put(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.METADATA.name());
     tableTaskConfigs.put(MinionTaskUtils.ALLOW_METADATA_PUSH_WITH_LOCAL_FS, "true");
-    return new TableTaskConfig(Collections.singletonMap(MinionConstants.PurgeTask.TASK_TYPE, tableTaskConfigs));
+    return new TableTaskConfig(Map.of(MinionConstants.PurgeTask.TASK_TYPE, tableTaskConfigs));
   }
 
   @Override

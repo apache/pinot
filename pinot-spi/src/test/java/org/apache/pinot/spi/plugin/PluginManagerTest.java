@@ -22,8 +22,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 import javax.tools.JavaCompiler;
@@ -337,6 +339,45 @@ public class PluginManagerTest {
     PluginManager instance1 = PluginManager.get();
     PluginManager instance2 = PluginManager.get();
     Assert.assertSame(instance1, instance2, "PluginManager should be a singleton");
+  }
+
+  @Test
+  public void testGetPluginClassLoadersEmptyOnFreshInstance() {
+    PluginManager pm = new PluginManager();
+    Set<ClassLoader> loaders = pm.getPluginClassLoaders();
+    Assert.assertNotNull(loaders, "getPluginClassLoaders() must never return null");
+    Assert.assertTrue(loaders.isEmpty(),
+        "A fresh PluginManager with no loaded plugins should return an empty set");
+  }
+
+  @Test
+  public void testGetPluginClassLoadersIncludesNewStylePlugin()
+      throws Exception {
+    // New-style plugins (with pinot-plugin.properties) are loaded into a ClassRealm.
+    // Old-style plugins (without the file) are NOT returned by getPluginClassLoaders().
+    File newStyleDir = new File(_tempDir, "new-style-plugin-for-cl-test");
+    newStyleDir.mkdirs();
+    Files.createFile(newStyleDir.toPath().resolve("pinot-plugin.properties"));
+    try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(new File(newStyleDir, "dummy.jar")))) {
+      // intentionally empty JAR
+    }
+    File oldStyleDir = new File(_tempDir, "old-style-plugin-for-cl-test");
+    oldStyleDir.mkdirs();
+    try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(new File(oldStyleDir, "dummy.jar")))) {
+      // intentionally empty JAR — no pinot-plugin.properties
+    }
+
+    PluginManager pm = new PluginManager();
+    Assert.assertTrue(pm.getPluginClassLoaders().isEmpty(), "Should start empty");
+
+    pm.load("old-style-plugin-for-cl-test", oldStyleDir);
+    Assert.assertTrue(pm.getPluginClassLoaders().isEmpty(),
+        "Old-style plugins must not appear in getPluginClassLoaders()");
+
+    pm.load("new-style-plugin-for-cl-test", newStyleDir);
+    Set<ClassLoader> loaders = pm.getPluginClassLoaders();
+    Assert.assertEquals(loaders.size(), 1,
+        "New-style plugin must appear in getPluginClassLoaders()");
   }
 
   @Test

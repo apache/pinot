@@ -36,9 +36,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.*;
 
 
-/**
- * The config used for HelixInstanceDataManager.
- */
+/// The config used for HelixInstanceDataManager.
 public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManagerConfig.class);
 
@@ -170,7 +168,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
     // Tier names are defined by pinot.server.instance.tierConfigs.tierNames = tierA,tierB
     // Specific configs for a tier are like pinot.server.instance.tierConfigs.tierA.someKey = someValue
     PinotConfiguration tierConfigs = getConfig().subset(TIER_CONFIGS_PREFIX);
-    List<String> tierNames = tierConfigs.getProperty(TIER_NAMES, Collections.emptyList());
+    List<String> tierNames = tierConfigs.getProperty(TIER_NAMES, List.of());
     for (String tierName : tierNames) {
       Map<String, String> mergedProps = new HashMap<>(unmodifiableDefaultTierProperties);
       tierConfigs.subset(tierName).toMap().forEach((k, v) -> mergedProps.put(k, String.valueOf(v)));

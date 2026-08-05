@@ -35,9 +35,9 @@ public class IngestionJobLauncherTest {
   @BeforeMethod
   public void setup() {
     _defaultEnvironmentValues = new HashMap<String, String>() {{
-      put("year", "2022");
-      put("month", "08");
-    }};
+        put("year", "2022");
+        put("month", "08");
+      }};
   }
   @Test
   public void testIngestionJobLauncherWithTemplate() {

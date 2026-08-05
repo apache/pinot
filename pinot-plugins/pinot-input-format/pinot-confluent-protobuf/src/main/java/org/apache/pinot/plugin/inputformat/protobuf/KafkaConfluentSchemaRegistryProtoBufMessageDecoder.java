@@ -27,8 +27,8 @@ import io.confluent.kafka.schemaregistry.client.rest.RestService;
 import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchemaProvider;
 import io.confluent.kafka.serializers.protobuf.KafkaProtobufDeserializer;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -62,17 +62,13 @@ public class KafkaConfluentSchemaRegistryProtoBufMessageDecoder implements Strea
   @Nullable
   private final Consumer<Message> _onMessage;
 
-  /**
-   * Creates a new instance of this decoder. This constructor with no argument is usually called by reflection
-   */
+  /// Creates a new instance of this decoder. This constructor with no argument is usually called by reflection
   public KafkaConfluentSchemaRegistryProtoBufMessageDecoder() {
     _onMessage = null;
   }
 
-  /**
-   * Creates a new instance of this decoder. This constructor with a Consumer argument is used by test to be able to
-   * analyze the received message.
-   */
+  /// Creates a new instance of this decoder. This constructor with a Consumer argument is used by test to be able to
+  /// analyze the received message.
   @VisibleForTesting
   KafkaConfluentSchemaRegistryProtoBufMessageDecoder(@Nullable Consumer<Message> onMessage) {
     _onMessage = onMessage;
@@ -118,7 +114,7 @@ public class KafkaConfluentSchemaRegistryProtoBufMessageDecoder implements Strea
         props.getOrDefault(CACHED_SCHEMA_MAP_CAPACITY, DEFAULT_CACHED_SCHEMA_MAP_CAPACITY));
     SchemaRegistryClient schemaRegistryClient =
         new CachedSchemaRegistryClient(createRestService(schemaRegistryUrl, props),
-            identityMapCapacity, Collections.singletonList(protobufSchemaProvider), props, null);
+            identityMapCapacity, List.of(protobufSchemaProvider), props, null);
     _deserializer = new KafkaProtobufDeserializer<>(schemaRegistryClient);
     Preconditions.checkNotNull(topicName, "Topic must be provided");
     _topicName = topicName;
@@ -150,12 +146,10 @@ public class KafkaConfluentSchemaRegistryProtoBufMessageDecoder implements Strea
     return decode(payload, destination);
   }
 
-  /**
-   * This method handles specific serialisation exceptions. If the exception cannot be ignored the method
-   * re-throws the exception.
-   *
-   * @param e exception to handle
-   */
+  /// This method handles specific serialisation exceptions. If the exception cannot be ignored the method
+  /// re-throws the exception.
+  ///
+  /// @param e exception to handle
   private void ignoreOrRethrowException(RuntimeException e) {
     if (isUnknownMagicByte(e) || isUnknownMagicByte(e.getCause())) {
       // Do nothing, the message is not an ProtoBuf message and can't be decoded

@@ -68,6 +68,20 @@ public class SegmentLineageTest {
     Assert.assertEquals(lineageEntry4.getSegmentsTo(), Arrays.asList("s12"));
     Assert.assertEquals(lineageEntry4.getState(), LineageEntryState.IN_PROGRESS);
     Assert.assertEquals(lineageEntry4.getTimestamp(), 44444L);
+    Assert.assertFalse(lineageEntry4.isAutoCompleteLineageEntry());
+
+    // Entry opting into observer-driven completion: should round-trip the flag and emit a 5-tuple
+    // in the ZNRecord list field, while the other entries stay 4-tuples.
+    String id5 = SegmentLineageUtils.generateLineageEntryId();
+    segmentLineage.addLineageEntry(id5,
+        new LineageEntry(Arrays.asList("s13", "s14"), Arrays.asList("s15"), LineageEntryState.IN_PROGRESS, 55555L,
+            true));
+    LineageEntry lineageEntry5 = segmentLineage.getLineageEntry(id5);
+    Assert.assertEquals(lineageEntry5.getSegmentsFrom(), Arrays.asList("s13", "s14"));
+    Assert.assertEquals(lineageEntry5.getSegmentsTo(), Arrays.asList("s15"));
+    Assert.assertEquals(lineageEntry5.getState(), LineageEntryState.IN_PROGRESS);
+    Assert.assertEquals(lineageEntry5.getTimestamp(), 55555L);
+    Assert.assertTrue(lineageEntry5.isAutoCompleteLineageEntry());
 
     // Test the convesion from the segment lineage to the znRecord
     ZNRecord znRecord = segmentLineage.toZNRecord();
@@ -97,6 +111,15 @@ public class SegmentLineageTest {
     Assert.assertEquals(entry4.get(1), String.join(",", Arrays.asList("s12")));
     Assert.assertEquals(entry4.get(2), LineageEntryState.IN_PROGRESS.toString());
     Assert.assertEquals(entry4.get(3), Long.toString(44444L));
+    // Default-false entries must stay 4-tuples on the wire to keep old readers happy.
+    Assert.assertEquals(entry4.size(), 4);
+
+    List<String> entry5 = listFields.get(id5);
+    Assert.assertEquals(entry5.get(0), String.join(",", Arrays.asList("s13", "s14")));
+    Assert.assertEquals(entry5.get(1), String.join(",", Arrays.asList("s15")));
+    Assert.assertEquals(entry5.get(2), LineageEntryState.IN_PROGRESS.toString());
+    Assert.assertEquals(entry5.get(3), Long.toString(55555L));
+    Assert.assertEquals(entry5.get(4), Boolean.toString(true));
 
     // Test the conversion from the znRecord to the segment lineage
     SegmentLineage segmentLineageFromZNRecord = SegmentLineage.fromZNRecord(segmentLineage.toZNRecord());
@@ -104,6 +127,7 @@ public class SegmentLineageTest {
     Assert.assertEquals(segmentLineageFromZNRecord.getLineageEntry(id2), lineageEntry2);
     Assert.assertEquals(segmentLineageFromZNRecord.getLineageEntry(id3), lineageEntry3);
     Assert.assertEquals(segmentLineageFromZNRecord.getLineageEntry(id4), lineageEntry4);
+    Assert.assertEquals(segmentLineageFromZNRecord.getLineageEntry(id5), lineageEntry5);
 
     // Try to delete by iterating through the lineage entry ids
     for (String lineageId : segmentLineage.getLineageEntryIds()) {
@@ -134,5 +158,27 @@ public class SegmentLineageTest {
     actualLineageEntry =
         new LineageEntry(Arrays.asList("seg1"), Arrays.asList("seg3", "seg4"), LineageEntryState.REVERTED, 12345L);
     Assert.assertNotEquals(actualLineageEntry, expectedLineageEntry);
+
+    // Entries that differ only in autoCompleteLineageEntry must not be equal.
+    LineageEntry flaggedEntry =
+        new LineageEntry(Arrays.asList("seg1", "seg2"), Arrays.asList("seg3", "seg4"), LineageEntryState.IN_PROGRESS,
+            12345L, true);
+    Assert.assertNotEquals(flaggedEntry, expectedLineageEntry);
+  }
+
+  @Test
+  public void testLegacyFourTupleReadsAsAutoCompleteFalse() {
+    // A ZNRecord written by an older controller (4-tuple list fields) must still parse, with the
+    // missing 5th element defaulting to false. Hand-build the ZNRecord to simulate the legacy wire
+    // format directly.
+    ZNRecord legacy = new ZNRecord("test_OFFLINE");
+    legacy.setListField("legacy-1", Arrays.asList("a,b", "c", LineageEntryState.IN_PROGRESS.toString(), "99999"));
+    SegmentLineage lineage = SegmentLineage.fromZNRecord(legacy);
+    LineageEntry parsed = lineage.getLineageEntry("legacy-1");
+    Assert.assertEquals(parsed.getSegmentsFrom(), Arrays.asList("a", "b"));
+    Assert.assertEquals(parsed.getSegmentsTo(), Arrays.asList("c"));
+    Assert.assertEquals(parsed.getState(), LineageEntryState.IN_PROGRESS);
+    Assert.assertEquals(parsed.getTimestamp(), 99999L);
+    Assert.assertFalse(parsed.isAutoCompleteLineageEntry());
   }
 }

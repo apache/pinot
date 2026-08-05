@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.indexsegment.immutable;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.io.File;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -49,8 +48,8 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,21 +61,17 @@ public class ImmutableSegmentLoader {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ImmutableSegmentLoader.class);
 
-  /**
-   * Loads the segment with empty schema and IndexLoadingConfig. This method is used to
-   * access the segment without modifying it, i.e. in read-only mode.
-   */
+  /// Loads the segment with empty schema and IndexLoadingConfig. This method is used to
+  /// access the segment without modifying it, i.e. in read-only mode.
   public static ImmutableSegment load(File indexDir, ReadMode readMode)
       throws Exception {
     return load(indexDir, readMode, false);
   }
 
-  /**
-   * Loads the segment in read-only mode with an option to load only column-level forward index, dictionary,
-   * and null value vector, skipping other column-level secondary indexes. Segment-level indexes (such as
-   * star-tree or multi-column text index) are still loaded when present. This is useful for tools like segment
-   * converters that only need to read data without requiring column-level secondary indexes.
-   */
+  /// Loads the segment in read-only mode with an option to load only column-level forward index, dictionary,
+  /// and null value vector, skipping other column-level secondary indexes. Segment-level indexes (such as
+  /// star-tree or multi-column text index) are still loaded when present. This is useful for tools like segment
+  /// converters that only need to read data without requiring column-level secondary indexes.
   public static ImmutableSegment load(File indexDir, ReadMode readMode, boolean forwardIndexOnly)
       throws Exception {
     IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig();
@@ -85,50 +80,40 @@ public class ImmutableSegmentLoader {
     return load(indexDir, defaultIndexLoadingConfig, false, null, null);
   }
 
-  /**
-   * Loads the segment with specified IndexLoadingConfig.
-   * This method modifies the segment like to convert segment format, add or remove indices.
-   * Mostly used by UT cases to add some specific index for testing purpose.
-   */
+  /// Loads the segment with specified IndexLoadingConfig.
+  /// This method modifies the segment like to convert segment format, add or remove indices.
+  /// Mostly used by UT cases to add some specific index for testing purpose.
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     return load(indexDir, indexLoadingConfig, true, null, null);
   }
-  /**
-   * Loads the segment with specified IndexLoadingConfig.
-   * This method modifies the segment like to convert segment format, add or remove indices.
-   * Mostly used by UT cases to add some specific index for testing purpose.
-   */
+  /// Loads the segment with specified IndexLoadingConfig.
+  /// This method modifies the segment like to convert segment format, add or remove indices.
+  /// Mostly used by UT cases to add some specific index for testing purpose.
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig,
       @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet)
       throws Exception {
     return load(indexDir, indexLoadingConfig, true, segmentOperationsThrottlerSet, null);
   }
 
-  /**
-   * Loads the segment with specified IndexLoadingConfig.
-   * This method modifies the segment like to convert segment format, add or remove indices.
-   * Mostly used by UT cases to add some specific index for testing purpose.
-   */
+  /// Loads the segment with specified IndexLoadingConfig.
+  /// This method modifies the segment like to convert segment format, add or remove indices.
+  /// Mostly used by UT cases to add some specific index for testing purpose.
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig,
       @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet, @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
     return load(indexDir, indexLoadingConfig, true, segmentOperationsThrottlerSet, zkMetadata);
   }
 
-  /**
-   * Loads the segment with specified IndexLoadingConfig.
-   * This method modifies the segment like to convert segment format, add or remove indices.
-   */
+  /// Loads the segment with specified IndexLoadingConfig.
+  /// This method modifies the segment like to convert segment format, add or remove indices.
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, boolean needPreprocess)
       throws Exception {
     return load(indexDir, indexLoadingConfig, needPreprocess, null, null);
   }
 
-  /**
-   * Loads the segment with specified schema and IndexLoadingConfig, and allows to control whether to
-   * modify the segment like to convert segment format, add or remove indices.
-   */
+  /// Loads the segment with specified schema and IndexLoadingConfig, and allows to control whether to
+  /// modify the segment like to convert segment format, add or remove indices.
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, boolean needPreprocess,
       @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet, @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
@@ -143,19 +128,18 @@ public class ImmutableSegmentLoader {
       preprocess(indexDir, indexLoadingConfig, segmentOperationsThrottlerSet, zkMetadata);
     }
     String segmentName = segmentMetadata.getName();
-    Map<String, String> segmentCustomConfigs = zkMetadata != null ? zkMetadata.getCustomMap() : new HashMap<>();
-    SegmentDirectoryLoaderContext segmentLoaderContext =
-        new SegmentDirectoryLoaderContext.Builder().setTableConfig(indexLoadingConfig.getTableConfig())
-            .setSchema(indexLoadingConfig.getSchema())
-            .setInstanceId(indexLoadingConfig.getInstanceId())
-            .setTableDataDir(indexLoadingConfig.getTableDataDir())
-            .setSegmentName(segmentName)
-            .setSegmentCrc(segmentMetadata.getCrc())
-            .setSegmentTier(indexLoadingConfig.getSegmentTier())
-            .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
-            .setSegmentDirectoryConfigs(indexLoadingConfig.getSegmentDirectoryConfigs())
-            .setSegmentCustomConfigs(segmentCustomConfigs)
-            .build();
+    SegmentDirectoryLoaderContext segmentLoaderContext = new SegmentDirectoryLoaderContext.Builder()
+        .setReadMode(indexLoadingConfig.getReadMode())
+        .setTableConfig(indexLoadingConfig.getTableConfig())
+        .setSchema(indexLoadingConfig.getSchema())
+        .setInstanceId(indexLoadingConfig.getInstanceId())
+        .setTableDataDir(indexLoadingConfig.getTableDataDir())
+        .setSegmentName(segmentName)
+        .setSegmentCrc(segmentMetadata.getCrc())
+        .setSegmentTier(indexLoadingConfig.getSegmentTier())
+        .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
+        .setSegmentCustomConfigs(zkMetadata != null ? zkMetadata.getCustomMap() : Map.of())
+        .build();
     SegmentDirectoryLoader segmentLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
     SegmentDirectory segmentDirectory = segmentLoader.load(indexDir.toURI(), segmentLoaderContext);
@@ -194,9 +178,7 @@ public class ImmutableSegmentLoader {
     }
   }
 
-  /**
-   * Load the segment represented by the SegmentDirectory object to serve queries.
-   */
+  /// Load the segment represented by the SegmentDirectory object to serve queries.
   public static ImmutableSegment load(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     return load(segmentDirectory, indexLoadingConfig, indexLoadingConfig.getSchema());
@@ -208,7 +190,9 @@ public class ImmutableSegmentLoader {
       throws Exception {
     SegmentMetadataImpl segmentMetadata = segmentDirectory.getSegmentMetadata();
     if (segmentMetadata.getTotalDocs() == 0) {
-      return new EmptyIndexSegment(segmentMetadata);
+      // Hand the directory to the empty segment so it can run post-registration work and own closing the directory,
+      // mirroring the non-empty ImmutableSegmentImpl path.
+      return new EmptyIndexSegment(segmentMetadata, segmentDirectory);
     }
 
     // Remove columns not in schema from the metadata
@@ -216,6 +200,17 @@ public class ImmutableSegmentLoader {
     if (schema != null) {
       Set<String> columnsInMetadata = new HashSet<>(columnMetadataMap.keySet());
       columnsInMetadata.removeIf(schema::hasColumn);
+      // Materialized OPEN_STRUCT child columns (col$key, col$__sparse__) live in segment metadata
+      // but not in the user-facing schema. Keep them when the parent OPEN_STRUCT column is in the
+      // schema; they will be grouped under their parent at segment-impl post-load (Task 16).
+      columnsInMetadata.removeIf(col -> {
+        if (!OpenStructNaming.isMaterializedOpenStructColumn(col)) {
+          return false;
+        }
+        String parent = OpenStructNaming.parseParentColumn(col);
+        return schema.hasColumn(parent)
+            && schema.getFieldSpecFor(parent).getDataType() == FieldSpec.DataType.OPEN_STRUCT;
+      });
       if (!columnsInMetadata.isEmpty()) {
         LOGGER.info("Skip loading columns only exist in metadata but not in schema: {}", columnsInMetadata);
         for (String column : columnsInMetadata) {
@@ -273,10 +268,8 @@ public class ImmutableSegmentLoader {
     return segment;
   }
 
-  /**
-   * Check segment directory against the IndexLoadingConfig to see if any preprocessing is needed, such as changing
-   * segment format, adding new indices or updating default columns.
-   */
+  /// Check segment directory against the IndexLoadingConfig to see if any preprocessing is needed, such as changing
+  /// segment format, adding new indices or updating default columns.
   public static boolean needPreprocess(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     if (indexLoadingConfig.isSkipSegmentPreprocess()) {
@@ -325,17 +318,15 @@ public class ImmutableSegmentLoader {
       IndexLoadingConfig indexLoadingConfig, @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet,
       SegmentZKMetadata zkMetadata)
       throws Exception {
-    PinotConfiguration segmentDirectoryConfigs = indexLoadingConfig.getSegmentDirectoryConfigs();
-    Map<String, String> segmentCustomConfigs = zkMetadata != null ? zkMetadata.getCustomMap() : new HashMap<>();
-    SegmentDirectoryLoaderContext segmentLoaderContext =
-        new SegmentDirectoryLoaderContext.Builder().setTableConfig(indexLoadingConfig.getTableConfig())
-            .setSchema(indexLoadingConfig.getSchema())
-            .setInstanceId(indexLoadingConfig.getInstanceId())
-            .setSegmentName(segmentName)
-            .setSegmentCrc(segmentCrc)
-            .setSegmentDirectoryConfigs(segmentDirectoryConfigs)
-            .setSegmentCustomConfigs(segmentCustomConfigs)
-            .build();
+    SegmentDirectoryLoaderContext segmentLoaderContext = new SegmentDirectoryLoaderContext.Builder()
+        .setReadMode(indexLoadingConfig.getReadMode())
+        .setTableConfig(indexLoadingConfig.getTableConfig())
+        .setSchema(indexLoadingConfig.getSchema())
+        .setInstanceId(indexLoadingConfig.getInstanceId())
+        .setSegmentName(segmentName)
+        .setSegmentCrc(segmentCrc)
+        .setSegmentCustomConfigs(zkMetadata != null ? zkMetadata.getCustomMap() : Map.of())
+        .build();
     SegmentDirectory segmentDirectory =
         SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(indexDir.toURI(), segmentLoaderContext);
     try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {

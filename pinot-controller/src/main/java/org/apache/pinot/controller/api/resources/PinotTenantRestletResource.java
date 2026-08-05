@@ -32,7 +32,6 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -94,27 +93,23 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-/**
- * <ul>
- *   <li>Sample curl call to create broker tenant</li>
- *   curl -i -X POST -H 'Content-Type: application/json' -d
- *   '{
- *     "role" : "broker",
- *     "numberOfInstances : "5",
- *     "name" : "brokerOne"
- *   }' http://localhost:1234/tenants
- *
- *   <li>Sample curl call to create server tenant</li>
- *   curl -i -X POST -H 'Content-Type: application/json' -d
- *   '{
- *     "role" : "server",
- *     "numberOfInstances : "5",
- *     "name" : "serverOne",
- *     "offlineInstances" : "3",
- *     "realtimeInstances" : "2"
- *   }' http://localhost:1234/tenants
- * </ul>
- */
+/// - Sample curl call to create broker tenant
+///   curl -i -X POST -H 'Content-Type: application/json' -d
+///   '{
+///     "role" : "broker",
+///     "numberOfInstances : "5",
+///     "name" : "brokerOne"
+///   }' http://localhost:1234/tenants
+///
+/// - Sample curl call to create server tenant
+///   curl -i -X POST -H 'Content-Type: application/json' -d
+///   '{
+///     "role" : "server",
+///     "numberOfInstances : "5",
+///     "name" : "serverOne",
+///     "offlineInstances" : "3",
+///     "realtimeInstances" : "2"
+///   }' http://localhost:1234/tenants
 @Api(tags = Constants.TENANT_TAG, authorizations = {
     @Authorization(value = SWAGGER_AUTHORIZATION_KEY),
     @Authorization(value = DATABASE)
@@ -286,13 +281,11 @@ public class PinotTenantRestletResource {
     }
   }
 
-  /**
-   * This method expects a tenant name and will return a list of tables tagged on that tenant. It assumes that the
-   * tagname is for server tenants only.
-   * @param tenantName
-   * @param tenantType
-   * @return
-   */
+  /// This method expects a tenant name and will return a list of tables tagged on that tenant. It assumes that the
+  /// tagname is for server tenants only.
+  /// @param tenantName
+  /// @param tenantType
+  /// @return
   @GET
   @Path("/tenants/{tenantName}/tables")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TENANT)
@@ -391,8 +384,9 @@ public class PinotTenantRestletResource {
   private void persistInstancePartitionsHelper(InstancePartitions instancePartitions) {
     try {
       LOGGER.info("Persisting instance partitions: {}", instancePartitions);
+      // WorkloadChangeListener is not needed for tenant instance partitions update
       InstancePartitionsUtils.persistInstancePartitions(_pinotHelixResourceManager.getPropertyStore(),
-          instancePartitions);
+          instancePartitions, null);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Caught Exception while persisting the instance partitions. "
           + "Reason: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
@@ -858,7 +852,7 @@ public class PinotTenantRestletResource {
       notes = "Get list of rebalance jobs for this tenant")
   public Map<String, Map<String, String>> getControllerJobs(
       @ApiParam(value = "Name of the tenant", required = true) @PathParam("tenantName") String tenantName) {
-    return _pinotHelixResourceManager.getAllJobs(Collections.singleton(ControllerJobTypes.TENANT_REBALANCE),
+    return _pinotHelixResourceManager.getAllJobs(Set.of(ControllerJobTypes.TENANT_REBALANCE),
         jobMetadata -> jobMetadata.get(CommonConstants.ControllerJob.TENANT_NAME)
             .equals(tenantName));
   }

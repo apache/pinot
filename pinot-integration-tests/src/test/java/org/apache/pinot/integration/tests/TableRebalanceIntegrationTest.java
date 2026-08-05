@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -183,7 +182,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // Use MinimizeDataMovementOptions.DEFAULT and disable it in table config for COMPLETED ONLY
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap =
-        Collections.singletonMap("COMPLETED", createInstanceAssignmentConfig(false, TableType.REALTIME));
+        Map.of("COMPLETED", createInstanceAssignmentConfig(false, TableType.REALTIME));
     InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
         instanceAssignmentConfigMap.get("COMPLETED").getReplicaGroupPartitionConfig();
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
@@ -225,7 +224,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
         RebalancePreCheckerResult.PreCheckStatus.WARN);
 
     instanceAssignmentConfigMap =
-        Collections.singletonMap("COMPLETED", createInstanceAssignmentConfig(true, TableType.REALTIME));
+        Map.of("COMPLETED", createInstanceAssignmentConfig(true, TableType.REALTIME));
     replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("COMPLETED").getReplicaGroupPartitionConfig();
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
@@ -245,7 +244,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // Use MinimizeDataMovementOptions.DEFAULT and disable it in table config for CONSUMING ONLY
     instanceAssignmentConfigMap =
-        Collections.singletonMap("CONSUMING", createInstanceAssignmentConfig(false, TableType.REALTIME));
+        Map.of("CONSUMING", createInstanceAssignmentConfig(false, TableType.REALTIME));
     replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("CONSUMING").getReplicaGroupPartitionConfig();
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
@@ -287,7 +286,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // Use MinimizeDataMovementOptions.DISABLE and enable it in table config for CONSUMING ONLY
     instanceAssignmentConfigMap =
-        Collections.singletonMap("CONSUMING", createInstanceAssignmentConfig(true, TableType.REALTIME));
+        Map.of("CONSUMING", createInstanceAssignmentConfig(true, TableType.REALTIME));
     replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("CONSUMING").getReplicaGroupPartitionConfig();
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
@@ -426,7 +425,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // Use MinimizeDataMovementOptions.DISABLE and enable it in table config for CONSUMING ONLY
     instanceAssignmentConfigMap =
-        Collections.singletonMap("CONSUMING", createInstanceAssignmentConfig(true, TableType.REALTIME));
+        Map.of("CONSUMING", createInstanceAssignmentConfig(true, TableType.REALTIME));
     replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("CONSUMING").getReplicaGroupPartitionConfig();
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     TenantConfig tenantConfig = new TenantConfig(getBrokerTenant(), getServerTenant(),
@@ -478,7 +477,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // Enable minimizeDataMovement, enable replica group only for COMPLETED segments
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap =
-        Collections.singletonMap("COMPLETED", createInstanceAssignmentConfig(true, TableType.REALTIME));
+        Map.of("COMPLETED", createInstanceAssignmentConfig(true, TableType.REALTIME));
     InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
         instanceAssignmentConfigMap.get("COMPLETED").getReplicaGroupPartitionConfig();
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
@@ -567,7 +566,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // Keep schema change and update table config to add minimizeDataMovement
     instanceAssignmentConfigMap =
-        Collections.singletonMap("COMPLETED", createInstanceAssignmentConfig(true, TableType.REALTIME));
+        Map.of("COMPLETED", createInstanceAssignmentConfig(true, TableType.REALTIME));
     replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("COMPLETED").getReplicaGroupPartitionConfig();
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
@@ -586,7 +585,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // Keep schema change and update table config to add instance config map with minimizeDataMovement = false
     instanceAssignmentConfigMap =
-        Collections.singletonMap("CONSUMING", createInstanceAssignmentConfig(false, TableType.REALTIME));
+        Map.of("CONSUMING", createInstanceAssignmentConfig(false, TableType.REALTIME));
     replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("CONSUMING").getReplicaGroupPartitionConfig();
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
@@ -677,7 +676,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // Enable minimizeDataMovement
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap =
-        Collections.singletonMap("OFFLINE", createInstanceAssignmentConfig(true, TableType.OFFLINE));
+        Map.of("OFFLINE", createInstanceAssignmentConfig(true, TableType.OFFLINE));
     InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
         instanceAssignmentConfigMap.get("OFFLINE").getReplicaGroupPartitionConfig();
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
@@ -712,7 +711,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // Use default minimizeDataMovement and disable it in table config
     instanceAssignmentConfigMap =
-        Collections.singletonMap("OFFLINE", createInstanceAssignmentConfig(false, TableType.OFFLINE));
+        Map.of("OFFLINE", createInstanceAssignmentConfig(false, TableType.OFFLINE));
     replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("OFFLINE").getReplicaGroupPartitionConfig();
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
@@ -762,7 +761,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     // set 'updateTargetTier=true'
     TierConfig tierConfig = new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "40d", null,
         TierFactory.PINOT_SERVER_STORAGE_TYPE, TagNameUtils.getOfflineTagForTenant(getServerTenant()), null, null);
-    tableConfig.setTierConfigsList(Collections.singletonList(tierConfig));
+    tableConfig.setTierConfigsList(List.of(tierConfig));
     updateTableConfig(tableConfig);
     rebalanceConfig.setUpdateTargetTier(true);
     rebalanceResult = triggerTableRebalance(rebalanceConfig, TableType.OFFLINE);
@@ -832,7 +831,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // Keep schema change and update table config to add minimizeDataMovement
     instanceAssignmentConfigMap =
-        Collections.singletonMap("OFFLINE", createInstanceAssignmentConfig(true, TableType.OFFLINE));
+        Map.of("OFFLINE", createInstanceAssignmentConfig(true, TableType.OFFLINE));
     replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("OFFLINE").getReplicaGroupPartitionConfig();
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
@@ -851,7 +850,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // Keep schema change and update table config to add instance config map with minimizeDataMovement = false
     instanceAssignmentConfigMap =
-        Collections.singletonMap("OFFLINE", createInstanceAssignmentConfig(false, TableType.OFFLINE));
+        Map.of("OFFLINE", createInstanceAssignmentConfig(false, TableType.OFFLINE));
     replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("OFFLINE").getReplicaGroupPartitionConfig();
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);

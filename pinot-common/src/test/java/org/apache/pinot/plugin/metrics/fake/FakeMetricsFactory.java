@@ -28,10 +28,8 @@ import org.apache.pinot.spi.metrics.PinotMetricName;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
-/**
- * A test-only {@link PinotMetricsFactory} backed by the in-memory {@link FakePinotMetricsRegistry}. Used by
- * pinot-common tests so they can exercise {@code AbstractMetrics} without depending on a plugin module.
- */
+/// A test-only [PinotMetricsFactory] backed by the in-memory [FakePinotMetricsRegistry]. Used by
+/// pinot-common tests so they can exercise `AbstractMetrics` without depending on a plugin module.
 @MetricsFactory
 public class FakeMetricsFactory implements PinotMetricsFactory {
   private PinotMetricsRegistry _registry;

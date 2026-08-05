@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.minion.tasks;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.text.SimpleDateFormat;
@@ -30,6 +31,7 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
@@ -38,6 +40,7 @@ import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.auth.NullAuthProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.RetentionUtils;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
@@ -72,12 +75,30 @@ import org.slf4j.LoggerFactory;
 public class MinionTaskUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionTaskUtils.class);
 
-  /** Package-private for testing: parses validDocIdsComparisonMode config string. */
-  static MinionConstants.ValidDocIdsConsensusMode parseValidDocIdsConsensusMode(String value) {
-    if (value == null || value.isBlank()) {
+  /// Parses the validDocIdsConsensusMode config string. Blank/null defaults to `EQUAL`.
+  public static MinionConstants.ValidDocIdsConsensusMode parseValidDocIdsConsensusMode(String value) {
+    if (StringUtils.isBlank(value)) {
       return MinionConstants.ValidDocIdsConsensusMode.EQUAL;
     }
     return MinionConstants.ValidDocIdsConsensusMode.valueOf(value.toUpperCase().trim());
+  }
+
+  /// Parses the validDocIdsValidationMode config string. Blank/null defaults to `STRICT`.
+  public static MinionConstants.ValidDocIdsValidationMode parseValidDocIdsValidationMode(String value) {
+    if (StringUtils.isBlank(value)) {
+      return MinionConstants.ValidDocIdsValidationMode.STRICT;
+    }
+    return MinionConstants.ValidDocIdsValidationMode.valueOf(value.toUpperCase().trim());
+  }
+
+  /// Resolves the consensus mode the generator should apply, given the configured consensus mode and validation
+  /// mode. EXECUTOR_ONLY downgrades the generator to UNSAFE (lenient pick, no bitmaps, no cross-replica enforcement)
+  /// so the executor stays the sole gate; STRICT keeps the configured mode.
+  public static MinionConstants.ValidDocIdsConsensusMode resolveGeneratorConsensusMode(
+      MinionConstants.ValidDocIdsConsensusMode consensusMode,
+      MinionConstants.ValidDocIdsValidationMode validationMode) {
+    return validationMode == MinionConstants.ValidDocIdsValidationMode.EXECUTOR_ONLY
+        ? MinionConstants.ValidDocIdsConsensusMode.UNSAFE : consensusMode;
   }
 
   private static final String DEFAULT_DIR_PATH_TERMINATOR = "/";
@@ -85,31 +106,25 @@ public class MinionTaskUtils {
   public static final String DATETIME_PATTERN = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
   public static final String UTC = "UTC";
 
-  /**
-   * When true, allows METADATA push mode with local FS output dir. Intended for integration tests only.
-   * Production should leave this unset (defaults to false); local FS then always uses TAR push.
-   */
+  /// When true, allows METADATA push mode with local FS output dir. Intended for integration tests only.
+  /// Production should leave this unset (defaults to false); local FS then always uses TAR push.
   public static final String ALLOW_METADATA_PUSH_WITH_LOCAL_FS = "allowMetadataPushWithLocalFs";
 
-  /**
-   * Task config key for an optional safety margin subtracted from retention when filtering segments.
-   * Value is a period string (e.g. "1h", "30m"). Segments within {@code (now - endTime) > (retention - buffer)}
-   * are excluded from task generation. This is a table-level config — not per-merge-level — because retention
-   * itself is table-level.
-   * <p>
-   * Currently used by {@code MergeRollupTask} and {@code UpsertCompactMergeTask}. Not applied to
-   * {@code UpsertCompactionTask} (legacy single-segment compaction, being superseded by UpsertCompactMergeTask).
-   */
+  /// Task config key for an optional safety margin subtracted from retention when filtering segments.
+  /// Value is a period string (e.g. "1h", "30m"). Segments within `(now - endTime) > (retention - buffer)`
+  /// are excluded from task generation. This is a table-level config — not per-merge-level — because retention
+  /// itself is table-level.
+  ///
+  /// Currently used by `MergeRollupTask` and `UpsertCompactMergeTask`. Not applied to
+  /// `UpsertCompactionTask` (legacy single-segment compaction, being superseded by UpsertCompactMergeTask).
   public static final String RETENTION_EXPIRY_BUFFER_PERIOD_KEY = "retentionExpiryBufferPeriod";
 
   private MinionTaskUtils() {
   }
 
-  /**
-   * Reads the creation-time fallback flag from Helix cluster config. This is the same config that
-   * {@code RetentionManager} reacts to via {@code onChange()}, so the filter stays aligned with what
-   * RetentionManager will actually delete.
-   */
+  /// Reads the creation-time fallback flag from Helix cluster config. This is the same config that
+  /// `RetentionManager` reacts to via `onChange()`, so the filter stays aligned with what
+  /// RetentionManager will actually delete.
   public static boolean isCreationTimeFallbackEnabled(ClusterInfoAccessor clusterInfoAccessor) {
     String raw = clusterInfoAccessor.getClusterConfig(
         ControllerConf.ControllerPeriodicTasksConf.ENABLE_RETENTION_CREATION_TIME_FALLBACK);
@@ -118,15 +133,13 @@ public class MinionTaskUtils {
         : ControllerConf.ControllerPeriodicTasksConf.DEFAULT_ENABLE_RETENTION_CREATION_TIME_FALLBACK;
   }
 
-  /**
-   * Resolves the AuthProvider to use for Minion tasks.
-   * Priority order:
-   * 1. If AUTH_TOKEN is explicitly provided in task configs (by Controller), use it for this specific task
-   * 2. Otherwise, fall back to the runtime AuthProvider from MinionContext (enables per-request token rotation)
-   *
-   * This allows any minion task or util to resolve auth from task configs without requiring callers to pass
-   * AuthProvider explicitly.
-   */
+  /// Resolves the AuthProvider to use for Minion tasks.
+  /// Priority order:
+  /// 1. If AUTH_TOKEN is explicitly provided in task configs (by Controller), use it for this specific task
+  /// 2. Otherwise, fall back to the runtime AuthProvider from MinionContext (enables per-request token rotation)
+  ///
+  /// This allows any minion task or util to resolve auth from task configs without requiring callers to pass
+  /// AuthProvider explicitly.
   public static AuthProvider resolveAuthProvider(Map<String, String> taskConfigs) {
     String explicitToken = taskConfigs.get(MinionConstants.AUTH_TOKEN);
     if (StringUtils.isNotBlank(explicitToken)) {
@@ -141,14 +154,12 @@ public class MinionTaskUtils {
     return runtimeProvider;
   }
 
-  /**
-   * Resolves the auth token string to use for Minion tasks (e.g. for specs that accept a token string).
-   * If AUTH_TOKEN is already present in task configs, returns it without creating an AuthProvider.
-   * Otherwise resolves via {@link #resolveAuthProvider} and returns its static token.
-   *
-   * @param taskConfigs task config map (may contain MinionConstants.AUTH_TOKEN)
-   * @return auth token string, or null if none
-   */
+  /// Resolves the auth token string to use for Minion tasks (e.g. for specs that accept a token string).
+  /// If AUTH_TOKEN is already present in task configs, returns it without creating an AuthProvider.
+  /// Otherwise resolves via [#resolveAuthProvider] and returns its static token.
+  ///
+  /// @param taskConfigs task config map (may contain MinionConstants.AUTH_TOKEN)
+  /// @return auth token string, or null if none
   @Nullable
   public static String resolveAuthToken(Map<String, String> taskConfigs) {
     String explicitToken = taskConfigs.get(MinionConstants.AUTH_TOKEN);
@@ -301,9 +312,7 @@ public class MinionTaskUtils {
     return servers;
   }
 
-  /**
-   * Extract allowDownloadFromServer config from table task config
-   */
+  /// Extract allowDownloadFromServer config from table task config
   public static boolean extractMinionAllowDownloadFromServer(TableConfig tableConfig, String taskType,
       boolean defaultValue) {
     TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
@@ -317,13 +326,19 @@ public class MinionTaskUtils {
     return defaultValue;
   }
 
-  /**
-   * Returns the validDocIds bitmap from server(s). {@code comparisonMode} is the task config value: UNSAFE,
-   * EQUAL (default), or MOST_VALID_DOCS.
-   */
+  /// Returns the validDocIds bitmap from server(s). `comparisonMode` is the task config value: UNSAFE,
+  /// EQUAL (default), or MOST_VALID_DOCS.
   @Nullable
   public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
       String validDocIdsType, MinionContext minionContext, String expectedCrc, String comparisonModeStr) {
+    return getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsType, minionContext,
+        expectedCrc, null, comparisonModeStr);
+  }
+
+  /// Variant that also matches on the expected data CRC; see [#crcMatches].
+  public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
+      String validDocIdsType, MinionContext minionContext, String expectedCrc, @Nullable String expectedDataCrc,
+      String comparisonModeStr) {
     MinionConstants.ValidDocIdsConsensusMode consensusMode = parseValidDocIdsConsensusMode(comparisonModeStr);
     String clusterName = minionContext.getHelixManager().getClusterName();
     HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
@@ -352,13 +367,15 @@ public class MinionTaskUtils {
       }
 
       String crcFromValidDocIdsBitmap = validDocIdsBitmapResponse.getSegmentCrc();
+      long serverDataCrc = parseCrc(validDocIdsBitmapResponse.getSegmentDataCrc());
       // Check crc from the downloaded segment against the crc returned from the server along with the valid doc id
       // bitmap. If this doesn't match, this means that we are hitting the race condition where the segment has been
       // uploaded successfully while the server is still reloading the segment. Reloading can take a while when the
       // offheap upsert is used because we will need to delete & add all primary keys.
       // `BaseSingleSegmentConversionExecutor.executeTask()` already checks for the crc from the task generator
       // against the crc from the current segment zk metadata, so we don't need to check that here.
-      if (!expectedCrc.equals(crcFromValidDocIdsBitmap)) {
+      if (!crcMatches(parseCrc(expectedCrc), parseCrc(expectedDataCrc), parseCrc(crcFromValidDocIdsBitmap),
+          serverDataCrc)) {
         if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
           LOGGER.warn("CRC mismatch for segment: {} from endpoint {}, skipping", segmentName, endpoint);
           continue;
@@ -428,6 +445,122 @@ public class MinionTaskUtils {
     return maxCardinalityMap;
   }
 
+  /// Picks the replica whose validDocIds the generator should use, or null to skip the segment, applying the same
+  /// checks the executor would so bad segments aren't scheduled: the replica must match CRC (via [#crcMatches]) and
+  /// be on a healthy server. UNSAFE uses the first such replica, EQUAL requires all to report the same valid doc
+  /// count, and MOST_VALID_DOCS picks the highest.
+  @Nullable
+  public static ValidDocIdsMetadataInfo selectValidDocIdsMetadataForConsensus(String taskType,
+      SegmentZKMetadata segmentZKMetadata, @Nullable List<ValidDocIdsMetadataInfo> replicas, int expectedReplicaCount,
+      MinionConstants.ValidDocIdsConsensusMode consensusMode) {
+    String segmentName = segmentZKMetadata.getSegmentName();
+    if (CollectionUtils.isEmpty(replicas)) {
+      return null;
+    }
+    boolean unsafe = consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE;
+    List<ValidDocIdsMetadataInfo> usableReplicas = new ArrayList<>();
+    for (ValidDocIdsMetadataInfo replica : replicas) {
+      // A CRC mismatch usually means the server is still reloading the segment, so its valid doc set can't be
+      // trusted. UNSAFE skips just this replica; stricter modes skip the whole segment.
+      long replicaCrc = parseCrc(replica.getSegmentCrc());
+      if (replicaCrc < 0) {
+        LOGGER.warn("Unparseable CRC '{}' for segment: {} from server: {}, skipping {} (mode={}) for {}",
+            replica.getSegmentCrc(), segmentName, replica.getInstanceId(), unsafe ? "replica" : "segment",
+            consensusMode, taskType);
+        if (unsafe) {
+          continue;
+        }
+        return null;
+      }
+      // -1 when this table doesn't use data CRC, so crcMatches falls back to the segment CRC.
+      long zkDataCrc = segmentZKMetadata.isUseDataCrc() ? segmentZKMetadata.getDataCrc() : -1;
+      if (!crcMatches(segmentZKMetadata.getCrc(), zkDataCrc, replicaCrc, parseCrc(replica.getSegmentDataCrc()))) {
+        LOGGER.warn("CRC mismatch for segment: {} (zkCrc={}, zkDataCrc={}, server={} reported crc={} dataCrc={}), "
+                + "skipping {} (mode={}) for {}", segmentName, segmentZKMetadata.getCrc(),
+            segmentZKMetadata.getDataCrc(), replica.getInstanceId(), replicaCrc, replica.getSegmentDataCrc(),
+            unsafe ? "replica" : "segment", consensusMode, taskType);
+        if (unsafe) {
+          continue;
+        }
+        return null;
+      }
+      // A non-GOOD server may still be mutating the segment, so its valid doc set is unreliable.
+      if (replica.getServerStatus() != null && replica.getServerStatus() != ServiceStatus.Status.GOOD) {
+        LOGGER.warn("Server {} is in {} state for segment: {}, skipping {} (mode={}) for {}", replica.getInstanceId(),
+            replica.getServerStatus(), segmentName, unsafe ? "replica" : "segment", consensusMode, taskType);
+        if (unsafe) {
+          continue;
+        }
+        return null;
+      }
+      if (unsafe) {
+        return replica;
+      }
+      usableReplicas.add(replica);
+    }
+
+    if (usableReplicas.isEmpty()) {
+      return null;
+    }
+
+    // Strict modes need every assigned replica to have responded; a short responder list means a server dropped out
+    // (network error, parse failure, or it no longer has the segment), so we can't confirm consensus across the full
+    // replica set and skip the segment.
+    if (usableReplicas.size() < expectedReplicaCount) {
+      LOGGER.warn("Only {} of {} replicas responded for segment: {}, cannot confirm consensus, skipping for {}",
+          usableReplicas.size(), expectedReplicaCount, segmentName, taskType);
+      return null;
+    }
+
+    if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.EQUAL) {
+      // Require every replica to report the same valid doc count. Comparing counts (rather than the full bitmaps)
+      // keeps the generator cheap - it avoids serializing a bitmap per replica back to the controller.
+      ValidDocIdsMetadataInfo first = usableReplicas.get(0);
+      for (int i = 1; i < usableReplicas.size(); i++) {
+        if (usableReplicas.get(i).getTotalValidDocs() != first.getTotalValidDocs()) {
+          LOGGER.warn("Replicas disagree on valid doc count for segment: {}, skipping segment for {}", segmentName,
+              taskType);
+          return null;
+        }
+      }
+      return first;
+    }
+
+    // MOST_VALID_DOCS: pick the replica reporting the most valid docs.
+    ValidDocIdsMetadataInfo chosen = usableReplicas.get(0);
+    for (ValidDocIdsMetadataInfo replica : usableReplicas) {
+      if (replica.getTotalValidDocs() > chosen.getTotalValidDocs()) {
+        chosen = replica;
+      }
+    }
+    return chosen;
+  }
+
+  /// Whether two segment copies hold the same data. Matches on the full segment CRC, or - when those differ - on the
+  /// data CRC (a checksum over only the forward index and dictionary, so index/metadata-only changes don't affect
+  /// it) when both copies report one (`>= 0`). A negative data CRC means "not reported". Mirrors the logic of
+  /// `BaseTableDataManager.hasSameCRC` and is used by both the generator's pre-scheduling check and the executor's
+  /// per-server check.
+  @VisibleForTesting
+  static boolean crcMatches(long segmentCrc, long dataCrc, long otherSegmentCrc, long otherDataCrc) {
+    if (segmentCrc == otherSegmentCrc) {
+      return true;
+    }
+    return dataCrc >= 0 && otherDataCrc >= 0 && dataCrc == otherDataCrc;
+  }
+
+  /// Parses a CRC string, returning `-1` ("unavailable") when it is null or unparseable.
+  private static long parseCrc(@Nullable String crc) {
+    if (crc == null) {
+      return -1;
+    }
+    try {
+      return Long.parseLong(crc);
+    } catch (NumberFormatException e) {
+      return -1;
+    }
+  }
+
   public static String toUTCString(long epochMillis) {
     Date date = new Date(epochMillis);
     SimpleDateFormat isoFormat = new SimpleDateFormat(DATETIME_PATTERN);
@@ -439,35 +572,22 @@ public class MinionTaskUtils {
     return Instant.parse(utcString).toEpochMilli();
   }
 
-  /**
-   * Get the validDocIdsType based on the upsertConfig and taskConfigs.
-   * The default value is determined by whether delete is enabled in the upsertConfig. If delete is enabled,
-   * the default value is 'snapshot_with_delete', otherwise it is 'snapshot'.
-   * If delete is enabled, we override the user-specified value to 'snapshot_with_delete' for backward compatibility
-   * except when it is 'in_memory_with_delete'.
-   * It also validates the combination of validDocIdsType, snapshot and deleteRecordColumn.
-   * @param upsertConfig upsertConfig of the table
-   * @param taskConfigs taskConfigs of the task
-   * @param validDocIdsTypeKey the key to get validDocIdsType from taskConfigs
-   * @return the validDocIdsType
-   */
+  /// Get the validDocIdsType based on the upsertConfig and taskConfigs.
+  /// The default value is 'snapshot' It validates the combination of validDocIdsType, snapshot and
+  /// deleteRecordColumn:
+  ///
+  /// - 'snapshot' and 'snapshot_with_delete' require upsert snapshots to be enabled.
+  /// - 'snapshot_with_delete' and 'in_memory_with_delete' require a deleteRecordColumn to be configured.
+  ///
+  /// @param upsertConfig upsertConfig of the table
+  /// @param taskConfigs taskConfigs of the task
+  /// @param validDocIdsTypeKey the key to get validDocIdsType from taskConfigs
+  /// @return the validDocIdsType
   public static ValidDocIdsType getValidDocIdsType(UpsertConfig upsertConfig, Map<String, String> taskConfigs,
       String validDocIdsTypeKey) {
-    boolean isDeleteEnabled = StringUtils.isNotEmpty(upsertConfig.getDeleteRecordColumn());
-    ValidDocIdsType defaultValidDocIdsType =
-        isDeleteEnabled ? ValidDocIdsType.SNAPSHOT_WITH_DELETE : ValidDocIdsType.SNAPSHOT;
     String validDocIdsTypeStr = taskConfigs.getOrDefault(validDocIdsTypeKey,
-        defaultValidDocIdsType.name()).toUpperCase();
+        ValidDocIdsType.SNAPSHOT.name()).toUpperCase();
     ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr);
-
-    if (isDeleteEnabled && validDocIdsType != ValidDocIdsType.SNAPSHOT_WITH_DELETE
-        && validDocIdsType != ValidDocIdsType.IN_MEMORY_WITH_DELETE) {
-      LOGGER.warn(
-          "Overriding user-specified validDocIdsType '{}' to '{}' for backward compatibility because delete is "
-              + "enabled (deleteRecordColumn='{}').",
-          validDocIdsType, ValidDocIdsType.SNAPSHOT_WITH_DELETE, upsertConfig.getDeleteRecordColumn());
-      validDocIdsType = ValidDocIdsType.SNAPSHOT_WITH_DELETE;
-    }
 
     if (validDocIdsType == ValidDocIdsType.SNAPSHOT || validDocIdsType == ValidDocIdsType.SNAPSHOT_WITH_DELETE) {
       Preconditions.checkState(upsertConfig.getSnapshot() != Enablement.DISABLE,
@@ -476,52 +596,50 @@ public class MinionTaskUtils {
 
     if (validDocIdsType == ValidDocIdsType.IN_MEMORY_WITH_DELETE
         || validDocIdsType == ValidDocIdsType.SNAPSHOT_WITH_DELETE) {
-      Preconditions.checkState(isDeleteEnabled,
+      Preconditions.checkState(StringUtils.isNotEmpty(upsertConfig.getDeleteRecordColumn()),
           "'deleteRecordColumn' must be provided with validDocIdsType: %s", validDocIdsType);
     }
     return validDocIdsType;
   }
 
-  /**
-   * Filters out segments that are past (or near) the table's retention period. This prevents task generators from
-   * selecting segments that RetentionManager may delete before the task executor downloads them.
-   * <p>
-   * Uses the same retention logic as {@code TimeRetentionStrategy}: a segment is considered expired if
-   * {@code currentTimeMs - endTimeMs > effectiveRetentionMs}, where effectiveRetentionMs is
-   * {@code retentionMs - bufferMs}.
-   * <p>
-   * If {@link #RETENTION_EXPIRY_BUFFER_PERIOD_KEY} is set in {@code taskConfigs}, the effective retention is reduced
-   * by that amount, excluding segments earlier — before RetentionManager actually deletes them. This is a table-level
-   * config, not a per-merge-level config, because retention itself is table-level.
-   * <p>
-   * <b>Note on hybrid tables:</b> This method reads only the table-level retention config
-   * ({@code segmentsConfig.retentionTimeUnit/Value}). It does not account for hybrid retention strategies that use
-   * the offline table's time boundary. If hybrid retention is enabled (off by default), RetentionManager may use a
-   * different deletion boundary than what this method computes, so the filter may not perfectly match the controller's
-   * deletion decisions for hybrid tables.
-   * <p>
-   * <b>Watermark impact (MergeRollupTask):</b> This filter runs before watermark advancement. If all segments in an
-   * early time bucket are filtered out, the watermark will advance past them permanently. This is a one-way door but
-   * is expected: those segments would be purged by RetentionManager regardless. If this is caused by a misconfigured
-   * {@code retentionExpiryBufferPeriod}, correcting the config will not recover already-skipped buckets.
-   *
-   * @apiNote Callers are expected to pass only completed segments (status DONE or UPLOADED). This method does not
-   * check segment status, unlike {@code TimeRetentionStrategy.isPurgeable()} which skips incomplete segments. All
-   * current callers ({@code UpsertCompactMergeTaskGenerator.getCandidateSegments},
-   * {@code MergeRollupTaskGenerator.getNonConsumingSegmentsZKMetadataForRealtimeTable}) already guarantee this.
-   *
-   * @param segments                    the candidate segments to filter (must not be null)
-   * @param tableConfig                 the table config containing retention settings
-   * @param taskConfigs                 task-level configs; may contain {@link #RETENTION_EXPIRY_BUFFER_PERIOD_KEY}.
-   *                                    Null if unavailable.
-   * @param currentTimeMs               the current time in milliseconds (pass {@code System.currentTimeMillis()})
-   * @param useCreationTimeFallback     when true, segments with invalid end times are evaluated against their
-   *                                    creation time; must match
-   *                                    {@code controller.retentionManager.enableCreationTimeFallback} so this
-   *                                    filter stays aligned with what RetentionManager will actually delete
-   * @return filtered list excluding segments past effective retention; returns the original list if retention is not
-   *         configured or cannot be parsed
-   */
+  /// Filters out segments that are past (or near) the table's retention period. This prevents task generators from
+  /// selecting segments that RetentionManager may delete before the task executor downloads them.
+  ///
+  /// Uses the same retention logic as `TimeRetentionStrategy`: a segment is considered expired if
+  /// `currentTimeMs - endTimeMs > effectiveRetentionMs`, where effectiveRetentionMs is
+  /// `retentionMs - bufferMs`.
+  ///
+  /// If [#RETENTION_EXPIRY_BUFFER_PERIOD_KEY] is set in `taskConfigs`, the effective retention is reduced
+  /// by that amount, excluding segments earlier — before RetentionManager actually deletes them. This is a table-level
+  /// config, not a per-merge-level config, because retention itself is table-level.
+  ///
+  /// **Note on hybrid tables:** This method reads only the table-level retention config
+  /// (`segmentsConfig.retentionTimeUnit/Value`). It does not account for hybrid retention strategies that use
+  /// the offline table's time boundary. If hybrid retention is enabled (off by default), RetentionManager may use a
+  /// different deletion boundary than what this method computes, so the filter may not perfectly match the controller's
+  /// deletion decisions for hybrid tables.
+  ///
+  /// **Watermark impact (MergeRollupTask):** This filter runs before watermark advancement. If all segments in an
+  /// early time bucket are filtered out, the watermark will advance past them permanently. This is a one-way door but
+  /// is expected: those segments would be purged by RetentionManager regardless. If this is caused by a misconfigured
+  /// `retentionExpiryBufferPeriod`, correcting the config will not recover already-skipped buckets.
+  ///
+  /// @apiNote Callers are expected to pass only completed segments (status DONE or UPLOADED). This method does not
+  /// check segment status, unlike `TimeRetentionStrategy.isPurgeable()` which skips incomplete segments. All
+  /// current callers (`UpsertCompactMergeTaskGenerator.getCandidateSegments`,
+  /// `MergeRollupTaskGenerator.getNonConsumingSegmentsZKMetadataForRealtimeTable`) already guarantee this.
+  ///
+  /// @param segments                    the candidate segments to filter (must not be null)
+  /// @param tableConfig                 the table config containing retention settings
+  /// @param taskConfigs                 task-level configs; may contain [#RETENTION_EXPIRY_BUFFER_PERIOD_KEY].
+  ///                                    Null if unavailable.
+  /// @param currentTimeMs               the current time in milliseconds (pass `System.currentTimeMillis()`)
+  /// @param useCreationTimeFallback     when true, segments with invalid end times are evaluated against their
+  ///                                    creation time; must match
+  ///                                    `controller.retentionManager.enableCreationTimeFallback` so this
+  ///                                    filter stays aligned with what RetentionManager will actually delete
+  /// @return filtered list excluding segments past effective retention; returns the original list if retention is not
+  ///         configured or cannot be parsed
   public static List<SegmentZKMetadata> filterSegmentsPastRetention(List<SegmentZKMetadata> segments,
       TableConfig tableConfig, @Nullable Map<String, String> taskConfigs, long currentTimeMs,
       boolean useCreationTimeFallback) {

@@ -25,7 +25,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,11 +47,9 @@ public class GroovyTemplateUtils {
     return templateRendered;
   }
 
-  /**
-   Construct default template context:
-   today : today's date in format `yyyy-MM-dd`, example value: '2020-05-06'
-   yesterday : yesterday's date in format `yyyy-MM-dd`, example value: '2020-05-06'
-   */
+  /// Construct default template context:
+  /// today : today's date in format `yyyy-MM-dd`, example value: '2020-05-06'
+  /// yesterday : yesterday's date in format `yyyy-MM-dd`, example value: '2020-05-06'
   public static Map<String, Object> getDefaultContextMap() {
     Map<String, Object> defaultContextMap = new HashMap<>();
     Instant now = Instant.now();
@@ -63,7 +60,7 @@ public class GroovyTemplateUtils {
 
   public static Map<String, Object> getTemplateContext(List<String> values) {
     if (values == null) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     Map<String, Object> context = new HashMap<>();
     for (String value : values) {
@@ -77,7 +74,7 @@ public class GroovyTemplateUtils {
 
   public static String renderTemplate(String template)
       throws IOException, ClassNotFoundException {
-    return renderTemplate(template, Collections.emptyMap());
+    return renderTemplate(template, Map.of());
   }
 
   static {

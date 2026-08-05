@@ -23,8 +23,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,6 +36,7 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.sql.SqlBasicCall;
+import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlIdentifier;
@@ -46,12 +50,14 @@ import org.apache.calcite.sql.SqlOrderBy;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlSelectKeyword;
 import org.apache.calcite.sql.SqlSetOption;
+import org.apache.calcite.sql.SqlWindow;
 import org.apache.calcite.sql.fun.SqlBetweenOperator;
 import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlLikeOperator;
 import org.apache.calcite.sql.parser.SqlAbstractParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.common.function.scalar.arithmetic.NegateScalarFunction;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -60,12 +66,21 @@ import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Join;
 import org.apache.pinot.common.request.JoinType;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
+import org.apache.pinot.sql.parsers.parser.SqlPinotCreateMaterializedView;
+import org.apache.pinot.sql.parsers.parser.SqlPinotCreateTable;
+import org.apache.pinot.sql.parsers.parser.SqlPinotDropMaterializedView;
+import org.apache.pinot.sql.parsers.parser.SqlPinotDropTable;
+import org.apache.pinot.sql.parsers.parser.SqlPinotShowCreateMaterializedView;
+import org.apache.pinot.sql.parsers.parser.SqlPinotShowCreateTable;
+import org.apache.pinot.sql.parsers.parser.SqlPinotShowMaterializedViews;
+import org.apache.pinot.sql.parsers.parser.SqlPinotShowTables;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
@@ -84,6 +99,9 @@ public class CalciteSqlParser {
   public static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(QueryRewriterFactory.getQueryRewriters());
   // TODO: Add the ability to configure the parser's maximum identifier length via configuration if needed in the future
   public static final int CALCITE_SQL_PARSER_IDENTIFIER_MAX_LENGTH = 1024;
+  /// Upper bound on the number of grouping sets a single query may expand to (guards against CUBE blow-up);
+  /// shared with the multi-stage plan conversion.
+  public static final int MAX_GROUPING_SETS = GroupingSets.MAX_GROUPING_SETS;
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
 
   // To Keep the backward compatibility with 'OPTION' Functionality in PQL, which is used to
@@ -137,6 +155,23 @@ public class CalciteSqlParser {
         } else {
           throw new SqlCompilationException("SqlNode with executable statement already exist with type: " + sqlType);
         }
+      } else if (sqlNode instanceof SqlPinotShowTables
+          || sqlNode instanceof SqlPinotShowMaterializedViews
+          || sqlNode instanceof SqlPinotCreateTable
+          || sqlNode instanceof SqlPinotShowCreateTable
+          || sqlNode instanceof SqlPinotDropTable
+          || sqlNode instanceof SqlPinotCreateMaterializedView
+          || sqlNode instanceof SqlPinotShowCreateMaterializedView
+          || sqlNode instanceof SqlPinotDropMaterializedView) {
+        // Pinot-native DDL statements; the controller dispatches these via the DDL endpoint.
+        // Ordering: Catalog → Table → Materialized View, lifecycle CREATE → SHOW CREATE → DROP,
+        // matching `DdlOperation` and `DdlCompiler#compile`.
+        if (sqlType == null) {
+          sqlType = PinotSqlType.DDL;
+          statementNode = sqlNode;
+        } else {
+          throw new SqlCompilationException("SqlNode with executable statement already exist with type: " + sqlType);
+        }
       } else if (sqlNode instanceof SqlSetOption) {
         // extract options, these are non-execution statements
         List<SqlNode> operandList = ((SqlSetOption) sqlNode).getOperandList();
@@ -164,9 +199,7 @@ public class CalciteSqlParser {
     return compileToPinotQuery(compileToSqlNodeAndOptions(sql));
   }
 
-  /**
-   * Should only be used for testing query rewriters.
-   */
+  /// Should only be used for testing query rewriters.
   public static PinotQuery compileToPinotQueryWithoutRewrites(String sql) {
     return compileWithoutRewrite(compileToSqlNodeAndOptions(sql).getSqlNode());
   }
@@ -217,6 +250,68 @@ public class CalciteSqlParser {
         }
       }
     }
+
+    // A GROUPING SETS / ROLLUP / CUBE query must contain at least one aggregation (in SELECT, HAVING or
+    // ORDER-BY): without one the engine would execute it as a selection query and silently ignore the grouping
+    // sets. Note that GROUPING() / GROUPING_ID() are not aggregation functions. (Plain non-aggregation GROUP BY
+    // queries are rewritten to DISTINCT by NonAggregationGroupByToDistinctQueryRewriter, but that rewrite cannot
+    // represent multiple grouping sets.)
+    if (pinotQuery.getGroupingSets() != null && aggregateExprCount == 0 && !hasAggregationOutsideSelect(
+        pinotQuery)) {
+      throw new SqlCompilationException(
+          "GROUP BY GROUPING SETS / ROLLUP / CUBE requires at least one aggregation function in the query");
+    }
+    // GROUPING()/GROUPING_ID() pack one bit per argument into an INT, so a single call accepts at most 31
+    // arguments (a per-call limit — the number of grouping columns is unlimited). Reject at compile time so the
+    // user gets a clear error instead of a mid-execution failure from the shared value computation.
+    if (pinotQuery.getGroupingSets() != null) {
+      for (Expression selectExpression : pinotQuery.getSelectList()) {
+        validateGroupingFunctionArgs(selectExpression);
+      }
+      if (pinotQuery.getHavingExpression() != null) {
+        validateGroupingFunctionArgs(pinotQuery.getHavingExpression());
+      }
+      if (pinotQuery.getOrderByList() != null) {
+        for (Expression orderBy : pinotQuery.getOrderByList()) {
+          validateGroupingFunctionArgs(orderBy);
+        }
+      }
+    }
+  }
+
+  /// Recursively rejects GROUPING() / GROUPING_ID() calls with more than
+  /// [GroupingSets#MAX_GROUPING_FUNCTION_ARGS] arguments (the packed INT bit width).
+  private static void validateGroupingFunctionArgs(Expression expression) {
+    Function function = expression.getFunctionCall();
+    if (function == null) {
+      return;
+    }
+    if (GroupingSets.isGroupingFunction(function.getOperator())
+        && function.getOperandsSize() > GroupingSets.MAX_GROUPING_FUNCTION_ARGS) {
+      throw new SqlCompilationException(
+          "GROUPING / GROUPING_ID supports at most " + GroupingSets.MAX_GROUPING_FUNCTION_ARGS + " arguments, got "
+              + function.getOperandsSize());
+    }
+    if (function.getOperands() != null) {
+      for (Expression operand : function.getOperands()) {
+        validateGroupingFunctionArgs(operand);
+      }
+    }
+  }
+
+  /// Returns true if the HAVING clause or any ORDER-BY expression contains an aggregation.
+  private static boolean hasAggregationOutsideSelect(PinotQuery pinotQuery) {
+    if (pinotQuery.getHavingExpression() != null && isAggregateExpression(pinotQuery.getHavingExpression())) {
+      return true;
+    }
+    if (pinotQuery.getOrderByList() != null) {
+      for (Expression orderBy : pinotQuery.getOrderByList()) {
+        if (isAggregateExpression(orderBy)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /*
@@ -365,9 +460,7 @@ public class CalciteSqlParser {
     return expressions;
   }
 
-  /**
-   * Check recursively if an expression contains any reference not appearing in the GROUP BY clause.
-   */
+  /// Check recursively if an expression contains any reference not appearing in the GROUP BY clause.
   private static boolean expressionOutsideGroupByList(Expression expr, Set<Expression> groupByExprs) {
     // return early for Literal, Aggregate and if we have an exact match
     if (expr.getType() == ExpressionType.LITERAL || isAggregateExpression(expr) || groupByExprs.contains(expr)) {
@@ -409,13 +502,11 @@ public class CalciteSqlParser {
     return function != null && function.getOperator().equals("as");
   }
 
-  /**
-   * Extract all the identifiers from given expressions.
-   *
-   * @param expressions
-   * @param excludeAs if true, ignores the right side identifier for AS function.
-   * @return all the identifier names.
-   */
+  /// Extract all the identifiers from given expressions.
+  ///
+  /// @param expressions
+  /// @param excludeAs if true, ignores the right side identifier for AS function.
+  /// @return all the identifier names.
   public static Set<String> extractIdentifiers(List<Expression> expressions, boolean excludeAs) {
     Set<String> identifiers = new HashSet<>();
     for (Expression expression : expressions) {
@@ -436,14 +527,12 @@ public class CalciteSqlParser {
     return identifiers;
   }
 
-  /**
-   * Compiles a String expression into {@link Expression}.
-   *
-   * @param expression String expression.
-   * @return {@link Expression} equivalent of the string.
-   *
-   * @throws SqlCompilationException if String is not a valid expression.
-   */
+  /// Compiles a String expression into [Expression].
+  ///
+  /// @param expression String expression.
+  /// @return [Expression] equivalent of the string.
+  ///
+  /// @throws SqlCompilationException if String is not a valid expression.
   public static Expression compileToExpression(String expression) {
     SqlNode sqlNode;
     try (StringReader inStream = new StringReader(expression)) {
@@ -518,7 +607,7 @@ public class CalciteSqlParser {
     // GROUP-BY
     SqlNodeList groupByNodeList = selectNode.getGroup();
     if (groupByNodeList != null) {
-      pinotQuery.setGroupByList(convertSelectList(groupByNodeList));
+      setGroupByListAndGroupingSets(pinotQuery, groupByNodeList);
     }
     // HAVING
     SqlNode havingNode = selectNode.getHaving();
@@ -609,14 +698,12 @@ public class CalciteSqlParser {
     validate(pinotQuery);
   }
 
-  /**
-   * Applies a specific query rewriter to the given PinotQuery and validates the result.
-   * This method searches for a rewriter by class name and applies it to transform the query.
-   *
-   * @param pinotQuery the query to be rewritten
-   * @param rewriterClass the class name of the query rewriter to apply
-   * @throws IllegalArgumentException if no rewriter with the specified class name is found
-   */
+  /// Applies a specific query rewriter to the given PinotQuery and validates the result.
+  /// This method searches for a rewriter by class name and applies it to transform the query.
+  ///
+  /// @param pinotQuery the query to be rewritten
+  /// @param rewriterClass the class name of the query rewriter to apply
+  /// @throws IllegalArgumentException if no rewriter with the specified class name is found
   public static void queryRewrite(PinotQuery pinotQuery, Class<? extends QueryRewriter> rewriterClass) {
     QueryRewriter queryRewriter = QUERY_REWRITERS.stream()
         .filter(rewriter -> rewriter.getClass().equals(rewriterClass))
@@ -673,6 +760,170 @@ public class CalciteSqlParser {
     return selectExpr;
   }
 
+  /// Converts the GROUP BY clause into [PinotQuery#groupByList] and (when grouping constructs are
+  /// present) [PinotQuery#groupingSets].
+  ///
+  /// For a plain GROUP BY (no ROLLUP / CUBE / GROUPING SETS) this behaves exactly like
+  /// [#convertSelectList] and leaves `groupingSets` unset, so non-grouping-set queries are
+  /// unchanged. When grouping constructs are present, the grouping elements are cross-multiplied into the
+  /// canonical, de-duplicated list of grouping sets (standard SQL semantics, e.g.
+  /// `GROUP BY a, ROLLUP(b, c)` produces `{a,b,c}, {a,b}, {a}`); the ordered, de-duplicated
+  /// union of all participating columns is stored as `groupByList`, and each grouping set is stored
+  /// as the sorted list of its participating union-column indexes, an empty list being the grand-total set
+  /// `()`.
+  private static void setGroupByListAndGroupingSets(PinotQuery pinotQuery, SqlNodeList groupByNodeList) {
+    boolean hasGroupingConstruct = false;
+    for (SqlNode node : groupByNodeList) {
+      if (isGroupingConstruct(node.getKind())) {
+        hasGroupingConstruct = true;
+        break;
+      }
+    }
+    if (!hasGroupingConstruct) {
+      pinotQuery.setGroupByList(convertSelectList(groupByNodeList));
+      return;
+    }
+
+    /// Cross-multiply the grouping elements: the overall grouping sets are the union of one chosen set from
+    /// each grouping element. Start with a single empty set (the multiplicative identity).
+    List<LinkedHashSet<Expression>> combinedSets = new ArrayList<>();
+    combinedSets.add(new LinkedHashSet<>());
+    for (SqlNode element : groupByNodeList) {
+      List<List<Expression>> elementSets = parseGroupingElement(element);
+      List<LinkedHashSet<Expression>> next = new ArrayList<>(combinedSets.size() * elementSets.size());
+      for (LinkedHashSet<Expression> prefix : combinedSets) {
+        for (List<Expression> choice : elementSets) {
+          LinkedHashSet<Expression> merged = new LinkedHashSet<>(prefix);
+          merged.addAll(choice);
+          next.add(merged);
+        }
+      }
+      if (next.size() > MAX_GROUPING_SETS) {
+        throw new SqlCompilationException(
+            "GROUPING SETS / ROLLUP / CUBE expands to more than " + MAX_GROUPING_SETS + " grouping sets");
+      }
+      combinedSets = next;
+    }
+
+    /// Build the ordered, de-duplicated union of all participating columns (first-appearance order).
+    LinkedHashMap<Expression, Integer> unionIndex = new LinkedHashMap<>();
+    for (LinkedHashSet<Expression> set : combinedSets) {
+      for (Expression expr : set) {
+        unionIndex.computeIfAbsent(expr, k -> unionIndex.size());
+      }
+    }
+    pinotQuery.setGroupByList(new ArrayList<>(unionIndex.keySet()));
+
+    /// Encode each grouping set as the sorted list of its participating union-column indexes (mirroring
+    /// Calcite's per-set column bitset, so the number of grouping columns is unlimited), de-duplicating
+    /// overlapping sets produced by CUBE/ROLLUP. An empty list is the grand-total set (). A set's position in
+    /// the list is its ordinal — the value the engine carries in the synthetic $groupingId discriminator.
+    Set<List<Integer>> seen = new HashSet<>();
+    List<List<Integer>> groupingSets = new ArrayList<>();
+    for (LinkedHashSet<Expression> set : combinedSets) {
+      List<Integer> columnIndexes = new ArrayList<>(set.size());
+      for (Expression expr : set) {
+        columnIndexes.add(unionIndex.get(expr));
+      }
+      Collections.sort(columnIndexes);
+      if (seen.add(columnIndexes)) {
+        groupingSets.add(columnIndexes);
+      }
+    }
+    pinotQuery.setGroupingSets(groupingSets);
+  }
+
+  private static boolean isGroupingConstruct(SqlKind kind) {
+    return kind == SqlKind.ROLLUP || kind == SqlKind.CUBE || kind == SqlKind.GROUPING_SETS;
+  }
+
+  /// Expands a single grouping element into the list of grouping sets it represents (each set is an ordered
+  /// list of column expressions; the empty list is the grand-total set).
+  /// - `ROLLUP(l1, ..., ln)` -> the n+1 prefixes `{l1..ln}, {l1..ln-1}, ..., {l1}, {}`
+  /// - `CUBE(l1, ..., ln)` -> the power set of the n levels
+  /// - `GROUPING SETS(g1, ..., gm)` -> the concatenation of each operand's expansion (operands may be
+  ///   nested ROLLUP/CUBE/GROUPING SETS or ordinary sets)
+  /// - an ordinary grouping element (a single column or a parenthesized list) -> a single set
+  private static List<List<Expression>> parseGroupingElement(SqlNode node) {
+    switch (node.getKind()) {
+      case ROLLUP: {
+        List<List<Expression>> levels = parseLevels((SqlCall) node);
+        List<List<Expression>> sets = new ArrayList<>(levels.size() + 1);
+        for (int numLevels = levels.size(); numLevels >= 0; numLevels--) {
+          List<Expression> set = new ArrayList<>();
+          for (int i = 0; i < numLevels; i++) {
+            set.addAll(levels.get(i));
+          }
+          sets.add(set);
+        }
+        return sets;
+      }
+      case CUBE: {
+        List<List<Expression>> levels = parseLevels((SqlCall) node);
+        int numLevels = levels.size();
+        /// Guard the shift against overflow (1L << 64 wraps to 1) before comparing against the set-count cap.
+        if (numLevels >= Integer.SIZE - 1 || (1L << numLevels) > MAX_GROUPING_SETS) {
+          throw new SqlCompilationException(
+              "CUBE expands to more than " + MAX_GROUPING_SETS + " grouping sets");
+        }
+        List<List<Expression>> sets = new ArrayList<>(1 << numLevels);
+        for (int mask = (1 << numLevels) - 1; mask >= 0; mask--) {
+          List<Expression> set = new ArrayList<>();
+          for (int i = 0; i < numLevels; i++) {
+            if ((mask & (1 << i)) != 0) {
+              set.addAll(levels.get(i));
+            }
+          }
+          sets.add(set);
+        }
+        return sets;
+      }
+      case GROUPING_SETS: {
+        List<List<Expression>> sets = new ArrayList<>();
+        for (SqlNode operand : ((SqlCall) node).getOperandList()) {
+          sets.addAll(parseGroupingElement(operand));
+        }
+        return sets;
+      }
+      default:
+        /// Ordinary grouping element: a single column expression or a parenthesized list of columns.
+        return List.of(parseLevel(node));
+    }
+  }
+
+  /// Parses each operand of a ROLLUP/CUBE call into a "level" (a level may be a single column or a
+  /// parenthesized list of columns that roll up together).
+  private static List<List<Expression>> parseLevels(SqlCall call) {
+    List<List<Expression>> levels = new ArrayList<>(call.getOperandList().size());
+    for (SqlNode operand : call.getOperandList()) {
+      levels.add(parseLevel(operand));
+    }
+    return levels;
+  }
+
+  /// Parses a single grouping level/set node into its column expressions. Handles a parenthesized list
+  /// (modeled by Calcite as either a [SqlNodeList] or a ROW call), and a bare single column. An empty
+  /// parenthesized list yields an empty column list (the grand-total set).
+  private static List<Expression> parseLevel(SqlNode node) {
+    if (node instanceof SqlNodeList) {
+      SqlNodeList list = (SqlNodeList) node;
+      List<Expression> columns = new ArrayList<>(list.size());
+      for (SqlNode column : list) {
+        columns.add(toExpression(column));
+      }
+      return columns;
+    }
+    if (node.getKind() == SqlKind.ROW) {
+      List<SqlNode> operands = ((SqlCall) node).getOperandList();
+      List<Expression> columns = new ArrayList<>(operands.size());
+      for (SqlNode column : operands) {
+        columns.add(toExpression(column));
+      }
+      return columns;
+    }
+    return List.of(toExpression(node));
+  }
+
   private static List<Expression> convertOrderByList(SqlNodeList orderList) {
     List<Expression> orderByExpr = new ArrayList<>(orderList.size());
     for (SqlNode sqlNode : orderList) {
@@ -705,13 +956,11 @@ public class CalciteSqlParser {
     return expression;
   }
 
-  /**
-   * DISTINCT is implemented as an aggregation function so need to take the select list items
-   * and convert them into a single function expression for handing over to execution engine
-   * either as a PinotQuery or BrokerRequest via conversion
-   * @param selectList select list items
-   * @return DISTINCT function expression
-   */
+  /// DISTINCT is implemented as an aggregation function so need to take the select list items
+  /// and convert them into a single function expression for handing over to execution engine
+  /// either as a PinotQuery or BrokerRequest via conversion
+  /// @param selectList select list items
+  /// @return DISTINCT function expression
   private static Expression convertDistinctAndSelectListToFunctionExpression(SqlNodeList selectList) {
     List<Expression> operands = new ArrayList<>(selectList.size());
     for (SqlNode node : selectList) {
@@ -799,8 +1048,14 @@ public class CalciteSqlParser {
         if (node instanceof SqlDataTypeSpec) {
           // This is to handle expression like: CAST(col AS INT)
           return RequestUtils.getLiteralExpression(((SqlDataTypeSpec) node).getTypeName().getSimple());
-        } else {
+        } else if (node instanceof SqlWindow) {
+          // Window definitions appear as operands of OVER calls. PinotQuery does not model window frames directly, but
+          // compiling them as literals keeps parsing/table-name extraction from failing on multi-stage window queries.
+          return RequestUtils.getLiteralExpression(node.toString());
+        } else if (node instanceof SqlBasicCall) {
           return compileFunctionExpression((SqlBasicCall) node);
+        } else {
+          throw new SqlCompilationException("Unsupported sql node - " + node);
         }
     }
   }
@@ -823,6 +1078,14 @@ public class CalciteSqlParser {
         negated = ((SqlLikeOperator) functionNode.getOperator()).isNegated();
         canonicalName = SqlKind.LIKE.name();
         break;
+      case MINUS_PREFIX:
+        // SqlKind.MINUS_PREFIX.name() would canonicalize to "minusprefix", which has no matching entry in
+        // FunctionRegistry. Map directly to the registered NegateScalarFunction name instead.
+        canonicalName = NegateScalarFunction.FUNCTION_NAME;
+        break;
+      case PLUS_PREFIX:
+        // Unary plus is identity -- unwrap to the operand directly (no function node needed).
+        return toExpression(functionNode.getOperandList().get(0));
       case OTHER:
       case OTHER_FUNCTION:
       case DOT:
@@ -874,25 +1137,23 @@ public class CalciteSqlParser {
     }
   }
 
-  /**
-   * Convert Calcite operator tree made up of ITEM and DOT functions to an identifier. For example, the operator tree
-   * shown below will be converted to IDENTIFIER "jsoncolumn.data[0][1].a.b[0]".
-   *
-   * ├── ITEM(jsoncolumn.data[0][1].a.b[0])
-   *      ├── LITERAL (0)
-   *      └── DOT (jsoncolumn.daa[0][1].a.b)
-   *            ├── IDENTIFIER (b)
-   *            └── DOT (jsoncolumn.data[0][1].a)
-   *                  ├── IDENTIFIER (a)
-   *                  └── ITEM (jsoncolumn.data[0][1])
-   *                        ├── LITERAL (1)
-   *                        └── ITEM (jsoncolumn.data[0])
-   *                              ├── LITERAL (1)
-   *                              └── IDENTIFIER (jsoncolumn.data)
-   *
-   * @param functionNode Root node of the DOT and/or ITEM operator function chain.
-   * @param pathBuilder StringBuilder representation of path represented by DOT and/or ITEM function chain.
-   */
+  /// Convert Calcite operator tree made up of ITEM and DOT functions to an identifier. For example, the operator tree
+  /// shown below will be converted to IDENTIFIER "jsoncolumn.data[0][1].a.b[0]".
+  ///
+  /// ├── ITEM(jsoncolumn.data[0][1].a.b[0])
+  /// ├── LITERAL (0)
+  /// └── DOT (jsoncolumn.daa[0][1].a.b)
+  /// ├── IDENTIFIER (b)
+  /// └── DOT (jsoncolumn.data[0][1].a)
+  /// ├── IDENTIFIER (a)
+  /// └── ITEM (jsoncolumn.data[0][1])
+  /// ├── LITERAL (1)
+  /// └── ITEM (jsoncolumn.data[0])
+  /// ├── LITERAL (1)
+  /// └── IDENTIFIER (jsoncolumn.data)
+  ///
+  /// @param functionNode Root node of the DOT and/or ITEM operator function chain.
+  /// @param pathBuilder StringBuilder representation of path represented by DOT and/or ITEM function chain.
   private static void compilePathExpression(SqlBasicCall functionNode, StringBuilder pathBuilder) {
     List<SqlNode> operands = functionNode.getOperandList();
 
@@ -925,9 +1186,7 @@ public class CalciteSqlParser {
     }
   }
 
-  /**
-   * Helper method to flatten the operands for the AND expression.
-   */
+  /// Helper method to flatten the operands for the AND expression.
   private static Expression compileAndExpression(SqlBasicCall andNode) {
     List<Expression> operands = new ArrayList<>();
     for (SqlNode childNode : andNode.getOperandList()) {
@@ -941,9 +1200,7 @@ public class CalciteSqlParser {
     return RequestUtils.getFunctionExpression(FilterKind.AND.name(), operands);
   }
 
-  /**
-   * Helper method to flatten the operands for the OR expression.
-   */
+  /// Helper method to flatten the operands for the OR expression.
   private static Expression compileOrExpression(SqlBasicCall orNode) {
     List<Expression> operands = new ArrayList<>();
     for (SqlNode childNode : orNode.getOperandList()) {

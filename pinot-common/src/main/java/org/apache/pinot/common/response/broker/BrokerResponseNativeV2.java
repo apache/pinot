@@ -21,6 +21,7 @@ package org.apache.pinot.common.response.broker;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,14 +33,12 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
 
 
-/**
- * Broker response for multi-stage engine.
- * TODO: Currently this class cannot be used to deserialize the JSON response.
- */
+/// Broker response for multi-stage engine.
+/// TODO: Currently this class cannot be used to deserialize the JSON response.
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
-    "numGroupsWarningLimitReached", "numGroups", "maxRowsInJoinReached", "maxRowsInJoin",
-    "maxRowsInWindowReached", "maxRowsInWindow", "timeUsedMs", "stageStats",
+    "numGroupsWarningLimitReached", "numGroups", "earlyTerminationReasons", "maxRowsInJoinReached",
+    "maxRowsInJoin", "maxRowsInWindowReached", "maxRowsInWindow", "timeUsedMs", "stageStats", "streamStatsCoverage",
     "maxRowsInOperator", "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs",
     "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded",
     "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
@@ -51,7 +50,8 @@ import org.apache.pinot.common.response.ProcessingException;
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "pools", "rlsFiltersApplied", "groupsTrimmed"
+    "pools", "rlsFiltersApplied", "groupsTrimmed",
+    "mseLiteLeafStageLimitReached", "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied"
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
   private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
@@ -64,17 +64,18 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   private boolean _maxRowsInWindowReached;
   private long _maxRowsInWindow;
   private long _timeUsedMs;
-  /**
-   * Statistics for each stage of the query execution.
-   */
+  /// Statistics for each stage of the query execution.
   private ObjectNode _stageStats;
-  /**
-   * The max number of rows seen at runtime.
-   * <p>
-   * In single-stage this doesn't make sense given it is the max number of rows read from the table. But in multi-stage
-   * virtual rows can be generated. For example, in a join query, the number of rows can be more than the number of rows
-   * in the table.
-   */
+  /// Stream-mode stats coverage, populated only when the query used `SubmitWithStream`. An array indexed by stage
+  /// id; each element is an object with `responded`, `mergeFailed`, and `missing` counters, or
+  /// `null` for stages that have no coverage info (e.g. stage 0 which runs broker-local).
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private ArrayNode _streamStatsCoverage;
+  /// The max number of rows seen at runtime.
+  ///
+  /// In single-stage this doesn't make sense given it is the max number of rows read from the table. But in multi-stage
+  /// virtual rows can be generated. For example, in a join query, the number of rows can be more than the number of
+  /// rows in the table.
   private long _maxRowsInOperator;
   private String _requestId;
   private String _clientRequestId;
@@ -86,6 +87,10 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   private Set<Integer> _pools = Set.of();
   private boolean _rlsFiltersApplied = false;
+  @Nullable
+  private Integer _mseLiteLeafStageEffectiveLimit;
+  @Nullable
+  private Boolean _mseLiteFanOutAdjustedLimitApplied;
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @Nullable
@@ -112,7 +117,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   @Override
   public boolean isPartialResult() {
-    return getExceptionsSize() > 0 || isNumGroupsLimitReached() || isMaxRowsInJoinReached();
+    return getExceptionsSize() > 0 || isNumGroupsLimitReached() || !getEarlyTerminationReasons().isEmpty()
+        || isMaxRowsInJoinReached() || isMseLiteLeafStageLimitReached();
   }
 
   @Override
@@ -163,6 +169,40 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     _brokerStats.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, numGroupsWarningLimitReached);
   }
 
+  public boolean isMseLiteLeafStageLimitReached() {
+    return _brokerStats.getBoolean(StatKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED);
+  }
+
+  public void mergeMseLiteLeafStageLimitReached(boolean mseLiteLeafStageLimitReached) {
+    _brokerStats.merge(StatKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED, mseLiteLeafStageLimitReached);
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Nullable
+  public Integer getMseLiteLeafStageEffectiveLimit() {
+    return _mseLiteLeafStageEffectiveLimit;
+  }
+
+  public void setMseLiteLeafStageEffectiveLimit(int mseLiteLeafStageEffectiveLimit) {
+    _mseLiteLeafStageEffectiveLimit = mseLiteLeafStageEffectiveLimit;
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @JsonProperty("mseLiteFanOutAdjustedLimitApplied")
+  @Nullable
+  public Boolean getMseLiteFanOutAdjustedLimitApplied() {
+    return _mseLiteFanOutAdjustedLimitApplied;
+  }
+
+  public void setMseLiteFanOutAdjustedLimitApplied(boolean mseLiteFanOutAdjustedLimitApplied) {
+    _mseLiteFanOutAdjustedLimitApplied = mseLiteFanOutAdjustedLimitApplied;
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  public List<String> getEarlyTerminationReasons() {
+    return List.copyOf(_brokerStats.getStringSet(StatKey.EARLY_TERMINATION_REASONS));
+  }
+
   @Override
   public boolean isMaxRowsInJoinReached() {
     return _maxRowsInJoinReached;
@@ -197,9 +237,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     _maxRowsInWindow = Math.max(_maxRowsInWindow, maxRowsInWindow);
   }
 
-  /**
-   * Returns the stage statistics.
-   */
+  /// Returns the stage statistics.
   public ObjectNode getStageStats() {
     return _stageStats;
   }
@@ -208,9 +246,18 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     _stageStats = stageStats;
   }
 
-  /**
-   * Returns the maximum number of rows seen by a single operator in the query processing chain.
-   */
+  /// Returns the stream-mode stats coverage, or `null` when the query ran in legacy mode. Array indexed by stage
+  /// id; elements may be `null` for stages with no coverage (e.g. stage 0).
+  @Nullable
+  public ArrayNode getStreamStatsCoverage() {
+    return _streamStatsCoverage;
+  }
+
+  public void setStreamStatsCoverage(ArrayNode streamStatsCoverage) {
+    _streamStatsCoverage = streamStatsCoverage;
+  }
+
+  /// Returns the maximum number of rows seen by a single operator in the query processing chain.
   public long getMaxRowsInOperator() {
     return _maxRowsInOperator;
   }
@@ -487,7 +534,9 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
       public long merge(long value1, long value2) {
         return Math.max(value1, value2);
       }
-    };
+    },
+    EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET),
+    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 

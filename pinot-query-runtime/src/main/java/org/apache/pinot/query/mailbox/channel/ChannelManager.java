@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.query.mailbox.channel;
 
+import com.google.common.base.Preconditions;
 import io.grpc.ConnectivityState;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator;
 import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
+import io.grpc.netty.shaded.io.netty.channel.WriteBufferWaterMark;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,47 +35,53 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * {@code ChannelManager} manages Grpc send/receive channels.
- *
- * <p>Grpc channels are managed centralized per Pinot component. Channels should be reused across different
- * query/job/stages.
- */
+/// `ChannelManager` manages Grpc send/receive channels.
+///
+/// Grpc channels are managed centralized per Pinot component. Channels should be reused across different
+/// query/job/stages.
 public class ChannelManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChannelManager.class);
 
-  /**
-   * Map from (hostname, port) to the ManagedChannel with all known channels
-   */
+  /// Map from (hostname, port) to the ManagedChannel with all known channels
   private final ConcurrentHashMap<Pair<String, Integer>, ManagedChannel> _channelMap = new ConcurrentHashMap<>();
-  /**
-   * The idle timeout for the channel, which cannot be disabled in gRPC.
-   *
-   * In general we want to prevent the channel from going idle, so that we don't have to re-establish the connection
-   * (including TLS negotiation) before sending any message, which increases the latency of the first query sent after a
-   * period of inactivity. In order to achieve that, we set the idle timeout to a very large value by default.
-   */
+  /// The idle timeout for the channel, which cannot be disabled in gRPC.
+  ///
+  /// In general we want to prevent the channel from going idle, so that we don't have to re-establish the connection
+  /// (including TLS negotiation) before sending any message, which increases the latency of the first query sent after
+  /// a period of inactivity. In order to achieve that, we set the idle timeout to a very large value by default.
   private final Duration _idleTimeout;
   private final int _maxInboundMessageSize;
-  /**
-   * Buffer allocator configured to prefer direct (off-heap) buffers for better performance.
-   * Using a single allocator instance across all channels allows for better memory pooling and reduces fragmentation.
-   */
+  /// Buffer allocator configured to prefer direct (off-heap) buffers for better performance.
+  /// Using a single allocator instance across all channels allows for better memory pooling and reduces fragmentation.
   private final PooledByteBufAllocator _bufAllocator;
   @Nullable
   private final SslContext _clientSslContext;
+  private final WriteBufferWaterMark _writeBufferWaterMark;
 
-  /**
-   * Constructs a {@code ChannelManager}.
-   *
-   * @param clientSslContext optional cached client {@link SslContext} to reuse across channels
-   * @param maxInboundMessageSize maximum inbound message size for gRPC channels
-   * @param idleTimeout idle timeout for gRPC channels; channels close after this period of inactivity
-   */
-  public ChannelManager(@Nullable SslContext clientSslContext, int maxInboundMessageSize, Duration idleTimeout) {
+  /// Constructs a `ChannelManager`.
+  ///
+  /// @param clientSslContext optional cached client [SslContext] to reuse across channels
+  /// @param maxInboundMessageSize maximum inbound message size for gRPC channels
+  /// @param idleTimeout idle timeout for gRPC channels; channels close after this period of inactivity
+  /// @param writeBufferHighWaterMarkBytes Netty per-channel [WriteBufferWaterMark] high watermark. This limit is
+  ///                                     per `(host, port)` peer and is shared across all streams multiplexed on
+  ///                                     that channel.
+  /// @param writeBufferLowWaterMarkBytes Netty per-channel [WriteBufferWaterMark] low mark. Once the channel's
+  ///                                     pending write queue grows above the high watermark, the channel is marked
+  ///                                     unwritable; it becomes writable again only when the queue drains below this
+  ///                                     low watermark. Must satisfy `0 < low ≤ high`; validated eagerly here so
+  ///                                     misconfiguration surfaces at startup rather than on the first query.
+  public ChannelManager(@Nullable SslContext clientSslContext, int maxInboundMessageSize, Duration idleTimeout,
+      int writeBufferHighWaterMarkBytes, int writeBufferLowWaterMarkBytes) {
     _clientSslContext = clientSslContext;
     _maxInboundMessageSize = maxInboundMessageSize;
     _idleTimeout = idleTimeout;
+    Preconditions.checkArgument(writeBufferLowWaterMarkBytes > 0,
+        "writeBufferLowWaterMarkBytes must be positive, got: %s", writeBufferLowWaterMarkBytes);
+    // The `low <= high` (and `low >= 0`) invariant is also checked by Netty's WriteBufferWaterMark constructor; by
+    // constructing the watermark eagerly here we surface any violation at startup instead of on the first send to
+    // a previously-unseen peer.
+    _writeBufferWaterMark = new WriteBufferWaterMark(writeBufferLowWaterMarkBytes, writeBufferHighWaterMarkBytes);
     // Use direct buffers (off-heap) for better performance - matches server-side configuration
     _bufAllocator = new PooledByteBufAllocator(true);
   }
@@ -86,6 +94,7 @@ public class ChannelManager {
                 .forAddress(k.getLeft(), k.getRight())
                 .maxInboundMessageSize(_maxInboundMessageSize)
                 .withOption(ChannelOption.ALLOCATOR, _bufAllocator)
+                .withOption(ChannelOption.WRITE_BUFFER_WATER_MARK, _writeBufferWaterMark)
                 .sslContext(_clientSslContext);
             return decorate(channelBuilder).build();
           }
@@ -97,18 +106,17 @@ public class ChannelManager {
                 .forAddress(k.getLeft(), k.getRight())
                 .maxInboundMessageSize(_maxInboundMessageSize)
                 .withOption(ChannelOption.ALLOCATOR, _bufAllocator)
+                .withOption(ChannelOption.WRITE_BUFFER_WATER_MARK, _writeBufferWaterMark)
                 .usePlaintext();
             return decorate(channelBuilder).build();
           });
     }
   }
 
-  /**
-   * Resets the connection backoff for the channel to the given server if the channel is in
-   * TRANSIENT_FAILURE state. Returns true if a reset was performed, false otherwise.
-   *
-   * @return true if the channel was in TRANSIENT_FAILURE and backoff was reset
-   */
+  /// Resets the connection backoff for the channel to the given server if the channel is in
+  /// TRANSIENT_FAILURE state. Returns true if a reset was performed, false otherwise.
+  ///
+  /// @return true if the channel was in TRANSIENT_FAILURE and backoff was reset
   public boolean resetConnectBackoff(String hostname, int port) {
     ManagedChannel channel = _channelMap.get(Pair.of(hostname, port));
     if (channel != null && channel.getState(false) == ConnectivityState.TRANSIENT_FAILURE) {
@@ -121,5 +129,21 @@ public class ChannelManager {
 
   private NettyChannelBuilder decorate(NettyChannelBuilder builder) {
     return builder.idleTimeout(_idleTimeout.getSeconds(), TimeUnit.SECONDS);
+  }
+
+  /// Bytes of direct (off-heap) memory currently pinned by the shared gRPC
+  /// client allocator. Covers every channel managed by this instance and remains
+  /// meaningful regardless of whether Netty is configured to prefer direct or
+  /// heap buffers (e.g. `-Dio.netty.noPreferDirect=true`). Consumed by
+  /// [MailboxService] to register the `MAILBOX_CLIENT_USED_DIRECT_MEMORY` gauge.
+  public long usedDirectMemoryBytes() {
+    return _bufAllocator.metric().usedDirectMemory();
+  }
+
+  /// Bytes of heap memory currently pinned by the shared gRPC client allocator.
+  /// Consumed by [MailboxService] to register the
+  /// `MAILBOX_CLIENT_USED_HEAP_MEMORY` gauge.
+  public long usedHeapMemoryBytes() {
+    return _bufAllocator.metric().usedHeapMemory();
   }
 }

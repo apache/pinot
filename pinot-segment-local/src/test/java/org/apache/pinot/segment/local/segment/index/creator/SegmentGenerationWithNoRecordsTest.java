@@ -20,7 +20,7 @@ package org.apache.pinot.segment.local.segment.index.creator;
 
 import com.google.common.collect.Lists;
 import java.io.File;
-import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
@@ -40,9 +40,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests segment generation for empty files
- */
+/// Tests segment generation for empty files
 public class SegmentGenerationWithNoRecordsTest implements PinotBuffersAfterMethodCheckRule {
   private static final String STRING_COLUMN1 = "string_col1";
   private static final String STRING_COLUMN2 = "string_col2";
@@ -109,7 +107,7 @@ public class SegmentGenerationWithNoRecordsTest implements PinotBuffersAfterMeth
     config.setSegmentName(SEGMENT_NAME);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new GenericRowRecordReader(Collections.emptyList()));
+    driver.init(config, new GenericRowRecordReader(List.of()));
     driver.build();
     driver.getOutputDirectory().deleteOnExit();
     return driver.getOutputDirectory();

@@ -174,8 +174,9 @@ public class TaskMetricsEmitterTest {
   private void runAndAssertForTaskType1WithTwoTables() {
     PinotMetricsRegistry metricsRegistry = _controllerMetrics.getMetricsRegistry();
     _taskMetricsEmitter.runTask(null);
-    // Expected 31 metrics: 29 original + 2 timing metrics (SUBTASK_WAITING_TIME and SUBTASK_RUNNING_TIME)
-    Assert.assertEquals(metricsRegistry.allMetrics().size(), 31);
+    // Expected 33 metrics: 29 original + MAX_SUBTASK_WAIT_TIME_MS gauge (x2 tables)
+    // + MAX_SUBTASK_RUNNING_TIME_MS gauge (x2 tables)
+    Assert.assertEquals(metricsRegistry.allMetrics().size(), 33);
 
     Assert.assertTrue(metricsRegistry.allMetrics().containsKey(
         new YammerMetricName(ControllerMetrics.class, "pinot.controller.onlineMinionInstances")));
@@ -250,6 +251,26 @@ public class TaskMetricsEmitterTest {
             new YammerMetricName(ControllerMetrics.class,
                 "pinot.controller.percentMinionSubtasksInError.table2_OFFLINE.taskType1"))
         .getMetric()).value(), 50L);
+
+    // table1 has a waiting subtask (subtask2, 3000ms); table2 has none (0ms)
+    Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
+            new YammerMetricName(ControllerMetrics.class,
+                "pinot.controller.maxSubtaskWaitTimeMs.table1_OFFLINE.taskType1"))
+        .getMetric()).value(), 3000L);
+    Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
+            new YammerMetricName(ControllerMetrics.class,
+                "pinot.controller.maxSubtaskWaitTimeMs.table2_OFFLINE.taskType1"))
+        .getMetric()).value(), 0L);
+
+    // table2 has a running subtask (subtask1, 5000ms); table1 has none (0ms)
+    Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
+            new YammerMetricName(ControllerMetrics.class,
+                "pinot.controller.maxSubtaskRunningTimeMs.table1_OFFLINE.taskType1"))
+        .getMetric()).value(), 0L);
+    Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
+            new YammerMetricName(ControllerMetrics.class,
+                "pinot.controller.maxSubtaskRunningTimeMs.table2_OFFLINE.taskType1"))
+        .getMetric()).value(), 5000L);
   }
 
   @Test
@@ -281,9 +302,9 @@ public class TaskMetricsEmitterTest {
 
     PinotMetricsRegistry metricsRegistry = _controllerMetrics.getMetricsRegistry();
     _taskMetricsEmitter.runTask(null);
-    // Expected at least 21 metrics: 20 original + 1 timing metric (SUBTASK_WAITING_TIME)
-    // The actual count may vary slightly based on test execution order
-    Assert.assertTrue(metricsRegistry.allMetrics().size() >= 21);
+    // Expected at least 22 metrics: 20 original + MAX_SUBTASK_WAIT_TIME_MS gauge (x1 table)
+    // + MAX_SUBTASK_RUNNING_TIME_MS gauge (x1 table). Count may vary based on test execution order.
+    Assert.assertTrue(metricsRegistry.allMetrics().size() >= 22);
 
     Assert.assertTrue(metricsRegistry.allMetrics().containsKey(
         new YammerMetricName(ControllerMetrics.class, "pinot.controller.onlineMinionInstances")));
@@ -366,19 +387,17 @@ public class TaskMetricsEmitterTest {
     taskType2WithOneTable();
   }
 
-  /**
-   * Test for previously in-progress tasks that completed between runs:
-   * Tasks that were in-progress in the previous run but completed before the current run
-   * should still have their metrics reported in the current run.
-   *
-   * Scenario:
-   * - Run 1: Task "taskCompletedBetweenRuns" is in-progress with 1 error subtask
-   * - Run 2: Task "taskCompletedBetweenRuns" has completed and is no longer in getTasksInProgress()
-   *
-   * Expected: Metrics for "taskCompletedBetweenRuns" should still be emitted in Run 2 by detecting it via
-   * _previousInProgressTasks tracking. The emitter maintains state of tasks that were in-progress
-   * in the previous execution cycle and includes completed tasks in the current cycle's metrics.
-   */
+  /// Test for previously in-progress tasks that completed between runs:
+  /// Tasks that were in-progress in the previous run but completed before the current run
+  /// should still have their metrics reported in the current run.
+  ///
+  /// Scenario:
+  /// - Run 1: Task "taskCompletedBetweenRuns" is in-progress with 1 error subtask
+  /// - Run 2: Task "taskCompletedBetweenRuns" has completed and is no longer in getTasksInProgress()
+  ///
+  /// Expected: Metrics for "taskCompletedBetweenRuns" should still be emitted in Run 2 by detecting it via
+  /// \_previousInProgressTasks tracking. The emitter maintains state of tasks that were in-progress
+  /// in the previous execution cycle and includes completed tasks in the current cycle's metrics.
   @Test
   public void testReportsPreviouslyInProgressTasksThatCompletedBetweenRuns() {
     String taskType = "SegmentGenerationAndPushTask";
@@ -433,21 +452,19 @@ public class TaskMetricsEmitterTest {
         "Previously in-progress task that completed between runs should still be reported");
   }
 
-  /**
-   * Test for short-lived tasks that started and completed between runs:
-   * Tasks that started AND completed between two collection runs should have their
-   * metrics reported.
-   *
-   * Scenario:
-   * - Run 1: No tasks in-progress
-   * - Between runs: Task "taskShortLived" starts and completes (very short-lived)
-   * - Run 2: No tasks in-progress (taskShortLived already completed)
-   *
-   * Expected: Metrics for "taskShortLived" should be emitted in Run 2 by detecting it via
-   * getTasksInProgressAndRecent(taskType, timestamp) which uses WorkflowContext.getJobStartTimes() to find tasks that
-   * started after the previous execution timestamp. The emitter combines in-progress tasks and
-   * short-lived tasks in a single Helix call to avoid duplicate getWorkflowConfig/getWorkflowContext calls.
-   */
+  /// Test for short-lived tasks that started and completed between runs:
+  /// Tasks that started AND completed between two collection runs should have their
+  /// metrics reported.
+  ///
+  /// Scenario:
+  /// - Run 1: No tasks in-progress
+  /// - Between runs: Task "taskShortLived" starts and completes (very short-lived)
+  /// - Run 2: No tasks in-progress (taskShortLived already completed)
+  ///
+  /// Expected: Metrics for "taskShortLived" should be emitted in Run 2 by detecting it via
+  /// getTasksInProgressAndRecent(taskType, timestamp) which uses WorkflowContext.getJobStartTimes() to find tasks that
+  /// started after the previous execution timestamp. The emitter combines in-progress tasks and
+  /// short-lived tasks in a single Helix call to avoid duplicate getWorkflowConfig/getWorkflowContext calls.
   @Test
   public void testReportsTasksThatStartAndCompleteBetweenRuns() {
     String taskType = "SegmentGenerationAndPushTask";

@@ -27,26 +27,18 @@ import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 
 
-/**
- * Block used by time series operators. We store the series data in a map keyed by the series' ID. The value is a
- * list of series, because some query languages support "union" operations which allow series with the same tags/labels
- * to exist either in the query response or temporarily during execution before some n-ary series function
- * is applied.
- */
+/// Block used by time series operators. We store the series data in a map keyed by the series' ID. The value is a
+/// list of series, because some query languages support "union" operations which allow series with the same tags/labels
+/// to exist either in the query response or temporarily during execution before some n-ary series function
+/// is applied.
 public class TimeSeriesBlock {
   private final TimeBuckets _timeBuckets;
-  /**
-   * Refer to {@link TimeSeries} for semantics on how to compute the Long hashed value from a
-   * {@link TimeSeries#getId()}.
-   */
+  /// Refer to [TimeSeries] for semantics on how to compute the Long hashed value from a
+  /// [TimeSeries#getId()].
   private final Map<Long, List<TimeSeries>> _seriesMap;
-  /**
-   * Holds optional metadata about the block (e.g., statistics).
-   */
+  /// Holds optional metadata about the block (e.g., statistics).
   private final Map<String, String> _metadata;
-  /**
-   * Holds exceptions encountered during processing of the block.
-   */
+  /// Holds exceptions encountered during processing of the block.
   // TODO(timeseries): Exceptions are not serialized and propagated from servers to brokers currently, need to pass
   // all exceptions from servers to broker through this only.
   private final List<QueryException> _exceptions;

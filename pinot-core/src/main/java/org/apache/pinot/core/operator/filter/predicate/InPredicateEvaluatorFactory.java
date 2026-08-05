@@ -43,34 +43,28 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * Factory for IN predicate evaluators.
- */
+/// Factory for IN predicate evaluators.
 public class InPredicateEvaluatorFactory {
   private InPredicateEvaluatorFactory() {
   }
 
-  /**
-   * Create a new instance of dictionary based IN predicate evaluator.
-   *
-   * @param inPredicate  IN predicate to evaluate
-   * @param dictionary   Dictionary for the column
-   * @param dataType     Data type for the column
-   * @param queryContext Query context
-   * @return Dictionary based IN predicate evaluator
-   */
+  /// Create a new instance of dictionary based IN predicate evaluator.
+  ///
+  /// @param inPredicate  IN predicate to evaluate
+  /// @param dictionary   Dictionary for the column
+  /// @param dataType     Data type for the column
+  /// @param queryContext Query context
+  /// @return Dictionary based IN predicate evaluator
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(InPredicate inPredicate,
       Dictionary dictionary, DataType dataType, @Nullable QueryContext queryContext) {
     return new DictionaryBasedInPredicateEvaluator(inPredicate, dictionary, dataType, queryContext);
   }
 
-  /**
-   * Create a new instance of raw value based IN predicate evaluator.
-   *
-   * @param inPredicate IN predicate to evaluate
-   * @param dataType Data type for the column
-   * @return Raw value based IN predicate evaluator
-   */
+  /// Create a new instance of raw value based IN predicate evaluator.
+  ///
+  /// @param inPredicate IN predicate to evaluate
+  /// @param dataType Data type for the column
+  /// @return Raw value based IN predicate evaluator
   public static InRawPredicateEvaluator newRawValueBasedEvaluator(InPredicate inPredicate, DataType dataType) {
     switch (dataType) {
       case INT: {

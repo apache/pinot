@@ -24,9 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 
 
-/**
- * Index creator for json index.
- */
+/// Index creator for json index.
 public interface JsonIndexCreator extends IndexCreator {
   char KEY_VALUE_SEPARATOR = '\0';
   char KEY_VALUE_SEPARATOR_NEXT_CHAR = KEY_VALUE_SEPARATOR + 1;
@@ -45,21 +43,15 @@ public interface JsonIndexCreator extends IndexCreator {
   default void add(Object[] values, @Nullable int[] dictIds) {
   }
 
-  /**
-   * Adds the next json value.
-   */
+  /// Adds the next json value.
   void add(String jsonString)
       throws IOException;
 
-  /**
-   * Adds the next json value for Map type
-   */
+  /// Adds the next json value for Map type
   void add(Map jsonMap)
-    throws IOException;
+      throws IOException;
 
-  /**
-   * Seals the index and flushes it to disk.
-   */
+  /// Seals the index and flushes it to disk.
   void seal()
       throws IOException;
 }

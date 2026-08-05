@@ -49,9 +49,7 @@ public abstract class BaseMapDataSource extends BaseDataSource implements MapDat
     _keyDataSources = new HashMap<>();
   }
 
-  /**
-   * Get the map FieldSpec.
-   */
+  /// Get the map FieldSpec.
   public ComplexFieldSpec.MapFieldSpec getFieldSpec() {
     return ComplexFieldSpec.toMapFieldSpec((ComplexFieldSpec) getDataSourceMetadata().getFieldSpec());
   }
@@ -62,12 +60,10 @@ public abstract class BaseMapDataSource extends BaseDataSource implements MapDat
     return null;
   }
 
-  /**
-   * Get the Data Source representation of a single key within this map column.
-   *
-   * @param key to get the DataSource for
-   * @return DataSource for the key
-   */
+  /// Get the Data Source representation of a single key within this map column.
+  ///
+  /// @param key to get the DataSource for
+  /// @return DataSource for the key
   public DataSource getDataSource(String key) {
     if (_keyDataSources.containsKey(key)) {
       return _keyDataSources.get(key);

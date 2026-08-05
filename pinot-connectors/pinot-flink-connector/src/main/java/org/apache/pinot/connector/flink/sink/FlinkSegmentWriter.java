@@ -57,10 +57,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A {@link SegmentWriter} implementation that uses a buffer. The {@link GenericRow} are written to
- * the buffer as AVRO records.
- */
+/// A [SegmentWriter] implementation that uses a buffer. The [GenericRow] are written to
+/// the buffer as AVRO records.
 @SuppressWarnings("NullAway")
 @NotThreadSafe
 public class FlinkSegmentWriter implements SegmentWriter {
@@ -84,7 +82,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
   private File _stagingDir;
   private File _bufferFile;
   private int _rowCount;
-  /** A sequence ID that increments each time a segment is flushed */
+  /// A sequence ID that increments each time a segment is flushed
   private int _seqId;
 
   private final String _segmentNamePrefix;
@@ -191,7 +189,8 @@ public class FlinkSegmentWriter implements SegmentWriter {
       throws IOException {
     FileUtils.deleteQuietly(_bufferFile);
     _rowCount = 0;
-    _recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
+    _recordWriter =
+        new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema, SegmentProcessorAvroUtils.getAvroDataModel()));
     _recordWriter.create(_avroSchema, _bufferFile);
   }
 
@@ -210,24 +209,22 @@ public class FlinkSegmentWriter implements SegmentWriter {
     _processedRecords.inc();
   }
 
-  /**
-   * Creates one Pinot segment using the {@link GenericRow}s collected in the AVRO file buffer, at
-   * the outputDirUri as specified in the tableConfig->batchConfigs. Successful invocation of this
-   * method means that the {@link GenericRow}s collected so far, are now available in the Pinot
-   * segment and not available in the buffer anymore.
-   *
-   * <p>Successful completion of segment will return the segment URI, and the URI includes a
-   * sequence id indicating the part number. The sequence id is initialized to 0 and each successful
-   * flush will increment the sequence id by 1. The segment name will be in the format of
-   * tableName_indexOfSubTask_sequenceId (e.g. starbucksStores_1_0). The buffer will be reset and
-   * ready to accept further records via <code>collect()</code> If an exception is thrown, the buffer
-   * will not be reset and so, <code>flush()</code> can be invoked repeatedly in a retry loop. If a
-   * successful invocation is not achieved,<code>close()</code> followed by <code>init </code> will
-   * have to be called in order to reset the buffer and resume record writing.
-   *
-   * @return URI of the generated segment
-   * @throws IOException
-   */
+  /// Creates one Pinot segment using the [GenericRow]s collected in the AVRO file buffer, at
+  /// the outputDirUri as specified in the tableConfig->batchConfigs. Successful invocation of this
+  /// method means that the [GenericRow]s collected so far, are now available in the Pinot
+  /// segment and not available in the buffer anymore.
+  ///
+  /// Successful completion of segment will return the segment URI, and the URI includes a
+  /// sequence id indicating the part number. The sequence id is initialized to 0 and each successful
+  /// flush will increment the sequence id by 1. The segment name will be in the format of
+  /// tableName_indexOfSubTask_sequenceId (e.g. starbucksStores_1_0). The buffer will be reset and
+  /// ready to accept further records via `collect()` If an exception is thrown, the buffer
+  /// will not be reset and so, `flush()` can be invoked repeatedly in a retry loop. If a
+  /// successful invocation is not achieved,`close()` followed by `init` will
+  /// have to be called in order to reset the buffer and resume record writing.
+  ///
+  /// @return URI of the generated segment
+  /// @throws IOException
   @Override
   public URI flush()
       throws IOException {

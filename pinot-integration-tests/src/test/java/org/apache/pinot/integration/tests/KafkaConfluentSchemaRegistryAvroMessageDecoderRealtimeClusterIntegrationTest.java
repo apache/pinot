@@ -61,10 +61,8 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test that extends RealtimeClusterIntegrationTest but uses low-level Kafka consumer.
- * TODO: Add separate module-level tests and remove the randomness of this test
- */
+/// Integration test that extends RealtimeClusterIntegrationTest but uses low-level Kafka consumer.
+/// TODO: Add separate module-level tests and remove the randomness of this test
 public class KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest
     extends BaseRealtimeClusterIntegrationTest {
   private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";

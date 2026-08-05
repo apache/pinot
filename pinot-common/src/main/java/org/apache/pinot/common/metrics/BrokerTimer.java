@@ -21,10 +21,7 @@ package org.apache.pinot.common.metrics;
 import org.apache.pinot.common.Utils;
 
 
-/**
- * Enumeration containing all the timers exposed by the Pinot broker.
- *
- */
+/// Enumeration containing all the timers exposed by the Pinot broker.
 public enum BrokerTimer implements AbstractMetrics.Timer {
   ROUTING_TABLE_UPDATE_TIME(true),
   CLUSTER_CHANGE_QUEUE_TIME(true), // metric tracking the freshness lag for consuming segments
@@ -62,6 +59,8 @@ public enum BrokerTimer implements AbstractMetrics.Timer {
   // Audit logging timers
   AUDIT_REQUEST_PROCESSING_TIME(true),
   AUDIT_RESPONSE_PROCESSING_TIME(true),
+  // The total time spent in processing the workload queries
+  WORKLOAD_TOTAL_QUERY_TIME_MS(false),
   // Time taken for remote cluster broker to compute routing table
   REMOTE_CLUSTER_BROKER_ROUTING_CALCULATION_TIME_MS(true);
 
@@ -78,11 +77,9 @@ public enum BrokerTimer implements AbstractMetrics.Timer {
     return _timerName;
   }
 
-  /**
-   * Returns true if the timer is global (not attached to a particular resource)
-   *
-   * @return true if the timer is global
-   */
+  /// Returns true if the timer is global (not attached to a particular resource)
+  ///
+  /// @return true if the timer is global
   @Override
   public boolean isGlobal() {
     return _global;

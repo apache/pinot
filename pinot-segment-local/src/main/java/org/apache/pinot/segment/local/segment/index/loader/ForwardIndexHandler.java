@@ -33,7 +33,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.BigDecimalColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPreIndexStatsCollector;
@@ -45,6 +44,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.MapColumnPreInd
 import org.apache.pinot.segment.local.segment.creator.impl.stats.NoDictColumnStatisticsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.forward.CompressionStatsMetadata;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -68,32 +68,32 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
-import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.Utf8Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
 
 
-/**
- * Helper class used by {@link SegmentPreProcessor} to make changes to forward index and dictionary configs. Note
- * that this handler only works for segment versions >= 3.0. Support for segment version < 3.0 is not added because
- * majority of the usecases are in versions >= 3.0 and this avoids adding tech debt. The currently supported
- * operations are:
- * 1. Change compression type for a raw column
- * 2. Enable dictionary
- * 3. Disable dictionary
- * 4. Disable forward index
- * 5. Rebuild the forward index for a forwardIndexDisabled column
- *
- *  TODO: Add support for the following:
- *  1. Segment versions < V3
- */
+/// Helper class used by [SegmentPreProcessor] to make changes to forward index and dictionary configs. Note
+/// that this handler only works for segment versions >= 3.0. Support for segment version < 3.0 is not added because
+/// majority of the usecases are in versions >= 3.0 and this avoids adding tech debt. The currently supported
+/// operations are:
+/// 1. Change compression type for a raw column
+/// 2. Enable dictionary
+/// 3. Disable dictionary
+/// 4. Disable forward index
+/// 5. Rebuild the forward index for a forwardIndexDisabled column
+///
+///  TODO: Add support for the following:
+///  1. Segment versions < V3
 public class ForwardIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(ForwardIndexHandler.class);
 
@@ -143,6 +143,15 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     for (Map.Entry<String, List<Operation>> entry : columnOperationsMap.entrySet()) {
       String column = entry.getKey();
       List<Operation> operations = entry.getValue();
+
+      boolean needsShapeMetadata = operations.contains(Operation.ENABLE_DICT_FORWARD_INDEX)
+          || operations.contains(Operation.ENABLE_RAW_FORWARD_INDEX)
+          || operations.contains(Operation.CHANGE_INDEX_COMPRESSION_TYPE)
+          || (operations.contains(Operation.DISABLE_DICTIONARY) && !forwardIndexDisabledColumns.contains(column)
+          && isForwardIndexDictionaryEncoded(column));
+      if (needsShapeMetadata) {
+        backfillMissingStats(column, segmentWriter);
+      }
 
       for (Operation operation : operations) {
         switch (operation) {
@@ -196,7 +205,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
             break;
           case ENABLE_DICTIONARY:
             if (_fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward()).getEncodingType()
-                == FieldConfig.EncodingType.DICTIONARY) {
+                == EncodingType.DICTIONARY) {
               createDictBasedForwardIndex(column, segmentWriter);
             } else {
               createDictionaryForRawForwardIndex(column, segmentWriter);
@@ -215,22 +224,36 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     }
   }
 
+  @Override
+  public void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
+      throws Exception {
+    super.postUpdateIndicesCleanup(segmentWriter);
+    if (!_tmpForwardIndexColumns.isEmpty()) {
+      Map<String, String> metadataProperties = new HashMap<>();
+      for (String column : _tmpForwardIndexColumns) {
+        CompressionStatsMetadata.unavailable().applyTo(metadataProperties, column);
+      }
+      SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
+    }
+  }
+
   @VisibleForTesting
   Map<String, List<Operation>> computeOperations(SegmentDirectory.Reader segmentReader)
       throws Exception {
-    Map<String, List<Operation>> columnOperationsMap = new HashMap<>();
+    SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
 
     // Does not work for segment versions < V3.
-    if (_segmentDirectory.getSegmentMetadata().getVersion().compareTo(SegmentVersion.v3) < 0) {
-      return columnOperationsMap;
+    if (segmentMetadata.getVersion().compareTo(SegmentVersion.v3) < 0) {
+      return Map.of();
     }
 
-    Set<String> existingAllColumns = _segmentDirectory.getSegmentMetadata().getSchema().getPhysicalColumnNames();
+    Map<String, List<Operation>> columnOperationsMap = new HashMap<>();
+    Set<String> existingAllColumns = segmentMetadata.getSchema().getPhysicalColumnNames();
     Set<String> existingDictColumns = _segmentDirectory.getColumnsWithIndex(StandardIndexes.dictionary());
     Set<String> existingForwardIndexColumns = _segmentDirectory.getColumnsWithIndex(StandardIndexes.forward());
     Set<String> existingInvertedIndexColumns =
         segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.inverted());
-    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
+    String segmentName = segmentMetadata.getName();
 
     for (String column : existingAllColumns) {
       if (!_schema.hasColumn(column)) {
@@ -246,14 +269,15 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
       // Forward-index encoding is the source-of-truth for "does forward exist and how is it laid out". Three
       // states: DICTIONARY (dict-encoded forward), RAW (raw forward), null (forward disabled / not on disk).
-      FieldConfig.EncodingType existingFwdEncoding = existingForwardIndexColumns.contains(column)
-          ? _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column).getForwardIndexEncoding() : null;
+      EncodingType existingFwdEncoding = existingForwardIndexColumns.contains(column)
+          ? segmentMetadata.getColumnMetadataFor(column).getForwardIndexEncoding()
+          : null;
       ForwardIndexConfig newFwdConf = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
-      FieldConfig.EncodingType newFwdEncoding = newFwdConf.isEnabled() ? newFwdConf.getEncodingType() : null;
+      EncodingType newFwdEncoding = newFwdConf.isEnabled() ? newFwdConf.getEncodingType() : null;
 
-      List<Operation> ops = computeColumnOperations(column, fieldSpec, segmentReader,
-          existingDictColumns.contains(column), existingFwdEncoding, newFwdEncoding,
-          existingInvertedIndexColumns.contains(column), segmentName);
+      List<Operation> ops =
+          computeColumnOperations(column, fieldSpec, segmentReader, existingDictColumns.contains(column),
+              existingFwdEncoding, newFwdEncoding, existingInvertedIndexColumns.contains(column), segmentName);
       if (!ops.isEmpty()) {
         columnOperationsMap.put(column, ops);
       }
@@ -280,7 +304,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   ///    forward to be on so the dict can be bootstrapped.
   private List<Operation> computeColumnOperations(String column, FieldSpec fieldSpec,
       SegmentDirectory.Reader segmentReader, boolean existingHasDict,
-      @Nullable FieldConfig.EncodingType existingFwdEncoding, @Nullable FieldConfig.EncodingType newFwdEncoding,
+      @Nullable EncodingType existingFwdEncoding, @Nullable EncodingType newFwdEncoding,
       boolean existingHasInverted, String segmentName)
       throws Exception {
     FieldIndexConfigs newConf = _fieldIndexConfigs.get(column);
@@ -326,8 +350,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
               existingHasInverted ? "enabled" : "disabled");
           return ops;
         }
-        ops.add(newFwdEncoding == FieldConfig.EncodingType.RAW
-            ? Operation.ENABLE_RAW_FORWARD_INDEX : Operation.ENABLE_DICT_FORWARD_INDEX);
+        ops.add(newFwdEncoding == EncodingType.RAW
+            ? Operation.ENABLE_RAW_FORWARD_INDEX
+            : Operation.ENABLE_DICT_FORWARD_INDEX);
         return ops;
       }
     } else if (existingHasFwd && existingFwdEncoding != newFwdEncoding && existingHasDict == desiredDict) {
@@ -343,8 +368,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
             + "ignoring", column, segmentName);
         return ops;
       }
-      ops.add(newFwdEncoding == FieldConfig.EncodingType.RAW
-          ? Operation.ENABLE_RAW_FORWARD_INDEX : Operation.ENABLE_DICT_FORWARD_INDEX);
+      ops.add(newFwdEncoding == EncodingType.RAW
+          ? Operation.ENABLE_RAW_FORWARD_INDEX
+          : Operation.ENABLE_DICT_FORWARD_INDEX);
     }
 
     // 2. Dictionary transition.
@@ -382,7 +408,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     // 3. Compression-type change (only when no encoding change happened).
     if (ops.isEmpty() && existingFwdEncoding != null && existingFwdEncoding == newFwdEncoding
         && existingHasDict == desiredDict) {
-      if (existingFwdEncoding == FieldConfig.EncodingType.RAW) {
+      if (existingFwdEncoding == EncodingType.RAW) {
         // TODO: Also check if raw index version needs to be changed
         if (shouldChangeRawCompressionType(column, segmentReader)) {
           ops.add(Operation.CHANGE_INDEX_COMPRESSION_TYPE);
@@ -425,10 +451,14 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     LOGGER.info("{}: Updating metadata properties for segment={} and column={}", reason, segmentName, column);
     Map<String, String> metadataProperties = new HashMap<>();
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(false));
-    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING), FieldConfig.EncodingType.RAW.name());
+    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING), EncodingType.RAW.name());
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
+    if (!segmentWriter.hasIndexFor(column, StandardIndexes.forward())) {
+      CompressionStatsMetadata.unavailable().applyTo(metadataProperties, column);
+    }
     // TODO: See https://github.com/apache/pinot/pull/16921 for details
-    // metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT), String.valueOf(-1));
+    // TODO: Remove the property after 1.6.0 release
+    // metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT), null);
     SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
     // Remove the inverted index, FST index and range index
@@ -439,12 +469,12 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
   private boolean isForwardIndexDictionaryEncoded(String column) {
     return _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column).getForwardIndexEncoding()
-        == FieldConfig.EncodingType.DICTIONARY;
+        == EncodingType.DICTIONARY;
   }
 
-  /// Returns {@code true} when removing the dictionary on this column would leave another enabled index
-  /// orphaned. Aggregates {@link IndexType#requiresDictionary} over every enabled index in the new config
-  /// via {@link DictionaryIndexConfig#requiresDictionary(FieldSpec, FieldIndexConfigs)}, so this automatically
+  /// Returns `true` when removing the dictionary on this column would leave another enabled index
+  /// orphaned. Aggregates [IndexType#requiresDictionary] over every enabled index in the new config
+  /// via [DictionaryIndexConfig#requiresDictionary(FieldSpec, FieldIndexConfigs)], so this automatically
   /// covers inverted, FST, IFST, and any future dict-requiring index type. Only the new config matters — any
   /// existing on-disk index no longer present in the new config is removed by its own handler later in
   /// preprocessing and does not need to keep the dictionary alive.
@@ -532,8 +562,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
   private void rewriteForwardIndexForCompressionChange(String column, SegmentDirectory.Writer segmentWriter)
       throws Exception {
-    ColumnMetadata existingColMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-    boolean isSingleValue = existingColMetadata.isSingleValue();
+    ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+    boolean isSingleValue = columnMetadata.isSingleValue();
     boolean isDictionaryEncodedForwardIndex = isForwardIndexDictionaryEncoded(column);
 
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
@@ -562,7 +592,41 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     }
 
     LOGGER.info("Creating new forward index for segment={} and column={}", segmentName, column);
-    rewriteForwardIndexForCompressionChange(column, existingColMetadata, indexDir, segmentWriter);
+    // The encoding does not change during a compression-change rewrite, so `_fieldIndexConfigs` already carries
+    // the correct encoding for the new forward index. The `IndexCreationContext.Builder` constructor pulls
+    // length stats from `ColumnMetadata`; `updateIndices` has already backfilled them for this column.
+    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+    CompressionStatsMetadata rawCompressionMetadata = CompressionStatsMetadata.unavailable();
+    long dictionaryUncompressedValueSize = -1;
+    try (ForwardIndexReader<?> reader = readerFactory.createIndexReader(segmentWriter, _fieldIndexConfigs.get(column),
+        columnMetadata)) {
+      IndexCreationContext context = new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata)
+          .withCompressionStatsEnabled(_tableConfig.getIndexingConfig().isCompressionStatsEnabled())
+          .build();
+      ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
+      boolean trackDictionarySize = isDictionaryEncodedForwardIndex
+          && _tableConfig.getIndexingConfig().isCompressionStatsEnabled();
+      try (Dictionary dictionary = trackDictionarySize ? DictionaryIndexType.read(segmentWriter, columnMetadata) : null;
+          ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
+        if (!reader.getStoredType().equals(creator.getValueType())) {
+          // Creator stored type should match reader stored type for raw columns. We do not support changing datatypes.
+          throw new UnsupportedOperationException(
+              "Unsupported operation to change datatype for column=" + column + " from " + reader.getStoredType()
+                  + " to " + creator.getValueType());
+        }
+        if (dictionary != null) {
+          dictionaryUncompressedValueSize = forwardIndexReadDictWriteDictAndTrack(columnMetadata, reader, creator,
+              dictionary);
+        } else {
+          forwardIndexRewriteHelper(column, columnMetadata, reader, creator, columnMetadata.getTotalDocs(), null, null);
+        }
+        if (!isDictionaryEncodedForwardIndex) {
+          rawCompressionMetadata = CompressionStatsMetadata.forRawForwardIndex(
+              creator.getRawForwardIndexUncompressedValueSizeInBytes(),
+              creator.getRawForwardIndexChunkCompressionType());
+        }
+      }
+    }
 
     // We used the existing forward index to generate a new forward index. The existing forward index will be in V3
     // format and the new forward index will be in V1 format. Remove the existing forward index as it is not needed
@@ -572,62 +636,23 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     segmentWriter.removeIndex(column, StandardIndexes.forward());
     LoaderUtils.writeIndexToV3Format(segmentWriter, column, fwdIndexFile, StandardIndexes.forward());
 
+    CompressionStatsMetadata compressionMetadata = CompressionStatsMetadata.unavailable();
+    if (isDictionaryEncodedForwardIndex) {
+      compressionMetadata = CompressionStatsMetadata.forDictionary(dictionaryUncompressedValueSize);
+    } else if (_tableConfig.getIndexingConfig().isCompressionStatsEnabled()) {
+      compressionMetadata = rawCompressionMetadata;
+    }
+    Map<String, String> compressionMetadataProperties = new HashMap<>();
+    compressionMetadata.applyTo(compressionMetadataProperties, column);
+    SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, compressionMetadataProperties);
+
     // Delete the marker file.
     FileUtils.deleteQuietly(inProgress);
 
     LOGGER.info("Created forward index for segment: {}, column: {}", segmentName, column);
   }
 
-  private void rewriteForwardIndexForCompressionChange(String column, ColumnMetadata columnMetadata, File indexDir,
-      SegmentDirectory.Writer segmentWriter)
-      throws Exception {
-    // Get the forward index reader factory and create a reader
-    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
-    try (ForwardIndexReader<?> reader = readerFactory.createIndexReader(segmentWriter, _fieldIndexConfigs.get(column),
-        columnMetadata)) {
-      IndexCreationContext.Builder builder = new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata);
-      // Encoding flows through ForwardIndexConfig; for compression-change rewrite the encoding does not change so
-      // the config in _fieldIndexConfigs already carries the correct encoding.
-      // Set entry length info for raw index creators. No need to set this when changing dictionary id compression type.
-      if (!reader.isDictionaryEncoded() && !columnMetadata.getDataType().getStoredType().isFixedWidth()) {
-        int lengthOfLongestEntry = reader.getLengthOfLongestEntry();
-        if (lengthOfLongestEntry < 0) {
-          // When this info is not available from the reader, we need to scan the column.
-          lengthOfLongestEntry = getMaxRowLength(columnMetadata, reader, null);
-        }
-        if (columnMetadata.isSingleValue()) {
-          builder.withLengthOfLongestElement(lengthOfLongestEntry);
-        } else {
-          // For VarByte MV columns like String and Bytes, the storage representation of each row contains the following
-          // components:
-          // 1. bytes required to store the actual elements of the MV row (A)
-          // 2. bytes required to store the number of elements in the MV row (B)
-          // 3. bytes required to store the length of each MV element (C)
-          //
-          // lengthOfLongestEntry = A + B + C
-          // maxRowLengthInBytes = A
-          int maxNumValuesPerEntry = columnMetadata.getMaxNumberOfMultiValues();
-          int maxRowLengthInBytes =
-              MultiValueVarByteRawIndexCreator.getMaxRowDataLengthInBytes(lengthOfLongestEntry, maxNumValuesPerEntry);
-          builder.withMaxRowLengthInBytes(maxRowLengthInBytes);
-        }
-      }
-      ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
-      IndexCreationContext context = builder.build();
-      try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
-        if (!reader.getStoredType().equals(creator.getValueType())) {
-          // Creator stored type should match reader stored type for raw columns. We do not support changing datatypes.
-          String failureMsg =
-              "Unsupported operation to change datatype for column=" + column + " from " + reader.getStoredType()
-                  .toString() + " to " + creator.getValueType().toString();
-          throw new UnsupportedOperationException(failureMsg);
-        }
 
-        int numDocs = columnMetadata.getTotalDocs();
-        forwardIndexRewriteHelper(column, columnMetadata, reader, creator, numDocs, null, null);
-      }
-    }
-  }
 
   private void forwardIndexRewriteHelper(String column, ColumnMetadata existingColumnMetadata,
       ForwardIndexReader<?> reader, ForwardIndexCreator creator, int numDocs,
@@ -655,17 +680,52 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     }
   }
 
-  private <C extends ForwardIndexReaderContext> void forwardIndexReadDictWriteDictHelper(ForwardIndexReader<C> reader,
+  private static <C extends ForwardIndexReaderContext> long forwardIndexReadDictWriteDictAndTrack(
+      ColumnMetadata columnMetadata, ForwardIndexReader<C> reader, ForwardIndexCreator creator,
+      Dictionary dictionary) {
+    DataType storedType = dictionary.getValueType().getStoredType();
+    C readerContext = reader.createContext();
+    int numDocs = columnMetadata.getTotalDocs();
+    if (storedType.isFixedWidth()) {
+      long numEntries = forwardIndexReadDictWriteDictHelper(reader, creator, numDocs);
+      return numEntries * storedType.size();
+    }
+    long uncompressedValueSizeInBytes = 0;
+    if (reader.isSingleValue()) {
+      for (int docId = 0; docId < numDocs; docId++) {
+        int dictId = reader.getDictId(docId, readerContext);
+        creator.putDictId(dictId);
+        uncompressedValueSizeInBytes += dictionary.getValueSize(dictId);
+      }
+    } else {
+      for (int docId = 0; docId < numDocs; docId++) {
+        int[] dictIds = reader.getDictIdMV(docId, readerContext);
+        creator.putDictIdMV(dictIds);
+        for (int dictId : dictIds) {
+          uncompressedValueSizeInBytes += dictionary.getValueSize(dictId);
+        }
+      }
+    }
+    return uncompressedValueSizeInBytes;
+  }
+
+  private static <C extends ForwardIndexReaderContext> long forwardIndexReadDictWriteDictHelper(
+      ForwardIndexReader<C> reader,
       ForwardIndexCreator creator, int numDocs) {
     C readerContext = reader.createContext();
     if (reader.isSingleValue()) {
       for (int i = 0; i < numDocs; i++) {
         creator.putDictId(reader.getDictId(i, readerContext));
       }
+      return numDocs;
     } else {
+      long numEntries = 0;
       for (int i = 0; i < numDocs; i++) {
-        creator.putDictIdMV(reader.getDictIdMV(i, readerContext));
+        int[] dictIds = reader.getDictIdMV(i, readerContext);
+        creator.putDictIdMV(dictIds);
+        numEntries += dictIds.length;
       }
+      return numEntries;
     }
   }
 
@@ -900,7 +960,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       SegmentDictionaryCreator dictionaryCreator) {
     boolean isSVColumn = reader.isSingleValue();
     int maxNumValuesPerEntry = existingColumnMetadata.getMaxNumberOfMultiValues();
-    PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(reader, null, null, maxNumValuesPerEntry);
+    PinotSegmentColumnReader columnReader =
+        new PinotSegmentColumnReader(column, reader, null, null, maxNumValuesPerEntry);
 
     for (int i = 0; i < numDocs; i++) {
       Object obj = columnReader.getValue(i);
@@ -925,28 +986,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
     ColumnMetadata existingColMetadata = segmentMetadata.getColumnMetadataFor(column);
     FieldSpec fieldSpec = existingColMetadata.getFieldSpec();
-    String fwdIndexFileExtension;
-    if (fieldSpec.isSingleValueField()) {
-      if (existingColMetadata.isSorted()) {
-        fwdIndexFileExtension = V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
-      } else {
-        fwdIndexFileExtension = V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
-      }
-    } else {
-      fwdIndexFileExtension = V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
-    }
-    File fwdIndexFile = new File(indexDir, column + fwdIndexFileExtension);
-
-    if (!inProgress.exists()) {
-      // Marker file does not exist, which means last run ended normally.
-      // Create a marker file.
-      FileUtils.touch(inProgress);
-    } else {
-      // Marker file exists, which means last run was interrupted.
-      // Remove forward index and dictionary files if they exist.
-      FileUtils.deleteQuietly(fwdIndexFile);
-      FileUtils.deleteQuietly(dictionaryFile);
-    }
+    File fwdIndexFile;
 
     AbstractColumnStatisticsCollector statsCollector;
     SegmentDictionaryCreator dictionaryCreator;
@@ -962,19 +1002,44 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       //   Special null handling is not necessary here. This is because, the existing default null value in the raw
       //   forwardIndex will be retained as such while created the dictionary and dict-based forward index. Also, null
       //   value vectors maintain a bitmap of docIds. No handling is necessary there.
-      try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(reader, null, null,
+      try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(column, reader, null, null,
           existingColMetadata.getMaxNumberOfMultiValues())) {
         for (int i = 0; i < numDocs; i++) {
           statsCollector.collect(columnReader.getValue(i));
         }
         statsCollector.seal();
       }
+
+      String fwdIndexFileExtension;
+      if (fieldSpec.isSingleValueField()) {
+        if (statsCollector.isSorted()) {
+          fwdIndexFileExtension = V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+        } else {
+          fwdIndexFileExtension = V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+        }
+      } else {
+        fwdIndexFileExtension = V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
+      }
+      fwdIndexFile = new File(indexDir, column + fwdIndexFileExtension);
+
+      if (!inProgress.exists()) {
+        // Marker file does not exist, which means last run ended normally.
+        // Create a marker file.
+        FileUtils.touch(inProgress);
+      } else {
+        // Marker file exists, which means last run was interrupted.
+        // Remove forward index and dictionary files if they exist.
+        FileUtils.deleteQuietly(fwdIndexFile);
+        FileUtils.deleteQuietly(dictionaryFile);
+      }
       DictionaryIndexConfig dictConf = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.dictionary());
       boolean optimizeDictionaryType = _tableConfig.getIndexingConfig().isOptimizeDictionaryType();
       boolean useVarLength = dictConf.isUseVarLengthDictionary() || DictionaryIndexType.shouldUseVarLengthDictionary(
           reader.getStoredType(), statsCollector) || (optimizeDictionaryType
           && DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(reader.getStoredType(), statsCollector));
-      dictionaryCreator = new SegmentDictionaryCreator(fieldSpec, segmentMetadata.getIndexDir(), useVarLength);
+      boolean compressionStatsEnabled = _tableConfig.getIndexingConfig().isCompressionStatsEnabled();
+      dictionaryCreator = new SegmentDictionaryCreator(fieldSpec, segmentMetadata.getIndexDir(), useVarLength,
+          SegmentDictionaryCreator.UncompressedValueSizeTracking.fromEnabled(compressionStatsEnabled));
       dictionaryCreator.build(statsCollector.getUniqueValuesSet());
 
       LOGGER.info("Built dictionary. Rewriting dictionary enabled forward index for segment={} and column={}",
@@ -998,8 +1063,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
     LOGGER.info("Created forwardIndex. Updating metadata properties for segment={} and column={}", segmentName, column);
     Map<String, String> metadataProperties = new HashMap<>();
+    metadataProperties.put(getKeyFor(column, IS_SORTED), String.valueOf(statsCollector.isSorted()));
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(true));
-    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING), FieldConfig.EncodingType.DICTIONARY.name());
+    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING), EncodingType.DICTIONARY.name());
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE),
         String.valueOf(dictionaryCreator.getNumBytesPerEntry()));
     // If realtime segments were completed when the column was RAW, the cardinality value is populated as Integer
@@ -1009,6 +1075,15 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     metadataProperties.put(getKeyFor(column, CARDINALITY), String.valueOf(cardinality));
     metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT),
         String.valueOf(PinotDataBitSet.getNumBitsPerValue(cardinality - 1)));
+    CompressionStatsMetadata compressionMetadata = CompressionStatsMetadata.unavailable();
+    if (_tableConfig.getIndexingConfig().isCompressionStatsEnabled()) {
+      DataType storedType = fieldSpec.getDataType().getStoredType();
+      long uncompressedValueSize = storedType.isFixedWidth()
+          ? (long) statsCollector.getTotalNumberOfEntries() * storedType.size()
+          : dictionaryCreator.getTotalVariableLengthUncompressedValueSizeInBytes();
+      compressionMetadata = CompressionStatsMetadata.forDictionary(uncompressedValueSize);
+    }
+    compressionMetadata.applyTo(metadataProperties, column);
     SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
     // We remove indexes that have to be rewritten when a dictEnabled is toggled. Note that the respective index
@@ -1043,7 +1118,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         .createIndexReader(segmentWriter, _fieldIndexConfigs.get(column), existingColMetadata)) {
       AbstractColumnStatisticsCollector statsCollector =
           getStatsCollector(column, fieldSpec.getDataType().getStoredType(), true);
-      try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(reader, null, null,
+      try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(column, reader, null, null,
           existingColMetadata.getMaxNumberOfMultiValues())) {
         for (int i = 0; i < existingColMetadata.getTotalDocs(); i++) {
           statsCollector.collect(columnReader.getValue(i));
@@ -1074,11 +1149,17 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         "Dictionary cardinality for column %s must be > 0 to compute BITS_PER_ELEMENT", column);
     Map<String, String> metadataProperties = new HashMap<>();
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(true));
-    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING), FieldConfig.EncodingType.RAW.name());
+    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING), EncodingType.RAW.name());
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(dictionaryElementSize));
     metadataProperties.put(getKeyFor(column, CARDINALITY), String.valueOf(dictionaryCardinality));
     metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT),
         String.valueOf(PinotDataBitSet.getNumBitsPerValue(dictionaryCardinality - 1)));
+    CompressionStatsMetadata compressionMetadata = _tableConfig.getIndexingConfig().isCompressionStatsEnabled()
+        ? CompressionStatsMetadata.forRawForwardIndex(
+            existingColMetadata.getRawForwardIndexUncompressedValueSizeInBytes(),
+            existingColMetadata.getRawForwardIndexChunkCompressionType())
+        : CompressionStatsMetadata.unavailable();
+    compressionMetadata.applyTo(metadataProperties, column);
     SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
     // Secondary indexes that require dictionary semantics should be rebuilt against the new shared dictionary.
@@ -1123,7 +1204,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     }
 
     LOGGER.info("Creating raw forward index for segment={} and column={}", segmentName, column);
-    rewriteDictToRawForwardIndex(existingColMetadata, segmentWriter, indexDir);
+    CompressionStatsMetadata compressionMetadata =
+        rewriteDictToRawForwardIndex(existingColMetadata, segmentWriter, indexDir);
 
     // Remove dictionary and forward index
     segmentWriter.removeIndex(column, StandardIndexes.forward());
@@ -1134,10 +1216,12 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         column);
     Map<String, String> metadataProperties = new HashMap<>();
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(false));
-    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING), FieldConfig.EncodingType.RAW.name());
+    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING), EncodingType.RAW.name());
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
     // TODO: See https://github.com/apache/pinot/pull/16921 for details
-    // metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT), String.valueOf(-1));
+    // TODO: Remove the property after 1.6.0 release
+    // metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT), null);
+    compressionMetadata.applyTo(metadataProperties, column);
     SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
     // Remove range index, inverted index and FST index.
@@ -1150,9 +1234,10 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   }
 
   /// Flip a dict-encoded forward index to RAW while keeping the dictionary intact. Used when an enabled
-  /// secondary index (e.g. inverted, FST, IFST) requires the dictionary to remain after the encoding flip —
-  /// the secondary index continues to operate against the same dict ids, so it does not need to be removed
-  /// or rebuilt. Compare with {@link #disableDictionaryAndCreateRawForwardIndex}, which performs the same
+  /// secondary index (e.g. inverted, FST, IFST) requires the dictionary to remain after the encoding flip.
+  /// The secondary index continues to operate against the same dict ids, so it does not need to be removed
+  /// or rebuilt. Compare with [#disableDictionaryAndCreateRawForwardIndex(String, SegmentDirectory.Writer)], which
+  /// performs the same
   /// rewrite and additionally drops the dictionary plus all dict-dependent indexes.
   private void convertDictForwardToRawKeepingDictionary(String column, SegmentDirectory.Writer segmentWriter)
       throws Exception {
@@ -1174,7 +1259,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
     LOGGER.info("Converting dict-encoded forward index to raw (keeping dictionary) for segment={} column={}",
         segmentName, column);
-    rewriteDictToRawForwardIndex(existingColMetadata, segmentWriter, indexDir);
+    CompressionStatsMetadata compressionMetadata =
+        rewriteDictToRawForwardIndex(existingColMetadata, segmentWriter, indexDir);
 
     // Remove the old dict-encoded forward index file and write the new raw forward index in its place.
     // Crucially we do NOT remove the dictionary or any dict-dependent secondary indexes — the dictionary stays
@@ -1183,65 +1269,239 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     LoaderUtils.writeIndexToV3Format(segmentWriter, column, fwdIndexFile, StandardIndexes.forward());
 
     Map<String, String> metadataProperties = new HashMap<>();
-    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING), FieldConfig.EncodingType.RAW.name());
+    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING), EncodingType.RAW.name());
+    compressionMetadata.applyTo(metadataProperties, column);
     SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
     FileUtils.deleteQuietly(inProgress);
     LOGGER.info("Converted forward index to raw (dictionary kept) for segment: {}, column: {}", segmentName, column);
   }
 
-  private void rewriteDictToRawForwardIndex(ColumnMetadata columnMetadata, SegmentDirectory.Writer segmentWriter,
-      File indexDir)
+  /// Rewrites a dictionary-encoded forward index as a raw forward index.
+  ///
+  /// @return compression metadata reported by the creator that built the new raw forward index
+  private CompressionStatsMetadata rewriteDictToRawForwardIndex(ColumnMetadata columnMetadata,
+      SegmentDirectory.Writer segmentWriter, File indexDir)
       throws Exception {
     String column = columnMetadata.getColumnName();
-    // Get the forward index reader factory and create a reader
-    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
-    try (ForwardIndexReader<?> reader = readerFactory.createIndexReader(segmentWriter, _fieldIndexConfigs.get(column),
-        columnMetadata)) {
-      Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata);
-      IndexCreationContext.Builder builder =
-          new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata).withDictionary(false);
-      // Encoding flows through ForwardIndexConfig set below. The row length is derived from persisted metadata via
-      // the Builder constructor; only fall back to scanning when metadata returns UNAVAILABLE (var-width MV columns
-      // with varying element lengths).
-      if (columnMetadata.getMaxRowLengthInBytes() == ColumnMetadata.UNAVAILABLE) {
-        builder.withMaxRowLengthInBytes(getMaxRowLength(columnMetadata, reader, dictionary));
-      }
-      ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
-      try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(builder.build(), config)) {
-        forwardIndexRewriteHelper(column, columnMetadata, reader, creator, columnMetadata.getTotalDocs(), null,
+    FieldIndexConfigs indexConfigs = _fieldIndexConfigs.get(column);
+    try (ForwardIndexReader<?> forwardIndex = StandardIndexes.forward().getReaderFactory()
+        .createIndexReader(segmentWriter, indexConfigs, columnMetadata);
+        Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
+      IndexCreationContext context = new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata)
+          .withCompressionStatsEnabled(_tableConfig.getIndexingConfig().isCompressionStatsEnabled())
+          .build();
+      ForwardIndexConfig config = indexConfigs.getConfig(StandardIndexes.forward());
+      try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
+        forwardIndexRewriteHelper(column, columnMetadata, forwardIndex, creator, columnMetadata.getTotalDocs(), null,
             dictionary);
+        return CompressionStatsMetadata.forRawForwardIndex(
+            creator.getRawForwardIndexUncompressedValueSizeInBytes(),
+            creator.getRawForwardIndexChunkCompressionType());
       }
     }
   }
 
-  /**
-   * Returns the max row length for a column.
-   * - For SV column, this is the length of the longest value.
-   * - For MV column, this is the length of the longest MV entry (sum of lengths of all elements).
-   */
-  private int getMaxRowLength(ColumnMetadata columnMetadata, ForwardIndexReader<?> forwardIndex,
-      @Nullable Dictionary dictionary)
-      throws IOException {
-    String column = columnMetadata.getColumnName();
+  /// Scans the column and persists the 1.6.0-era stats — `lengthOfShortestElement`, `lengthOfLongestElement`,
+  /// `isAscii` (STRING) and `maxRowLengthInBytes` (MV) — when they are missing from segment metadata. After this
+  /// returns, per-op handlers can read those stats off [ColumnMetadata] when they construct their forward-index
+  /// creator.
+  ///
+  /// The trigger probes the most-recently-added stat for the column's shape — `lengthOfShortestElement` for SV,
+  /// `maxRowLengthInBytes` for MV — because its presence implies the older 1.6.0 stats are also present (stats are
+  /// persisted as a set on the writer side, so older keys never appear without the newest). The backfill is a
+  /// no-op when:
+  /// - the column is fixed-width (length stats derive from `storedType.size()`);
+  /// - the trigger stat is already present in metadata;
+  /// - the column has no forward index on disk (those are rebuilt via
+  ///   [InvertedIndexAndDictionaryBasedForwardIndexCreator], which handles its own backfill).
+  private void backfillMissingStats(String column, SegmentDirectory.Writer segmentWriter)
+      throws Exception {
+    ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
     DataType storedType = columnMetadata.getDataType().getStoredType();
-    assert !storedType.isFixedWidth();
-
-    try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(forwardIndex, dictionary, null,
-        columnMetadata.getMaxNumberOfMultiValues())) {
-      AbstractColumnStatisticsCollector statsCollector = getStatsCollector(column, storedType);
-      int numDocs = columnMetadata.getTotalDocs();
-      for (int i = 0; i < numDocs; i++) {
-        statsCollector.collect(columnReader.getValue(i));
+    boolean singleValue = columnMetadata.isSingleValue();
+    if (storedType.isFixedWidth()
+        || (singleValue && columnMetadata.getLengthOfShortestElement() >= 0)
+        || (!singleValue && columnMetadata.getMaxRowLengthInBytes() >= 0)) {
+      return;
+    }
+    try (ForwardIndexReader<?> forwardIndex = StandardIndexes.forward().getReaderFactory()
+        .createIndexReader(segmentWriter, _fieldIndexConfigs.get(column), columnMetadata)) {
+      if (forwardIndex == null) {
+        return;
       }
-      // NOTE: No need to seal the stats collector because value length is updated while collecting stats.
-      return columnMetadata.isSingleValue() ? statsCollector.getLengthOfLongestElement()
-          : statsCollector.getMaxRowLengthInBytes();
+      boolean dictionaryEncoded = forwardIndex.isDictionaryEncoded();
+      try (Dictionary dictionary = dictionaryEncoded ? DictionaryIndexType.read(segmentWriter, columnMetadata) : null) {
+        ShapeStats shapeStats = collectShapeStats(column, columnMetadata, forwardIndex, dictionary);
+        Map<String, String> metadataProperties = new HashMap<>();
+        metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING),
+            dictionaryEncoded ? EncodingType.DICTIONARY.name() : EncodingType.RAW.name());
+        metadataProperties.put(getKeyFor(column, LENGTH_OF_SHORTEST_ELEMENT),
+            String.valueOf(shapeStats._lengthOfShortestElement));
+        metadataProperties.put(getKeyFor(column, LENGTH_OF_LONGEST_ELEMENT),
+            String.valueOf(shapeStats._lengthOfLongestElement));
+        if (storedType == DataType.STRING) {
+          metadataProperties.put(getKeyFor(column, IS_ASCII), String.valueOf(shapeStats._isAscii));
+        }
+        if (!singleValue) {
+          metadataProperties.put(getKeyFor(column, MAX_ROW_LENGTH_IN_BYTES),
+              String.valueOf(shapeStats._maxRowLengthInBytes));
+        }
+        SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
+      }
     }
   }
 
-  private AbstractColumnStatisticsCollector getStatsCollector(String column, DataType storedType) {
-    return getStatsCollector(column, storedType, false);
+  private <C extends ForwardIndexReaderContext> ShapeStats collectShapeStats(String column,
+      ColumnMetadata columnMetadata, ForwardIndexReader<C> forwardIndex, @Nullable Dictionary dictionary)
+      throws IOException {
+    if (dictionary != null) {
+      return collectDictionaryShapeStats(columnMetadata, forwardIndex, dictionary);
+    }
+    DataType storedType = columnMetadata.getDataType().getStoredType();
+    if (storedType != DataType.STRING && storedType != DataType.BYTES && storedType != DataType.BIG_DECIMAL) {
+      return collectShapeStatsWithCollector(column, columnMetadata, forwardIndex);
+    }
+
+    ShapeStats stats = new ShapeStats();
+    C context = forwardIndex.createContext();
+    int numDocs = columnMetadata.getTotalDocs();
+    boolean singleValue = columnMetadata.isSingleValue();
+    int maxNumMultiValues = Math.max(columnMetadata.getMaxNumberOfMultiValues(), 1);
+    String[] stringBuffer = !singleValue && storedType == DataType.STRING
+        ? new String[maxNumMultiValues] : null;
+    byte[][] bytesBuffer = !singleValue && storedType == DataType.BYTES
+        ? new byte[maxNumMultiValues][] : null;
+    BigDecimal[] bigDecimalBuffer = !singleValue && storedType == DataType.BIG_DECIMAL
+        ? new BigDecimal[maxNumMultiValues] : null;
+    for (int docId = 0; docId < numDocs; docId++) {
+      int rowLength = 0;
+      switch (storedType) {
+        case STRING:
+          if (singleValue) {
+            String value = forwardIndex.getString(docId, context);
+            rowLength = Utf8Utils.encodedLengthWithReplacement(value);
+            stats.addElement(rowLength, isAscii(value));
+          } else {
+            int numValues = forwardIndex.getStringMV(docId, stringBuffer, context);
+            for (int i = 0; i < numValues; i++) {
+              int valueLength = Utf8Utils.encodedLengthWithReplacement(stringBuffer[i]);
+              rowLength += valueLength;
+              stats.addElement(valueLength, isAscii(stringBuffer[i]));
+            }
+          }
+          break;
+        case BYTES:
+          if (singleValue) {
+            rowLength = forwardIndex.getBytes(docId, context).length;
+            stats.addElement(rowLength, true);
+          } else {
+            int numValues = forwardIndex.getBytesMV(docId, bytesBuffer, context);
+            for (int i = 0; i < numValues; i++) {
+              rowLength += bytesBuffer[i].length;
+              stats.addElement(bytesBuffer[i].length, true);
+            }
+          }
+          break;
+        case BIG_DECIMAL:
+          if (singleValue) {
+            rowLength = BigDecimalUtils.byteSize(forwardIndex.getBigDecimal(docId, context));
+            stats.addElement(rowLength, true);
+          } else {
+            int numValues = forwardIndex.getBigDecimalMV(docId, bigDecimalBuffer, context);
+            for (int i = 0; i < numValues; i++) {
+              int valueLength = BigDecimalUtils.byteSize(bigDecimalBuffer[i]);
+              rowLength += valueLength;
+              stats.addElement(valueLength, true);
+            }
+          }
+          break;
+        default:
+          throw new IllegalStateException("Unsupported variable-width type: " + storedType);
+      }
+      if (!singleValue) {
+        stats._maxRowLengthInBytes = Math.max(stats._maxRowLengthInBytes, rowLength);
+      }
+    }
+    stats.finish();
+    return stats;
+  }
+
+  private static <C extends ForwardIndexReaderContext> ShapeStats collectDictionaryShapeStats(
+      ColumnMetadata columnMetadata, ForwardIndexReader<C> forwardIndex, Dictionary dictionary) {
+    ShapeStats stats = new ShapeStats();
+    boolean stringValues = dictionary.getValueType().getStoredType() == DataType.STRING;
+    for (int dictId = 0; dictId < dictionary.length(); dictId++) {
+      stats.addElement(dictionary.getValueSize(dictId), !stringValues || isAscii((String) dictionary.get(dictId)));
+    }
+    if (!columnMetadata.isSingleValue()) {
+      int[] dictIdBuffer = new int[Math.max(columnMetadata.getMaxNumberOfMultiValues(), 1)];
+      C context = forwardIndex.createContext();
+      for (int docId = 0; docId < columnMetadata.getTotalDocs(); docId++) {
+        int numValues = forwardIndex.getDictIdMV(docId, dictIdBuffer, context);
+        int rowLength = 0;
+        for (int i = 0; i < numValues; i++) {
+          rowLength += dictionary.getValueSize(dictIdBuffer[i]);
+        }
+        stats._maxRowLengthInBytes = Math.max(stats._maxRowLengthInBytes, rowLength);
+      }
+    }
+    stats.finish();
+    return stats;
+  }
+
+  private ShapeStats collectShapeStatsWithCollector(String column, ColumnMetadata columnMetadata,
+      ForwardIndexReader<?> forwardIndex)
+      throws IOException {
+    try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(column, forwardIndex, null, null,
+        columnMetadata.getMaxNumberOfMultiValues())) {
+      AbstractColumnStatisticsCollector statsCollector =
+          getStatsCollector(column, columnMetadata.getDataType().getStoredType(), false);
+      for (int docId = 0; docId < columnMetadata.getTotalDocs(); docId++) {
+        statsCollector.collect(columnReader.getValue(docId));
+      }
+      return new ShapeStats(statsCollector.getLengthOfShortestElement(), statsCollector.getLengthOfLongestElement(),
+          statsCollector.isAscii(), statsCollector.getMaxRowLengthInBytes());
+    }
+  }
+
+  private static boolean isAscii(String value) {
+    for (int i = 0; i < value.length(); i++) {
+      if (value.charAt(i) > 0x7f) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static final class ShapeStats {
+    private int _lengthOfShortestElement = Integer.MAX_VALUE;
+    private int _lengthOfLongestElement;
+    private boolean _isAscii = true;
+    private int _maxRowLengthInBytes;
+
+    private ShapeStats() {
+    }
+
+    private ShapeStats(int lengthOfShortestElement, int lengthOfLongestElement, boolean isAscii,
+        int maxRowLengthInBytes) {
+      _lengthOfShortestElement = lengthOfShortestElement;
+      _lengthOfLongestElement = lengthOfLongestElement;
+      _isAscii = isAscii;
+      _maxRowLengthInBytes = maxRowLengthInBytes;
+    }
+
+    private void addElement(int sizeInBytes, boolean isAscii) {
+      _lengthOfShortestElement = Math.min(_lengthOfShortestElement, sizeInBytes);
+      _lengthOfLongestElement = Math.max(_lengthOfLongestElement, sizeInBytes);
+      _isAscii &= isAscii;
+    }
+
+    private void finish() {
+      if (_lengthOfShortestElement == Integer.MAX_VALUE) {
+        _lengthOfShortestElement = 0;
+      }
+    }
   }
 
   /// `requireUniqueValues=true` forces a per-type collector even when the no-dict optimization would apply.
@@ -1252,9 +1512,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   private AbstractColumnStatisticsCollector getStatsCollector(String column, DataType storedType,
       boolean requireUniqueValues) {
     StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, _schema, null);
-    boolean dictionaryEnabled = hasIndex(column, StandardIndexes.dictionary());
-    // MAP collector is optimised for no-dictionary collection.
-    if (!requireUniqueValues && !dictionaryEnabled && storedType != DataType.MAP) {
+    if (!requireUniqueValues && storedType != DataType.MAP) {
       if (ClusterConfigForTable.useOptimizedNoDictCollector(_tableConfig)) {
         return new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
       }

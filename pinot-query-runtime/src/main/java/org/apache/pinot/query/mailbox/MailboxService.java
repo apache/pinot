@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
@@ -30,6 +31,10 @@ import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.metrics.BrokerGauge;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.core.instance.context.BrokerContext;
 import org.apache.pinot.core.instance.context.ControllerContext;
@@ -46,19 +51,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Mailbox service that handles data transfer.
- */
+/// Mailbox service that handles data transfer.
 public class MailboxService {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxService.class);
   private static final int DANGLING_RECEIVING_MAILBOX_EXPIRY_SECONDS = 300;
 
-  /**
-   * Cached receiving mailboxes that contains the received blocks queue.
-   *
-   * We use a cache to ensure the receiving mailbox are not leaked in the cases where the corresponding OpChain is
-   * either never registered or died before the sender finished sending data.
-   */
+  /// Cached receiving mailboxes that contains the received blocks queue.
+  ///
+  /// We use a cache to ensure the receiving mailbox are not leaked in the cases where the corresponding OpChain is
+  /// either never registered or died before the sender finished sending data.
   private final Cache<String, ReceivingMailbox> _receivingMailboxCache =
       CacheBuilder.newBuilder().expireAfterAccess(DANGLING_RECEIVING_MAILBOX_EXPIRY_SECONDS, TimeUnit.SECONDS)
           .removalListener((RemovalListener<String, ReceivingMailbox>) notification -> {
@@ -85,17 +86,16 @@ public class MailboxService {
   @Nullable
   private final SslContext _serverSslContext;
   @Nullable private final QueryAccessControlFactory _accessControlFactory;
-  /**
-   * The max inbound message size for the gRPC server.
-   *
-   * If we try to send a message larger than this value, the gRPC server will throw an exception and close the
-   * connection.
-   *
-   * The {@link GrpcSendingMailbox} will split the data block into smaller chunks to fit into this limit, but a very
-   * small limit (lower than hundred of KBs) will cause performance degradation and may even fail, given that some extra
-   * bloating is added by gRPC and protobuf.
-   */
+  /// The max inbound message size for the gRPC server.
+  ///
+  /// If we try to send a message larger than this value, the gRPC server will throw an exception and close the
+  /// connection.
+  ///
+  /// The [GrpcSendingMailbox] will split the data block into smaller chunks to fit into this limit, but a very
+  /// small limit (lower than hundred of KBs) will cause performance degradation and may even fail, given that some
+  /// extra bloating is added by gRPC and protobuf.
   private final int _maxInboundMessageSize;
+  private final boolean _grpcSenderBackpressureEnabled;
 
   private GrpcMailboxServer _grpcMailboxServer;
 
@@ -121,23 +121,72 @@ public class MailboxService {
         CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
         CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES
     );
-    _channelManager = new ChannelManager(_clientSslContext, _maxInboundMessageSize, getIdleTimeout(config));
+    _grpcSenderBackpressureEnabled = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_SENDER_BACKPRESSURE_ENABLED
+    );
+    int writeBufferHighWaterMarkBytes = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES);
+    int writeBufferLowWaterMarkBytes = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES);
+    _channelManager = new ChannelManager(_clientSslContext, _maxInboundMessageSize, getIdleTimeout(config),
+        writeBufferHighWaterMarkBytes, writeBufferLowWaterMarkBytes);
     _accessControlFactory = accessControlFactory;
+    registerMailboxClientGauges();
     LOGGER.info("Initialized MailboxService with hostname: {}, port: {}", hostname, port);
   }
 
-  /**
-   * Starts the mailbox service.
-   */
+  /// Registers gauges exposing the memory used by the gRPC client allocator
+  /// shared by every [GrpcSendingMailbox] this service creates. The companion
+  /// gauges for the server allocator are registered in [GrpcMailboxServer].
+  ///
+  /// Notice we are wiring the shaded gRPC Netty allocator
+  /// ([io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator]) rather than
+  /// the non-shaded one.
+  ///
+  /// Only the two `MAILBOX_CLIENT_USED_*` gauges are mirrored on the client side;
+  /// the six debug-only counterparts exposed by the server (`MAILBOX_SERVER_ARENAS_*`,
+  /// `MAILBOX_SERVER_CACHE_SIZE_*`, `MAILBOX_SERVER_THREADLOCALCACHE`,
+  /// `MAILBOX_SERVER_CHUNK_SIZE`) are intentionally not mirrored here. The operational
+  /// signal that matters on the client is direct-memory pool exhaustion (the OOM that
+  /// motivated wiring these gauges in the first place); the rest are server-side
+  /// allocator-internals useful only for debugging. If you ever need to mirror the
+  /// remaining six, copy the registration block from [GrpcMailboxServer]'s constructor.
+  private void registerMailboxClientGauges() {
+    switch (_instanceType) {
+      case BROKER: {
+        BrokerMetrics brokerMetrics = BrokerMetrics.get();
+        brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_CLIENT_USED_DIRECT_MEMORY,
+            _channelManager::usedDirectMemoryBytes);
+        brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_CLIENT_USED_HEAP_MEMORY,
+            _channelManager::usedHeapMemoryBytes);
+        break;
+      }
+      case SERVER: {
+        ServerMetrics serverMetrics = ServerMetrics.get();
+        serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_CLIENT_USED_DIRECT_MEMORY,
+            _channelManager::usedDirectMemoryBytes);
+        serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_CLIENT_USED_HEAP_MEMORY,
+            _channelManager::usedHeapMemoryBytes);
+        break;
+      }
+      default:
+        // Controller does not run a MailboxService in production today, but if one is ever
+        // started for tests we silently skip metric registration rather than failing.
+        break;
+    }
+  }
+
+  /// Starts the mailbox service.
   public void start() {
     LOGGER.info("Starting GrpcMailboxServer");
     _grpcMailboxServer = new GrpcMailboxServer(this, _config, _tlsConfig, _serverSslContext, _accessControlFactory);
     _grpcMailboxServer.start();
   }
 
-  /**
-   * Shuts down the mailbox service.
-   */
+  /// Shuts down the mailbox service.
   public void shutdown() {
     LOGGER.info("Shutting down GrpcMailboxServer");
     _grpcMailboxServer.shutdown();
@@ -155,24 +204,23 @@ public class MailboxService {
     return _instanceType;
   }
 
-  /**
-   * Returns a sending mailbox for the given mailbox id. The returned sending mailbox is uninitialized, i.e. it will
-   * not open the underlying channel or acquire any additional resources. Instead, it will initialize lazily when the
-   * data is sent for the first time.
-   */
+  /// Returns a sending mailbox for the given mailbox id. The returned sending mailbox is uninitialized, i.e. it will
+  /// not open the underlying channel or acquire any additional resources. Instead, it will initialize lazily when the
+  /// data is sent for the first time.
+  // TODO(https://github.com/apache/pinot/issues/18539): add a global byte budget across peers; the
+  //  per-channel WriteBufferWaterMark bound is watermark.high × #peers × #concurrent_queries, which can
+  //  reach multiple GiB and re-trigger OutOfDirectMemoryError at large fan-outs.
   public SendingMailbox getSendingMailbox(String hostname, int port, String mailboxId, long deadlineMs,
       StatMap<MailboxSendOperator.StatKey> statMap) {
     if (_hostname.equals(hostname) && _port == port) {
       return new InMemorySendingMailbox(mailboxId, this, deadlineMs, statMap);
     } else {
       return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs, statMap,
-          _maxInboundMessageSize);
+          _maxInboundMessageSize, _grpcSenderBackpressureEnabled);
     }
   }
 
-  /**
-   * Returns the receiving mailbox for the given mailbox id.
-   */
+  /// Returns the receiving mailbox for the given mailbox id.
   public ReceivingMailbox getReceivingMailbox(String mailboxId) {
     try {
       return _receivingMailboxCache.get(mailboxId, () -> new ReceivingMailbox(mailboxId));
@@ -181,26 +229,57 @@ public class MailboxService {
     }
   }
 
-  /**
-   * Resets the GRPC connection backoff for the channel to the given server.
-   * @see ChannelManager#resetConnectBackoff(String, int)
-   * @return true if the channel was in TRANSIENT_FAILURE and backoff was reset
-   */
+  /// Resets the GRPC connection backoff for the channel to the given server.
+  /// @see ChannelManager#resetConnectBackoff(String, int)
+  /// @return true if the channel was in TRANSIENT_FAILURE and backoff was reset
   public boolean resetConnectBackoff(String hostname, int port) {
     return _channelManager.resetConnectBackoff(hostname, port);
   }
 
-  /**
-   * Releases the receiving mailbox from the cache.
-   *
-   * The receiving mailbox for a given OpChain may be created before the OpChain is even registered. Reason being that
-   * the sender starts sending data, and the receiver starts receiving the same without waiting for the OpChain to be
-   * registered. The ownership for the ReceivingMailbox hence lies with the MailboxService and not the OpChain.
-   *
-   * We can safely release a receiving mailbox when all the data are received and processed by the OpChain. If there
-   * might be data not received yet, we should not release the receiving mailbox to prevent a new receiving mailbox
-   * being created.
-   */
+  /// Current value of [BrokerGauge#MAILBOX_CLIENT_USED_DIRECT_MEMORY] /
+  /// [ServerGauge#MAILBOX_CLIENT_USED_DIRECT_MEMORY] — bytes pinned by the
+  /// shared gRPC client allocator backing every [GrpcSendingMailbox] created
+  /// from this service.
+  @VisibleForTesting
+  public long getMailboxClientUsedDirectMemoryBytes() {
+    return _channelManager.usedDirectMemoryBytes();
+  }
+
+  /// Current value of [BrokerGauge#MAILBOX_CLIENT_USED_HEAP_MEMORY] /
+  /// [ServerGauge#MAILBOX_CLIENT_USED_HEAP_MEMORY].
+  @VisibleForTesting
+  public long getMailboxClientUsedHeapMemoryBytes() {
+    return _channelManager.usedHeapMemoryBytes();
+  }
+
+  /// Current value of [BrokerGauge#MAILBOX_SERVER_USED_DIRECT_MEMORY] /
+  /// [ServerGauge#MAILBOX_SERVER_USED_DIRECT_MEMORY] — bytes pinned by the
+  /// gRPC server allocator handling inbound mailbox traffic.
+  ///
+  /// Returns 0 before [#start] is called (the gRPC server is built lazily there).
+  @VisibleForTesting
+  public long getMailboxServerUsedDirectMemoryBytes() {
+    return _grpcMailboxServer != null ? _grpcMailboxServer.usedDirectMemoryBytes() : 0L;
+  }
+
+  /// Current value of [BrokerGauge#MAILBOX_SERVER_USED_HEAP_MEMORY] /
+  /// [ServerGauge#MAILBOX_SERVER_USED_HEAP_MEMORY].
+  ///
+  /// Returns 0 before [#start] is called.
+  @VisibleForTesting
+  public long getMailboxServerUsedHeapMemoryBytes() {
+    return _grpcMailboxServer != null ? _grpcMailboxServer.usedHeapMemoryBytes() : 0L;
+  }
+
+  /// Releases the receiving mailbox from the cache.
+  ///
+  /// The receiving mailbox for a given OpChain may be created before the OpChain is even registered. Reason being that
+  /// the sender starts sending data, and the receiver starts receiving the same without waiting for the OpChain to be
+  /// registered. The ownership for the ReceivingMailbox hence lies with the MailboxService and not the OpChain.
+  ///
+  /// We can safely release a receiving mailbox when all the data are received and processed by the OpChain. If there
+  /// might be data not received yet, we should not release the receiving mailbox to prevent a new receiving mailbox
+  /// being created.
   public void releaseReceivingMailbox(ReceivingMailbox mailbox) {
     _receivingMailboxCache.invalidate(mailbox.getId());
   }

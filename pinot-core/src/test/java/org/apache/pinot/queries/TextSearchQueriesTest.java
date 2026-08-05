@@ -26,7 +26,6 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -57,7 +56,6 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer;
@@ -80,14 +78,12 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-/**
- * Functional tests for text search feature.
- * The tests use two kinds of input data
- * (1) Skills file
- * (2) Query log file
- * The test table has a SKILLS column and QUERY_LOG column. Text index is created
- * on each of these columns.
- */
+/// Functional tests for text search feature.
+/// The tests use two kinds of input data
+/// (1) Skills file
+/// (2) Query log file
+/// The test table has a SKILLS column and QUERY_LOG column. Text index is created
+/// on each of these columns.
 public class TextSearchQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TextSearchQueriesTest");
   protected static final String TABLE_NAME = "MyTable";
@@ -305,10 +301,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     testTextSearchSelectQueryHelper(query3, 0, false, new ArrayList<>());
   }
 
-  /**
-   * Tests for phrase, term, regex, composite (using AND/OR) text search queries.
-   * Both selection and aggregation queries are used.
-   */
+  /// Tests for phrase, term, regex, composite (using AND/OR) text search queries.
+  /// Both selection and aggregation queries are used.
   @Test
   public void testTextSearch()
       throws Exception {
@@ -1056,10 +1050,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     testTextSearchAggregationQueryHelper(query, expected.size());
   }
 
-  /**
-   * Tests for combining (using AND/OR)
-   * the execution of text match filters with other filters.
-   */
+  /// Tests for combining (using AND/OR)
+  /// the execution of text match filters with other filters.
   @Test
   public void testTextSearchWithAdditionalFilter()
       throws Exception {
@@ -1357,10 +1349,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     testTextSearchAggregationQueryHelper(query, expected.size());
   }
 
-  /**
-   * Test NotFilterOperator with index based doc id iterator (text_match)
-   * @throws Exception
-   */
+  /// Test NotFilterOperator with index based doc id iterator (text_match)
+  /// @throws Exception
   @Test
   public void testTextSearchWithInverse()
       throws Exception {
@@ -1375,11 +1365,9 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     testTextSearchSelectQueryHelper(query, 28, false, expected);
   }
 
-  /**
-   * Test the reference counting mechanism of {@link SearcherManager}
-   * used by {@link RealtimeLuceneTextIndex}
-   * for near realtime text search.
-   */
+  /// Test the reference counting mechanism of [SearcherManager]
+  /// used by [org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex]
+  /// for near realtime text search.
   @Test
   public void testLuceneRealtimeWithSearcherManager()
       throws Exception {
@@ -1545,11 +1533,9 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     indexWriter.close();
   }
 
-  /**
-   * Test the realtime search by verifying that realtime reader is able
-   * to see monotonically increasing number of uncommitted documents
-   * added to the index.
-   */
+  /// Test the realtime search by verifying that realtime reader is able
+  /// to see monotonically increasing number of uncommitted documents
+  /// added to the index.
   @Test
   public void testLuceneRealtimeWithoutSearcherManager()
       throws Exception {
@@ -1995,7 +1981,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
   private void testInterSegmentAggregationQueryHelper(String query, long expectedCount) {
     DataSchema expectedDataSchema = new DataSchema(new String[]{"count(*)"}, new ColumnDataType[]{ColumnDataType.LONG});
-    List<Object[]> expectedRows = Collections.singletonList(new Object[]{expectedCount});
+    List<Object[]> expectedRows = List.<Object[]>of(new Object[]{expectedCount});
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query),
         new ResultTable(expectedDataSchema, expectedRows));
   }
@@ -2019,7 +2005,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expected = new ArrayList<>();
     expected.add(new Object[]{
         1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
-        + "storage, concurrency, multi-threading"
+          + "storage, concurrency, multi-threading"
     });
     expected.add(new Object[]{
         1019,
@@ -2038,7 +2024,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expected1 = new ArrayList<>();
     expected1.add(new Object[]{
         1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
-        + "storage, concurrency, multi-threading"
+          + "storage, concurrency, multi-threading"
     });
     String query1 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
         + ", '*ava realtime streaming system*', 'parser=CLASSIC,allowLeadingWildcard=true,defaultOperator=AND') LIMIT "
@@ -2096,11 +2082,11 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     });
     expectedTensorFlow.add(new Object[]{
         1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building "
-        + "large scale systems, Machine learning"
+          + "large scale systems, Machine learning"
     });
     expectedTensorFlow.add(new Object[]{
         1016, "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building"
-        + " high performance scalable systems"
+          + " high performance scalable systems"
     });
 
     // Test exact phrase "Tensor flow" with default settings (slop=0, inOrder=true)
@@ -2113,7 +2099,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expectedTensorDatabase = new ArrayList<>();
     expectedTensorDatabase.add(new Object[]{
         1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building "
-        + "large scale systems, Machine learning"
+          + "large scale systems, Machine learning"
     });
 
     String querySlop1 =
@@ -2189,7 +2175,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expectedWildcardAnd = new ArrayList<>();
     expectedWildcardAnd.add(new Object[]{
         1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
-        + "storage, concurrency, multi-threading"
+          + "storage, concurrency, multi-threading"
     });
     expectedWildcardAnd.add(new Object[]{
         1018,
@@ -2348,7 +2334,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expectedMin2Of3 = new ArrayList<>();
     expectedMin2Of3.add(new Object[]{
         1008, "Amazon EC2, AWS, hadoop, big data, spark, building high performance scalable systems, building and "
-        + "deploying large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
+          + "deploying large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
     });
 
     String queryMin2Of3 =
@@ -2369,11 +2355,11 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     });
     expectedMin1Of2.add(new Object[]{
         1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building "
-        + "large scale systems, Machine learning"
+          + "large scale systems, Machine learning"
     });
     expectedMin1Of2.add(new Object[]{
         1016, "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building"
-        + " high performance scalable systems"
+          + " high performance scalable systems"
     });
 
     String queryMin1Of2 =
@@ -2385,7 +2371,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expectedMin3Of4 = new ArrayList<>();
     expectedMin3Of4.add(new Object[]{
         1017, "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production "
-        + "systems, concurrency, multi-threading, C++, CPU processing, Java"
+          + "systems, concurrency, multi-threading, C++, CPU processing, Java"
     });
 
     String queryMin3Of4 =
@@ -2397,7 +2383,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expectedMin3Of3 = new ArrayList<>();
     expectedMin3Of3.add(new Object[]{
         1008, "Amazon EC2, AWS, hadoop, big data, spark, building high performance scalable systems, building and "
-        + "deploying large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
+          + "deploying large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
     });
 
     String queryMin3Of3 =

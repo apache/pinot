@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.routing.manager;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -48,9 +47,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
-/**
- * Unit tests for {@link MultiClusterRoutingManager}.
- */
+/// Unit tests for [MultiClusterRoutingManager].
 public class MultiClusterRoutingManagerTest {
   private static final String TEST_TABLE = "testTable_OFFLINE";
   private static final long REQUEST_ID = 12345L;
@@ -299,9 +296,9 @@ public class MultiClusterRoutingManagerTest {
   private RoutingTable createRoutingTable(String serverName, List<String> segments) {
     Map<ServerInstance, SegmentsToQuery> serverMap = new HashMap<>();
     ServerInstance server = createMockServerInstance(serverName);
-    SegmentsToQuery segmentsToQuery = new SegmentsToQuery(segments, Collections.emptyList());
+    SegmentsToQuery segmentsToQuery = new SegmentsToQuery(segments, List.of());
     serverMap.put(server, segmentsToQuery);
-    return new RoutingTable(serverMap, Collections.emptyList(), 0);
+    return new RoutingTable(serverMap, List.of(), 0);
   }
 
   private ServerInstance createMockServerInstance(String instanceName) {

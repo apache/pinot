@@ -25,21 +25,17 @@ import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * Factory for REGEXP_LIKE predicate evaluators when IFST index is enabled for case-insensitive matching.
- */
+/// Factory for REGEXP_LIKE predicate evaluators when IFST index is enabled for case-insensitive matching.
 public class IFSTBasedRegexpPredicateEvaluatorFactory {
   private IFSTBasedRegexpPredicateEvaluatorFactory() {
   }
 
-  /**
-   * Create a new instance of IFST based REGEXP_LIKE predicate evaluator for case-insensitive matching.
-   *
-   * @param regexpLikePredicate REGEXP_LIKE predicate to evaluate
-   * @param ifstIndexReader IFST index reader
-   * @param dictionary Dictionary for the column
-   * @return IFST based REGEXP_LIKE predicate evaluator
-   */
+  /// Create a new instance of IFST based REGEXP_LIKE predicate evaluator for case-insensitive matching.
+  ///
+  /// @param regexpLikePredicate REGEXP_LIKE predicate to evaluate
+  /// @param ifstIndexReader IFST index reader
+  /// @param dictionary Dictionary for the column
+  /// @return IFST based REGEXP_LIKE predicate evaluator
   public static BaseDictionaryBasedPredicateEvaluator newIFSTBasedEvaluator(RegexpLikePredicate regexpLikePredicate,
       TextIndexReader ifstIndexReader, Dictionary dictionary) {
     return new IFSTBasedRegexpPredicateEvaluator(regexpLikePredicate, ifstIndexReader, dictionary);

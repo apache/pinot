@@ -34,9 +34,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -140,7 +142,7 @@ public class PluginManager {
   PluginManager() {
     // For the shaded plugins
     _registry = new HashMap<>();
-    _registry.put(new Plugin(DEFAULT_PLUGIN_NAME), createClassLoader(Collections.emptyList()));
+    _registry.put(new Plugin(DEFAULT_PLUGIN_NAME), createClassLoader(List.of()));
 
     // for the new pinot plugins
     try {
@@ -203,14 +205,12 @@ public class PluginManager {
     }
   }
 
-  /**
-   * This method will take a semi-colon delimited string of directories and a semi-colon delimited string of plugin
-   * names. It will traverse the directories in order and produce a <String, File> map of plugins to be loaded.
-   * If a plugin is found in multiple directories, only the first copy of it will be picked up.
-   * @param pluginsDirectories
-   * @param pluginsInclude
-   * @return A hash map with key = plugin name, value = file object
-   */
+  /// This method will take a semi-colon delimited string of directories and a semi-colon delimited string of plugin
+  /// names. It will traverse the directories in order and produce a <String, File> map of plugins to be loaded.
+  /// If a plugin is found in multiple directories, only the first copy of it will be picked up.
+  /// @param pluginsDirectories
+  /// @param pluginsInclude
+  /// @return A hash map with key = plugin name, value = file object
   @VisibleForTesting
   public HashMap<String, File> getPluginsToLoad(String pluginsDirectories, String pluginsInclude)
       throws IllegalArgumentException {
@@ -259,11 +259,9 @@ public class PluginManager {
   private void initRecordReaderClassMap() {
   }
 
-  /**
-   * Loads jars recursively
-   * @param pluginName
-   * @param directory the directory of one plugin
-   */
+  /// Loads jars recursively
+  /// @param pluginName
+  /// @param directory the directory of one plugin
   public void load(String pluginName, File directory) {
     Path pluginPropertiesPath = directory.toPath().resolve(PINOUT_PLUGIN_PROPERTIES_FILE_NAME);
     if (Files.isRegularFile(pluginPropertiesPath)) {
@@ -298,10 +296,19 @@ public class PluginManager {
 
         ClassRealm pinotRealm = _classWorld.getClassRealm(PINOT_REALMID);
 
-        // All packages to look up in pinot realm BEFORE itself
-        Stream<String> importedPinotPackages =
-            Stream.of("org.apache.pinot.spi"); // this works like a prefix, so ALL spi classes will be accessible
-        importedPinotPackages.forEach(p -> pluginRealm.importFrom(pinotRealm, p));
+        // All packages to look up in pinot realm BEFORE itself.
+        // Acts like a prefix so all classes in (and below) the listed package are accessible.
+        // Hardcoding the list here is cheap while it stays small. A cleaner long-term approach
+        // would have each SPI module self-declare its exports in a META-INF/pinot-realm-exports
+        // resource file (one package per line) and have PluginManager discover them at init time
+        // via ClassLoader.getResources() — that would eliminate the layering violation of
+        // pinot-spi naming packages from higher-level modules such as pinot-query-planner-spi.
+        // TODO: implement the self-declaring META-INF/pinot-realm-exports mechanism.
+        Stream.of(
+            "org.apache.pinot.spi",
+            "org.apache.pinot.query.planner.spi",     // RuleSetCustomizer SPI (pinot-query-planner-spi)
+            "org.apache.calcite.plan"                 // RelOptRule, used by RuleSetCustomizer.customize
+        ).forEach(p -> pluginRealm.importFrom(pinotRealm, p));
 
         // Additional importForm as specified by the plugin configuration
         config.getImportsFromPerRealm().forEach((r, ifs) -> {
@@ -348,14 +355,15 @@ public class PluginManager {
     return new PluginClassLoader(urls, this.getClass().getClassLoader());
   }
 
-  /**
-   * Loads a class. The class name can be in any of the following formats
-   * <li>com.x.y.foo</li> loads the class in the default class path
-   * <li>pluginName:com.x.y.foo</li> loads the class in plugin specific classloader
-   * @param className
-   * @return
-   * @throws ClassNotFoundException
-   */
+  /// Loads a class. The class name can be in any of the following formats
+  ///
+  /// - com.x.y.foo
+  ///   loads the class in the default class path
+  /// - pluginName:com.x.y.foo
+  ///   loads the class in plugin specific classloader
+  ///   @param className
+  ///   @return
+  ///   @throws ClassNotFoundException
   public Class<?> loadClass(String className)
       throws ClassNotFoundException {
     String pluginName = DEFAULT_PLUGIN_NAME;
@@ -368,13 +376,11 @@ public class PluginManager {
     return loadClass(pluginName, realClassName);
   }
 
-  /**
-   * Loads a class using the plugin specific class loader
-   * @param pluginName
-   * @param className
-   * @return
-   * @throws ClassNotFoundException
-   */
+  /// Loads a class using the plugin specific class loader
+  /// @param pluginName
+  /// @param className
+  /// @return
+  /// @throws ClassNotFoundException
   public Class<?> loadClass(String pluginName, String className)
       throws ClassNotFoundException {
     // Backward compatible check.
@@ -396,25 +402,27 @@ public class PluginManager {
     return PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP.getOrDefault(className, className);
   }
 
-  /**
-   * Create an instance of the className. The className can be in any of the following formats
-   * <li>com.x.y.foo</li> loads the class in the default class path
-   * <li>pluginName:com.x.y.foo</li> loads the class in plugin specific classloader
-   * @param className
-   * @return
-   */
+  /// Create an instance of the className. The className can be in any of the following formats
+  ///
+  /// - com.x.y.foo
+  ///   loads the class in the default class path
+  /// - pluginName:com.x.y.foo
+  ///   loads the class in plugin specific classloader
+  ///   @param className
+  ///   @return
   public <T> T createInstance(String className)
       throws Exception {
     return createInstance(className, new Class[]{}, new Object[]{});
   }
 
-  /**
-   * Create an instance of the className. The className can be in any of the following formats
-   * <li>com.x.y.foo</li> loads the class in the default class path
-   * <li>pluginName:com.x.y.foo</li> loads the class in plugin specific classloader
-   * @param className
-   * @return
-   */
+  /// Create an instance of the className. The className can be in any of the following formats
+  ///
+  /// - com.x.y.foo
+  ///   loads the class in the default class path
+  /// - pluginName:com.x.y.foo
+  ///   loads the class in plugin specific classloader
+  ///   @param className
+  ///   @return
   public <T> T createInstance(String className, Class[] argTypes, Object[] argValues)
       throws Exception {
     String pluginName = DEFAULT_PLUGIN_NAME;
@@ -427,28 +435,23 @@ public class PluginManager {
     return createInstance(pluginName, realClassName, argTypes, argValues);
   }
 
-  /**
-   * Creates an instance of className using classloader specific to the plugin
-   * @param pluginName
-   * @param className
-   * @param <T>
-   * @return
-   * @throws Exception
-   */
+  /// Creates an instance of className using classloader specific to the plugin
+  /// @param pluginName
+  /// @param className
+  /// @param <T>
+  /// @return
+  /// @throws Exception
   public <T> T createInstance(String pluginName, String className)
       throws Exception {
     return createInstance(pluginName, className, new Class[]{}, new Object[]{});
   }
 
-  /**
-   *
-   * @param pluginName
-   * @param className
-   * @param argTypes
-   * @param argValues
-   * @param <T>
-   * @return
-   */
+  /// @param pluginName
+  /// @param className
+  /// @param argTypes
+  /// @param argValues
+  /// @param <T>
+  /// @return
   public <T> T createInstance(String pluginName, String className, Class[] argTypes, Object[] argValues)
       throws Exception {
     Class<T> loadedClass;
@@ -472,6 +475,32 @@ public class PluginManager {
       return _pluginsDirectories.split(";");
     }
     return null;
+  }
+
+  /// Returns the set of classloaders for all new-style plugins, in load order.
+  /// New-style plugins are those packaged with a `pinot-plugin.properties` file
+  /// and loaded into a dedicated [ClassRealm]. Legacy shaded plugins (loaded via
+  /// [PluginClassLoader]) are excluded — new SPIs should only target new-style plugins.
+  ///
+  /// Intended for `ServiceLoader` enumeration across plugin classloaders:
+  ///
+  /// ```java
+  /// for (ClassLoader cl : PluginManager.get().getPluginClassLoaders()) {
+  ///   for (MyService svc : ServiceLoader.load(MyService.class, cl)) { ... }
+  /// }
+  /// ```
+  ///
+  /// Call after all plugins have been loaded; classloaders added after this
+  /// call returns will not appear in the snapshot.
+  public synchronized Set<ClassLoader> getPluginClassLoaders() {
+    Set<ClassLoader> result = new LinkedHashSet<>();
+    for (ClassRealm realm : _classWorld.getRealms()) {
+      String id = realm.getId();
+      if (!PINOT_REALMID.equals(id) && !DEFAULT_PLUGIN_NAME.equals(id)) {
+        result.add(realm);
+      }
+    }
+    return Collections.unmodifiableSet(result);
   }
 
   public static PluginManager get() {

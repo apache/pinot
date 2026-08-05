@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.ExplainPlanRows;
@@ -26,9 +25,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 
 
-/**
- * Singleton class which extends {@link BaseFilterOperator} that is empty, i.e. does not match any document.
- */
+/// Singleton class which extends [BaseFilterOperator] that is empty, i.e. does not match any document.
 public final class EmptyFilterOperator extends BaseFilterOperator {
   private EmptyFilterOperator() {
     // We will never call its getFalses() method.
@@ -72,7 +69,7 @@ public final class EmptyFilterOperator extends BaseFilterOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override

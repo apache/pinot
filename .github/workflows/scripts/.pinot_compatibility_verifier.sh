@@ -60,18 +60,29 @@ echo "  </servers>">> ${SETTINGS_FILE}
 echo "</settings>">> ${SETTINGS_FILE}
 
 # PINOT_MAVEN_OPTS is used to provide additional maven options to the checkoutAndBuild.sh command
-export PINOT_MAVEN_OPTS="-s $(pwd)/${SETTINGS_FILE}"
+export PINOT_MAVEN_OPTS="${PINOT_MAVEN_OPTS:-} -s $(pwd)/${SETTINGS_FILE}"
 
 # Compare commit hash for compatibility verification
-git fetch --all
-NEW_COMMIT_HASH=`git log -1 --pretty=format:'%h' HEAD`
+git fetch --all --tags
+function commitHash() {
+  local commit=$1
+  git log -1 --pretty=format:'%h' "${commit}" 2>/dev/null \
+    || git log -1 --pretty=format:'%h' "origin/${commit}" 2>/dev/null \
+    || git log -1 --pretty=format:'%h' "refs/tags/${commit}" 2>/dev/null
+}
+
+NEW_COMMIT_HASH=$(commitHash HEAD)
 if [ ! -z "${NEW_COMMIT}" ]; then
-  NEW_COMMIT_HASH=`git log -1 --pretty=format:'%h' ${NEW_COMMIT}`
+  NEW_COMMIT_HASH=$(commitHash "${NEW_COMMIT}")
 fi
-OLD_COMMIT_HASH=`git log -1 --pretty=format:'%h' ${OLD_COMMIT}`
-if [ $? -ne 0 ]; then
+OLD_COMMIT_HASH=$(commitHash "${OLD_COMMIT}")
+if [ -z "${OLD_COMMIT_HASH}" ]; then
   echo "Failed to get commit hash for commit: \"${OLD_COMMIT}\""
-  OLD_COMMIT_HASH=`git log -1 --pretty=format:'%h' origin/${OLD_COMMIT}`
+  exit 1
+fi
+if [ -z "${NEW_COMMIT_HASH}" ]; then
+  echo "Failed to get commit hash for commit: \"${NEW_COMMIT:-HEAD}\""
+  exit 1
 fi
 if [ "${NEW_COMMIT_HASH}" == "${OLD_COMMIT_HASH}" ]; then
   echo "No changes between old commit: \"${OLD_COMMIT}\" and new commit: \"${NEW_COMMIT}\""

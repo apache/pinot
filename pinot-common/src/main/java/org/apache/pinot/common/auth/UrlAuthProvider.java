@@ -22,18 +22,15 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 
 
-/**
- * Auth provider with dynamic loading support, typically used for rotating tokens such as those injected by kubernetes.
- * UrlAuthProvider will re-read the source on every invocation, so beware of long round-trip times if the source is
- * remote.
- */
+/// Auth provider with dynamic loading support, typically used for rotating tokens such as those injected by kubernetes.
+/// UrlAuthProvider will re-read the source on every invocation, so beware of long round-trip times if the source is
+/// remote.
 public class UrlAuthProvider implements AuthProvider {
   public static final String HEADER = "header";
   public static final String PREFIX = "prefix";
@@ -69,7 +66,7 @@ public class UrlAuthProvider implements AuthProvider {
 
   @Override
   public Map<String, Object> getRequestHeaders() {
-    return Collections.singletonMap(_header, makeToken());
+    return Map.of(_header, makeToken());
   }
 
   @Override

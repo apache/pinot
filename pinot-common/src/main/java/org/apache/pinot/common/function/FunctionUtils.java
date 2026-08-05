@@ -23,6 +23,7 @@ import java.sql.Timestamp;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
@@ -37,63 +38,63 @@ public class FunctionUtils {
 
   // Types allowed as the function parameter (in the function signature) for type conversion
   private static final Map<Class<?>, PinotDataType> PARAMETER_TYPE_MAP = new HashMap<>() {{
-    put(int.class, PinotDataType.INTEGER);
-    put(Integer.class, PinotDataType.INTEGER);
-    put(long.class, PinotDataType.LONG);
-    put(Long.class, PinotDataType.LONG);
-    put(float.class, PinotDataType.FLOAT);
-    put(Float.class, PinotDataType.FLOAT);
-    put(double.class, PinotDataType.DOUBLE);
-    put(Double.class, PinotDataType.DOUBLE);
-    put(BigDecimal.class, PinotDataType.BIG_DECIMAL);
-    put(boolean.class, PinotDataType.BOOLEAN);
-    put(Boolean.class, PinotDataType.BOOLEAN);
-    put(Timestamp.class, PinotDataType.TIMESTAMP);
-    put(String.class, PinotDataType.STRING);
-    put(byte[].class, PinotDataType.BYTES);
-    put(int[].class, PinotDataType.PRIMITIVE_INT_ARRAY);
-    put(long[].class, PinotDataType.PRIMITIVE_LONG_ARRAY);
-    put(float[].class, PinotDataType.PRIMITIVE_FLOAT_ARRAY);
-    put(double[].class, PinotDataType.PRIMITIVE_DOUBLE_ARRAY);
-    put(BigDecimal[].class, PinotDataType.BIG_DECIMAL_ARRAY);
-    put(boolean[].class, PinotDataType.PRIMITIVE_BOOLEAN_ARRAY);
-    put(Timestamp[].class, PinotDataType.TIMESTAMP_ARRAY);
-    put(String[].class, PinotDataType.STRING_ARRAY);
-    put(byte[][].class, PinotDataType.BYTES_ARRAY);
-    put(Map.class, PinotDataType.MAP);
-    put(Object.class, PinotDataType.OBJECT);
-  }};
+      put(int.class, PinotDataType.INT);
+      put(Integer.class, PinotDataType.INT);
+      put(long.class, PinotDataType.LONG);
+      put(Long.class, PinotDataType.LONG);
+      put(float.class, PinotDataType.FLOAT);
+      put(Float.class, PinotDataType.FLOAT);
+      put(double.class, PinotDataType.DOUBLE);
+      put(Double.class, PinotDataType.DOUBLE);
+      put(BigDecimal.class, PinotDataType.BIG_DECIMAL);
+      put(boolean.class, PinotDataType.BOOLEAN);
+      put(Boolean.class, PinotDataType.BOOLEAN);
+      put(Timestamp.class, PinotDataType.TIMESTAMP);
+      put(String.class, PinotDataType.STRING);
+      put(byte[].class, PinotDataType.BYTES);
+      put(UUID.class, PinotDataType.UUID);
+      put(int[].class, PinotDataType.PRIMITIVE_INT_ARRAY);
+      put(long[].class, PinotDataType.PRIMITIVE_LONG_ARRAY);
+      put(float[].class, PinotDataType.PRIMITIVE_FLOAT_ARRAY);
+      put(double[].class, PinotDataType.PRIMITIVE_DOUBLE_ARRAY);
+      put(BigDecimal[].class, PinotDataType.BIG_DECIMAL_ARRAY);
+      put(boolean[].class, PinotDataType.PRIMITIVE_BOOLEAN_ARRAY);
+      put(Timestamp[].class, PinotDataType.TIMESTAMP_ARRAY);
+      put(String[].class, PinotDataType.STRING_ARRAY);
+      put(byte[][].class, PinotDataType.BYTES_ARRAY);
+      put(Map.class, PinotDataType.MAP);
+      put(Object.class, PinotDataType.OBJECT);
+    }};
 
   private static final Map<Class<?>, ColumnDataType> COLUMN_DATA_TYPE_MAP = new HashMap<>() {{
-    put(int.class, ColumnDataType.INT);
-    put(Integer.class, ColumnDataType.INT);
-    put(long.class, ColumnDataType.LONG);
-    put(Long.class, ColumnDataType.LONG);
-    put(float.class, ColumnDataType.FLOAT);
-    put(Float.class, ColumnDataType.FLOAT);
-    put(double.class, ColumnDataType.DOUBLE);
-    put(Double.class, ColumnDataType.DOUBLE);
-    put(BigDecimal.class, ColumnDataType.BIG_DECIMAL);
-    put(boolean.class, ColumnDataType.BOOLEAN);
-    put(Boolean.class, ColumnDataType.BOOLEAN);
-    put(Timestamp.class, ColumnDataType.TIMESTAMP);
-    put(String.class, ColumnDataType.STRING);
-    put(byte[].class, ColumnDataType.BYTES);
-    put(int[].class, ColumnDataType.INT_ARRAY);
-    put(long[].class, ColumnDataType.LONG_ARRAY);
-    put(float[].class, ColumnDataType.FLOAT_ARRAY);
-    put(double[].class, ColumnDataType.DOUBLE_ARRAY);
-    put(BigDecimal[].class, ColumnDataType.BIG_DECIMAL_ARRAY);
-    put(boolean[].class, ColumnDataType.BOOLEAN_ARRAY);
-    put(Timestamp[].class, ColumnDataType.TIMESTAMP_ARRAY);
-    put(String[].class, ColumnDataType.STRING_ARRAY);
-    put(byte[][].class, ColumnDataType.BYTES_ARRAY);
-    put(Object.class, ColumnDataType.OBJECT);
-  }};
+      put(int.class, ColumnDataType.INT);
+      put(Integer.class, ColumnDataType.INT);
+      put(long.class, ColumnDataType.LONG);
+      put(Long.class, ColumnDataType.LONG);
+      put(float.class, ColumnDataType.FLOAT);
+      put(Float.class, ColumnDataType.FLOAT);
+      put(double.class, ColumnDataType.DOUBLE);
+      put(Double.class, ColumnDataType.DOUBLE);
+      put(BigDecimal.class, ColumnDataType.BIG_DECIMAL);
+      put(boolean.class, ColumnDataType.BOOLEAN);
+      put(Boolean.class, ColumnDataType.BOOLEAN);
+      put(Timestamp.class, ColumnDataType.TIMESTAMP);
+      put(String.class, ColumnDataType.STRING);
+      put(byte[].class, ColumnDataType.BYTES);
+      put(UUID.class, ColumnDataType.UUID);
+      put(int[].class, ColumnDataType.INT_ARRAY);
+      put(long[].class, ColumnDataType.LONG_ARRAY);
+      put(float[].class, ColumnDataType.FLOAT_ARRAY);
+      put(double[].class, ColumnDataType.DOUBLE_ARRAY);
+      put(BigDecimal[].class, ColumnDataType.BIG_DECIMAL_ARRAY);
+      put(boolean[].class, ColumnDataType.BOOLEAN_ARRAY);
+      put(Timestamp[].class, ColumnDataType.TIMESTAMP_ARRAY);
+      put(String[].class, ColumnDataType.STRING_ARRAY);
+      put(byte[][].class, ColumnDataType.BYTES_ARRAY);
+      put(Object.class, ColumnDataType.OBJECT);
+    }};
 
-  /**
-   * Returns the corresponding PinotDataType for the given parameter class, or {@code null} if there is no one matching.
-   */
+  /// Returns the corresponding PinotDataType for the given parameter class, or `null` if there is no one matching.
   @Nullable
   public static PinotDataType getParameterType(Class<?> clazz) {
     return PARAMETER_TYPE_MAP.get(clazz);
@@ -150,17 +151,13 @@ public class FunctionUtils {
     return PinotDataType.OBJECT;
   }
 
-  /**
-   * Returns the corresponding ColumnDataType for the given class, or {@code null} if there is no one matching.
-   */
+  /// Returns the corresponding ColumnDataType for the given class, or `null` if there is no one matching.
   @Nullable
   public static ColumnDataType getColumnDataType(Class<?> clazz) {
     return COLUMN_DATA_TYPE_MAP.get(clazz);
   }
 
-  /**
-   * Returns the corresponding RelDataType for the given class, or OTHER if there is no one matching.
-   */
+  /// Returns the corresponding RelDataType for the given class, or OTHER if there is no one matching.
   public static RelDataType getRelDataType(RelDataTypeFactory typeFactory, Class<?> clazz) {
     ColumnDataType columnDataType = getColumnDataType(clazz);
     if (columnDataType == null) {
@@ -184,6 +181,8 @@ public class FunctionUtils {
       case STRING:
       case JSON:
         return typeFactory.createSqlType(SqlTypeName.VARCHAR);
+      case UUID:
+        return typeFactory.createSqlType(SqlTypeName.UUID);
       case BYTES:
         return typeFactory.createSqlType(SqlTypeName.VARBINARY);
       case INT_ARRAY:

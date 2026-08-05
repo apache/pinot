@@ -36,12 +36,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base implementation of the combine operator.
- * <p>Combine operator uses multiple worker threads to process segments in parallel, and uses the main thread to merge
- * the results blocks from the processed segments. It can early-terminate the query to save the system resources if it
- * detects that the merged results can already satisfy the query, or the query is already errored out or timed out.
- */
+/// Base implementation of the combine operator.
+///
+/// Combine operator uses multiple worker threads to process segments in parallel, and uses the main thread to merge
+/// the results blocks from the processed segments. It can early-terminate the query to save the system resources if it
+/// detects that the merged results can already satisfy the query, or the query is already errored out or timed out.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock> extends BaseCombineOperator<T> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleBlockCombineOperator.class);
@@ -60,13 +59,33 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
   @Override
   protected BaseResultsBlock getNextBlock() {
     try {
-      startProcess();
-      return checkTerminateExceptionAndAttachExecutionStats(mergeResults());
+      return mergeResultsAndAttachExecutionStats();
     } catch (Exception e) {
-      return createExceptionResultsBlockAndAttachExecutionStats(e, "merging results blocks");
+      LOGGER.error("Caught exception while attaching execution stats (query: {})", _queryContext, e);
+      QueryErrorMessage errMsg =
+          QueryErrorMessage.safeMsg(QueryErrorCode.INTERNAL, "Caught exception while attaching execution stats");
+      return new ExceptionResultsBlock(errMsg);
+    }
+  }
+
+  /// Merges the results and waits for all worker threads to finish before attaching execution statistics.
+  private BaseResultsBlock mergeResultsAndAttachExecutionStats() {
+    BaseResultsBlock mergedBlock = null;
+    Exception mergeException = null;
+    try {
+      startProcess();
+      mergedBlock = mergeResults();
+    } catch (Exception e) {
+      mergeException = e;
     } finally {
+      // Wait for all worker threads to finish before reading execution stats. This ensures that no worker thread is
+      // still mutating operator state (e.g. _numDocsScanned) when attachExecutionStats() iterates over operators.
       stopProcess();
     }
+    if (mergeException != null) {
+      return createExceptionResultsBlockAndAttachExecutionStats(mergeException, "merging results blocks");
+    }
+    return checkTerminateExceptionAndAttachExecutionStats(mergedBlock);
   }
 
   @Override
@@ -114,9 +133,7 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
   protected void onProcessSegmentsFinish() {
   }
 
-  /**
-   * Merges the results from the worker threads into a results block.
-   */
+  /// Merges the results from the worker threads into a results block.
   protected BaseResultsBlock mergeResults()
       throws Exception {
     T mergedBlock = null;

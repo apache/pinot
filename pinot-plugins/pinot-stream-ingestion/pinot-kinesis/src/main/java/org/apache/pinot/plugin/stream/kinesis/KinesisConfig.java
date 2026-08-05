@@ -29,9 +29,7 @@ import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
 
-/**
- * Kinesis stream specific config
- */
+/// Kinesis stream specific config
 public class KinesisConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(KinesisConfig.class);
 
@@ -46,18 +44,16 @@ public class KinesisConfig {
 
 
   // IAM role configs
-  /**
-   * Enable Role based access to AWS.
-   * iamRoleBasedAccessEnabled - Set it to `true` to enable role based access, default: false
-   * roleArn - Required. specify the ARN of the role the client should assume.
-   * roleSessionName - session name to be used when creating a role based session. default: pinot-kineis-uuid
-   * externalId - string external id value required by role's policy. default: null
-   * sessionDurationSeconds - The duration, in seconds, of the role session. Default: 900
-   * asyncSessionUpdateEnabled -
-   *        Configure whether the provider should fetch credentials asynchronously in the background.
-   *       If this is true, threads are less likely to block when credentials are loaded,
-   *       but additional resources are used to maintain the provider. Default - `true`
-   */
+  /// Enable Role based access to AWS.
+  /// iamRoleBasedAccessEnabled - Set it to `true` to enable role based access, default: false
+  /// roleArn - Required. specify the ARN of the role the client should assume.
+  /// roleSessionName - session name to be used when creating a role based session. default: pinot-kineis-uuid
+  /// externalId - string external id value required by role's policy. default: null
+  /// sessionDurationSeconds - The duration, in seconds, of the role session. Default: 900
+  /// asyncSessionUpdateEnabled -
+  ///        Configure whether the provider should fetch credentials asynchronously in the background.
+  ///       If this is true, threads are less likely to block when credentials are loaded,
+  ///       but additional resources are used to maintain the provider. Default - `true`
   public static final String IAM_ROLE_BASED_ACCESS_ENABLED = "iamRoleBasedAccessEnabled";
   public static final String ROLE_ARN = "roleArn";
   public static final String ROLE_SESSION_NAME = "roleSessionName";
@@ -76,7 +72,7 @@ public class KinesisConfig {
   // We are setting it to 1 to avoid hitting the limit  in a replicated setup,
   // where multiple replicas are fetching from the same shard.
   // see - https://docs.aws.amazon.com/kinesis/latest/APIReference/API_GetRecords.html
-  public static final String DEFAULT_RPS_LIMIT = "1";
+  public static final String DEFAULT_RPS_LIMIT = "1.0";
 
   private final String _streamTopicName;
   private final String _awsRegion;
@@ -94,7 +90,7 @@ public class KinesisConfig {
   private String _externalId;
   private int _sessionDurationSeconds;
   private boolean _asyncSessionUpdateEnabled;
-  private int _rpsLimit;
+  private double _rpsLimit;
 
   public KinesisConfig(StreamConfig streamConfig) {
     Map<String, String> props = streamConfig.getStreamConfigsMap();
@@ -103,13 +99,7 @@ public class KinesisConfig {
     Preconditions.checkNotNull(_awsRegion, "Must provide 'region' in stream config for table: %s",
         streamConfig.getTableNameWithType());
     _numMaxRecordsToFetch = Integer.parseInt(props.getOrDefault(MAX_RECORDS_TO_FETCH, DEFAULT_MAX_RECORDS));
-    _rpsLimit = Integer.parseInt(props.getOrDefault(RPS_LIMIT, DEFAULT_RPS_LIMIT));
-
-    if (_rpsLimit <= 0) {
-      LOGGER.warn("Invalid 'requests_per_second_limit' value: {}."
-          + " Please provide value greater than 0. Using default: {}", _rpsLimit, DEFAULT_RPS_LIMIT);
-      _rpsLimit = Integer.parseInt(DEFAULT_RPS_LIMIT);
-    }
+    _rpsLimit = parseRpsLimit(props.getOrDefault(RPS_LIMIT, DEFAULT_RPS_LIMIT));
 
     _shardIteratorType =
         ShardIteratorType.fromValue(props.getOrDefault(SHARD_ITERATOR_TYPE, DEFAULT_SHARD_ITERATOR_TYPE));
@@ -149,7 +139,13 @@ public class KinesisConfig {
     return _numMaxRecordsToFetch;
   }
 
+  /// @deprecated Use [#getRpsLimitPerSecond()] to preserve fractional limits.
+  @Deprecated
   public int getRpsLimit() {
+    return (int) Math.ceil(_rpsLimit);
+  }
+
+  public double getRpsLimitPerSecond() {
     return _rpsLimit;
   }
 
@@ -195,5 +191,21 @@ public class KinesisConfig {
 
   public boolean isPopulateMetadata() {
     return _populateMetadata;
+  }
+
+  private double parseRpsLimit(String rpsLimit) {
+    try {
+      double parsedRpsLimit = Double.parseDouble(rpsLimit);
+      if (parsedRpsLimit > 0) {
+        return parsedRpsLimit;
+      }
+    } catch (NumberFormatException e) {
+      LOGGER.warn("Invalid '{}' value: {}. Please provide a numeric value greater than 0. Using default: {}",
+          RPS_LIMIT, rpsLimit, DEFAULT_RPS_LIMIT);
+      return Double.parseDouble(DEFAULT_RPS_LIMIT);
+    }
+    LOGGER.warn("Invalid '{}' value: {}. Please provide value greater than 0. Using default: {}", RPS_LIMIT, rpsLimit,
+        DEFAULT_RPS_LIMIT);
+    return Double.parseDouble(DEFAULT_RPS_LIMIT);
   }
 }

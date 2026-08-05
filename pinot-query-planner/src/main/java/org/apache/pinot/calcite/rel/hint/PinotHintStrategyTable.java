@@ -22,16 +22,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
 import javax.annotation.Nullable;
-import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.hint.HintPredicates;
 import org.apache.calcite.rel.hint.HintStrategyTable;
 import org.apache.calcite.rel.hint.Hintable;
 import org.apache.calcite.rel.hint.RelHint;
 
 
-/**
- * Default hint strategy set for Pinot query.
- */
+/// Default hint strategy set for Pinot query.
 public class PinotHintStrategyTable {
   private PinotHintStrategyTable() {
   }
@@ -40,31 +37,27 @@ public class PinotHintStrategyTable {
       .hintStrategy(PinotHintOptions.AGGREGATE_HINT_OPTIONS, HintPredicates.AGGREGATE)
       .hintStrategy(PinotHintOptions.JOIN_HINT_OPTIONS, HintPredicates.JOIN)
       .hintStrategy(PinotHintOptions.TABLE_HINT_OPTIONS, HintPredicates.TABLE_SCAN)
+      .hintStrategy(PinotHintOptions.WINDOW_HINT_OPTIONS, HintPredicates.WINDOW)
+      .hintStrategy(PinotHintOptions.SET_OP_HINT_OPTIONS, HintPredicates.SETOP)
       .build();
 
-  /**
-   * Get the first hint that has the specified name.
-   */
+  /// Get the first hint that has the specified name.
   @Nullable
   public static RelHint getHint(Hintable hintable, String hintName) {
     return getHint(hintable.getHints(), hintName);
   }
 
-  /**
-   * Get the first hint that satisfies the predicate.
-   */
+  /// Get the first hint that satisfies the predicate.
   @Nullable
   public static RelHint getHint(Hintable hintable, Predicate<RelHint> predicate) {
     return getHint(hintable.getHints(), predicate);
   }
 
-  /**
-   * Check if a hint-able {@link RelNode} contains a specific {@link RelHint} by name.
-   *
-   * @param hintList hint list from the {@link RelNode}.
-   * @param hintName the name of the {@link RelHint} to be matched
-   * @return true if it contains the hint
-   */
+  /// Check if a hint-able [org.apache.calcite.rel.RelNode] contains a specific [RelHint] by name.
+  ///
+  /// @param hintList hint list from the [org.apache.calcite.rel.RelNode].
+  /// @param hintName the name of the [RelHint] to be matched
+  /// @return true if it contains the hint
   public static boolean containsHint(List<RelHint> hintList, String hintName) {
     for (RelHint relHint : hintList) {
       if (relHint.hintName.equals(hintName)) {
@@ -94,9 +87,7 @@ public class PinotHintStrategyTable {
     return null;
   }
 
-  /**
-   * Returns the hint options for a specific hint name of {@link RelHint}, or {@code null} if the hint is not present.
-   */
+  /// Returns the hint options for a specific hint name of [RelHint], or `null` if the hint is not present.
   @Nullable
   public static Map<String, String> getHintOptions(List<RelHint> hintList, String hintName) {
     for (RelHint relHint : hintList) {
@@ -107,40 +98,36 @@ public class PinotHintStrategyTable {
     return null;
   }
 
-  /**
-   * Check if a hint-able {@link RelNode} contains an option key for a specific hint name of {@link RelHint}.
-   *
-   * @param hintList hint list from the {@link RelNode}.
-   * @param hintName the name of the {@link RelHint}.
-   * @param optionKey the option key to look for in the {@link RelHint#kvOptions}.
-   * @return true if it contains the hint
-   */
+  /// Check if a hint-able [org.apache.calcite.rel.RelNode] contains an option key for a specific hint name of
+  /// [RelHint].
+  ///
+  /// @param hintList hint list from the [org.apache.calcite.rel.RelNode].
+  /// @param hintName the name of the [RelHint].
+  /// @param optionKey the option key to look for in the [RelHint#kvOptions].
+  /// @return true if it contains the hint
   public static boolean containsHintOption(List<RelHint> hintList, String hintName, String optionKey) {
     Map<String, String> options = getHintOptions(hintList, hintName);
     return options != null && options.containsKey(optionKey);
   }
 
-  /**
-   * Check if a hint-able {@link RelNode} has an option key as {@code true} for a specific hint name of {@link RelHint}.
-   *
-   * @param hintList hint list from the {@link RelNode}.
-   * @param hintName the name of the {@link RelHint}.
-   * @param optionKey the option key to look for in the {@link RelHint#kvOptions}.
-   * @return true if it contains the hint
-   */
+  /// Check if a hint-able [org.apache.calcite.rel.RelNode] has an option key as `true` for a specific
+  /// hint name of [RelHint].
+  ///
+  /// @param hintList hint list from the [org.apache.calcite.rel.RelNode].
+  /// @param hintName the name of the [RelHint].
+  /// @param optionKey the option key to look for in the [RelHint#kvOptions].
+  /// @return true if it contains the hint
   public static boolean isHintOptionTrue(List<RelHint> hintList, String hintName, String optionKey) {
     Map<String, String> options = getHintOptions(hintList, hintName);
     return options != null && Boolean.parseBoolean(options.get(optionKey));
   }
 
-  /**
-   * Retrieve the option value by option key in the {@link RelHint#kvOptions}. the option key is looked up from the
-   * specified hint name for a hint-able {@link RelNode}.
-   *
-   * @param hintList hint list from the {@link RelNode}.
-   * @param hintName the name of the {@link RelHint}.
-   * @param optionKey the option key to look for in the {@link RelHint#kvOptions}.
-   */
+  /// Retrieve the option value by option key in the [RelHint#kvOptions]. the option key is looked up from the
+  /// specified hint name for a hint-able [org.apache.calcite.rel.RelNode].
+  ///
+  /// @param hintList hint list from the [org.apache.calcite.rel.RelNode].
+  /// @param hintName the name of the [RelHint].
+  /// @param optionKey the option key to look for in the [RelHint#kvOptions].
   @Nullable
   public static String getHintOption(List<RelHint> hintList, String hintName, String optionKey) {
     Map<String, String> options = getHintOptions(hintList, hintName);

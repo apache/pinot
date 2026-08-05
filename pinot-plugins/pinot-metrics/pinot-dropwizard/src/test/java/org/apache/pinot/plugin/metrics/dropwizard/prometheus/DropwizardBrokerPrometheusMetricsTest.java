@@ -22,15 +22,15 @@ package org.apache.pinot.plugin.metrics.dropwizard.prometheus;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerTimer;
+import org.apache.pinot.common.metrics.MseMeter;
+import org.apache.pinot.common.metrics.MseTimer;
 import org.apache.pinot.common.metrics.prometheus.BrokerPrometheusMetricsTest;
 import org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory;
 import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
 import org.testng.annotations.Test;
 
 
-/**
- * Disabling tests as Pinot currently uses Yammer and these tests fail for for {@link DropwizardMetricsFactory}
- */
+/// Disabling tests as Pinot currently uses Yammer and these tests fail for [DropwizardMetricsFactory]
 @Test(enabled = false) // enabled=false on class level doesn't seem to work in intellij
 public class DropwizardBrokerPrometheusMetricsTest extends BrokerPrometheusMetricsTest {
   @Override
@@ -57,5 +57,15 @@ public class DropwizardBrokerPrometheusMetricsTest extends BrokerPrometheusMetri
   @Test(dataProvider = "brokerGauges", enabled = false)
   public void gaugeTest(BrokerGauge gauge) {
     super.gaugeTest(gauge);
+  }
+
+  @Test(dataProvider = "mseMeters", enabled = false)
+  public void mseMeterExportedFromBrokerJmx(MseMeter meter) {
+    super.mseMeterExportedFromBrokerJmx(meter);
+  }
+
+  @Test(dataProvider = "mseTimers", enabled = false)
+  public void mseTimerExportedFromBrokerJmx(MseTimer timer) {
+    super.mseTimerExportedFromBrokerJmx(timer);
   }
 }

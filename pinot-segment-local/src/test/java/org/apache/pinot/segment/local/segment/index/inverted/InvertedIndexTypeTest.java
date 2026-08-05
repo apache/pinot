@@ -43,7 +43,7 @@ public class InvertedIndexTypeTest {
         throws IOException {
       _tableConfig.getIndexingConfig()
           .setInvertedIndexColumns(parseStringList("[]")
-      );
+          );
 
       assertEquals(IndexConfig.DISABLED);
     }

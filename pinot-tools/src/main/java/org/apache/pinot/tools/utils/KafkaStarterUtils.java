@@ -53,8 +53,6 @@ public class KafkaStarterUtils {
   public static final String KAFKA_PRODUCER_CLASS_NAME = getKafkaConnectorPackageName() + ".server.KafkaDataProducer";
   public static final String KAFKA_STREAM_CONSUMER_FACTORY_CLASS_NAME =
       getKafkaConnectorPackageName() + ".KafkaConsumerFactory";
-  public static final String KAFKA_STREAM_LEVEL_CONSUMER_CLASS_NAME =
-      getKafkaConnectorPackageName() + ".KafkaStreamLevelConsumer";
   public static final String KAFKA_JSON_MESSAGE_DECODER_CLASS_NAME =
       "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder";
 

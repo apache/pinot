@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.minion.tasks.upsertcompactmerge;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -165,6 +164,18 @@ public class UpsertCompactMergeTaskGeneratorTest {
     Map<String, String> upsertCompactMergeTaskConfig1 = Map.of("bufferTimePeriod", "5hd");
     Assert.assertThrows(IllegalArgumentException.class,
         () -> _taskGenerator.validateTaskConfigs(validTableConfig, new Schema(), upsertCompactMergeTaskConfig1));
+
+    // metadataTTL enabled is not supported with UpsertCompactMergeTask
+    UpsertConfig ttlUpsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    ttlUpsertConfig.setSnapshot(Enablement.ENABLE);
+    ttlUpsertConfig.setMetadataTTL(30);
+    TableConfig metadataTtlTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setUpsertConfig(ttlUpsertConfig)
+        .setTaskConfig(
+            new TableTaskConfig(Map.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, upsertCompactMergeTaskConfig)))
+        .build();
+    Assert.assertThrows(IllegalStateException.class,
+        () -> _taskGenerator.validateTaskConfigs(metadataTtlTableConfig, new Schema(), upsertCompactMergeTaskConfig));
   }
 
   @Test
@@ -189,7 +200,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
     Assert.assertTrue(alreadyMergedSegments.isEmpty());
 
     // no segment present, empty list
-    alreadyMergedSegments = UpsertCompactMergeTaskGenerator.getAlreadyMergedSegments(Collections.emptyList());
+    alreadyMergedSegments = UpsertCompactMergeTaskGenerator.getAlreadyMergedSegments(List.of());
     Assert.assertTrue(alreadyMergedSegments.isEmpty());
   }
 
@@ -307,11 +318,9 @@ public class UpsertCompactMergeTaskGeneratorTest {
     Assert.assertEquals(_taskGenerator.getMaxZKCreationTimeMillis(segmentMergerMetadataList), creationTime2);
   }
 
-  /**
-   * Tests the generateTasks method with various scenarios.
-   * This test is disabled because it requires complex mocking of server segment metadata reader.
-   * The actual integration test covers this scenario.
-   */
+  /// Tests the generateTasks method with various scenarios.
+  /// This test is disabled because it requires complex mocking of server segment metadata reader.
+  /// The actual integration test covers this scenario.
   @Test(enabled = false)
   public void testGenerateTasks()
       throws Exception {
@@ -319,9 +328,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
     // which is better covered in the integration test
   }
 
-  /**
-   * Tests task generation with incomplete tasks present.
-   */
+  /// Tests task generation with incomplete tasks present.
   @Test
   public void testGenerateTasksWithIncompleteTasks() {
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
@@ -351,9 +358,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
     }
   }
 
-  /**
-   * Tests processValidDocIdsMetadata method.
-   */
+  /// Tests processValidDocIdsMetadata method.
   @Test
   public void testProcessValidDocIdsMetadata() {
     Map<String, String> taskConfigs = new HashMap<>();
@@ -364,19 +369,19 @@ public class UpsertCompactMergeTaskGeneratorTest {
 
     Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadata = new HashMap<>();
     validDocIdsMetadata.put("testTable__0__0__12345", Arrays.asList(
-        new ValidDocIdsMetadataInfo("testTable__0__0__12345", 90, 10, 100, "1000",
+        new ValidDocIdsMetadataInfo("testTable__0__0__12345", 90, 10, 100, "1000", null,
             ValidDocIdsType.SNAPSHOT, 100000, System.currentTimeMillis(), "server1",
             ServiceStatus.Status.GOOD)));
     validDocIdsMetadata.put("testTable__0__1__12346", Arrays.asList(
-        new ValidDocIdsMetadataInfo("testTable__0__1__12346", 8, 2, 10, "2000",
+        new ValidDocIdsMetadataInfo("testTable__0__1__12346", 8, 2, 10, "2000", null,
             ValidDocIdsType.SNAPSHOT, 10000, System.currentTimeMillis(), "server1",
             ServiceStatus.Status.GOOD)));
 
-    Set<String> alreadyMergedSegments = Collections.emptySet();
+    Set<String> alreadyMergedSegments = Set.of();
 
     SegmentSelectionResult result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(
         RAW_TABLE_NAME + "_REALTIME", taskConfigs, candidateSegmentsMap,
-        validDocIdsMetadata, alreadyMergedSegments, null);
+        validDocIdsMetadata, alreadyMergedSegments, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE, null);
 
     Assert.assertNotNull(result);
     Assert.assertNotNull(result.getSegmentsForCompactMergeByPartition());
@@ -388,9 +393,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
     Assert.assertTrue(segmentsByPartition.containsKey(0), "Should have segments for partition 0");
   }
 
-  /**
-   * Tests processValidDocIdsMetadata with segments that should be deleted.
-   */
+  /// Tests processValidDocIdsMetadata with segments that should be deleted.
   @Test
   public void testProcessValidDocIdsMetadataWithSegmentsForDeletion() {
     Map<String, String> taskConfigs = new HashMap<>();
@@ -402,28 +405,94 @@ public class UpsertCompactMergeTaskGeneratorTest {
     Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadata = new HashMap<>();
     // Segment with 0 valid docs - should be marked for deletion
     validDocIdsMetadata.put("testTable__0__0__12345", Arrays.asList(
-        new ValidDocIdsMetadataInfo("testTable__0__0__12345", 0, 100, 100, "1000",
+        new ValidDocIdsMetadataInfo("testTable__0__0__12345", 0, 100, 100, "1000", null,
             ValidDocIdsType.SNAPSHOT, 100000, System.currentTimeMillis(), "server1",
             ServiceStatus.Status.GOOD)));
     validDocIdsMetadata.put("testTable__0__1__12346", Arrays.asList(
-        new ValidDocIdsMetadataInfo("testTable__0__1__12346", 8, 2, 10, "2000",
+        new ValidDocIdsMetadataInfo("testTable__0__1__12346", 8, 2, 10, "2000", null,
             ValidDocIdsType.SNAPSHOT, 10000, System.currentTimeMillis(), "server1",
             ServiceStatus.Status.GOOD)));
 
-    Set<String> alreadyMergedSegments = Collections.emptySet();
+    Set<String> alreadyMergedSegments = Set.of();
 
     SegmentSelectionResult result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(
         RAW_TABLE_NAME + "_REALTIME", taskConfigs, candidateSegmentsMap,
-        validDocIdsMetadata, alreadyMergedSegments, null);
+        validDocIdsMetadata, alreadyMergedSegments, Map.of(), MinionConstants.ValidDocIdsConsensusMode.UNSAFE, null);
 
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getSegmentsForDeletion().size(), 1, "Should have one segment for deletion");
     Assert.assertTrue(result.getSegmentsForDeletion().contains("testTable__0__0__12345"));
   }
 
-  /**
-   * Tests getCandidateSegments with various edge cases.
-   */
+  /// Tests that replica consensus is enforced before a segment is selected. Uses the deletion path (a fully-invalid
+  /// segment) as a clean signal: the segment is processed only when its replicas pass the consensus check.
+  @Test
+  public void testProcessValidDocIdsMetadataConsensus() {
+    Map<String, String> taskConfigs = new HashMap<>();
+    String segmentName = _completedSegment.getSegmentName();
+    long crc = _completedSegment.getCrc();
+    Map<String, SegmentZKMetadata> candidateSegmentsMap = Map.of(segmentName, _completedSegment);
+    Set<String> noMerged = Set.of();
+    Map<String, Integer> twoReplicas = Map.of(segmentName, 2);
+
+    Map<String, List<ValidDocIdsMetadataInfo>> agree = Map.of(segmentName, List.of(
+        meta(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1"),
+        meta(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server2")));
+    SegmentSelectionResult result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(RAW_TABLE_NAME,
+        taskConfigs, candidateSegmentsMap, agree, noMerged, twoReplicas,
+        MinionConstants.ValidDocIdsConsensusMode.EQUAL, null);
+    Assert.assertTrue(result.getSegmentsForDeletion().contains(segmentName));
+
+    Map<String, List<ValidDocIdsMetadataInfo>> disagree = Map.of(segmentName, List.of(
+        meta(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1"),
+        meta(segmentName, 1, 99, 100, crc, ServiceStatus.Status.GOOD, "server2")));
+    result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(RAW_TABLE_NAME, taskConfigs,
+        candidateSegmentsMap, disagree, noMerged, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL, null);
+    Assert.assertTrue(result.getSegmentsForDeletion().isEmpty());
+
+    Map<String, List<ValidDocIdsMetadataInfo>> crcMismatch = Map.of(segmentName, List.of(
+        meta(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1"),
+        meta(segmentName, 0, 100, 100, crc + 1, ServiceStatus.Status.GOOD, "server2")));
+    result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(RAW_TABLE_NAME, taskConfigs,
+        candidateSegmentsMap, crcMismatch, noMerged, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL,
+        null);
+    Assert.assertTrue(result.getSegmentsForDeletion().isEmpty());
+
+    Map<String, List<ValidDocIdsMetadataInfo>> unhealthy = Map.of(segmentName, List.of(
+        meta(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1"),
+        meta(segmentName, 0, 100, 100, crc, ServiceStatus.Status.STARTING, "server2")));
+    result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(RAW_TABLE_NAME, taskConfigs,
+        candidateSegmentsMap, unhealthy, noMerged, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL, null);
+    Assert.assertTrue(result.getSegmentsForDeletion().isEmpty());
+
+    result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(RAW_TABLE_NAME, taskConfigs,
+        candidateSegmentsMap, crcMismatch, noMerged, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.UNSAFE,
+        null);
+    Assert.assertTrue(result.getSegmentsForDeletion().contains(segmentName));
+
+    Map<String, List<ValidDocIdsMetadataInfo>> mostValidDocs = Map.of(segmentName, List.of(
+        meta(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1"),
+        meta(segmentName, 100, 0, 100, crc, ServiceStatus.Status.GOOD, "server2")));
+    result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(RAW_TABLE_NAME, taskConfigs,
+        candidateSegmentsMap, mostValidDocs, noMerged, twoReplicas,
+        MinionConstants.ValidDocIdsConsensusMode.MOST_VALID_DOCS, null);
+    Assert.assertTrue(result.getSegmentsForDeletion().isEmpty());
+
+    Map<String, List<ValidDocIdsMetadataInfo>> oneResponded = Map.of(segmentName, List.of(
+        meta(segmentName, 0, 100, 100, crc, ServiceStatus.Status.GOOD, "server1")));
+    result = UpsertCompactMergeTaskGenerator.processValidDocIdsMetadata(RAW_TABLE_NAME, taskConfigs,
+        candidateSegmentsMap, oneResponded, noMerged, twoReplicas, MinionConstants.ValidDocIdsConsensusMode.EQUAL,
+        null);
+    Assert.assertTrue(result.getSegmentsForDeletion().isEmpty());
+  }
+
+  private static ValidDocIdsMetadataInfo meta(String segmentName, long validDocs, long invalidDocs, long totalDocs,
+      long crc, ServiceStatus.Status serverStatus, String instanceId) {
+    return new ValidDocIdsMetadataInfo(segmentName, validDocs, invalidDocs, totalDocs, String.valueOf(crc), null,
+        ValidDocIdsType.SNAPSHOT, 1000, System.currentTimeMillis(), instanceId, serverStatus);
+  }
+
+  /// Tests getCandidateSegments with various edge cases.
   @Test
   public void testGetCandidateSegmentsEdgeCases() {
     Map<String, String> taskConfigs = new HashMap<>();
@@ -450,28 +519,22 @@ public class UpsertCompactMergeTaskGeneratorTest {
     Assert.assertEquals(candidates.size(), 1, "Should include segments with endTime = 0");
   }
 
-  /**
-   * Tests task type method.
-   */
+  /// Tests task type method.
   @Test
   public void testGetTaskType() {
     Assert.assertEquals(_taskGenerator.getTaskType(), MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
   }
 
-  /**
-   * Tests validation with offline table (should fail).
-   */
+  /// Tests validation with offline table (should fail).
   @Test(expectedExceptions = IllegalStateException.class)
   public void testValidateTaskConfigsWithOfflineTable() {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
         .build();
 
-    _taskGenerator.validateTaskConfigs(tableConfig, new Schema(), Collections.emptyMap());
+    _taskGenerator.validateTaskConfigs(tableConfig, new Schema(), Map.of());
   }
 
-  /**
-   * Tests validation with invalid time period format.
-   */
+  /// Tests validation with invalid time period format.
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testValidateTaskConfigsWithInvalidTimePeriod() {
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
@@ -486,9 +549,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
     _taskGenerator.validateTaskConfigs(tableConfig, new Schema(), taskConfigs);
   }
 
-  /**
-   * Tests getAlreadyMergedSegments with complex scenarios.
-   */
+  /// Tests getAlreadyMergedSegments with complex scenarios.
   @Test
   public void testGetAlreadyMergedSegmentsComplex() {
     // Create multiple merged segments
@@ -523,9 +584,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
     Assert.assertTrue(alreadyMerged.contains("seg5"));
   }
 
-  /**
-   * Tests segment name and CRC list generation with edge cases.
-   */
+  /// Tests segment name and CRC list generation with edge cases.
   @Test
   public void testSegmentListGenerationEdgeCases() {
     // Test with segments having special characters

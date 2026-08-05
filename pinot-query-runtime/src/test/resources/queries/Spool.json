@@ -31,6 +31,21 @@
         "description": "Simplest spool",
         "sql": "SET timeoutMs=10000; SET useSpools=true; SELECT * FROM {tbl1} as a1 JOIN {tbl2} as b ON a1.strCol1 = b.strCol1 JOIN {tbl1} as a2 ON a2.strCol1 = b.strCol1",
         "h2Sql": "SELECT * FROM {tbl1} as a1 JOIN {tbl2} as b ON a1.strCol1 = b.strCol1 JOIN {tbl1} as a2 ON a2.strCol1 = b.strCol1"
+      },
+      {
+        "description": "Spool reused by three downstream stages (table scanned once, joined three times)",
+        "sql": "SET timeoutMs=10000; SET useSpools=true; SELECT a1.intCol1, a2.intCol1, a3.intCol1 FROM {tbl1} as a1 JOIN {tbl1} as a2 ON a1.strCol1 = a2.strCol1 JOIN {tbl1} as a3 ON a1.strCol1 = a3.strCol1",
+        "h2Sql": "SELECT a1.intCol1, a2.intCol1, a3.intCol1 FROM {tbl1} as a1 JOIN {tbl1} as a2 ON a1.strCol1 = a2.strCol1 JOIN {tbl1} as a3 ON a1.strCol1 = a3.strCol1"
+      },
+      {
+        "description": "Spool of an aggregated stage reused by a self join",
+        "sql": "SET timeoutMs=10000; SET useSpools=true; WITH g AS (SELECT strCol1, SUM(intCol1) AS s FROM {tbl1} GROUP BY strCol1) SELECT a.strCol1, a.s, b.s FROM g a JOIN g b ON a.strCol1 = b.strCol1",
+        "h2Sql": "WITH g AS (SELECT strCol1, SUM(intCol1) AS s FROM {tbl1} GROUP BY strCol1) SELECT a.strCol1, a.s, b.s FROM g a JOIN g b ON a.strCol1 = b.strCol1"
+      },
+      {
+        "description": "Spool of an aggregated stage reused by both arms of a UNION ALL",
+        "sql": "SET timeoutMs=10000; SET useSpools=true; WITH g AS (SELECT strCol1, SUM(intCol1) AS s FROM {tbl1} GROUP BY strCol1) SELECT strCol1, s FROM g UNION ALL SELECT strCol1, s FROM g",
+        "h2Sql": "WITH g AS (SELECT strCol1, SUM(intCol1) AS s FROM {tbl1} GROUP BY strCol1) SELECT strCol1, s FROM g UNION ALL SELECT strCol1, s FROM g"
       }
     ]
   }

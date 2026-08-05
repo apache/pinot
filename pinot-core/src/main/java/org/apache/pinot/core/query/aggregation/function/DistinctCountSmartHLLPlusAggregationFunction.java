@@ -41,20 +41,18 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The {@code DistinctCountSmartHLLPlusAggregationFunction} calculates the number of distinct values for a given
- * expression (both single-valued and multi-valued are supported).
- *
- * For aggregation-only queries, the distinct values are stored in a Set initially. Once the number of distinct values
- * exceeds a threshold, the Set will be converted into a HyperLogLogPlus, and approximate result will be returned.
- *
- * The function takes an optional second argument for parameters:
- * - threshold: Threshold of the number of distinct values to trigger the conversion, 100_000 by default. Non-positive
- *              value means never convert.
- * - p: Parameter p for the converted HyperLogLogPlus, 14 by default.
- * - sp: Parameter sp for the converted HyperLogLogPlus, 0 by default.
- * Example of second argument: 'threshold=10;p=12;sp=25'
- */
+/// The `DistinctCountSmartHLLPlusAggregationFunction` calculates the number of distinct values for a given
+/// expression (both single-valued and multi-valued are supported).
+///
+/// For aggregation-only queries, the distinct values are stored in a Set initially. Once the number of distinct values
+/// exceeds a threshold, the Set will be converted into a HyperLogLogPlus, and approximate result will be returned.
+///
+/// The function takes an optional second argument for parameters:
+/// - threshold: Threshold of the number of distinct values to trigger the conversion, 100_000 by default. Non-positive
+///              value means never convert.
+/// - p: Parameter p for the converted HyperLogLogPlus, 14 by default.
+/// - sp: Parameter sp for the converted HyperLogLogPlus, 0 by default.
+/// Example of second argument: 'threshold=10;p=12;sp=25'
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCountSmartSketchAggregationFunction {
 
@@ -100,7 +98,7 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
       if (blockValSet.isSingleValue()) {
@@ -350,10 +348,8 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
     return finalResult1 + finalResult2;
   }
 
-  /**
-   * Helper method to read dictionary and convert dictionary ids to a HyperLogLogPlus for
-   * dictionary-encoded expression.
-   */
+  /// Helper method to read dictionary and convert dictionary ids to a HyperLogLogPlus for
+  /// dictionary-encoded expression.
   private HyperLogLogPlus convertToHLLPlus(
           BaseDistinctCountSmartSketchAggregationFunction.DictIdsWrapper dictIdsWrapper) {
     HyperLogLogPlus hllPlus = new HyperLogLogPlus(_p, _sp);
@@ -383,9 +379,7 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
             : "_MV"));
   }
 
-  /**
-   * Helper class to wrap the parameters.
-   */
+  /// Helper class to wrap the parameters.
   private static class Parameters {
     static final char PARAMETER_DELIMITER = ';';
     static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';

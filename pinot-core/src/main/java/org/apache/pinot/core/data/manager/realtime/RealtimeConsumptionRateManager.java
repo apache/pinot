@@ -35,7 +35,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.LongAdder;
 import org.apache.pinot.common.metrics.ServerGauge;
-import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -48,23 +47,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class is responsible for creating realtime consumption rate limiters.
- * It contains one rate limiter for the entire server and multiple table partition level rate limiters.
- * Server rate limiter is used to throttle the overall consumption rate of the server and configured via
- * cluster or server config.
- * For table partition level rate limiter, the rate limit value specified in StreamConfig of table config, is for the
- * entire topic. The effective rate limit for each partition is simply the specified rate limit divided by the
- * partition count.
- * This class leverages a cache for storing partition count for different topics as retrieving partition count from
- * stream is a bit expensive and also the same count will be used of all partition consumers of the same topic.
- */
+/// This class is responsible for creating realtime consumption rate limiters.
+/// It contains one rate limiter for the entire server and multiple table partition level rate limiters.
+/// Server rate limiter is used to throttle the overall consumption rate of the server and configured via cluster or
+/// server config.
+/// For table partition level rate limiter, the rate limit can be specified in [StreamConfig] of table config in two
+/// ways:
+/// - Partition level rate limit: directly used as the rate limit for each partition. It doesn't need to be adjusted
+///   when the partition count of the topic changes.
+/// - Topic level rate limit: the rate limit for the entire topic. The effective rate limit for each partition is the
+///   specified rate limit divided by the partition count. When both are specified, partition level rate limit takes
+///   precedence.
+/// This class leverages a cache for storing partition count for different topics as retrieving partition count from
+/// stream is a bit expensive and also the same count will be used of all partition consumers of the same topic.
 public class RealtimeConsumptionRateManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeConsumptionRateManager.class);
   private static final int CACHE_ENTRY_EXPIRATION_TIME_IN_MINUTES = 10;
 
-  private static final String SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME =
-      ServerMeter.REALTIME_ROWS_CONSUMED.getMeterName();
   private volatile ConsumptionRateLimiter _serverRateLimiter = NOOP_RATE_LIMITER;
 
   // stream config object is required for fetching the partition count from the stream
@@ -145,6 +144,11 @@ public class RealtimeConsumptionRateManager {
         // result of it, But the metric related to throttling won't be emitted since as a result of here above the
         // AsyncMetricEmitter will be closed. It's recommended to forceCommit segments to avoid this.
       }
+      // Expose the configured cap (-1 when disabled) so operators can see that rate limiting is off. The server
+      // utilization gauge is intentionally not touched here: it is a global gauge seeded at server startup, so
+      // removing it would be undone on restart, and rate-limit updates keep the emitter running so it self-corrects
+      // on the common update path. The -1 cap already signals that any last utilization value is stale.
+      emitServerRateLimit(serverMetrics, -1);
       return;
     }
 
@@ -152,11 +156,42 @@ public class RealtimeConsumptionRateManager {
       ServerRateLimiter existingLimiter = (ServerRateLimiter) _serverRateLimiter;
       existingLimiter.updateRateLimit(serverRateLimitConfig._serverRateLimit,
           serverRateLimitConfig._throttlingStrategy);
+      emitServerRateLimit(serverMetrics, serverRateLimitConfig._serverRateLimit);
       return;
     }
 
     _serverRateLimiter = new ServerRateLimiter(serverRateLimitConfig._serverRateLimit, serverMetrics,
-        SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME, serverRateLimitConfig._throttlingStrategy);
+        serverRateLimitConfig._throttlingStrategy);
+    emitServerRateLimit(serverMetrics, serverRateLimitConfig._serverRateLimit);
+  }
+
+  // Exposes the configured server-level consumption rate limit as a global gauge so operators can see the cap
+  // (and whether it is enabled) without inspecting server config. Set on setup and on each config change, mirroring
+  // the configured-threshold gauge pattern used by SegmentOperationsThrottler.
+  private static void emitServerRateLimit(ServerMetrics serverMetrics, double rateLimit) {
+    if (serverMetrics != null) {
+      // Round rather than truncate so a sub-1 limit does not report 0 and collide with the -1 "disabled" sentinel.
+      serverMetrics.setValueOfGlobalGauge(ServerGauge.SERVER_CONSUMPTION_RATE_LIMIT, Math.round(rateLimit));
+    }
+  }
+
+  // Exposes the configured per-partition consumption rate limit alongside its utilization gauge.
+  private static void emitPartitionRateLimit(ServerMetrics serverMetrics, String metricKeyName,
+      double partitionRateLimit) {
+    if (serverMetrics != null && metricKeyName != null) {
+      serverMetrics.setValueOfTableGauge(metricKeyName, ServerGauge.CONSUMPTION_RATE_LIMIT,
+          Math.round(partitionRateLimit));
+    }
+  }
+
+  // Removes the per-partition rate limit gauges when a consumer is created without a rate limit, so that a
+  // previously configured limit that has since been removed does not linger as stale series. Removing a gauge that
+  // was never emitted is a no-op, so this is safe (and cheap) for partitions that never had a limit.
+  private static void removePartitionRateLimitGauges(ServerMetrics serverMetrics, String metricKeyName) {
+    if (serverMetrics != null && metricKeyName != null) {
+      serverMetrics.removeTableGauge(metricKeyName, ServerGauge.CONSUMPTION_RATE_LIMIT);
+      serverMetrics.removeTableGauge(metricKeyName, ServerGauge.CONSUMPTION_QUOTA_UTILIZATION);
+    }
   }
 
   public void updateServerRateLimiter(ServerRateLimitConfig serverRateLimitConfig, ServerMetrics serverMetrics) {
@@ -171,7 +206,18 @@ public class RealtimeConsumptionRateManager {
 
   public ConsumptionRateLimiter createRateLimiter(StreamConfig streamConfig, String tableName,
       ServerMetrics serverMetrics, String metricKeyName) {
-    if (streamConfig.getTopicConsumptionRateLimit().isEmpty()) {
+    double partitionRateLimit = streamConfig.getPartitionConsumptionRateLimit();
+    if (partitionRateLimit > 0) {
+      LOGGER.info("A consumption rate limiter is set up for topic {} in table {} with partition rate limit: {}",
+          streamConfig.getTopicName(), tableName, partitionRateLimit);
+      emitPartitionRateLimit(serverMetrics, metricKeyName, partitionRateLimit);
+      return new PartitionRateLimiter(partitionRateLimit, serverMetrics, metricKeyName);
+    }
+    double topicRateLimit = streamConfig.getTopicConsumptionRateLimit();
+    if (topicRateLimit <= 0) {
+      // No rate limit configured (possibly removed since the previous consuming segment): clean up any gauges left
+      // behind by a previous limiter for this partition so the metrics reflect the current config.
+      removePartitionRateLimitGauges(serverMetrics, metricKeyName);
       return NOOP_RATE_LIMITER;
     }
     int partitionCount;
@@ -181,11 +227,11 @@ public class RealtimeConsumptionRateManager {
       // Exception here means for some reason, partition count cannot be fetched from stream!
       throw new RuntimeException(e);
     }
-    double topicRateLimit = streamConfig.getTopicConsumptionRateLimit().get();
-    double partitionRateLimit = topicRateLimit / partitionCount;
+    partitionRateLimit = topicRateLimit / partitionCount;
     LOGGER.info("A consumption rate limiter is set up for topic {} in table {} with rate limit: {} "
             + "(topic rate limit: {}, partition count: {})", streamConfig.getTopicName(), tableName, partitionRateLimit,
         topicRateLimit, partitionCount);
+    emitPartitionRateLimit(serverMetrics, metricKeyName, partitionRateLimit);
     return new PartitionRateLimiter(partitionRateLimit, serverMetrics, metricKeyName);
   }
 
@@ -219,35 +265,45 @@ public class RealtimeConsumptionRateManager {
         });
   }
 
-  /**
-   * Tracks quota utilization for a stream consumer by aggregating the number of units (messages or bytes) consumed
-   * and computing the consumption rate against the configured rate limit.
-   * <p>
-   * This class maintains the unit count over time and computes the quota utilization ratio once per minute.
-   * The utilization is reported as a gauge metric to {@link ServerMetrics}.
-   * <p>
-   * Note: This class is not thread-safe and is intended to be used in contexts where concurrency control is
-   * managed externally (e.g., per-partition rate limiter instances).
-   * <p>
-   * Example:
-   *   - If 3000 messages are consumed in one minute and the rate limit is 50 msg/sec,
-   *     the quota utilization = (3000 / 60) / 50 = 1.0 → 100%
-   */
+  /// Tracks quota utilization for a stream consumer by aggregating the number of units (messages or bytes) consumed
+  /// and computing the consumption rate against the configured rate limit.
+  ///
+  /// This class maintains the unit count over time and computes the quota utilization ratio once per minute.
+  /// The utilization is reported as a gauge metric to [ServerMetrics].
+  ///
+  /// Note: This class is not thread-safe and is intended to be used in contexts where concurrency control is
+  /// managed externally (e.g., per-partition rate limiter instances).
+  ///
+  /// Example:
+  ///   - If 3000 messages are consumed in one minute and the rate limit is 50 msg/sec,
+  ///     the quota utilization = (3000 / 60) / 50 = 1.0 → 100%
   static class QuotaUtilizationTracker {
     private long _previousMinute = -1;
-    private int _aggregateUnits = 0;
+    // Aggregated over a minute; must be long because in byte-throttling mode this counts bytes/minute, which for a
+    // busy server easily exceeds Integer.MAX_VALUE (~35.8 MB/s over the 60s window) and would otherwise overflow.
+    private long _aggregateUnits = 0;
     private final ServerMetrics _serverMetrics;
     private final String _metricKeyName;
+    private final boolean _serverLevel;
 
+    // Partition-level: emits the per-table/partition CONSUMPTION_QUOTA_UTILIZATION gauge.
     public QuotaUtilizationTracker(ServerMetrics serverMetrics, String metricKeyName) {
-      _serverMetrics = serverMetrics;
-      _metricKeyName = metricKeyName;
+      this(serverMetrics, metricKeyName, false);
     }
 
-    /**
-     * Update count and return utilization ratio percentage (0 if not enough data yet).
-     */
-    public int update(int unitsConsumed, double rateLimit, Instant now) {
+    // Server-level: emits the server-wide (global) SERVER_CONSUMPTION_QUOTA_UTILIZATION gauge.
+    public QuotaUtilizationTracker(ServerMetrics serverMetrics) {
+      this(serverMetrics, null, true);
+    }
+
+    private QuotaUtilizationTracker(ServerMetrics serverMetrics, String metricKeyName, boolean serverLevel) {
+      _serverMetrics = serverMetrics;
+      _metricKeyName = metricKeyName;
+      _serverLevel = serverLevel;
+    }
+
+    /// Update count and return utilization ratio percentage (0 if not enough data yet).
+    public int update(long unitsConsumed, double rateLimit, Instant now) {
       int ratioPercentage = 0;
       long nowInMinutes = now.getEpochSecond() / 60;
       if (nowInMinutes == _previousMinute) {
@@ -256,8 +312,12 @@ public class RealtimeConsumptionRateManager {
         if (_previousMinute != -1) { // not first time
           double actualRate = _aggregateUnits / ((nowInMinutes - _previousMinute) * 60.0); // units per second
           ratioPercentage = (int) Math.round(actualRate / rateLimit * 100);
-          _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.CONSUMPTION_QUOTA_UTILIZATION,
-              ratioPercentage);
+          if (_serverLevel) {
+            _serverMetrics.setValueOfGlobalGauge(ServerGauge.SERVER_CONSUMPTION_QUOTA_UTILIZATION, ratioPercentage);
+          } else {
+            _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.CONSUMPTION_QUOTA_UTILIZATION,
+                ratioPercentage);
+          }
         }
         _aggregateUnits = unitsConsumed;
         _previousMinute = nowInMinutes;
@@ -266,7 +326,7 @@ public class RealtimeConsumptionRateManager {
     }
 
     @VisibleForTesting
-    int getAggregateUnits() {
+    long getAggregateUnits() {
       return _aggregateUnits;
     }
   }
@@ -311,13 +371,11 @@ public class RealtimeConsumptionRateManager {
   static final ConsumptionRateLimiter NOOP_RATE_LIMITER = n -> {
   };
 
-  /**
-   * {@code PartitionRateLimiter} is an implementation of {@link ConsumptionRateLimiter} that uses Guava's
-   * {@link com.google.common.util.concurrent.RateLimiter} to throttle the rate of consumption at per partition
-   * level based on a configurable rate limit (in permits per second).
-   * <p>
-   * <p>This class is NOT thread-safe
-   */
+  /// `PartitionRateLimiter` is an implementation of [ConsumptionRateLimiter] that uses Guava's
+  /// [com.google.common.util.concurrent.RateLimiter] to throttle the rate of consumption at per partition
+  /// level based on a configurable rate limit (in permits per second).
+  ///
+  /// This class is NOT thread-safe
   @VisibleForTesting
   static class PartitionRateLimiter implements ConsumptionRateLimiter {
     private final double _rate;
@@ -359,26 +417,24 @@ public class RealtimeConsumptionRateManager {
     }
   }
 
-  /**
-   * {@code ServerRateLimiter} is an implementation of {@link ConsumptionRateLimiter} that uses Guava's
-   * {@link com.google.common.util.concurrent.RateLimiter} to throttle the rate of consumption at entire server
-   * level based on a configurable rate limit (in permits per second).
-   * <p>
-   * It supports dynamically updating the rate limit and emits metrics asynchronously to track quota utilization
-   * via {@link AsyncMetricEmitter}.
-   *
-   * <p>This class is thread-safe
-   */
+  /// `ServerRateLimiter` is an implementation of [ConsumptionRateLimiter] that uses Guava's
+  /// [com.google.common.util.concurrent.RateLimiter] to throttle the rate of consumption at entire server
+  /// level based on a configurable rate limit (in permits per second).
+  ///
+  /// It supports dynamically updating the rate limit and emits metrics asynchronously to track quota utilization
+  /// via [AsyncMetricEmitter].
+  ///
+  /// This class is thread-safe
   @VisibleForTesting
   static class ServerRateLimiter implements ConsumptionRateLimiter {
     private final RateLimiter _rateLimiter;
     private final AsyncMetricEmitter _metricEmitter;
     private ThrottlingStrategy _throttlingStrategy;
 
-    public ServerRateLimiter(double initialRateLimit, ServerMetrics serverMetrics, String metricKeyName,
+    public ServerRateLimiter(double initialRateLimit, ServerMetrics serverMetrics,
         ThrottlingStrategy throttlingStrategy) {
       _rateLimiter = RateLimiter.create(initialRateLimit);
-      _metricEmitter = new AsyncMetricEmitter(serverMetrics, metricKeyName, initialRateLimit);
+      _metricEmitter = new AsyncMetricEmitter(serverMetrics, initialRateLimit);
       _throttlingStrategy = throttlingStrategy;
       _metricEmitter.start(); // start background emission
     }
@@ -444,23 +500,21 @@ public class RealtimeConsumptionRateManager {
     }
   };
 
-  /**
-   * Asynchronously emits the quota utilization metric for a shared rate limiter (e.g., server-wide).
-   * <p>
-   * This class aggregates consumed message counts over a fixed time interval (default: 60 seconds) using a
-   * high-performance {@link java.util.concurrent.atomic.LongAdder}. A scheduled background task computes the
-   * actual message rate and reports the quota utilization ratio as a gauge metric.
-   * <p>
-   * This design avoids contention from multiple threads calling emit logic and ensures non-blocking accumulation
-   * of message counts. Thread-safe and suitable for shared use.
-   * <p>
-   * Usage:
-   *   - Call {@link #record(int)} to record messages consumed.
-   *   - Call {@link #start()} once to schedule metric emission.
-   *   - Optionally call {@link #close()} to stop the emitter.
-   * <p>
-   * Thread-safe.
-   */
+  /// Asynchronously emits the quota utilization metric for a shared rate limiter (e.g., server-wide).
+  ///
+  /// This class aggregates consumed message counts over a fixed time interval (default: 60 seconds) using a
+  /// high-performance [java.util.concurrent.atomic.LongAdder]. A scheduled background task computes the
+  /// actual message rate and reports the quota utilization ratio as a gauge metric.
+  ///
+  /// This design avoids contention from multiple threads calling emit logic and ensures non-blocking accumulation
+  /// of message counts. Thread-safe and suitable for shared use.
+  ///
+  /// Usage:
+  ///   - Call [#record(int)] to record messages consumed.
+  ///   - Call [#start()] once to schedule metric emission.
+  ///   - Optionally call [#close()] to stop the emitter.
+  ///
+  /// Thread-safe.
   static class AsyncMetricEmitter {
     private static final int METRIC_EMIT_FREQUENCY_SEC = 60;
     private final AtomicDouble _rateLimit;
@@ -469,9 +523,9 @@ public class RealtimeConsumptionRateManager {
     private final AtomicBoolean _running = new AtomicBoolean(false);
     private final QuotaUtilizationTracker _tracker;
 
-    public AsyncMetricEmitter(ServerMetrics serverMetrics, String metricKeyName, double initialRateLimit) {
+    public AsyncMetricEmitter(ServerMetrics serverMetrics, double initialRateLimit) {
       _rateLimit = new AtomicDouble(initialRateLimit);
-      _tracker = new QuotaUtilizationTracker(serverMetrics, metricKeyName);
+      _tracker = new QuotaUtilizationTracker(serverMetrics);
       _executor = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "server-rate-limit-metric-emitter");
         t.setDaemon(true);
@@ -504,7 +558,7 @@ public class RealtimeConsumptionRateManager {
       try {
         double rateLimit = _rateLimit.get();
         Instant now = Instant.now();
-        int count = (int) _messageCount.sumThenReset();
+        long count = _messageCount.sumThenReset();
         _tracker.update(count, rateLimit, now);
       } catch (Exception e) {
         LOGGER.warn("Encountered an error while emitting the metrics.", e);

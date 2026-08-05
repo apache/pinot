@@ -180,31 +180,31 @@ public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
     try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(file);
         VarByteChunkForwardIndexReaderV4 reader = createReader(buffer, dataType, true);
         VarByteChunkForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
-        for (int i = 0; i < values.size(); i++) {
-          assertEquals(read.read(reader, context, i), values.get(i));
-        }
-        for (int i = 0; i < values.size(); i += 2) {
-          assertEquals(read.read(reader, context, i), values.get(i));
-        }
-        for (int i = 1; i < values.size(); i += 2) {
-          assertEquals(read.read(reader, context, i), values.get(i));
-        }
-        for (int i = 1; i < values.size(); i += 100) {
-          assertEquals(read.read(reader, context, i), values.get(i));
-        }
-        for (int i = values.size() - 1; i >= 0; i--) {
-          assertEquals(read.read(reader, context, i), values.get(i));
-        }
-        for (int i = values.size() - 1; i >= 0; i -= 2) {
-          assertEquals(read.read(reader, context, i), values.get(i));
-        }
-        for (int i = values.size() - 2; i >= 0; i -= 2) {
-          assertEquals(read.read(reader, context, i), values.get(i));
-        }
-        for (int i = values.size() - 1; i >= 0; i -= 100) {
-          assertEquals(read.read(reader, context, i), values.get(i));
-        }
+      for (int i = 0; i < values.size(); i++) {
+        assertEquals(read.read(reader, context, i), values.get(i));
       }
+      for (int i = 0; i < values.size(); i += 2) {
+        assertEquals(read.read(reader, context, i), values.get(i));
+      }
+      for (int i = 1; i < values.size(); i += 2) {
+        assertEquals(read.read(reader, context, i), values.get(i));
+      }
+      for (int i = 1; i < values.size(); i += 100) {
+        assertEquals(read.read(reader, context, i), values.get(i));
+      }
+      for (int i = values.size() - 1; i >= 0; i--) {
+        assertEquals(read.read(reader, context, i), values.get(i));
+      }
+      for (int i = values.size() - 1; i >= 0; i -= 2) {
+        assertEquals(read.read(reader, context, i), values.get(i));
+      }
+      for (int i = values.size() - 2; i >= 0; i -= 2) {
+        assertEquals(read.read(reader, context, i), values.get(i));
+      }
+      for (int i = values.size() - 1; i >= 0; i -= 100) {
+        assertEquals(read.read(reader, context, i), values.get(i));
+      }
+    }
   }
 
   protected Stream<String> randomStrings(int count, int lengthOfLongestEntry) {

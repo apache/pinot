@@ -24,11 +24,10 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting.ScanKillingMode;
 
 
-/**
- * The {@code QueryConfig} class contains the table-level query execution related configurations.
- */
+/// The `QueryConfig` class contains the table-level query execution related configurations.
 public class QueryConfig extends BaseJsonConfig {
   // The timeout for the entire query execution in milliseconds. This value will be gathered on the broker side, and
   // passed to the servers within the broker request.
@@ -62,12 +61,26 @@ public class QueryConfig extends BaseJsonConfig {
 
   private final Long _maxEntriesScannedPostFilter;
 
+  // Per-table scan-based killing mode override. Null means use the cluster-level mode.
+  // Valid values: "disabled", "logOnly", "enforce" (case-insensitive).
+  private final String _scanKillingMode;
+
 
   public QueryConfig(@Nullable Long timeoutMs, @Nullable Boolean disableGroovy,
       @Nullable Boolean useApproximateFunction, @Nullable Map<String, String> expressionOverrideMap,
       @Nullable Long maxQueryResponseSizeBytes, @Nullable Long maxServerResponseSizeBytes) {
     this(timeoutMs, disableGroovy, useApproximateFunction, expressionOverrideMap,
         maxQueryResponseSizeBytes, maxServerResponseSizeBytes, null, null, null);
+  }
+
+  public QueryConfig(@Nullable Long timeoutMs, @Nullable Boolean disableGroovy,
+      @Nullable Boolean useApproximateFunction, @Nullable Map<String, String> expressionOverrideMap,
+      @Nullable Long maxQueryResponseSizeBytes, @Nullable Long maxServerResponseSizeBytes,
+      @Nullable Long maxEntriesScannedInFilter, @Nullable Long maxDocsScanned,
+      @Nullable Long maxEntriesScannedPostFilter) {
+    this(timeoutMs, disableGroovy, useApproximateFunction, expressionOverrideMap,
+        maxQueryResponseSizeBytes, maxServerResponseSizeBytes, maxEntriesScannedInFilter, maxDocsScanned,
+        maxEntriesScannedPostFilter, null);
   }
 
   @JsonCreator
@@ -79,7 +92,8 @@ public class QueryConfig extends BaseJsonConfig {
       @JsonProperty("maxServerResponseSizeBytes") @Nullable Long maxServerResponseSizeBytes,
       @JsonProperty("maxEntriesScannedInFilter") @Nullable Long maxEntriesScannedInFilter,
       @JsonProperty("maxDocsScanned") @Nullable Long maxDocsScanned,
-      @JsonProperty("maxEntriesScannedPostFilter") @Nullable Long maxEntriesScannedPostFilter) {
+      @JsonProperty("maxEntriesScannedPostFilter") @Nullable Long maxEntriesScannedPostFilter,
+      @JsonProperty("scanKillingMode") @Nullable String scanKillingMode) {
     Preconditions.checkArgument(timeoutMs == null || timeoutMs > 0, "Invalid 'timeoutMs': %s", timeoutMs);
     Preconditions.checkArgument(maxQueryResponseSizeBytes == null || maxQueryResponseSizeBytes > 0,
         "Invalid 'maxQueryResponseSizeBytes': %s", maxQueryResponseSizeBytes);
@@ -91,6 +105,8 @@ public class QueryConfig extends BaseJsonConfig {
         "Invalid 'maxDocsScanned': %s", maxDocsScanned);
     Preconditions.checkArgument(maxEntriesScannedPostFilter == null || maxEntriesScannedPostFilter > 0,
         "Invalid 'maxEntriesScannedPostFilter': %s", maxEntriesScannedPostFilter);
+    Preconditions.checkArgument(scanKillingMode == null || ScanKillingMode.fromConfigValue(scanKillingMode) != null,
+        "Invalid 'scanKillingMode': %s. Valid values: disabled, logOnly, enforce", scanKillingMode);
 
     _timeoutMs = timeoutMs;
     _disableGroovy = disableGroovy;
@@ -101,6 +117,7 @@ public class QueryConfig extends BaseJsonConfig {
     _maxEntriesScannedInFilter = maxEntriesScannedInFilter;
     _maxDocsScanned = maxDocsScanned;
     _maxEntriesScannedPostFilter = maxEntriesScannedPostFilter;
+    _scanKillingMode = scanKillingMode;
   }
 
   @Nullable
@@ -155,5 +172,11 @@ public class QueryConfig extends BaseJsonConfig {
   @JsonProperty("maxEntriesScannedPostFilter")
   public Long getMaxEntriesScannedPostFilter() {
     return _maxEntriesScannedPostFilter;
+  }
+
+  @Nullable
+  @JsonProperty("scanKillingMode")
+  public String getScanKillingMode() {
+    return _scanKillingMode;
   }
 }

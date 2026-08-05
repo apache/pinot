@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ColumnShape;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -105,6 +106,11 @@ public interface IndexCreationContext extends ColumnShape {
     return columnStatistics != null ? columnStatistics.getUniqueValuesSet() : null;
   }
 
+  /// Returns whether compression-statistics tracking is enabled for this index creation.
+  default boolean isCompressionStatsEnabled() {
+    return false;
+  }
+
   @SuppressWarnings("UnusedReturnValue")
   final class Builder {
     // Identity. Non-overridable shape accessors delegate to `_columnShape`.
@@ -137,12 +143,14 @@ public interface IndexCreationContext extends ColumnShape {
 
     // Error handling.
     private boolean _continueOnError;
+    private boolean _compressionStatsEnabled;
 
     /// Segment-creation path. Shape values come from the freshly-collected [ColumnStatistics]; `hasDictionary` is
     /// supplied separately because it's a driver decision not carried on [ColumnStatistics]. `_tableNameWithType`
     /// and `_continueOnError` are derived from `tableConfig`.
     public Builder(File indexDir, TableConfig tableConfig, ColumnStatistics columnStatistics, boolean hasDictionary) {
       this(indexDir, tableConfig.getTableName(), columnStatistics, hasDictionary, isContinueOnError(tableConfig));
+      _compressionStatsEnabled = isCompressionStatsEnabled(tableConfig);
     }
 
     /// Index-handler path. Shape values (including `hasDictionary`) come from [ColumnMetadata]; `_tableNameWithType`
@@ -150,6 +158,7 @@ public interface IndexCreationContext extends ColumnShape {
     public Builder(File indexDir, TableConfig tableConfig, ColumnMetadata columnMetadata) {
       this(indexDir, tableConfig.getTableName(), columnMetadata, columnMetadata.hasDictionary(),
           isContinueOnError(tableConfig));
+      _compressionStatsEnabled = isCompressionStatsEnabled(tableConfig);
     }
 
     /// Generic constructor for callers that have a [ColumnShape] but not a [TableConfig] — every value the
@@ -173,6 +182,11 @@ public interface IndexCreationContext extends ColumnShape {
     private static boolean isContinueOnError(TableConfig tableConfig) {
       IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
       return ingestionConfig != null && ingestionConfig.isContinueOnError();
+    }
+
+    private static boolean isCompressionStatsEnabled(TableConfig tableConfig) {
+      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+      return indexingConfig != null && indexingConfig.isCompressionStatsEnabled();
     }
 
     // Overridable column-attribute setters.
@@ -260,6 +274,12 @@ public interface IndexCreationContext extends ColumnShape {
       return this;
     }
 
+    /// Sets whether created indexes should track compression statistics.
+    public Builder withCompressionStatsEnabled(boolean compressionStatsEnabled) {
+      _compressionStatsEnabled = compressionStatsEnabled;
+      return this;
+    }
+
     public Common build() {
       return new Common(this);
     }
@@ -295,6 +315,7 @@ public interface IndexCreationContext extends ColumnShape {
 
     // Error handling.
     private final boolean _continueOnError;
+    private final boolean _compressionStatsEnabled;
 
     private Common(Builder builder) {
       _tableNameWithType = builder._tableNameWithType;
@@ -315,6 +336,7 @@ public interface IndexCreationContext extends ColumnShape {
       _mutableSegmentCompacted = builder._mutableSegmentCompacted;
       _mutableToImmutableDocIdMap = builder._mutableToImmutableDocIdMap;
       _continueOnError = builder._continueOnError;
+      _compressionStatsEnabled = builder._compressionStatsEnabled;
     }
 
     // Identity accessors.
@@ -470,6 +492,11 @@ public interface IndexCreationContext extends ColumnShape {
     @Override
     public boolean isContinueOnError() {
       return _continueOnError;
+    }
+
+    @Override
+    public boolean isCompressionStatsEnabled() {
+      return _compressionStatsEnabled;
     }
   }
 }

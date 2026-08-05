@@ -124,7 +124,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
   protected void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet,
       DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       getDictIdBitmap(aggregationResultHolder, dictionary).addN(dictIds, 0, length);
@@ -173,7 +173,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
   protected void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet,
       DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
@@ -268,7 +268,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
   protected void aggregateSVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
@@ -318,7 +318,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
   protected void aggregateMVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       for (int i = 0; i < length; i++) {
@@ -419,7 +419,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
   protected void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
@@ -469,7 +469,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
   protected void aggregateMVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       for (int i = 0; i < length; i++) {
@@ -645,9 +645,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     }
   }
 
-  /**
-   * Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
-   */
+  /// Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
   protected static RoaringBitmap getDictIdBitmap(AggregationResultHolder aggregationResultHolder,
       Dictionary dictionary) {
     DictIdsWrapper dictIdsWrapper = aggregationResultHolder.getResult();
@@ -658,9 +656,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     return dictIdsWrapper._dictIdBitmap;
   }
 
-  /**
-   * Returns the HyperLogLogPlus from the result holder or creates a new one if it does not exist.
-   */
+  /// Returns the HyperLogLogPlus from the result holder or creates a new one if it does not exist.
   protected HyperLogLogPlus getHyperLogLogPlus(AggregationResultHolder aggregationResultHolder) {
     HyperLogLogPlus hyperLogLogPlus = aggregationResultHolder.getResult();
     if (hyperLogLogPlus == null) {
@@ -670,9 +666,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     return hyperLogLogPlus;
   }
 
-  /**
-   * Returns the dictionary id bitmap for the given group key or creates a new one if it does not exist.
-   */
+  /// Returns the dictionary id bitmap for the given group key or creates a new one if it does not exist.
   protected static RoaringBitmap getDictIdBitmap(GroupByResultHolder groupByResultHolder, int groupKey,
       Dictionary dictionary) {
     DictIdsWrapper dictIdsWrapper = groupByResultHolder.getResult(groupKey);
@@ -683,9 +677,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     return dictIdsWrapper._dictIdBitmap;
   }
 
-  /**
-   * Returns the HyperLogLogPlus for the given group key or creates a new one if it does not exist.
-   */
+  /// Returns the HyperLogLogPlus for the given group key or creates a new one if it does not exist.
   protected HyperLogLogPlus getHyperLogLogPlus(GroupByResultHolder groupByResultHolder, int groupKey) {
     HyperLogLogPlus hyperLogLogPlus = groupByResultHolder.getResult(groupKey);
     if (hyperLogLogPlus == null) {
@@ -695,9 +687,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     return hyperLogLogPlus;
   }
 
-  /**
-   * Helper method to set dictionary id for the given group keys into the result holder.
-   */
+  /// Helper method to set dictionary id for the given group keys into the result holder.
   private static void setDictIdForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys,
       Dictionary dictionary, int dictId) {
     for (int groupKey : groupKeys) {
@@ -705,18 +695,14 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     }
   }
 
-  /**
-   * Helper method to set value for the given group keys into the result holder.
-   */
+  /// Helper method to set value for the given group keys into the result holder.
   private void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, Object value) {
     for (int groupKey : groupKeys) {
       getHyperLogLogPlus(groupByResultHolder, groupKey).offer(value);
     }
   }
 
-  /**
-   * Helper method to read dictionary and convert dictionary ids to HyperLogLogPlus for dictionary-encoded expression.
-   */
+  /// Helper method to read dictionary and convert dictionary ids to HyperLogLogPlus for dictionary-encoded expression.
   private HyperLogLogPlus convertToHyperLogLogPlus(DictIdsWrapper dictIdsWrapper) {
     HyperLogLogPlus hyperLogLogPlus = new HyperLogLogPlus(_p, _sp);
     Dictionary dictionary = dictIdsWrapper._dictionary;

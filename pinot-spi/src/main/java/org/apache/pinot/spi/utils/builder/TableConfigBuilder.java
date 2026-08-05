@@ -21,7 +21,6 @@ package org.apache.pinot.spi.utils.builder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.CompletionConfig;
@@ -66,6 +65,7 @@ public class TableConfigBuilder {
   private final TableType _tableType;
   private String _tableName;
   private boolean _isDimTable;
+  private boolean _isMaterializedView;
 
   // Segments config related
   private String _numReplicas = DEFAULT_NUM_REPLICAS;
@@ -112,6 +112,7 @@ public class TableConfigBuilder {
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private List<String> _jsonIndexColumns;
   private boolean _aggregateMetrics;
+  private boolean _compressionStatsEnabled;
   private boolean _optimizeDictionary;
   private boolean _optimizeDictionaryForMetrics;
   // This threshold determines if dictionary should be enabled or not for a metric column and is relevant
@@ -161,18 +162,16 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setIsMaterializedView(boolean isMaterializedView) {
+    _isMaterializedView = isMaterializedView;
+    return this;
+  }
+
   public TableConfigBuilder addFieldConfig(FieldConfig config) {
     if (_fieldConfigList == null) {
       _fieldConfigList = new ArrayList<>();
     }
     _fieldConfigList.add(config);
-    return this;
-  }
-
-  @Deprecated
-  public TableConfigBuilder setLLC(boolean isLLC) {
-    Preconditions.checkState(_tableType == TableType.REALTIME);
-    Preconditions.checkArgument(isLLC, "Real-time table must use LLC");
     return this;
   }
 
@@ -217,9 +216,7 @@ public class TableConfigBuilder {
     return this;
   }
 
-  /**
-   * @deprecated Use {@code segmentIngestionType} from {@link IngestionConfig#getBatchIngestionConfig()}
-   */
+  /// @deprecated Use `segmentIngestionType` from [IngestionConfig#getBatchIngestionConfig()]
   public TableConfigBuilder setSegmentPushType(String segmentPushType) {
     if (REFRESH_SEGMENT_PUSH_TYPE.equalsIgnoreCase(segmentPushType)) {
       _segmentPushType = REFRESH_SEGMENT_PUSH_TYPE;
@@ -229,9 +226,7 @@ public class TableConfigBuilder {
     return this;
   }
 
-  /**
-   * @deprecated Use {@code segmentIngestionFrequency} from {@link IngestionConfig#getBatchIngestionConfig()}
-   */
+  /// @deprecated Use `segmentIngestionFrequency` from [IngestionConfig#getBatchIngestionConfig()]
   public TableConfigBuilder setSegmentPushFrequency(String segmentPushFrequency) {
     _segmentPushFrequency = segmentPushFrequency;
     return this;
@@ -366,6 +361,12 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setAggregateMetrics(boolean aggregateMetrics) {
     _aggregateMetrics = aggregateMetrics;
+    return this;
+  }
+
+  /// Sets whether newly built or rewritten indexes collect compression statistics. Disabled by default.
+  public TableConfigBuilder setCompressionStatsEnabled(boolean compressionStatsEnabled) {
+    _compressionStatsEnabled = compressionStatsEnabled;
     return this;
   }
 
@@ -533,7 +534,7 @@ public class TableConfigBuilder {
     indexingConfig.setLoadMode(_loadMode);
     indexingConfig.setSegmentFormatVersion(_segmentVersion);
     if (_sortedColumn != null) {
-      indexingConfig.setSortedColumn(Collections.singletonList(_sortedColumn));
+      indexingConfig.setSortedColumn(List.of(_sortedColumn));
     }
     indexingConfig.setInvertedIndexColumns(_invertedIndexColumns);
     indexingConfig.setCreateInvertedIndexDuringSegmentGeneration(_createInvertedIndexDuringSegmentGeneration);
@@ -552,6 +553,7 @@ public class TableConfigBuilder {
     indexingConfig.setMultiColumnTextIndexConfig(_multiColumnTextIndexConfig);
     indexingConfig.setJsonIndexColumns(_jsonIndexColumns);
     indexingConfig.setAggregateMetrics(_aggregateMetrics);
+    indexingConfig.setCompressionStatsEnabled(_compressionStatsEnabled);
     indexingConfig.setOptimizeDictionary(_optimizeDictionary);
     indexingConfig.setOptimizeDictionaryForMetrics(_optimizeDictionaryForMetrics);
     indexingConfig.setOptimizeDictionaryType(_optimizeDictionaryType);
@@ -568,7 +570,8 @@ public class TableConfigBuilder {
         new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
             _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
             _fieldConfigList, _upsertConfig, _dedupConfig, _dimensionTableConfig, _ingestionConfig, _tierConfigList,
-            _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap, _tableSamplers);
+            _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap,
+            _tableSamplers, _isMaterializedView);
     tableConfig.setDescription(_description);
     tableConfig.setTags(_tags);
     return tableConfig;

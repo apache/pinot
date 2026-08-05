@@ -32,7 +32,6 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.net.URI;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -51,7 +50,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
@@ -159,28 +157,6 @@ public class PinotTableInstances {
     return ret.toString();
   }
 
-  @Deprecated
-  @GET
-  @Path("/tables/{tableName}/livebrokers")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_BROKER)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "List the brokers serving a table", notes = "List live brokers of the given table based on EV")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 404, message = "Table not found"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
-  public List<String> getLiveBrokersForTable(
-      @ApiParam(value = "Table name (with or without type)", required = true)
-      @PathParam("tableName") String tableName, @Context HttpHeaders headers) {
-    tableName = DatabaseUtils.translateTableName(tableName, headers);
-    try {
-      return _pinotHelixResourceManager.getLiveBrokersForTable(tableName);
-    } catch (TableNotFoundException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
-    }
-  }
-
   @GET
   @Path("/tables/livebrokers")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_BROKER)
@@ -196,7 +172,11 @@ public class PinotTableInstances {
     try {
       return _pinotHelixResourceManager.getTableToLiveBrokersMapping(headers.getHeaderString(DATABASE), tables);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
+      // Unknown tables are filtered out rather than reported, so anything thrown here (e.g. a missing broker
+      // ExternalView) is a server-side failure, not a lookup miss. Use a stable message since the cause may
+      // carry none, and let the attached cause supply the detail in the logs.
+      throw new ControllerApplicationException(LOGGER, "Failed to get table to live brokers mapping",
+          Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
@@ -228,7 +208,7 @@ public class PinotTableInstances {
     String serverEndpoint;
     try {
       BiMap<String, String> dataInstanceAdminEndpoints =
-          _pinotHelixResourceManager.getDataInstanceAdminEndpoints(Collections.singleton(instanceId));
+          _pinotHelixResourceManager.getDataInstanceAdminEndpoints(Set.of(instanceId));
       serverEndpoint = dataInstanceAdminEndpoints.get(instanceId);
       Preconditions.checkNotNull(serverEndpoint, "Server endpoint not found for instance: " + instanceId);
     } catch (Exception e) {

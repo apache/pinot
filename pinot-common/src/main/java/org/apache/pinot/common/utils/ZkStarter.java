@@ -58,9 +58,7 @@ public class ZkStarter {
     }
   }
 
-  /**
-   * Silly class to make protected methods public.
-   */
+  /// Silly class to make protected methods public.
   static class PublicZooKeeperServerMain extends ZooKeeperServerMain {
     @Override
     public void initializeAndRun(String[] args)
@@ -137,9 +135,7 @@ public class ZkStarter {
     }
   }
 
-  /**
-   * Starts an empty local Zk instance on the default port
-   */
+  /// Starts an empty local Zk instance on the default port
   public static ZookeeperInstance startLocalZkServer() {
     return startLocalZkServer(NetUtils.findOpenPort(DEFAULT_ZK_TEST_PORT));
   }
@@ -148,20 +144,16 @@ public class ZkStarter {
     return "localhost:" + DEFAULT_ZK_TEST_PORT;
   }
 
-  /**
-   * Starts a local Zk instance with a generated empty data directory
-   * @param port The port to listen on
-   */
+  /// Starts a local Zk instance with a generated empty data directory
+  /// @param port The port to listen on
   public static ZookeeperInstance startLocalZkServer(final int port) {
     return startLocalZkServer(port,
         org.apache.commons.io.FileUtils.getTempDirectoryPath() + File.separator + "test-" + System.currentTimeMillis());
   }
 
-  /**
-   * Starts a local Zk instance
-   * @param port The port to listen on
-   * @param dataDirPath The path for the Zk data directory
-   */
+  /// Starts a local Zk instance
+  /// @param port The port to listen on
+  /// @param dataDirPath The path for the Zk data directory
   public synchronized static ZookeeperInstance startLocalZkServer(final int port, final String dataDirPath) {
     // Start the local ZK server
     try {
@@ -213,17 +205,13 @@ public class ZkStarter {
   private static final ExecutorService ZK_DISCONNECTOR =
       Executors.newFixedThreadPool(1, new NamedThreadFactory("zk-disconnector"));
 
-  /**
-   * Stops a local Zk instance, deleting its data directory
-   */
+  /// Stops a local Zk instance, deleting its data directory
   public static void stopLocalZkServer(final ZookeeperInstance instance) {
     stopLocalZkServer(instance, true);
   }
 
-  /**
-   * Stops a local Zk instance.
-   * @param deleteDataDir Whether or not to delete the data directory
-   */
+  /// Stops a local Zk instance.
+  /// @param deleteDataDir Whether or not to delete the data directory
   public synchronized static void stopLocalZkServer(final ZookeeperInstance instance, final boolean deleteDataDir) {
     if (instance._serverMain != null) {
       try {

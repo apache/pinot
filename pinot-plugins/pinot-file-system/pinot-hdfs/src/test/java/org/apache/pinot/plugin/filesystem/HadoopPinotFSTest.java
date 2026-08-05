@@ -152,6 +152,17 @@ public class HadoopPinotFSTest {
   }
 
   @Test
+  public void testIsDirectoryReturnsFalseForNonExistentPath()
+      throws IOException {
+    URI missingPath = URI.create(TMP_DIR + "/testIsDirectoryReturnsFalseForNonExistentPath/missing");
+    try (HadoopPinotFS hadoopFS = new HadoopPinotFS()) {
+      hadoopFS.init(new PinotConfiguration());
+
+      Assert.assertFalse(hadoopFS.isDirectory(missingPath));
+    }
+  }
+
+  @Test
   public void testDeleteBatchWithEmptyList()
       throws IOException {
     try (HadoopPinotFS hadoopFS = new HadoopPinotFS()) {
