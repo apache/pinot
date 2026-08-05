@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.readers;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -94,7 +95,13 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
 
   @Override
   public Set<String> getAvailableColumns() {
-    return _indexSegment.getPhysicalColumnNames();
+    Set<String> availableColumns = new HashSet<>(_indexSegment.getPhysicalColumnNames());
+    for (String columnName : BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS) {
+      if (_indexSegment.getDataSourceNullable(columnName) != null) {
+        availableColumns.add(columnName);
+      }
+    }
+    return availableColumns;
   }
 
   /// Get the total number of documents/rows in the data source.
@@ -172,7 +179,7 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
   /// @return true if the column exists in source, false otherwise
   public boolean hasColumn(String columnName) {
     return _indexSegment.getPhysicalColumnNames().contains(columnName)
-        || (BuiltInVirtualColumn.CREATIONTIME.equals(columnName)
+        || (BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS.contains(columnName)
             && _indexSegment.getDataSourceNullable(columnName) != null);
   }
 

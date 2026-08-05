@@ -217,6 +217,8 @@ public class LoaderTest {
   }
 
   private void testBuiltInVirtualColumns(IndexSegment indexSegment) {
+    assertTrue(BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS.contains(BuiltInVirtualColumn.CREATIONTIME));
+    assertFalse(BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS.contains(BuiltInVirtualColumn.DOCID));
     assertTrue(indexSegment.getColumnNames().containsAll(
         Arrays.asList(BuiltInVirtualColumn.DOCID, BuiltInVirtualColumn.HOSTNAME, BuiltInVirtualColumn.SEGMENTNAME,
             BuiltInVirtualColumn.CREATIONTIME)));

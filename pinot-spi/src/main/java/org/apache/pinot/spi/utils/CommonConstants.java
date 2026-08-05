@@ -2249,6 +2249,9 @@ public class CommonConstants {
       public static final String CREATIONTIME = "$creationTime";
       public static final Set<String> BUILT_IN_VIRTUAL_COLUMNS =
           Set.of(DOCID, HOSTNAME, SEGMENTNAME, PARTITIONID, CREATIONTIME);
+
+      /// Built-in virtual columns whose values can also be physically materialized in a Pinot segment.
+      public static final Set<String> MATERIALIZABLE_VIRTUAL_COLUMNS = Set.of(CREATIONTIME);
     }
   }
 

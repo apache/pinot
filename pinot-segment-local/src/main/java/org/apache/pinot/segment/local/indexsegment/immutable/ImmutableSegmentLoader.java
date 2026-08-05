@@ -201,8 +201,8 @@ public class ImmutableSegmentLoader {
     if (schema != null) {
       Set<String> columnsInMetadata = new HashSet<>(columnMetadataMap.keySet());
       columnsInMetadata.removeIf(schema::hasColumn);
-      // `$creationTime` is allowed to be physical even though it is not declared in the table schema.
-      columnsInMetadata.remove(BuiltInVirtualColumn.CREATIONTIME);
+      // Materializable virtual columns are allowed to be physical even when they are not declared in the table schema.
+      columnsInMetadata.removeAll(BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS);
       // Materialized OPEN_STRUCT child columns (col$key, col$__sparse__) live in segment metadata
       // but not in the user-facing schema. Keep them when the parent OPEN_STRUCT column is in the
       // schema; they will be grouped under their parent at segment-impl post-load (Task 16).

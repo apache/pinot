@@ -180,9 +180,12 @@ public class PinotSegmentRecordReader implements RecordReader {
       _columnNames = new ArrayList<>();
       _openStructDataSources = new HashMap<>();
       Set<String> columnsInSegment = new HashSet<>(_indexSegment.getPhysicalColumnNames());
-      if (_readingPinotSegmentFile && fieldsToRead != null
-          && fieldsToRead.contains(BuiltInVirtualColumn.CREATIONTIME)) {
-        columnsInSegment.add(BuiltInVirtualColumn.CREATIONTIME);
+      if (_readingPinotSegmentFile && fieldsToRead != null) {
+        for (String columnName : BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS) {
+          if (fieldsToRead.contains(columnName) && _indexSegment.getDataSourceNullable(columnName) != null) {
+            columnsInSegment.add(columnName);
+          }
+        }
       }
       if (CollectionUtils.isEmpty(fieldsToRead)) {
         for (String column : columnsInSegment) {

@@ -313,10 +313,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     for (Object o : src) {
       String column = o.toString();
       if (!column.isEmpty() && (!BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS.contains(column)
-          || BuiltInVirtualColumn.CREATIONTIME.equals(column))) {
+          || BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS.contains(column))) {
         // NOTE:
-        //   Exclude virtual-only built in columns. `$creationTime` can be physically materialized by a Pinot-segment
-        //   rewrite, so it must remain part of the physical segment schema.
+        //   Exclude virtual-only built-in columns. Materializable virtual columns can be physically stored by a
+        //   Pinot-segment rewrite, so they must remain part of the physical segment schema when present in metadata.
         // TODO:
         //   We need a better way to identify virtual columns. This info is currently missing from the metadata file.
         //   Virtual column is a column with virtual column provider configured in the schema.
