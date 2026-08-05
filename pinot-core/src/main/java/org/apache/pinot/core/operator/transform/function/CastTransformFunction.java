@@ -263,9 +263,6 @@ public class CastTransformFunction extends BaseTransformFunction {
           return _stringValuesSV;
         }
         case UUID: {
-          if (resultDataType != DataType.STRING) {
-            return _transformFunction.transformToStringValuesSV(valueBlock);
-          }
           int length = valueBlock.getNumDocs();
           initStringValuesSV(length);
           byte[][] uuidValues = _transformFunction.transformToBytesValuesSV(valueBlock);
@@ -446,9 +443,6 @@ public class CastTransformFunction extends BaseTransformFunction {
           ArrayCopyUtils.copyFromTimestamp(longValuesMV, _stringValuesMV, length);
           return _stringValuesMV;
         case UUID: {
-          if (resultDataType != DataType.STRING) {
-            return _transformFunction.transformToStringValuesMV(valueBlock);
-          }
           length = valueBlock.getNumDocs();
           initStringValuesMV(length);
           byte[][][] uuidValuesMV = _transformFunction.transformToBytesValuesMV(valueBlock);
