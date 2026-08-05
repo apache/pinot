@@ -445,7 +445,7 @@ public class CastTransformFunction extends BaseTransformFunction {
           long[][] longValuesMV = _transformFunction.transformToLongValuesMV(valueBlock);
           ArrayCopyUtils.copyFromTimestamp(longValuesMV, _stringValuesMV, length);
           return _stringValuesMV;
-        case UUID:
+        case UUID: {
           if (resultDataType != DataType.STRING) {
             return _transformFunction.transformToStringValuesMV(valueBlock);
           }
@@ -461,6 +461,7 @@ public class CastTransformFunction extends BaseTransformFunction {
             _stringValuesMV[i] = stringValues;
           }
           return _stringValuesMV;
+        }
         default:
           return _transformFunction.transformToStringValuesMV(valueBlock);
       }
