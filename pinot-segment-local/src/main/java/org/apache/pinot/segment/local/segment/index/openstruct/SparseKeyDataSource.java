@@ -103,6 +103,9 @@ public class SparseKeyDataSource extends BaseDataSource {
       return node == null ? defaultValue : map.apply(node);
     }
 
+    // TODO: these hardcode the type defaults, so a child with a schema-configured defaultNullValue
+    // reads back differently here than on the dense path (OpenStructColumnSplitter uses the spec).
+    // Fixing it means threading the spec in and updating MapFilterOperator's sentinel check to match.
     @Override
     public int getInt(int docId, ForwardIndexReaderContext context) {
       return orDefault(docId, context, JsonNode::asInt, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
@@ -137,20 +140,16 @@ public class SparseKeyDataSource extends BaseDataSource {
 
     @Override
     public byte[] getBytes(int docId, ForwardIndexReaderContext context) {
-      JsonNode node = valueNode(docId, context);
-      if (node == null) {
-        return FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
-      }
-      try {
-        byte[] bytes = node.binaryValue();
-        if (bytes == null) {
-          throw new IllegalStateException(
-              "Cannot read binary value for sparse key '" + _key + "': node type is " + node.getNodeType());
+      // Non-binary nodes yield null, and TextNode base64-decoding throws on malformed input; both fold to the
+      // type default, matching the other getters.
+      return orDefault(docId, context, node -> {
+        try {
+          byte[] bytes = node.binaryValue();
+          return bytes == null ? FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES : bytes;
+        } catch (IOException e) {
+          return FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
         }
-        return bytes;
-      } catch (IOException e) {
-        throw new IllegalStateException("Failed to read binary value for sparse key '" + _key + "'", e);
-      }
+      }, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES);
     }
 
     @Override

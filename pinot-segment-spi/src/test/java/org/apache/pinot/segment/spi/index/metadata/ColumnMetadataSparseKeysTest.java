@@ -113,6 +113,42 @@ public class ColumnMetadataSparseKeysTest {
   }
 
   @Test
+  public void testQuoteInsideKeyRoundTrips() throws Exception {
+    PropertiesConfiguration config = baseParentProps();
+    config.setProperty(Column.getKeyFor(COLUMN, Column.SPARSE_KEYS), "[\"quo\\\"te\"]");
+
+    PropertiesConfiguration reloaded = saveAndReload(config);
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(reloaded, 10, COLUMN);
+    assertEquals(metadata.getSparseKeys(), List.of("quo\"te"));
+  }
+
+  /// Known limitation, pinned so a fix is noticed rather than silently changing behaviour. A
+  /// multi-key manifest contains commas, so `LegacyListDelimiterHandler` treats it as a list and
+  /// applies escape processing, consuming the `\\` that Jackson emitted. The rejoined value is then
+  /// invalid JSON (`\s` is not a JSON escape) and segment load fails. A single-key manifest has no
+  /// comma, is handled as a scalar, and is unaffected — see [#testSingleBackslashKeyIsUnaffected].
+  /// Writer-side escaping in `OpenStructColumnSplitter` would fix it.
+  @Test(expectedExceptions = RuntimeException.class,
+      expectedExceptionsMessageRegExp = "Failed to parse sparse-key manifest.*")
+  public void testBackslashInsideKeyIsNotSupportedWithMultipleKeys() throws Exception {
+    PropertiesConfiguration config = baseParentProps();
+    config.setProperty(Column.getKeyFor(COLUMN, Column.SPARSE_KEYS), "[\"region\",\"back\\\\slash\"]");
+
+    PropertiesConfiguration reloaded = saveAndReload(config);
+    ColumnMetadataImpl.fromPropertiesConfiguration(reloaded, 10, COLUMN);
+  }
+
+  @Test
+  public void testSingleBackslashKeyIsUnaffected() throws Exception {
+    PropertiesConfiguration config = baseParentProps();
+    config.setProperty(Column.getKeyFor(COLUMN, Column.SPARSE_KEYS), "[\"back\\\\slash\"]");
+
+    PropertiesConfiguration reloaded = saveAndReload(config);
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(reloaded, 10, COLUMN);
+    assertEquals(metadata.getSparseKeys(), List.of("back\\slash"));
+  }
+
+  @Test
   public void testSparseKeysAbsentParsesAsNull() {
     ColumnMetadataImpl metadata =
         ColumnMetadataImpl.fromPropertiesConfiguration(baseParentProps(), 10, COLUMN);

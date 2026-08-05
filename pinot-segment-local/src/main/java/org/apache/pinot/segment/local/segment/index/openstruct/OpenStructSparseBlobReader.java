@@ -19,9 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.MissingNode;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -31,23 +28,14 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/// Shared per-parent sparse blob parser with a ThreadLocal LRU cache so multi-key projections
-/// parse each doc's blob once. Thread-safe: cache is ThreadLocal, forward reader is segment-shared.
+/// Shared per-parent sparse blob parser: each read re-parses the doc's blob. Instances are
+/// stateless and segment-shared; each caller needs its own [ForwardIndexReaderContext].
+/// FastJsonPathExtractor is the planned follow-up for making repeated key reads cheap.
 public class OpenStructSparseBlobReader {
-  static final int PARSE_CACHE_SIZE = 10_000;
-
   private final ForwardIndexReader<ForwardIndexReaderContext> _blobReader;
   @Nullable
   private final NullValueVectorReader _blobNulls;
   private final int _numDocs;
-
-  private final ThreadLocal<LinkedHashMap<Integer, JsonNode>> _parseCache =
-      ThreadLocal.withInitial(() -> new LinkedHashMap<>(1024, 0.75f, true) {
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<Integer, JsonNode> eldest) {
-          return size() > PARSE_CACHE_SIZE;
-        }
-      });
 
   @SuppressWarnings("unchecked")
   public OpenStructSparseBlobReader(ForwardIndexReader<?> blobReader, @Nullable NullValueVectorReader blobNulls,
@@ -68,20 +56,10 @@ public class OpenStructSparseBlobReader {
 
   @Nullable
   public JsonNode getValue(int docId, String key, @Nullable ForwardIndexReaderContext context) {
-    JsonNode blob = getBlob(docId, context);
+    // TODO: an N-key projection parses each doc N times. FastJsonPathExtractor fixes this in one pass,
+    // but only across a batch of paths — this single-key signature has to change first.
+    JsonNode blob = parseBlob(docId, context);
     return blob == null ? null : blob.get(key);
-  }
-
-  @Nullable
-  private JsonNode getBlob(int docId, @Nullable ForwardIndexReaderContext context) {
-    LinkedHashMap<Integer, JsonNode> cache = _parseCache.get();
-    JsonNode cached = cache.get(docId);
-    if (cached != null) {
-      return cached.isMissingNode() ? null : cached;
-    }
-    JsonNode parsed = parseBlob(docId, context);
-    cache.put(docId, parsed == null ? MissingNode.getInstance() : parsed);
-    return parsed;
   }
 
   @Nullable
@@ -102,6 +80,8 @@ public class OpenStructSparseBlobReader {
 
   /// Full scan for docs where `key` is present (explicit JSON null = absent). Callers memoize.
   public ImmutableRoaringBitmap computePresence(String key) {
+    // TODO: the opt-in sparse JSON index already encodes this; deriving presence from it needs a
+    // handle on the index, which only ImmutableOpenStructDataSource has.
     MutableRoaringBitmap present = new MutableRoaringBitmap();
     try (ForwardIndexReaderContext context = createBlobContext()) {
       for (int docId = 0; docId < _numDocs; docId++) {

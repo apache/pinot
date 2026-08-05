@@ -22,9 +22,15 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.predicate.EqPredicate;
+import org.apache.pinot.common.request.context.predicate.InPredicate;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -34,6 +40,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
@@ -47,6 +54,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -79,6 +87,11 @@ public class OpenStructSparseDenseParityTest {
     Map<String, FieldSpec> children = new HashMap<>();
     children.put("region", new DimensionFieldSpec("region", FieldSpec.DataType.STRING, true));
     children.put("latencyMs", new DimensionFieldSpec("latencyMs", FieldSpec.DataType.LONG, true));
+    // Declared STRING, only populated by testNonScalarValuesStoredAsJsonStrings.
+    children.put("attrs", new DimensionFieldSpec("attrs", FieldSpec.DataType.STRING, true));
+    children.put("tags", new DimensionFieldSpec("tags", FieldSpec.DataType.STRING, true));
+    // Declared INT, only populated by testTypeMismatchedValueDroppedFromBothTiers.
+    children.put("count", new DimensionFieldSpec("count", FieldSpec.DataType.INT, true));
     return new ComplexFieldSpec(METRICS, FieldSpec.DataType.OPEN_STRUCT, true, children);
   }
 
@@ -227,6 +240,86 @@ public class OpenStructSparseDenseParityTest {
     assertEquals(sparseNull.getNullBitmap(), denseNull.getNullBitmap(), key + " null bitmap");
   }
 
+  /// A Map- or List-valued key can never reach the sparse blob as a JSON container.
+  /// `OpenStructColumnSplitter#addMap` coerces every value to the key's stored type before it is
+  /// serialized, and for a STRING key that coercion is `PinotDataType.STRING.convert`, i.e.
+  /// `sourceType.toString(value)` — so the blob holds `{"k":"<text>"}`, never `{"k":{...}}`.
+  ///
+  /// The assertion is discriminating: a container node would make `JsonNode#asText()` return the
+  /// empty string, so reading back the exact serialized text proves the stored form is a JSON
+  /// string. That is also what the opt-in sparse JSON index indexes, which is why the index fast
+  /// path and the scan cannot disagree for non-scalar values.
+  @Test
+  public void testNonScalarValuesStoredAsJsonStrings()
+      throws Exception {
+    // Index on, so the assertions below cover both the scan and the index view of the same blob.
+    OpenStructIndexConfig sparseConfig =
+        new OpenStructIndexConfig(false, null, 0, null, null, null, true);
+    int numDocs = 4;
+
+    // Insertion order b,a — MapUtils.toString sorts keys, so the stored text must come back sorted.
+    Map<String, Object> attrs = new LinkedHashMap<>();
+    attrs.put("b", 2);
+    attrs.put("a", 1);
+
+    List<GenericRow> rows = new ArrayList<>(numDocs);
+    for (int docId = 0; docId < numDocs; docId++) {
+      GenericRow row = new GenericRow();
+      Map<String, Object> m = new HashMap<>();
+      m.put("attrs", attrs);
+      m.put("tags", List.of(1, 2));
+      row.putValue(METRICS, m);
+      rows.add(row);
+    }
+
+    ImmutableSegment sparse = buildSegment(sparseConfig, "sparse-non-scalar", rows);
+    try {
+      OpenStructDataSource ds = (OpenStructDataSource) sparse.getDataSource(METRICS);
+      assertFalse(ds.isMaterialized("attrs"), "attrs should be sparse");
+      assertFalse(ds.isMaterialized("tags"), "tags should be sparse");
+
+      // Map → PinotDataType.MAP.toString → MapUtils.toString → compact JSON, keys sorted.
+      assertSparseStringValue(ds, "attrs", "{\"a\":1,\"b\":2}", numDocs);
+      // List → PinotDataType.OBJECT.toString → Java List#toString, which is not JSON. Pinned as the
+      // current stored form, not endorsed: changing it is safe from a tier-skew angle, since
+      // OpenStructColumnSplitter hands one serialized string to both the forward and JSON index
+      // creators, but it does change segment contents, so the test should fail loudly if it moves.
+      assertSparseStringValue(ds, "tags", "[1, 2]", numDocs);
+
+      // The index is built from that same serialized text, so an EQ on it must match every doc.
+      // This is the half that would break if a container ever reached the blob: the scan would
+      // read "" from asText() while the index flattened the container into per-element postings.
+      assertIndexMatchesAll(ds, "attrs", "{\"a\":1,\"b\":2}", numDocs);
+      assertIndexMatchesAll(ds, "tags", "[1, 2]", numDocs);
+    } finally {
+      sparse.destroy();
+    }
+  }
+
+  private static void assertIndexMatchesAll(OpenStructDataSource ds, String key, String value, int numDocs) {
+    JsonIndexReader jsonIndex = ds.getSparseJsonIndex();
+    assertNotNull(jsonIndex, "sparse JSON index");
+    ImmutableRoaringBitmap matching = jsonIndex.getMatchingDocIds(
+        FilterContext.forPredicate(new EqPredicate(ExpressionContext.forIdentifier(key), value)));
+    assertEquals(matching.getCardinality(), numDocs, "index EQ on the stored text for " + key);
+  }
+
+  private void assertSparseStringValue(OpenStructDataSource ds, String key, String expected, int numDocs) {
+    DataSource keyDs = ds.getDataSource(key);
+    assertNotNull(keyDs, "sparse DataSource for " + key);
+    assertEquals(keyDs.getDataSourceMetadata().getDataType().getStoredType(), FieldSpec.DataType.STRING);
+
+    @SuppressWarnings("rawtypes")
+    ForwardIndexReader fwd = keyDs.getForwardIndex();
+    ForwardIndexReaderContext ctx = fwd.createContext();
+    for (int docId = 0; docId < numDocs; docId++) {
+      String actual = fwd.getString(docId, ctx);
+      assertFalse(actual.isEmpty(),
+          key + " read back empty at docId=" + docId + " — the blob holds a JSON container, not a string");
+      assertEquals(actual, expected, key + " docId=" + docId);
+    }
+  }
+
   /// Same config (fillRate=0.5), different data: "region" is dense in seg1 (present on 90% of docs)
   /// and sparse in seg2 (present on 10%). Both segments must return the same values for the
   /// overlapping docs, same defaults for absent docs, and same declared type (STRING).
@@ -299,5 +392,158 @@ public class OpenStructSparseDenseParityTest {
       seg1.destroy();
       seg2.destroy();
     }
+  }
+
+  /// A value that cannot be coerced to its key's declared type never reaches either tier.
+  /// `OpenStructColumnSplitter#addMap` catches the `PinotDataType.convert` failure, rolls the doc
+  /// back out of the key's presence bitmap and stores nothing — so `writeDenseKeyColumn` and
+  /// `writeSparseJsonColumn` both see that doc as ABSENT. The drop must therefore be invisible to
+  /// the tier: null in both null vectors, and the INT default from both forward readers.
+  @Test
+  public void testTypeMismatchedValueDroppedFromBothTiers()
+      throws Exception {
+    OpenStructIndexConfig denseConfig =
+        new OpenStructIndexConfig(false, null, -1, null, 0.0, null, null);
+    OpenStructIndexConfig sparseConfig =
+        new OpenStructIndexConfig(false, null, 0, null, null, null, null);
+
+    // "count" is declared INT. Even docs supply a well-typed int; odd docs supply "abc", which
+    // PinotDataType.INTEGER.convert cannot parse.
+    List<GenericRow> rows = new ArrayList<>(NUM_DOCS);
+    for (int docId = 0; docId < NUM_DOCS; docId++) {
+      GenericRow row = new GenericRow();
+      Map<String, Object> m = new HashMap<>();
+      m.put("count", docId % 2 == 0 ? docId : "abc");
+      row.putValue(METRICS, m);
+      rows.add(row);
+    }
+
+    ImmutableSegment dense = buildSegment(denseConfig, "dense-coercion-failure", rows);
+    ImmutableSegment sparse = buildSegment(sparseConfig, "sparse-coercion-failure", rows);
+    try {
+      OpenStructDataSource denseDs = (OpenStructDataSource) dense.getDataSource(METRICS);
+      OpenStructDataSource sparseDs = (OpenStructDataSource) sparse.getDataSource(METRICS);
+      assertTrue(denseDs.isMaterialized("count"), "count should be dense");
+      assertFalse(sparseDs.isMaterialized("count"), "count should be sparse");
+
+      assertForwardValuesParity(denseDs, sparseDs, "count", FieldSpec.DataType.INT);
+      assertNullBitmapParity(denseDs, sparseDs, "count");
+
+      // Pin the absolute answer, not just dense == sparse: well-typed docs keep their value,
+      // dropped docs read as null plus the INT default in both tiers.
+      DataSource denseKey = denseDs.getDataSource("count");
+      DataSource sparseKey = sparseDs.getDataSource("count");
+      @SuppressWarnings("rawtypes")
+      ForwardIndexReader denseFwd = denseKey.getForwardIndex();
+      @SuppressWarnings("rawtypes")
+      ForwardIndexReader sparseFwd = sparseKey.getForwardIndex();
+      ForwardIndexReaderContext denseCtx = denseFwd.createContext();
+      ForwardIndexReaderContext sparseCtx = sparseFwd.createContext();
+      NullValueVectorReader denseNull = denseKey.getNullValueVector();
+      NullValueVectorReader sparseNull = sparseKey.getNullValueVector();
+      for (int docId = 0; docId < NUM_DOCS; docId++) {
+        boolean dropped = docId % 2 != 0;
+        Object expected = dropped ? FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT : docId;
+        assertEquals(readValue(denseKey, denseFwd, docId, FieldSpec.DataType.INT, denseCtx), expected,
+            "dense count docId=" + docId);
+        assertEquals(readValue(sparseKey, sparseFwd, docId, FieldSpec.DataType.INT, sparseCtx), expected,
+            "sparse count docId=" + docId);
+        assertEquals(denseNull.isNull(docId), dropped, "dense null docId=" + docId);
+        assertEquals(sparseNull.isNull(docId), dropped, "sparse null docId=" + docId);
+      }
+    } finally {
+      dense.destroy();
+      sparse.destroy();
+    }
+  }
+
+  /// The opt-in sparse JSON index must change only how a sparse-key filter is computed, never the
+  /// answer. Same dataset built twice — index on and off — and for every EQ / IN shape the
+  /// index-derived doc set must equal a straight scan of the sparse key's forward reader, which is
+  /// what the filter path falls back to when the index is absent.
+  ///
+  /// Only the positive shapes are checked. `MapFilterOperator#trySparseJsonIndex` answers NOT_EQ /
+  /// NOT_IN by wrapping the same positive `JsonMatchFilterOperator` in a `NotFilterOperator`, so
+  /// both sides here would complement over the identical `[0, numDocs)` universe and the assertion
+  /// could not fail independently of its positive counterpart. The operator lives in pinot-core and
+  /// cannot be driven from this module; its translation, negation and refusal guards are covered by
+  /// `MapFilterOperatorOpenStructTest` against a mocked index. This test is the other half — a real
+  /// index, checked against a real scan.
+  @Test
+  public void testSparseJsonIndexAgreesWithScan()
+      throws Exception {
+    OpenStructIndexConfig indexOn = new OpenStructIndexConfig(false, null, 0, null, null, null, true);
+    OpenStructIndexConfig indexOff = new OpenStructIndexConfig(false, null, 0, null, null, null, false);
+
+    ImmutableSegment withIndex = buildSegment(indexOn, "sparse-json-index-on");
+    ImmutableSegment withoutIndex = buildSegment(indexOff, "sparse-json-index-off");
+    try {
+      OpenStructDataSource onDs = (OpenStructDataSource) withIndex.getDataSource(METRICS);
+      OpenStructDataSource offDs = (OpenStructDataSource) withoutIndex.getDataSource(METRICS);
+
+      assertFalse(onDs.isMaterialized("region"), "region should be sparse");
+      assertNotNull(onDs.getSparseJsonIndex(), "sparseJsonIndex=true should build the index");
+      assertNull(offDs.getSparseJsonIndex(), "the sparse JSON index is opt-in");
+
+      // Identical stored values either way — the index only changes how they are searched.
+      assertForwardValuesParity(onDs, offDs, "region", FieldSpec.DataType.STRING);
+
+      // "nope" is absent from the data, exercising the missing-dictId branch on both sides.
+      List<List<String>> valueSets =
+          List.of(List.of("us"), List.of("nope"), List.of("us", "eu"), List.of("eu", "nope"));
+      // Guard against a vacuous pass, where both sides agree only because both match nothing.
+      assertFalse(jsonIndexMatches(onDs, "region", List.of("us")).isEmpty(), "EQ 'us' matched nothing");
+      for (List<String> values : valueSets) {
+        assertEquals(jsonIndexMatches(onDs, "region", values), scanMatches(offDs, "region", values),
+            (values.size() == 1 ? "EQ" : "IN") + values);
+      }
+
+      // The one shape where the two legitimately disagree, and the reason MapFilterOperator refuses
+      // the index for it. An absent key reads back as the schema's defaultNullValue — for STRING
+      // that is the literal "null", the same sentinel every Pinot STRING column uses, since a
+      // forward index has no null slot. So the scan matches exactly the docs missing the key, while
+      // the index has no posting for that literal. Real nullability lives in the null vector.
+      List<String> sentinel = List.of(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
+      List<Integer> absentDocIds = new ArrayList<>();
+      for (int docId : offDs.getDataSource("region").getNullValueVector().getNullBitmap().toArray()) {
+        absentDocIds.add(docId);
+      }
+      assertEquals(scanMatches(offDs, "region", sentinel), absentDocIds,
+          "EQ on the sentinel makes the scan match exactly the absent docs");
+      assertTrue(jsonIndexMatches(onDs, "region", sentinel).isEmpty(),
+          "the index must not match the absent-value sentinel");
+    } finally {
+      withIndex.destroy();
+      withoutIndex.destroy();
+    }
+  }
+
+  private static List<Integer> jsonIndexMatches(OpenStructDataSource ds, String key, List<String> values) {
+    JsonIndexReader jsonIndex = ds.getSparseJsonIndex();
+    assertNotNull(jsonIndex, "sparse JSON index");
+    ExpressionContext lhs = ExpressionContext.forIdentifier(key);
+    Predicate predicate =
+        values.size() == 1 ? new EqPredicate(lhs, values.get(0)) : new InPredicate(lhs, values);
+    ImmutableRoaringBitmap matching = jsonIndex.getMatchingDocIds(FilterContext.forPredicate(predicate));
+    List<Integer> docIds = new ArrayList<>(matching.getCardinality());
+    for (int docId : matching.toArray()) {
+      docIds.add(docId);
+    }
+    return docIds;
+  }
+
+  private static List<Integer> scanMatches(OpenStructDataSource ds, String key, List<String> values) {
+    DataSource keyDs = ds.getDataSource(key);
+    assertNotNull(keyDs, "sparse DataSource for " + key);
+    @SuppressWarnings("rawtypes")
+    ForwardIndexReader fwd = keyDs.getForwardIndex();
+    ForwardIndexReaderContext ctx = fwd.createContext();
+    List<Integer> docIds = new ArrayList<>();
+    for (int docId = 0; docId < NUM_DOCS; docId++) {
+      if (values.contains(fwd.getString(docId, ctx))) {
+        docIds.add(docId);
+      }
+    }
+    return docIds;
   }
 }

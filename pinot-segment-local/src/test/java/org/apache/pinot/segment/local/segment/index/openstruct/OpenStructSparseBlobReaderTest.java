@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.annotations.Test;
 
@@ -50,16 +49,6 @@ public class OpenStructSparseBlobReaderTest {
   }
 
   @Test
-  public void testCachesParsedBlobAcrossKeys() {
-    CountingStringForwardIndex counting = new CountingStringForwardIndex(BLOBS);
-    OpenStructSparseBlobReader blob =
-        new OpenStructSparseBlobReader(counting, FakeStringForwardIndex.nullVector(BLOBS), BLOBS.length);
-    blob.getValue(0, "region", null);
-    blob.getValue(0, "latencyMs", null);   // same doc, different key — must hit the cache
-    assertEquals(counting.getReadCount(0), 1);
-  }
-
-  @Test
   public void testComputesPresenceBitmapPerKey() {
     OpenStructSparseBlobReader blob = reader();
     ImmutableRoaringBitmap present = blob.computePresence("region");
@@ -67,29 +56,6 @@ public class OpenStructSparseBlobReaderTest {
     assertFalse(present.contains(1));
     assertTrue(present.contains(2));
     assertFalse(present.contains(3));
-  }
-
-  @Test
-  public void testEvictsLeastRecentlyUsedEntry() {
-    int size = OpenStructSparseBlobReader.PARSE_CACHE_SIZE;
-    String[] blobs = new String[size + 1];
-    for (int i = 0; i < blobs.length; i++) {
-      blobs[i] = "{\"k\":" + i + "}";
-    }
-    CountingStringForwardIndex counting = new CountingStringForwardIndex(blobs);
-    OpenStructSparseBlobReader blob =
-        new OpenStructSparseBlobReader(counting, FakeStringForwardIndex.nullVector(blobs), blobs.length);
-    for (int i = 0; i < blobs.length; i++) {
-      blob.getValue(i, "k", null);
-    }
-    // Doc 1 stayed within the cache (doc 0 was the least recently used entry once the cache went one over
-    // capacity); re-reading it must not trigger a re-parse. Check this before touching doc 0 below, since
-    // re-inserting doc 0 would itself evict the new eldest entry.
-    blob.getValue(1, "k", null);
-    assertEquals(counting.getReadCount(1), 1);
-    // Doc 0 was evicted; re-reading it must trigger a fresh parse.
-    blob.getValue(0, "k", null);
-    assertEquals(counting.getReadCount(0), 2);
   }
 
   @Test
@@ -121,24 +87,5 @@ public class OpenStructSparseBlobReaderTest {
     // reader's default-folding semantics.
     ImmutableRoaringBitmap presence = blob.computePresence("region");
     assertFalse(presence.contains(0));
-  }
-
-  static class CountingStringForwardIndex extends FakeStringForwardIndex {
-    private final int[] _reads;
-
-    CountingStringForwardIndex(String[] blobs) {
-      super(blobs);
-      _reads = new int[blobs.length];
-    }
-
-    @Override
-    public String getString(int docId, ForwardIndexReaderContext context) {
-      _reads[docId]++;
-      return super.getString(docId, context);
-    }
-
-    int getReadCount(int docId) {
-      return _reads[docId];
-    }
   }
 }

@@ -125,6 +125,16 @@ public class SparseKeyDataSourceTest {
   }
 
   @Test
+  public void testBytesFallsBackToDefaultForNonBinaryNodes() {
+    // Key "n" is an int node: binaryValue() returns null. Key "s" is "hello", which is not valid base64:
+    // TextNode.binaryValue() throws. Both must fold to the default rather than failing the query.
+    assertEquals(source("n", DataType.BYTES).getForwardIndex().getBytes(0, null),
+        FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES);
+    assertEquals(source("s", DataType.BYTES).getForwardIndex().getBytes(0, null),
+        FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES);
+  }
+
+  @Test
   public void testExplicitJsonNullTreatedAsAbsent() {
     // Key "jn" is present in doc 0 as explicit JSON null — forward reader and null vector
     // must agree: forward returns the default, null vector marks it as null.
