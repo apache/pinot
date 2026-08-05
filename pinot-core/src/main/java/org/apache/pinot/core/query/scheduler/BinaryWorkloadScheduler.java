@@ -147,6 +147,9 @@ public class BinaryWorkloadScheduler extends QueryScheduler {
           try {
             SchedulerQueryContext request = _secondaryQueryQ.take();
             if (request == null) {
+              // mirrors query completion callback functionality.
+              _secondaryRunnerSemaphore.release();
+              checkStopResourceManager();
               continue;
             }
             ServerQueryRequest queryRequest = request.getQueryRequest();
