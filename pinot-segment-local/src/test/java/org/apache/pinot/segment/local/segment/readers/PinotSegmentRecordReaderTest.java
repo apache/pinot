@@ -201,9 +201,20 @@ public class PinotSegmentRecordReaderTest {
     long sourceCreationTime = sourceMetadata.getIndexCreationTime();
     Assert.assertNull(sourceMetadata.getColumnMetadataFor(BuiltInVirtualColumn.CREATIONTIME));
 
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(createTableConfig(), createPinotSchema());
+    ImmutableSegment sourceSegment = ImmutableSegmentLoader.load(_segmentIndexDir, indexLoadingConfig);
+    try {
+      Assert.assertFalse(sourceSegment.getColumnNames().contains(BuiltInVirtualColumn.CREATIONTIME));
+      Assert.assertFalse(sourceSegment.getPhysicalColumnNames().contains(BuiltInVirtualColumn.CREATIONTIME));
+      Assert.assertNull(sourceSegment.getDataSourceNullable(BuiltInVirtualColumn.CREATIONTIME));
+    } finally {
+      sourceSegment.destroy();
+    }
+
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
-      recordReader.init(_segmentIndexDir, Set.of(BuiltInVirtualColumn.CREATIONTIME), null);
+      recordReader.init(_segmentIndexDir, Set.of(D_SV_1), null);
       GenericRow row = recordReader.next();
+      Assert.assertEquals(row.getValue(D_SV_1), _rows.get(0).getValue(D_SV_1));
       Assert.assertEquals(row.getValue(BuiltInVirtualColumn.CREATIONTIME), sourceCreationTime);
       Assert.assertFalse(row.getFieldToValueMap().containsKey(BuiltInVirtualColumn.DOCID));
       Assert.assertFalse(row.getFieldToValueMap().containsKey(BuiltInVirtualColumn.HOSTNAME));

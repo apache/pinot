@@ -37,7 +37,6 @@ import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
-import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGeneratorFactory;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -147,7 +146,7 @@ public class SegmentProcessorFramework {
       }
       return;
     }
-    VirtualColumnProviderFactory.materializeCreationTimeColumn(segmentProcessorConfig.getSchema());
+    PinotSegmentRecordReader.materializeCreationTimeColumn(segmentProcessorConfig.getSchema());
   }
 
   public static List<RecordReaderFileConfig> convertRecordReadersToRecordReaderFileConfig(

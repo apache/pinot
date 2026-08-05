@@ -22,7 +22,6 @@ import java.io.File;
 import java.util.Set;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -36,28 +35,26 @@ import org.testng.annotations.Test;
 /// - All data types are correctly handled in columnar mode
 /// - Segment statistics and metadata are preserved
 public class ColumnarRowMajorEquivalenceTest extends ColumnarSegmentBuildingTestBase {
+
   @Test
   public void testBasicColumnarBuilding()
       throws Exception {
-    // First create a source segment, then rewrite it through both Pinot-segment reader paths.
-    File sourceSegmentDir = createRowMajorSegment();
-    File rowMajorSegmentDir = createRowMajorSegmentFromPinotSegment(sourceSegmentDir);
+    // First create a segment using traditional row-major approach
+    File rowMajorSegmentDir = createRowMajorSegment();
 
-    File columnarSegmentDir = createColumnarSegment(sourceSegmentDir);
+    // Then create a segment using columnar approach from the row-major segment
+    File columnarSegmentDir = createColumnarSegment(rowMajorSegmentDir);
 
     // Validate that both segments have identical data
     validateSegmentsIdentical(rowMajorSegmentDir, columnarSegmentDir);
-    validateMaterializedCreationTime(rowMajorSegmentDir);
-    validateMaterializedCreationTime(columnarSegmentDir);
   }
 
   @Test
   public void testAllDataTypes()
       throws Exception {
     // This test validates that all supported data types work correctly with columnar building
-    File sourceSegmentDir = createRowMajorSegment();
-    File rowMajorSegmentDir = createRowMajorSegmentFromPinotSegment(sourceSegmentDir);
-    File columnarSegmentDir = createColumnarSegment(sourceSegmentDir);
+    File rowMajorSegmentDir = createRowMajorSegment();
+    File columnarSegmentDir = createColumnarSegment(rowMajorSegmentDir);
 
     // Validate that both segments have identical data for all data types
     validateSegmentsIdentical(rowMajorSegmentDir, columnarSegmentDir);
@@ -66,9 +63,6 @@ public class ColumnarRowMajorEquivalenceTest extends ColumnarSegmentBuildingTest
     ImmutableSegment segment = ImmutableSegmentLoader.load(columnarSegmentDir, ReadMode.mmap);
     try {
       Set<String> columnNames = segment.getPhysicalColumnNames();
-
-      Assert.assertTrue(columnNames.containsAll(BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS),
-          "Materializable virtual columns should be physical in a Pinot-segment rewrite");
 
       // Validate all data types are present
       Assert.assertTrue(columnNames.contains(STRING_COL_1), "STRING column missing");
@@ -82,20 +76,6 @@ public class ColumnarRowMajorEquivalenceTest extends ColumnarSegmentBuildingTest
       Assert.assertTrue(columnNames.contains(MV_BIG_DECIMAL_COL), "Multi-value BIG_DECIMAL column missing");
       Assert.assertTrue(columnNames.contains(MV_STRING_COL), "Multi-value STRING column missing");
       Assert.assertTrue(columnNames.contains(TIME_COL), "TIME column missing");
-    } finally {
-      segment.destroy();
-    }
-  }
-
-  private void validateMaterializedCreationTime(File segmentDir)
-      throws Exception {
-    ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
-    try {
-      Assert.assertNotEquals(segment.getSegmentMetadata().getIndexCreationTime(), INPUT_SEGMENT_CREATION_TIME);
-      Assert.assertTrue(segment.getPhysicalColumnNames().contains(BuiltInVirtualColumn.CREATIONTIME));
-      for (int docId = 0; docId < segment.getSegmentMetadata().getTotalDocs(); docId++) {
-        Assert.assertEquals(segment.getValue(docId, BuiltInVirtualColumn.CREATIONTIME), INPUT_SEGMENT_CREATION_TIME);
-      }
     } finally {
       segment.destroy();
     }

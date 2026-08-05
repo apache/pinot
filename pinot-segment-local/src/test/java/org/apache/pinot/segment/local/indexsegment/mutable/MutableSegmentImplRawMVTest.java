@@ -167,8 +167,7 @@ public class MutableSegmentImplRawMVTest implements PinotBuffersAfterClassCheckR
         assertEquals(actualDictionary.length(), expectedDictionary.length());
 
         // Allow the segment name to be different
-        if (column.equals(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME)
-            || column.equals(CommonConstants.Segment.BuiltInVirtualColumn.CREATIONTIME)) {
+        if (column.equals(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME)) {
           continue;
         }
 

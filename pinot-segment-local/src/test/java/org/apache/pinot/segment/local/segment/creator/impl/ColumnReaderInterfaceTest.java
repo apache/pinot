@@ -19,19 +19,16 @@
 package org.apache.pinot.segment.local.segment.creator.impl;
 
 import java.io.File;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReaderFactory;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.spi.data.readers.ColumnReader;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -58,10 +55,6 @@ public class ColumnReaderInterfaceTest extends ColumnarSegmentBuildingTestBase {
 
         // Test that all expected columns are available
         Set<String> availableColumns = factory.getAvailableColumns();
-        Set<String> expectedAvailableColumns = new HashSet<>(segment.getPhysicalColumnNames());
-        expectedAvailableColumns.addAll(BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS);
-        assertFalse(segment.getPhysicalColumnNames().contains(BuiltInVirtualColumn.CREATIONTIME));
-        assertEquals(availableColumns, expectedAvailableColumns);
         assertTrue(availableColumns.contains(STRING_COL_1));
         assertTrue(availableColumns.contains(INT_COL_1));
         assertTrue(availableColumns.contains(MV_INT_COL));

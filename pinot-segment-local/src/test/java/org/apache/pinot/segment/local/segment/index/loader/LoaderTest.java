@@ -220,15 +220,13 @@ public class LoaderTest {
     assertTrue(BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS.contains(BuiltInVirtualColumn.CREATIONTIME));
     assertFalse(BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS.contains(BuiltInVirtualColumn.DOCID));
     assertTrue(indexSegment.getColumnNames().containsAll(
-        Arrays.asList(BuiltInVirtualColumn.DOCID, BuiltInVirtualColumn.HOSTNAME, BuiltInVirtualColumn.SEGMENTNAME,
-            BuiltInVirtualColumn.CREATIONTIME)));
+        Arrays.asList(BuiltInVirtualColumn.DOCID, BuiltInVirtualColumn.HOSTNAME, BuiltInVirtualColumn.SEGMENTNAME)));
+    assertFalse(indexSegment.getColumnNames().contains(BuiltInVirtualColumn.CREATIONTIME));
     assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.DOCID));
     assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.HOSTNAME));
     assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.SEGMENTNAME));
-    assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.CREATIONTIME));
+    assertNull(indexSegment.getDataSourceNullable(BuiltInVirtualColumn.CREATIONTIME));
     assertFalse(indexSegment.getPhysicalColumnNames().contains(BuiltInVirtualColumn.CREATIONTIME));
-    assertEquals(indexSegment.getValue(0, BuiltInVirtualColumn.CREATIONTIME),
-        indexSegment.getSegmentMetadata().getIndexCreationTime());
   }
 
   /// Tests loading default string column with empty ("") default null value.

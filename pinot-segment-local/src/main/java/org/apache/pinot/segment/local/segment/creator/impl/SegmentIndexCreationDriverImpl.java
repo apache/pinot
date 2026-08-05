@@ -37,9 +37,7 @@ import org.apache.pinot.segment.local.segment.creator.ColumnarSegmentCreationDat
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
-import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReaderFactory;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
-import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
@@ -147,11 +145,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       throws Exception {
     if (recordReader instanceof PinotSegmentRecordReader
         && ((PinotSegmentRecordReader) recordReader).isReadingPinotSegmentFile()) {
-      ((PinotSegmentRecordReader) recordReader).addCreationTimeColumn();
       addCreationTimeColumn(config);
     } else if (recordReader instanceof CompactedPinotSegmentRecordReader
         && ((CompactedPinotSegmentRecordReader) recordReader).isReadingPinotSegmentFile()) {
-      ((CompactedPinotSegmentRecordReader) recordReader).addCreationTimeColumn();
       addCreationTimeColumn(config);
     }
     init(config, new RecordReaderSegmentCreationDataSource(recordReader),
@@ -164,7 +160,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (fieldSpec != null && !fieldSpec.isVirtualColumn()) {
       return;
     }
-    FieldSpec creationTimeFieldSpec = VirtualColumnProviderFactory.materializeCreationTimeColumn(schema);
+    FieldSpec creationTimeFieldSpec = PinotSegmentRecordReader.materializeCreationTimeColumn(schema);
     config.getIndexConfigsByColName().put(BuiltInVirtualColumn.CREATIONTIME,
         FieldIndexConfigsUtil.fromFieldConfig(null, creationTimeFieldSpec));
   }
@@ -184,9 +180,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   /// @throws Exception if initialization fails
   public void init(SegmentGeneratorConfig config, ColumnReaderFactory columnReaderFactory)
       throws Exception {
-    if (columnReaderFactory instanceof PinotSegmentColumnReaderFactory) {
-      addCreationTimeColumn(config);
-    }
     // Initialize the column reader factory with target schema
     columnReaderFactory.init(config.getSchema());
 

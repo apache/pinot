@@ -242,11 +242,10 @@ public class RefreshSegmentUpsertMinionTest extends CustomDataQueryClusterIntegr
   private void waitForRawSegment(String segmentName) {
     TestUtils.waitForCondition(input -> {
       try {
-        JsonNode response = postQuery("SELECT " + VALUE_COLUMN + ", " + BuiltInVirtualColumn.CREATIONTIME + " FROM "
-            + TABLE_NAME + " WHERE $segmentName = '" + segmentName + "' OPTION(skipUpsert=true)");
+        JsonNode response = postQuery("SELECT " + VALUE_COLUMN + " FROM " + TABLE_NAME + " WHERE $segmentName = '"
+            + segmentName + "' OPTION(skipUpsert=true)");
         JsonNode rows = response.get("resultTable").get("rows");
-        return rows.size() == 1 && OLD_VALUE.equals(rows.get(0).get(0).asText())
-            && rows.get(0).get(1).asLong() == OLD_CREATION_TIME;
+        return rows.size() == 1 && OLD_VALUE.equals(rows.get(0).get(0).asText());
       } catch (Exception e) {
         return false;
       }

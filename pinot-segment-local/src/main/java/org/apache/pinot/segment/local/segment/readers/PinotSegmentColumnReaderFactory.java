@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.readers;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -29,7 +28,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.ColumnReaderFactory;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,13 +93,7 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
 
   @Override
   public Set<String> getAvailableColumns() {
-    Set<String> availableColumns = new HashSet<>(_indexSegment.getPhysicalColumnNames());
-    for (String columnName : BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS) {
-      if (_indexSegment.getDataSourceNullable(columnName) != null) {
-        availableColumns.add(columnName);
-      }
-    }
-    return availableColumns;
+    return _indexSegment.getPhysicalColumnNames();
   }
 
   /// Get the total number of documents/rows in the data source.
@@ -178,9 +170,7 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
   /// @param columnName Column name to check
   /// @return true if the column exists in source, false otherwise
   public boolean hasColumn(String columnName) {
-    return _indexSegment.getPhysicalColumnNames().contains(columnName)
-        || (BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS.contains(columnName)
-            && _indexSegment.getDataSourceNullable(columnName) != null);
+    return _indexSegment.getPhysicalColumnNames().contains(columnName);
   }
 
   @Override

@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -42,6 +43,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
@@ -61,7 +63,6 @@ public abstract class ColumnarSegmentBuildingTestBase {
   protected static final String TEMP_DIR = System.getProperty("java.io.tmpdir");
   protected static final String TABLE_NAME = "testTable";
   protected static final String SEGMENT_NAME = "testSegment";
-  protected static final long INPUT_SEGMENT_CREATION_TIME = 1_000L;
 
   // Test columns
   protected static final String STRING_COL_1 = "stringCol1";
@@ -174,10 +175,9 @@ public abstract class ColumnarSegmentBuildingTestBase {
     FileUtils.deleteQuietly(outputDir);
     outputDir.mkdirs();
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, copySchema(schema));
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(outputDir.getAbsolutePath());
     config.setSegmentName(SEGMENT_NAME + "_" + dirName);
-    config.setCreationTime(Long.toString(INPUT_SEGMENT_CREATION_TIME));
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     TestRecordReader recordReader = new TestRecordReader(_testData);
@@ -267,7 +267,7 @@ public abstract class ColumnarSegmentBuildingTestBase {
     ImmutableSegment sourceSegment = ImmutableSegmentLoader.load(sourceSegmentDir, ReadMode.mmap);
 
     try {
-      SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, copySchema(_originalSchema));
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, _originalSchema);
       config.setOutDir(outputDir.getAbsolutePath());
       config.setSegmentName(SEGMENT_NAME + "_columnar");
 
@@ -296,7 +296,7 @@ public abstract class ColumnarSegmentBuildingTestBase {
 
     try {
       // Use extended schema with new columns
-      SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, copySchema(_extendedSchema));
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, _extendedSchema);
       config.setOutDir(outputDir.getAbsolutePath());
       config.setSegmentName(SEGMENT_NAME + "_withNewColumns");
 
@@ -316,25 +316,13 @@ public abstract class ColumnarSegmentBuildingTestBase {
 
   protected File createRowMajorSegmentWithExtendedSchema(File originalSegmentDir)
       throws Exception {
-    return createRowMajorSegmentFromPinotSegment(originalSegmentDir, _extendedSchema,
-        "rowMajorSegmentWithExtendedSchema");
-  }
-
-  protected File createRowMajorSegmentFromPinotSegment(File originalSegmentDir)
-      throws Exception {
-    return createRowMajorSegmentFromPinotSegment(originalSegmentDir, _originalSchema,
-        "rowMajorSegmentFromPinotSegment");
-  }
-
-  private File createRowMajorSegmentFromPinotSegment(File originalSegmentDir, Schema schema, String dirName)
-      throws Exception {
-    File outputDir = new File(_tempDir, dirName);
+    File outputDir = new File(_tempDir, "rowMajorSegmentWithExtendedSchema");
     FileUtils.deleteQuietly(outputDir);
     outputDir.mkdirs();
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, copySchema(schema));
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, _extendedSchema);
     config.setOutDir(outputDir.getAbsolutePath());
-    config.setSegmentName(SEGMENT_NAME + "_" + dirName);
+    config.setSegmentName(SEGMENT_NAME + "_rowMajorExtended");
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
 
@@ -345,11 +333,7 @@ public abstract class ColumnarSegmentBuildingTestBase {
       driver.build();
     }
 
-    return new File(outputDir, SEGMENT_NAME + "_" + dirName);
-  }
-
-  private static Schema copySchema(Schema schema) {
-    return Schema.cloneSchemaWithName(schema, schema.getSchemaName());
+    return new File(outputDir, SEGMENT_NAME + "_rowMajorExtended");
   }
 
   protected void validateSegmentsIdentical(File segment1Dir, File segment2Dir)
@@ -360,11 +344,17 @@ public abstract class ColumnarSegmentBuildingTestBase {
     try {
       // Validate basic segment metadata
       Assert.assertEquals(segment1.getSegmentMetadata().getTotalDocs(), segment2.getSegmentMetadata().getTotalDocs());
-      Assert.assertEquals(segment1.getSegmentMetadata().getAllColumns(), segment2.getSegmentMetadata().getAllColumns());
-      Assert.assertEquals(segment1.getPhysicalColumnNames(), segment2.getPhysicalColumnNames());
+      Set<String> segment1Columns = new HashSet<>(segment1.getSegmentMetadata().getAllColumns());
+      Set<String> segment2Columns = new HashSet<>(segment2.getSegmentMetadata().getAllColumns());
+      segment1Columns.removeAll(BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS);
+      segment2Columns.removeAll(BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS);
+      Assert.assertEquals(segment1Columns, segment2Columns);
 
       // Validate column metadata and statistics for each column
       for (String columnName : segment1.getPhysicalColumnNames()) {
+        if (BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS.contains(columnName)) {
+          continue;
+        }
         validateColumnMetadata(segment1, segment2, columnName);
         validateColumnData(segment1, segment2, columnName);
       }

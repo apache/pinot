@@ -19,6 +19,11 @@
 package org.apache.pinot.segment.local.segment.creator.impl;
 
 import java.io.File;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
+import org.apache.pinot.spi.utils.ReadMode;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
@@ -42,6 +47,16 @@ public class ColumnarSchemaEvolutionTest extends ColumnarSegmentBuildingTestBase
 
     // Create row-major segment with extended schema for comparison using the same original segment
     File rowMajorExtendedSegmentDir = createRowMajorSegmentWithExtendedSchema(originalSegmentDir);
+
+    ImmutableSegment rowMajorSegment = ImmutableSegmentLoader.load(rowMajorExtendedSegmentDir, ReadMode.mmap);
+    ImmutableSegment columnarSegment = ImmutableSegmentLoader.load(columnarSegmentDir, ReadMode.mmap);
+    try {
+      Assert.assertTrue(rowMajorSegment.getPhysicalColumnNames().contains(BuiltInVirtualColumn.CREATIONTIME));
+      Assert.assertFalse(columnarSegment.getPhysicalColumnNames().contains(BuiltInVirtualColumn.CREATIONTIME));
+    } finally {
+      rowMajorSegment.destroy();
+      columnarSegment.destroy();
+    }
 
     // Validate that both segments are identical (comprehensive comparison)
     validateSegmentsIdentical(rowMajorExtendedSegmentDir, columnarSegmentDir);
