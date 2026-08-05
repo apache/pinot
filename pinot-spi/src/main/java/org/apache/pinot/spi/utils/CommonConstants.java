@@ -572,6 +572,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD =
         "pinot.broker.mse.streaming.distinct.flush.threshold";
     public static final int DEFAULT_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD = -1;
+
+    /// Default output block size (rows) for the streaming selection ORDER BY combine
+    /// ({@link Request.QueryOptionKey#SORTED_SELECTION_MERGE_BLOCK_SIZE}).
+    public static final int DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE = 10_000;
+
     // Whether to infer partition hint by default or not.
     // This value can always be overridden by INFER_PARTITION_HINT query option
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
@@ -843,6 +848,11 @@ public class CommonConstants {
         /// exchange over the distinct columns provides. Do not set it on the gRPC streaming query path, where
         /// there is no such stage and the client would observe duplicate rows across flush windows.
         public static final String STREAMING_DISTINCT_FLUSH_THRESHOLD = "streamingDistinctFlushThreshold";
+
+        /// Opt-in: use the streaming k-way-merge selection ORDER BY combine over sorted segments.
+        public static final String SORTED_SELECTION_MERGE_ENABLED = "sortedSelectionMergeEnabled";
+        /// Output block size (rows) for the streaming selection ORDER BY combine.
+        public static final String SORTED_SELECTION_MERGE_BLOCK_SIZE = "sortedSelectionMergeBlockSize";
 
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
         public static final String ORDERED_PREFERRED_POOLS = "orderedPreferredPools";
