@@ -24,7 +24,9 @@ import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileReader;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileRecordReader;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileWriter;
+import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,15 +84,22 @@ public class DedupReducer implements Reducer {
     GenericRow previousRow = new GenericRow();
     recordReader.read(0, previousRow);
     int previousRowId = 0;
-    dedupFileWriter.write(previousRow);
+    boolean hasCreationTime = _fileManager.getFieldSpecs().stream()
+        .anyMatch(fieldSpec -> fieldSpec.getName().equals(BuiltInVirtualColumn.CREATIONTIME));
+    GenericRow buffer = hasCreationTime ? new GenericRow() : null;
     for (int i = 1; i < numRows; i++) {
       if (recordReader.compare(previousRowId, i) != 0) {
+        dedupFileWriter.write(previousRow);
         previousRow.clear();
         recordReader.read(i, previousRow);
         previousRowId = i;
-        dedupFileWriter.write(previousRow);
+      } else if (hasCreationTime) {
+        buffer.clear();
+        recordReader.read(i, buffer);
+        SegmentProcessorUtils.mergeCreationTime(previousRow, buffer);
       }
     }
+    dedupFileWriter.write(previousRow);
     _dedupFileManager.closeFileWriter();
     LOGGER.info("Finish creating dedup file in {}ms", System.currentTimeMillis() - dedupFileCreationStartTimeMs);
 

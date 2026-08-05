@@ -29,6 +29,7 @@ import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileReader;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileRecordReader;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileWriter;
+import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
@@ -136,6 +137,7 @@ public class RollupReducer implements Reducer {
         buffer.clear();
         recordReader.read(i, buffer);
         if (recordReader.compare(previousRowId, i, numGroupFields) == 0) {
+          SegmentProcessorUtils.mergeCreationTime(previousRow, buffer);
           aggregateWithNullFields(previousRow, buffer, aggregatorContextList);
         } else {
           rollupFileWriter.write(previousRow);
@@ -150,6 +152,7 @@ public class RollupReducer implements Reducer {
         buffer.clear();
         recordReader.read(i, buffer);
         if (recordReader.compare(previousRowId, i, numGroupFields) == 0) {
+          SegmentProcessorUtils.mergeCreationTime(previousRow, buffer);
           aggregateWithoutNullFields(previousRow, buffer, aggregatorContextList);
         } else {
           rollupFileWriter.write(previousRow);

@@ -27,10 +27,14 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerConfig;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
@@ -39,11 +43,14 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -348,6 +355,117 @@ public class SegmentProcessorFrameworkTest extends BaseSegmentProcessorFramework
     assertEquals(segmentMetadata.getTotalDocs(), 2);
     assertEquals(segmentMetadata.getName(), "myTable_1597881600000_1597881600000_2");
     FileUtils.cleanDirectory(workingDir);
+  }
+
+  @Test
+  public void testCreationTimeMaterializedAcrossSegmentMergeTypes()
+      throws Exception {
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("creationTimeMergeTable").build();
+    Schema sourceSchema = creationTimeMergeSchema();
+    File inputDir = new File(TEMP_DIR, "creation_time_merge_input");
+    FileUtils.forceMkdir(inputDir);
+    File firstSegment = buildLegacySegment(tableConfig, sourceSchema, inputDir, "firstSegment", 1_000L);
+    File secondSegment = buildLegacySegment(tableConfig, sourceSchema, inputDir, "secondSegment", 2_000L);
+    assertNull(new SegmentMetadataImpl(firstSegment).getColumnMetadataFor(BuiltInVirtualColumn.CREATIONTIME));
+    assertNull(new SegmentMetadataImpl(secondSegment).getColumnMetadataFor(BuiltInVirtualColumn.CREATIONTIME));
+
+    for (MergeType mergeType : MergeType.values()) {
+      File workingDir = new File(TEMP_DIR, "creation_time_merge_" + mergeType.name().toLowerCase());
+      FileUtils.forceMkdir(workingDir);
+      Schema processingSchema = creationTimeMergeSchema();
+      SegmentProcessorConfig config = new SegmentProcessorConfig.Builder()
+          .setTableConfig(tableConfig)
+          .setSchema(processingSchema)
+          .setMergeType(mergeType)
+          .setCustomCreationTime(3_000L)
+          .build();
+      List<RecordReaderFileConfig> readerConfigs = List.of(
+          compactedSegmentReaderConfig(firstSegment), compactedSegmentReaderConfig(secondSegment));
+      List<File> outputSegments =
+          new SegmentProcessorFramework(config, workingDir, readerConfigs, List.of(), null).process();
+
+      assertEquals(outputSegments.size(), 1);
+      ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
+      try {
+        SegmentMetadata metadata = segment.getSegmentMetadata();
+        assertEquals(metadata.getIndexCreationTime(), 3_000L);
+        assertTrue(segment.getPhysicalColumnNames().contains(BuiltInVirtualColumn.CREATIONTIME));
+        ColumnMetadata creationTimeMetadata = metadata.getColumnMetadataFor(BuiltInVirtualColumn.CREATIONTIME);
+        assertNotNull(creationTimeMetadata);
+        assertEquals(creationTimeMetadata.getFieldType(), FieldSpec.FieldType.DIMENSION);
+        assertEquals(creationTimeMetadata.getDataType(), FieldSpec.DataType.LONG);
+        assertTrue(creationTimeMetadata.isSingleValue());
+
+        if (mergeType == MergeType.CONCAT) {
+          assertEquals(metadata.getTotalDocs(), 2);
+          assertEquals(readLongValues(segment, BuiltInVirtualColumn.CREATIONTIME), List.of(1_000L, 2_000L));
+          assertEquals(readLongValues(segment, "metric"), List.of(1L, 1L));
+        } else {
+          assertEquals(metadata.getTotalDocs(), 1);
+          assertEquals(segment.getValue(0, BuiltInVirtualColumn.CREATIONTIME), 2_000L);
+          assertEquals(segment.getValue(0, "metric"), mergeType == MergeType.ROLLUP ? 2L : 1L);
+        }
+      } finally {
+        segment.destroy();
+      }
+    }
+  }
+
+  @Test
+  public void testCreationTimeNotMaterializedForCustomPinotFormatReader()
+      throws Exception {
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("customPinotReaderTable").build();
+    Schema schema = creationTimeMergeSchema();
+    SegmentProcessorConfig config =
+        new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema).build();
+    File workingDir = new File(TEMP_DIR, "custom_pinot_reader");
+    FileUtils.forceMkdir(workingDir);
+    RecordReader customReader = new GenericRowRecordReader(List.of(new GenericRow()));
+    RecordReaderFileConfig readerConfig =
+        new RecordReaderFileConfig(FileFormat.PINOT, new File(workingDir, "input"), null, null, customReader);
+
+    new SegmentProcessorFramework(config, workingDir, List.of(readerConfig), List.of(), null);
+
+    assertNull(schema.getFieldSpecFor(BuiltInVirtualColumn.CREATIONTIME));
+  }
+
+  private static Schema creationTimeMergeSchema() {
+    return new Schema.SchemaBuilder().setSchemaName("creationTimeMergeSchema")
+        .addSingleValueDimension("key", FieldSpec.DataType.STRING)
+        .addMetric("metric", FieldSpec.DataType.LONG)
+        .build();
+  }
+
+  private static File buildLegacySegment(TableConfig tableConfig, Schema schema, File outputDir, String segmentName,
+      long creationTime)
+      throws Exception {
+    GenericRow row = new GenericRow();
+    row.putValue("key", "same");
+    row.putValue("metric", 1L);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(outputDir.getPath());
+    config.setSegmentName(segmentName);
+    config.setCreationTime(String.valueOf(creationTime));
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(List.of(row)));
+    driver.build();
+    return new File(outputDir, segmentName);
+  }
+
+  private static RecordReaderFileConfig compactedSegmentReaderConfig(File segmentDir) {
+    return new RecordReaderFileConfig(FileFormat.PINOT, segmentDir, null, null,
+        new CompactedPinotSegmentRecordReader(RoaringBitmap.bitmapOf(0)));
+  }
+
+  private static List<Long> readLongValues(ImmutableSegment segment, String column) {
+    List<Long> values = new ArrayList<>();
+    for (int docId = 0; docId < segment.getSegmentMetadata().getTotalDocs(); docId++) {
+      values.add(((Number) segment.getValue(docId, column)).longValue());
+    }
+    values.sort(null);
+    return values;
   }
 
   @Test

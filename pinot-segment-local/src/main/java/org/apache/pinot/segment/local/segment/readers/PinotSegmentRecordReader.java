@@ -64,6 +64,7 @@ public class PinotSegmentRecordReader implements RecordReader {
   private int[] _sortedDocIds;
   private boolean _skipDefaultNullValues;
   private boolean _readingPinotSegmentFile;
+  private boolean _includeCreationTimeColumn;
 
   private int _nextDocId = 0;
 
@@ -196,6 +197,9 @@ public class PinotSegmentRecordReader implements RecordReader {
           }
         }
       }
+      if (_includeCreationTimeColumn) {
+        addCreationTimeColumn();
+      }
 
       if (sortedDocIds != null) {
         _sortedDocIds = sortedDocIds;
@@ -259,7 +263,9 @@ public class PinotSegmentRecordReader implements RecordReader {
 
   /// Adds `$creationTime` to this reader so a Pinot-segment rewrite can persist it as a physical column.
   public void addCreationTimeColumn() {
-    if (_numDocs > 0 && !_columnReaderMap.containsKey(BuiltInVirtualColumn.CREATIONTIME)
+    _includeCreationTimeColumn = true;
+    if (_readingPinotSegmentFile && _numDocs > 0
+        && !_columnReaderMap.containsKey(BuiltInVirtualColumn.CREATIONTIME)
         && _indexSegment.getDataSourceNullable(BuiltInVirtualColumn.CREATIONTIME) != null) {
       addColumnReader(BuiltInVirtualColumn.CREATIONTIME);
     }

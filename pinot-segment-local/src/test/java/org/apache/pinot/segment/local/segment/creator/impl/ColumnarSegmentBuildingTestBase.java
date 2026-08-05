@@ -343,6 +343,7 @@ public abstract class ColumnarSegmentBuildingTestBase {
       // Validate basic segment metadata
       Assert.assertEquals(segment1.getSegmentMetadata().getTotalDocs(), segment2.getSegmentMetadata().getTotalDocs());
       Assert.assertEquals(segment1.getSegmentMetadata().getAllColumns(), segment2.getSegmentMetadata().getAllColumns());
+      Assert.assertEquals(segment1.getPhysicalColumnNames(), segment2.getPhysicalColumnNames());
 
       // Validate column metadata and statistics for each column
       for (String columnName : segment1.getPhysicalColumnNames()) {

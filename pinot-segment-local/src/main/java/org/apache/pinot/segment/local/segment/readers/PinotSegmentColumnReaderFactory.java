@@ -28,6 +28,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.ColumnReaderFactory;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -170,7 +171,9 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
   /// @param columnName Column name to check
   /// @return true if the column exists in source, false otherwise
   public boolean hasColumn(String columnName) {
-    return _indexSegment.getPhysicalColumnNames().contains(columnName);
+    return _indexSegment.getPhysicalColumnNames().contains(columnName)
+        || (BuiltInVirtualColumn.CREATIONTIME.equals(columnName)
+            && _indexSegment.getDataSourceNullable(columnName) != null);
   }
 
   @Override

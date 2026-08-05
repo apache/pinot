@@ -47,6 +47,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -267,6 +268,51 @@ public class ReducerTest {
       assertEquals(fieldToValueMap.get("m2"), expectedMetrics[1]);
       assertEquals(fieldToValueMap.get("m3"), expectedMetrics[2]);
     }
+  }
+
+  @Test
+  public void testRollupPreservesNewestCreationTime()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("d", DataType.INT)
+        .addSingleValueDimension(BuiltInVirtualColumn.CREATIONTIME, DataType.LONG).addMetric("m", DataType.INT).build();
+    Pair<List<FieldSpec>, Integer> result = SegmentProcessorUtils.getFieldSpecs(schema, MergeType.ROLLUP, null);
+    GenericRowFileManager fileManager =
+        new GenericRowFileManager(FILE_MANAGER_OUTPUT_DIR, result.getLeft(), false, result.getRight());
+    GenericRowFileWriter fileWriter = fileManager.getFileWriter();
+    GenericRow inputRow = new GenericRow();
+    inputRow.putValue("d", 1);
+    inputRow.putValue("m", 3);
+    inputRow.putValue(BuiltInVirtualColumn.CREATIONTIME, 100L);
+    fileWriter.write(inputRow);
+    inputRow.clear();
+    inputRow.putValue("d", 1);
+    inputRow.putValue("m", 4);
+    inputRow.putValue(BuiltInVirtualColumn.CREATIONTIME, 200L);
+    fileWriter.write(inputRow);
+    inputRow.clear();
+    inputRow.putValue("d", 2);
+    inputRow.putValue("m", 5);
+    inputRow.putValue(BuiltInVirtualColumn.CREATIONTIME, 150L);
+    fileWriter.write(inputRow);
+    fileManager.closeFileWriter();
+
+    SegmentProcessorConfig config = new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema)
+        .setMergeType(MergeType.ROLLUP).build();
+    GenericRowFileManager reducedFileManager =
+        ReducerFactory.getReducer("0", fileManager, config, REDUCER_OUTPUT_DIR).reduce();
+    GenericRowFileRecordReader recordReader = reducedFileManager.getFileReader().getRecordReader();
+    GenericRow row = new GenericRow();
+    recordReader.read(0, row);
+    assertEquals(row.getValue("d"), 1);
+    assertEquals(row.getValue("m"), 7);
+    assertEquals(row.getValue(BuiltInVirtualColumn.CREATIONTIME), 200L);
+    row.clear();
+    recordReader.read(1, row);
+    assertEquals(row.getValue("d"), 2);
+    assertEquals(row.getValue("m"), 5);
+    assertEquals(row.getValue(BuiltInVirtualColumn.CREATIONTIME), 150L);
+    reducedFileManager.cleanUp();
   }
 
   @Test
@@ -714,6 +760,53 @@ public class ReducerTest {
       assertEquals(fieldToValueMap.get("d"), expectedValue / 5);
       assertEquals(fieldToValueMap.get("m"), expectedValue % 5);
     }
+  }
+
+  @Test
+  public void testDedupIgnoresCreationTimeAndPreservesNewestValue()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("d", DataType.INT)
+        .addSingleValueDimension(BuiltInVirtualColumn.CREATIONTIME, DataType.LONG).addMetric("m", DataType.INT).build();
+    Pair<List<FieldSpec>, Integer> result = SegmentProcessorUtils.getFieldSpecs(schema, MergeType.DEDUP, null);
+    GenericRowFileManager fileManager =
+        new GenericRowFileManager(FILE_MANAGER_OUTPUT_DIR, result.getLeft(), false, result.getRight());
+    GenericRowFileWriter fileWriter = fileManager.getFileWriter();
+    GenericRow inputRow = new GenericRow();
+    inputRow.putValue("d", 1);
+    inputRow.putValue("m", 2);
+    inputRow.putValue(BuiltInVirtualColumn.CREATIONTIME, 100L);
+    fileWriter.write(inputRow);
+    inputRow.clear();
+    inputRow.putValue("d", 1);
+    inputRow.putValue("m", 2);
+    inputRow.putValue(BuiltInVirtualColumn.CREATIONTIME, 200L);
+    fileWriter.write(inputRow);
+    inputRow.clear();
+    inputRow.putValue("d", 2);
+    inputRow.putValue("m", 3);
+    inputRow.putValue(BuiltInVirtualColumn.CREATIONTIME, 150L);
+    fileWriter.write(inputRow);
+    fileManager.closeFileWriter();
+
+    SegmentProcessorConfig config = new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema)
+        .setMergeType(MergeType.DEDUP).build();
+    GenericRowFileManager reducedFileManager =
+        ReducerFactory.getReducer("0", fileManager, config, REDUCER_OUTPUT_DIR).reduce();
+    GenericRowFileReader fileReader = reducedFileManager.getFileReader();
+    assertEquals(fileReader.getNumRows(), 2);
+    GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+    GenericRow row = new GenericRow();
+    recordReader.read(0, row);
+    assertEquals(row.getValue("d"), 1);
+    assertEquals(row.getValue("m"), 2);
+    assertEquals(row.getValue(BuiltInVirtualColumn.CREATIONTIME), 200L);
+    row.clear();
+    recordReader.read(1, row);
+    assertEquals(row.getValue("d"), 2);
+    assertEquals(row.getValue("m"), 3);
+    assertEquals(row.getValue(BuiltInVirtualColumn.CREATIONTIME), 150L);
+    reducedFileManager.cleanUp();
   }
 
   @Test

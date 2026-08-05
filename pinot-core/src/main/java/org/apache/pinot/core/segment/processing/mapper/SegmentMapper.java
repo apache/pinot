@@ -42,6 +42,8 @@ import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerFactory;
 import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformerUtils;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
+import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -52,6 +54,7 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.tasks.MinionTaskBaseObserverStats;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -155,6 +158,7 @@ public class SegmentMapper {
     GenericRow reuse = new GenericRow();
     for (RecordReaderFileConfig recordReaderFileConfig : _recordReaderFileConfigs) {
       RecordReader recordReader = recordReaderFileConfig.getRecordReader();
+      addCreationTimeColumnIfNeeded(recordReader);
 
       // Mapper can terminate midway of reading a file if the intermediate file size has crossed the configured
       // threshold. Map phase will continue in the next iteration right where we are leaving off in the current
@@ -174,6 +178,18 @@ public class SegmentMapper {
       fileManager.closeFileWriter();
     }
     return _partitionToFileManagerMap;
+  }
+
+  private void addCreationTimeColumnIfNeeded(RecordReader recordReader) {
+    FieldSpec fieldSpec = _processorConfig.getSchema().getFieldSpecFor(BuiltInVirtualColumn.CREATIONTIME);
+    if (fieldSpec == null || fieldSpec.isVirtualColumn()) {
+      return;
+    }
+    if (recordReader instanceof PinotSegmentRecordReader) {
+      ((PinotSegmentRecordReader) recordReader).addCreationTimeColumn();
+    } else if (recordReader instanceof CompactedPinotSegmentRecordReader) {
+      ((CompactedPinotSegmentRecordReader) recordReader).addCreationTimeColumn();
+    }
   }
 
 

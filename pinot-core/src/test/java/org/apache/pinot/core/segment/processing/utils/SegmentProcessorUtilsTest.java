@@ -25,6 +25,7 @@ import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -85,5 +86,23 @@ public class SegmentProcessorUtilsTest {
             .addDateTime("dateTime", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
     assertThrows(IllegalArgumentException.class,
         () -> SegmentProcessorUtils.getFieldSpecs(schemaWithReservedColumn, MergeType.ROLLUP, null, true));
+  }
+
+  @Test
+  public void testCreationTimeIsPayloadInsteadOfSortField() {
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("dimensionCol", DataType.STRING)
+        .addSingleValueDimension(BuiltInVirtualColumn.CREATIONTIME, DataType.LONG)
+        .addMetric("metricCol", DataType.LONG).build();
+
+    for (MergeType mergeType : MergeType.values()) {
+      Pair<List<FieldSpec>, Integer> pair = SegmentProcessorUtils.getFieldSpecs(schema, mergeType, null);
+      List<FieldSpec> fieldSpecs = pair.getLeft();
+      assertEquals(fieldSpecs.get(fieldSpecs.size() - 1).getName(), BuiltInVirtualColumn.CREATIONTIME);
+      int expectedNumSortFields = mergeType == MergeType.CONCAT ? 0 : mergeType == MergeType.ROLLUP ? 1 : 2;
+      assertEquals(pair.getRight().intValue(), expectedNumSortFields);
+    }
+
+    assertThrows(IllegalArgumentException.class, () -> SegmentProcessorUtils.getFieldSpecs(schema, MergeType.ROLLUP,
+        List.of(BuiltInVirtualColumn.CREATIONTIME)));
   }
 }

@@ -41,6 +41,21 @@ public class VirtualColumnProviderFactory {
     }
   }
 
+  /// Replaces the virtual `$creationTime` field, when present, with the physical field used by segment rewrites.
+  public static FieldSpec materializeCreationTimeColumn(Schema schema) {
+    FieldSpec fieldSpec = schema.getFieldSpecFor(BuiltInVirtualColumn.CREATIONTIME);
+    if (fieldSpec != null && !fieldSpec.isVirtualColumn()) {
+      return fieldSpec;
+    }
+    if (fieldSpec != null) {
+      schema.removeField(BuiltInVirtualColumn.CREATIONTIME);
+    }
+    DimensionFieldSpec creationTimeFieldSpec =
+        new DimensionFieldSpec(BuiltInVirtualColumn.CREATIONTIME, FieldSpec.DataType.LONG, true);
+    schema.addField(creationTimeFieldSpec);
+    return creationTimeFieldSpec;
+  }
+
   public static void addBuiltInVirtualColumnsToSegmentSchema(Schema schema, String segmentName) {
     if (!schema.hasColumn(BuiltInVirtualColumn.DOCID)) {
       schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.DOCID, FieldSpec.DataType.INT, true,

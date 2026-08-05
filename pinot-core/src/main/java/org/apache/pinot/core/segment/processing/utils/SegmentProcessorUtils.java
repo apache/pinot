@@ -30,6 +30,8 @@ import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 
 
 public final class SegmentProcessorUtils {
@@ -69,6 +71,13 @@ public final class SegmentProcessorUtils {
     if (sortOrder == null) {
       sortOrder = List.of();
     }
+    Preconditions.checkArgument(!sortOrder.contains(BuiltInVirtualColumn.CREATIONTIME),
+        "Cannot sort on reserved column: %s", BuiltInVirtualColumn.CREATIONTIME);
+
+    FieldSpec creationTimeFieldSpec = schema.getFieldSpecFor(BuiltInVirtualColumn.CREATIONTIME);
+    if (creationTimeFieldSpec != null && creationTimeFieldSpec.isVirtualColumn()) {
+      creationTimeFieldSpec = null;
+    }
 
     List<FieldSpec> fieldSpecs = new ArrayList<>();
     for (String sortColumn : sortOrder) {
@@ -85,7 +94,8 @@ public final class SegmentProcessorUtils {
     List<FieldSpec> metricFieldSpecs = new ArrayList<>();
     List<FieldSpec> nonMetricFieldSpecs = new ArrayList<>();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (!fieldSpec.isVirtualColumn() && !sortOrder.contains(fieldSpec.getName())) {
+      if (!fieldSpec.isVirtualColumn() && !sortOrder.contains(fieldSpec.getName())
+          && !fieldSpec.getName().equals(BuiltInVirtualColumn.CREATIONTIME)) {
         if (fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC) {
           metricFieldSpecs.add(fieldSpec);
         } else {
@@ -103,6 +113,10 @@ public final class SegmentProcessorUtils {
     }
     metricFieldSpecs.sort(Comparator.comparing(FieldSpec::getName));
     fieldSpecs.addAll(metricFieldSpecs);
+    if (creationTimeFieldSpec != null) {
+      // Carry creation time as payload. It must not change ROLLUP grouping or DEDUP equality.
+      fieldSpecs.add(creationTimeFieldSpec);
+    }
 
     int numSortFields;
     switch (mergeType) {
@@ -113,12 +127,24 @@ public final class SegmentProcessorUtils {
         numSortFields = sortOrder.size() + nonMetricFieldSpecs.size() + (includeOriginalTimeField ? 1 : 0);
         break;
       case DEDUP:
-        numSortFields = fieldSpecs.size();
+        numSortFields = fieldSpecs.size() - (creationTimeFieldSpec != null ? 1 : 0);
         break;
       default:
         throw new IllegalStateException("Unsupported merge type: " + mergeType);
     }
 
     return new ImmutablePair<>(fieldSpecs, numSortFields);
+  }
+
+  /// Retains the newest source creation time when multiple input rows collapse into one output row.
+  public static void mergeCreationTime(GenericRow target, GenericRow source) {
+    Object sourceValue = source.getValue(BuiltInVirtualColumn.CREATIONTIME);
+    if (sourceValue == null) {
+      return;
+    }
+    Object targetValue = target.getValue(BuiltInVirtualColumn.CREATIONTIME);
+    if (targetValue == null || ((Number) sourceValue).longValue() > ((Number) targetValue).longValue()) {
+      target.putValue(BuiltInVirtualColumn.CREATIONTIME, sourceValue);
+    }
   }
 }

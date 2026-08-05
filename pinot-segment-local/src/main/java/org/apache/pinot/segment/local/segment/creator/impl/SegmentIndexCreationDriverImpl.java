@@ -37,7 +37,9 @@ import org.apache.pinot.segment.local.segment.creator.ColumnarSegmentCreationDat
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReaderFactory;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
@@ -50,7 +52,6 @@ import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.IngestionSchemaValidator;
 import org.apache.pinot.spi.data.Schema;
@@ -163,12 +164,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (fieldSpec != null && !fieldSpec.isVirtualColumn()) {
       return;
     }
-    if (fieldSpec != null) {
-      schema.removeField(BuiltInVirtualColumn.CREATIONTIME);
-    }
-    DimensionFieldSpec creationTimeFieldSpec =
-        new DimensionFieldSpec(BuiltInVirtualColumn.CREATIONTIME, FieldSpec.DataType.LONG, true);
-    schema.addField(creationTimeFieldSpec);
+    FieldSpec creationTimeFieldSpec = VirtualColumnProviderFactory.materializeCreationTimeColumn(schema);
     config.getIndexConfigsByColName().put(BuiltInVirtualColumn.CREATIONTIME,
         FieldIndexConfigsUtil.fromFieldConfig(null, creationTimeFieldSpec));
   }
@@ -188,6 +184,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   /// @throws Exception if initialization fails
   public void init(SegmentGeneratorConfig config, ColumnReaderFactory columnReaderFactory)
       throws Exception {
+    if (columnReaderFactory instanceof PinotSegmentColumnReaderFactory) {
+      addCreationTimeColumn(config);
+    }
     // Initialize the column reader factory with target schema
     columnReaderFactory.init(config.getSchema());
 
