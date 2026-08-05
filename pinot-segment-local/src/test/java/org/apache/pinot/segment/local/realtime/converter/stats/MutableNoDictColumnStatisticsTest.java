@@ -32,9 +32,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.segment.spi.Constants.UNKNOWN_CARDINALITY;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
@@ -87,6 +85,28 @@ public class MutableNoDictColumnStatisticsTest {
     assertEquals(stats.getTotalNumberOfEntries(), numDocs);
     assertEquals(stats.getMaxNumberOfMultiValues(), 0);
     assertEquals(stats.getMaxRowLengthInBytes(), type.size());
+  }
+
+  // ======== isSorted caching ========
+
+  @Test
+  public void testIsSortedScansOnce() {
+    int numDocs = 3;
+    FieldSpec fieldSpec = new DimensionFieldSpec("col", DataType.INT, true);
+    Comparable[] values = fixedWidthValues(DataType.INT);
+
+    DataSourceMetadata metadata = mockMetadata(fieldSpec, numDocs);
+
+    MutableForwardIndex forwardIndex = mock(MutableForwardIndex.class);
+    when(forwardIndex.isSingleValue()).thenReturn(true);
+    stubForwardIndexReads(forwardIndex, DataType.INT, values);
+
+    MutableNoDictColumnStatistics stats =
+        new MutableNoDictColumnStatistics(mockNoDictDataSource(metadata, forwardIndex), null, false);
+
+    assertTrue(stats.isSorted());
+    assertTrue(stats.isSorted());
+    verify(forwardIndex, times(numDocs)).getInt(anyInt());
   }
 
   // ======== BigDecimal SV ========

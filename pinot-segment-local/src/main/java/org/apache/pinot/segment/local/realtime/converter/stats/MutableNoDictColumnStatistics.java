@@ -45,6 +45,13 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
   protected final boolean _isSortedColumn;
   protected final MutableForwardIndex _forwardIndex;
 
+  // Lazily computed because it may require a full scan of the forward index, and it is queried multiple times per
+  // column during segment creation. Left unsynchronized: an instance describes a single column and is reached only
+  // through the per-column stats map, so it is confined to whichever thread creates that column. Even if that ever
+  // changes, the segment no longer accepts documents by the time stats are collected, so a race can only recompute
+  // the same value.
+  private Boolean _sorted;
+
   public MutableNoDictColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn) {
     _dataSourceMetadata = dataSource.getDataSourceMetadata();
     _fieldSpec = _dataSourceMetadata.getFieldSpec();
@@ -105,6 +112,13 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
 
   @Override
   public boolean isSorted() {
+    if (_sorted == null) {
+      _sorted = computeSorted();
+    }
+    return _sorted;
+  }
+
+  private boolean computeSorted() {
     // Sorted column is guaranteed to be sorted by construction — no scan needed
     if (_isSortedColumn) {
       return true;
