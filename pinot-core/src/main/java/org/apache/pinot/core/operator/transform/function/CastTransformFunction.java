@@ -28,6 +28,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -261,6 +262,15 @@ public class CastTransformFunction extends BaseTransformFunction {
           ArrayCopyUtils.copyFromTimestamp(longValues, _stringValuesSV, length);
           return _stringValuesSV;
         }
+        case UUID: {
+          int length = valueBlock.getNumDocs();
+          initStringValuesSV(length);
+          byte[][] uuidValues = _transformFunction.transformToBytesValuesSV(valueBlock);
+          for (int i = 0; i < length; i++) {
+            _stringValuesSV[i] = UuidUtils.toString(uuidValues[i]);
+          }
+          return _stringValuesSV;
+        }
         default:
           return _transformFunction.transformToStringValuesSV(valueBlock);
       }
@@ -422,6 +432,19 @@ public class CastTransformFunction extends BaseTransformFunction {
           initStringValuesMV(length);
           long[][] longValuesMV = _transformFunction.transformToLongValuesMV(valueBlock);
           ArrayCopyUtils.copyFromTimestamp(longValuesMV, _stringValuesMV, length);
+          return _stringValuesMV;
+        case UUID:
+          length = valueBlock.getNumDocs();
+          initStringValuesMV(length);
+          byte[][][] uuidValuesMV = _transformFunction.transformToBytesValuesMV(valueBlock);
+          for (int i = 0; i < length; i++) {
+            int numValues = uuidValuesMV[i].length;
+            String[] stringValues = new String[numValues];
+            for (int j = 0; j < numValues; j++) {
+              stringValues[j] = UuidUtils.toString(uuidValuesMV[i][j]);
+            }
+            _stringValuesMV[i] = stringValues;
+          }
           return _stringValuesMV;
         default:
           return _transformFunction.transformToStringValuesMV(valueBlock);
