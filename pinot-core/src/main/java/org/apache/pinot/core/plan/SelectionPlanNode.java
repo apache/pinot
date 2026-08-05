@@ -31,6 +31,7 @@ import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
 import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByDescOperation;
 import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByLinearOperator;
+import org.apache.pinot.core.operator.query.StreamingSelectionOrderByOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -87,11 +88,29 @@ public class SelectionPlanNode implements PlanNode {
         maxDocsPerCall = Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
       }
 
-      BaseProjectOperator<?> projectOperator =
-          getSortedByProject(expressionsToProject, maxDocsPerCall, orderByExpressions);
       // Empty operators support both directions, so check compatibility with the query order.
       DocIdOrderedOperator.DocIdOrder queryOrder =
           DocIdOrderedOperator.DocIdOrder.fromAsc(orderByExpressions.get(0).isAsc());
+
+      // Opt-in streaming path: emit one globally-sorted block at a time so a downstream k-way-merge combine can pull
+      // lazily. Only build it when the first order-by column is an identifier (kept consistent with the combine-side
+      // gate) and the forward-scan project is order-compatible; the DESC-incompatible sorted case still falls back to
+      // the materialized SelectionPartiallyOrderedByDescOperation below so global order stays correct.
+      if (_queryContext.isSortedSelectionMergeEnabled()
+          && orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
+        // The forward scan fetches only the order-by expressions; the streaming operator fetches the rest in a second
+        // pass.
+        BaseProjectOperator<?> streamingProjectOperator =
+            getSortedByProject(expressionsToProject, maxDocsPerCall, orderByExpressions);
+        if (streamingProjectOperator.isCompatibleWith(queryOrder)) {
+          return new StreamingSelectionOrderByOperator(_indexSegment, _queryContext, expressions,
+              streamingProjectOperator, sortedColumnsPrefixSize);
+        }
+        // DESC-incompatible: fall through to the materialized fallback, which builds its own project below.
+      }
+
+      BaseProjectOperator<?> projectOperator =
+          getSortedByProject(expressionsToProject, maxDocsPerCall, orderByExpressions);
       if (projectOperator.isCompatibleWith(queryOrder)) {
         return new SelectionPartiallyOrderedByLinearOperator(_indexSegment, _queryContext, expressions, projectOperator,
             sortedColumnsPrefixSize);
