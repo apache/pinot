@@ -52,16 +52,12 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.TimeValue;
 
 
-/**
- * Micro-benchmark for resolving a large {@code IN} list against a high-cardinality STRING dictionary whose values are
- * bare signed 64-bit integers stored as strings (e.g. {@code "-7930618564724103528"}) with no shared prefix. This
- * mirrors the production hot path
- * {@code PredicateUtils.getDictIdSet -> BaseImmutableDictionary.getDictIdsDivideBinarySearch ->
- * FixedByteValueReaderWriter.compareUtf8Bytes -> ValueReaderComparisons.mismatch}.
- *
- * Run the same benchmark on the baseline tree and on the patched tree to compare throughput and, with
- * {@code -prof gc}, the per-probe allocation rate.
- */
+/// Micro-benchmark for resolving a large `IN` list against a high-cardinality STRING dictionary whose values are bare
+/// signed 64-bit integers stored as strings (e.g. `"-7930618564724103528"`) with no shared prefix. This mirrors the
+/// production hot path `PredicateUtils.getDictIdSet -> BaseImmutableDictionary.getDictIdsDivideBinarySearch ->
+/// FixedByteValueReaderWriter.compareUtf8Bytes -> ValueReaderComparisons.mismatch`.
+/// Run the same benchmark on the baseline tree and on the patched tree to compare throughput and, with `-prof gc`, the
+/// per-probe allocation rate.
 @State(Scope.Benchmark)
 public class BenchmarkStringInListLookup {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "BenchmarkStringInListLookup");
@@ -130,7 +126,7 @@ public class BenchmarkStringInListLookup {
     FileUtils.deleteDirectory(INDEX_DIR);
   }
 
-  /** End-to-end IN-list resolution as used by the IN predicate evaluator. */
+  /// End-to-end IN-list resolution as used by the IN predicate evaluator.
   @Benchmark
   @BenchmarkMode(Mode.Throughput)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -140,7 +136,7 @@ public class BenchmarkStringInListLookup {
     return dictIds.size();
   }
 
-  /** Isolates the comparison primitive: one independent binary search per value via indexOf. */
+  /// Isolates the comparison primitive: one independent binary search per value via indexOf.
   @Benchmark
   @BenchmarkMode(Mode.Throughput)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
