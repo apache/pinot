@@ -36,6 +36,17 @@ import static org.testng.Assert.assertTrue;
 
 public class CastTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
+  public void testCastUuidToString() {
+    String uuid = "550e8400-e29b-41d4-a716-446655440000";
+    ExpressionContext expression = RequestContextUtils.getExpression("CAST(toUuid('" + uuid + "') AS STRING)");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+
+    String[] expectedValues = new String[NUM_ROWS];
+    Arrays.fill(expectedValues, uuid);
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
   public void testCastTransformFunction() {
     ExpressionContext expression =
         RequestContextUtils.getExpression(String.format("CAST(%s AS string)", INT_SV_COLUMN));
