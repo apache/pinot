@@ -32,6 +32,7 @@ import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
 import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByDescOperation;
 import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByLinearOperator;
+import org.apache.pinot.core.operator.query.StreamingSelectionOrderByOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -104,6 +105,34 @@ public class SelectionPlanNode implements PlanNode {
       boolean lateMaterialize = expressions.size() > numOrderByExpressions && !scanBoundedByLimit
           && QueryOptionsUtils.isLateMaterializeSortedOrderByEnabled(_queryContext.getQueryOptions());
 
+      // Remember that we cannot use asc == projectOperator.isAscending() because empty operators are considered
+      // both ascending and descending
+      DocIdOrderedOperator.DocIdOrder queryOrder = DocIdOrderedOperator.DocIdOrder.fromAsc(asc);
+
+      // Opt-in streaming path: emit one globally-sorted block at a time so a downstream k-way-merge combine can pull
+      // lazily. Only build it when the first order-by column is an identifier (kept consistent with the combine-side
+      // gate) and the forward-scan project is order-compatible; the DESC-incompatible sorted case still falls back to
+      // the materialized SelectionPartiallyOrderedByDescOperation below so global order stays correct.
+      if (_queryContext.isSortedSelectionMergeEnabled()
+          && orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
+        // When there are non-order-by output expressions, only fetch the order-by expressions during the forward scan
+        // (the streaming operator fetches the rest in a second pass); otherwise fetch all expressions.
+        List<ExpressionContext> projectExpressions = expressions;
+        if (expressions.size() > numOrderByExpressions) {
+          projectExpressions = new ArrayList<>(numOrderByExpressions);
+          for (OrderByExpressionContext orderByExpression : orderByExpressions) {
+            projectExpressions.add(orderByExpression.getExpression());
+          }
+        }
+        BaseProjectOperator<?> streamingProjectOperator =
+            getSortedByProject(projectExpressions, maxDocsPerCall, orderByExpressions);
+        if (streamingProjectOperator.isCompatibleWith(queryOrder)) {
+          return new StreamingSelectionOrderByOperator(_indexSegment, _queryContext, expressions,
+              streamingProjectOperator, sortedColumnsPrefixSize);
+        }
+        // DESC-incompatible: fall through to the materialized fallback, which builds its own project below.
+      }
+
       // Build the project operator once. Constructing one is not free -- it resolves a DataSource and a
       // ColumnContext per selected column, and some implementations start prefetching those columns -- so a
       // build-and-discard probe would read exactly the columns this is trying to avoid reading.
@@ -111,9 +140,6 @@ public class SelectionPlanNode implements PlanNode {
           lateMaterialize ? expressions.subList(0, numOrderByExpressions) : expressions;
       BaseProjectOperator<?> projectOperator =
           getSortedByProject(expressionsToProject, maxDocsPerCall, orderByExpressions);
-      // Remember that we cannot use asc == projectOperator.isAscending() because empty operators are considered
-      // both ascending and descending
-      DocIdOrderedOperator.DocIdOrder queryOrder = DocIdOrderedOperator.DocIdOrder.fromAsc(asc);
       if (projectOperator.isCompatibleWith(queryOrder)) {
         return new SelectionPartiallyOrderedByLinearOperator(_indexSegment, _queryContext, expressions, projectOperator,
             sortedColumnsPrefixSize, lateMaterialize);
