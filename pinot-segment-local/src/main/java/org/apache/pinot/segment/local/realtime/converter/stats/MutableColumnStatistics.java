@@ -43,6 +43,13 @@ public class MutableColumnStatistics implements ColumnStatistics {
   //       dictionary.
   protected final Dictionary _dictionary;
 
+  // Lazily computed because it may require a full scan of the forward index, and it is queried multiple times per
+  // column during segment creation. Left unsynchronized: an instance describes a single column and is reached only
+  // through the per-column stats map, so it is confined to whichever thread creates that column. Even if that ever
+  // changes, the segment no longer accepts documents by the time stats are collected, so a race can only recompute
+  // the same value.
+  private Boolean _sorted;
+
   public MutableColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn) {
     _dataSource = dataSource;
     _dataSourceMetadata = dataSource.getDataSourceMetadata();
@@ -102,6 +109,13 @@ public class MutableColumnStatistics implements ColumnStatistics {
 
   @Override
   public boolean isSorted() {
+    if (_sorted == null) {
+      _sorted = computeSorted();
+    }
+    return _sorted;
+  }
+
+  private boolean computeSorted() {
     // Sorted column is guaranteed to be sorted by construction — no scan needed
     if (_isSortedColumn) {
       return true;
@@ -112,28 +126,40 @@ public class MutableColumnStatistics implements ColumnStatistics {
       return false;
     }
 
+    // A single distinct value is always sorted — no scan needed. Cardinality cannot be 0 here because the segment is
+    // non-empty and every document of a dictionary-encoded column has a dict id.
+    if (getCardinality() == 1) {
+      return true;
+    }
+
     // Iterate over all data to figure out whether or not it's in sorted order
     MutableForwardIndex forwardIndex = (MutableForwardIndex) _dataSource.getForwardIndex();
     Preconditions.checkState(forwardIndex != null, "Failed to find forward index for column: %s", _fieldSpec.getName());
     int numDocs = _dataSourceMetadata.getNumDocs();
     // Iterate with the sorted order if provided
     if (_sortedDocIds != null) {
-      int previousDictId = forwardIndex.getDictId(_sortedDocIds[0]);
+      int prevDictId = forwardIndex.getDictId(_sortedDocIds[0]);
       for (int i = 1; i < numDocs; i++) {
-        int currentDictId = forwardIndex.getDictId(_sortedDocIds[i]);
-        if (_dictionary.compare(previousDictId, currentDictId) > 0) {
-          return false;
+        int dictId = forwardIndex.getDictId(_sortedDocIds[i]);
+        // A repeated dict id cannot break the sort order, so skip the comparison entirely
+        if (dictId != prevDictId) {
+          if (_dictionary.compare(prevDictId, dictId) > 0) {
+            return false;
+          }
+          prevDictId = dictId;
         }
-        previousDictId = currentDictId;
       }
     } else {
-      int previousDictId = forwardIndex.getDictId(0);
+      int prevDictId = forwardIndex.getDictId(0);
       for (int i = 1; i < numDocs; i++) {
-        int currentDictId = forwardIndex.getDictId(i);
-        if (_dictionary.compare(previousDictId, currentDictId) > 0) {
-          return false;
+        int dictId = forwardIndex.getDictId(i);
+        // A repeated dict id cannot break the sort order, so skip the comparison entirely
+        if (dictId != prevDictId) {
+          if (_dictionary.compare(prevDictId, dictId) > 0) {
+            return false;
+          }
+          prevDictId = dictId;
         }
-        previousDictId = currentDictId;
       }
     }
 
