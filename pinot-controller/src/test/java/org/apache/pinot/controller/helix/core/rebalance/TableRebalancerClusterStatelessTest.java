@@ -1318,6 +1318,17 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.PASS);
     assertEquals(preCheckerResult.getMessage(), "All rebalance parameters look good");
 
+    // trigger the warning about lowDiskMode being inert with downtime, which replaces the IdealState in one go
+    rebalanceConfig.setLowDiskMode(true);
+    rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
+    preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
+    assertNotNull(preCheckerResult);
+    assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
+    assertEquals(preCheckerResult.getMessage(),
+        "lowDiskMode has no effect when downtime is enabled, disable downtime for segments to be deleted before the "
+            + "new ones are added.");
+    rebalanceConfig.setLowDiskMode(false);
+
     // trigger peer-download enabled table rebalance warning
     newTableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
 

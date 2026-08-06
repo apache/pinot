@@ -104,6 +104,22 @@ public class DefaultRebalancePreCheckerTest {
   }
 
   @Test
+  public void testDowntimeCancelsLowDiskModeOut() {
+    // Downtime replaces the IdealState with the target assignment in one go, skipping the incremental path that is the
+    // only one honoring lowDiskMode, so the transient peak stands and the message has to say so
+    setDiskUsage(550L, 0L);
+    RebalanceConfig rebalanceConfig = lowDiskMode();
+    rebalanceConfig.setDowntime(true);
+
+    RebalancePreCheckerResult result = checkDiskUtilization(rebalanceConfig);
+    assertEquals(result.getPreCheckStatus(), PreCheckStatus.ERROR);
+    assertEquals(result.getMessage(),
+        "UNSAFE. Servers with unsafe disk utilization during rebalance (>50%): " + SERVER_0 + " (55%). lowDiskMode has "
+            + "no effect while downtime is enabled, disable downtime for it to delete segments before adding the new "
+            + "ones");
+  }
+
+  @Test
   public void testDiskUsageInfoNotAvailable() {
     ResourceUtilizationInfo.setDiskUsageInfo(Map.of());
     RebalancePreCheckerResult result = checkDiskUtilization(new RebalanceConfig());

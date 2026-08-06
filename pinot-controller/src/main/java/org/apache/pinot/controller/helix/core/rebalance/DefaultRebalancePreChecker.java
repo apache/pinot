@@ -273,8 +273,10 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   ///   brings the end state back within the threshold.
   /// - **During the rebalance**, where a server can transiently hold the segments it is gaining on top of the ones it
   ///   is about to lose. Only `lowDiskMode` rules that peak out, by waiting for the segments to be deleted before
-  ///   adding the new ones, so going over the threshold there is an error unless it is enabled. Note that `downtime`
-  ///   does not help: it hands every segment to Helix at once without ordering the drops before the adds.
+  ///   adding the new ones, so going over the threshold there is an error unless it is enabled. `downtime` does not
+  ///   help: it replaces the IdealState with the target assignment in one go, without ordering the drops before the
+  ///   adds. Worse, that one-shot path skips the incremental one `lowDiskMode` acts on, so `downtime` cancels
+  ///   `lowDiskMode` out entirely.
   ///
   /// Every segment is assumed to take up disk space on each server it is assigned to. Downstream projects where that
   /// does not hold (e.g. because a segment can be stored outside of the server, as indicated by
@@ -350,15 +352,19 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       return RebalancePreCheckerResult.pass(withinThreshold);
     }
     // lowDiskMode is the only way to rule the transient disk usage above out, since it waits for the segments to be
-    // deleted before adding the new ones. downtime does not: it moves every segment in one shot without ordering the
-    // drops before the adds, so a server can still end up holding both at once
-    if (preCheckContext.getRebalanceConfig().isLowDiskMode()) {
+    // deleted before adding the new ones. It is however only honored by the incremental rebalance path, which downtime
+    // skips altogether by replacing the IdealState with the target assignment in one go
+    RebalanceConfig rebalanceConfig = preCheckContext.getRebalanceConfig();
+    if (rebalanceConfig.isLowDiskMode() && !rebalanceConfig.isDowntime()) {
       return RebalancePreCheckerResult.pass(withinThreshold + " after rebalance. Some servers would go over it during "
           + "the rebalance, but lowDiskMode avoids that transient disk usage");
     }
     return RebalancePreCheckerResult.error(
-        getUnsafeDiskUtilizationMessage("during rebalance", serversUnsafeDuringRebalance, threshold)
-            + ". Enable lowDiskMode to delete segments before adding the new ones");
+        getUnsafeDiskUtilizationMessage("during rebalance", serversUnsafeDuringRebalance, threshold) + (
+            rebalanceConfig.isLowDiskMode()
+                ? ". lowDiskMode has no effect while downtime is enabled, disable downtime for it to delete segments "
+                + "before adding the new ones"
+                : ". Enable lowDiskMode to delete segments before adding the new ones"));
   }
 
   private static void addIfOverThreshold(List<String> servers, String server, double utilizationRatio,
@@ -399,6 +405,13 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       if (!segmentsToMove.isEmpty() && numReplicas > 1) {
         pass = false;
         warnings.add("Number of replicas (" + numReplicas + ") is greater than 1, downtime is not recommended.");
+      }
+      // Downtime replaces the IdealState with the target assignment in one go, skipping the incremental path that is
+      // the only one honoring lowDiskMode
+      if (rebalanceConfig.isLowDiskMode()) {
+        pass = false;
+        warnings.add("lowDiskMode has no effect when downtime is enabled, disable downtime for segments to be deleted "
+            + "before the new ones are added.");
       }
     }
 
