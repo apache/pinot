@@ -139,6 +139,11 @@ public class VarByteChunkForwardIndexReaderV4
   }
 
   @Override
+  public String getMapAsJsonString(int docId, ReaderContext context) {
+    return MapUtils.frameToJsonString(context.getValue(docId));
+  }
+
+  @Override
   public int getIntMV(int docId, int[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
     return ArraySerDeUtils.deserializeIntArrayWithLength(context.getValue(docId), valueBuffer);
   }
