@@ -129,6 +129,13 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
       return false;
     }
 
+    // A single distinct value is always sorted — no scan needed. Min and max are tracked per raw value during
+    // ingestion, but are left null when aggregated metrics are enabled, so fall back to the scan when unavailable.
+    Comparable<?> minValue = getMinValue();
+    if (minValue != null && minValue.equals(getMaxValue())) {
+      return true;
+    }
+
     int numDocs = _dataSourceMetadata.getNumDocs();
 
     // Verify that values are non-decreasing when iterated in the given order. The BYTES path uses
