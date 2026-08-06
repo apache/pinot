@@ -1067,9 +1067,9 @@ public class AggregationSubsumptionStrategyTest {
     MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
 
     assertNotNull(result, "The complete materialized grouping expression is a valid residual");
-    assertEquals(result.getCost(), 7.0);
+    assertEquals(result.getMatchType(), MatchType.AGG_REAGG);
     Expression residual = result.getMaterializedViewQuery().getFilterExpression();
-    assertNotNull(residual);
+    assertNotNull(residual, "The residual must be retained on the MV side, not dropped");
     assertEquals(residual.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "day");
   }
 
@@ -1089,10 +1089,79 @@ public class AggregationSubsumptionStrategyTest {
     MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
 
     assertNotNull(result, "Directly projected identifier group keys remain valid residuals");
-    assertEquals(result.getCost(), 7.0);
+    assertEquals(result.getMatchType(), MatchType.AGG_REAGG);
     Expression residual = result.getMaterializedViewQuery().getFilterExpression();
-    assertNotNull(residual);
+    assertNotNull(residual, "The residual must be retained on the MV side, not dropped");
     assertEquals(residual.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "mv_city");
+  }
+
+  /// Regression: an MV may group by a key it never materializes — here `city` is only visible
+  /// through `UPPER(city)`. Matching such an MV would rewrite the user's `GROUP BY city` to the
+  /// missing column and emit `GROUP BY <null identifier>`, failing on the server instead of
+  /// falling back to the base table. Treating the scalar as a direct projection hit must not
+  /// bypass that check.
+  @Test
+  public void testNoMatchScalarProjectedButGroupKeyNotMaterialized() {
+    String definedSql =
+        "SELECT UPPER(city) AS uc, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT UPPER(city), SUM(revenue) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result, "'city' is grouped by the MV but not materialized as a column");
+  }
+
+  /// The same invariant for a plain identifier grouping key: an MV that groups by `city` without
+  /// projecting it cannot answer a query grouped by `city`.
+  @Test
+  public void testNoMatchGroupKeyNotMaterialized() {
+    String definedSql = "SELECT SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT SUM(revenue) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result, "'city' is grouped by the MV but not materialized as a column");
+  }
+
+  /// Counterpart to the two rejections above: once the MV also projects the grouping key, the
+  /// scalar projection resolves and the key remaps to the MV column.
+  @Test
+  public void testScalarProjectedWithMaterializedGroupKey() {
+    String definedSql =
+        "SELECT city, UPPER(city) AS uc, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT UPPER(city), SUM(revenue) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "Both the grouping key and the scalar projection are materialized");
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    assertEquals(rewritten.getGroupByList().size(), 1);
+    assertEquals(rewritten.getGroupByList().get(0).getIdentifier().getName(), "city");
+
+    Function upperAlias = rewritten.getSelectList().get(0).getFunctionCall();
+    assertNotNull(upperAlias);
+    assertEquals(upperAlias.getOperator(), "as");
+    assertEquals(upperAlias.getOperands().get(0).getIdentifier().getName(), "uc");
+  }
+
+  /// A whole-table user aggregate re-aggregates the MV's per-group rows, so no GROUP BY key needs
+  /// remapping — the unmaterialized MV grouping key must not reject this rewrite.
+  @Test
+  public void testWholeTableAggregateOverUnmaterializedGroupKey() {
+    String definedSql = "SELECT SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery("SELECT SUM(revenue) FROM orders");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "Whole-table re-aggregation does not reference the MV grouping key");
+    assertNull(result.getMaterializedViewQuery().getGroupByList());
   }
 
   /// Regression: a nested aggregate such as ROUND(SUM(x)) must stay on the aggregate path. There is

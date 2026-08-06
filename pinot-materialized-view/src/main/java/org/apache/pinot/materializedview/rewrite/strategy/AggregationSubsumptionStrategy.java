@@ -69,7 +69,8 @@ public class AggregationSubsumptionStrategy extends AbstractSubsumptionStrategy 
   }
 
   @Override
-  protected boolean groupByMatches(PinotQuery userQuery, PinotQuery viewQuery) {
+  protected boolean groupByMatches(PinotQuery userQuery, PinotQuery viewQuery,
+      Map<Expression, String> viewProjectionMap) {
     List<Expression> userGroupBy = userQuery.getGroupByList();
     List<Expression> materializedViewGroupBy = viewQuery.getGroupByList();
 
@@ -90,7 +91,22 @@ public class AggregationSubsumptionStrategy extends AbstractSubsumptionStrategy 
 
     Set<Expression> userSet = new HashSet<>(userGroupBy);
     Set<Expression> materializedViewSet = new HashSet<>(materializedViewGroupBy);
-    return materializedViewSet.containsAll(userSet);
+    if (!materializedViewSet.containsAll(userSet)) {
+      return false;
+    }
+
+    /// The MV grouping by a key is not enough — buildResult rewrites every user GROUP BY key to the
+    /// MV column that holds it, so the MV must also *project* each key.  An MV such as
+    /// `SELECT UPPER(city) AS uc, SUM(revenue) AS sum_rev FROM orders GROUP BY city` groups by
+    /// `city` without materializing it: the rewritten query would carry `GROUP BY <null>` and fail
+    /// on the server instead of falling back to the base table.  Reject here so the user query
+    /// simply runs against the base table.
+    for (Expression userGroupByExpr : userSet) {
+      if (!viewProjectionMap.containsKey(userGroupByExpr)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @Override
@@ -302,6 +318,8 @@ public class AggregationSubsumptionStrategy extends AbstractSubsumptionStrategy 
     if (userGroupBy != null && !userGroupBy.isEmpty()) {
       List<Expression> remappedGroupBy = new ArrayList<>(userGroupBy.size());
       for (Expression gbExpr : userGroupBy) {
+        /// Never null: groupByMatches rejected the candidate unless every user GROUP BY key is
+        /// projected by the MV.  A null here would silently emit `GROUP BY <null identifier>`.
         String materializedViewCol = viewProjectionMap.get(gbExpr);
         remappedGroupBy.add(RequestUtils.getIdentifierExpression(materializedViewCol));
       }

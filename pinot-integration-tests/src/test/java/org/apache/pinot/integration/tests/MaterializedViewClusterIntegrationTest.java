@@ -132,6 +132,12 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
 
   private static final String[] CARRIERS = {"AA", "DL", "UA", "WN", "US", "B6", "OO", "EV", "MQ", "NK"};
 
+  /// Row cap for the source aggregation that seeds an MV segment.  The MV must hold *every* group
+  /// or the row-for-row comparison against the rewrite-disabled baseline would validate a
+  /// truncated view; callers assert the returned row count stays strictly below this cap so a
+  /// dataset that outgrows it fails loudly instead of silently materializing a prefix.
+  private static final int MATERIALIZED_VIEW_SOURCE_ROW_LIMIT = 10000;
+
   private PinotHelixResourceManager _helixResourceManager;
   private HelixPropertyStore<ZNRecord> _propertyStore;
 
@@ -1220,12 +1226,16 @@ public class MaterializedViewClusterIntegrationTest extends BaseClusterIntegrati
         + "FROM " + SOURCE_TABLE_NAME + " "
         + "GROUP BY UPPER(UniqueCarrier), Origin "
         + "ORDER BY UPPER(UniqueCarrier), Origin "
-        + "LIMIT 10000";
+        + "LIMIT " + MATERIALIZED_VIEW_SOURCE_ROW_LIMIT;
     JsonNode sourceAggregationResponse = postQuery(sourceAggregationQuery);
     assertNoExceptions(sourceAggregationResponse);
 
     JsonNode sourceRows = sourceAggregationResponse.get("resultTable").get("rows");
     assertTrue(sourceRows.size() > 0, "Source aggregation should produce rows");
+    assertTrue(sourceRows.size() < MATERIALIZED_VIEW_SOURCE_ROW_LIMIT,
+        "Source aggregation hit the row limit, so the MV would hold only a prefix of the groups "
+            + "and the row-for-row comparison would validate a truncated view. Raise "
+            + "MATERIALIZED_VIEW_SOURCE_ROW_LIMIT.");
     List<GenericRow> rows = new ArrayList<>(sourceRows.size());
     for (JsonNode sourceRow : sourceRows) {
       GenericRow row = new GenericRow();
