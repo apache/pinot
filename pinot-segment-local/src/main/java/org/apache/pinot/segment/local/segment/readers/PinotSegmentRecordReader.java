@@ -28,8 +28,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.local.segment.index.readers.ConstantValueLongDictionary;
-import org.apache.pinot.segment.local.segment.index.readers.constant.ConstantSortedIndexReader;
 import org.apache.pinot.segment.local.segment.readers.sort.PinotSegmentSorter;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -67,6 +65,13 @@ public class PinotSegmentRecordReader implements RecordReader {
   private int[] _sortedDocIds;
   private boolean _skipDefaultNullValues;
   private boolean _readingImmutableSegment;
+
+  /// Pre-boxed [#CREATION_TIME_COLUMN] value for the segment being read, or `null` when the segment is mutable and
+  /// therefore has no immutable creation time. The value is constant per segment, so it is resolved once at init and
+  /// stamped onto each row as a virtual value; it is deliberately not modelled as a column reader, which would cost a
+  /// dictionary lookup and a boxing allocation on every row of every segment scan in Pinot.
+  @Nullable
+  private Long _creationTime;
 
   private int _nextDocId = 0;
 
@@ -175,6 +180,8 @@ public class PinotSegmentRecordReader implements RecordReader {
     _indexSegment = indexSegment;
     _destroySegmentOnClose = destroySegmentOnClose;
     _numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
+    // Reset so a reader re-initialized onto a mutable segment does not keep stamping a previous segment's value
+    _creationTime = null;
 
     if (_numDocs > 0) {
       _columnReaderMap = new HashMap<>();
@@ -196,7 +203,12 @@ public class PinotSegmentRecordReader implements RecordReader {
         }
       }
       if (_readingImmutableSegment) {
-        addVirtualColumns();
+        long creationTime = (long) getVirtualColumnValue(CREATION_TIME_COLUMN, _indexSegment.getSegmentMetadata());
+        if (creationTime == Long.MIN_VALUE) {
+          LOGGER.warn("Segment: {} has no recorded index creation time; exposing {} as the oldest possible value",
+              _indexSegment.getSegmentName(), CREATION_TIME_COLUMN);
+        }
+        _creationTime = creationTime;
       }
 
       if (sortedDocIds != null) {
@@ -222,14 +234,7 @@ public class PinotSegmentRecordReader implements RecordReader {
       _openStructDataSources.put(column, (OpenStructDataSource) dataSource);
       return;
     }
-    PinotSegmentColumnReader reader;
-    if (_readingImmutableSegment && CREATION_TIME_COLUMN.equals(column)) {
-      reader = new PinotSegmentColumnReader(column, new ConstantSortedIndexReader(_numDocs),
-          new ConstantValueLongDictionary((long) getVirtualColumnValue(column, _indexSegment.getSegmentMetadata())),
-          null, 0);
-    } else {
-      reader = new PinotSegmentColumnReader(_indexSegment, column);
-    }
+    PinotSegmentColumnReader reader = new PinotSegmentColumnReader(_indexSegment, column);
     _columnReaderMap.put(column, reader);
     _columnNames.add(column);
     _columnReaders.add(reader);
@@ -261,15 +266,12 @@ public class PinotSegmentRecordReader implements RecordReader {
     return _indexSegment.getSegmentName();
   }
 
-  private void addVirtualColumns() {
-    for (String column : VIRTUAL_COLUMNS) {
-      if (!_columnReaderMap.containsKey(column)) {
-        addColumnReader(column);
-      }
-    }
-  }
-
   /// Returns the value of a reader-only virtual column for the given Pinot segment.
+  ///
+  /// For [#CREATION_TIME_COLUMN] this is the segment's immutable index creation time. Segments written without a
+  /// `creation.meta` file report [Long#MIN_VALUE]; that value is propagated deliberately so such a segment sorts as
+  /// the oldest possible input. Substituting a synthetic "now" instead would let a rebuilt old segment outrank newer
+  /// data, which is the very corruption this column exists to prevent.
   public static Object getVirtualColumnValue(String column, SegmentMetadata segmentMetadata) {
     if (CREATION_TIME_COLUMN.equals(column)) {
       return segmentMetadata.getIndexCreationTime();
@@ -282,14 +284,13 @@ public class PinotSegmentRecordReader implements RecordReader {
       String column = entry.getKey();
       PinotSegmentColumnReader columnReader = entry.getValue();
       if (!columnReader.isNull(docId)) {
-        if (VIRTUAL_COLUMNS.contains(column)) {
-          buffer.putVirtualValue(column, columnReader.getValue(docId));
-        } else {
-          buffer.putValue(column, columnReader.getValue(docId));
-        }
+        buffer.putValue(column, columnReader.getValue(docId));
       } else if (!_skipDefaultNullValues) {
         buffer.putDefaultNullValue(column, columnReader.getValue(docId));
       }
+    }
+    if (_creationTime != null) {
+      buffer.putVirtualValue(CREATION_TIME_COLUMN, _creationTime);
     }
     for (Map.Entry<String, OpenStructDataSource> entry : _openStructDataSources.entrySet()) {
       Map<String, Object> value = entry.getValue().getMapValue(docId);

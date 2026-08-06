@@ -151,7 +151,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     boolean requiresCreationTime = transformers.stream().anyMatch(
         transformer -> transformer.getInputColumns().contains(PinotSegmentRecordReader.CREATION_TIME_COLUMN));
     if (requiresCreationTime) {
-      transformers.add(0, new SegmentCreationTimeTransformer(resolveCreationTime(config)));
+      transformers.add(0, new SegmentCreationTimeTransformer(pinCreationTime(config)));
     }
     init(config, new RecordReaderSegmentCreationDataSource(recordReader),
         new TransformPipeline(config.getTableConfig().getTableName(), transformers));
@@ -240,7 +240,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.debug("tempIndexDir:{}", _tempIndexDir);
   }
 
-  private static long resolveCreationTime(SegmentGeneratorConfig config) {
+  /// Resolves the segment creation time and *pins it back onto the config* so that the value stamped onto each record
+  /// is the same one the finished segment reports in its metadata. Without pinning, the row values and the segment
+  /// metadata would be derived from two separate `System.currentTimeMillis()` reads.
+  private static long pinCreationTime(SegmentGeneratorConfig config) {
     String configuredCreationTime = config.getCreationTime();
     long creationTime;
     if (configuredCreationTime != null) {
@@ -257,6 +260,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     return creationTime;
   }
 
+  /// Supplies the build-time `$creationTime` default for records that did not come from a Pinot segment.
+  ///
+  /// Runs first in the pipeline so that downstream transforms can read `$creationTime` through
+  /// [GenericRow#getValue(String)]. A value already supplied by [PinotSegmentRecordReader] wins, which is what makes a
+  /// rewritten segment keep its source creation time instead of adopting the rewrite's.
   private static class SegmentCreationTimeTransformer implements RecordTransformer {
     private final long _creationTime;
 
@@ -269,6 +277,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       if (!record.hasVirtualValue(PinotSegmentRecordReader.CREATION_TIME_COLUMN)) {
         record.putVirtualValue(PinotSegmentRecordReader.CREATION_TIME_COLUMN, _creationTime);
       }
+      // Drop any physical value the source data carried under this name so it is never materialized into the segment.
+      // This intentionally bypasses GenericRow#removeValue, which would also discard the virtual value set above.
       record.getFieldToValueMap().remove(PinotSegmentRecordReader.CREATION_TIME_COLUMN);
       record.removeNullValueField(PinotSegmentRecordReader.CREATION_TIME_COLUMN);
     }

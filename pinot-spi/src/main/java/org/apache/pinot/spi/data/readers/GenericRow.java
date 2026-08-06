@@ -214,7 +214,12 @@ public class GenericRow implements Serializable {
   }
 
   /// Sets a reader-only virtual value. It is available through [#getValue(String)], but excluded from
-  /// [#getFieldToValueMap()] so consumers that enumerate physical row fields do not materialize it.
+  /// [#getFieldToValueMap()], [#hashCode()], [#equals(Object)] and [#toString()], so consumers that enumerate,
+  /// compare or serialize physical row fields do not materialize it.
+  ///
+  /// A virtual value *shadows* the physical value for the same field: once set, [#getValue(String)] returns the
+  /// virtual value and a subsequent [#putValue(String, Object)] for that field is invisible to readers until the
+  /// virtual value is removed via [#removeValue(String)] or [#clear()]. Use distinct field names to avoid this.
   public void putVirtualValue(String fieldName, @Nullable Object value) {
     if (_virtualFieldToValueMap == null) {
       _virtualFieldToValueMap = new HashMap<>();
@@ -232,14 +237,15 @@ public class GenericRow implements Serializable {
     _fieldToValueMap.putAll(fieldToValueMap);
   }
 
-  /// Removes the value for the given field.
+  /// Removes both the physical and the virtual value for the given field.
+  ///
+  /// Returns the removed *physical* value, which can be `null` even when [#getValue(String)] returned non-`null`
+  /// beforehand because the field only had a virtual value.
   public Object removeValue(String fieldName) {
-    Object value = getValue(fieldName);
-    _fieldToValueMap.remove(fieldName);
     if (_virtualFieldToValueMap != null) {
       _virtualFieldToValueMap.remove(fieldName);
     }
-    return value;
+    return _fieldToValueMap.remove(fieldName);
   }
 
   /// Sets the `defaultNullValue` for the given `nullField`.
@@ -279,9 +285,13 @@ public class GenericRow implements Serializable {
     _sanitized = false;
   }
 
+  /// Virtual values are reader-supplied metadata rather than row content, so they are deliberately excluded from
+  /// [#hashCode()] and [#equals(Object)], matching their exclusion from [#getFieldToValueMap()] and [#toString()].
+  /// Including them would make two rows that render identically compare unequal, which is undiagnosable from an
+  /// assertion failure message.
   @Override
   public int hashCode() {
-    return Objects.hash(_fieldToValueMap, getVirtualFieldToValueMap(), _nullValueFields, _incomplete, _sanitized);
+    return Objects.hash(_fieldToValueMap, _nullValueFields, _incomplete, _sanitized);
   }
 
   @Override
@@ -292,8 +302,7 @@ public class GenericRow implements Serializable {
     if (obj instanceof GenericRow) {
       GenericRow that = (GenericRow) obj;
       return _incomplete == that._incomplete && _sanitized == that._sanitized && _nullValueFields.equals(
-          that._nullValueFields) && EqualityUtils.isEqual(_fieldToValueMap, that._fieldToValueMap)
-          && EqualityUtils.isEqual(getVirtualFieldToValueMap(), that.getVirtualFieldToValueMap());
+          that._nullValueFields) && EqualityUtils.isEqual(_fieldToValueMap, that._fieldToValueMap);
     }
     return false;
   }
@@ -305,9 +314,5 @@ public class GenericRow implements Serializable {
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
-  }
-
-  private Map<String, Object> getVirtualFieldToValueMap() {
-    return _virtualFieldToValueMap != null ? _virtualFieldToValueMap : Map.of();
   }
 }

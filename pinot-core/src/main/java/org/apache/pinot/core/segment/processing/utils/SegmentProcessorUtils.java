@@ -114,6 +114,10 @@ public final class SegmentProcessorUtils {
     }
     metricFieldSpecs.sort(Comparator.comparing(FieldSpec::getName));
     fieldSpecs.addAll(metricFieldSpecs);
+    // DEDUP treats every field ahead of the comparison column as part of row identity, so capture the count before
+    // appending the payload rather than subtracting from the final size, which would silently break if another
+    // trailing field were ever added below.
+    int numIdentityFields = fieldSpecs.size();
     if (comparisonFieldSpec != null) {
       // Carry the comparison value as payload. It must not change ROLLUP grouping or DEDUP equality.
       fieldSpecs.add(comparisonFieldSpec);
@@ -128,7 +132,7 @@ public final class SegmentProcessorUtils {
         numSortFields = sortOrder.size() + nonMetricFieldSpecs.size() + (includeOriginalTimeField ? 1 : 0);
         break;
       case DEDUP:
-        numSortFields = fieldSpecs.size() - (comparisonFieldSpec != null ? 1 : 0);
+        numSortFields = numIdentityFields;
         break;
       default:
         throw new IllegalStateException("Unsupported merge type: " + mergeType);

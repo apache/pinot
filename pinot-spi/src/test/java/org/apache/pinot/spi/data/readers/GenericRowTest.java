@@ -193,4 +193,53 @@ public class GenericRowTest {
     Assert.assertNull(row.getValue("virtual"));
     Assert.assertEquals(row, new GenericRow());
   }
+
+  /// A row read back from a segment carries reader-supplied virtual values that a hand-built expected row does not.
+  /// Those values must stay out of row identity, otherwise the two compare unequal while rendering identically, and
+  /// the resulting assertion failure is impossible to read.
+  @Test
+  public void testVirtualValueExcludedFromIdentity() {
+    GenericRow withVirtual = new GenericRow();
+    withVirtual.putValue("physical", 1);
+    withVirtual.putVirtualValue("virtual", 2);
+
+    GenericRow withoutVirtual = new GenericRow();
+    withoutVirtual.putValue("physical", 1);
+
+    Assert.assertEquals(withVirtual, withoutVirtual);
+    Assert.assertEquals(withoutVirtual, withVirtual);
+    Assert.assertEquals(withVirtual.hashCode(), withoutVirtual.hashCode());
+    Assert.assertEquals(withVirtual.toString(), withoutVirtual.toString());
+
+    // Differing virtual values must not split identity either
+    GenericRow otherVirtual = new GenericRow();
+    otherVirtual.putValue("physical", 1);
+    otherVirtual.putVirtualValue("virtual", 99);
+    Assert.assertEquals(withVirtual, otherVirtual);
+
+    // ... but a differing physical value still must
+    GenericRow differentPhysical = new GenericRow();
+    differentPhysical.putValue("physical", 2);
+    differentPhysical.putVirtualValue("virtual", 2);
+    Assert.assertNotEquals(withVirtual, differentPhysical);
+  }
+
+  @Test
+  public void testRemoveValueClearsBothPhysicalAndVirtual() {
+    GenericRow row = new GenericRow();
+    row.putValue("both", 1);
+    row.putVirtualValue("both", 2);
+    // Virtual value shadows the physical one for reads
+    Assert.assertEquals(row.getValue("both"), 2);
+
+    // removeValue returns the physical value and drops the virtual one as well
+    Assert.assertEquals(row.removeValue("both"), 1);
+    Assert.assertNull(row.getValue("both"));
+    Assert.assertFalse(row.hasVirtualValue("both"));
+
+    GenericRow virtualOnly = new GenericRow();
+    virtualOnly.putVirtualValue("virtual", 2);
+    Assert.assertNull(virtualOnly.removeValue("virtual"));
+    Assert.assertNull(virtualOnly.getValue("virtual"));
+  }
 }
