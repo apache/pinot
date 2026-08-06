@@ -239,6 +239,108 @@ public class MapUtils {
   /// @throws BufferUnderflowException if the MAP frame is malformed or truncated
   @Nullable
   public static Object deserializeMapEntryValue(ByteBuffer byteBuffer, PreparedMapKey key) {
+    byte[] valueBytes = findValueBytes(byteBuffer, key);
+    if (valueBytes == null) {
+      return null;
+    }
+    try {
+      return JsonUtils.bytesToObject(valueBytes, Object.class);
+    } catch (IOException e) {
+      LOGGER.error("Caught exception while deserializing value for key: {}", key.getKey(), e);
+      return null;
+    }
+  }
+
+  @Nullable
+  public static String deserializeMapEntryValueAsString(ByteBuffer byteBuffer, String key) {
+    return deserializeMapEntryValueAsString(byteBuffer, new PreparedMapKey(key));
+  }
+
+  /// Reads the value for a prepared key as a string, skipping Jackson for the value shapes whose stored bytes are
+  /// already exactly what `toString()` on the parsed value would produce.
+  ///
+  /// Consumes the buffer from its current position and forces [ByteOrder#BIG_ENDIAN] on it, exactly as
+  /// [#deserializeMapEntryValue(ByteBuffer, PreparedMapKey)] does, so a caller must not assume the buffer is
+  /// reusable afterwards. A truncated or corrupt frame raises [BufferUnderflowException].
+  @Nullable
+  public static String deserializeMapEntryValueAsString(ByteBuffer byteBuffer, PreparedMapKey key) {
+    byte[] valueBytes = findValueBytes(byteBuffer, key);
+    if (valueBytes == null) {
+      return null;
+    }
+    String decoded = decodeWithoutJackson(valueBytes);
+    if (decoded != null) {
+      return decoded;
+    }
+    try {
+      Object value = JsonUtils.bytesToObject(valueBytes, Object.class);
+      return value == null ? null : value.toString();
+    } catch (IOException e) {
+      LOGGER.error("Caught exception while deserializing value for key: {}", key.getKey(), e);
+      return null;
+    }
+  }
+
+  /// Renders a stored JSON value without Jackson when the bytes are already identical to `toString()` on whatever
+  /// Jackson would have parsed them into, otherwise returns `null` so the caller falls back.
+  ///
+  /// Covers plain strings, canonical integers and the two boolean literals. Non-integral numbers deliberately fall
+  /// back: Jackson binds them to `Double`, whose `toString()` re-normalizes, so `1.50` has to render as `1.5`.
+  @Nullable
+  private static String decodeWithoutJackson(byte[] valueBytes) {
+    int length = valueBytes.length;
+    if (length == 0) {
+      return null;
+    }
+    switch (valueBytes[0]) {
+      case '"':
+        return unquotePlainJsonString(valueBytes, length);
+      case 't':
+        return length == 4 && valueBytes[1] == 'r' && valueBytes[2] == 'u' && valueBytes[3] == 'e' ? "true" : null;
+      case 'f':
+        return length == 5 && valueBytes[1] == 'a' && valueBytes[2] == 'l' && valueBytes[3] == 's'
+            && valueBytes[4] == 'e' ? "false" : null;
+      default:
+        return isCanonicalInteger(valueBytes, length)
+            ? new String(valueBytes, 0, length, StandardCharsets.US_ASCII) : null;
+    }
+  }
+
+  /// True when the bytes are an integer in the exact form `Integer`, `Long` and `BigInteger` render - which is what
+  /// Jackson binds an integral JSON number to, so the stored bytes and `toString()` coincide. Leading zeros, `+`,
+  /// `-0`, decimal points and exponents are all rejected because they would re-render differently.
+  private static boolean isCanonicalInteger(byte[] valueBytes, int length) {
+    int start = valueBytes[0] == '-' ? 1 : 0;
+    if (length == start) {
+      return false;
+    }
+    if (valueBytes[start] == '0') {
+      // Bare "0" is canonical; "-0" renders as "0" and anything longer has a leading zero.
+      return length == 1;
+    }
+    for (int i = start; i < length; i++) {
+      if (valueBytes[i] < '0' || valueBytes[i] > '9') {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @Nullable
+  private static String unquotePlainJsonString(byte[] valueBytes, int length) {
+    if (length < 2 || valueBytes[length - 1] != '"') {
+      return null;
+    }
+    for (int i = 1; i < length - 1; i++) {
+      if (valueBytes[i] == '\\') {
+        return null;
+      }
+    }
+    return new String(valueBytes, 1, length - 2, StandardCharsets.UTF_8);
+  }
+
+  @Nullable
+  private static byte[] findValueBytes(ByteBuffer byteBuffer, PreparedMapKey key) {
     byteBuffer.order(ByteOrder.BIG_ENDIAN);
     int size = byteBuffer.getInt();
     if (size < 0) {
@@ -278,12 +380,7 @@ public class MapUtils {
       // the remaining entries never need to be scanned.
       byte[] valueBytes = new byte[valueLength];
       byteBuffer.get(valueBytes);
-      try {
-        return JsonUtils.bytesToObject(valueBytes, Object.class);
-      } catch (IOException e) {
-        LOGGER.error("Caught exception while deserializing value for key: {}", key.getKey(), e);
-        return null;
-      }
+      return valueBytes;
     }
     return null;
   }

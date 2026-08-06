@@ -467,6 +467,19 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
         + "ForwardIndexReader is being created to read this column.");
   }
 
+  /// Reads the MAP type single-value at the given document id, rendered as a JSON object string.
+  ///
+  /// Readers that store the map as a serialized frame should override this to render straight from those bytes
+  /// (see [MapUtils#frameToJsonString(byte\[\])]); the default here materializes the map first and serializes it
+  /// again, which is what a reader holding the map columnar-decomposed has to do anyway.
+  ///
+  /// @param docId Document id
+  /// @param context Reader context
+  /// @return MAP type single-value at the given document id, as JSON
+  default String getMapAsJsonString(int docId, T context) {
+    return MapUtils.toString(getMap(docId, context));
+  }
+
   /// Reads a value for a key from a MAP type single-value column at the given document id.
   /// Implementations can override this method to avoid deserializing the entire map when only one key is needed.
   ///
@@ -486,17 +499,25 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
     return getMap(docId, context).get(key.getKey());
   }
 
-  /// Reads the MAP type single-value at the given document id, rendered as a JSON object string.
+  /// Reads a value for a key from a MAP type single-value column as a string.
   ///
-  /// Readers that store the map as a serialized frame should override this to render straight from those bytes
-  /// (see [MapUtils#frameToJsonString(byte\[\])]); the default here materializes the map first and serializes it
-  /// again, which is what a reader holding the map columnar-decomposed has to do anyway.
+  /// Implementations that store the map as a serialized frame can override this to decode a stored string value
+  /// without routing it through a JSON parser.
   ///
   /// @param docId Document id
   /// @param context Reader context
-  /// @return MAP type single-value at the given document id, as JSON
-  default String getMapAsJsonString(int docId, T context) {
-    return MapUtils.toString(getMap(docId, context));
+  /// @param key Map key
+  /// @return Value for the key as a string, or `null` if the key is missing or its value is null
+  @Nullable
+  default String getMapEntryValueAsString(int docId, T context, String key) {
+    return getMapEntryValueAsString(docId, context, new PreparedMapKey(key));
+  }
+
+  /// Variant of [#getMapEntryValueAsString(int, ForwardIndexReaderContext, String)] that reuses a pre-encoded MAP key.
+  @Nullable
+  default String getMapEntryValueAsString(int docId, T context, PreparedMapKey key) {
+    Object value = getMapEntryValue(docId, context, key);
+    return value == null ? null : value.toString();
   }
 
   default int get32BitsMurmur3Hash(int docId, T context) {

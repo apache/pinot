@@ -114,6 +114,12 @@ public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
+  @Nullable
+  public String getMapEntryValueAsString(int docId, ForwardIndexReaderContext context, PreparedMapKey key) {
+    return MapUtils.deserializeMapEntryValueAsString(_byteArrayStore.getByteBuffer(docId), key);
+  }
+
+  @Override
   public void setBigDecimal(int docId, BigDecimal value) {
     setBytes(docId, BigDecimalUtils.serialize(value));
   }
