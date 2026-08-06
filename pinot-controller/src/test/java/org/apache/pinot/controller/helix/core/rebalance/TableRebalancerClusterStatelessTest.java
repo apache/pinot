@@ -1192,7 +1192,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         RebalancePreCheckerResult.PreCheckStatus.ERROR);
     assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION)
         .getMessage()
-        .startsWith("UNSAFE. Servers with unsafe disk utilization after rebalance"));
+        .startsWith("UNSAFE. Servers with unsafe disk utilization AFTER rebalance"));
 
     // The servers are over the threshold no matter how the rebalance is run, so lowDiskMode does not help
     rebalanceConfig = new RebalanceConfig();

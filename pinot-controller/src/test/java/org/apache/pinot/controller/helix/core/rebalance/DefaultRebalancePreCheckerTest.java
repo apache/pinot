@@ -77,7 +77,7 @@ public class DefaultRebalancePreCheckerTest {
       RebalancePreCheckerResult result = checkDiskUtilization(rebalanceConfig);
       assertEquals(result.getPreCheckStatus(), PreCheckStatus.ERROR);
       assertEquals(result.getMessage(),
-          "UNSAFE. Servers with unsafe disk utilization after rebalance (>50%): " + SERVER_1 + " (55%)");
+          "UNSAFE. Servers with unsafe disk utilization AFTER rebalance (>50%): " + SERVER_1 + " (55%)");
     }
   }
 
@@ -90,7 +90,7 @@ public class DefaultRebalancePreCheckerTest {
       RebalancePreCheckerResult result = checkDiskUtilization(rebalanceConfig);
       assertEquals(result.getPreCheckStatus(), PreCheckStatus.ERROR);
       assertTrue(result.getMessage()
-              .startsWith("UNSAFE. Servers with unsafe disk utilization during rebalance (>50%): " + SERVER_0
+              .startsWith("UNSAFE. Servers with unsafe disk utilization DURING rebalance (>50%): " + SERVER_0
                   + " (55%)"), result.getMessage());
     }
   }
@@ -100,7 +100,7 @@ public class DefaultRebalancePreCheckerTest {
     setDiskUsage(550L, 0L);
     RebalancePreCheckerResult result = checkDiskUtilization(lowDiskMode());
     assertEquals(result.getPreCheckStatus(), PreCheckStatus.PASS);
-    assertTrue(result.getMessage().startsWith("Within threshold (<50%) after rebalance"), result.getMessage());
+    assertTrue(result.getMessage().startsWith("Within threshold (<50%) AFTER rebalance"), result.getMessage());
   }
 
   @Test
@@ -114,7 +114,7 @@ public class DefaultRebalancePreCheckerTest {
     RebalancePreCheckerResult result = checkDiskUtilization(rebalanceConfig);
     assertEquals(result.getPreCheckStatus(), PreCheckStatus.ERROR);
     assertEquals(result.getMessage(),
-        "UNSAFE. Servers with unsafe disk utilization during rebalance (>50%): " + SERVER_0 + " (55%). lowDiskMode has "
+        "UNSAFE. Servers with unsafe disk utilization DURING rebalance (>50%): " + SERVER_0 + " (55%). lowDiskMode has "
             + "no effect while downtime is enabled, disable downtime for it to delete segments before adding the new "
             + "ones");
   }

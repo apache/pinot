@@ -345,7 +345,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     // rather than by tuning the rebalance config
     if (!serversUnsafeAfterRebalance.isEmpty()) {
       return RebalancePreCheckerResult.error(
-          getUnsafeDiskUtilizationMessage("after rebalance", serversUnsafeAfterRebalance, threshold));
+          getUnsafeDiskUtilizationMessage("AFTER rebalance", serversUnsafeAfterRebalance, threshold));
     }
     String withinThreshold = String.format("Within threshold (<%d%%)", (short) (threshold * 100));
     if (serversUnsafeDuringRebalance.isEmpty()) {
@@ -356,11 +356,11 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     // skips altogether by replacing the IdealState with the target assignment in one go
     RebalanceConfig rebalanceConfig = preCheckContext.getRebalanceConfig();
     if (rebalanceConfig.isLowDiskMode() && !rebalanceConfig.isDowntime()) {
-      return RebalancePreCheckerResult.pass(withinThreshold + " after rebalance. Some servers would go over it during "
+      return RebalancePreCheckerResult.pass(withinThreshold + " AFTER rebalance. Some servers would go over it DURING "
           + "the rebalance, but lowDiskMode avoids that transient disk usage");
     }
     return RebalancePreCheckerResult.error(
-        getUnsafeDiskUtilizationMessage("during rebalance", serversUnsafeDuringRebalance, threshold) + (
+        getUnsafeDiskUtilizationMessage("DURING rebalance", serversUnsafeDuringRebalance, threshold) + (
             rebalanceConfig.isLowDiskMode()
                 ? ". lowDiskMode has no effect while downtime is enabled, disable downtime for it to delete segments "
                 + "before adding the new ones"
