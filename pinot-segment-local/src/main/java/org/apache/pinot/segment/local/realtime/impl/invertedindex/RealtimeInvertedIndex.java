@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.pinot.segment.spi.index.mutable.MutableInvertedIndex;
@@ -59,8 +60,11 @@ public class RealtimeInvertedIndex implements MutableInvertedIndex {
 
   /// Pre-creates an empty bitmap for the next dictionary id. Used by callers that reserve a
   /// dictionary id upfront (e.g. OPEN_STRUCT key columns reserve dictId 0 for the default null
-  /// value) so that subsequent contiguous [#add] calls stay aligned with dictionary ids.
+  /// value) so that subsequent contiguous [#add] calls stay aligned with dictionary ids. Must be
+  /// called before any [#add] call, on a single thread, prior to publishing this index to readers.
   public void reserveNextDictId() {
+    Preconditions.checkState(_bitmaps.isEmpty(), "reserveNextDictId() must be called on an empty index, found %s "
+        + "existing bitmap(s)", _bitmaps.size());
     ThreadSafeMutableRoaringBitmap bitmap = new ThreadSafeMutableRoaringBitmap();
     try {
       _writeLock.lock();

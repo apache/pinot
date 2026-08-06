@@ -118,7 +118,7 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
         .build();
     // First arg is `disabled` — false => enabled.
     OpenStructIndexConfig osConfig = new OpenStructIndexConfig(false, null, 3,
-        Set.of("views", "cpu", "host"), 0.5, List.of(viewsCfg, cpuCfg, hostCfg));
+        Set.of("views", "cpu", "host"), 0.5, List.of(viewsCfg, cpuCfg, hostCfg), null);
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set(OPEN_STRUCT_INDEX_NAME, JsonUtils.objectToJsonNode(osConfig));
     FieldConfig metricsCfg = new FieldConfig.Builder(METRICS).withIndexes(indexes).build();
@@ -179,8 +179,50 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
     assertEquals(response.get("resultTable").get("rows").get(0).get(0).asLong(), NUM_DOCS);
   }
 
-  /// White-box validation: open the committed on-disk segment and assert the materialized child
-  /// columns, their per-key index_map, and the dense/sparse split.
+  @Test
+  public void testSparseKeyGroupBy()
+      throws Exception {
+    JsonNode response = postQuery(
+        "SELECT " + METRICS + "['region'], COUNT(*) FROM " + getTableName() + " GROUP BY " + METRICS + "['region']");
+    assertEquals(response.get("exceptions").size(), 0);
+    assertEquals(response.get("resultTable").get("rows").size(), 4);
+  }
+
+  @Test
+  public void testSparseKeyEqFilter()
+      throws Exception {
+    JsonNode response = postQuery(
+        "SELECT COUNT(*) FROM " + getTableName() + " WHERE " + METRICS + "['region'] = 'region-0'");
+    assertEquals(response.get("exceptions").size(), 0);
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asLong(), 250);
+  }
+
+  @Test
+  public void testSparseKeyNotEqFilter()
+      throws Exception {
+    JsonNode response = postQuery(
+        "SELECT COUNT(*) FROM " + getTableName() + " WHERE " + METRICS + "['region'] != 'region-0'");
+    assertEquals(response.get("exceptions").size(), 0);
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asLong(), 750);
+  }
+
+  @Test
+  public void testSparseKeySum()
+      throws Exception {
+    JsonNode response = postQuery("SELECT SUM(" + METRICS + "['latencyMs']) FROM " + getTableName());
+    assertEquals(response.get("exceptions").size(), 0);
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asLong(), 49500);
+  }
+
+  @Test
+  public void testManifestShortCircuitNonexistentKey()
+      throws Exception {
+    JsonNode response = postQuery(
+        "SELECT COUNT(*) FROM " + getTableName() + " WHERE " + METRICS + "['nonexistent_key'] = 'x'");
+    assertEquals(response.get("exceptions").size(), 0);
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asLong(), 0);
+  }
+
   @Test
   public void testCommittedSegmentIndexMap()
       throws Exception {

@@ -146,9 +146,12 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
         if (!(fieldSpec instanceof ComplexFieldSpec)) {
           continue;
         }
+        ColumnMetadata parentMetadata = segmentMetadata.getColumnMetadataMap().get(parent);
+        List<String> sparseKeys =
+            parentMetadata instanceof ColumnMetadataImpl impl ? impl.getSparseKeys() : null;
         _dataSources.put(parent, new ImmutableOpenStructDataSource((ComplexFieldSpec) fieldSpec,
             openStructDenseChildren.getOrDefault(parent, Map.of()),
-            openStructSparseChildren.get(parent), segmentMetadata.getTotalDocs()));
+            openStructSparseChildren.get(parent), segmentMetadata.getTotalDocs(), sparseKeys));
       }
     }
 
