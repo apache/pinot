@@ -199,6 +199,9 @@ public class MapUtils {
 
   /// Variant of [#deserializeMapValue(byte[], String)] that reads from the supplied buffer without copying the
   /// complete MAP frame.
+  ///
+  /// Consumes the buffer from its current position and forces [ByteOrder#BIG_ENDIAN] on it — the write path frames
+  /// lengths through a big-endian [ByteBuffer], while an off-heap view inherits the platform's native order.
   @Nullable
   public static Object deserializeMapValue(ByteBuffer byteBuffer, String key) {
     byteBuffer.order(ByteOrder.BIG_ENDIAN);
@@ -207,33 +210,43 @@ public class MapUtils {
       return null;
     }
     byte[] keyBytes = Utf8Utils.encode(key);
-    Object value = null;
-    boolean found = false;
+    int keyBytesLength = keyBytes.length;
     for (int i = 0; i < size; i++) {
       int keyLength = byteBuffer.getInt();
-      boolean matches = keyLength == keyBytes.length;
-      for (int j = 0; j < keyLength; j++) {
-        byte currentByte = byteBuffer.get();
-        if (matches && currentByte != keyBytes[j]) {
-          matches = false;
+      // Bounds-check up front so the absolute gets below are provably in range, and so a truncated frame still
+      // surfaces as BufferUnderflowException rather than IndexOutOfBoundsException.
+      checkLength(byteBuffer, keyLength);
+      // Compare through absolute gets so a length mismatch or a differing byte skips the rest of the key outright,
+      // rather than walking it one relative get at a time just to advance the position.
+      boolean matches = keyLength == keyBytesLength;
+      if (matches) {
+        int keyOffset = byteBuffer.position();
+        for (int j = 0; j < keyLength; j++) {
+          if (byteBuffer.get(keyOffset + j) != keyBytes[j]) {
+            matches = false;
+            break;
+          }
         }
       }
+      byteBuffer.position(byteBuffer.position() + keyLength);
 
       int valueLength = byteBuffer.getInt();
-      if (matches) {
-        byte[] valueBytes = new byte[valueLength];
-        byteBuffer.get(valueBytes);
-        try {
-          value = JsonUtils.bytesToObject(valueBytes, Object.class);
-          found = true;
-        } catch (IOException e) {
-          LOGGER.error("Caught exception while deserializing value for key: {}", key, e);
-        }
-      } else {
+      if (!matches) {
         skip(byteBuffer, valueLength);
+        continue;
+      }
+      // Keys within a frame are unique - the write path iterates a Map - so the first match is the only match and
+      // the remaining entries never need to be scanned.
+      byte[] valueBytes = new byte[valueLength];
+      byteBuffer.get(valueBytes);
+      try {
+        return JsonUtils.bytesToObject(valueBytes, Object.class);
+      } catch (IOException e) {
+        LOGGER.error("Caught exception while deserializing value for key: {}", key, e);
+        return null;
       }
     }
-    return found ? value : null;
+    return null;
   }
 
   private static byte[] readLengthPrefixed(ByteBuffer byteBuffer) {
@@ -244,10 +257,14 @@ public class MapUtils {
   }
 
   private static void skip(ByteBuffer byteBuffer, int length) {
+    checkLength(byteBuffer, length);
+    byteBuffer.position(byteBuffer.position() + length);
+  }
+
+  private static void checkLength(ByteBuffer byteBuffer, int length) {
     if (length < 0 || length > byteBuffer.remaining()) {
       throw new BufferUnderflowException();
     }
-    byteBuffer.position(byteBuffer.position() + length);
   }
 
   public static String toString(Map<String, Object> map) {
