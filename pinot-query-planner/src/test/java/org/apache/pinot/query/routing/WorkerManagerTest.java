@@ -494,6 +494,77 @@ public class WorkerManagerTest {
     assertNull(brokerRequest.getPinotQuery().getFilterExpression());
   }
 
+  @Test
+  public void testBrokerPruningSkippedForPrePartitionedNonPartitionedLeaf() {
+    // A leaf with no partition metadata gets one worker per server of its routing table, in instance id order, so
+    // worker n means "the n-th surviving server". Pruning decides which servers survive, and the two sides of a
+    // colocated join need not prune the same ones: a filter that eliminates server 1 on one side and not the other
+    // renumbers that side, and the 1-to-1 exchange then pairs rows from different servers. Nothing downstream can
+    // catch it -- neither side has a partition class list for checkPartitionClassAgreement to compare -- so a
+    // pre-partitioned leaf on this path is left unpruned.
+    Schema schema = getSchemaBuilder("testTable").build();
+    ServerInstance server1 = getServerInstance("localhost", 1);
+    ServerInstance server2 = getServerInstance("localhost", 2);
+    Map<String, ServerInstance> serverInstanceMap =
+        Map.of(server1.getInstanceId(), server1, server2.getInstanceId(), server2);
+    RoutingTable unfiltered = new RoutingTable(
+        Map.of(server1, new SegmentsToQuery(List.of("segment1"), List.of()),
+            server2, new SegmentsToQuery(List.of("segment2"), List.of())), List.of(), 0);
+    // The filter would leave only server 2, renumbering it from worker 1 to worker 0.
+    RoutingTable filtered =
+        new RoutingTable(Map.of(server2, new SegmentsToQuery(List.of("segment2"), List.of())), List.of(), 1);
+    CapturingRoutingManager routingManager =
+        new CapturingRoutingManager(serverInstanceMap, Map.of("testTable_OFFLINE", unfiltered))
+            .setFilteredRoutingTable("testTable_OFFLINE", filtered);
+
+    QueryEnvironment queryEnvironment = newQueryEnvironment(schema, routingManager);
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=true; SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ t1.col2 "
+            + "FROM testTable t1 JOIN testTable t2 ON t1.col1 = t2.col1 WHERE t1.col1 = 'foo'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      List<DispatchablePlanFragment> leafFragments = leafFragments(dispatchableSubPlan);
+      assertEquals(leafFragments.size(), 2);
+      for (DispatchablePlanFragment leaf : leafFragments) {
+        assertEquals(leaf.getWorkerIdToSegmentsMap().size(), 2);
+      }
+      assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 0);
+    }
+    // Nothing filtered was ever routed for this leaf.
+    BrokerRequest brokerRequest = routingManager.getCapturedRoutingRequest("testTable_OFFLINE");
+    assertNotNull(brokerRequest);
+    assertNull(brokerRequest.getPinotQuery().getFilterExpression());
+  }
+
+  @Test
+  public void testBrokerPruningStillAppliesToNonPrePartitionedNonPartitionedLeaf() {
+    // The control for the test above: the same shape without the colocation hint is shuffled, so renumbering its
+    // workers is harmless and pruning stays on.
+    Schema schema = getSchemaBuilder("testTable").build();
+    ServerInstance server1 = getServerInstance("localhost", 1);
+    ServerInstance server2 = getServerInstance("localhost", 2);
+    Map<String, ServerInstance> serverInstanceMap =
+        Map.of(server1.getInstanceId(), server1, server2.getInstanceId(), server2);
+    RoutingTable unfiltered = new RoutingTable(
+        Map.of(server1, new SegmentsToQuery(List.of("segment1"), List.of()),
+            server2, new SegmentsToQuery(List.of("segment2"), List.of())), List.of(), 0);
+    RoutingTable filtered =
+        new RoutingTable(Map.of(server2, new SegmentsToQuery(List.of("segment2"), List.of())), List.of(), 1);
+    CapturingRoutingManager routingManager =
+        new CapturingRoutingManager(serverInstanceMap, Map.of("testTable_OFFLINE", unfiltered))
+            .setFilteredRoutingTable("testTable_OFFLINE", filtered);
+
+    QueryEnvironment queryEnvironment = newQueryEnvironment(schema, routingManager);
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=true; SELECT t1.col2 FROM testTable t1 JOIN testTable t2 ON t1.col1 = t2.col1 "
+            + "WHERE t1.col1 = 'foo'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertEquals(leafFragments(dispatchableSubPlan).get(0).getWorkerIdToSegmentsMap().size(), 1);
+    }
+    BrokerRequest brokerRequest = routingManager.getCapturedRoutingRequest("testTable_OFFLINE");
+    assertNotNull(brokerRequest);
+    assertNotNull(brokerRequest.getPinotQuery().getFilterExpression());
+  }
+
   /// Mimics how segment pruners consume a routing filter: operators are resolved via `FilterKind.valueOf`
   /// (which throws on non-FilterKind operators, e.g. bare boolean scalar functions like `contains`) and
   /// AND/OR/NOT operands are walked recursively. Keeps the mock routing managers honest: a routing query that would
@@ -1251,6 +1322,7 @@ public class WorkerManagerTest {
     private final Map<String, RoutingTable> _routingTableByName;
     private final boolean _throwOnFilteredRouting;
     private boolean _emptyOnFilteredRouting;
+    private final Map<String, RoutingTable> _filteredRoutingTableByName = new HashMap<>();
     private final Map<String, BrokerRequest> _capturedRoutingRequests = new LinkedHashMap<>();
 
     CapturingRoutingManager(Map<String, ServerInstance> serverInstanceMap,
@@ -1268,6 +1340,12 @@ public class WorkerManagerTest {
     /// When set, filter-bearing routing requests return an all-pruned (empty) routing table.
     void setEmptyOnFilteredRouting(boolean emptyOnFilteredRouting) {
       _emptyOnFilteredRouting = emptyOnFilteredRouting;
+    }
+
+    /// Registers the routing table a filter-bearing request gets, so that a test can make pruning drop a whole server.
+    CapturingRoutingManager setFilteredRoutingTable(String tableNameWithType, RoutingTable routingTable) {
+      _filteredRoutingTableByName.put(tableNameWithType, routingTable);
+      return this;
     }
 
     @Nullable
@@ -1289,8 +1367,14 @@ public class WorkerManagerTest {
       validatePrunableFilter(brokerRequest.getPinotQuery().getFilterExpression());
       String tableNameWithType = brokerRequest.getQuerySource().getTableName();
       _capturedRoutingRequests.put(tableNameWithType, brokerRequest);
-      if (_emptyOnFilteredRouting && brokerRequest.getPinotQuery().getFilterExpression() != null) {
-        return new RoutingTable(Map.of(), List.of(), 1);
+      if (brokerRequest.getPinotQuery().getFilterExpression() != null) {
+        if (_emptyOnFilteredRouting) {
+          return new RoutingTable(Map.of(), List.of(), 1);
+        }
+        RoutingTable filteredRoutingTable = _filteredRoutingTableByName.get(tableNameWithType);
+        if (filteredRoutingTable != null) {
+          return filteredRoutingTable;
+        }
       }
       return _routingTableByName.get(tableNameWithType);
     }

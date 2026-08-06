@@ -528,7 +528,14 @@ public class WorkerManager {
   private void assignWorkersToNonPartitionedLeafFragment(PlanFragment fragment, DispatchablePlanMetadata metadata,
       DispatchablePlanContext context) {
     String tableName = metadata.getScannedTables().get(0);
-    PinotQuery routingPinotQuery = extractRoutingQuery(fragment.getFragmentRoot(), tableName, context);
+    // A worker here is the n-th server of the routing table in instance id order, so the only thing that makes worker
+    // n mean the same rows on both sides of a 1-to-1 exchange is that both sides route over the same servers. Pruning
+    // decides which servers appear, so a filter that eliminates a different server on each side renumbers one of them
+    // and the exchange pairs rows that do not belong together -- silently, because both sides of this shape carry no
+    // partition class list for MailboxAssignmentVisitor#checkPartitionClassAgreement to compare. Leave a
+    // pre-partitioned leaf unpruned rather than risk it.
+    PinotQuery routingPinotQuery =
+        metadata.isPrePartitioned() ? null : extractRoutingQuery(fragment.getFragmentRoot(), tableName, context);
     // When broker pruning is enabled, routingPinotQuery carries the leaf stage filter so that segment pruners can
     // eliminate segments. When disabled (null), fall back to an unfiltered SELECT * routing request.
     Map<String, RoutingTable> routingTableMap = null;
@@ -800,7 +807,11 @@ public class WorkerManager {
     String rawTableName = TableNameBuilder.extractRawTableName(
         logicalTableRouteInfo.hasOffline() ? logicalTableRouteInfo.getOfflineTableName()
             : logicalTableRouteInfo.getRealtimeTableName());
-    PinotQuery routingPinotQuery = extractRoutingQuery(fragment.getFragmentRoot(), rawTableName, context);
+    // A worker here is the n-th server in instance id order, exactly as on the physical-table path, so a
+    // pre-partitioned leaf is left unpruned for the same reason: a filter eliminating a different server on each side
+    // of a 1-to-1 exchange renumbers one of them, and neither side carries a partition class list to catch it.
+    PinotQuery routingPinotQuery =
+        metadata.isPrePartitioned() ? null : extractRoutingQuery(fragment.getFragmentRoot(), rawTableName, context);
 
     boolean routed = false;
     if (routingPinotQuery != null) {
