@@ -29,6 +29,7 @@ public class FixedSegmentNameGeneratorTest {
   @Test
   public void testWithMalFormedSegmentName() {
     assertEquals(new FixedSegmentNameGenerator("seg01").generateSegmentName(0, null, null), "seg01");
+    assertEquals(new FixedSegmentNameGenerator("seg    01").generateSegmentName(0, null, null), "seg_01");
     try {
       new FixedSegmentNameGenerator("seg*01").generateSegmentName(0, null, null);
       Assert.fail();

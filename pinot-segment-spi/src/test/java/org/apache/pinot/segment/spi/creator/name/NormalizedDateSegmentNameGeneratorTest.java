@@ -77,6 +77,20 @@ public class NormalizedDateSegmentNameGeneratorTest {
   }
 
   @Test
+  public void testWithSegmentNamePrefixPostfixHavingSpaces() {
+    SegmentNameGenerator segmentNameGenerator =
+            new NormalizedDateSegmentNameGenerator(TABLE_NAME, SEGMENT_NAME_PREFIX + "   " + 'a', false,
+                    REFRESH_PUSH_TYPE, null, null, SEGMENT_NAME_POSTFIX + "   " + 'b');
+    assertEquals(segmentNameGenerator.toString(),
+            "NormalizedDateSegmentNameGenerator: segmentNamePrefix=myTable_daily_a, segmentNamePostfix=myPostfix_b, "
+                    + "appendPushType=false");
+    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null),
+            "myTable_daily_a_myPostfix_b");
+    assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, null, null),
+            "myTable_daily_a_myPostfix_b_1");
+  }
+
+  @Test
   public void testWithUntrimmedSegmentNamePrefix() {
     SegmentNameGenerator segmentNameGenerator =
         new NormalizedDateSegmentNameGenerator(TABLE_NAME, SEGMENT_NAME_PREFIX + "  ", false, REFRESH_PUSH_TYPE, null,
