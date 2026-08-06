@@ -35,14 +35,11 @@ import org.apache.pinot.core.segment.processing.reducer.ReducerFactory;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
-import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGeneratorFactory;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
@@ -112,7 +109,6 @@ public class SegmentProcessorFramework {
     Preconditions.checkState(!recordReaderFileConfigs.isEmpty(), "No recordReaderFileConfigs provided");
     LOGGER.info("Initializing SegmentProcessorFramework with {} record readers, config: {}, working dir: {}",
         recordReaderFileConfigs.size(), segmentProcessorConfig, workingDir.getAbsolutePath());
-    materializeCreationTime(recordReaderFileConfigs, segmentProcessorConfig);
     _recordReaderFileConfigs = recordReaderFileConfigs;
     _customRecordTransformers = customRecordTransformers;
     _transformPipeline = transformPipeline;
@@ -128,25 +124,6 @@ public class SegmentProcessorFramework {
 
     _segmentNumRowProvider = (segmentNumRowProvider == null) ? new DefaultSegmentNumRowProvider(
         segmentProcessorConfig.getSegmentConfig().getMaxNumRecordsPerSegment()) : segmentNumRowProvider;
-  }
-
-  /// Carries each input segment's creation time as a physical per-record value through Pinot segment rewrites.
-  /// Only homogeneous Pinot-segment input is eligible because other input formats have no segment creation time.
-  private static void materializeCreationTime(List<RecordReaderFileConfig> recordReaderFileConfigs,
-      SegmentProcessorConfig segmentProcessorConfig) {
-    for (RecordReaderFileConfig recordReaderFileConfig : recordReaderFileConfigs) {
-      RecordReader recordReader = recordReaderFileConfig._recordReader;
-      boolean readsSegmentFile = recordReaderFileConfig._dataFile != null;
-      if ((recordReader == null && readsSegmentFile && recordReaderFileConfig._fileFormat == FileFormat.PINOT)
-          || (recordReader instanceof PinotSegmentRecordReader
-          && (readsSegmentFile || ((PinotSegmentRecordReader) recordReader).isReadingPinotSegmentFile()))
-          || (recordReader instanceof CompactedPinotSegmentRecordReader
-          && (readsSegmentFile || ((CompactedPinotSegmentRecordReader) recordReader).isReadingPinotSegmentFile()))) {
-        continue;
-      }
-      return;
-    }
-    PinotSegmentRecordReader.materializeCreationTimeColumn(segmentProcessorConfig.getSchema());
   }
 
   public static List<RecordReaderFileConfig> convertRecordReadersToRecordReaderFileConfig(

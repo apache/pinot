@@ -25,7 +25,8 @@ import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -89,20 +90,46 @@ public class SegmentProcessorUtilsTest {
   }
 
   @Test
-  public void testCreationTimeIsPayloadInsteadOfSortField() {
+  public void testComparisonColumnIsPayloadInsteadOfSortField() {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("dimensionCol", DataType.STRING)
-        .addSingleValueDimension(BuiltInVirtualColumn.CREATIONTIME, DataType.LONG)
+        .addSingleValueDimension(CommonConstants.Segment.COMPARISON_COLUMN, DataType.LONG)
         .addMetric("metricCol", DataType.LONG).build();
 
     for (MergeType mergeType : MergeType.values()) {
       Pair<List<FieldSpec>, Integer> pair = SegmentProcessorUtils.getFieldSpecs(schema, mergeType, null);
       List<FieldSpec> fieldSpecs = pair.getLeft();
-      assertEquals(fieldSpecs.get(fieldSpecs.size() - 1).getName(), BuiltInVirtualColumn.CREATIONTIME);
+      assertEquals(fieldSpecs.get(fieldSpecs.size() - 1).getName(), CommonConstants.Segment.COMPARISON_COLUMN);
       int expectedNumSortFields = mergeType == MergeType.CONCAT ? 0 : mergeType == MergeType.ROLLUP ? 1 : 2;
       assertEquals(pair.getRight().intValue(), expectedNumSortFields);
     }
 
     assertThrows(IllegalArgumentException.class, () -> SegmentProcessorUtils.getFieldSpecs(schema, MergeType.ROLLUP,
-        List.of(BuiltInVirtualColumn.CREATIONTIME)));
+        List.of(CommonConstants.Segment.COMPARISON_COLUMN)));
+  }
+
+  @Test
+  public void testMergeComparisonValueSupportsComparableTypes() {
+    String comparisonColumn = CommonConstants.Segment.COMPARISON_COLUMN;
+    GenericRow target = new GenericRow();
+    target.putDefaultNullValue(comparisonColumn, "");
+    GenericRow source = new GenericRow();
+    source.putValue(comparisonColumn, "b");
+
+    SegmentProcessorUtils.mergeComparisonValue(target, source);
+    assertEquals(target.getValue(comparisonColumn), "b");
+    assertFalse(target.isNullValue(comparisonColumn));
+
+    source.putValue(comparisonColumn, "a");
+    SegmentProcessorUtils.mergeComparisonValue(target, source);
+    assertEquals(target.getValue(comparisonColumn), "b");
+
+    target.putValue(comparisonColumn, new byte[]{1});
+    source.putValue(comparisonColumn, new byte[]{2});
+    SegmentProcessorUtils.mergeComparisonValue(target, source);
+    assertEquals(target.getValue(comparisonColumn), new byte[]{2});
+
+    source.putValue(comparisonColumn, new byte[]{0});
+    SegmentProcessorUtils.mergeComparisonValue(target, source);
+    assertEquals(target.getValue(comparisonColumn), new byte[]{2});
   }
 }

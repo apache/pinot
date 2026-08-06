@@ -2221,6 +2221,9 @@ public class CommonConstants {
     public static final String CUSTOM_MAP = "custom.map";
     public static final String SIZE_IN_BYTES = "segment.size.in.bytes";
 
+    /// Reserved physical column for carrying OFFLINE upsert comparison values across segment rewrites.
+    public static final String COMPARISON_COLUMN = "$comparisonColumn";
+
     /// This field is used for parallel push protection to lock the segment globally.
     /// We put the segment upload start timestamp so that if the previous push failed without unlock the segment, the
     /// next upload won't be blocked forever.
@@ -2246,12 +2249,7 @@ public class CommonConstants {
       public static final String HOSTNAME = "$hostName";
       public static final String SEGMENTNAME = "$segmentName";
       public static final String PARTITIONID = "$partitionId";
-      public static final String CREATIONTIME = "$creationTime";
-      public static final Set<String> BUILT_IN_VIRTUAL_COLUMNS =
-          Set.of(DOCID, HOSTNAME, SEGMENTNAME, PARTITIONID, CREATIONTIME);
-
-      /// Built-in virtual columns whose values can also be physically materialized in a Pinot segment.
-      public static final Set<String> MATERIALIZABLE_VIRTUAL_COLUMNS = Set.of(CREATIONTIME);
+      public static final Set<String> BUILT_IN_VIRTUAL_COLUMNS = Set.of(DOCID, HOSTNAME, SEGMENTNAME, PARTITIONID);
     }
   }
 

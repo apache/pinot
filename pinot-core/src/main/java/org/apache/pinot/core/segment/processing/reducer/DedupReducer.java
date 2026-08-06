@@ -26,7 +26,7 @@ import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileRecordR
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileWriter;
 import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,19 +84,19 @@ public class DedupReducer implements Reducer {
     GenericRow previousRow = new GenericRow();
     recordReader.read(0, previousRow);
     int previousRowId = 0;
-    boolean hasCreationTime = _fileManager.getFieldSpecs().stream()
-        .anyMatch(fieldSpec -> fieldSpec.getName().equals(BuiltInVirtualColumn.CREATIONTIME));
-    GenericRow buffer = hasCreationTime ? new GenericRow() : null;
+    boolean hasComparisonColumn = _fileManager.getFieldSpecs().stream()
+        .anyMatch(fieldSpec -> fieldSpec.getName().equals(CommonConstants.Segment.COMPARISON_COLUMN));
+    GenericRow buffer = hasComparisonColumn ? new GenericRow() : null;
     for (int i = 1; i < numRows; i++) {
       if (recordReader.compare(previousRowId, i) != 0) {
         dedupFileWriter.write(previousRow);
         previousRow.clear();
         recordReader.read(i, previousRow);
         previousRowId = i;
-      } else if (hasCreationTime) {
+      } else if (hasComparisonColumn) {
         buffer.clear();
         recordReader.read(i, buffer);
-        SegmentProcessorUtils.mergeCreationTime(previousRow, buffer);
+        SegmentProcessorUtils.mergeComparisonValue(previousRow, buffer);
       }
     }
     dedupFileWriter.write(previousRow);

@@ -31,7 +31,8 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public final class SegmentProcessorUtils {
@@ -71,12 +72,12 @@ public final class SegmentProcessorUtils {
     if (sortOrder == null) {
       sortOrder = List.of();
     }
-    Preconditions.checkArgument(!sortOrder.contains(BuiltInVirtualColumn.CREATIONTIME),
-        "Cannot sort on reserved column: %s", BuiltInVirtualColumn.CREATIONTIME);
+    Preconditions.checkArgument(!sortOrder.contains(CommonConstants.Segment.COMPARISON_COLUMN),
+        "Cannot sort on reserved column: %s", CommonConstants.Segment.COMPARISON_COLUMN);
 
-    FieldSpec creationTimeFieldSpec = schema.getFieldSpecFor(BuiltInVirtualColumn.CREATIONTIME);
-    if (creationTimeFieldSpec != null && creationTimeFieldSpec.isVirtualColumn()) {
-      creationTimeFieldSpec = null;
+    FieldSpec comparisonFieldSpec = schema.getFieldSpecFor(CommonConstants.Segment.COMPARISON_COLUMN);
+    if (comparisonFieldSpec != null && comparisonFieldSpec.isVirtualColumn()) {
+      comparisonFieldSpec = null;
     }
 
     List<FieldSpec> fieldSpecs = new ArrayList<>();
@@ -95,7 +96,7 @@ public final class SegmentProcessorUtils {
     List<FieldSpec> nonMetricFieldSpecs = new ArrayList<>();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn() && !sortOrder.contains(fieldSpec.getName())
-          && !fieldSpec.getName().equals(BuiltInVirtualColumn.CREATIONTIME)) {
+          && !fieldSpec.getName().equals(CommonConstants.Segment.COMPARISON_COLUMN)) {
         if (fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC) {
           metricFieldSpecs.add(fieldSpec);
         } else {
@@ -113,9 +114,9 @@ public final class SegmentProcessorUtils {
     }
     metricFieldSpecs.sort(Comparator.comparing(FieldSpec::getName));
     fieldSpecs.addAll(metricFieldSpecs);
-    if (creationTimeFieldSpec != null) {
-      // Carry creation time as payload. It must not change ROLLUP grouping or DEDUP equality.
-      fieldSpecs.add(creationTimeFieldSpec);
+    if (comparisonFieldSpec != null) {
+      // Carry the comparison value as payload. It must not change ROLLUP grouping or DEDUP equality.
+      fieldSpecs.add(comparisonFieldSpec);
     }
 
     int numSortFields;
@@ -127,7 +128,7 @@ public final class SegmentProcessorUtils {
         numSortFields = sortOrder.size() + nonMetricFieldSpecs.size() + (includeOriginalTimeField ? 1 : 0);
         break;
       case DEDUP:
-        numSortFields = fieldSpecs.size() - (creationTimeFieldSpec != null ? 1 : 0);
+        numSortFields = fieldSpecs.size() - (comparisonFieldSpec != null ? 1 : 0);
         break;
       default:
         throw new IllegalStateException("Unsupported merge type: " + mergeType);
@@ -136,15 +137,26 @@ public final class SegmentProcessorUtils {
     return new ImmutablePair<>(fieldSpecs, numSortFields);
   }
 
-  /// Retains the newest source creation time when multiple input rows collapse into one output row.
-  public static void mergeCreationTime(GenericRow target, GenericRow source) {
-    Object sourceValue = source.getValue(BuiltInVirtualColumn.CREATIONTIME);
-    if (sourceValue == null) {
+  /// Retains the maximum comparison value when multiple input rows collapse into one output row.
+  public static void mergeComparisonValue(GenericRow target, GenericRow source) {
+    String comparisonColumn = CommonConstants.Segment.COMPARISON_COLUMN;
+    Object sourceValue = source.getValue(comparisonColumn);
+    if (sourceValue == null || source.isNullValue(comparisonColumn)) {
       return;
     }
-    Object targetValue = target.getValue(BuiltInVirtualColumn.CREATIONTIME);
-    if (targetValue == null || ((Number) sourceValue).longValue() > ((Number) targetValue).longValue()) {
-      target.putValue(BuiltInVirtualColumn.CREATIONTIME, sourceValue);
+    Object targetValue = target.getValue(comparisonColumn);
+    if (targetValue == null || target.isNullValue(comparisonColumn)
+        || toComparable(sourceValue).compareTo(toComparable(targetValue)) > 0) {
+      target.putValue(comparisonColumn, sourceValue);
+      target.removeNullValueField(comparisonColumn);
     }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Comparable<Object> toComparable(Object value) {
+    Object comparableValue = value instanceof byte[] ? new ByteArray((byte[]) value) : value;
+    Preconditions.checkState(comparableValue instanceof Comparable,
+        "Comparison column value must be comparable: %s", comparableValue);
+    return (Comparable<Object>) comparableValue;
   }
 }

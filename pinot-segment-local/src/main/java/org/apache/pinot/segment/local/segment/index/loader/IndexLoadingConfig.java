@@ -410,8 +410,7 @@ public class IndexLoadingConfig {
     }
     for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
       String childColumn = entry.getKey();
-      if (!OpenStructNaming.isMaterializedOpenStructColumn(childColumn)
-          || _indexConfigsByColName.containsKey(childColumn)) {
+      if (!childColumn.contains(OpenStructNaming.SEPARATOR) || _indexConfigsByColName.containsKey(childColumn)) {
         continue;
       }
       if (OpenStructNaming.isSparseColumn(childColumn)) {

@@ -34,18 +34,22 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.apache.pinot.spi.utils.CommonConstants.Segment.COMPARISON_COLUMN;
 
 
 /// Tests the PinotSegmentRecordReader to check that the records being generated
@@ -195,18 +199,41 @@ public class PinotSegmentRecordReaderTest {
   }
 
   @Test
-  public void testCreationTimeMaterializedAndPreservedAcrossRewrites()
+  public void testCreationTimeDefaultsComparisonColumnForRawInput()
+      throws Exception {
+    long creationTime = 123_456_789L;
+    String segmentName = "rawInputComparisonTime";
+    GenericRow missingComparison = _rows.get(0).copy();
+    missingComparison.putValue(PinotSegmentRecordReader.CREATION_TIME_COLUMN, -1L);
+    GenericRow nullComparison = _rows.get(1).copy();
+    nullComparison.putValue(COMPARISON_COLUMN, null);
+
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(createComparisonTableConfig(), createComparisonSchema());
+    config.setOutDir(_segmentOutputDir);
+    config.setSegmentName(segmentName);
+    config.setCreationTime(String.valueOf(creationTime));
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(List.of(missingComparison, nullComparison)));
+    driver.build();
+
+    assertComparisonTime(new File(_segmentOutputDir, segmentName), creationTime, creationTime);
+  }
+
+  @Test
+  public void testCreationTimeFillsAndPreservesPhysicalComparisonColumnAcrossRewrites()
       throws Exception {
     SegmentMetadataImpl sourceMetadata = new SegmentMetadataImpl(_segmentIndexDir);
     long sourceCreationTime = sourceMetadata.getIndexCreationTime();
-    Assert.assertNull(sourceMetadata.getColumnMetadataFor(BuiltInVirtualColumn.CREATIONTIME));
+    Assert.assertNull(sourceMetadata.getColumnMetadataFor(PinotSegmentRecordReader.CREATION_TIME_COLUMN));
+    Assert.assertNull(sourceMetadata.getColumnMetadataFor(COMPARISON_COLUMN));
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(createTableConfig(), createPinotSchema());
     ImmutableSegment sourceSegment = ImmutableSegmentLoader.load(_segmentIndexDir, indexLoadingConfig);
     try {
-      Assert.assertFalse(sourceSegment.getColumnNames().contains(BuiltInVirtualColumn.CREATIONTIME));
-      Assert.assertFalse(sourceSegment.getPhysicalColumnNames().contains(BuiltInVirtualColumn.CREATIONTIME));
-      Assert.assertNull(sourceSegment.getDataSourceNullable(BuiltInVirtualColumn.CREATIONTIME));
+      Assert.assertFalse(sourceSegment.getColumnNames().contains(PinotSegmentRecordReader.CREATION_TIME_COLUMN));
+      Assert.assertFalse(
+          sourceSegment.getPhysicalColumnNames().contains(PinotSegmentRecordReader.CREATION_TIME_COLUMN));
+      Assert.assertNull(sourceSegment.getDataSourceNullable(PinotSegmentRecordReader.CREATION_TIME_COLUMN));
     } finally {
       sourceSegment.destroy();
     }
@@ -215,30 +242,31 @@ public class PinotSegmentRecordReaderTest {
       recordReader.init(_segmentIndexDir, Set.of(D_SV_1), null);
       GenericRow row = recordReader.next();
       Assert.assertEquals(row.getValue(D_SV_1), _rows.get(0).getValue(D_SV_1));
-      Assert.assertEquals(row.getValue(BuiltInVirtualColumn.CREATIONTIME), sourceCreationTime);
-      Assert.assertFalse(row.getFieldToValueMap().containsKey(BuiltInVirtualColumn.DOCID));
-      Assert.assertFalse(row.getFieldToValueMap().containsKey(BuiltInVirtualColumn.HOSTNAME));
-      Assert.assertFalse(row.getFieldToValueMap().containsKey(BuiltInVirtualColumn.SEGMENTNAME));
-      Assert.assertFalse(row.getFieldToValueMap().containsKey(BuiltInVirtualColumn.PARTITIONID));
+      Assert.assertEquals(row.getValue(PinotSegmentRecordReader.CREATION_TIME_COLUMN), sourceCreationTime);
+      Assert.assertFalse(
+          row.getFieldToValueMap().containsKey(PinotSegmentRecordReader.CREATION_TIME_COLUMN));
+      Assert.assertNull(row.getValue(COMPARISON_COLUMN));
     }
 
     long firstArtifactCreationTime = sourceCreationTime + 1_000L;
-    File firstRewrite = rewriteSegment(_segmentIndexDir, "creationTimeRewrite1", firstArtifactCreationTime);
-    assertCreationTime(firstRewrite, firstArtifactCreationTime, sourceCreationTime);
+    File firstRewrite = rewriteSegment(_segmentIndexDir, "comparisonTimeRewrite1", firstArtifactCreationTime);
+    assertComparisonTime(firstRewrite, firstArtifactCreationTime, sourceCreationTime);
 
     long secondArtifactCreationTime = sourceCreationTime + 2_000L;
-    File secondRewrite = rewriteSegment(firstRewrite, "creationTimeRewrite2", secondArtifactCreationTime);
-    assertCreationTime(secondRewrite, secondArtifactCreationTime, sourceCreationTime);
+    File secondRewrite = rewriteSegment(firstRewrite, "comparisonTimeRewrite2", secondArtifactCreationTime);
+    assertComparisonTime(secondRewrite, secondArtifactCreationTime, sourceCreationTime);
   }
 
   private File rewriteSegment(File sourceIndexDir, String segmentName, long artifactCreationTime)
       throws Exception {
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(createTableConfig(), createPinotSchema());
+    TableConfig tableConfig = createComparisonTableConfig();
+    Schema schema = createComparisonSchema();
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(_segmentOutputDir);
     config.setSegmentName(segmentName);
     config.setCreationTime(String.valueOf(artifactCreationTime));
 
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(createTableConfig(), createPinotSchema());
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
     ImmutableSegment sourceSegment = ImmutableSegmentLoader.load(sourceIndexDir, indexLoadingConfig, false);
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
       recordReader.init(sourceSegment);
@@ -251,26 +279,44 @@ public class PinotSegmentRecordReaderTest {
     return new File(_segmentOutputDir, segmentName);
   }
 
-  private void assertCreationTime(File indexDir, long artifactCreationTime, long sourceCreationTime)
+  private void assertComparisonTime(File indexDir, long artifactCreationTime, long sourceCreationTime)
       throws Exception {
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(indexDir);
     Assert.assertEquals(metadata.getIndexCreationTime(), artifactCreationTime);
-    ColumnMetadata creationTimeMetadata = metadata.getColumnMetadataFor(BuiltInVirtualColumn.CREATIONTIME);
-    Assert.assertNotNull(creationTimeMetadata);
-    Assert.assertEquals(creationTimeMetadata.getFieldType(), FieldType.DIMENSION);
-    Assert.assertEquals(creationTimeMetadata.getDataType(), DataType.LONG);
-    Assert.assertTrue(creationTimeMetadata.isSingleValue());
-    Assert.assertEquals(creationTimeMetadata.getMinValue(), sourceCreationTime);
-    Assert.assertEquals(creationTimeMetadata.getMaxValue(), sourceCreationTime);
+    Assert.assertNull(metadata.getColumnMetadataFor(PinotSegmentRecordReader.CREATION_TIME_COLUMN));
+    ColumnMetadata comparisonTimeMetadata = metadata.getColumnMetadataFor(COMPARISON_COLUMN);
+    Assert.assertNotNull(comparisonTimeMetadata);
+    Assert.assertEquals(comparisonTimeMetadata.getFieldType(), FieldType.DIMENSION);
+    Assert.assertEquals(comparisonTimeMetadata.getDataType(), DataType.LONG);
+    Assert.assertTrue(comparisonTimeMetadata.isSingleValue());
+    Assert.assertEquals(comparisonTimeMetadata.getMinValue(), sourceCreationTime);
+    Assert.assertEquals(comparisonTimeMetadata.getMaxValue(), sourceCreationTime);
 
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(createTableConfig(), createPinotSchema());
+    IndexLoadingConfig indexLoadingConfig =
+        new IndexLoadingConfig(createComparisonTableConfig(), createComparisonSchema());
     ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
     try {
-      Assert.assertTrue(segment.getPhysicalColumnNames().contains(BuiltInVirtualColumn.CREATIONTIME));
-      Assert.assertEquals(segment.getValue(0, BuiltInVirtualColumn.CREATIONTIME), sourceCreationTime);
+      Assert.assertFalse(segment.getColumnNames().contains(PinotSegmentRecordReader.CREATION_TIME_COLUMN));
+      Assert.assertFalse(segment.getPhysicalColumnNames().contains(PinotSegmentRecordReader.CREATION_TIME_COLUMN));
+      Assert.assertTrue(segment.getPhysicalColumnNames().contains(COMPARISON_COLUMN));
+      Assert.assertEquals(segment.getValue(0, COMPARISON_COLUMN), sourceCreationTime);
     } finally {
       segment.destroy();
     }
+  }
+
+  private Schema createComparisonSchema() {
+    Schema schema = createPinotSchema();
+    schema.addField(new DimensionFieldSpec(COMPARISON_COLUMN, DataType.LONG, true, Long.MIN_VALUE));
+    return schema;
+  }
+
+  private TableConfig createComparisonTableConfig() {
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(
+        new TransformConfig(COMPARISON_COLUMN, PinotSegmentRecordReader.CREATION_TIME_COLUMN)));
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME)
+        .setIngestionConfig(ingestionConfig).build();
   }
 
   @AfterClass

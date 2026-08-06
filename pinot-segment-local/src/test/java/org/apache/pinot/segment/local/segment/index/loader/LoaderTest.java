@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
@@ -217,16 +218,14 @@ public class LoaderTest {
   }
 
   private void testBuiltInVirtualColumns(IndexSegment indexSegment) {
-    assertTrue(BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS.contains(BuiltInVirtualColumn.CREATIONTIME));
-    assertFalse(BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS.contains(BuiltInVirtualColumn.DOCID));
     assertTrue(indexSegment.getColumnNames().containsAll(
         Arrays.asList(BuiltInVirtualColumn.DOCID, BuiltInVirtualColumn.HOSTNAME, BuiltInVirtualColumn.SEGMENTNAME)));
-    assertFalse(indexSegment.getColumnNames().contains(BuiltInVirtualColumn.CREATIONTIME));
+    assertFalse(indexSegment.getColumnNames().contains(PinotSegmentRecordReader.CREATION_TIME_COLUMN));
     assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.DOCID));
     assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.HOSTNAME));
     assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.SEGMENTNAME));
-    assertNull(indexSegment.getDataSourceNullable(BuiltInVirtualColumn.CREATIONTIME));
-    assertFalse(indexSegment.getPhysicalColumnNames().contains(BuiltInVirtualColumn.CREATIONTIME));
+    assertNull(indexSegment.getDataSourceNullable(PinotSegmentRecordReader.CREATION_TIME_COLUMN));
+    assertFalse(indexSegment.getPhysicalColumnNames().contains(PinotSegmentRecordReader.CREATION_TIME_COLUMN));
   }
 
   /// Tests loading default string column with empty ("") default null value.

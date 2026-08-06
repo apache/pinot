@@ -34,6 +34,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,7 +110,8 @@ public class RollupReducer implements Reducer {
     }
     List<AggregatorContext> aggregatorContextList = new ArrayList<>();
     for (FieldSpec fieldSpec : outputFieldSpecs) {
-      if (fieldSpec.getFieldType() == FieldType.METRIC) {
+      if (fieldSpec.getFieldType() == FieldType.METRIC
+          && !fieldSpec.getName().equals(CommonConstants.Segment.COMPARISON_COLUMN)) {
         AggregationFunctionType aggregationType =
             _aggregationTypes.getOrDefault(fieldSpec.getName(), DEFAULT_AGGREGATOR_TYPE);
         if (ValueAggregatorFactory.requiresTimeOrdering(aggregationType) && !hasOriginalTimeField) {
@@ -137,7 +139,7 @@ public class RollupReducer implements Reducer {
         buffer.clear();
         recordReader.read(i, buffer);
         if (recordReader.compare(previousRowId, i, numGroupFields) == 0) {
-          SegmentProcessorUtils.mergeCreationTime(previousRow, buffer);
+          SegmentProcessorUtils.mergeComparisonValue(previousRow, buffer);
           aggregateWithNullFields(previousRow, buffer, aggregatorContextList);
         } else {
           rollupFileWriter.write(previousRow);
@@ -152,7 +154,7 @@ public class RollupReducer implements Reducer {
         buffer.clear();
         recordReader.read(i, buffer);
         if (recordReader.compare(previousRowId, i, numGroupFields) == 0) {
-          SegmentProcessorUtils.mergeCreationTime(previousRow, buffer);
+          SegmentProcessorUtils.mergeComparisonValue(previousRow, buffer);
           aggregateWithoutNullFields(previousRow, buffer, aggregatorContextList);
         } else {
           rollupFileWriter.write(previousRow);

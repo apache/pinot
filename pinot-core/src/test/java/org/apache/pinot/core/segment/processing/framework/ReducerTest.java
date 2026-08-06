@@ -47,7 +47,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -271,11 +271,11 @@ public class ReducerTest {
   }
 
   @Test
-  public void testRollupPreservesNewestCreationTime()
+  public void testRollupPreservesMaximumComparisonValue()
       throws Exception {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("d", DataType.INT)
-        .addSingleValueDimension(BuiltInVirtualColumn.CREATIONTIME, DataType.LONG).addMetric("m", DataType.INT).build();
+        .addMetric(CommonConstants.Segment.COMPARISON_COLUMN, DataType.LONG).addMetric("m", DataType.INT).build();
     Pair<List<FieldSpec>, Integer> result = SegmentProcessorUtils.getFieldSpecs(schema, MergeType.ROLLUP, null);
     GenericRowFileManager fileManager =
         new GenericRowFileManager(FILE_MANAGER_OUTPUT_DIR, result.getLeft(), false, result.getRight());
@@ -283,17 +283,17 @@ public class ReducerTest {
     GenericRow inputRow = new GenericRow();
     inputRow.putValue("d", 1);
     inputRow.putValue("m", 3);
-    inputRow.putValue(BuiltInVirtualColumn.CREATIONTIME, 100L);
+    inputRow.putValue(CommonConstants.Segment.COMPARISON_COLUMN, 100L);
     fileWriter.write(inputRow);
     inputRow.clear();
     inputRow.putValue("d", 1);
     inputRow.putValue("m", 4);
-    inputRow.putValue(BuiltInVirtualColumn.CREATIONTIME, 200L);
+    inputRow.putValue(CommonConstants.Segment.COMPARISON_COLUMN, 200L);
     fileWriter.write(inputRow);
     inputRow.clear();
     inputRow.putValue("d", 2);
     inputRow.putValue("m", 5);
-    inputRow.putValue(BuiltInVirtualColumn.CREATIONTIME, 150L);
+    inputRow.putValue(CommonConstants.Segment.COMPARISON_COLUMN, 150L);
     fileWriter.write(inputRow);
     fileManager.closeFileWriter();
 
@@ -306,12 +306,12 @@ public class ReducerTest {
     recordReader.read(0, row);
     assertEquals(row.getValue("d"), 1);
     assertEquals(row.getValue("m"), 7);
-    assertEquals(row.getValue(BuiltInVirtualColumn.CREATIONTIME), 200L);
+    assertEquals(row.getValue(CommonConstants.Segment.COMPARISON_COLUMN), 200L);
     row.clear();
     recordReader.read(1, row);
     assertEquals(row.getValue("d"), 2);
     assertEquals(row.getValue("m"), 5);
-    assertEquals(row.getValue(BuiltInVirtualColumn.CREATIONTIME), 150L);
+    assertEquals(row.getValue(CommonConstants.Segment.COMPARISON_COLUMN), 150L);
     reducedFileManager.cleanUp();
   }
 
@@ -763,11 +763,12 @@ public class ReducerTest {
   }
 
   @Test
-  public void testDedupIgnoresCreationTimeAndPreservesNewestValue()
+  public void testDedupIgnoresComparisonColumnAndPreservesMaximumValue()
       throws Exception {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("d", DataType.INT)
-        .addSingleValueDimension(BuiltInVirtualColumn.CREATIONTIME, DataType.LONG).addMetric("m", DataType.INT).build();
+        .addSingleValueDimension(CommonConstants.Segment.COMPARISON_COLUMN, DataType.LONG)
+        .addMetric("m", DataType.INT).build();
     Pair<List<FieldSpec>, Integer> result = SegmentProcessorUtils.getFieldSpecs(schema, MergeType.DEDUP, null);
     GenericRowFileManager fileManager =
         new GenericRowFileManager(FILE_MANAGER_OUTPUT_DIR, result.getLeft(), false, result.getRight());
@@ -775,17 +776,17 @@ public class ReducerTest {
     GenericRow inputRow = new GenericRow();
     inputRow.putValue("d", 1);
     inputRow.putValue("m", 2);
-    inputRow.putValue(BuiltInVirtualColumn.CREATIONTIME, 100L);
+    inputRow.putValue(CommonConstants.Segment.COMPARISON_COLUMN, 100L);
     fileWriter.write(inputRow);
     inputRow.clear();
     inputRow.putValue("d", 1);
     inputRow.putValue("m", 2);
-    inputRow.putValue(BuiltInVirtualColumn.CREATIONTIME, 200L);
+    inputRow.putValue(CommonConstants.Segment.COMPARISON_COLUMN, 200L);
     fileWriter.write(inputRow);
     inputRow.clear();
     inputRow.putValue("d", 2);
     inputRow.putValue("m", 3);
-    inputRow.putValue(BuiltInVirtualColumn.CREATIONTIME, 150L);
+    inputRow.putValue(CommonConstants.Segment.COMPARISON_COLUMN, 150L);
     fileWriter.write(inputRow);
     fileManager.closeFileWriter();
 
@@ -800,12 +801,12 @@ public class ReducerTest {
     recordReader.read(0, row);
     assertEquals(row.getValue("d"), 1);
     assertEquals(row.getValue("m"), 2);
-    assertEquals(row.getValue(BuiltInVirtualColumn.CREATIONTIME), 200L);
+    assertEquals(row.getValue(CommonConstants.Segment.COMPARISON_COLUMN), 200L);
     row.clear();
     recordReader.read(1, row);
     assertEquals(row.getValue("d"), 2);
     assertEquals(row.getValue("m"), 3);
-    assertEquals(row.getValue(BuiltInVirtualColumn.CREATIONTIME), 150L);
+    assertEquals(row.getValue(CommonConstants.Segment.COMPARISON_COLUMN), 150L);
     reducedFileManager.cleanUp();
   }
 

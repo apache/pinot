@@ -44,18 +44,21 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Segment.COMPARISON_COLUMN;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
 /// Verifies that a refreshed old segment cannot replace newer OFFLINE upsert data.
@@ -90,6 +93,7 @@ public class RefreshSegmentUpsertMinionTest extends CustomDataQueryClusterIntegr
         .setSchemaName(TABLE_NAME)
         .addSingleValueDimension(PRIMARY_KEY_COLUMN, FieldSpec.DataType.INT)
         .addSingleValueDimension(VALUE_COLUMN, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(COMPARISON_COLUMN, FieldSpec.DataType.LONG)
         .setPrimaryKeyColumns(List.of(PRIMARY_KEY_COLUMN))
         .build();
   }
@@ -101,12 +105,18 @@ public class RefreshSegmentUpsertMinionTest extends CustomDataQueryClusterIntegr
 
   @Override
   public TableConfig createOfflineTableConfig() {
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setComparisonColumns(List.of(COMPARISON_COLUMN));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(COMPARISON_COLUMN, PinotSegmentRecordReader.CREATION_TIME_COLUMN)));
     Map<String, ColumnPartitionConfig> partitionConfig =
         Map.of(PRIMARY_KEY_COLUMN, new ColumnPartitionConfig("Murmur", 1));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(TABLE_NAME)
         .setNumReplicas(2)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setUpsertConfig(upsertConfig)
+        .setIngestionConfig(ingestionConfig)
         .setRoutingConfig(new RoutingConfig(null, null,
             RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(partitionConfig))
@@ -124,11 +134,12 @@ public class RefreshSegmentUpsertMinionTest extends CustomDataQueryClusterIntegr
     addSchema(schema);
     TableConfig tableConfig = createOfflineTableConfig();
     addTableConfig(tableConfig);
-    buildAndUploadSegment(tableConfig, schema, OLD_SEGMENT, OLD_VALUE, OLD_CREATION_TIME);
+    buildAndUploadSegment(OLD_SEGMENT, OLD_VALUE, OLD_CREATION_TIME, createLegacyOfflineTableConfig(),
+        createLegacySchema());
   }
 
   @Test
-  public void testRefreshCarriesCreationTimeAcrossReplacement()
+  public void testRefreshCarriesComparisonTimeAcrossReplacement()
       throws Exception {
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
     Schema refreshedSchema = createSchema();
@@ -138,7 +149,8 @@ public class RefreshSegmentUpsertMinionTest extends CustomDataQueryClusterIntegr
 
     TableConfig tableConfig = getSharedHelixResourceManager().getOfflineTableConfig(TABLE_NAME);
     File rebuiltSegmentTarDir = rebuildRefreshedSegment(tableNameWithType, tableConfig);
-    buildAndUploadSegment(tableConfig, createSchema(), NEW_SEGMENT, NEW_VALUE, NEW_CREATION_TIME);
+    buildAndUploadSegment(NEW_SEGMENT, NEW_VALUE, NEW_CREATION_TIME, tableConfig, refreshedSchema);
+    waitForValue(NEW_VALUE);
 
     String lineageEntryId = getSharedHelixResourceManager().startReplaceSegments(tableNameWithType,
         List.of(OLD_SEGMENT), List.of(REBUILT_OLD_SEGMENT), false, null);
@@ -150,8 +162,8 @@ public class RefreshSegmentUpsertMinionTest extends CustomDataQueryClusterIntegr
     waitForValue(NEW_VALUE);
   }
 
-  private void buildAndUploadSegment(TableConfig tableConfig, Schema schema, String segmentName, String value,
-      long creationTime)
+  private void buildAndUploadSegment(String segmentName, String value, long creationTime, TableConfig tableConfig,
+      Schema schema)
       throws Exception {
     File segmentDir = new File(_tempDir, segmentName + "Build");
     File tarDir = new File(_tempDir, segmentName + "Tar");
@@ -169,6 +181,14 @@ public class RefreshSegmentUpsertMinionTest extends CustomDataQueryClusterIntegr
     driver.build();
 
     File indexDir = new File(segmentDir, segmentName);
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(indexDir);
+    assertEquals(metadata.getIndexCreationTime(), creationTime);
+    if (schema.hasColumn(COMPARISON_COLUMN)) {
+      assertPhysicalComparisonTime(metadata, creationTime);
+    } else {
+      assertNull(metadata.getColumnMetadataFor(COMPARISON_COLUMN));
+    }
+    assertNull(metadata.getColumnMetadataFor(PinotSegmentRecordReader.CREATION_TIME_COLUMN));
     File tarFile = new File(tarDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
     TarCompressionUtils.createCompressedTarFile(indexDir, tarFile);
     uploadSegments(TABLE_NAME, tarDir);
@@ -189,7 +209,7 @@ public class RefreshSegmentUpsertMinionTest extends CustomDataQueryClusterIntegr
     SegmentMetadataImpl sourceMetadata = new SegmentMetadataImpl(sourceIndexDir);
     assertEquals(sourceMetadata.getIndexCreationTime(), OLD_CREATION_TIME);
     assertNotNull(sourceMetadata.getColumnMetadataFor(REFRESH_COLUMN));
-    assertPhysicalCreationTime(sourceMetadata, OLD_CREATION_TIME);
+    assertPhysicalComparisonTime(sourceMetadata, OLD_CREATION_TIME);
 
     Schema schema = getSharedHelixResourceManager().getSchema(TABLE_NAME);
     assertNotNull(schema);
@@ -207,18 +227,36 @@ public class RefreshSegmentUpsertMinionTest extends CustomDataQueryClusterIntegr
     File rebuiltIndexDir = new File(outputDir, REBUILT_OLD_SEGMENT);
     SegmentMetadataImpl rebuiltMetadata = new SegmentMetadataImpl(rebuiltIndexDir);
     assertEquals(rebuiltMetadata.getIndexCreationTime(), REBUILT_CREATION_TIME);
-    assertPhysicalCreationTime(rebuiltMetadata, OLD_CREATION_TIME);
+    assertPhysicalComparisonTime(rebuiltMetadata, OLD_CREATION_TIME);
     File tarFile = new File(tarDir, REBUILT_OLD_SEGMENT + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
     TarCompressionUtils.createCompressedTarFile(rebuiltIndexDir, tarFile);
     return tarDir;
   }
 
-  private static void assertPhysicalCreationTime(SegmentMetadataImpl segmentMetadata, long expectedCreationTime) {
-    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(BuiltInVirtualColumn.CREATIONTIME);
+  private static Schema createLegacySchema() {
+    return new Schema.SchemaBuilder()
+        .setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(PRIMARY_KEY_COLUMN, FieldSpec.DataType.INT)
+        .addSingleValueDimension(VALUE_COLUMN, FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(List.of(PRIMARY_KEY_COLUMN))
+        .build();
+  }
+
+  private TableConfig createLegacyOfflineTableConfig() {
+    TableConfig tableConfig = createOfflineTableConfig();
+    tableConfig.setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL));
+    tableConfig.setIngestionConfig(null);
+    return tableConfig;
+  }
+
+  private static void assertPhysicalComparisonTime(SegmentMetadataImpl segmentMetadata,
+      long expectedComparisonTime) {
+    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(COMPARISON_COLUMN);
     assertNotNull(columnMetadata);
     assertEquals(columnMetadata.getDataType(), FieldSpec.DataType.LONG);
-    assertEquals(columnMetadata.getMinValue(), expectedCreationTime);
-    assertEquals(columnMetadata.getMaxValue(), expectedCreationTime);
+    assertEquals(columnMetadata.getMinValue(), expectedComparisonTime);
+    assertEquals(columnMetadata.getMaxValue(), expectedComparisonTime);
+    assertNull(segmentMetadata.getColumnMetadataFor(PinotSegmentRecordReader.CREATION_TIME_COLUMN));
   }
 
   private List<String> scheduleRefresh(String tableNameWithType) {
@@ -242,10 +280,11 @@ public class RefreshSegmentUpsertMinionTest extends CustomDataQueryClusterIntegr
   private void waitForRawSegment(String segmentName) {
     TestUtils.waitForCondition(input -> {
       try {
-        JsonNode response = postQuery("SELECT " + VALUE_COLUMN + " FROM " + TABLE_NAME + " WHERE $segmentName = '"
-            + segmentName + "' OPTION(skipUpsert=true)");
+        JsonNode response = postQuery("SELECT " + VALUE_COLUMN + ", " + COMPARISON_COLUMN + " FROM " + TABLE_NAME
+            + " WHERE $segmentName = '" + segmentName + "' OPTION(skipUpsert=true)");
         JsonNode rows = response.get("resultTable").get("rows");
-        return rows.size() == 1 && OLD_VALUE.equals(rows.get(0).get(0).asText());
+        return rows.size() == 1 && OLD_VALUE.equals(rows.get(0).get(0).asText())
+            && rows.get(0).get(1).asLong() == OLD_CREATION_TIME;
       } catch (Exception e) {
         return false;
       }

@@ -312,11 +312,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private static void addPhysicalColumns(List<Object> src, Set<String> dest) {
     for (Object o : src) {
       String column = o.toString();
-      if (!column.isEmpty() && (!BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS.contains(column)
-          || BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS.contains(column))) {
+      if (!column.isEmpty() && !BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS.contains(column)) {
         // NOTE:
-        //   Exclude virtual-only built-in columns. Materializable virtual columns can be physically stored by a
-        //   Pinot-segment rewrite, so they must remain part of the physical segment schema when present in metadata.
+        //   Exclude built in virtual columns. In regular case they shouldn't exist in the metadata file, but we perform
+        //   this extra check to handle historical bad segments.
         // TODO:
         //   We need a better way to identify virtual columns. This info is currently missing from the metadata file.
         //   Virtual column is a column with virtual column provider configured in the schema.

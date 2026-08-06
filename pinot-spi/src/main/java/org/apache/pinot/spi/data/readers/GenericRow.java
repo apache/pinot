@@ -63,6 +63,8 @@ public class GenericRow implements Serializable {
   public static final String SKIP_RECORD_KEY = "$SKIP_RECORD_KEY$";
 
   private final Map<String, Object> _fieldToValueMap = new HashMap<>();
+  @Nullable
+  private Map<String, Object> _virtualFieldToValueMap;
   private final Set<String> _nullValueFields = new HashSet<>();
   private boolean _incomplete;
   private boolean _sanitized;
@@ -71,6 +73,9 @@ public class GenericRow implements Serializable {
   /// before calling this method.
   public void init(GenericRow row) {
     _fieldToValueMap.putAll(row._fieldToValueMap);
+    if (row._virtualFieldToValueMap != null) {
+      _virtualFieldToValueMap = new HashMap<>(row._virtualFieldToValueMap);
+    }
     _nullValueFields.addAll(row._nullValueFields);
     _incomplete = row._incomplete;
     _sanitized = row._sanitized;
@@ -97,6 +102,9 @@ public class GenericRow implements Serializable {
   /// Before setting the `defaultNullValue` for a field by calling [#putDefaultNullValue(String, Object)],
   /// the value for the field can be `null`.
   public Object getValue(String fieldName) {
+    if (_virtualFieldToValueMap != null && _virtualFieldToValueMap.containsKey(fieldName)) {
+      return _virtualFieldToValueMap.get(fieldName);
+    }
     return _fieldToValueMap.get(fieldName);
   }
 
@@ -146,6 +154,11 @@ public class GenericRow implements Serializable {
     for (Map.Entry<String, Object> entry : copy._fieldToValueMap.entrySet()) {
       entry.setValue(copy(entry.getValue()));
     }
+    if (copy._virtualFieldToValueMap != null) {
+      for (Map.Entry<String, Object> entry : copy._virtualFieldToValueMap.entrySet()) {
+        entry.setValue(copy(entry.getValue()));
+      }
+    }
     return copy;
   }
 
@@ -153,7 +166,12 @@ public class GenericRow implements Serializable {
   public GenericRow copy(List<String> fieldsToCopy) {
     GenericRow copy = new GenericRow();
     for (String field : fieldsToCopy) {
-      copy.putValue(field, copy(getValue(field)));
+      Object value = copy(getValue(field));
+      if (hasVirtualValue(field)) {
+        copy.putVirtualValue(field, value);
+      } else {
+        copy.putValue(field, value);
+      }
     }
     return copy;
   }
@@ -195,6 +213,20 @@ public class GenericRow implements Serializable {
     _fieldToValueMap.put(fieldName, value);
   }
 
+  /// Sets a reader-only virtual value. It is available through [#getValue(String)], but excluded from
+  /// [#getFieldToValueMap()] so consumers that enumerate physical row fields do not materialize it.
+  public void putVirtualValue(String fieldName, @Nullable Object value) {
+    if (_virtualFieldToValueMap == null) {
+      _virtualFieldToValueMap = new HashMap<>();
+    }
+    _virtualFieldToValueMap.put(fieldName, value);
+  }
+
+  /// Returns whether the row contains a reader-only virtual value for the given field.
+  public boolean hasVirtualValue(String fieldName) {
+    return _virtualFieldToValueMap != null && _virtualFieldToValueMap.containsKey(fieldName);
+  }
+
   /// Sets the values per the given map from fields to values.
   public void putValues(Map<String, Object> fieldToValueMap) {
     _fieldToValueMap.putAll(fieldToValueMap);
@@ -202,7 +234,12 @@ public class GenericRow implements Serializable {
 
   /// Removes the value for the given field.
   public Object removeValue(String fieldName) {
-    return _fieldToValueMap.remove(fieldName);
+    Object value = getValue(fieldName);
+    _fieldToValueMap.remove(fieldName);
+    if (_virtualFieldToValueMap != null) {
+      _virtualFieldToValueMap.remove(fieldName);
+    }
+    return value;
   }
 
   /// Sets the `defaultNullValue` for the given `nullField`.
@@ -234,6 +271,9 @@ public class GenericRow implements Serializable {
   /// Removes all the fields from the row.
   public void clear() {
     _fieldToValueMap.clear();
+    if (_virtualFieldToValueMap != null) {
+      _virtualFieldToValueMap.clear();
+    }
     _nullValueFields.clear();
     _incomplete = false;
     _sanitized = false;
@@ -241,7 +281,7 @@ public class GenericRow implements Serializable {
 
   @Override
   public int hashCode() {
-    return Objects.hash(_fieldToValueMap, _nullValueFields, _incomplete, _sanitized);
+    return Objects.hash(_fieldToValueMap, getVirtualFieldToValueMap(), _nullValueFields, _incomplete, _sanitized);
   }
 
   @Override
@@ -252,7 +292,8 @@ public class GenericRow implements Serializable {
     if (obj instanceof GenericRow) {
       GenericRow that = (GenericRow) obj;
       return _incomplete == that._incomplete && _sanitized == that._sanitized && _nullValueFields.equals(
-          that._nullValueFields) && EqualityUtils.isEqual(_fieldToValueMap, that._fieldToValueMap);
+          that._nullValueFields) && EqualityUtils.isEqual(_fieldToValueMap, that._fieldToValueMap)
+          && EqualityUtils.isEqual(getVirtualFieldToValueMap(), that.getVirtualFieldToValueMap());
     }
     return false;
   }
@@ -264,5 +305,9 @@ public class GenericRow implements Serializable {
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private Map<String, Object> getVirtualFieldToValueMap() {
+    return _virtualFieldToValueMap != null ? _virtualFieldToValueMap : Map.of();
   }
 }

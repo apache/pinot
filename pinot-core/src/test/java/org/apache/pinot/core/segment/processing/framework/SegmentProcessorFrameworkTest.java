@@ -40,6 +40,8 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
@@ -47,7 +49,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.RoaringBitmap;
@@ -358,24 +360,34 @@ public class SegmentProcessorFrameworkTest extends BaseSegmentProcessorFramework
   }
 
   @Test
-  public void testCreationTimeMaterializedAcrossSegmentMergeTypes()
+  public void testComparisonColumnMaterializedAcrossSegmentMergeTypes()
       throws Exception {
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("creationTimeMergeTable").build();
-    Schema sourceSchema = creationTimeMergeSchema();
-    File inputDir = new File(TEMP_DIR, "creation_time_merge_input");
+    String tableName = "comparisonColumnMergeTable";
+    TableConfig sourceTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig(CommonConstants.Segment.COMPARISON_COLUMN,
+        PinotSegmentRecordReader.CREATION_TIME_COLUMN)));
+    TableConfig processingTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName)
+        .setIngestionConfig(ingestionConfig).build();
+    Schema sourceSchema = legacyMergeSchema();
+    File inputDir = new File(TEMP_DIR, "comparison_column_merge_input");
     FileUtils.forceMkdir(inputDir);
-    File firstSegment = buildLegacySegment(tableConfig, sourceSchema, inputDir, "firstSegment", 1_000L);
-    File secondSegment = buildLegacySegment(tableConfig, sourceSchema, inputDir, "secondSegment", 2_000L);
-    assertNull(new SegmentMetadataImpl(firstSegment).getColumnMetadataFor(BuiltInVirtualColumn.CREATIONTIME));
-    assertNull(new SegmentMetadataImpl(secondSegment).getColumnMetadataFor(BuiltInVirtualColumn.CREATIONTIME));
+    File firstSegment = buildLegacySegment(sourceTableConfig, sourceSchema, inputDir, "firstSegment", 1_000L);
+    File secondSegment = buildLegacySegment(sourceTableConfig, sourceSchema, inputDir, "secondSegment", 2_000L);
+    assertNull(new SegmentMetadataImpl(firstSegment)
+        .getColumnMetadataFor(PinotSegmentRecordReader.CREATION_TIME_COLUMN));
+    assertNull(new SegmentMetadataImpl(secondSegment)
+        .getColumnMetadataFor(PinotSegmentRecordReader.CREATION_TIME_COLUMN));
+    assertNull(new SegmentMetadataImpl(firstSegment).getColumnMetadataFor(CommonConstants.Segment.COMPARISON_COLUMN));
+    assertNull(new SegmentMetadataImpl(secondSegment).getColumnMetadataFor(CommonConstants.Segment.COMPARISON_COLUMN));
 
     for (MergeType mergeType : MergeType.values()) {
-      File workingDir = new File(TEMP_DIR, "creation_time_merge_" + mergeType.name().toLowerCase());
+      File workingDir = new File(TEMP_DIR, "comparison_column_merge_" + mergeType.name().toLowerCase());
       FileUtils.forceMkdir(workingDir);
-      Schema processingSchema = creationTimeMergeSchema();
+      Schema processingSchema = comparisonMergeSchema();
       SegmentProcessorConfig config = new SegmentProcessorConfig.Builder()
-          .setTableConfig(tableConfig)
+          .setTableConfig(processingTableConfig)
           .setSchema(processingSchema)
           .setMergeType(mergeType)
           .setCustomCreationTime(3_000L)
@@ -390,20 +402,23 @@ public class SegmentProcessorFrameworkTest extends BaseSegmentProcessorFramework
       try {
         SegmentMetadata metadata = segment.getSegmentMetadata();
         assertEquals(metadata.getIndexCreationTime(), 3_000L);
-        assertTrue(segment.getPhysicalColumnNames().contains(BuiltInVirtualColumn.CREATIONTIME));
-        ColumnMetadata creationTimeMetadata = metadata.getColumnMetadataFor(BuiltInVirtualColumn.CREATIONTIME);
-        assertNotNull(creationTimeMetadata);
-        assertEquals(creationTimeMetadata.getFieldType(), FieldSpec.FieldType.DIMENSION);
-        assertEquals(creationTimeMetadata.getDataType(), FieldSpec.DataType.LONG);
-        assertTrue(creationTimeMetadata.isSingleValue());
+        assertFalse(segment.getPhysicalColumnNames().contains(PinotSegmentRecordReader.CREATION_TIME_COLUMN));
+        assertNull(metadata.getColumnMetadataFor(PinotSegmentRecordReader.CREATION_TIME_COLUMN));
+        assertTrue(segment.getPhysicalColumnNames().contains(CommonConstants.Segment.COMPARISON_COLUMN));
+        ColumnMetadata comparisonColumnMetadata =
+            metadata.getColumnMetadataFor(CommonConstants.Segment.COMPARISON_COLUMN);
+        assertNotNull(comparisonColumnMetadata);
+        assertEquals(comparisonColumnMetadata.getFieldType(), FieldSpec.FieldType.DIMENSION);
+        assertEquals(comparisonColumnMetadata.getDataType(), FieldSpec.DataType.LONG);
+        assertTrue(comparisonColumnMetadata.isSingleValue());
 
         if (mergeType == MergeType.CONCAT) {
           assertEquals(metadata.getTotalDocs(), 2);
-          assertEquals(readLongValues(segment, BuiltInVirtualColumn.CREATIONTIME), List.of(1_000L, 2_000L));
+          assertEquals(readLongValues(segment, CommonConstants.Segment.COMPARISON_COLUMN), List.of(1_000L, 2_000L));
           assertEquals(readLongValues(segment, "metric"), List.of(1L, 1L));
         } else {
           assertEquals(metadata.getTotalDocs(), 1);
-          assertEquals(segment.getValue(0, BuiltInVirtualColumn.CREATIONTIME), 2_000L);
+          assertEquals(segment.getValue(0, CommonConstants.Segment.COMPARISON_COLUMN), 2_000L);
           assertEquals(segment.getValue(0, "metric"), mergeType == MergeType.ROLLUP ? 2L : 1L);
         }
       } finally {
@@ -412,28 +427,17 @@ public class SegmentProcessorFrameworkTest extends BaseSegmentProcessorFramework
     }
   }
 
-  @Test
-  public void testCreationTimeNotMaterializedForCustomPinotFormatReader()
-      throws Exception {
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("customPinotReaderTable").build();
-    Schema schema = creationTimeMergeSchema();
-    SegmentProcessorConfig config =
-        new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema).build();
-    File workingDir = new File(TEMP_DIR, "custom_pinot_reader");
-    FileUtils.forceMkdir(workingDir);
-    RecordReader customReader = new GenericRowRecordReader(List.of(new GenericRow()));
-    RecordReaderFileConfig readerConfig =
-        new RecordReaderFileConfig(FileFormat.PINOT, new File(workingDir, "input"), null, null, customReader);
-
-    new SegmentProcessorFramework(config, workingDir, List.of(readerConfig), List.of(), null);
-
-    assertNull(schema.getFieldSpecFor(BuiltInVirtualColumn.CREATIONTIME));
+  private static Schema legacyMergeSchema() {
+    return new Schema.SchemaBuilder().setSchemaName("legacyMergeSchema")
+        .addSingleValueDimension("key", FieldSpec.DataType.STRING)
+        .addMetric("metric", FieldSpec.DataType.LONG)
+        .build();
   }
 
-  private static Schema creationTimeMergeSchema() {
-    return new Schema.SchemaBuilder().setSchemaName("creationTimeMergeSchema")
+  private static Schema comparisonMergeSchema() {
+    return new Schema.SchemaBuilder().setSchemaName("comparisonMergeSchema")
         .addSingleValueDimension("key", FieldSpec.DataType.STRING)
+        .addSingleValueDimension(CommonConstants.Segment.COMPARISON_COLUMN, FieldSpec.DataType.LONG)
         .addMetric("metric", FieldSpec.DataType.LONG)
         .build();
   }

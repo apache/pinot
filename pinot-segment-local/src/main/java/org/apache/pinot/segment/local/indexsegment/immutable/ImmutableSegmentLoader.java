@@ -50,7 +50,6 @@ import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -201,8 +200,6 @@ public class ImmutableSegmentLoader {
     if (schema != null) {
       Set<String> columnsInMetadata = new HashSet<>(columnMetadataMap.keySet());
       columnsInMetadata.removeIf(schema::hasColumn);
-      // Materializable virtual columns are allowed to be physical even when they are not declared in the table schema.
-      columnsInMetadata.removeAll(BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS);
       // Materialized OPEN_STRUCT child columns (col$key, col$__sparse__) live in segment metadata
       // but not in the user-facing schema. Keep them when the parent OPEN_STRUCT column is in the
       // schema; they will be grouped under their parent at segment-impl post-load (Task 16).

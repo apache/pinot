@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.function.FunctionUtils;
@@ -54,6 +55,7 @@ import org.apache.pinot.segment.local.segment.index.forward.CompressionStatsMeta
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -392,8 +394,13 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           // Check if all arguments exist in the segment
           // TODO: Support chained derived column
           List<String> arguments = functionEvaluator.getArguments();
-          List<ColumnMetadata> argumentsMetadata = new ArrayList<>(arguments.size());
+          List<DerivedColumnArgument> derivedColumnArguments = new ArrayList<>(arguments.size());
           for (String argument : arguments) {
+            if (PinotSegmentRecordReader.VIRTUAL_COLUMNS.contains(argument)) {
+              derivedColumnArguments.add(DerivedColumnArgument.forConstant(
+                  PinotSegmentRecordReader.getVirtualColumnValue(argument, _segmentMetadata)));
+              continue;
+            }
             ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(argument);
             if (columnMetadata == null) {
               LOGGER.warn("Assigning default value to derived column: {} because argument: {} does not exist in the "
@@ -408,7 +415,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
                       + "refresh/backfill the segments to create a derived column from source column", column,
                   argument));
             }
-            argumentsMetadata.add(columnMetadata);
+            derivedColumnArguments.add(DerivedColumnArgument.forColumn(columnMetadata));
           }
 
           // TODO: Support forward index disabled derived column
@@ -422,7 +429,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           }
 
           try {
-            createDerivedColumnV1Indices(column, functionEvaluator, argumentsMetadata, errorOnFailure);
+            createDerivedColumnV1Indices(column, functionEvaluator, derivedColumnArguments, errorOnFailure);
             return true;
           } catch (Exception e) {
             LOGGER.error("Caught exception while creating derived column: {} with transform function: {}", column,
@@ -536,13 +543,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   ///   - Support chained derived column
   ///   - Support forward index disabled derived column
   private void createDerivedColumnV1Indices(String column, FunctionEvaluator functionEvaluator,
-      List<ColumnMetadata> argumentsMetadata, boolean errorOnFailure)
+      List<DerivedColumnArgument> derivedColumnArguments, boolean errorOnFailure)
       throws Exception {
     // Initialize value readers for all arguments
-    int numArguments = argumentsMetadata.size();
+    int numArguments = derivedColumnArguments.size();
     List<ValueReader> valueReaders = new ArrayList<>(numArguments);
-    for (ColumnMetadata argumentMetadata : argumentsMetadata) {
-      valueReaders.add(new ValueReader(argumentMetadata));
+    for (DerivedColumnArgument argument : derivedColumnArguments) {
+      valueReaders.add(argument._columnMetadata != null ? new ValueReader(argument._columnMetadata)
+          : new ValueReader(argument._constantValue));
     }
 
     FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
@@ -1221,9 +1229,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
   @SuppressWarnings("rawtypes")
   private class ValueReader implements Closeable {
+    @Nullable
     final ForwardIndexReader _forwardIndexReader;
+    @Nullable
     final Dictionary _dictionary;
+    @Nullable
     final PinotSegmentColumnReader _columnReader;
+    @Nullable
+    final Object _constantValue;
 
     ValueReader(ColumnMetadata columnMetadata)
         throws IOException, IndexReaderConstraintException {
@@ -1240,20 +1253,51 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       }
       _columnReader = new PinotSegmentColumnReader(columnMetadata.getColumnName(), _forwardIndexReader, _dictionary,
           null, columnMetadata.getMaxNumberOfMultiValues());
+      _constantValue = null;
+    }
+
+    ValueReader(Object constantValue) {
+      _forwardIndexReader = null;
+      _dictionary = null;
+      _columnReader = null;
+      _constantValue = constantValue;
     }
 
     Object getValue(int docId) {
-      return _columnReader.getValue(docId);
+      return _columnReader != null ? _columnReader.getValue(docId) : _constantValue;
     }
 
     @Override
     public void close()
         throws IOException {
+      if (_columnReader == null) {
+        return;
+      }
       _columnReader.close();
       if (_dictionary != null) {
         _dictionary.close();
       }
       _forwardIndexReader.close();
+    }
+  }
+
+  private static class DerivedColumnArgument {
+    @Nullable
+    private final ColumnMetadata _columnMetadata;
+    @Nullable
+    private final Object _constantValue;
+
+    private DerivedColumnArgument(@Nullable ColumnMetadata columnMetadata, @Nullable Object constantValue) {
+      _columnMetadata = columnMetadata;
+      _constantValue = constantValue;
+    }
+
+    private static DerivedColumnArgument forColumn(ColumnMetadata columnMetadata) {
+      return new DerivedColumnArgument(columnMetadata, null);
+    }
+
+    private static DerivedColumnArgument forConstant(Object constantValue) {
+      return new DerivedColumnArgument(null, constantValue);
     }
   }
 }

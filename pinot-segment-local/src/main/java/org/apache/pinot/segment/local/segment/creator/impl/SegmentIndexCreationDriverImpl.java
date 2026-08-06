@@ -20,6 +20,8 @@ package org.apache.pinot.segment.local.segment.creator.impl;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -33,6 +35,7 @@ import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.ExceptionUtils;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformerUtils;
 import org.apache.pinot.segment.local.segment.creator.ColumnarSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
@@ -47,7 +50,6 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
-import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -60,7 +62,7 @@ import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,7 +115,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     FileFormat fileFormat = segmentGeneratorConfig.getFormat();
     String recordReaderClassName = segmentGeneratorConfig.getRecordReaderPath();
     Set<String> sourceFields =
-        IngestionUtils.getFieldsForRecordExtractor(tableConfig, segmentGeneratorConfig.getSchema());
+        new HashSet<>(IngestionUtils.getFieldsForRecordExtractor(tableConfig, segmentGeneratorConfig.getSchema()));
+    sourceFields.removeAll(PinotSegmentRecordReader.VIRTUAL_COLUMNS);
 
     // Allow for instantiation general record readers from a record reader path passed into segment generator config
     // If this is set, this will override the file format
@@ -143,26 +146,15 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   public void init(SegmentGeneratorConfig config, RecordReader recordReader)
       throws Exception {
-    if (recordReader instanceof PinotSegmentRecordReader
-        && ((PinotSegmentRecordReader) recordReader).isReadingPinotSegmentFile()) {
-      addCreationTimeColumn(config);
-    } else if (recordReader instanceof CompactedPinotSegmentRecordReader
-        && ((CompactedPinotSegmentRecordReader) recordReader).isReadingPinotSegmentFile()) {
-      addCreationTimeColumn(config);
+    List<RecordTransformer> transformers =
+        RecordTransformerUtils.getDefaultTransformers(config.getTableConfig(), config.getSchema());
+    boolean requiresCreationTime = transformers.stream().anyMatch(
+        transformer -> transformer.getInputColumns().contains(PinotSegmentRecordReader.CREATION_TIME_COLUMN));
+    if (requiresCreationTime) {
+      transformers.add(0, new SegmentCreationTimeTransformer(resolveCreationTime(config)));
     }
     init(config, new RecordReaderSegmentCreationDataSource(recordReader),
-        new TransformPipeline(config.getTableConfig(), config.getSchema()));
-  }
-
-  private static void addCreationTimeColumn(SegmentGeneratorConfig config) {
-    Schema schema = config.getSchema();
-    FieldSpec fieldSpec = schema.getFieldSpecFor(BuiltInVirtualColumn.CREATIONTIME);
-    if (fieldSpec != null && !fieldSpec.isVirtualColumn()) {
-      return;
-    }
-    FieldSpec creationTimeFieldSpec = PinotSegmentRecordReader.materializeCreationTimeColumn(schema);
-    config.getIndexConfigsByColName().put(BuiltInVirtualColumn.CREATIONTIME,
-        FieldIndexConfigsUtil.fromFieldConfig(null, creationTimeFieldSpec));
+        new TransformPipeline(config.getTableConfig().getTableName(), transformers));
   }
 
   /// Initialize the driver for columnar segment building using a ColumnReaderFactory.
@@ -203,7 +195,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     _schema = config.getSchema();
     _continueOnError = config.isContinueOnError();
     _instanceType = config.getInstanceType();
-
     // Handle columnar data sources differently
     String readerClassName = null;
     if (dataSource instanceof ColumnarSegmentCreationDataSource) {
@@ -247,6 +238,40 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Create a temporary directory used in segment creation
     _tempIndexDir = new File(indexDir, "tmp-" + UUID.randomUUID());
     LOGGER.debug("tempIndexDir:{}", _tempIndexDir);
+  }
+
+  private static long resolveCreationTime(SegmentGeneratorConfig config) {
+    String configuredCreationTime = config.getCreationTime();
+    long creationTime;
+    if (configuredCreationTime != null) {
+      try {
+        creationTime = Long.parseLong(configuredCreationTime);
+      } catch (NumberFormatException e) {
+        LOGGER.error("Caught exception while parsing creation time in config, use current time as creation time", e);
+        creationTime = System.currentTimeMillis();
+      }
+    } else {
+      creationTime = System.currentTimeMillis();
+    }
+    config.setCreationTime(Long.toString(creationTime));
+    return creationTime;
+  }
+
+  private static class SegmentCreationTimeTransformer implements RecordTransformer {
+    private final long _creationTime;
+
+    private SegmentCreationTimeTransformer(long creationTime) {
+      _creationTime = creationTime;
+    }
+
+    @Override
+    public void transform(GenericRow record) {
+      if (!record.hasVirtualValue(PinotSegmentRecordReader.CREATION_TIME_COLUMN)) {
+        record.putVirtualValue(PinotSegmentRecordReader.CREATION_TIME_COLUMN, _creationTime);
+      }
+      record.getFieldToValueMap().remove(PinotSegmentRecordReader.CREATION_TIME_COLUMN);
+      record.removeNullValueField(PinotSegmentRecordReader.CREATION_TIME_COLUMN);
+    }
   }
 
   /// Get sorted document IDs from the record reader if it supports this functionality.

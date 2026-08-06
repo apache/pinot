@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.data.readers;
 
 import java.util.HashMap;
+import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -167,5 +168,29 @@ public class GenericRowTest {
     second = new GenericRow();
     second.putDefaultNullValue("one", null);
     Assert.assertEquals(first, second);
+  }
+
+  @Test
+  public void testVirtualValueIsReadableButNotPhysical() {
+    GenericRow row = new GenericRow();
+    row.putValue("physical", 1);
+    row.putVirtualValue("virtual", 2);
+
+    Assert.assertEquals(row.getValue("virtual"), 2);
+    Assert.assertFalse(row.getFieldToValueMap().containsKey("virtual"));
+
+    GenericRow copy = row.copy();
+    Assert.assertEquals(copy, row);
+    Assert.assertEquals(copy.getValue("virtual"), 2);
+    Assert.assertFalse(copy.getFieldToValueMap().containsKey("virtual"));
+
+    GenericRow selectedCopy = row.copy(List.of("physical", "virtual"));
+    Assert.assertEquals(selectedCopy.getValue("physical"), 1);
+    Assert.assertEquals(selectedCopy.getValue("virtual"), 2);
+    Assert.assertFalse(selectedCopy.getFieldToValueMap().containsKey("virtual"));
+
+    row.clear();
+    Assert.assertNull(row.getValue("virtual"));
+    Assert.assertEquals(row, new GenericRow());
   }
 }

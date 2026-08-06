@@ -104,11 +104,6 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
     return _pinotSegmentRecordReader.getSortedDocIds();
   }
 
-  /// Returns whether the underlying reader was initialized from a Pinot segment on disk.
-  public boolean isReadingPinotSegmentFile() {
-    return _pinotSegmentRecordReader.isReadingPinotSegmentFile();
-  }
-
   @Override
   public boolean hasNext() {
     // Check if we've exhausted all documents

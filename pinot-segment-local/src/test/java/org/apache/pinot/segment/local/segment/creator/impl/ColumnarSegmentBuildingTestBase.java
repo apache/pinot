@@ -23,7 +23,6 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -43,7 +42,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
@@ -344,17 +342,10 @@ public abstract class ColumnarSegmentBuildingTestBase {
     try {
       // Validate basic segment metadata
       Assert.assertEquals(segment1.getSegmentMetadata().getTotalDocs(), segment2.getSegmentMetadata().getTotalDocs());
-      Set<String> segment1Columns = new HashSet<>(segment1.getSegmentMetadata().getAllColumns());
-      Set<String> segment2Columns = new HashSet<>(segment2.getSegmentMetadata().getAllColumns());
-      segment1Columns.removeAll(BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS);
-      segment2Columns.removeAll(BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS);
-      Assert.assertEquals(segment1Columns, segment2Columns);
+      Assert.assertEquals(segment1.getSegmentMetadata().getAllColumns(), segment2.getSegmentMetadata().getAllColumns());
 
       // Validate column metadata and statistics for each column
       for (String columnName : segment1.getPhysicalColumnNames()) {
-        if (BuiltInVirtualColumn.MATERIALIZABLE_VIRTUAL_COLUMNS.contains(columnName)) {
-          continue;
-        }
         validateColumnMetadata(segment1, segment2, columnName);
         validateColumnData(segment1, segment2, columnName);
       }
