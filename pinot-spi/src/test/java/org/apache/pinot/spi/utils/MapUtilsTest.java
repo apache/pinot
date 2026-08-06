@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.utils;
 
 import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.HashMap;
@@ -64,6 +65,21 @@ public class MapUtilsTest {
     assertEquals(deserialized.get("double"), map.get("double"), "Double value should match");
     assertEquals(deserialized.get("boolean"), map.get("boolean"), "Boolean value should match");
     assertNull(deserialized.get("nullValue"), "Null value should be preserved");
+  }
+
+  @Test
+  void testDeserializeMapValue() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("first", Map.of("nested", List.of(1, 2, 3)));
+    map.put("k8s.workload.name", "pinot-server");
+    map.put("nullValue", null);
+    byte[] serialized = MapUtils.serializeMap(map);
+
+    assertEquals(MapUtils.deserializeMapValue(serialized, "k8s.workload.name"), "pinot-server");
+    assertEquals(MapUtils.deserializeMapValue(ByteBuffer.wrap(serialized), "first"),
+        Map.of("nested", List.of(1, 2, 3)));
+    assertNull(MapUtils.deserializeMapValue(serialized, "missing"));
+    assertNull(MapUtils.deserializeMapValue(serialized, "nullValue"));
   }
 
   @Test
