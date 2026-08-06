@@ -37,10 +37,15 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
+import org.openjdk.jmh.runner.options.CommandLineOptions;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
 /// Measures selective MAP key access against the current full-map read path.
+///
+/// Keys are fixed-length and share a common prefix, modelling dotted OpenTelemetry-style attribute names
+/// (`k8s.workload.name`, `k8s.namespace.name`, ...). That is the honest case for a scanning extractor: every entry
+/// clears the key-length check, so the key bytes are actually compared rather than skipped on a length mismatch.
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @Fork(value = 2)
@@ -51,7 +56,10 @@ public class BenchmarkMapKeyAccess {
 
   public static void main(String[] args)
       throws Exception {
-    ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkMapKeyAccess.class.getSimpleName());
+    // Inherit the command line so `-p`, `-prof`, `-f` and friends take effect. Without the parent options they are
+    // parsed and then silently dropped, and the run quietly falls back to the annotated defaults.
+    ChainedOptionsBuilder opt = new OptionsBuilder().parent(new CommandLineOptions(args))
+        .include(BenchmarkMapKeyAccess.class.getSimpleName());
     new Runner(opt.build()).run();
   }
 
@@ -61,20 +69,31 @@ public class BenchmarkMapKeyAccess {
   @Param({"first", "last"})
   private String _targetPosition;
 
+  /// `flat` models scalar attribute maps (the common ingestion shape); `nested` models maps whose values are
+  /// themselves objects, where the full-map path pays to materialize a container per value.
+  @Param({"flat", "nested"})
+  private String _valueShape;
+
   private byte[] _serialized;
   private ByteBuffer _directBuffer;
   private String _targetKey;
 
   @Setup(Level.Trial)
   public void setUp() {
+    boolean nested = "nested".equals(_valueShape);
     Map<String, Object> map = new LinkedHashMap<>();
     for (int i = 0; i < _numEntries; i++) {
-      map.put("key-" + i, Map.of("value", "value-with-enough-bytes-to-exercise-json-parsing-" + i));
+      String value = "value-with-enough-bytes-to-exercise-json-parsing-" + i;
+      map.put(key(i), nested ? Map.of("value", value) : value);
     }
-    _targetKey = "key-" + ("first".equals(_targetPosition) ? 0 : _numEntries - 1);
+    _targetKey = key("first".equals(_targetPosition) ? 0 : _numEntries - 1);
     _serialized = MapUtils.serializeMap(map, false);
     _directBuffer = ByteBuffer.allocateDirect(_serialized.length);
     _directBuffer.put(_serialized);
+  }
+
+  private static String key(int i) {
+    return String.format("k8s.attribute.%03d.name", i);
   }
 
   /// Models the existing consuming path: copy the complete off-heap value, then deserialize every MAP entry.
