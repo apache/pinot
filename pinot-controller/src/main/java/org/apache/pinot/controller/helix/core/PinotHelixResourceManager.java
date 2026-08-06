@@ -1068,7 +1068,7 @@ public class PinotHelixResourceManager {
           // llcName can be null if the segment is uploaded through offline ingestion
           continue;
         }
-        int partitionGroupId = llcName.getPartitionGroupId();
+        int partitionGroupId = llcName.getTopicPartitionId().getPartitionId();
         int sequenceNumber = llcName.getSequenceNumber();
         String lastCompletedSegName = partitionIdToLastLLCCompletedSegmentMap.get(partitionGroupId);
         if (lastCompletedSegName == null

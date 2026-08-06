@@ -469,7 +469,7 @@ public class IngestionDelayTracker {
   /// when the new consuming segment is created on a different server.
   public void stopTrackingPartition(String segmentName) {
     _segmentsToIgnore.put(segmentName, true);
-    removePartitionId(new LLCSegmentName(segmentName).getPartitionGroupId());
+    removePartitionId(new LLCSegmentName(segmentName).getTopicPartitionId().getPartitionId());
   }
 
   /// This method is used for timing out inactive partitions, so we don't display their metrics on current server.
@@ -515,7 +515,8 @@ public class IngestionDelayTracker {
       // Do not update the tracker state during server startup period or if the segment is marked to be ignored
       return;
     }
-    _partitionsMarkedForVerification.put(new LLCSegmentName(segmentName).getPartitionGroupId(), _clock.millis());
+    _partitionsMarkedForVerification.put(new LLCSegmentName(segmentName).getTopicPartitionId().getPartitionId(),
+        _clock.millis());
   }
 
   /// Method to get timestamp used for the ingestion delay for a given partition.

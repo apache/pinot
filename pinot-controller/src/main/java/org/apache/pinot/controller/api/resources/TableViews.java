@@ -215,7 +215,8 @@ public class TableViews {
         if (llcSegmentName == null) {
           continue;
         }
-        partitionIdToSegments.computeIfAbsent(llcSegmentName.getPartitionGroupId(), k -> new TreeSet<>())
+        partitionIdToSegments.computeIfAbsent(
+            llcSegmentName.getTopicPartitionId().getPartitionId(), k -> new TreeSet<>())
             .add(llcSegmentName);
       }
 
