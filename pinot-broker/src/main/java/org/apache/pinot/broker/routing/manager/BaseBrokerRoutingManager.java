@@ -20,6 +20,7 @@ package org.apache.pinot.broker.routing.manager;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -1235,6 +1236,16 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     return routingEntry.getSegments(brokerRequest, samplerName);
   }
 
+  @Nullable
+  @Override
+  public Set<String> getPrunedSegments(BrokerRequest brokerRequest) {
+    RoutingEntry routingEntry = _routingEntryMap.get(brokerRequest.getQuerySource().getTableName());
+    if (routingEntry == null) {
+      return null;
+    }
+    return routingEntry.getPrunedSegments(brokerRequest, extractSamplerName(brokerRequest));
+  }
+
   private static String normalizeSamplerName(String samplerName) {
     return samplerName.trim().toLowerCase(Locale.ROOT);
   }
@@ -1510,22 +1521,33 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       }
     }
 
+    /// Runs selection and then the pruner chain, which is the one place that decides what a query sees. Every caller
+    /// goes through here on purpose: the routing table, the plain segment list and the planner's emptiness proof must
+    /// all be judged by the same selector and the same pruners. A second copy of this sequence that drifted would let
+    /// the planner prove a partition empty that a real query would still have scanned, and that loses rows with no
+    /// error anywhere.
+    private SelectedSegments selectThenPrune(BrokerRequest brokerRequest, @Nullable SamplerInfo samplerInfo) {
+      SegmentSelector segmentSelector = samplerInfo != null ? samplerInfo._segmentSelector : _segmentSelector;
+      Set<String> selectedSegments = segmentSelector.select(brokerRequest);
+      Set<String> survivingSegments = selectedSegments;
+      if (!selectedSegments.isEmpty()) {
+        for (SegmentPruner segmentPruner : _segmentPruners) {
+          survivingSegments = segmentPruner.prune(brokerRequest, survivingSegments);
+        }
+      }
+      return new SelectedSegments(selectedSegments, survivingSegments);
+    }
+
     InstanceSelector.SelectionResult calculateRouting(BrokerRequest brokerRequest, long requestId,
         @Nullable String samplerName) {
       SamplerInfo samplerInfo = getSamplerInfo(samplerName);
-      SegmentSelector segmentSelector = samplerInfo != null ? samplerInfo._segmentSelector : _segmentSelector;
       InstanceSelector instanceSelector = samplerInfo != null ? samplerInfo._instanceSelector : _instanceSelector;
-      Set<String> selectedSegments = segmentSelector.select(brokerRequest);
-      int numTotalSelectedSegments = selectedSegments.size();
-      if (!selectedSegments.isEmpty()) {
-        for (SegmentPruner segmentPruner : _segmentPruners) {
-          selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
-        }
-      }
-      int numPrunedSegments = numTotalSelectedSegments - selectedSegments.size();
-      if (!selectedSegments.isEmpty()) {
+      SelectedSegments selectedSegments = selectThenPrune(brokerRequest, samplerInfo);
+      Set<String> survivingSegments = selectedSegments._surviving;
+      int numPrunedSegments = selectedSegments.getNumPruned();
+      if (!survivingSegments.isEmpty()) {
         InstanceSelector.SelectionResult selectionResult =
-            instanceSelector.select(brokerRequest, new ArrayList<>(selectedSegments), requestId);
+            instanceSelector.select(brokerRequest, new ArrayList<>(survivingSegments), requestId);
         selectionResult.setNumPrunedSegments(numPrunedSegments);
         return selectionResult;
       } else {
@@ -1535,15 +1557,47 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     }
 
     List<String> getSegments(BrokerRequest brokerRequest, @Nullable String samplerName) {
-      SamplerInfo samplerInfo = getSamplerInfo(samplerName);
-      SegmentSelector segmentSelector = samplerInfo != null ? samplerInfo._segmentSelector : _segmentSelector;
-      Set<String> selectedSegments = segmentSelector.select(brokerRequest);
-      if (!selectedSegments.isEmpty()) {
-        for (SegmentPruner segmentPruner : _segmentPruners) {
-          selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
+      return new ArrayList<>(selectThenPrune(brokerRequest, getSamplerInfo(samplerName))._surviving);
+    }
+
+    /// See [RoutingManager#getPrunedSegments]. The sampler is honoured for the same reason the query path honours it:
+    /// a narrower selection only ever shrinks what this can prove, never widens it.
+    ///
+    /// The pruners return a new set rather than editing the one they are handed, so taking the difference costs
+    /// nothing unless something was actually pruned. If one ever did edit in place the two sets would be the same
+    /// object, the difference would come out empty, and this would fall back to proving nothing -- the safe direction.
+    Set<String> getPrunedSegments(BrokerRequest brokerRequest, @Nullable String samplerName) {
+      SelectedSegments selectedSegments = selectThenPrune(brokerRequest, getSamplerInfo(samplerName));
+      int numPruned = selectedSegments.getNumPruned();
+      if (numPruned == 0) {
+        return Set.of();
+      }
+      // Built up rather than copied down: the count is already known and is usually a small fraction of the table's
+      // segments, so copying every selected segment only to remove most of them again would size the allocation to
+      // the table instead of to the answer.
+      Set<String> prunedSegments = Sets.newHashSetWithExpectedSize(numPruned);
+      for (String segment : selectedSegments._selected) {
+        if (!selectedSegments._surviving.contains(segment)) {
+          prunedSegments.add(segment);
         }
       }
-      return new ArrayList<>(selectedSegments);
+      return prunedSegments;
+    }
+  }
+
+  /// What one run of [RoutingEntry#selectThenPrune] decided: the segments selection offered, and the ones the pruners
+  /// left. Both are needed because the difference between them is the only sound proof that a segment cannot match.
+  private static class SelectedSegments {
+    final Set<String> _selected;
+    final Set<String> _surviving;
+
+    SelectedSegments(Set<String> selected, Set<String> surviving) {
+      _selected = selected;
+      _surviving = surviving;
+    }
+
+    int getNumPruned() {
+      return _selected.size() - _surviving.size();
     }
   }
 }

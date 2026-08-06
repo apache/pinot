@@ -636,6 +636,11 @@ public class CommonConstants {
     /// Separated from [#CONFIG_OF_USE_BROKER_PRUNING] so the two paths can be rolled out independently; both
     /// default to enabled now that all logical-planner leaf paths (non-partitioned, partitioned, logical tables)
     /// support broker pruning. Actual pruning still requires segment pruners to be configured on the table.
+    ///
+    /// On a colocated join this governs more than which segments are dispatched: a partition class that every member
+    /// of the colocated group prunes away is dropped from the group's shared class list, so the leaves and the stages
+    /// derived from them run fewer workers and the query is dispatched to fewer servers. Turning it off restores one
+    /// worker per populated class.
     public static final String CONFIG_OF_LOGICAL_PLANNER_USE_BROKER_PRUNING =
         "pinot.broker.multistage.logical.planner.use.broker.pruning";
     public static final boolean DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING = true;

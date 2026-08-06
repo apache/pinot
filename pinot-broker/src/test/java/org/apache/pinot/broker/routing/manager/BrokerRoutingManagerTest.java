@@ -19,9 +19,10 @@
 package org.apache.pinot.broker.routing.manager;
 
 import java.lang.reflect.Constructor;
-import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
@@ -45,6 +46,8 @@ import org.apache.pinot.broker.routing.tablesampler.TableSampler;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryManager;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
@@ -73,9 +76,11 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -258,16 +263,169 @@ public class BrokerRoutingManagerTest {
     assertSame(_routingManager.getTablePartitionReplicatedServersInfo(TEST_TABLE), expectedReplicatedServersInfo);
   }
 
+  @Test
+  public void testGetPrunedSegmentsIsExactlySelectedMinusSurvivors()
+      throws Exception {
+    SegmentSelector segmentSelector = selectorOf("seg1", "seg2", "seg3", "seg4");
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, segmentSelector, List.of(prunerDropping("seg1", "seg3")),
+            mock(InstanceSelector.class)));
+
+    assertEquals(_routingManager.getPrunedSegments(brokerRequest(TEST_TABLE)), Set.of("seg1", "seg3"));
+  }
+
+  @Test
+  public void testGetPrunedSegmentsChainsEveryPruner()
+      throws Exception {
+    SegmentPruner firstPruner = prunerDropping("seg1");
+    SegmentPruner secondPruner = prunerDropping("seg3");
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, selectorOf("seg1", "seg2", "seg3"), List.of(firstPruner, secondPruner),
+            mock(InstanceSelector.class)));
+
+    assertEquals(_routingManager.getPrunedSegments(brokerRequest(TEST_TABLE)), Set.of("seg1", "seg3"));
+
+    // The second pruner judges what the first left, so consulting only the last one would lose "seg1".
+    ArgumentCaptor<Set<String>> captor = ArgumentCaptor.captor();
+    verify(secondPruner).prune(any(), captor.capture());
+    assertEquals(captor.getValue(), Set.of("seg2", "seg3"));
+  }
+
+  /// Nothing pruned must read as "proved nothing", not as "proved every selected segment empty" -- the latter would
+  /// let a caller treat a table that fully matches the filter as a table with no matching rows.
+  @Test
+  public void testGetPrunedSegmentsIsEmptyWhenNothingWasPruned()
+      throws Exception {
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, selectorOf("seg1", "seg2"), List.of(prunerDropping()),
+            mock(InstanceSelector.class)));
+
+    assertEquals(_routingManager.getPrunedSegments(brokerRequest(TEST_TABLE)), Set.of());
+  }
+
+  @Test
+  public void testGetPrunedSegmentsIsEmptyWhenSelectionIsEmpty()
+      throws Exception {
+    SegmentPruner pruner = prunerDropping("seg1");
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, selectorOf(), List.of(pruner), mock(InstanceSelector.class)));
+
+    assertEquals(_routingManager.getPrunedSegments(brokerRequest(TEST_TABLE)), Set.of());
+    // An empty selection is answered without asking anyone, so the empty result cannot have come from a pruner.
+    verify(pruner, never()).prune(any(), any());
+  }
+
+  /// A table this broker has no routing for is `null`, not an empty set: it eliminated nothing because it would have
+  /// routed nothing, which is a different claim from "the pruners ran and proved nothing".
+  @Test
+  public void testGetPrunedSegmentsIsNullForUnknownTable() {
+    assertNull(_routingManager.getPrunedSegments(brokerRequest("noSuchTable_OFFLINE")));
+  }
+
+  /// The whole point of the API: only presence in the result is a proof. A segment the selector never offered is
+  /// absent from the survivors for a reason that has nothing to do with the filter -- here the selector withheld
+  /// "seg3" -- and reporting it would let a caller skip a segment that may well hold matching rows.
+  @Test
+  public void testGetPrunedSegmentsDoesNotReportASegmentTheSelectorNeverOffered()
+      throws Exception {
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, selectorOf("seg1", "seg2"), List.of(prunerDropping("seg1", "seg3")),
+            mock(InstanceSelector.class)));
+
+    Set<String> prunedSegments = _routingManager.getPrunedSegments(brokerRequest(TEST_TABLE));
+
+    assertEquals(prunedSegments, Set.of("seg1"));
+    assertFalse(prunedSegments.contains("seg3"));
+  }
+
+  /// Instance selection is what makes routing depend on the request id and on which replicas are up; keeping it out
+  /// is what makes this deterministic enough to plan on.
+  @Test
+  public void testGetPrunedSegmentsNeverConsultsInstanceSelection()
+      throws Exception {
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, selectorOf("seg1", "seg2"), List.of(prunerDropping("seg1")), instanceSelector));
+
+    assertEquals(_routingManager.getPrunedSegments(brokerRequest(TEST_TABLE)), Set.of("seg1"));
+    verifyNoInteractions(instanceSelector);
+  }
+
+  /// A pruner that edits the set it was handed leaves nothing to take a difference against. That has to degrade to
+  /// "proved nothing" rather than to a wrong proof.
+  @Test
+  public void testGetPrunedSegmentsIsEmptyWhenAPrunerEditsInPlace()
+      throws Exception {
+    SegmentPruner pruner = mock(SegmentPruner.class);
+    when(pruner.prune(any(), any())).thenAnswer(invocation -> {
+      Set<String> segments = invocation.getArgument(1);
+      segments.remove("seg1");
+      return segments;
+    });
+    SegmentSelector segmentSelector = mock(SegmentSelector.class);
+    when(segmentSelector.select(any())).thenReturn(new HashSet<>(Set.of("seg1", "seg2")));
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, segmentSelector, List.of(pruner), mock(InstanceSelector.class)));
+
+    assertEquals(_routingManager.getPrunedSegments(brokerRequest(TEST_TABLE)), Set.of());
+  }
+
+  private static BrokerRequest brokerRequest(String tableNameWithType) {
+    QuerySource querySource = new QuerySource();
+    querySource.setTableName(tableNameWithType);
+    BrokerRequest brokerRequest = new BrokerRequest();
+    brokerRequest.setQuerySource(querySource);
+    return brokerRequest;
+  }
+
+  private static SegmentSelector selectorOf(String... segments) {
+    SegmentSelector segmentSelector = mock(SegmentSelector.class);
+    when(segmentSelector.select(any())).thenReturn(Set.of(segments));
+    return segmentSelector;
+  }
+
+  /// Mirrors [org.apache.pinot.broker.routing.segmentpruner.EmptySegmentPruner]: a fresh set when it prunes
+  /// something, the very set it was handed when it does not.
+  private static SegmentPruner prunerDropping(String... segments) {
+    Set<String> droppedSegments = Set.of(segments);
+    SegmentPruner segmentPruner = mock(SegmentPruner.class);
+    when(segmentPruner.prune(any(), any())).thenAnswer(invocation -> {
+      Set<String> candidateSegments = invocation.getArgument(1);
+      if (droppedSegments.stream().noneMatch(candidateSegments::contains)) {
+        return candidateSegments;
+      }
+      Set<String> survivingSegments = new HashSet<>(candidateSegments);
+      survivingSegments.removeAll(droppedSegments);
+      return survivingSegments;
+    });
+    return segmentPruner;
+  }
+
   private static Object createRoutingEntry(String tableNameWithType, TimeBoundaryManager timeBoundaryManager,
       SegmentPartitionMetadataManager partitionMetadataManager, Map<String, ?> samplerInfos)
       throws Exception {
-    return createRoutingEntry(tableNameWithType, timeBoundaryManager, partitionMetadataManager, samplerInfos,
-        mock(InstanceSelector.class), false);
+    return createRoutingEntry(tableNameWithType, mock(SegmentSelector.class), List.of(),
+        mock(InstanceSelector.class), timeBoundaryManager, partitionMetadataManager, samplerInfos, false);
   }
 
   private static Object createRoutingEntry(String tableNameWithType, TimeBoundaryManager timeBoundaryManager,
       SegmentPartitionMetadataManager partitionMetadataManager, Map<String, ?> samplerInfos,
       InstanceSelector instanceSelector, boolean disabled)
+      throws Exception {
+    return createRoutingEntry(tableNameWithType, mock(SegmentSelector.class), List.of(), instanceSelector,
+        timeBoundaryManager, partitionMetadataManager, samplerInfos, disabled);
+  }
+
+  private static Object createRoutingEntry(String tableNameWithType, SegmentSelector segmentSelector,
+      List<SegmentPruner> segmentPruners, InstanceSelector instanceSelector)
+      throws Exception {
+    return createRoutingEntry(tableNameWithType, segmentSelector, segmentPruners, instanceSelector,
+        mock(TimeBoundaryManager.class), mock(SegmentPartitionMetadataManager.class), Map.of(), false);
+  }
+
+  private static Object createRoutingEntry(String tableNameWithType, SegmentSelector segmentSelector,
+      List<SegmentPruner> segmentPruners, InstanceSelector instanceSelector, TimeBoundaryManager timeBoundaryManager,
+      SegmentPartitionMetadataManager partitionMetadataManager, Map<String, ?> samplerInfos, boolean disabled)
       throws Exception {
     Class<?> routingEntryClass = Class.forName(BaseBrokerRoutingManager.class.getName() + "$RoutingEntry");
     Constructor<?> constructor = routingEntryClass.getDeclaredConstructor(String.class, String.class, String.class,
@@ -276,8 +434,8 @@ public class BrokerRoutingManagerTest {
         Map.class, boolean.class);
     constructor.setAccessible(true);
     return constructor.newInstance(tableNameWithType, "/IDEALSTATES/" + tableNameWithType,
-        "/EXTERNALVIEW/" + tableNameWithType, mock(SegmentPreSelector.class), mock(SegmentSelector.class),
-        Collections.<SegmentPruner>emptyList(), instanceSelector, 1, 1,
+        "/EXTERNALVIEW/" + tableNameWithType, mock(SegmentPreSelector.class), segmentSelector, segmentPruners,
+        instanceSelector, 1, 1,
         mock(SegmentZkMetadataFetcher.class), timeBoundaryManager, partitionMetadataManager, null, samplerInfos,
         disabled);
   }

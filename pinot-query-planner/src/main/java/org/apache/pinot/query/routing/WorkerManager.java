@@ -136,12 +136,24 @@ public class WorkerManager {
   /// publishes the decision on each partitioned leaf of the group (see
   /// [DispatchablePlanMetadata#getPartitionClassIds()] and [DispatchablePlanMetadata#getPaddedClassCandidates()]).
   ///
-  /// A class survives when *any* member holds a segment in it: the union, not the intersection, because a class that
-  /// holds data for one member must keep its worker on every member or the members stop agreeing on what a worker id
-  /// stands for. A member holding no data in a surviving class gets a worker with no segments (see
-  /// [#assignPaddedWorker]). Emptiness is computed in class space (`0..partitionSize-1`) rather than over raw partition
-  /// ids because members may declare different partition counts; a member carrying no per-class visibility (replicated,
-  /// non-partitioned, or deriving its worker map from a peer) contributes nothing to the union.
+  /// A class survives when *any* member holds a segment in it that the query's filter does not provably exclude: the
+  /// union, not the intersection, because a class that holds matching data for one member must keep its worker on
+  /// every member or the members stop agreeing on what a worker id stands for. Dropping a class the group as a whole
+  /// has no matching row in is what turns broker pruning into fewer workers, and therefore fewer dispatched servers,
+  /// for a colocated join. The union direction is also what keeps this layer free of relational semantics: no input
+  /// row anywhere in a class means no output row attributable to it, whatever operator sits above, whereas dropping a
+  /// class only one side filtered away would be wrong for a RIGHT or FULL join, a union, or an anti-join.
+  ///
+  /// A member holding no data in a surviving class gets a worker with no segments (see [#assignPaddedWorker]). A
+  /// member that holds data the filter excludes does *not*: it keeps every segment of the class. Survival is decided
+  /// per class rather than per partition on purpose -- a class's worker is placed on the servers shared by all of its
+  /// populated partitions, so dropping some of them on one member and not on another would move that member's worker
+  /// off its peer's server and turn an in-process exchange into a network one. Filtering inside a surviving class is a
+  /// possible follow-up.
+  ///
+  /// Emptiness is computed in class space (`0..partitionSize-1`) rather than over raw partition ids because members
+  /// may declare different partition counts; a member carrying no per-class visibility (replicated, non-partitioned,
+  /// or deriving its worker map from a peer) contributes nothing to the union.
   ///
   /// Marking no group keeps the assignment as it is without one: every class gets a worker, so a class holding no
   /// segment fails the assignment instead of being dropped or padded.
@@ -151,66 +163,107 @@ public class WorkerManager {
     for (ColocationGroupAnalyzer.ColocationGroup group : ColocationGroupAnalyzer.findReducibleGroups(rootFragment,
         metadataMap)) {
       int numWorkers = group._partitionSize;
-      List<Integer> memberFragmentIds = group._partitionedLeafFragmentIds;
-      // The servers each member can scan each class on, in the same order as the member fragment ids.
-      List<List<Set<String>>> memberClassServers = new ArrayList<>(memberFragmentIds.size());
+      List<PlanFragment> memberFragments = group._partitionedLeafFragments;
+      List<Integer> memberFragmentIds = new ArrayList<>(memberFragments.size());
+      // The servers each member can scan each class on, in the same order as the member fragments.
+      List<List<Set<String>>> memberClassServers = new ArrayList<>(memberFragments.size());
+      // The partition layouts, same order again, kept only to count what a filter-dropped class cost each member.
+      List<PartitionInfo[]> memberPartitionInfoMaps = new ArrayList<>(memberFragments.size());
       // Allocated lazily, once the first member has checked the hint against its table: numWorkers is the raw hinted
       // partition size, so sizing anything from it before that check would let a bogus hint allocate unboundedly. The
       // check also bounds it by the table's partition count.
-      boolean[] survivingClasses = null;
+      // populatedClasses ignores the filter and is what decides padding and the all-pruned fallback; matchingClasses
+      // is the same union taken over the segments the filter leaves, and is a subset of it.
+      boolean[] populatedClasses = null;
+      boolean[] matchingClasses = null;
       boolean reducible = true;
-      for (Integer fragmentId : memberFragmentIds) {
-        DispatchablePlanMetadata metadata = metadataMap.get(fragmentId);
+      for (PlanFragment fragment : memberFragments) {
+        DispatchablePlanMetadata metadata = metadataMap.get(fragment.getFragmentId());
         String tableName = metadata.getScannedTables().get(0);
         // NOTE: A failure here is the same one the leaf assignment would hit for this table, only raised earlier.
         PartitionTableInfo partitionTableInfo =
             partitionTableInfoCache.computeIfAbsent(tableName, this::calculatePartitionTableInfo);
-        int numPartitions = partitionTableInfo._partitionInfoMap.length;
+        PartitionInfo[] partitionInfoMap = partitionTableInfo._partitionInfoMap;
+        int numPartitions = partitionInfoMap.length;
         if (numPartitions == 0 || numPartitions % numWorkers != 0) {
           // The table does not match the hinted partition size. Leave the group alone so that checkPartitionInfoMap
           // reports it during the leaf assignment.
           reducible = false;
           break;
         }
-        if (survivingClasses == null) {
-          survivingClasses = new boolean[numWorkers];
+        if (populatedClasses == null) {
+          populatedClasses = new boolean[numWorkers];
+          matchingClasses = new boolean[numWorkers];
         }
-        List<Set<String>> classServers = collectClassServers(partitionTableInfo._partitionInfoMap, numWorkers);
+        List<Set<String>> classServers = collectClassServers(partitionInfoMap, numWorkers);
+        Set<String> prunedSegments = getPrunedSegments(fragment, tableName, context);
         boolean anyPopulated = false;
         for (int classId = 0; classId < numWorkers; classId++) {
           if (classServers.get(classId) != null) {
-            survivingClasses[classId] = true;
+            populatedClasses[classId] = true;
             anyPopulated = true;
+            if (prunedSegments == null) {
+              // No filter to prune this member with, so it contributes every class it holds data in.
+              matchingClasses[classId] = true;
+            }
           }
         }
         // A member holding no data at all leaves nothing to assign: no class to place its single empty worker in, and
         // no server known to host the table to place it on. Check the deferred cause first though -- a table whose
         // every partition is deferred also has no populated class, and reports far more actionably. That is the
-        // pre-pass' only deferred check: a group it marks gets no broker pruning, so the leaf assignment covers the
-        // rest.
+        // pre-pass' only deferred check: a group it marks gets no broker pruning at the leaf, so the leaf assignment
+        // covers the rest.
+        //
+        // NOTE: This reads the unfiltered population on purpose. A member whose filter matches nothing holds data
+        //       all the same, and failing it here would turn a correct empty result into a query error.
         if (!anyPopulated) {
           checkNoPartitionsWithOnlyDeferredSegments(partitionTableInfo, tableName);
         }
         Preconditions.checkState(anyPopulated,
             "Failed to find any segment in any partition for table: %s, which is required for a partitioned worker "
                 + "assignment", tableName);
+        if (prunedSegments != null) {
+          markClassesWithMatchingData(partitionInfoMap, numWorkers, prunedSegments, matchingClasses);
+        }
         memberClassServers.add(classServers);
+        memberPartitionInfoMaps.add(partitionInfoMap);
+        memberFragmentIds.add(fragment.getFragmentId());
       }
       if (!reducible) {
         continue;
       }
-      // The member list is never empty (see ColocationGroupAnalyzer#toReducibleGroup), so the loop allocated this, and
-      // the class list is never empty either: every member holds data in at least one class, and the union keeps it.
-      assert survivingClasses != null;
+      // The member list is never empty (see ColocationGroupAnalyzer#toReducibleGroup), so the loop allocated these,
+      // and the class list is never empty either: every member holds data in at least one class, and the union keeps
+      // it.
+      assert populatedClasses != null && matchingClasses != null;
+      // A group the filter empties keeps all of its populated classes, mirroring the leaf-level fallback in
+      // computePartitionsToKeep: a zero-worker leaf has no handling on a 1-to-1 exchange, and the server-side filter
+      // still returns the correct empty result from an unreduced plan.
+      boolean[] survivingClasses = anyTrue(matchingClasses) ? matchingClasses : populatedClasses;
       int[] partitionClassIds = toClassIds(survivingClasses);
       Map<Integer, Map<Integer, Set<String>>> padding =
           computePadding(memberFragmentIds, memberClassServers, partitionClassIds);
       if (padding.isEmpty() && partitionClassIds.length == numWorkers) {
         // Worker k already stands for class k on every member: nothing to reduce, nothing to pad. Leaving the group
-        // unmarked also keeps broker pruning on for its leaves (see computePartitionsToKeep). A group that needs
+        // unmarked also keeps leaf-level broker pruning on for the members that are eligible for it (see
+        // computePartitionsToKeep), which prunes at partition rather than class granularity. A group that needs
         // padding is marked even when it keeps every class, because a padded worker's id is its index in the class
         // list.
         continue;
+      }
+      // Report what the filter cost, not what the class reduction did: a class no member holds data in is empty
+      // rather than pruned, and it is already dropped above without being counted. Derived from the decision actually
+      // taken, so the all-pruned fallback above reports nothing.
+      long numPrunedSegments = 0;
+      for (int classId = 0; classId < numWorkers; classId++) {
+        if (populatedClasses[classId] && !survivingClasses[classId]) {
+          for (PartitionInfo[] partitionInfoMap : memberPartitionInfoMaps) {
+            numPrunedSegments += countSegmentsInClass(partitionInfoMap, numWorkers, classId);
+          }
+        }
+      }
+      if (numPrunedSegments > 0) {
+        context.addNumSegmentsPrunedByBroker(numPrunedSegments);
       }
       // One shared array instance, so that the agreement check in MailboxAssignmentVisitor compares one list rather
       // than copies of it. The padding goes on the same metadata: a padded worker's id only means something within the
@@ -221,6 +274,55 @@ public class WorkerManager {
         metadata.setPaddedClassCandidates(padding.get(fragmentId));
       }
     }
+  }
+
+  private static long countSegmentsInClass(PartitionInfo[] partitionInfoMap, int numWorkers, int classId) {
+    long numSegments = 0;
+    for (int partitionId = classId; partitionId < partitionInfoMap.length; partitionId += numWorkers) {
+      PartitionInfo partitionInfo = partitionInfoMap[partitionId];
+      if (partitionInfo != null) {
+        numSegments += CollectionUtils.size(partitionInfo._offlineSegments)
+            + CollectionUtils.size(partitionInfo._realtimeSegments);
+      }
+    }
+    return numSegments;
+  }
+
+  /// Sets, for every class holding at least one segment the given pruned set does not cover, the corresponding entry
+  /// of `matchingClasses`. Only presence in the pruned set is a proof (see [RoutingManager#getPrunedSegments]), so a
+  /// segment missing from it counts as matching. A hybrid partition that lists segments for one table type and none
+  /// for the other is therefore decided by the type that has them.
+  ///
+  /// This reads "holds data" more strictly than [#collectClassServers], which counts every partition that has an entry
+  /// at all. A partition whose entry lists no segment is empty here and its class goes unmarked, while
+  /// `collectClassServers` still reports it as populated. The two can only disagree on a shape the broker does not
+  /// publish -- a partition's entry is created together with its first segment -- so the difference shows up in test
+  /// fixtures rather than on a live table, and it is emptiness the planner sees for itself rather than a pruning
+  /// verdict, so nothing is counted as pruned for it.
+  private static void markClassesWithMatchingData(PartitionInfo[] partitionInfoMap, int numWorkers,
+      Set<String> prunedSegments, boolean[] matchingClasses) {
+    int numPartitions = partitionInfoMap.length;
+    for (int classId = 0; classId < numWorkers; classId++) {
+      if (matchingClasses[classId]) {
+        continue;
+      }
+      for (int partitionId = classId; partitionId < numPartitions; partitionId += numWorkers) {
+        PartitionInfo partitionInfo = partitionInfoMap[partitionId];
+        if (partitionInfo != null && !allSegmentsPruned(partitionInfo, prunedSegments)) {
+          matchingClasses[classId] = true;
+          break;
+        }
+      }
+    }
+  }
+
+  private static boolean anyTrue(boolean[] flags) {
+    for (boolean flag : flags) {
+      if (flag) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// Returns the servers that can scan each partition class of the given layout as a whole, in class-id order, or
@@ -687,13 +789,14 @@ public class WorkerManager {
       metadata.setPartitionParallelism(partitionHints.getPartitionParallelism());
 
       if (partitionHints.getPartitionKey() != null) {
-        // Broker pruning: build a filter-bearing routing query (null when disabled/unsupported) so the partitioned
-        // assignment can drop partitions with no matching segments. Reuses the same gate as the non-partitioned path.
-        // Skip pre-partitioned leaves and leaves of a reduced colocated group up front: pruning is disabled for them
-        // (see computePartitionsToKeep), so don't spend planning time building the routing query.
-        PinotQuery routingPinotQuery = metadata.isPrePartitioned() || metadata.getPartitionClassIds() != null ? null
-            : extractRoutingQuery(fragment.getFragmentRoot(), metadata.getScannedTables().get(0), context);
-        assignWorkersToPartitionedLeafFragment(metadata, context, partitionHints, routingPinotQuery);
+        // Broker pruning: the segments the pruners provably eliminated (empty when disabled/unsupported) so the
+        // partitioned assignment can drop partitions holding none of them. Skip the lookup for a pre-partitioned leaf
+        // and for a leaf of a marked colocated group: leaf-level pruning is disabled for both (see
+        // computePartitionsToKeep) because the group's shared class list already carries their verdict, so asking
+        // would only cost planning time.
+        Set<String> prunedSegments = metadata.isPrePartitioned() || metadata.getPartitionClassIds() != null ? null
+            : getPrunedSegments(fragment, metadata.getScannedTables().get(0), context);
+        assignWorkersToPartitionedLeafFragment(metadata, context, partitionHints, prunedSegments);
         updateContextForLeafStage(metadata, context);
         return;
       }
@@ -867,6 +970,86 @@ public class WorkerManager {
     }
   }
 
+  /// Returns the segments the broker's pruners provably eliminated for the given leaf fragment, or `null` when there
+  /// was no filter to prune with at all: broker pruning off, an unsupported leaf shape, a filterless leaf, or a
+  /// routing failure (pruning is best-effort and never fails a query that would otherwise route).
+  ///
+  /// The empty set and `null` mean different things and callers depend on it. An empty set is "a filter ran and
+  /// proved nothing", which still lets the partitioned assignment skip a partition holding no segment at all --
+  /// behaviour that predates this and that a query with an empty partition relies on to plan.
+  ///
+  /// Memoised per fragment for the query, because the colocation pre-pass and the leaf assignment both ask for it and
+  /// each answer costs a routing call. Keyed by fragment rather than by table: the two sides of a self-join scan one
+  /// table under two different filters.
+  @Nullable
+  private Set<String> getPrunedSegments(PlanFragment fragment, String tableName, DispatchablePlanContext context) {
+    // Not computeIfAbsent: null is a meaningful answer here and would be recomputed on every call.
+    Map<Integer, Set<String>> prunedSegmentsCache = context.getPrunedSegmentsCache();
+    Integer fragmentId = fragment.getFragmentId();
+    if (prunedSegmentsCache.containsKey(fragmentId)) {
+      return prunedSegmentsCache.get(fragmentId);
+    }
+    Set<String> prunedSegments = computePrunedSegments(fragment, tableName, context);
+    prunedSegmentsCache.put(fragmentId, prunedSegments);
+    return prunedSegments;
+  }
+
+  @Nullable
+  private Set<String> computePrunedSegments(PlanFragment fragment, String tableName,
+      DispatchablePlanContext context) {
+    PinotQuery routingPinotQuery = extractRoutingQuery(fragment.getFragmentRoot(), tableName, context);
+    if (routingPinotQuery == null || routingPinotQuery.getFilterExpression() == null) {
+      return null;
+    }
+    try {
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(routingPinotQuery.getDataSource()
+          .getTableName());
+      if (tableType != null) {
+        return getPrunedSegmentsHelper(routingPinotQuery);
+      }
+      // A raw table name may resolve to either or both physical tables. Segment names are unique across them, and a
+      // segment is pruned by the table that holds it, so the two verdicts simply add up. Only merge when both prove
+      // something: a table of one type alone is the common case, and copying its verdict to union it with an empty
+      // set would allocate a second set over every segment name for nothing.
+      Set<String> offlinePrunedSegments = getPrunedSegmentsHelper(routingPinotQuery, TableType.OFFLINE);
+      Set<String> realtimePrunedSegments = getPrunedSegmentsHelper(routingPinotQuery, TableType.REALTIME);
+      if (offlinePrunedSegments.isEmpty()) {
+        return realtimePrunedSegments;
+      }
+      if (realtimePrunedSegments.isEmpty()) {
+        return offlinePrunedSegments;
+      }
+      Set<String> prunedSegments = new HashSet<>(offlinePrunedSegments);
+      prunedSegments.addAll(realtimePrunedSegments);
+      return prunedSegments;
+    } catch (RuntimeException e) {
+      // Pruning is best-effort: never fail a query that would otherwise route successfully unpruned.
+      LOGGER.warn("Broker pruning skipped for table {} due to routing failure", tableName, e);
+      return null;
+    }
+  }
+
+  /// A table the routing manager does not have is reported as `null` there; here it is simply a table that proves
+  /// nothing, which is the same thing this path does with a table whose pruners eliminated no segment.
+  private Set<String> getPrunedSegmentsHelper(PinotQuery pinotQuery) {
+    Set<String> prunedSegments =
+        _routingManager.getPrunedSegments(CalciteSqlCompiler.convertToBrokerRequest(pinotQuery));
+    return prunedSegments != null ? prunedSegments : Set.of();
+  }
+
+  private Set<String> getPrunedSegmentsHelper(PinotQuery pinotQuery, TableType tableType) {
+    return getPrunedSegmentsHelper(withTableType(pinotQuery, tableType));
+  }
+
+  /// Returns a copy of the given routing query aimed at one physical table, so that a query written against a raw
+  /// table name can be routed against each type in turn.
+  private static PinotQuery withTableType(PinotQuery pinotQuery, TableType tableType) {
+    PinotQuery copy = pinotQuery.deepCopy();
+    copy.getDataSource().setTableName(TableNameBuilder.forType(tableType).tableNameWithType(
+        TableNameBuilder.extractRawTableName(pinotQuery.getDataSource().getTableName())));
+    return copy;
+  }
+
   /// Builds a [PinotQuery] from the leaf stage tree for broker-side segment pruning on the logical planner path.
   /// Returns `null` if broker pruning is disabled or the leaf stage shape is unsupported.
   @Nullable
@@ -876,6 +1059,9 @@ public class WorkerManager {
     boolean useBrokerPruning = QueryOptionsUtils.isUseBrokerPruning(
         context.getPlannerContext().getOptions(), defaultLogicalPlannerUseBrokerPruning);
     if (!useBrokerPruning) {
+      return null;
+    }
+    if (!PlanNodeRoutingQueryBuilder.canBuildRoutingQuery(leafStageRoot)) {
       return null;
     }
     try {
@@ -911,10 +1097,7 @@ public class WorkerManager {
 
   @Nullable
   private RoutingTable getRoutingTableHelper(PinotQuery pinotQuery, long requestId, TableType tableType) {
-    PinotQuery copy = pinotQuery.deepCopy();
-    copy.getDataSource().setTableName(TableNameBuilder.forType(tableType).tableNameWithType(
-        TableNameBuilder.extractRawTableName(pinotQuery.getDataSource().getTableName())));
-    return getRoutingTableHelper(copy, requestId);
+    return getRoutingTableHelper(withTableType(pinotQuery, tableType), requestId);
   }
 
   // --------------------------------------------------------------------------
@@ -1137,8 +1320,7 @@ public class WorkerManager {
 
   /// Assigns one worker per partition class of a leaf that scans a partitioned table.
   private void assignWorkersToPartitionedLeafFragment(DispatchablePlanMetadata metadata,
-      DispatchablePlanContext context, LeafPartitionHints partitionHints,
-      @Nullable PinotQuery routingPinotQuery) {
+      DispatchablePlanContext context, LeafPartitionHints partitionHints, @Nullable Set<String> prunedSegments) {
     // when partition key exist, we assign workers for leaf-stage in partitioned fashion.
     String partitionKey = partitionHints.getPartitionKey();
     assert partitionKey != null;
@@ -1172,8 +1354,7 @@ public class WorkerManager {
         collectHostingServers(partitionInfoMap)) : null;
 
     // Broker pruning: the partitions to keep (null means keep all). Partitions absent from the set are skipped below.
-    Set<Integer> partitionsToKeep =
-        computePartitionsToKeep(routingPinotQuery, metadata, context.getRequestId(), partitionInfoMap);
+    Set<Integer> partitionsToKeep = computePartitionsToKeep(prunedSegments, metadata, partitionInfoMap);
     if (partitionsToKeep != null) {
       long numSegmentsPrunedByBroker = countPrunedSegments(partitionInfoMap, partitionsToKeep);
       if (numSegmentsPrunedByBroker > 0) {
@@ -1202,35 +1383,42 @@ public class WorkerManager {
           partitionClassIds, partitionsToKeep, paddingInfo, _routingManager.getEnabledServerInstanceMap(),
           workerIdToServerInstanceMap, workerIdToSegmentsMap);
     }
-    checkLeafWorkerAssignment(tableName, workerIdToServerInstanceMap, workerIdToSegmentsMap);
+    checkLeafWorkerAssignment(tableName, partitionClassIds, workerIdToServerInstanceMap, workerIdToSegmentsMap);
     metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
     metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
     metadata.setTimeBoundaryInfo(partitionTableInfo._timeBoundaryInfo);
     metadata.setPartitionFunction(partitionFunction);
   }
 
-  /// Broker pruning for the partitioned leaf path. Returns the set of partition ids that still have at least one
-  /// segment matching the query filter, or `null` to keep all partitions.
+  /// Broker pruning for the partitioned leaf path. Returns the set of partition ids that are not provably empty for
+  /// this query, or `null` to keep all partitions.
+  ///
+  /// Note that an *empty* pruned set is not the same as an absent one and does not return `null` here: a filter that
+  /// proved nothing still leaves this the job of skipping a partition holding no segment at all, which is what lets a
+  /// table with an empty partition plan rather than fail on a worker it cannot place.
   ///
   /// Returns `null` (no pruning) when any of the following hold:
   ///
-  /// - broker pruning is disabled or the leaf shape is unsupported (the routing query is `null`), or there is
-  ///   no filter to prune with;
+  /// - there was no filter to prune with at all (see [#getPrunedSegments]) -- broker pruning is disabled, the leaf
+  ///   shape is unsupported, the leaf carries no filter, or routing failed (pruning is best-effort);
   /// - the leaf feeds a pre-partitioned (1-to-1 direct) exchange, or it belongs to a colocated group that agreed on a
-  ///   partition class list -- dropping/compacting workers would misalign sender/receiver worker ids in
-  ///   `MailboxAssignmentVisitor`. A non-pre-partitioned leaf is shuffled via `connectWorkers`, which re-hashes across
-  ///   any worker count, so pruning is safe there;
-  /// - routing fails (pruning is best-effort);
+  ///   partition class list. Both get their verdict from the group instead, in `assignPartitionClasses`, because it is
+  ///   the only place that sees every member before any of them is assigned: a leaf deciding on its own would drop a
+  ///   class its peer keeps, and the two would stop agreeing on what a worker id stands for. A non-pre-partitioned,
+  ///   unmarked leaf is shuffled via `connectWorkers`, which re-hashes across any worker count, so it can decide alone
+  ///   -- and at partition rather than class granularity;
   /// - every partition would be pruned -- an empty worker map would break exchanges in a multi-leaf plan (the
   ///   all-leaves-empty short-circuit does not fire for a partially-empty plan), and the server-side filter still
   ///   yields the correct empty result unpruned.
   ///
-  /// Partition survival is decided by routing the filter-bearing query through the [RoutingManager] (the same
-  /// mechanism the non-partitioned path uses), so the segment-level pruners judge survival using each segment's own
-  /// partition metadata. This is correct for every partition function and configuration, unlike recomputing the
-  /// partition id from the table-level function name (which lacks the per-segment function config). A partition is
-  /// dropped only when every one of its segments was pruned; a segment that merely became unavailable keeps its
-  /// partition alive so matching data is never silently dropped.
+  /// A partition is dropped only when every one of its segments is in the *provably pruned* set (see
+  /// [RoutingManager#getPrunedSegments]), never because a segment failed to appear somewhere. That direction is the
+  /// whole point: absence from a routing result has innocent causes -- a segment classified as optional by instance
+  /// selection, one whose server left the enabled server map, one that entered the partition metadata before it became
+  /// selectable -- and each would otherwise be read as "this partition is empty" and silently drop matching rows. It
+  /// also makes the verdict independent of the request id, so two leaves scanning one table under one filter cannot
+  /// disagree. Judging by pruner verdict rather than by recomputing the partition id from the table-level function
+  /// name is also what keeps it correct for every partition function and per-segment function config.
   ///
   /// Note that pruning here is partition-level, not segment-level: a surviving partition dispatches all of its
   /// segments, including ones the pruners eliminated (the server-side pruners drop those again cheaply). This keeps
@@ -1238,37 +1426,15 @@ public class WorkerManager {
   /// workers -- at the cost of a lower pruning ceiling than the non-partitioned path for partitions with mixed-match
   /// segments. Segment-level pruning within surviving partitions is a possible follow-up.
   @Nullable
-  private Set<Integer> computePartitionsToKeep(@Nullable PinotQuery routingPinotQuery,
-      DispatchablePlanMetadata metadata, long requestId, PartitionInfo[] partitionInfoMap) {
-    if (routingPinotQuery == null || routingPinotQuery.getFilterExpression() == null || metadata.isPrePartitioned()
-        || metadata.getPartitionClassIds() != null) {
+  private static Set<Integer> computePartitionsToKeep(@Nullable Set<String> prunedSegments,
+      DispatchablePlanMetadata metadata, PartitionInfo[] partitionInfoMap) {
+    if (prunedSegments == null || metadata.isPrePartitioned() || metadata.getPartitionClassIds() != null) {
       return null;
-    }
-    Map<String, RoutingTable> routingTableMap;
-    try {
-      routingTableMap = getRoutingTable(routingPinotQuery, requestId);
-    } catch (RuntimeException e) {
-      // Pruning is best-effort: never fail a query that would otherwise route successfully unpruned.
-      LOGGER.warn("Broker pruning skipped for partitioned table {} due to routing failure",
-          routingPinotQuery.getDataSource().getTableName(), e);
-      return null;
-    }
-    if (routingTableMap.isEmpty()) {
-      return null;
-    }
-    Set<String> matchedSegments = new HashSet<>();
-    for (RoutingTable routingTable : routingTableMap.values()) {
-      for (SegmentsToQuery segmentsToQuery : routingTable.getServerInstanceToSegmentsMap().values()) {
-        matchedSegments.addAll(segmentsToQuery.getSegments());
-      }
-      // Keep a partition alive if any of its segments is merely unavailable (rather than pruned) so we never drop data.
-      matchedSegments.addAll(routingTable.getUnavailableSegments());
     }
     Set<Integer> partitionsToKeep = new HashSet<>();
     for (int i = 0; i < partitionInfoMap.length; i++) {
       PartitionInfo partitionInfo = partitionInfoMap[i];
-      if (partitionInfo != null && (containsAny(partitionInfo._offlineSegments, matchedSegments) || containsAny(
-          partitionInfo._realtimeSegments, matchedSegments))) {
+      if (partitionInfo != null && !allSegmentsPruned(partitionInfo, prunedSegments)) {
         partitionsToKeep.add(i);
       }
     }
@@ -1276,18 +1442,28 @@ public class WorkerManager {
     return partitionsToKeep.isEmpty() ? null : partitionsToKeep;
   }
 
-  private static boolean containsAny(@Nullable List<String> segments, Set<String> matchedSegments) {
+  /// Returns whether every segment of the given partition is provably pruned. Vacuously true for a partition listing
+  /// no segment at all, which has no rows to contribute either way -- note that a partition holding data the broker
+  /// cannot route yet has no entry in the map rather than an empty one, so it is not this case (see
+  /// [#checkNoPartitionsWithOnlyDeferredSegments]).
+  private static boolean allSegmentsPruned(PartitionInfo partitionInfo, Set<String> prunedSegments) {
+    return allPruned(partitionInfo._offlineSegments, prunedSegments)
+        && allPruned(partitionInfo._realtimeSegments, prunedSegments);
+  }
+
+  private static boolean allPruned(@Nullable List<String> segments, Set<String> prunedSegments) {
     if (segments != null) {
       for (String segment : segments) {
-        if (matchedSegments.contains(segment)) {
-          return true;
+        if (!prunedSegments.contains(segment)) {
+          return false;
         }
       }
     }
-    return false;
+    return true;
   }
 
-  /// Counts the segments in partitions dropped by broker pruning (those absent from `partitionsToKeep`).
+  /// Counts the segments in partitions dropped by broker pruning (those absent from `partitionsToKeep`). A partition
+  /// dropped for holding no segment rather than for being pruned contributes nothing, so it is not miscounted.
   private static long countPrunedSegments(PartitionInfo[] partitionInfoMap, Set<Integer> partitionsToKeep) {
     long numPrunedSegments = 0;
     for (int i = 0; i < partitionInfoMap.length; i++) {
@@ -1508,12 +1684,20 @@ public class WorkerManager {
   ///   server map by worker id, where a gap leaves a null entry;
   /// - every worker must have a segments map keyed by 1 or 2 [TableType] names, with non-null lists, because the server
   ///   splits the request on the number of entries and resolves one table data manager per key: an unexpected key
-  ///   becomes an opaque server-side failure.
+  ///   becomes an opaque server-side failure;
+  /// - a leaf of a colocated group must produce exactly one worker per class of the group's shared list, because a
+  ///   worker id *is* an index into that list. Nothing downstream can catch a leaf that skipped one:
+  ///   `MailboxAssignmentVisitor#checkPartitionClassAgreement` compares the shared array against itself, so a member
+  ///   that quietly assigned fewer workers than the array claims still agrees with its peers on the array while
+  ///   disagreeing with them on what every worker id after the gap means.
   @VisibleForTesting
-  static void checkLeafWorkerAssignment(String tableName,
+  static void checkLeafWorkerAssignment(String tableName, @Nullable int[] partitionClassIds,
       Map<Integer, QueryServerInstance> workerIdToServerInstanceMap,
       Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
     int numWorkers = workerIdToServerInstanceMap.size();
+    Preconditions.checkState(partitionClassIds == null || partitionClassIds.length == numWorkers,
+        "Got %s workers for partition classes: %s of table: %s", numWorkers,
+        partitionClassIds != null ? Arrays.toString(partitionClassIds) : null, tableName);
     Preconditions.checkState(workerIdToSegmentsMap.size() == numWorkers,
         "Got %s workers but %s worker segment entries for table: %s", numWorkers, workerIdToSegmentsMap.size(),
         tableName);

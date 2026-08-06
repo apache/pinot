@@ -44,6 +44,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -325,6 +326,91 @@ public class MultiClusterRoutingManagerTest {
     when(_remoteClusterRoutingManager2.getTablePartitionReplicatedServersInfo(TEST_TABLE)).thenReturn(null);
 
     assertEquals(_multiClusterRoutingManager.getTablePartitionReplicatedServersInfo(TEST_TABLE), partitionInfo);
+  }
+
+  /// The usual case: the table lives in exactly one cluster, so the intersection is that cluster's own verdict.
+  @Test
+  public void testGetPrunedSegmentsReturnsTheSoleClusterVerdictVerbatim() {
+    BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
+    when(_localClusterRoutingManager.getPrunedSegments(brokerRequest))
+        .thenReturn(Set.of("seg1", "seg2"));
+    withoutTheTable(brokerRequest, _remoteClusterRoutingManager1, _remoteClusterRoutingManager2);
+
+    assertEquals(_multiClusterRoutingManager.getPrunedSegments(brokerRequest), Set.of("seg1", "seg2"));
+  }
+
+  /// Intersection, not union: unioning would let one cluster's pruners speak for a segment another cluster would
+  /// still have queried, so the planner would skip data that matches -- a silent wrong answer rather than a slow one.
+  /// Here only "seg2" is eliminated everywhere; "seg1" and "seg3" each survive in one cluster.
+  @Test
+  public void testGetPrunedSegmentsIntersectsRatherThanUnions() {
+    BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
+    when(_localClusterRoutingManager.getPrunedSegments(brokerRequest))
+        .thenReturn(Set.of("seg1", "seg2"));
+    when(_remoteClusterRoutingManager1.getPrunedSegments(brokerRequest))
+        .thenReturn(Set.of("seg2", "seg3"));
+    withoutTheTable(brokerRequest, _remoteClusterRoutingManager2);
+
+    Set<String> prunedSegments = _multiClusterRoutingManager.getPrunedSegments(brokerRequest);
+
+    assertEquals(prunedSegments, Set.of("seg2"));
+    assertFalse(prunedSegments.contains("seg1"));
+    assertFalse(prunedSegments.contains("seg3"));
+  }
+
+  @Test
+  public void testGetPrunedSegmentsIsEmptyWhenAClusterProvesNothing() {
+    BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
+    when(_localClusterRoutingManager.getPrunedSegments(brokerRequest)).thenReturn(Set.of("seg1"));
+    when(_remoteClusterRoutingManager1.getPrunedSegments(brokerRequest)).thenReturn(Set.of());
+    withoutTheTable(brokerRequest, _remoteClusterRoutingManager2);
+
+    assertEquals(_multiClusterRoutingManager.getPrunedSegments(brokerRequest), Set.of());
+  }
+
+  /// A cluster that does not have the table constrains nothing. Were its absence folded into the same empty set the
+  /// pruners use for "proved nothing", every answer would collapse to "nothing proven" in the common deployment.
+  @Test
+  public void testGetPrunedSegmentsSkipsAClusterWithoutTheTable() {
+    BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
+    when(_localClusterRoutingManager.getPrunedSegments(brokerRequest))
+        .thenReturn(Set.of("seg1", "seg2"));
+    // A cluster without the table reports null rather than an empty verdict, which is what keeps it from collapsing
+    // the intersection to "nothing proven".
+    withoutTheTable(brokerRequest, _remoteClusterRoutingManager1, _remoteClusterRoutingManager2);
+
+    assertEquals(_multiClusterRoutingManager.getPrunedSegments(brokerRequest), Set.of("seg1", "seg2"));
+  }
+
+  @Test
+  public void testGetPrunedSegmentsIsNullWhenNoClusterHasTheTable() {
+    BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
+    withoutTheTable(brokerRequest, _localClusterRoutingManager, _remoteClusterRoutingManager1,
+        _remoteClusterRoutingManager2);
+
+    assertNull(_multiClusterRoutingManager.getPrunedSegments(brokerRequest));
+  }
+
+  /// The deliberate opposite of [#testGetTablePartitionInfoIgnoresAFailingRemoteCluster]: a cluster we could not ask
+  /// may still have routed any of these segments, so its silence cannot be read as agreement.
+  @Test
+  public void testGetPrunedSegmentsIsEmptyWhenAClusterThrows() {
+    BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
+    when(_localClusterRoutingManager.getPrunedSegments(brokerRequest)).thenReturn(Set.of("seg1"));
+    when(_remoteClusterRoutingManager1.getPrunedSegments(brokerRequest))
+        .thenThrow(new RuntimeException("remote cluster is down"));
+    withoutTheTable(brokerRequest, _remoteClusterRoutingManager2);
+
+    assertEquals(_multiClusterRoutingManager.getPrunedSegments(brokerRequest), Set.of());
+  }
+
+  /// Makes the given clusters report that they have no routing for the table. Worth spelling out in every pruning
+  /// test: an unstubbed mock hands back an empty set, which means "ran the pruners and proved nothing" and would
+  /// collapse the intersection for a reason the test did not intend.
+  private static void withoutTheTable(BrokerRequest brokerRequest, BaseBrokerRoutingManager... clusters) {
+    for (BaseBrokerRoutingManager cluster : clusters) {
+      when(cluster.getPrunedSegments(brokerRequest)).thenReturn(null);
+    }
   }
 
   private RoutingTable createRoutingTable(String serverName, List<String> segments) {
