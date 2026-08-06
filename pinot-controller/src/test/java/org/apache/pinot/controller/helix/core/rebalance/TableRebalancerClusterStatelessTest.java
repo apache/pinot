@@ -277,11 +277,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
       Map<String, RebalancePreCheckerResult> preCheckResult = rebalanceResult.getPreChecksResult();
       assertNotNull(preCheckResult);
-      assertEquals(preCheckResult.size(), 6);
+      assertEquals(preCheckResult.size(), 5);
       assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
       assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
-      assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
-      assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
+      assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION));
       assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS));
       assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO));
       // Sending request to servers should fail for all, so needsPreprocess should be set to "error" to indicate that a
@@ -294,14 +293,9 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
           RebalancePreCheckerResult.PreCheckStatus.PASS);
       assertEquals(preCheckResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
           "Instance assignment not allowed, no need for minimizeDataMovement");
-      assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE).getPreCheckStatus(),
+      assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getPreCheckStatus(),
           RebalancePreCheckerResult.PreCheckStatus.PASS);
-      assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE)
-          .getMessage()
-          .startsWith("Within threshold"));
-      assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE).getPreCheckStatus(),
-          RebalancePreCheckerResult.PreCheckStatus.PASS);
-      assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE)
+      assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION)
           .getMessage()
           .startsWith("Within threshold"));
       assertEquals(preCheckResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getPreCheckStatus(),
@@ -1172,16 +1166,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     Map<String, RebalancePreCheckerResult> preCheckResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preCheckResult);
-    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE).getPreCheckStatus(),
+    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION));
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
-    assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE)
-        .getMessage()
-        .startsWith("Within threshold"));
-    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE).getPreCheckStatus(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-    assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE)
+    assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION)
         .getMessage()
         .startsWith("Within threshold"));
 
@@ -1199,11 +1187,24 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     preCheckResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preCheckResult);
-    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE).getPreCheckStatus(),
+    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION));
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.ERROR);
-    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE).getPreCheckStatus(),
+    assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION)
+        .getMessage()
+        .startsWith("UNSAFE. Servers with unsafe disk utilization after rebalance"));
+
+    // The servers are over the threshold no matter how the rebalance is run, so lowDiskMode does not help
+    rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setPreChecks(true);
+    rebalanceConfig.setLowDiskMode(true);
+
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    preCheckResult = rebalanceResult.getPreChecksResult();
+    assertNotNull(preCheckResult);
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.ERROR);
 
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
