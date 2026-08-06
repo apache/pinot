@@ -111,4 +111,21 @@ public class BenchmarkMapKeyAccess {
     _directBuffer.position(0);
     return MapUtils.deserializeMapValue(_directBuffer, _targetKey);
   }
+
+  /// The string baseline: what `MapKeyIndexReader#getString` did - deserialize to an object, then `toString()` it.
+  @Benchmark
+  public Object selectiveMapValueToString() {
+    _directBuffer.position(0);
+    Object value = MapUtils.deserializeMapValue(_directBuffer, _targetKey);
+    return value == null ? null : value.toString();
+  }
+
+  /// Same scan, but decoding a stored string without handing it to Jackson - what a `STRING`-valued MAP column
+  /// resolves to when projected. Values that are not plain strings still fall back to Jackson, so `nested` here
+  /// should land on top of [#selectiveMapValueToString] rather than beating it.
+  @Benchmark
+  public Object selectiveMapValueAsString() {
+    _directBuffer.position(0);
+    return MapUtils.deserializeMapValueAsString(_directBuffer, _targetKey);
+  }
 }

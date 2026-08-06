@@ -478,6 +478,21 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
     return getMap(docId, context).get(key);
   }
 
+  /// Reads a value for a key from a MAP type single-value column as a string.
+  ///
+  /// Implementations that store the map as a serialized frame can override this to decode a stored string value
+  /// without routing it through a JSON parser.
+  ///
+  /// @param docId Document id
+  /// @param context Reader context
+  /// @param key Map key
+  /// @return Value for the key as a string, or `null` if the key is missing or its value is null
+  @Nullable
+  default String getMapValueAsString(int docId, T context, String key) {
+    Object value = getMapValue(docId, context, key);
+    return value == null ? null : value.toString();
+  }
+
   default int get32BitsMurmur3Hash(int docId, T context) {
     return MurmurHashFunctions.murmurHash3X64Bit32(getBytes(docId, context), 0);
   }

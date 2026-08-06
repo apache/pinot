@@ -28,6 +28,7 @@ import java.io.OutputStream;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
@@ -204,6 +205,63 @@ public class MapUtils {
   /// lengths through a big-endian [ByteBuffer], while an off-heap view inherits the platform's native order.
   @Nullable
   public static Object deserializeMapValue(ByteBuffer byteBuffer, String key) {
+    byte[] valueBytes = findValueBytes(byteBuffer, key);
+    if (valueBytes == null) {
+      return null;
+    }
+    try {
+      return JsonUtils.bytesToObject(valueBytes, Object.class);
+    } catch (IOException e) {
+      LOGGER.error("Caught exception while deserializing value for key: {}", key, e);
+      return null;
+    }
+  }
+
+  /// Reads the value for a key as a string, skipping Jackson when the stored value is a plain JSON string.
+  ///
+  /// A `MAP` column with a `STRING` value type stores `"pinot-server"`, and parsing that into a `String` only to
+  /// call `toString()` on it costs a parser instantiation per access. Values that are not plain strings - numbers,
+  /// booleans, objects, arrays - still go through Jackson so the rendering matches [#deserializeMapValue] exactly.
+  ///
+  /// @return The value as a string, or `null` if the key is missing, its value is null, or it cannot be deserialized
+  @Nullable
+  public static String deserializeMapValueAsString(ByteBuffer byteBuffer, String key) {
+    byte[] valueBytes = findValueBytes(byteBuffer, key);
+    if (valueBytes == null) {
+      return null;
+    }
+    String unquoted = unquotePlainJsonString(valueBytes);
+    if (unquoted != null) {
+      return unquoted;
+    }
+    try {
+      Object value = JsonUtils.bytesToObject(valueBytes, Object.class);
+      return value == null ? null : value.toString();
+    } catch (IOException e) {
+      LOGGER.error("Caught exception while deserializing value for key: {}", key, e);
+      return null;
+    }
+  }
+
+  /// Decodes a JSON string literal that carries no escapes, otherwise returns `null` so the caller falls back to
+  /// Jackson. A lone backslash anywhere means an escape sequence is present and the literal is not its own value.
+  @Nullable
+  private static String unquotePlainJsonString(byte[] valueBytes) {
+    int length = valueBytes.length;
+    if (length < 2 || valueBytes[0] != '"' || valueBytes[length - 1] != '"') {
+      return null;
+    }
+    for (int i = 1; i < length - 1; i++) {
+      if (valueBytes[i] == '\\') {
+        return null;
+      }
+    }
+    return new String(valueBytes, 1, length - 2, StandardCharsets.UTF_8);
+  }
+
+  /// Scans a frame for `key` and returns its raw value bytes, or `null` when the key is absent.
+  @Nullable
+  private static byte[] findValueBytes(ByteBuffer byteBuffer, String key) {
     byteBuffer.order(ByteOrder.BIG_ENDIAN);
     int size = byteBuffer.getInt();
     if (size == 0) {
@@ -239,12 +297,7 @@ public class MapUtils {
       // the remaining entries never need to be scanned.
       byte[] valueBytes = new byte[valueLength];
       byteBuffer.get(valueBytes);
-      try {
-        return JsonUtils.bytesToObject(valueBytes, Object.class);
-      } catch (IOException e) {
-        LOGGER.error("Caught exception while deserializing value for key: {}", key, e);
-        return null;
-      }
+      return valueBytes;
     }
     return null;
   }

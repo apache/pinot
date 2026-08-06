@@ -121,6 +121,45 @@ public class MapUtilsTest {
     assertNull(MapUtils.deserializeMapValue(serialized, "命名"));
   }
 
+  /// The string accessor must agree with `deserializeMapValue(...).toString()` for every value shape, since the only
+  /// difference is meant to be whether Jackson was involved. Escaped and multi-byte strings take the Jackson
+  /// fallback and must come out identical to the plain ones.
+  @Test
+  void testDeserializeMapValueAsStringMatchesToString() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("plain", "pinot-server");
+    map.put("empty", "");
+    map.put("quoted", "has \"quotes\" inside");
+    map.put("backslash", "has \\ backslash");
+    map.put("newline", "has \n newline");
+    map.put("unicode", "çöğüşÇÖĞÜŞéÉ");
+    map.put("int", 42);
+    map.put("long", 9999999999L);
+    map.put("double", 1.5);
+    map.put("bool", true);
+    map.put("list", List.of(1, 2));
+    map.put("nested", Map.of("a", 1));
+    byte[] serialized = MapUtils.serializeMap(map, false);
+
+    for (String key : map.keySet()) {
+      Object asObject = MapUtils.deserializeMapValue(serialized, key);
+      assertEquals(MapUtils.deserializeMapValueAsString(ByteBuffer.wrap(serialized), key), asObject.toString(),
+          "String rendering should match toString() for key: " + key);
+    }
+  }
+
+  @Test
+  void testDeserializeMapValueAsStringHandlesMissingAndNull() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("present", "value");
+    map.put("nullValue", null);
+    byte[] serialized = MapUtils.serializeMap(map, false);
+
+    assertNull(MapUtils.deserializeMapValueAsString(ByteBuffer.wrap(serialized), "missing"));
+    assertNull(MapUtils.deserializeMapValueAsString(ByteBuffer.wrap(serialized), "nullValue"));
+    assertEquals(MapUtils.deserializeMapValueAsString(ByteBuffer.wrap(serialized), "present"), "value");
+  }
+
   /// An off-heap forward-index view inherits the platform's native byte order, while the frame is always written
   /// big-endian. The extractor has to force the order rather than trust the incoming buffer.
   @Test
