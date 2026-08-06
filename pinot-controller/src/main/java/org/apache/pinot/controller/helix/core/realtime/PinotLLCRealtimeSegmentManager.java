@@ -1448,28 +1448,34 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
+
+    // Fetch all stream offsets BEFORE acquiring the ideal-state update lock. On tables with many partitions these
+    // stream round-trips can take minutes; doing them here (against a snapshot of the ideal state) keeps the
+    // per-table ideal-state lock hold-time proportional to the in-memory ideal-state mutation, not to the offset
+    // I/O. The updater lambda below performs no stream I/O, so it is also cheap to re-run on ZK CAS retries.
+    IdealState snapshotIdealState = HelixHelper.getTableIdealState(_helixManager, realtimeTableName);
+    if (snapshotIdealState == null) {
+      LOGGER.warn("Cannot find ideal state for table: {}, skipping ensureAllPartitionsConsuming", realtimeTableName);
+      return;
+    }
+    if (!snapshotIdealState.isEnabled() || isTablePaused(snapshotIdealState)) {
+      LOGGER.info("Skipping LLC segments validation for table: {}, isTableEnabled: {}, isTablePaused: {}",
+          realtimeTableName, snapshotIdealState.isEnabled(), isTablePaused(snapshotIdealState));
+      return;
+    }
+
     try {
+      PreFetchedOffsets preFetchedOffsets =
+          preFetchOffsets(streamConfigs, realtimeTableName, snapshotIdealState, offsetCriteria);
+
       HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
         assert idealState != null;
         boolean isTableEnabled = idealState.isEnabled();
         boolean isTablePaused = isTablePaused(idealState);
-        boolean offsetsHaveToChange = offsetCriteria != null;
         if (isTableEnabled && !isTablePaused) {
-          List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
-              offsetsHaveToChange ? List.of()
-                  // offsets from metadata are not valid anymore; fetch for all partitions
-                  : getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
-          // FIXME: Right now, we assume topics are sharing same offset criteria
-          OffsetCriteria originalOffsetCriteria = streamConfigs.get(0).getOffsetCriteria();
-          // Read the smallest offset when a new partition is detected
-          streamConfigs.stream()
-              .forEach(streamConfig -> streamConfig.setOffsetCriteria(
-                  offsetsHaveToChange ? offsetCriteria : OffsetCriteria.SMALLEST_OFFSET_CRITERIA));
-          List<StreamMetadata> streamMetadataList =
-              getNewStreamMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState);
-          streamConfigs.stream().forEach(streamConfig -> streamConfig.setOffsetCriteria(originalOffsetCriteria));
-          return ensureAllPartitionsConsuming(tableConfig, streamConfigs, idealState, streamMetadataList,
-              offsetCriteria);
+          return ensureAllPartitionsConsuming(tableConfig, streamConfigs, idealState,
+              preFetchedOffsets._streamMetadataList, offsetCriteria,
+              preFetchedOffsets._partitionIdToSmallestOffset);
         } else {
           LOGGER.info("Skipping LLC segments validation for table: {}, isTableEnabled: {}, isTablePaused: {}",
               realtimeTableName, isTableEnabled, isTablePaused);
@@ -1478,6 +1484,78 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       }, DEFAULT_RETRY_POLICY, true);
     } catch (Exception e) {
       throw new RuntimeException("Failed to update ideal state during ensureAllPartitionsConsuming.", e);
+    }
+  }
+
+  /// Fetches, from a read-only snapshot of the ideal state and outside the ideal-state update lock, the stream
+  /// state needed by [#ensureAllPartitionsConsuming]: the latest partition-group metadata (with start offsets) and,
+  /// when required, the smallest stream offset per partition.
+  ///
+  /// The smallest-offset fetch is a real stream round-trip, so it is only performed when it can actually be used:
+  /// on a reset (`offsetCriteria != null`) or when at least one partition currently lacks a CONSUMING segment and
+  /// may need a new one created. On a healthy table nothing is fetched and `null` is returned for it, signalling
+  /// the repair pass to reuse the start offsets. When the criteria is SMALLEST the start offsets already are the
+  /// smallest offsets, so it is likewise left `null`.
+  ///
+  /// Any temporary mutation of the shared `streamConfigs` offset criteria is always restored, even on error.
+  @VisibleForTesting
+  PreFetchedOffsets preFetchOffsets(List<StreamConfig> streamConfigs, String realtimeTableName,
+      IdealState snapshotIdealState, OffsetCriteria offsetCriteria) {
+    boolean offsetsHaveToChange = offsetCriteria != null;
+    List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
+        offsetsHaveToChange ? List.of()
+            // offsets from metadata are not valid anymore; fetch for all partitions
+            : getPartitionGroupConsumptionStatusList(snapshotIdealState, streamConfigs);
+    // FIXME: Right now, we assume topics are sharing same offset criteria
+    OffsetCriteria originalOffsetCriteria = streamConfigs.get(0).getOffsetCriteria();
+    // For the periodic run, compute start offsets with SMALLEST so a newly detected partition starts from the
+    // beginning; for a reset, use the requested criteria. Restored in the finally below.
+    streamConfigs.forEach(streamConfig -> streamConfig.setOffsetCriteria(
+        offsetsHaveToChange ? offsetCriteria : OffsetCriteria.SMALLEST_OFFSET_CRITERIA));
+    try {
+      List<StreamMetadata> streamMetadataList =
+          getNewStreamMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, snapshotIdealState);
+      Map<Integer, StreamPartitionMsgOffset> partitionIdToSmallestOffset = null;
+      if (offsetCriteria == null || !offsetCriteria.equals(OffsetCriteria.SMALLEST_OFFSET_CRITERIA)) {
+        Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap = getLatestSegmentZKMetadataMap(realtimeTableName);
+        if (offsetsHaveToChange || anyPartitionNeedsSmallestOffset(snapshotIdealState, latestSegmentZKMetadataMap)) {
+          partitionIdToSmallestOffset =
+              fetchPartitionGroupIdToSmallestOffset(streamConfigs, snapshotIdealState, latestSegmentZKMetadataMap);
+        }
+      }
+      return new PreFetchedOffsets(streamMetadataList, partitionIdToSmallestOffset);
+    } finally {
+      streamConfigs.forEach(streamConfig -> streamConfig.setOffsetCriteria(originalOffsetCriteria));
+    }
+  }
+
+  /// Returns true if at least one partition's latest segment is present in the ideal state but has no replica in the
+  /// CONSUMING state, i.e. it may need a new CONSUMING segment created (the only repair path that consults the
+  /// smallest stream offset). Mirrors the trigger in [#ensureAllPartitionsConsuming].
+  private boolean anyPartitionNeedsSmallestOffset(IdealState idealState,
+      Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap) {
+    Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
+    for (SegmentZKMetadata latestSegmentZKMetadata : latestSegmentZKMetadataMap.values()) {
+      Map<String, String> instanceStateMap = instanceStatesMap.get(latestSegmentZKMetadata.getSegmentName());
+      if (instanceStateMap != null && !instanceStateMap.containsValue(SegmentStateModel.CONSUMING)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Holder for the stream state pre-fetched by [#preFetchOffsets] outside the ideal-state update lock.
+  /// `_partitionIdToSmallestOffset` is null when the smallest offsets were not fetched (see [#preFetchOffsets]).
+  @VisibleForTesting
+  static class PreFetchedOffsets {
+    final List<StreamMetadata> _streamMetadataList;
+    @Nullable
+    final Map<Integer, StreamPartitionMsgOffset> _partitionIdToSmallestOffset;
+
+    PreFetchedOffsets(List<StreamMetadata> streamMetadataList,
+        @Nullable Map<Integer, StreamPartitionMsgOffset> partitionIdToSmallestOffset) {
+      _streamMetadataList = streamMetadataList;
+      _partitionIdToSmallestOffset = partitionIdToSmallestOffset;
     }
   }
 
@@ -1718,7 +1796,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
    */
   @VisibleForTesting
   IdealState ensureAllPartitionsConsuming(TableConfig tableConfig, List<StreamConfig> streamConfigs,
-      IdealState idealState, List<StreamMetadata> streamMetadataList, OffsetCriteria offsetCriteria) {
+      IdealState idealState, List<StreamMetadata> streamMetadataList, OffsetCriteria offsetCriteria,
+      @Nullable Map<Integer, StreamPartitionMsgOffset> preFetchedPartitionIdToSmallestOffset) {
     String realtimeTableName = tableConfig.getTableName();
 
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
@@ -1745,10 +1824,22 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         partitionIdToStartOffset.put(metadata.getPartitionGroupId(), metadata.getStartOffset());
       }
     }
-    // Create a map from partition id to the smallest stream offset
-    Map<Integer, StreamPartitionMsgOffset> partitionIdToSmallestOffset = null;
-    if (offsetCriteria != null && offsetCriteria.equals(OffsetCriteria.SMALLEST_OFFSET_CRITERIA)) {
+    // Map from partition id to the smallest stream offset, pre-fetched outside the ideal-state lock (see
+    // preFetchOffsets). Three cases:
+    //   - non-null: the fetched map. A partition absent from it has reached end of life.
+    //   - null with SMALLEST offset criteria: the start offsets computed above already are the smallest offsets, so
+    //     reuse them (they were fetched with SMALLEST for every partition).
+    //   - null otherwise: the lock-free snapshot gate saw no partition needing a new CONSUMING segment, so the
+    //     smallest offsets were not fetched. Start offsets are NOT the stream-smallest in this case, so they must
+    //     not be substituted; a partition that turns out to need a new segment now (it started needing repair after
+    //     the snapshot) is deferred to the next validation run below.
+    Map<Integer, StreamPartitionMsgOffset> partitionIdToSmallestOffset;
+    if (preFetchedPartitionIdToSmallestOffset != null) {
+      partitionIdToSmallestOffset = preFetchedPartitionIdToSmallestOffset;
+    } else if (offsetCriteria != null && offsetCriteria.equals(OffsetCriteria.SMALLEST_OFFSET_CRITERIA)) {
       partitionIdToSmallestOffset = partitionIdToStartOffset;
+    } else {
+      partitionIdToSmallestOffset = null;
     }
 
     // Walk over all partitions that we have metadata for, and repair any partitions necessary.
@@ -1861,16 +1952,21 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
             continue;
           }
 
-          // Smallest offset is fetched from stream once and cached in partitionIdToSmallestOffset.
+          // The smallest offsets were not fetched this cycle (the lock-free snapshot gate saw no partition needing a
+          // new CONSUMING segment) but this partition needs one now - it started needing repair after the snapshot.
+          // Defer to the next validation run, which will fetch the true stream-smallest for it. Start offsets are not
+          // the stream-smallest here, so they must not be substituted.
           if (partitionIdToSmallestOffset == null) {
-            partitionIdToSmallestOffset =
-                fetchPartitionGroupIdToSmallestOffset(streamConfigs, idealState, latestSegmentZKMetadataMap);
+            LOGGER.info("Smallest stream offsets not fetched this cycle; deferring repair of partition: {} of table: "
+                + "{} to the next run", partitionId, realtimeTableName);
+            continue;
           }
-
-          // Do not create new CONSUMING segment when the stream partition has reached end of life.
-          if (!partitionIdToSmallestOffset.containsKey(partitionId)) {
-            LOGGER.info("PartitionGroup: {} has reached end of life. Skipping creation of new segment {}", partitionId,
-                latestSegmentName);
+          // Do not create a new CONSUMING segment when the partition has no smallest stream offset (it has reached
+          // end of life).
+          StreamPartitionMsgOffset smallestStreamOffset = partitionIdToSmallestOffset.get(partitionId);
+          if (smallestStreamOffset == null) {
+            LOGGER.info("Partition: {} of table: {} has reached end of life. Skipping creation of new segment {}",
+                partitionId, realtimeTableName, latestSegmentName);
             continue;
           }
 
