@@ -25,12 +25,15 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.SortedMap;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -183,11 +186,68 @@ public class MapUtils {
     return map;
   }
 
+  /// Deserializes only the value for the requested key from a length-prefixed MAP frame.
+  /// Non-matching keys and values are skipped without allocating byte arrays or invoking Jackson.
+  ///
+  /// @param bytes Serialized MAP frame
+  /// @param key Key whose value should be deserialized
+  /// @return Deserialized value, or `null` if the key is missing, has a null value, or cannot be deserialized
+  @Nullable
+  public static Object deserializeMapValue(byte[] bytes, String key) {
+    return deserializeMapValue(ByteBuffer.wrap(bytes), key);
+  }
+
+  /// Variant of [#deserializeMapValue(byte[], String)] that reads from the supplied buffer without copying the
+  /// complete MAP frame.
+  @Nullable
+  public static Object deserializeMapValue(ByteBuffer byteBuffer, String key) {
+    byteBuffer.order(ByteOrder.BIG_ENDIAN);
+    int size = byteBuffer.getInt();
+    if (size == 0) {
+      return null;
+    }
+    byte[] keyBytes = Utf8Utils.encode(key);
+    Object value = null;
+    boolean found = false;
+    for (int i = 0; i < size; i++) {
+      int keyLength = byteBuffer.getInt();
+      boolean matches = keyLength == keyBytes.length;
+      for (int j = 0; j < keyLength; j++) {
+        byte currentByte = byteBuffer.get();
+        if (matches && currentByte != keyBytes[j]) {
+          matches = false;
+        }
+      }
+
+      int valueLength = byteBuffer.getInt();
+      if (matches) {
+        byte[] valueBytes = new byte[valueLength];
+        byteBuffer.get(valueBytes);
+        try {
+          value = JsonUtils.bytesToObject(valueBytes, Object.class);
+          found = true;
+        } catch (IOException e) {
+          LOGGER.error("Caught exception while deserializing value for key: {}", key, e);
+        }
+      } else {
+        skip(byteBuffer, valueLength);
+      }
+    }
+    return found ? value : null;
+  }
+
   private static byte[] readLengthPrefixed(ByteBuffer byteBuffer) {
     int length = byteBuffer.getInt();
     byte[] bytes = new byte[length];
     byteBuffer.get(bytes);
     return bytes;
+  }
+
+  private static void skip(ByteBuffer byteBuffer, int length) {
+    if (length < 0 || length > byteBuffer.remaining()) {
+      throw new BufferUnderflowException();
+    }
+    byteBuffer.position(byteBuffer.position() + length);
   }
 
   public static String toString(Map<String, Object> map) {
