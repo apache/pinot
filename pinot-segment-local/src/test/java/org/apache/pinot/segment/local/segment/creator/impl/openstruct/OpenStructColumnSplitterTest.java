@@ -34,6 +34,7 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
@@ -202,7 +203,17 @@ public class OpenStructColumnSplitterTest {
     }
     s.seal();
     String sparseCol = OpenStructNaming.sparseColumnName("metrics");
-    assertTrue(s.getMaterializedColumnMetadata().containsKey(sparseCol));
+    PropertiesConfiguration props = s.getMaterializedColumnMetadata().get(sparseCol);
+    assertNotNull(props);
+
+    // Regression: the sparse column's metadata used to omit several properties ColumnMetadataImpl.
+    // fromPropertiesConfiguration() reads via config.getInt() with no default (e.g. CARDINALITY). This branch's
+    // reader still tolerates a missing bitsPerElement/lengthOfEachEntry/maxNumberOfMultiValues via UNAVAILABLE
+    // defaults, but the sibling early-release branch's stricter reader throws NoSuchElementException on the same
+    // gap, so keep this column on the standard addColumnMetadataInfo() path and verify it round-trips cleanly.
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(props, 10, sparseCol);
+    assertEquals(metadata.getFieldSpec().getDataType(), DataType.STRING);
+    assertFalse(metadata.hasDictionary());
   }
 
   @Test

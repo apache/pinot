@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -30,12 +32,17 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /// Per-key {@link DataSource} accessor for sealed OPEN_STRUCT segments. Dense keys get
@@ -150,6 +157,84 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
   @Nullable
   public JsonIndexReader getSparseJsonIndex() {
     return _sparseDataSource != null ? _sparseDataSource.getJsonIndex() : null;
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  @Override
+  @Nullable
+  public Map<String, Object> getMapValue(int docId) {
+    Map<String, Object> result = null;
+
+    for (Map.Entry<String, DataSource> entry : _perKeyDataSources.entrySet()) {
+      Object value = readValue(entry.getValue(), docId);
+      if (value != null) {
+        if (result == null) {
+          result = new HashMap<>();
+        }
+        result.put(entry.getKey(), value);
+      }
+    }
+
+    if (_sparseDataSource != null) {
+      Object sparseValue = readValue(_sparseDataSource, docId);
+      if (sparseValue instanceof String) {
+        String json = (String) sparseValue;
+        if (!json.isEmpty()) {
+          try {
+            Map<String, Object> sparseMap = JsonUtils.stringToObject(json, Map.class);
+            if (result == null) {
+              result = new HashMap<>();
+            }
+            result.putAll(sparseMap);
+          } catch (IOException e) {
+            throw new RuntimeException("Failed to parse sparse JSON at docId " + docId, e);
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  @Nullable
+  private static Object readValue(DataSource dataSource, int docId) {
+    NullValueVectorReader nullReader = dataSource.getNullValueVector();
+    if (nullReader != null && nullReader.isNull(docId)) {
+      return null;
+    }
+    ForwardIndexReader fwdReader = dataSource.getForwardIndex();
+    if (fwdReader == null) {
+      return null;
+    }
+    try (ForwardIndexReaderContext ctx = fwdReader.createContext()) {
+      Dictionary dictionary = dataSource.getDictionary();
+      if (dictionary != null) {
+        int dictId = fwdReader.getDictId(docId, ctx);
+        return dictionary.get(dictId);
+      }
+      DataType storedType = fwdReader.getStoredType();
+      switch (storedType) {
+        case INT:
+          return fwdReader.getInt(docId, ctx);
+        case LONG:
+          return fwdReader.getLong(docId, ctx);
+        case FLOAT:
+          return fwdReader.getFloat(docId, ctx);
+        case DOUBLE:
+          return fwdReader.getDouble(docId, ctx);
+        case BIG_DECIMAL:
+          return fwdReader.getBigDecimal(docId, ctx);
+        case STRING:
+          return fwdReader.getString(docId, ctx);
+        case BYTES:
+          return fwdReader.getBytes(docId, ctx);
+        default:
+          throw new IllegalStateException("Unsupported stored type for OPEN_STRUCT key: " + storedType);
+      }
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to read value from OPEN_STRUCT key forward index", e);
+    }
   }
 
   private static class ImmutableOpenStructDataSourceMetadata implements DataSourceMetadata {
