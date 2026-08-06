@@ -228,6 +228,35 @@ public class QueryRoutingTest {
   }
 
   @Test
+  public void testDataTableDeserializationError()
+      throws Exception {
+    long requestId = 123;
+    // Garbage bytes that cannot be deserialized into a DataTable. The server "responds" but with unusable bytes.
+    byte[] garbageBytes = new byte[]{0, 1, 2, 3, 4, 5};
+
+    // Start the server on port 0 (OS-assigned) to avoid TOCTOU race
+    _queryServer = getQueryServer(0, garbageBytes);
+    initializeTestFixtures(startAndGetPort(_queryServer));
+    String serverId = _serverInstance.getInstanceId();
+
+    long startTimeMs = System.currentTimeMillis();
+    // Use a long timeout so we can assert that the query completes well before the timeout
+    AsyncQueryResponse asyncQueryResponse =
+        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, _routingTable, null, null, 10_000L);
+    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
+    assertEquals(response.size(), 1);
+    assertTrue(response.containsKey(_offlineServerRoutingInstance));
+    ServerResponse serverResponse = response.get(_offlineServerRoutingInstance);
+    // The deserialization error should be signaled so the query completes immediately with no DataTable
+    assertNull(serverResponse.getDataTable());
+    // The query should NOT block for the full timeout
+    assertTrue(System.currentTimeMillis() - startTimeMs < 1000);
+    _requestCount += 2;
+    waitForStatsUpdate(_requestCount);
+    assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
+  }
+
+  @Test
   public void testLatencyForQueryServerException()
       throws Exception {
     long requestId = 123;
