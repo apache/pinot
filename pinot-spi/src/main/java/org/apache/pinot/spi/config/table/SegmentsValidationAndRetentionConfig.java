@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.config.table;
 
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 
@@ -246,5 +247,16 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   public void setUntrackedSegmentsRetentionTimeValue(String untrackedSegmentsRetentionTimeValue) {
     _untrackedSegmentsRetentionTimeValue = untrackedSegmentsRetentionTimeValue;
+  }
+
+  ///  Returns true when both the configs required to set retention are present in table config.
+  public boolean hasRetention() {
+    return !StringUtils.isEmpty(_retentionTimeUnit) && !StringUtils.isEmpty(_retentionTimeValue);
+  }
+
+  /// Converts the configured retention to ms.
+  @JsonIgnore
+  public long getRetentionTimeMillis() {
+    return TimeUnit.valueOf(_retentionTimeUnit.toUpperCase()).toMillis(Long.parseLong(_retentionTimeValue));
   }
 }
