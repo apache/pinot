@@ -20,6 +20,7 @@ package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 
 
 /// This class gives the details of a particular schema and the corresponding column count metrics
@@ -66,8 +67,17 @@ public class SchemaInfo {
   public SchemaInfo(Schema schema) {
     _schemaName = schema.getSchemaName();
 
-    //Removed virtual columns($docId, $hostName, $segmentName) from dimension fields count
-    _numDimensionFields = schema.getDimensionFieldSpecs().size() - 3;
+    // The schema handed in here has usually been through TableCache#addBuiltInVirtualColumns, which adds the built-in
+    // virtual columns as plain dimension fields (without a provider class, so isVirtualColumn() does not identify
+    // them). Exclude them by name so that the reported count only covers the user's own dimensions, and stays correct
+    // as built-in virtual columns are added.
+    int numDimensionFields = 0;
+    for (DimensionFieldSpec fieldSpec : schema.getDimensionFieldSpecs()) {
+      if (!BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS.contains(fieldSpec.getName())) {
+        numDimensionFields++;
+      }
+    }
+    _numDimensionFields = numDimensionFields;
     _numDateTimeFields = schema.getDateTimeFieldSpecs().size();
     _numMetricFields = schema.getMetricFieldSpecs().size();
     _numComplexFields = schema.getComplexFieldSpecs().size();

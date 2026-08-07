@@ -19,8 +19,8 @@
 package org.apache.pinot.segment.local.segment.virtualcolumn;
 
 import org.apache.pinot.segment.local.segment.index.column.DefaultNullValueVirtualColumnProvider;
+import org.apache.pinot.spi.data.BuiltInVirtualColumns;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
@@ -41,25 +41,53 @@ public class VirtualColumnProviderFactory {
     }
   }
 
+  /// Adds the built-in virtual columns to the schema of a segment, together with the provider that produces their
+  /// values.
+  ///
+  /// The shape of each column (name, data type, single-value vs multi-value) comes from
+  /// [BuiltInVirtualColumns#DEFINITIONS], which the broker side uses as well, so the two can never disagree on a type.
+  /// This method only layers on the provider class, and the constant value for the columns whose value is already
+  /// known here.
   public static void addBuiltInVirtualColumnsToSegmentSchema(Schema schema, String segmentName) {
-    if (!schema.hasColumn(BuiltInVirtualColumn.DOCID)) {
-      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.DOCID, FieldSpec.DataType.INT, true,
-          DocIdVirtualColumnProvider.class));
+    for (BuiltInVirtualColumns.Definition definition : BuiltInVirtualColumns.DEFINITIONS) {
+      String column = definition.getName();
+      if (schema.hasColumn(column)) {
+        continue;
+      }
+      DimensionFieldSpec fieldSpec = definition.createFieldSpec();
+      fieldSpec.setVirtualColumnProvider(getProviderClass(column).getName());
+      // $hostName and $segmentName are constants known at schema construction time, and are carried as the field's
+      // default null value, which DefaultNullValueVirtualColumnProvider reads back.
+      if (BuiltInVirtualColumn.HOSTNAME.equals(column)) {
+        fieldSpec.setDefaultNullValue(NetUtils.getHostnameOrAddress());
+      } else if (BuiltInVirtualColumn.SEGMENTNAME.equals(column)) {
+        fieldSpec.setDefaultNullValue(segmentName);
+      }
+      schema.addField(fieldSpec);
     }
+  }
 
-    if (!schema.hasColumn(BuiltInVirtualColumn.HOSTNAME)) {
-      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.HOSTNAME, FieldSpec.DataType.STRING, true,
-          DefaultNullValueVirtualColumnProvider.class, NetUtils.getHostnameOrAddress()));
-    }
-
-    if (!schema.hasColumn(BuiltInVirtualColumn.SEGMENTNAME)) {
-      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.SEGMENTNAME, FieldSpec.DataType.STRING, true,
-          DefaultNullValueVirtualColumnProvider.class, segmentName));
-    }
-
-    if (!schema.hasColumn(BuiltInVirtualColumn.PARTITIONID)) {
-      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.PARTITIONID, FieldSpec.DataType.STRING, false,
-          PartitionIdVirtualColumnProvider.class));
+  private static Class<? extends VirtualColumnProvider> getProviderClass(String column) {
+    switch (column) {
+      case BuiltInVirtualColumn.DOCID:
+        return DocIdVirtualColumnProvider.class;
+      case BuiltInVirtualColumn.HOSTNAME:
+      case BuiltInVirtualColumn.SEGMENTNAME:
+        return DefaultNullValueVirtualColumnProvider.class;
+      case BuiltInVirtualColumn.PARTITIONID:
+        return PartitionIdVirtualColumnProvider.class;
+      case BuiltInVirtualColumn.CREATIONTIME:
+        return SegmentCreationTimeVirtualColumnProvider.class;
+      case BuiltInVirtualColumn.STARTTIMEMS:
+        return SegmentStartTimeVirtualColumnProvider.class;
+      case BuiltInVirtualColumn.ENDTIMEMS:
+        return SegmentEndTimeVirtualColumnProvider.class;
+      case BuiltInVirtualColumn.TOTALDOCS:
+        return SegmentTotalDocsVirtualColumnProvider.class;
+      case BuiltInVirtualColumn.SEGMENTCRC:
+        return SegmentCrcVirtualColumnProvider.class;
+      default:
+        throw new IllegalStateException("No virtual column provider registered for built-in column: " + column);
     }
   }
 }

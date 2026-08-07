@@ -465,6 +465,13 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         "select $docId, $segmentName, $hostName, $partitionId from mytable where $docId = 5 limit 50");
     getPinotConnection().execute(
         "select $docId, $segmentName, $hostName, $partitionId from mytable where $docId > 19998 limit 50");
+
+    // Segment metadata virtual columns
+    getPinotConnection().execute(
+        "select $creationTime, $startTimeMs, $endTimeMs, $totalDocs, $segmentCrc from mytable limit 50");
+    getPinotConnection().execute("select $segmentName, $segmentCrc, $totalDocs from mytable "
+        + "group by $segmentName, $segmentCrc, $totalDocs limit 1000");
+    getPinotConnection().execute("select count(*) from mytable where $creationTime > 0");
   }
 
   /// Test queries from the query file.

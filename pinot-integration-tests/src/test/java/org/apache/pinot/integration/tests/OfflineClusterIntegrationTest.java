@@ -2450,6 +2450,69 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testSegmentMetadataVirtualColumns(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT $creationTime, $startTimeMs, $endTimeMs, $totalDocs, $segmentCrc FROM mytable LIMIT 10";
+    JsonNode response = postQuery(query);
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnNames").toString(),
+        "[\"$creationTime\",\"$startTimeMs\",\"$endTimeMs\",\"$totalDocs\",\"$segmentCrc\"]");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"LONG\",\"LONG\",\"LONG\",\"INT\",\"STRING\"]");
+    JsonNode rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      JsonNode row = rows.get(i);
+      long creationTime = row.get(0).asLong();
+      assertTrue(creationTime > 0, "Unexpected segment creation time: " + creationTime);
+      long startTime = row.get(1).asLong();
+      long endTime = row.get(2).asLong();
+      assertTrue(startTime > 0, "Unexpected segment start time: " + startTime);
+      assertTrue(startTime <= endTime, "Segment start time: " + startTime + " is after end time: " + endTime);
+      assertTrue(row.get(3).asInt() > 0, "Unexpected total docs: " + row.get(3).asInt());
+      // A real CRC, not the default null value the column falls back to when the metadata is unavailable
+      String crc = row.get(4).asText();
+      assertNotEquals(crc, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING, "Segment CRC should be a real CRC");
+      assertNotEquals(crc, String.valueOf(Long.MIN_VALUE), "Segment CRC should be a real CRC");
+      assertTrue(crc.matches("-?\\d+"), "Unexpected segment CRC: " + crc);
+    }
+
+    // $totalDocs is constant within a segment, so the per-segment values must add up to the total number of rows
+    query = "SELECT $segmentName, MAX($totalDocs) FROM mytable GROUP BY $segmentName LIMIT 10000";
+    rows = postQuery(query).get("resultTable").get("rows");
+    long totalDocs = 0;
+    for (JsonNode row : rows) {
+      totalDocs += row.get(1).asLong();
+    }
+    assertEquals(totalDocs, getCountStarResult());
+
+    // $startTimeMs/$endTimeMs are normalized to milliseconds regardless of the time column's unit. mytable's time
+    // column is DaysSinceEpoch in DAYS, so the values must be the day boundaries expressed in millis - this is what
+    // distinguishes a correct implementation from one leaking the raw DAYS value.
+    query = "SELECT MIN($startTimeMs), MAX($endTimeMs), MIN(DaysSinceEpoch), MAX(DaysSinceEpoch) FROM mytable";
+    JsonNode row = postQuery(query).get("resultTable").get("rows").get(0);
+    long daysToMillis = TimeUnit.DAYS.toMillis(1);
+    assertEquals(row.get(0).asLong(), row.get(2).asLong() * daysToMillis);
+    assertEquals(row.get(1).asLong(), row.get(3).asLong() * daysToMillis);
+
+    // Filters on the segment metadata columns must actually prune, not match everything or nothing
+    assertEquals(postQuery("SELECT COUNT(*) FROM mytable WHERE $creationTime > 0").get("resultTable").get("rows").get(0)
+        .get(0).asLong(), getCountStarResult());
+    assertEquals(postQuery("SELECT COUNT(*) FROM mytable WHERE $creationTime < 0").get("resultTable").get("rows").get(0)
+        .get(0).asLong(), 0);
+
+    // Filtering on a single segment's CRC must return exactly that segment's documents
+    query = "SELECT $segmentCrc, MAX($totalDocs) FROM mytable GROUP BY $segmentCrc LIMIT 10000";
+    JsonNode crcRow = postQuery(query).get("resultTable").get("rows").get(0);
+    String segmentCrc = crcRow.get(0).asText();
+    long docsInSegment = crcRow.get(1).asLong();
+    assertEquals(postQuery("SELECT COUNT(*) FROM mytable WHERE $segmentCrc = '" + segmentCrc + "'").get("resultTable")
+        .get("rows").get(0).get(0).asLong(), docsInSegment);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testGroupByUDF(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
