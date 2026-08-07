@@ -25,26 +25,37 @@ import com.google.common.hash.Funnels;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.readers.bloom.OnHeapGuavaBloomFilterReader;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
-import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.BloomFilterConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.UuidUtils;
+import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -53,11 +64,17 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
 public class BloomFilterSegmentPrunerTest {
   private static final BloomFilterSegmentPruner PRUNER = new BloomFilterSegmentPruner();
+  private static final String UUID_COLUMN = "uuidColumn";
+  private static final String UUID_0 = "550e8400-e29b-41d4-a716-446655440000";
+  private static final String ABSENT_UUID = "550e8400-e29b-41d4-a716-446655440001";
+  private static final String UUID_2 = "550e8400-e29b-41d4-a716-446655440002";
+  private static final String UUID_3 = "550e8400-e29b-41d4-a716-446655440003";
 
   @BeforeClass
   public void setUp() {
@@ -99,109 +116,102 @@ public class BloomFilterSegmentPrunerTest {
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21.0 AND column = 30.0"));
   }
 
-  @Test
-  public void testUuidBloomFilterPruning()
-      throws IOException {
-    IndexSegment indexSegment = mockIndexSegment(new String[]{
-        "550e8400-e29b-41d4-a716-446655440000",
-        "550e8400-e29b-41d4-a716-446655440001"
-    }, DataType.UUID);
+  @Test(dataProvider = "uuidBloomFilterCreationModes")
+  public void testUuidBloomFilterPruningEndToEnd(boolean noDictionary, boolean multiValue, boolean createOnLoad)
+      throws Exception {
+    File indexDir = Files.createTempDirectory("uuidBloomFilterSegment").toFile();
+    ImmutableSegment segment = null;
+    try {
+      TableConfig tableConfig = createTableConfig(noDictionary, !createOnLoad);
+      Schema schema = createSchema(multiValue);
 
-    assertFalse(runPruner(indexSegment,
-        "SELECT COUNT(*) FROM testTable WHERE column = '550e8400-e29b-41d4-a716-446655440000'"));
-    assertFalse(runPruner(indexSegment,
-        "SELECT COUNT(*) FROM testTable WHERE column IN ('550e8400-e29b-41d4-a716-446655440001')"));
-    assertTrue(runPruner(indexSegment,
-        "SELECT COUNT(*) FROM testTable WHERE column = '550e8400-e29b-41d4-a716-44665544ffff'"));
+      List<GenericRow> rows = new ArrayList<>();
+      rows.add(row(UUID_0, multiValue));
+      rows.add(row(UUID_2, multiValue));
 
-    // The bloom filter is keyed on the canonical lowercase dashed rendering, but UuidUtils.toBytes also accepts
-    // uppercase and dashless literals. Those must reach the same key, which is the whole reason the probe goes
-    // literal -> stored bytes -> canonical string rather than hashing the raw literal: hashing the literal directly
-    // would miss here and silently prune a segment that holds the row.
-    assertFalse(runPruner(indexSegment,
-        "SELECT COUNT(*) FROM testTable WHERE column = '550E8400-E29B-41D4-A716-446655440000'"));
-    assertFalse(runPruner(indexSegment,
-        "SELECT COUNT(*) FROM testTable WHERE column = '550e8400e29b41d4a716446655440000'"));
-    assertFalse(runPruner(indexSegment,
-        "SELECT COUNT(*) FROM testTable WHERE column IN ('550E8400E29B41D4A716446655440001')"));
+      String segmentName = (noDictionary ? "raw" : "dictionary") + (multiValue ? "Mv" : "Sv") + "UuidSegment";
+      SegmentGeneratorConfig generatorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+      generatorConfig.setSegmentName(segmentName);
+      generatorConfig.setOutDir(indexDir.getAbsolutePath());
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(generatorConfig, new GenericRowRecordReader(rows));
+      driver.build();
+
+      File segmentDir = new File(indexDir, segmentName);
+      if (createOnLoad) {
+        segment = ImmutableSegmentLoader.load(segmentDir,
+            new IndexLoadingConfig(createTableConfig(noDictionary, true), schema));
+      } else {
+        segment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
+      }
+      assertEquals(segment.getSegmentMetadata().getColumnMetadataFor(UUID_COLUMN).hasDictionary(), !noDictionary);
+      assertEquals(segment.getSegmentMetadata().getColumnMetadataFor(UUID_COLUMN).isSingleValue(), !multiValue);
+      assertEquals(segment.getDataSource(UUID_COLUMN).getDataSourceMetadata().getDataType(), DataType.UUID);
+      assertNotNull(segment.getDataSource(UUID_COLUMN).getBloomFilter());
+
+      assertFalse(runPruner(segment,
+          "SELECT COUNT(*) FROM testTable WHERE uuidColumn = '" + UUID_0 + "'"));
+      assertFalse(runPruner(segment,
+          "SELECT COUNT(*) FROM testTable WHERE uuidColumn = '550E8400-E29B-41D4-A716-446655440000'"));
+      assertFalse(runPruner(segment,
+          "SELECT COUNT(*) FROM testTable WHERE uuidColumn = '550e8400e29b41d4a716446655440000'"));
+      if (multiValue) {
+        assertFalse(runPruner(segment,
+            "SELECT COUNT(*) FROM testTable WHERE uuidColumn = '" + UUID_3 + "'"));
+      }
+      assertFalse(runPruner(segment,
+          "SELECT COUNT(*) FROM testTable WHERE uuidColumn IN ('" + ABSENT_UUID + "', '" + UUID_2 + "')"));
+      assertTrue(runPruner(segment,
+          "SELECT COUNT(*) FROM testTable WHERE uuidColumn = '" + ABSENT_UUID + "'"));
+    } finally {
+      if (segment != null) {
+        segment.destroy();
+      }
+      FileUtils.deleteDirectory(indexDir);
+    }
   }
 
-  /// The pruner hashes the query literal and looks it up in a bloom filter that was written by
-  /// [BloomFilterCreator]. If the two sides render the same value differently, the lookup misses, the segment is
-  /// pruned, and matching rows silently disappear. This builds the filter through the real creator so any divergence
-  /// shows up as a wrongly-pruned segment.
-  ///
-  /// BIG_DECIMAL is the sharp case: `BigDecimal.toString()` yields `1.0E-7` while
-  /// `toPlainString()` yields `0.00000010`, so rendering the reader side via
-  /// `FieldSpec.DataType#toString` would break every BIG_DECIMAL bloom filter.
-  @Test(dataProvider = "bloomFilterRoundTripValues")
-  public void testBloomFilterRoundTripsThroughCreatorRendering(DataType dataType, Object indexedValue,
-      String queryLiteral)
-      throws IOException {
-    IndexSegment indexSegment = mockIndexSegmentIndexedViaCreator(dataType, indexedValue);
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = " + queryLiteral),
-        dataType + " literal " + queryLiteral + " was pruned despite being present in the bloom filter");
-  }
-
-  @DataProvider(name = "bloomFilterRoundTripValues")
-  public Object[][] bloomFilterRoundTripValues() {
-    byte[] uuidBytes = UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440000");
+  @DataProvider(name = "uuidBloomFilterCreationModes")
+  public Object[][] uuidBloomFilterCreationModes() {
     return new Object[][]{
-        {DataType.INT, 42, "42"},
-        {DataType.LONG, 42L, "42"},
-        {DataType.DOUBLE, 21.0d, "21.0"},
-        // Scientific notation is the case that breaks if the reader renders via toPlainString().
-        {DataType.BIG_DECIMAL, new BigDecimal("1.0E-7"), "1.0E-7"},
-        // NOTE: a BIG_DECIMAL literal carrying trailing zeros (e.g. 123.4500) is still wrongly pruned, because the
-        // query literal loses them before it reaches the pruner while the indexed value keeps its scale. That is a
-        // pre-existing gap on master, independent of the rendering fixed here, so it is deliberately not asserted.
-
-        {DataType.STRING, "hello", "'hello'"},
-        {DataType.BYTES, new byte[]{0x0a, 0x1b, 0x2c}, "'0a1b2c'"},
-        {DataType.UUID, uuidBytes, "'550e8400-e29b-41d4-a716-446655440000'"}
+        {false, false, false},
+        {true, false, false},
+        {false, true, false},
+        {true, true, false},
+        {false, false, true},
+        {true, false, true},
+        {false, true, true},
+        {true, true, true}
     };
   }
 
-  private IndexSegment mockIndexSegmentIndexedViaCreator(DataType dataType, Object indexedValue)
-      throws IOException {
-    IndexSegment indexSegment = mock(IndexSegment.class);
-    when(indexSegment.getColumnNames()).thenReturn(ImmutableSet.of("column"));
-    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
-    when(segmentMetadata.getTotalDocs()).thenReturn(20);
-    when(indexSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
+  private static TableConfig createTableConfig(boolean noDictionary, boolean enableBloomFilter) {
+    TableConfigBuilder builder = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable");
+    if (noDictionary) {
+      builder.setNoDictionaryColumns(List.of(UUID_COLUMN));
+    }
+    TableConfig tableConfig = builder.build();
+    if (enableBloomFilter) {
+      tableConfig.getIndexingConfig().setBloomFilterConfigs(
+          Map.of(UUID_COLUMN, new BloomFilterConfig(1e-9, 0, false)));
+    }
+    return tableConfig;
+  }
 
-    DataSource dataSource = mock(DataSource.class);
-    when(indexSegment.getDataSourceNullable("column")).thenReturn(dataSource);
-    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
-    when(dataSourceMetadata.getDataType()).thenReturn(dataType);
-    when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
+  private static Schema createSchema(boolean multiValue) {
+    Schema.SchemaBuilder builder = new Schema.SchemaBuilder();
+    if (multiValue) {
+      builder.addMultiValueDimension(UUID_COLUMN, DataType.UUID);
+    } else {
+      builder.addSingleValueDimension(UUID_COLUMN, DataType.UUID);
+    }
+    return builder.build();
+  }
 
-    // Route the value through BloomFilterCreator's own default add(Object, int) so the writer-side rendering under
-    // test is the production one, not a copy of it.
-    BloomFilterReaderBuilder builder = new BloomFilterReaderBuilder();
-    BloomFilterCreator creator = new BloomFilterCreator() {
-      @Override
-      public DataType getDataType() {
-        return dataType;
-      }
-
-      @Override
-      public void add(String value) {
-        builder.put(value);
-      }
-
-      @Override
-      public void seal() {
-      }
-
-      @Override
-      public void close() {
-      }
-    };
-    creator.add(indexedValue, -1);
-    when(dataSource.getBloomFilter()).thenReturn(builder.build());
-
-    return indexSegment;
+  private static GenericRow row(String uuid, boolean multiValue) {
+    GenericRow row = new GenericRow();
+    row.putValue(UUID_COLUMN, multiValue ? new String[]{uuid, UUID_3} : uuid);
+    return row;
   }
 
   @Test(expectedExceptions = RuntimeException.class)
@@ -270,11 +280,6 @@ public class BloomFilterSegmentPrunerTest {
 
   private IndexSegment mockIndexSegment(String[] values)
       throws IOException {
-    return mockIndexSegment(values, DataType.DOUBLE);
-  }
-
-  private IndexSegment mockIndexSegment(String[] values, DataType dataType)
-      throws IOException {
     IndexSegment indexSegment = mock(IndexSegment.class);
     when(indexSegment.getColumnNames()).thenReturn(ImmutableSet.of("column"));
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
@@ -289,7 +294,7 @@ public class BloomFilterSegmentPrunerTest {
     for (String v : values) {
       builder.put(v);
     }
-    when(dataSourceMetadata.getDataType()).thenReturn(dataType);
+    when(dataSourceMetadata.getDataType()).thenReturn(DataType.DOUBLE);
     when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
     when(dataSource.getBloomFilter()).thenReturn(builder.build());
 
