@@ -26,6 +26,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
@@ -62,7 +63,9 @@ public class PinotQueryResourceStaticValidationTest {
     Assert.assertNotNull(provider.getTableConfig("testTable_OFFLINE"));
     Assert.assertNotNull(provider.getSchema("testTable"));
     Assert.assertNotNull(provider.getColumnNameMap("testTable"));
-    Assert.assertEquals(provider.getColumnNameMap("testTable").size(), 6); // 2 columns + 4 built-in virtual columns
+    // 2 columns + all built-in virtual columns
+    Assert.assertEquals(provider.getColumnNameMap("testTable").size(),
+        2 + CommonConstants.Segment.BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS.size());
 
     Assert.assertTrue(provider.getTableNameMap().containsKey("testTable_OFFLINE"));
     Assert.assertTrue(provider.getTableNameMap().containsKey("testTable"));

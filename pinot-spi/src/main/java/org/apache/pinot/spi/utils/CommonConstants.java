@@ -2246,7 +2246,34 @@ public class CommonConstants {
       public static final String HOSTNAME = "$hostName";
       public static final String SEGMENTNAME = "$segmentName";
       public static final String PARTITIONID = "$partitionId";
-      public static final Set<String> BUILT_IN_VIRTUAL_COLUMNS = Set.of(DOCID, HOSTNAME, SEGMENTNAME, PARTITIONID);
+
+      // Segment metadata virtual columns. Each of them is a constant single-value column within a segment, exposing a
+      // piece of the segment metadata to queries. When the underlying metadata is not available (e.g. on a CONSUMING
+      // segment, which has no time range and no CRC yet), the column reads as NULL.
+      //
+      // NOTE on naming: only the time range columns carry the "Ms" suffix. SegmentMetadata#getStartTime() and
+      // #getEndTime() return values in the time column's own unit, so an unsuffixed $startTime/$endTime would be
+      // ambiguous. A creation time is always epoch milliseconds throughout Pinot, so $creationTime is not.
+
+      /// Segment creation time in milliseconds since epoch (LONG). This is the index creation time recorded in the
+      /// segment's creation metadata; for a CONSUMING segment it is the time the consuming segment was created.
+      public static final String CREATIONTIME = "$creationTime";
+      /// Start of the segment time range in milliseconds since epoch (LONG), normalized from the time column's unit.
+      /// NULL for segments without a time range, such as CONSUMING segments and tables without a time column.
+      public static final String STARTTIMEMS = "$startTimeMs";
+      /// End of the segment time range in milliseconds since epoch (LONG), normalized from the time column's unit.
+      /// NULL for segments without a time range, such as CONSUMING segments and tables without a time column.
+      public static final String ENDTIMEMS = "$endTimeMs";
+      /// Number of documents in the segment (INT). On a CONSUMING segment this is the number of documents indexed so
+      /// far. NOTE: This counts all the documents physically stored in the segment, so for an upsert table it also
+      /// includes the documents that have been replaced and are no longer returned by queries.
+      public static final String TOTALDOCS = "$totalDocs";
+      /// Segment CRC (STRING). NULL on CONSUMING segments, which have no CRC until they are committed.
+      public static final String SEGMENTCRC = "$segmentCrc";
+
+      public static final Set<String> BUILT_IN_VIRTUAL_COLUMNS =
+          Set.of(DOCID, HOSTNAME, SEGMENTNAME, PARTITIONID, CREATIONTIME, STARTTIMEMS, ENDTIMEMS, TOTALDOCS,
+              SEGMENTCRC);
     }
   }
 
