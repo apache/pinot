@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -568,8 +569,16 @@ public class WorkerManager {
       for (Map.Entry<ServerInstance, SegmentsToQuery> serverEntry : segmentsMap.entrySet()) {
         Map<String, List<String>> tableTypeToSegmentListMap =
             serverInstanceToSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
-        // TODO: support optional segments for multi-stage engine.
-        Preconditions.checkState(tableTypeToSegmentListMap.put(tableType, serverEntry.getValue().getSegments()) == null,
+        // Merge required and optional segments for multi-stage engine.
+        List<String> segments = serverEntry.getValue().getSegments();
+        List<String> optionalSegments = serverEntry.getValue().getOptionalSegments();
+        if (optionalSegments != null && !optionalSegments.isEmpty()) {
+          List<String> combinedSegments = new ArrayList<>(segments.size() + optionalSegments.size());
+          combinedSegments.addAll(segments);
+          combinedSegments.addAll(optionalSegments);
+          segments = Collections.unmodifiableList(combinedSegments);
+        }
+        Preconditions.checkState(tableTypeToSegmentListMap.put(tableType, segments) == null,
             "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
       }
 
@@ -737,7 +746,13 @@ public class WorkerManager {
       }
     }
 
-    // TODO: Support unavailable segments and optional segments for replicated leaf stage
+    // Attach unavailable segments to metadata for replicated leaf stage
+    Map<String, RoutingTable> routingTableMap = getRoutingTable(tableName, context.getRequestId());
+    for (Map.Entry<String, RoutingTable> entry : routingTableMap.entrySet()) {
+      if (!entry.getValue().getUnavailableSegments().isEmpty()) {
+        metadata.addUnavailableSegments(tableName, entry.getValue().getUnavailableSegments());
+      }
+    }
     metadata.setReplicatedSegments(segmentsMap);
     filterReplicatedLeafStageSegments(context, metadata);
   }
@@ -918,9 +933,17 @@ public class WorkerManager {
     for (Map.Entry<ServerInstance, SegmentsToQuery> serverEntry : segmentsMap.entrySet()) {
       Map<String, List<String>> tableNameToSegmentsMap =
           serverInstanceToLogicalSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
-      // TODO: support optional segments for multi-stage engine.
+      // Merge required and optional segments for multi-stage engine.
+      List<String> segments = serverEntry.getValue().getSegments();
+      List<String> optionalSegments = serverEntry.getValue().getOptionalSegments();
+      if (optionalSegments != null && !optionalSegments.isEmpty()) {
+        List<String> combinedSegments = new ArrayList<>(segments.size() + optionalSegments.size());
+        combinedSegments.addAll(segments);
+        combinedSegments.addAll(optionalSegments);
+        segments = Collections.unmodifiableList(combinedSegments);
+      }
       Preconditions.checkState(
-          tableNameToSegmentsMap.put(physicalTableName, serverEntry.getValue().getSegments()) == null,
+          tableNameToSegmentsMap.put(physicalTableName, segments) == null,
           "Entry for server {} and physical table: {} already exist!", serverEntry.getKey(), physicalTableName);
     }
   }
@@ -1084,10 +1107,12 @@ public class WorkerManager {
         continue;
       }
       PartitionInfo partitionInfo = partitionInfoMap[i];
-      // TODO: Currently we don't support the case when a partition doesn't contain any segment. The reason is that
-      //       the leaf stage won't be able to directly return empty response.
-      Preconditions.checkState(partitionInfo != null, "Failed to find any segment for table: %s, partition: %s",
-          tableName, i);
+      // Skip partitions that don't contain any segment. The leaf stage can handle empty partitions by
+      // returning an empty response, which is equivalent to a pruned partition.
+      if (partitionInfo == null) {
+        LOGGER.warn("No segment found for table: {}, partition: {}, skipping", tableName, i);
+        continue;
+      }
       // NOTE: Pick worker based on the request id plus the partition id (not a running counter) so that the same worker
       //       is picked across different table scans when the segments for the same partition are colocated, and so
       //       that skipping pruned partitions does not shift the server assignment of the surviving ones.
