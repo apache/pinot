@@ -41,6 +41,7 @@ import static org.apache.pinot.common.function.scalar.DataTypeConversionFunction
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -332,6 +333,21 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
       expectedArraySums[i] = Arrays.stream(afterCast[i]).sum();
     }
     testTransformFunction(transformFunction, expectedArraySums);
+  }
+
+  @Test
+  public void testCastTransformFunctionBytesArray() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("CAST(%s AS BYTES_ARRAY)", STRING_MV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof CastTransformFunction);
+    TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
+    assertEquals(resultMetadata.getDataType(), FieldSpec.DataType.BYTES);
+    assertFalse(resultMetadata.isSingleValue());
+
+    byte[][][] expectedBytesValues = new byte[NUM_ROWS][][];
+    ArrayCopyUtils.copy(_stringMVValues, expectedBytesValues, NUM_ROWS);
+    assertEquals(transformFunction.transformToBytesValuesMV(_projectionBlock), expectedBytesValues);
   }
 
   @Test

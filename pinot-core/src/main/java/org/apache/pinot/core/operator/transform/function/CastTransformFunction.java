@@ -102,10 +102,6 @@ public class CastTransformFunction extends BaseTransformFunction {
           Preconditions.checkState(sourceSV, "Cannot cast from MV to UUID");
           _resultMetadata = UUID_SV_NO_DICTIONARY_METADATA;
           break;
-        case "UUID_ARRAY":
-          Preconditions.checkState(!sourceSV, "Cannot cast from SV to UUID_ARRAY");
-          _resultMetadata = UUID_MV_NO_DICTIONARY_METADATA;
-          break;
         case "INT_ARRAY":
         case "INTEGER_ARRAY":
           _resultMetadata = INT_MV_NO_DICTIONARY_METADATA;
@@ -127,6 +123,13 @@ public class CastTransformFunction extends BaseTransformFunction {
         case "STRING_ARRAY":
         case "VARCHAR_ARRAY":
           _resultMetadata = STRING_MV_NO_DICTIONARY_METADATA;
+          break;
+        case "BYTES_ARRAY":
+          _resultMetadata = BYTES_MV_NO_DICTIONARY_METADATA;
+          break;
+        case "UUID_ARRAY":
+          Preconditions.checkState(!sourceSV, "Cannot cast from SV to UUID_ARRAY");
+          _resultMetadata = UUID_MV_NO_DICTIONARY_METADATA;
           break;
         default:
           throw new IllegalArgumentException("Unable to cast expression to type - " + targetType);
@@ -331,7 +334,8 @@ public class CastTransformFunction extends BaseTransformFunction {
         // Renders a UUID *result* (e.g. CAST(x AS UUID) read as a string). The switch above handles the other
         // direction, a UUID *source* cast to STRING.
         case UUID:
-          ArrayCopyUtils.copyFromUuid(transformToBytesValuesSV(valueBlock), _stringValuesSV, length);
+          byte[][] uuidValues = transformToBytesValuesSV(valueBlock);
+          ArrayCopyUtils.copyFromUuid(uuidValues, _stringValuesSV, length);
           break;
         default:
           throw new IllegalStateException(String.format("Cannot cast from SV %s to STRING", resultDataType));
@@ -569,7 +573,8 @@ public class CastTransformFunction extends BaseTransformFunction {
           break;
         // See the SV variant: this renders a UUID result, not a UUID source.
         case UUID:
-          ArrayCopyUtils.copyFromUuid(transformToBytesValuesMV(valueBlock), _stringValuesMV, length);
+          byte[][][] uuidValuesMV = transformToBytesValuesMV(valueBlock);
+          ArrayCopyUtils.copyFromUuid(uuidValuesMV, _stringValuesMV, length);
           break;
         default:
           throw new IllegalStateException(String.format("Cannot cast from MV %s to STRING", resultDataType));

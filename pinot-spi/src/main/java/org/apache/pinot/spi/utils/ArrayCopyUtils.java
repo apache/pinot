@@ -306,30 +306,6 @@ public class ArrayCopyUtils {
     }
   }
 
-  /// Multi-value variant of [#copyFromUuid(byte[][], String[], int)].
-  public static void copyFromUuid(byte[][][] src, String[][] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      int rowLength = src[i].length;
-      String[] row = new String[rowLength];
-      for (int j = 0; j < rowLength; j++) {
-        row[j] = UuidUtils.toString(src[i][j]);
-      }
-      dest[i] = row;
-    }
-  }
-
-  /// Multi-value variant of [#copyToUuid(byte[][], byte[][], int)].
-  public static void copyToUuid(byte[][][] src, byte[][][] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      int rowLength = src[i].length;
-      byte[][] row = new byte[rowLength][];
-      for (int j = 0; j < rowLength; j++) {
-        row[j] = UuidUtils.toBytes(src[i][j]);
-      }
-      dest[i] = row;
-    }
-  }
-
   public static void copy(byte[][] src, BigDecimal[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = BigDecimalUtils.deserialize(src[i]);
@@ -355,6 +331,30 @@ public class ArrayCopyUtils {
   public static void copyToUuid(byte[][] src, byte[][] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = UuidUtils.toBytes(src[i]);
+    }
+  }
+
+  /// Multi-value variant of [#copyFromUuid(byte[][], String[], int)].
+  public static void copyFromUuid(byte[][][] src, String[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      String[] row = new String[rowLength];
+      for (int j = 0; j < rowLength; j++) {
+        row[j] = UuidUtils.toString(src[i][j]);
+      }
+      dest[i] = row;
+    }
+  }
+
+  /// Multi-value variant of [#copyToUuid(byte[][], byte[][], int)].
+  public static void copyToUuid(byte[][][] src, byte[][][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      byte[][] row = new byte[rowLength][];
+      for (int j = 0; j < rowLength; j++) {
+        row[j] = UuidUtils.toBytes(src[i][j]);
+      }
+      dest[i] = row;
     }
   }
 
