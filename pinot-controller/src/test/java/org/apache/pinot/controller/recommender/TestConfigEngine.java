@@ -36,6 +36,7 @@ import org.apache.pinot.controller.recommender.rules.AbstractRule;
 import org.apache.pinot.controller.recommender.rules.RulesToExecute;
 import org.apache.pinot.controller.recommender.rules.impl.InvertedSortedIndexJointRule;
 import org.apache.pinot.controller.recommender.rules.io.configs.SegmentSizeRecommendations;
+import org.apache.pinot.controller.recommender.realtime.provisioning.MemoryEstimator;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
 import org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -459,9 +460,32 @@ public class TestConfigEngine {
   @Test
   void testRealtimeProvisioningRuleWithHighIngestionRate()
       throws Exception {
-    // Total memory for some of the options are greater than the provided max memory in a host.
-    // For those option, the returned values is "NA"
-    testRealtimeProvisioningRule("recommenderInput/RealtimeProvisioningInput_highIngestionRate.json");
+    // Total memory for some options may exceed max usable host memory; values are still populated
+    // and WARNINGS entries call out the over-limit combinations (see #8339).
+    ConfigManager output = runRecommenderDriver("recommenderInput/RealtimeProvisioningInput_highIngestionRate.json");
+    Map<String, Map<String, String>> recommendations = output.getRealtimeProvisioningRecommendations();
+    assertRealtimeProvisioningRecommendation(recommendations.get(OPTIMAL_SEGMENT_SIZE));
+    assertRealtimeProvisioningRecommendation(recommendations.get(NUM_ROWS_IN_SEGMENT));
+    assertRealtimeProvisioningRecommendation(recommendations.get(NUM_SEGMENTS_QUERIED_PER_HOST));
+    assertRealtimeProvisioningRecommendation(recommendations.get(CONSUMING_MEMORY_PER_HOST));
+    assertRealtimeProvisioningRecommendation(recommendations.get(TOTAL_MEMORY_USED_PER_HOST));
+
+    // Over-memory cells must be numeric sizes (not NA); advisory Warnings map must be present.
+    Map<String, String> totalMemory = recommendations.get(TOTAL_MEMORY_USED_PER_HOST);
+    boolean sawNumericCell = false;
+    for (Map.Entry<String, String> e : totalMemory.entrySet()) {
+      if (e.getKey().startsWith("numHours")) {
+        String cell = e.getValue().trim().split("\\s+")[0];
+        if (!MemoryEstimator.NOT_APPLICABLE.equals(cell)) {
+          sawNumericCell = true;
+          break;
+        }
+      }
+    }
+    assertTrue(sawNumericCell, "Expected at least one non-NA total-memory cell for high ingestion rate");
+    Map<String, String> warnings = recommendations.get(WARNINGS);
+    assertNotNull(warnings, "High ingestion rate should produce WARNINGS");
+    assertFalse(warnings.isEmpty());
   }
 
   @Test
