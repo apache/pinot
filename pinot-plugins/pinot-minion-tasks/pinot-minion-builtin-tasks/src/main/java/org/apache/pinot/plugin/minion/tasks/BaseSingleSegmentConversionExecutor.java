@@ -29,9 +29,11 @@ import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -129,9 +131,6 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
         return segmentConversionResult;
       }
 
-      // Publish metrics related to segment upload
-      reportSegmentUploadMetrics(workingDir, tableNameWithType, taskType);
-
       // Collect the task processing metrics from various single segment executors and publish them here.
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
       Object numRecordsPurged = segmentConversionResult.getCustomProperty(PurgeTaskExecutor.NUM_RECORDS_PURGED_KEY);
@@ -141,6 +140,37 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       } else {
         reportTaskProcessingMetrics(tableNameWithType, taskType, segmentMetadata.getTotalDocs());
       }
+
+      SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
+          getSegmentZKMetadataCustomMapModifier(pinotTaskConfig, segmentConversionResult);
+      if (convertedSegmentDir.getCanonicalFile().equals(indexDir.getCanonicalFile())) {
+        _eventObserver.notifyProgress(_pinotTaskConfig,
+            "Updating ZK metadata without uploading unchanged segment: " + segmentName);
+        try {
+          SegmentConversionUtils.updateSegmentZKMetadata(tableNameWithType, segmentName, uploadURL,
+              originalSegmentCrc, segmentZKMetadataCustomMapModifier, authProvider);
+          LOGGER.info("Updated ZK metadata without uploading unchanged segment: {} of table: {}", segmentName,
+              tableNameWithType);
+          return segmentConversionResult;
+        } catch (HttpErrorStatusException e) {
+          if (e.getStatusCode() != HttpStatus.SC_NOT_FOUND) {
+            _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_UPLOAD_FAIL_COUNT, 1L);
+            _eventObserver.notifyTaskError(_pinotTaskConfig, e);
+            throw e;
+          }
+          // The endpoint is additive. Fall back to the existing upload path when a mixed-version controller does not
+          // expose it yet. A missing segment also follows the fallback and is rejected by the refresh-only upload.
+          LOGGER.info("Segment ZK metadata update API is unavailable for segment: {} of table: {}, falling back to "
+              + "segment upload", segmentName, tableNameWithType);
+        } catch (Exception e) {
+          _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_UPLOAD_FAIL_COUNT, 1L);
+          _eventObserver.notifyTaskError(_pinotTaskConfig, e);
+          throw e;
+        }
+      }
+
+      // Publish metrics related to segment upload
+      reportSegmentUploadMetrics(workingDir, tableNameWithType, taskType);
 
       // Tar the converted segment
       _eventObserver.notifyProgress(_pinotTaskConfig, "Compressing segment: " + segmentName);
@@ -172,10 +202,6 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       Header refreshOnlyHeader = new BasicHeader(FileUploadDownloadClient.CustomHeaders.REFRESH_ONLY, "true");
 
       // Set segment ZK metadata custom map modifier into HTTP header to modify the segment ZK metadata
-      // NOTE: even segment is not changed, still need to upload the segment to update the segment ZK metadata so that
-      // segment will not be submitted again
-      SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
-          getSegmentZKMetadataCustomMapModifier(pinotTaskConfig, segmentConversionResult);
       Header segmentZKMetadataCustomMapModifierHeader =
           new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
               segmentZKMetadataCustomMapModifier.toJsonString());
