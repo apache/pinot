@@ -98,6 +98,7 @@ import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.Instance;
@@ -1053,6 +1054,136 @@ public class PinotLLCRealtimeSegmentManagerTest {
     consumingSegmentInstanceStateMap = instanceStatesMap.get(consumingSegment);
     assertEquals(consumingSegmentInstanceStateMap.get(offlineInstance), SegmentStateModel.OFFLINE);
     assertEquals(oldInstanceStatesMap.get(consumingSegment), consumingSegmentInstanceStateMap);
+  }
+
+  /// Phase-2 regression: the smallest offsets are pre-fetched outside the ideal-state lock and passed into the
+  /// repair method. A partition that needs a new CONSUMING segment but is absent from the (populated) pre-fetched
+  /// map is treated as having reached end of life and skipped, while other partitions are still repaired using the
+  /// pre-fetched offsets.
+  @Test
+  public void testEnsureAllPartitionsConsumingHonorsPreFetchedSmallestOffset() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    setUpNewTable(segmentManager, 2, 5, 4);
+    Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
+
+    // Both partition 0 and partition 3 lose all replicas of their CONSUMING segment, so both need a new CONSUMING
+    // segment created from the smallest offset.
+    turnNewConsumingSegmentOffline(instanceStatesMap,
+        new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName());
+    turnNewConsumingSegmentOffline(instanceStatesMap,
+        new LLCSegmentName(RAW_TABLE_NAME, 3, 0, CURRENT_TIME_MS).getSegmentName());
+    segmentManager._exceededMaxSegmentCompletionTime = true;
+
+    List<StreamMetadata> streamMetadataList =
+        segmentManager.getNewStreamMetadataList(segmentManager._streamConfigs, List.of(), mock(IdealState.class));
+    // Pre-fetched smallest offsets: partition 0 gets an offset ahead of its committed segment (so the new segment
+    // must start from it, proving the pre-fetched map is used); partition 3 is intentionally omitted.
+    LongMsgOffset partition0SmallestOffset = new LongMsgOffset(PARTITION_OFFSET.getOffset() + 10_000);
+    Map<Integer, StreamPartitionMsgOffset> preFetchedSmallestOffset = new HashMap<>();
+    preFetchedSmallestOffset.put(0, partition0SmallestOffset);
+    preFetchedSmallestOffset.put(1, PARTITION_OFFSET);
+    preFetchedSmallestOffset.put(2, PARTITION_OFFSET);
+
+    segmentManager.ensureAllPartitionsConsuming(segmentManager._tableConfig, segmentManager._streamConfigs,
+        segmentManager._idealState, streamMetadataList, null, preFetchedSmallestOffset);
+
+    // Partition 0 (present in the pre-fetched map) gets a fresh CONSUMING segment whose start offset comes from the
+    // pre-fetched smallest offset; partition 3 (absent from the populated map -> treated as end of life) is skipped
+    // and no exception is thrown.
+    String partition0NewSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+    assertTrue(instanceStatesMap.containsKey(partition0NewSegment));
+    assertEquals(segmentManager._segmentZKMetadataMap.get(partition0NewSegment).getStartOffset(),
+        partition0SmallestOffset.toString());
+    assertFalse(instanceStatesMap.containsKey(
+        new LLCSegmentName(RAW_TABLE_NAME, 3, 1, CURRENT_TIME_MS).getSegmentName()));
+  }
+
+  /// Phase-2: when the smallest offsets were not pre-fetched (null map, periodic/non-SMALLEST criteria) but a
+  /// partition needs a new CONSUMING segment (it started needing repair after the lock-free snapshot), the repair is
+  /// deferred to the next run rather than substituting start offsets. Healthy partitions are untouched and no
+  /// exception is thrown.
+  @Test
+  public void testEnsureAllPartitionsConsumingDefersRepairWhenSmallestOffsetsNotPreFetched() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    setUpNewTable(segmentManager, 2, 5, 4);
+    Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
+
+    // Partition 0 loses all replicas of its CONSUMING segment, so it needs a new one.
+    turnNewConsumingSegmentOffline(instanceStatesMap,
+        new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName());
+    segmentManager._exceededMaxSegmentCompletionTime = true;
+
+    List<StreamMetadata> streamMetadataList =
+        segmentManager.getNewStreamMetadataList(segmentManager._streamConfigs, List.of(), mock(IdealState.class));
+
+    // Null pre-fetched map with a periodic (null) offset criteria -> the defer branch.
+    segmentManager.ensureAllPartitionsConsuming(segmentManager._tableConfig, segmentManager._streamConfigs,
+        segmentManager._idealState, streamMetadataList, null, null);
+
+    // Partition 0's repair was deferred: no new CONSUMING segment created for it.
+    assertFalse(instanceStatesMap.containsKey(
+        new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName()));
+    // Healthy partition 1 still has its original CONSUMING segment, untouched.
+    assertTrue(instanceStatesMap.containsKey(
+        new LLCSegmentName(RAW_TABLE_NAME, 1, 0, CURRENT_TIME_MS).getSegmentName()));
+  }
+
+  /// Phase-2: the smallest-offset stream fetch is only performed when it can be used. On a healthy table (every
+  /// partition has a CONSUMING segment) [PinotLLCRealtimeSegmentManager#preFetchOffsets] returns a null
+  /// smallest-offset map; once a partition loses all CONSUMING replicas it is fetched.
+  @Test
+  public void testPreFetchOffsetsSkipsSmallestOffsetFetchForHealthyTable() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    setUpNewTable(segmentManager, 2, 5, 4);
+
+    PinotLLCRealtimeSegmentManager.PreFetchedOffsets healthy = segmentManager.preFetchOffsets(
+        segmentManager._streamConfigs, REALTIME_TABLE_NAME, segmentManager._idealState, null);
+    assertNull(healthy._partitionIdToSmallestOffset);
+    assertNotNull(healthy._streamMetadataList);
+
+    // Turn all replicas of partition 0's CONSUMING segment OFFLINE - now the smallest offset is needed.
+    turnNewConsumingSegmentOffline(segmentManager._idealState.getRecord().getMapFields(),
+        new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName());
+    PinotLLCRealtimeSegmentManager.PreFetchedOffsets needsRepair = segmentManager.preFetchOffsets(
+        segmentManager._streamConfigs, REALTIME_TABLE_NAME, segmentManager._idealState, null);
+    assertNotNull(needsRepair._partitionIdToSmallestOffset);
+  }
+
+  /// Phase-2: preFetchOffsets temporarily overrides the shared streamConfigs offset criteria; it must restore the
+  /// original even when the stream fetch throws, so subsequent segment creation is not corrupted.
+  @Test
+  public void testPreFetchOffsetsRestoresOffsetCriteriaOnFailure() {
+    // Toggled on only after table setup, so the simulated failure occurs during preFetchOffsets and not during
+    // setUpNewTable (which also builds stream metadata).
+    boolean[] failStreamFetch = {false};
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager() {
+      @Override
+      List<StreamMetadata> getNewStreamMetadataList(List<StreamConfig> streamConfigs,
+          List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, IdealState idealState) {
+        if (failStreamFetch[0]) {
+          throw new RuntimeException("simulated stream failure");
+        }
+        return super.getNewStreamMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState);
+      }
+    };
+    setUpNewTable(segmentManager, 2, 5, 4);
+    OffsetCriteria originalOffsetCriteria = segmentManager._streamConfigs.get(0).getOffsetCriteria();
+    // Guard the test's discriminating power: the reset criteria below must differ from the original, otherwise a
+    // missing restore would be indistinguishable from the mutation.
+    assertNotEquals(originalOffsetCriteria, OffsetCriteria.LARGEST_OFFSET_CRITERIA);
+    failStreamFetch[0] = true;
+
+    // Pass a reset criteria (LARGEST) so preFetchOffsets mutates the shared streamConfigs to LARGEST before the
+    // fetch throws. If the finally-restore were removed, the criteria would remain LARGEST and the assertion below
+    // would fail.
+    try {
+      segmentManager.preFetchOffsets(segmentManager._streamConfigs, REALTIME_TABLE_NAME, segmentManager._idealState,
+          OffsetCriteria.LARGEST_OFFSET_CRITERIA);
+      fail("Expected the simulated stream failure to propagate");
+    } catch (RuntimeException e) {
+      // Expected
+    }
+    assertEquals(segmentManager._streamConfigs.get(0).getOffsetCriteria(), originalOffsetCriteria);
   }
 
   /// Removes the new CONSUMING segment and sets the latest committed (ONLINE) segment to CONSUMING if exists in the
@@ -2494,8 +2625,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     public void ensureAllPartitionsConsuming() {
-      ensureAllPartitionsConsuming(_tableConfig, _streamConfigs, _idealState,
-          getNewStreamMetadataList(_streamConfigs, List.of(), mock(IdealState.class)), null);
+      // Mirror the production flow: pre-fetch offsets (gated) outside the ideal-state update, then pass them into the
+      // package-private repair method.
+      PreFetchedOffsets preFetchedOffsets = preFetchOffsets(_streamConfigs, REALTIME_TABLE_NAME, _idealState, null);
+      ensureAllPartitionsConsuming(_tableConfig, _streamConfigs, _idealState, preFetchedOffsets._streamMetadataList,
+          null, preFetchedOffsets._partitionIdToSmallestOffset);
     }
 
     @Override
