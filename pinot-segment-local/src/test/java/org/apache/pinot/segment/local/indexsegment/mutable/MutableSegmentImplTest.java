@@ -68,9 +68,9 @@ public class MutableSegmentImplTest {
   private static final Set<String> SEGMENT_LEVEL_VIRTUAL_COLUMNS =
       Set.of(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME,
           CommonConstants.Segment.BuiltInVirtualColumn.CREATIONTIME,
-          CommonConstants.Segment.BuiltInVirtualColumn.STARTTIMEMS,
-          CommonConstants.Segment.BuiltInVirtualColumn.ENDTIMEMS,
-          CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTCRC);
+          CommonConstants.Segment.BuiltInVirtualColumn.STARTTIME,
+          CommonConstants.Segment.BuiltInVirtualColumn.ENDTIME,
+          CommonConstants.Segment.BuiltInVirtualColumn.CRC);
 
   private Schema _schema;
   private MutableSegmentImpl _mutableSegmentImpl;
@@ -148,9 +148,9 @@ public class MutableSegmentImplTest {
   @Test
   public void testSegmentMetadataVirtualColumnsOnMutableSegment() {
     for (String column : Set.of(CommonConstants.Segment.BuiltInVirtualColumn.CREATIONTIME,
-        CommonConstants.Segment.BuiltInVirtualColumn.STARTTIMEMS,
-        CommonConstants.Segment.BuiltInVirtualColumn.ENDTIMEMS,
-        CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTCRC)) {
+        CommonConstants.Segment.BuiltInVirtualColumn.STARTTIME,
+        CommonConstants.Segment.BuiltInVirtualColumn.ENDTIME,
+        CommonConstants.Segment.BuiltInVirtualColumn.CRC)) {
       DataSource dataSource = _mutableSegmentImpl.getDataSource(column);
       NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
       Assert.assertNotNull(nullValueVector, "Expecting a null value vector for virtual column: " + column);

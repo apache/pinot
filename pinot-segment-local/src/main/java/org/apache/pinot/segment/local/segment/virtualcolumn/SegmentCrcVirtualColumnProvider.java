@@ -22,10 +22,10 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 
 
-/// Virtual column provider for `$segmentCrc`, the CRC of the segment.
+/// Virtual column provider for `$crc`, the CRC of the segment.
 ///
 /// The CRC is exposed as a STRING to match [SegmentMetadata#getCrc()]. It reads as NULL for
-/// CONSUMING segments, which have no CRC until they are committed. Grouping by `$segmentName` and `$segmentCrc` is a
+/// CONSUMING segments, which have no CRC until they are committed. Grouping by `$segmentName` and `$crc` is a
 /// convenient way to detect replicas of a segment that have diverged.
 public class SegmentCrcVirtualColumnProvider extends BaseSegmentMetadataVirtualColumnProvider {
   /// [SegmentMetadata#getCrc()] renders an unset CRC as the string form of `Long.MIN_VALUE`.

@@ -23,10 +23,10 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.joda.time.Interval;
 
 
-/// Virtual column provider for `$startTimeMs`, the start of the segment time range, in milliseconds since epoch.
+/// Virtual column provider for `$startTime`, the start of the segment time range.
 ///
-/// The value is normalized to milliseconds regardless of the time unit of the segment's time column. It reads as NULL
-/// for segments without a time range, such as CONSUMING segments and segments of tables without a time column.
+/// The value is normalized from the time unit of the segment's time column, and exposed as a TIMESTAMP. It reads as
+/// NULL for segments without a time range, such as CONSUMING segments and segments of tables without a time column.
 public class SegmentStartTimeVirtualColumnProvider extends BaseSegmentMetadataVirtualColumnProvider {
 
   @Nullable

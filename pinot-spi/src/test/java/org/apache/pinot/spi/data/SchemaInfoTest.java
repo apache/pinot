@@ -48,7 +48,7 @@ public class SchemaInfoTest {
     assertEquals(new SchemaInfo(schema).getNumDimensionFields(), 2);
 
     // Adding the built-in virtual columns must not change the reported dimension count
-    BuiltInVirtualColumns.addToSchema(schema);
+    BuiltInVirtualColumnDefinitions.addToSchema(schema);
     assertEquals(schema.getDimensionFieldSpecs().size(),
         2 + CommonConstants.Segment.BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS.size());
     SchemaInfo schemaInfo = new SchemaInfo(schema);

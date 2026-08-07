@@ -20,7 +20,6 @@ package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 
 
 /// This class gives the details of a particular schema and the corresponding column count metrics
@@ -73,7 +72,7 @@ public class SchemaInfo {
     // as built-in virtual columns are added.
     int numDimensionFields = 0;
     for (DimensionFieldSpec fieldSpec : schema.getDimensionFieldSpecs()) {
-      if (!BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS.contains(fieldSpec.getName())) {
+      if (!BuiltInVirtualColumnDefinitions.NAMES.contains(fieldSpec.getName())) {
         numDimensionFields++;
       }
     }

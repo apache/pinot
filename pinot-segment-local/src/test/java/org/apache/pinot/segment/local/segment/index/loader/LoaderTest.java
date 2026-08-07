@@ -229,11 +229,11 @@ public class LoaderTest {
     SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
     assertEquals(indexSegment.getDataSource(BuiltInVirtualColumn.TOTALDOCS).getDictionary().get(0),
         segmentMetadata.getTotalDocs());
-    assertEquals(indexSegment.getDataSource(BuiltInVirtualColumn.SEGMENTCRC).getDictionary().get(0),
+    assertEquals(indexSegment.getDataSource(BuiltInVirtualColumn.CRC).getDictionary().get(0),
         segmentMetadata.getCrc());
     assertEquals(indexSegment.getDataSource(BuiltInVirtualColumn.CREATIONTIME).getDictionary().get(0),
         segmentMetadata.getIndexCreationTime());
-    for (String column : List.of(BuiltInVirtualColumn.TOTALDOCS, BuiltInVirtualColumn.SEGMENTCRC,
+    for (String column : List.of(BuiltInVirtualColumn.TOTALDOCS, BuiltInVirtualColumn.CRC,
         BuiltInVirtualColumn.CREATIONTIME)) {
       assertNull(indexSegment.getDataSource(column).getNullValueVector(),
           "Unexpected null value vector for virtual column: " + column);
@@ -241,9 +241,9 @@ public class LoaderTest {
 
     // This table has no time column, so the segment has no time range and the two time columns read as NULL
     assertNull(segmentMetadata.getTimeInterval());
-    for (String column : List.of(BuiltInVirtualColumn.STARTTIMEMS, BuiltInVirtualColumn.ENDTIMEMS)) {
+    for (String column : List.of(BuiltInVirtualColumn.STARTTIME, BuiltInVirtualColumn.ENDTIME)) {
       DataSource dataSource = indexSegment.getDataSource(column);
-      assertEquals(dataSource.getDictionary().get(0), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
+      assertEquals(dataSource.getDictionary().get(0), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP);
       NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
       assertNotNull(nullValueVector, "Missing null value vector for virtual column: " + column);
       assertEquals(nullValueVector.getNullBitmap().getCardinality(), segmentMetadata.getTotalDocs());

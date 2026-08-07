@@ -304,10 +304,10 @@ public class TableCacheTest {
     expectedColumnMap.put(isCaseInsensitive ? "$segmentname" : "$segmentName", "$segmentName");
     expectedColumnMap.put(isCaseInsensitive ? "$partitionid" : "$partitionId", "$partitionId");
     expectedColumnMap.put(isCaseInsensitive ? "$creationtime" : "$creationTime", "$creationTime");
-    expectedColumnMap.put(isCaseInsensitive ? "$starttimems" : "$startTimeMs", "$startTimeMs");
-    expectedColumnMap.put(isCaseInsensitive ? "$endtimems" : "$endTimeMs", "$endTimeMs");
+    expectedColumnMap.put(isCaseInsensitive ? "$starttime" : "$startTime", "$startTime");
+    expectedColumnMap.put(isCaseInsensitive ? "$endtime" : "$endTime", "$endTime");
     expectedColumnMap.put(isCaseInsensitive ? "$totaldocs" : "$totalDocs", "$totalDocs");
-    expectedColumnMap.put(isCaseInsensitive ? "$segmentcrc" : "$segmentCrc", "$segmentCrc");
+    expectedColumnMap.put("$crc", "$crc");
     return expectedColumnMap;
   }
 
@@ -317,11 +317,11 @@ public class TableCacheTest {
         .addSingleValueDimension(BuiltInVirtualColumn.HOSTNAME, DataType.STRING)
         .addSingleValueDimension(BuiltInVirtualColumn.SEGMENTNAME, DataType.STRING)
         .addMultiValueDimension(BuiltInVirtualColumn.PARTITIONID, DataType.STRING)
-        .addSingleValueDimension(BuiltInVirtualColumn.CREATIONTIME, DataType.LONG)
-        .addSingleValueDimension(BuiltInVirtualColumn.STARTTIMEMS, DataType.LONG)
-        .addSingleValueDimension(BuiltInVirtualColumn.ENDTIMEMS, DataType.LONG)
+        .addSingleValueDimension(BuiltInVirtualColumn.CREATIONTIME, DataType.TIMESTAMP)
+        .addSingleValueDimension(BuiltInVirtualColumn.STARTTIME, DataType.TIMESTAMP)
+        .addSingleValueDimension(BuiltInVirtualColumn.ENDTIME, DataType.TIMESTAMP)
         .addSingleValueDimension(BuiltInVirtualColumn.TOTALDOCS, DataType.INT)
-        .addSingleValueDimension(BuiltInVirtualColumn.SEGMENTCRC, DataType.STRING).build();
+        .addSingleValueDimension(BuiltInVirtualColumn.CRC, DataType.STRING).build();
   }
 
   @DataProvider(name = "testTableCacheDataProvider")
