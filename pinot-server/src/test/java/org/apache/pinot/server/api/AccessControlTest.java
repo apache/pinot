@@ -87,7 +87,7 @@ public class AccessControlTest {
         CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port);
     _adminApiApplication = new AdminApiApplication(serverInstance, new DenyAllAccessFactory(),
         mock(ServerReloadJobStatusCache.class),
-        serverConf);
+        serverConf, () -> true);
 
     int adminApiApplicationPort = getAvailablePort();
     _adminApiApplication.start(List.of(

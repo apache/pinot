@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
 import org.apache.commons.io.FileUtils;
@@ -89,6 +90,7 @@ public abstract class BaseResourceTest {
   protected final Map<String, TableDataManager> _tableDataManagerMap = new HashMap<>();
   protected final List<ImmutableSegment> _realtimeIndexSegments = new ArrayList<>();
   protected final List<ImmutableSegment> _offlineIndexSegments = new ArrayList<>();
+  protected final AtomicBoolean _isServerReadyToServeQueries = new AtomicBoolean(true);
   protected File _avroFile;
   protected AdminApiApplication _adminApiApplication;
   protected WebTarget _webTarget;
@@ -163,7 +165,7 @@ public abstract class BaseResourceTest {
     configureServerConf(serverConf);
     _adminApiApplication = new AdminApiApplication(_serverInstance, new AllowAllAccessFactory(),
         mock(ServerReloadJobStatusCache.class),
-        serverConf);
+        serverConf, _isServerReadyToServeQueries::get);
     _adminApiApplication.start(List.of(
         new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0", CommonConstants.Server.DEFAULT_ADMIN_API_PORT,
             CommonConstants.HTTP_PROTOCOL, new TlsConfig(), HttpServerThreadPoolConfig.defaultInstance())));
