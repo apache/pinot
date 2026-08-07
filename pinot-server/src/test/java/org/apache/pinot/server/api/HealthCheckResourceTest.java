@@ -59,6 +59,15 @@ public class HealthCheckResourceTest extends BaseResourceTest {
         _webTarget.path(healthPath).queryParam("checkType", "readiness").request().get(Response.class).getStatus(),
         200);
 
+    _isServerReadyToServeQueries.set(false);
+    assertEquals(_webTarget.path(livenessPath).request().get(Response.class).getStatus(), 200);
+    assertEquals(_webTarget.path(healthPath).request().get(Response.class).getStatus(), 503);
+    assertEquals(_webTarget.path(readinessPath).request().get(Response.class).getStatus(), 503);
+    assertEquals(
+        _webTarget.path(healthPath).queryParam("checkType", "readiness").request().get(Response.class).getStatus(),
+        503);
+    _isServerReadyToServeQueries.set(true);
+
     ServiceStatus.setServiceStatusCallback(_instanceId, mockFailureCallback);
     assertEquals(_webTarget.path(livenessPath).request().get(Response.class).getStatus(), 200);
     assertEquals(
