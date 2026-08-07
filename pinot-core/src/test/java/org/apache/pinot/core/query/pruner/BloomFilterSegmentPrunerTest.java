@@ -113,6 +113,17 @@ public class BloomFilterSegmentPrunerTest {
         "SELECT COUNT(*) FROM testTable WHERE column IN ('550e8400-e29b-41d4-a716-446655440001')"));
     assertTrue(runPruner(indexSegment,
         "SELECT COUNT(*) FROM testTable WHERE column = '550e8400-e29b-41d4-a716-44665544ffff'"));
+
+    // The bloom filter is keyed on the canonical lowercase dashed rendering, but UuidUtils.toBytes also accepts
+    // uppercase and dashless literals. Those must reach the same key, which is the whole reason the probe goes
+    // literal -> stored bytes -> canonical string rather than hashing the raw literal: hashing the literal directly
+    // would miss here and silently prune a segment that holds the row.
+    assertFalse(runPruner(indexSegment,
+        "SELECT COUNT(*) FROM testTable WHERE column = '550E8400-E29B-41D4-A716-446655440000'"));
+    assertFalse(runPruner(indexSegment,
+        "SELECT COUNT(*) FROM testTable WHERE column = '550e8400e29b41d4a716446655440000'"));
+    assertFalse(runPruner(indexSegment,
+        "SELECT COUNT(*) FROM testTable WHERE column IN ('550E8400E29B41D4A716446655440001')"));
   }
 
   /// The pruner hashes the query literal and looks it up in a bloom filter that was written by

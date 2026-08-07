@@ -253,7 +253,7 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
       /// Deliberately NOT routed through `DataType#toString`: that renders BIG_DECIMAL with
       /// `toPlainString()`, which the creator does not, so every BIG_DECIMAL bloom filter would start missing.
       private String bloomFilterKey() {
-        return _dt == DataType.UUID ? UuidUtils.toString(((ByteArray) _comparableValue).getBytes())
+        return _dt == DataType.UUID ? UuidUtils.toString((ByteArray) _comparableValue)
             : _comparableValue.toString();
       }
     }
