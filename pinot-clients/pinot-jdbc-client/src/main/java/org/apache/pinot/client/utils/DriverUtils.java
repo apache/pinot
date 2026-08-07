@@ -36,6 +36,7 @@ import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.net.URLEncodedUtils;
 import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
@@ -152,6 +153,12 @@ public class DriverUtils {
     if (columnDataType == null) {
       return Types.VARCHAR;
     }
+    if (isArrayDataType(columnDataType)) {
+      return Types.JAVA_OBJECT;
+    }
+    if (ColumnDataType.MAP.name().equals(columnDataType)) {
+      return Types.JAVA_OBJECT;
+    }
     Integer columnsSQLDataType;
     switch (columnDataType) {
       case "STRING":
@@ -192,6 +199,12 @@ public class DriverUtils {
     if (columnDataType == null) {
       return String.class.getTypeName();
     }
+    if (isArrayDataType(columnDataType)) {
+      return List.class.getTypeName();
+    }
+    if (ColumnDataType.MAP.name().equals(columnDataType)) {
+      return Map.class.getTypeName();
+    }
     String columnsJavaClassName;
     switch (columnDataType) {
       case "STRING":
@@ -226,6 +239,14 @@ public class DriverUtils {
         break;
     }
     return columnsJavaClassName;
+  }
+
+  private static boolean isArrayDataType(String columnDataType) {
+    try {
+      return ColumnDataType.valueOf(columnDataType).isArray();
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
   }
 
   public static boolean queryContainsLimitStatement(String query) {
