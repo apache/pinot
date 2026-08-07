@@ -27,6 +27,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -54,6 +55,10 @@ public class HealthCheckResource {
 
   @Inject
   private AtomicBoolean _shutDownInProgress;
+
+  @Inject
+  @Named(AdminApiApplication.SERVER_READY_TO_SERVE_QUERIES)
+  private BooleanSupplier _isServerReadyToServeQueries;
 
   @Inject
   @Named(AdminApiApplication.SERVER_INSTANCE_ID)
@@ -108,6 +113,11 @@ public class HealthCheckResource {
   public String checkReadiness() {
     if (_shutDownInProgress.get()) {
       String errMessage = "Server is shutting down";
+      throw new WebApplicationException(errMessage,
+          Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build());
+    }
+    if (!_isServerReadyToServeQueries.getAsBoolean()) {
+      String errMessage = "Server is not ready to serve queries";
       throw new WebApplicationException(errMessage,
           Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build());
     }
