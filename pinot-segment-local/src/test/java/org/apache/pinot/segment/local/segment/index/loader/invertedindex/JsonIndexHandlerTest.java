@@ -18,10 +18,14 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
+import java.io.File;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -29,6 +33,10 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -40,17 +48,32 @@ import static org.testng.Assert.assertTrue;
 
 /// Unit tests for [JsonIndexHandler].
 ///
-/// Covers:
-/// - needUpdateIndices returns true when a column is dropped from the JSON index config
-/// - updateIndices removes the on-disk index when a column is dropped from config
-/// - needUpdateIndices returns true when a new column is added to the config
-/// - needUpdateIndices returns false when the index is already present and matches config
-/// - needUpdateIndices returns false when column metadata is absent (column not in segment)
+/// Covers two axes:
+/// - Column lifecycle: needUpdateIndices / updateIndices when a column is added, removed, or unchanged.
+/// - Config-change detection: needUpdateIndices triggers a rebuild when any [JsonIndexConfig] field
+///   changes. Legacy segments with no stored config trigger a one-time rebuild to backfill the
+///   stored config and catch any config drift.
 public class JsonIndexHandlerTest {
-  private static final String COLUMN = "details";
+  private static final String COLUMN = "myJsonCol";
 
   /// FieldIndexConfigs that explicitly has no JSON index — used for the "column removed" tests.
   private static final FieldIndexConfigs NO_JSON = new FieldIndexConfigs.Builder().build();
+
+  private File _indexDir;
+
+  @BeforeMethod
+  public void setUp()
+      throws Exception {
+    _indexDir = new File(FileUtils.getTempDirectory(), "json-index-handler-test-" + System.nanoTime());
+    assertTrue(_indexDir.mkdirs());
+  }
+
+  @AfterMethod
+  public void tearDown() {
+    FileUtils.deleteQuietly(_indexDir);
+  }
+
+  // --- Column lifecycle tests (mock-based) ---
 
   @Test
   public void testNeedUpdateReturnsTrueWhenColumnRemovedFromConfig()
@@ -97,7 +120,7 @@ public class JsonIndexHandlerTest {
     SegmentDirectory.Reader reader = mock(SegmentDirectory.Reader.class);
     when(reader.toSegmentDirectory()).thenReturn(segmentDirectory);
 
-    assertTrue(createHandler(segmentDirectory).needUpdateIndices(reader),
+    assertTrue(createHandlerWithDefaultConfig(segmentDirectory).needUpdateIndices(reader),
         "New JSON index expected for column added to config with metadata present");
   }
 
@@ -118,7 +141,7 @@ public class JsonIndexHandlerTest {
     SegmentDirectory.Reader reader = mock(SegmentDirectory.Reader.class);
     when(reader.toSegmentDirectory()).thenReturn(segmentDirectory);
 
-    assertFalse(createHandler(segmentDirectory).needUpdateIndices(reader),
+    assertFalse(createHandlerWithDefaultConfig(segmentDirectory).needUpdateIndices(reader),
         "No update expected when column metadata is absent");
   }
 
@@ -129,11 +152,126 @@ public class JsonIndexHandlerTest {
     SegmentDirectory segmentDirectory = mockSegmentDirectory(COLUMN);
     SegmentDirectory.Reader reader = mockReader(segmentDirectory);
 
-    assertFalse(createHandler(segmentDirectory).needUpdateIndices(reader),
+    assertFalse(createHandlerWithDefaultConfig(segmentDirectory).needUpdateIndices(reader),
         "No update expected when JSON index is present and matches config");
   }
 
-  private static JsonIndexHandler createHandler(SegmentDirectory segmentDirectory) {
+  // --- Config-change detection tests (file-based) ---
+
+  @Test
+  public void testNeedUpdateReturnsFalseWhenConfigUnchanged()
+      throws Exception {
+    JsonIndexConfig config = new JsonIndexConfig();
+    storeConfig(COLUMN, config);
+
+    JsonIndexHandler handler = createHandler(COLUMN, config);
+    SegmentDirectory.Reader reader = mockReaderWithIndexOn(COLUMN);
+
+    assertFalse(handler.needUpdateIndices(reader),
+        "No rebuild expected when stored config equals current config");
+  }
+
+  @Test
+  public void testNeedUpdateReturnsTrueWhenConfigChanged()
+      throws Exception {
+    // Store a default config (maxLevels = -1)
+    JsonIndexConfig storedConfig = new JsonIndexConfig();
+    storeConfig(COLUMN, storedConfig);
+
+    // Current config has maxLevels = 3
+    JsonIndexConfig currentConfig = new JsonIndexConfig();
+    currentConfig.setMaxLevels(3);
+
+    JsonIndexHandler handler = createHandler(COLUMN, currentConfig);
+    SegmentDirectory.Reader reader = mockReaderWithIndexOn(COLUMN);
+
+    assertTrue(handler.needUpdateIndices(reader),
+        "Rebuild expected when maxLevels changed from default to 3");
+  }
+
+  @Test
+  public void testNeedUpdateReturnsTrueWhenExcludeArrayChanges()
+      throws Exception {
+    JsonIndexConfig storedConfig = new JsonIndexConfig();
+    storeConfig(COLUMN, storedConfig);
+
+    JsonIndexConfig currentConfig = new JsonIndexConfig();
+    currentConfig.setExcludeArray(true);
+
+    JsonIndexHandler handler = createHandler(COLUMN, currentConfig);
+    SegmentDirectory.Reader reader = mockReaderWithIndexOn(COLUMN);
+
+    assertTrue(handler.needUpdateIndices(reader),
+        "Rebuild expected when excludeArray changed from false to true");
+  }
+
+  @Test
+  public void testNeedUpdateReturnsTrueWhenMaxBytesSizeChanges()
+      throws Exception {
+    JsonIndexConfig storedConfig = new JsonIndexConfig();
+    storeConfig(COLUMN, storedConfig);
+
+    JsonIndexConfig currentConfig = new JsonIndexConfig();
+    currentConfig.setMaxBytesSize(1024L);
+
+    JsonIndexHandler handler = createHandler(COLUMN, currentConfig);
+    SegmentDirectory.Reader reader = mockReaderWithIndexOn(COLUMN);
+
+    assertTrue(handler.needUpdateIndices(reader),
+        "Rebuild expected when maxBytesSize changed");
+  }
+
+  @Test
+  public void testNeedUpdateReturnsTrueWhenNoStoredConfigAndForwardIndexAvailable()
+      throws Exception {
+    // No stored config — index was built before config persistence was added (legacy segment).
+    // Forward index is present, so a one-time backfill rebuild is safe and expected.
+    createEmptyMetadataFile();
+
+    JsonIndexConfig currentConfig = new JsonIndexConfig();
+    JsonIndexHandler handler = createHandler(COLUMN, currentConfig);
+    SegmentDirectory.Reader reader = mockReaderWithIndexOn(COLUMN, /* hasForwardIndex= */ true);
+
+    assertTrue(handler.needUpdateIndices(reader),
+        "Rebuild expected for legacy segments with no stored config when forward index is available");
+  }
+
+  @Test
+  public void testNeedUpdateReturnsFalseWhenNoStoredConfigButForwardIndexAbsent()
+      throws Exception {
+    // No stored config (legacy segment) AND no forward index (forwardIndexDisabled=true with no
+    // dictionary/inverted pair). createForwardIndexIfNeeded() would fail in this case, so the
+    // existing JSON index must be preserved without triggering a rebuild.
+    createEmptyMetadataFile();
+
+    JsonIndexConfig currentConfig = new JsonIndexConfig();
+    JsonIndexHandler handler = createHandler(COLUMN, currentConfig);
+    SegmentDirectory.Reader reader = mockReaderWithIndexOn(COLUMN, /* hasForwardIndex= */ false,
+        /* hasDictionary= */ false, /* hasInverted= */ false);
+
+    assertFalse(handler.needUpdateIndices(reader),
+        "No rebuild expected for legacy segments when forward index is absent (forwardIndexDisabled)");
+  }
+
+  @Test
+  public void testNeedUpdateReturnsTrueWhenNoStoredConfigAndForwardIndexReconstructable()
+      throws Exception {
+    // No stored config (legacy segment) AND forward index is absent but can be reconstructed from
+    // dictionary + inverted index. The rebuild is safe and should be triggered for backfill.
+    createEmptyMetadataFile();
+
+    JsonIndexConfig currentConfig = new JsonIndexConfig();
+    JsonIndexHandler handler = createHandler(COLUMN, currentConfig);
+    SegmentDirectory.Reader reader = mockReaderWithIndexOn(COLUMN, /* hasForwardIndex= */ false,
+        /* hasDictionary= */ true, /* hasInverted= */ true);
+
+    assertTrue(handler.needUpdateIndices(reader),
+        "Rebuild expected when forward index is reconstructable via dictionary + inverted index");
+  }
+
+  // --- helpers (mock-based) ---
+
+  private static JsonIndexHandler createHandlerWithDefaultConfig(SegmentDirectory segmentDirectory) {
     FieldIndexConfigs fieldIndexConfigs =
         new FieldIndexConfigs.Builder().add(StandardIndexes.json(), new JsonIndexConfig()).build();
     return new JsonIndexHandler(segmentDirectory, Map.of(COLUMN, fieldIndexConfigs),
@@ -155,6 +293,63 @@ public class JsonIndexHandlerTest {
   private static SegmentDirectory.Reader mockReader(SegmentDirectory segmentDirectory) {
     SegmentDirectory.Reader reader = mock(SegmentDirectory.Reader.class);
     when(reader.toSegmentDirectory()).thenReturn(segmentDirectory);
+    return reader;
+  }
+
+  // --- helpers (file-based) ---
+
+  private void storeConfig(String columnName, JsonIndexConfig config)
+      throws Exception {
+    File metadataFile = new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
+    PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(metadataFile);
+    String key = V1Constants.MetadataKeys.Column.getKeyFor(columnName, "jsonIndexConfig");
+    String serialized = JsonUtils.objectToString(config);
+    String escaped = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(serialized);
+    properties.setProperty(key, escaped);
+    CommonsConfigurationUtils.saveToFile(properties, metadataFile);
+  }
+
+  private void createEmptyMetadataFile()
+      throws Exception {
+    File metadataFile = new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
+    PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(metadataFile);
+    CommonsConfigurationUtils.saveToFile(properties, metadataFile);
+  }
+
+  private JsonIndexHandler createHandler(String columnName, JsonIndexConfig config) {
+    FieldIndexConfigs fieldIndexConfigs =
+        new FieldIndexConfigs.Builder().add(StandardIndexes.json(), config).build();
+    SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
+    when(segmentMetadata.getName()).thenReturn("testSegment");
+    when(segmentMetadata.getIndexDir()).thenReturn(_indexDir);
+    when(segmentMetadata.getTotalDocs()).thenReturn(1);
+    when(segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Set.of(columnName)));
+    SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
+    when(segmentDirectory.getSegmentMetadata()).thenReturn(segmentMetadata);
+    when(segmentDirectory.getColumnsWithIndex(StandardIndexes.json())).thenReturn(Set.of(columnName));
+    return new JsonIndexHandler(segmentDirectory, Map.of(columnName, fieldIndexConfigs),
+        mock(TableConfig.class), mock(Schema.class));
+  }
+
+  private SegmentDirectory.Reader mockReaderWithIndexOn(String columnName) {
+    return mockReaderWithIndexOn(columnName, /* hasForwardIndex= */ true, /* hasDictionary= */ false,
+        /* hasInverted= */ false);
+  }
+
+  private SegmentDirectory.Reader mockReaderWithIndexOn(String columnName, boolean hasForwardIndex) {
+    return mockReaderWithIndexOn(columnName, hasForwardIndex, /* hasDictionary= */ false,
+        /* hasInverted= */ false);
+  }
+
+  private SegmentDirectory.Reader mockReaderWithIndexOn(String columnName, boolean hasForwardIndex,
+      boolean hasDictionary, boolean hasInverted) {
+    SegmentDirectory segDir = mock(SegmentDirectory.class);
+    when(segDir.getColumnsWithIndex(StandardIndexes.json())).thenReturn(Set.of(columnName));
+    SegmentDirectory.Reader reader = mock(SegmentDirectory.Reader.class);
+    when(reader.toSegmentDirectory()).thenReturn(segDir);
+    when(reader.hasIndexFor(columnName, StandardIndexes.forward())).thenReturn(hasForwardIndex);
+    when(reader.hasIndexFor(columnName, StandardIndexes.dictionary())).thenReturn(hasDictionary);
+    when(reader.hasIndexFor(columnName, StandardIndexes.inverted())).thenReturn(hasInverted);
     return reader;
   }
 }
