@@ -25,6 +25,7 @@ import com.google.common.hash.Funnels;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -38,11 +39,14 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -93,6 +97,100 @@ public class BloomFilterSegmentPrunerTest {
     assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21.0 OR column = 30.0"));
     // 30 out the bloom filter with AND
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21.0 AND column = 30.0"));
+  }
+
+  @Test
+  public void testUuidBloomFilterPruning()
+      throws IOException {
+    IndexSegment indexSegment = mockIndexSegment(new String[]{
+        "550e8400-e29b-41d4-a716-446655440000",
+        "550e8400-e29b-41d4-a716-446655440001"
+    }, DataType.UUID);
+
+    assertFalse(runPruner(indexSegment,
+        "SELECT COUNT(*) FROM testTable WHERE column = '550e8400-e29b-41d4-a716-446655440000'"));
+    assertFalse(runPruner(indexSegment,
+        "SELECT COUNT(*) FROM testTable WHERE column IN ('550e8400-e29b-41d4-a716-446655440001')"));
+    assertTrue(runPruner(indexSegment,
+        "SELECT COUNT(*) FROM testTable WHERE column = '550e8400-e29b-41d4-a716-44665544ffff'"));
+  }
+
+  /// The pruner hashes the query literal and looks it up in a bloom filter that was written by
+  /// [BloomFilterCreator]. If the two sides render the same value differently, the lookup misses, the segment is
+  /// pruned, and matching rows silently disappear. This builds the filter through the real creator so any divergence
+  /// shows up as a wrongly-pruned segment.
+  ///
+  /// BIG_DECIMAL is the sharp case: `BigDecimal.toString()` yields `1.0E-7` while
+  /// `toPlainString()` yields `0.00000010`, so rendering the reader side via
+  /// `FieldSpec.DataType#toString` would break every BIG_DECIMAL bloom filter.
+  @Test(dataProvider = "bloomFilterRoundTripValues")
+  public void testBloomFilterRoundTripsThroughCreatorRendering(DataType dataType, Object indexedValue,
+      String queryLiteral)
+      throws IOException {
+    IndexSegment indexSegment = mockIndexSegmentIndexedViaCreator(dataType, indexedValue);
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = " + queryLiteral),
+        dataType + " literal " + queryLiteral + " was pruned despite being present in the bloom filter");
+  }
+
+  @DataProvider(name = "bloomFilterRoundTripValues")
+  public Object[][] bloomFilterRoundTripValues() {
+    byte[] uuidBytes = UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440000");
+    return new Object[][]{
+        {DataType.INT, 42, "42"},
+        {DataType.LONG, 42L, "42"},
+        {DataType.DOUBLE, 21.0d, "21.0"},
+        // Scientific notation is the case that breaks if the reader renders via toPlainString().
+        {DataType.BIG_DECIMAL, new BigDecimal("1.0E-7"), "1.0E-7"},
+        // NOTE: a BIG_DECIMAL literal carrying trailing zeros (e.g. 123.4500) is still wrongly pruned, because the
+        // query literal loses them before it reaches the pruner while the indexed value keeps its scale. That is a
+        // pre-existing gap on master, independent of the rendering fixed here, so it is deliberately not asserted.
+
+        {DataType.STRING, "hello", "'hello'"},
+        {DataType.BYTES, new byte[]{0x0a, 0x1b, 0x2c}, "'0a1b2c'"},
+        {DataType.UUID, uuidBytes, "'550e8400-e29b-41d4-a716-446655440000'"}
+    };
+  }
+
+  private IndexSegment mockIndexSegmentIndexedViaCreator(DataType dataType, Object indexedValue)
+      throws IOException {
+    IndexSegment indexSegment = mock(IndexSegment.class);
+    when(indexSegment.getColumnNames()).thenReturn(ImmutableSet.of("column"));
+    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
+    when(segmentMetadata.getTotalDocs()).thenReturn(20);
+    when(indexSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
+
+    DataSource dataSource = mock(DataSource.class);
+    when(indexSegment.getDataSourceNullable("column")).thenReturn(dataSource);
+    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
+    when(dataSourceMetadata.getDataType()).thenReturn(dataType);
+    when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
+
+    // Route the value through BloomFilterCreator's own default add(Object, int) so the writer-side rendering under
+    // test is the production one, not a copy of it.
+    BloomFilterReaderBuilder builder = new BloomFilterReaderBuilder();
+    BloomFilterCreator creator = new BloomFilterCreator() {
+      @Override
+      public DataType getDataType() {
+        return dataType;
+      }
+
+      @Override
+      public void add(String value) {
+        builder.put(value);
+      }
+
+      @Override
+      public void seal() {
+      }
+
+      @Override
+      public void close() {
+      }
+    };
+    creator.add(indexedValue, -1);
+    when(dataSource.getBloomFilter()).thenReturn(builder.build());
+
+    return indexSegment;
   }
 
   @Test(expectedExceptions = RuntimeException.class)
@@ -161,6 +259,11 @@ public class BloomFilterSegmentPrunerTest {
 
   private IndexSegment mockIndexSegment(String[] values)
       throws IOException {
+    return mockIndexSegment(values, DataType.DOUBLE);
+  }
+
+  private IndexSegment mockIndexSegment(String[] values, DataType dataType)
+      throws IOException {
     IndexSegment indexSegment = mock(IndexSegment.class);
     when(indexSegment.getColumnNames()).thenReturn(ImmutableSet.of("column"));
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
@@ -175,7 +278,7 @@ public class BloomFilterSegmentPrunerTest {
     for (String v : values) {
       builder.put(v);
     }
-    when(dataSourceMetadata.getDataType()).thenReturn(DataType.DOUBLE);
+    when(dataSourceMetadata.getDataType()).thenReturn(dataType);
     when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
     when(dataSource.getBloomFilter()).thenReturn(builder.build());
 

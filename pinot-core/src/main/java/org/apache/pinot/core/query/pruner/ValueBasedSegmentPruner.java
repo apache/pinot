@@ -37,7 +37,9 @@ import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /// The `ValueBasedSegmentPruner` prunes segments based on values inside the filter and segment metadata and data.
@@ -230,14 +232,29 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
       }
 
       public boolean mightBeContained(BloomFilterReader bloomFilter) {
+        // The rendering and hashing below run once per (value, data type): the resulting hashes are memoized and
+        // every subsequent segment in the query reuses them. Deliberately not precomputed in ensureDataType, so a
+        // query that only reaches min/max pruning never pays for it.
         if (!_hashed) {
           GuavaBloomFilterReaderUtils.Hash128AsLongs hash128AsLongs =
-              GuavaBloomFilterReaderUtils.hashAsLongs(_comparableValue.toString());
+              GuavaBloomFilterReaderUtils.hashAsLongs(bloomFilterKey());
           _hash1 = hash128AsLongs.getHash1();
           _hash2 = hash128AsLongs.getHash2();
           _hashed = true;
         }
         return bloomFilter.mightContain(_hash1, _hash2);
+      }
+
+      /// Renders the value exactly as `BloomFilterCreator#add(Object, int)` did when the index was built. If the
+      /// two disagree the lookup silently misses and the segment is wrongly pruned, dropping matching rows with no
+      /// error. That creator special-cases UUID to the canonical string and renders everything else with
+      /// `value.toString()` -- which for BYTES is already hex via [ByteArray].
+      ///
+      /// Deliberately NOT routed through `DataType#toString`: that renders BIG_DECIMAL with
+      /// `toPlainString()`, which the creator does not, so every BIG_DECIMAL bloom filter would start missing.
+      private String bloomFilterKey() {
+        return _dt == DataType.UUID ? UuidUtils.toString(((ByteArray) _comparableValue).getBytes())
+            : _comparableValue.toString();
       }
     }
   }
