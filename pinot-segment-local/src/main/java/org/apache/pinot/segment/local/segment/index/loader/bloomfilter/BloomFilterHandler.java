@@ -287,9 +287,9 @@ public class BloomFilterHandler extends BaseIndexHandler {
 
   private Dictionary getDictionaryReader(ColumnMetadata columnMetadata, SegmentDirectory.Writer segmentWriter)
       throws IOException {
-    DataType dataType = columnMetadata.getDataType().getStoredType();
+    DataType storedType = columnMetadata.getDataType().getStoredType();
 
-    switch (dataType) {
+    switch (storedType) {
       case INT:
       case LONG:
       case FLOAT:
@@ -300,7 +300,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
         return DictionaryIndexType.read(buf, columnMetadata, DictionaryIndexConfig.DEFAULT);
       default:
         throw new IllegalStateException(
-            "Unsupported data type: " + dataType + " for column: " + columnMetadata.getColumnName());
+            "Unsupported data type: " + storedType + " for column: " + columnMetadata.getColumnName());
     }
   }
 }
