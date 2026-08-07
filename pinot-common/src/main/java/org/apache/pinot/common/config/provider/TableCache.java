@@ -31,7 +31,7 @@ import org.apache.pinot.spi.config.provider.SchemaChangeListener;
 import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.BuiltInVirtualColumns;
+import org.apache.pinot.spi.data.BuiltInVirtualColumnDefinitions;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
@@ -117,7 +117,7 @@ public interface TableCache extends PinotConfigProvider {
   /// Adds the built-in virtual columns to the schema.
   /// NOTE: The virtual column provider class is not added.
   default void addBuiltInVirtualColumns(Schema schema) {
-    BuiltInVirtualColumns.addToSchema(schema);
+    BuiltInVirtualColumnDefinitions.addToSchema(schema);
   }
 
   static Map<Expression, Expression> createExpressionOverrideMap(String physicalOrLogicalTableName,

@@ -19,6 +19,8 @@
 package org.apache.pinot.spi.data;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 
@@ -34,8 +36,12 @@ import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 ///
 /// If the two sides disagreed on a data type or on single-value vs multi-value, the broker would declare one type
 /// while the server produced another. Both sides therefore build their field specs from [#DEFINITIONS].
-public class BuiltInVirtualColumns {
-  private BuiltInVirtualColumns() {
+///
+/// The column *names* additionally live in [BuiltInVirtualColumn], which is where code that only needs to recognize a
+/// built-in virtual column by name looks them up. [#NAMES] exposes the names derived from [#DEFINITIONS] so the two
+/// can be asserted equal in a test.
+public class BuiltInVirtualColumnDefinitions {
+  private BuiltInVirtualColumnDefinitions() {
   }
 
   /// Shape of a single built-in virtual column. The provider class is intentionally not part of this definition: it
@@ -43,12 +49,12 @@ public class BuiltInVirtualColumns {
   public static class Definition {
     private final String _name;
     private final DataType _dataType;
-    private final boolean _singleValue;
+    private final boolean _singleValueField;
 
-    private Definition(String name, DataType dataType, boolean singleValue) {
+    private Definition(String name, DataType dataType, boolean singleValueField) {
       _name = name;
       _dataType = dataType;
-      _singleValue = singleValue;
+      _singleValueField = singleValueField;
     }
 
     public String getName() {
@@ -59,14 +65,17 @@ public class BuiltInVirtualColumns {
       return _dataType;
     }
 
-    public boolean isSingleValue() {
-      return _singleValue;
+    public boolean isSingleValueField() {
+      return _singleValueField;
     }
 
-    /// Creates the field spec for this column without a virtual column provider. Callers that can resolve a provider
-    /// should set it on the returned spec.
+    /// Creates a new field spec for this column, without a virtual column provider. Callers that can resolve a
+    /// provider should set it on the returned spec.
+    ///
+    /// NOTE: Returns a fresh instance on every call. Field specs are mutable and are stored by reference in the
+    /// schema they are added to, so they must never be shared across schemas.
     public DimensionFieldSpec createFieldSpec() {
-      return new DimensionFieldSpec(_name, _dataType, _singleValue);
+      return new DimensionFieldSpec(_name, _dataType, _singleValueField);
     }
   }
 
@@ -75,11 +84,15 @@ public class BuiltInVirtualColumns {
       new Definition(BuiltInVirtualColumn.HOSTNAME, DataType.STRING, true),
       new Definition(BuiltInVirtualColumn.SEGMENTNAME, DataType.STRING, true),
       new Definition(BuiltInVirtualColumn.PARTITIONID, DataType.STRING, false),
-      new Definition(BuiltInVirtualColumn.CREATIONTIME, DataType.LONG, true),
-      new Definition(BuiltInVirtualColumn.STARTTIMEMS, DataType.LONG, true),
-      new Definition(BuiltInVirtualColumn.ENDTIMEMS, DataType.LONG, true),
+      new Definition(BuiltInVirtualColumn.CREATIONTIME, DataType.TIMESTAMP, true),
+      new Definition(BuiltInVirtualColumn.STARTTIME, DataType.TIMESTAMP, true),
+      new Definition(BuiltInVirtualColumn.ENDTIME, DataType.TIMESTAMP, true),
       new Definition(BuiltInVirtualColumn.TOTALDOCS, DataType.INT, true),
-      new Definition(BuiltInVirtualColumn.SEGMENTCRC, DataType.STRING, true));
+      new Definition(BuiltInVirtualColumn.CRC, DataType.STRING, true));
+
+  /// Names of all the built-in virtual columns, derived from [#DEFINITIONS].
+  public static final Set<String> NAMES =
+      DEFINITIONS.stream().map(Definition::getName).collect(Collectors.toUnmodifiableSet());
 
   /// Adds the built-in virtual columns to the given schema, without a virtual column provider.
   ///

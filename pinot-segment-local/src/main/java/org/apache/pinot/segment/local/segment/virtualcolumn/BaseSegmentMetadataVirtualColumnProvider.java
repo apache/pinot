@@ -19,8 +19,8 @@
 package org.apache.pinot.segment.local.segment.virtualcolumn;
 
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.local.segment.index.column.DefaultNullValueVirtualColumnProvider;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -29,25 +29,41 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 /// Base class for the built-in virtual columns that expose a piece of the segment metadata (creation time, time range,
 /// CRC, etc.) as a constant single-value column.
 ///
-/// The value is read from [SegmentMetadata] every time the column is built rather than baked into the field spec, so
-/// that mutable segments - which rebuild their virtual data sources on every access - always observe the current
-/// metadata.
+/// The value is read from [SegmentMetadata] when the column is built rather than baked into the field spec, so that a
+/// mutable segment - which rebuilds its virtual data sources on every access - picks up metadata that was not yet
+/// available when the segment was created. Within a single build the value is resolved exactly once (see
+/// [BaseConstantValueVirtualColumnProvider#buildColumnIndexContainer]), so the dictionary and the null value vector
+/// can never disagree about whether the column has a value.
 ///
 /// When the metadata is not available at all, or the specific piece of metadata is not set (e.g. the time range of a
 /// CONSUMING segment), the column stores the default null value of its data type *and* reports every document as null,
 /// so that the placeholder is not mistaken for a real value once null handling is enabled.
-public abstract class BaseSegmentMetadataVirtualColumnProvider extends DefaultNullValueVirtualColumnProvider {
+public abstract class BaseSegmentMetadataVirtualColumnProvider extends BaseConstantValueVirtualColumnProvider {
 
   @Override
   protected Object getValue(VirtualColumnContext context) {
-    Object value = extractValueOrNull(context);
-    return value != null ? value : super.getValue(context);
+    return valueOrPlaceholder(context, extractValueOrNull(context));
   }
 
   @Nullable
   @Override
   public NullValueVectorReader buildNullValueVector(VirtualColumnContext context) {
-    return extractValueOrNull(context) != null ? null : new AllNullValueVector(context.getTotalDocCount());
+    return extractValueOrNull(context) == null ? new AllNullValueVector(context.getTotalDocCount()) : null;
+  }
+
+  @Override
+  public ColumnIndexContainer buildColumnIndexContainer(VirtualColumnContext context) {
+    // Resolve the metadata exactly once, so the dictionary and the null value vector cannot disagree about whether
+    // this column has a value - they are derived from the same read even if the metadata changes underneath.
+    Object extracted = extractValueOrNull(context);
+    return buildColumnIndexContainer(context, valueOrPlaceholder(context, extracted),
+        extracted == null ? new AllNullValueVector(context.getTotalDocCount()) : null);
+  }
+
+  /// Falls back to the column's default null value, which is only ever a placeholder: whenever it is used, the column
+  /// also reports every document as null.
+  private static Object valueOrPlaceholder(VirtualColumnContext context, @Nullable Object extracted) {
+    return extracted != null ? extracted : context.getFieldSpec().getDefaultNullValue();
   }
 
   @Nullable
@@ -60,16 +76,14 @@ public abstract class BaseSegmentMetadataVirtualColumnProvider extends DefaultNu
   @Nullable
   protected abstract Object extractValue(SegmentMetadata segmentMetadata);
 
-  /// [NullValueVectorReader] where every document is null.
+  /// [NullValueVectorReader] where every document is null. The bitmap is built lazily because null value vectors are
+  /// only consulted when null handling is enabled, while the vector itself is created on every data source build.
   private static class AllNullValueVector implements NullValueVectorReader {
-    private final ImmutableRoaringBitmap _nullBitmap;
+    private final int _numDocs;
+    private volatile ImmutableRoaringBitmap _nullBitmap;
 
     AllNullValueVector(int numDocs) {
-      MutableRoaringBitmap nullBitmap = new MutableRoaringBitmap();
-      if (numDocs > 0) {
-        nullBitmap.add(0L, numDocs);
-      }
-      _nullBitmap = nullBitmap.toImmutableRoaringBitmap();
+      _numDocs = numDocs;
     }
 
     @Override
@@ -79,7 +93,15 @@ public abstract class BaseSegmentMetadataVirtualColumnProvider extends DefaultNu
 
     @Override
     public ImmutableRoaringBitmap getNullBitmap() {
-      return _nullBitmap;
+      ImmutableRoaringBitmap nullBitmap = _nullBitmap;
+      if (nullBitmap == null) {
+        // Benign race: concurrent callers may each build an equivalent bitmap, and publication is safe because the
+        // field is volatile and MutableRoaringBitmap#toImmutableRoaringBitmap returns a fully constructed value.
+        nullBitmap = _numDocs > 0 ? MutableRoaringBitmap.bitmapOfRange(0, _numDocs).toImmutableRoaringBitmap()
+            : new MutableRoaringBitmap().toImmutableRoaringBitmap();
+        _nullBitmap = nullBitmap;
+      }
+      return nullBitmap;
     }
   }
 }

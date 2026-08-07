@@ -2454,22 +2454,24 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
-    String query = "SELECT $creationTime, $startTimeMs, $endTimeMs, $totalDocs, $segmentCrc FROM mytable LIMIT 10";
+    String query = "SELECT $creationTime, $startTime, $endTime, $totalDocs, $crc FROM mytable LIMIT 10";
     JsonNode response = postQuery(query);
     JsonNode resultTable = response.get("resultTable");
     JsonNode dataSchema = resultTable.get("dataSchema");
     assertEquals(dataSchema.get("columnNames").toString(),
-        "[\"$creationTime\",\"$startTimeMs\",\"$endTimeMs\",\"$totalDocs\",\"$segmentCrc\"]");
-    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"LONG\",\"LONG\",\"LONG\",\"INT\",\"STRING\"]");
+        "[\"$creationTime\",\"$startTime\",\"$endTime\",\"$totalDocs\",\"$crc\"]");
+    // The three time columns are TIMESTAMP, so they render as formatted timestamps rather than raw millis
+    assertEquals(dataSchema.get("columnDataTypes").toString(),
+        "[\"TIMESTAMP\",\"TIMESTAMP\",\"TIMESTAMP\",\"INT\",\"STRING\"]");
     JsonNode rows = resultTable.get("rows");
     assertEquals(rows.size(), 10);
     for (int i = 0; i < 10; i++) {
       JsonNode row = rows.get(i);
-      long creationTime = row.get(0).asLong();
-      assertTrue(creationTime > 0, "Unexpected segment creation time: " + creationTime);
-      long startTime = row.get(1).asLong();
-      long endTime = row.get(2).asLong();
-      assertTrue(startTime > 0, "Unexpected segment start time: " + startTime);
+      long creationTime = Timestamp.valueOf(row.get(0).asText()).getTime();
+      assertTrue(creationTime > 0, "Unexpected segment creation time: " + row.get(0).asText());
+      long startTime = Timestamp.valueOf(row.get(1).asText()).getTime();
+      long endTime = Timestamp.valueOf(row.get(2).asText()).getTime();
+      assertTrue(startTime > 0, "Unexpected segment start time: " + row.get(1).asText());
       assertTrue(startTime <= endTime, "Segment start time: " + startTime + " is after end time: " + endTime);
       assertTrue(row.get(3).asInt() > 0, "Unexpected total docs: " + row.get(3).asInt());
       // A real CRC, not the default null value the column falls back to when the metadata is unavailable
@@ -2488,28 +2490,37 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
     assertEquals(totalDocs, getCountStarResult());
 
-    // $startTimeMs/$endTimeMs are normalized to milliseconds regardless of the time column's unit. mytable's time
-    // column is DaysSinceEpoch in DAYS, so the values must be the day boundaries expressed in millis - this is what
+    // $startTime/$endTime are normalized from the time column's own unit. mytable's time column is DaysSinceEpoch in
+    // DAYS, so each segment's values must be its own day boundaries expressed as timestamps - this is what
     // distinguishes a correct implementation from one leaking the raw DAYS value.
-    query = "SELECT MIN($startTimeMs), MAX($endTimeMs), MIN(DaysSinceEpoch), MAX(DaysSinceEpoch) FROM mytable";
-    JsonNode row = postQuery(query).get("resultTable").get("rows").get(0);
+    query = "SELECT $segmentName, $startTime, $endTime, MIN(DaysSinceEpoch), MAX(DaysSinceEpoch) FROM mytable "
+        + "GROUP BY $segmentName, $startTime, $endTime LIMIT 10000";
+    rows = postQuery(query).get("resultTable").get("rows");
+    assertFalse(rows.isEmpty());
     long daysToMillis = TimeUnit.DAYS.toMillis(1);
-    assertEquals(row.get(0).asLong(), row.get(2).asLong() * daysToMillis);
-    assertEquals(row.get(1).asLong(), row.get(3).asLong() * daysToMillis);
+    for (JsonNode row : rows) {
+      assertEquals(Timestamp.valueOf(row.get(1).asText()).getTime(), row.get(3).asLong() * daysToMillis,
+          "Unexpected $startTime for segment: " + row.get(0).asText());
+      assertEquals(Timestamp.valueOf(row.get(2).asText()).getTime(), row.get(4).asLong() * daysToMillis,
+          "Unexpected $endTime for segment: " + row.get(0).asText());
+    }
 
-    // Filters on the segment metadata columns must actually prune, not match everything or nothing
-    assertEquals(postQuery("SELECT COUNT(*) FROM mytable WHERE $creationTime > 0").get("resultTable").get("rows").get(0)
-        .get(0).asLong(), getCountStarResult());
-    assertEquals(postQuery("SELECT COUNT(*) FROM mytable WHERE $creationTime < 0").get("resultTable").get("rows").get(0)
-        .get(0).asLong(), 0);
-
-    // Filtering on a single segment's CRC must return exactly that segment's documents
-    query = "SELECT $segmentCrc, MAX($totalDocs) FROM mytable GROUP BY $segmentCrc LIMIT 10000";
+    // Filtering on a single segment's CRC must return exactly the documents grouped under that CRC
+    query = "SELECT $crc, COUNT(*) FROM mytable GROUP BY $crc LIMIT 10000";
     JsonNode crcRow = postQuery(query).get("resultTable").get("rows").get(0);
     String segmentCrc = crcRow.get(0).asText();
-    long docsInSegment = crcRow.get(1).asLong();
-    assertEquals(postQuery("SELECT COUNT(*) FROM mytable WHERE $segmentCrc = '" + segmentCrc + "'").get("resultTable")
-        .get("rows").get(0).get(0).asLong(), docsInSegment);
+    long docsForCrc = crcRow.get(1).asLong();
+    assertEquals(postQuery("SELECT COUNT(*) FROM mytable WHERE $crc = '" + segmentCrc + "'").get("resultTable")
+        .get("rows").get(0).get(0).asLong(), docsForCrc);
+
+    // With null handling on, the engine must consult the null value vector. Every segment of this table has a time
+    // range, a CRC and a creation time, so none of these columns may report a null.
+    for (String column : List.of("$creationTime", "$startTime", "$endTime", "$totalDocs", "$crc")) {
+      assertEquals(postQuery("SET enableNullHandling=true; SELECT COUNT(*) FROM mytable WHERE " + column
+          + " IS NOT NULL").get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult(), column);
+      assertEquals(postQuery("SET enableNullHandling=true; SELECT COUNT(*) FROM mytable WHERE " + column
+          + " IS NULL").get("resultTable").get("rows").get(0).get(0).asLong(), 0, column);
+    }
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -3644,7 +3655,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "    LogicalProject(count=[$1], name=[$0])\n"
         + "      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])\n"
         + "        PinotLogicalExchange(distribution=[hash[0]])\n"
-        + "          PinotLogicalAggregate(group=[{18}], agg#0=[COUNT()], aggType=[LEAF])\n"
+        + "          PinotLogicalAggregate(group=[{23}], agg#0=[COUNT()], aggType=[LEAF])\n"
         + "            PinotLogicalTableScan(table=[[default, mytable]])\n");
     assertEquals(response1Json.get("rows").get(0).get(2).asText(), "Rule Execution Times\n"
         + "Rule: SortRemove -> Time:*\n"
@@ -3933,22 +3944,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode starColumnResponse = JsonUtils.objectToJsonNode(
         getOrCreateAdminClient().getTableClient().getAggregateMetadata(
             TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "*"));
-    validateMetadataResponse(starColumnResponse, 83, 10);
+    validateMetadataResponse(starColumnResponse, 88, 10);
 
     JsonNode starEncodedColumnResponse = JsonUtils.objectToJsonNode(
         getOrCreateAdminClient().getTableClient().getAggregateMetadata(
             TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "*"));
-    validateMetadataResponse(starEncodedColumnResponse, 83, 10);
+    validateMetadataResponse(starEncodedColumnResponse, 88, 10);
 
     JsonNode starWithExtraColumnResponse = JsonUtils.objectToJsonNode(
         getOrCreateAdminClient().getTableClient().getAggregateMetadata(
             TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "CRSElapsedTime,*,OriginStateName"));
-    validateMetadataResponse(starWithExtraColumnResponse, 83, 10);
+    validateMetadataResponse(starWithExtraColumnResponse, 88, 10);
 
     JsonNode starWithExtraEncodedColumnResponse = JsonUtils.objectToJsonNode(
         getOrCreateAdminClient().getTableClient().getAggregateMetadata(
             TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "CRSElapsedTime,*,OriginStateName"));
-    validateMetadataResponse(starWithExtraEncodedColumnResponse, 83, 10);
+    validateMetadataResponse(starWithExtraEncodedColumnResponse, 88, 10);
   }
 
   private void validateMetadataResponse(JsonNode response, int numTotalColumn, int numMVColumn) {

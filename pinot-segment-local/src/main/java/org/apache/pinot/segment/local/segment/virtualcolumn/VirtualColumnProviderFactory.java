@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.segment.local.segment.virtualcolumn;
 
+import com.google.common.base.Preconditions;
+import java.util.Map;
 import org.apache.pinot.segment.local.segment.index.column.DefaultNullValueVirtualColumnProvider;
-import org.apache.pinot.spi.data.BuiltInVirtualColumns;
+import org.apache.pinot.spi.data.BuiltInVirtualColumnDefinitions;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -29,6 +31,26 @@ import org.apache.pinot.spi.utils.NetUtils;
 
 /// Factory for virtual column providers.
 public class VirtualColumnProviderFactory {
+  /// Provider for each built-in virtual column. Its key set is asserted against
+  /// [BuiltInVirtualColumnDefinitions#DEFINITIONS] below, so a column added there without a provider here fails at
+  /// class load rather than aborting every segment load on every server.
+  private static final Map<String, Class<? extends VirtualColumnProvider>> PROVIDER_CLASSES =
+      Map.of(BuiltInVirtualColumn.DOCID, DocIdVirtualColumnProvider.class,
+          BuiltInVirtualColumn.HOSTNAME, DefaultNullValueVirtualColumnProvider.class,
+          BuiltInVirtualColumn.SEGMENTNAME, DefaultNullValueVirtualColumnProvider.class,
+          BuiltInVirtualColumn.PARTITIONID, PartitionIdVirtualColumnProvider.class,
+          BuiltInVirtualColumn.CREATIONTIME, SegmentCreationTimeVirtualColumnProvider.class,
+          BuiltInVirtualColumn.STARTTIME, SegmentStartTimeVirtualColumnProvider.class,
+          BuiltInVirtualColumn.ENDTIME, SegmentEndTimeVirtualColumnProvider.class,
+          BuiltInVirtualColumn.TOTALDOCS, SegmentTotalDocsVirtualColumnProvider.class,
+          BuiltInVirtualColumn.CRC, SegmentCrcVirtualColumnProvider.class);
+
+  static {
+    Preconditions.checkState(PROVIDER_CLASSES.keySet().equals(BuiltInVirtualColumnDefinitions.NAMES),
+        "Virtual column providers: %s do not cover the built-in virtual columns: %s", PROVIDER_CLASSES.keySet(),
+        BuiltInVirtualColumnDefinitions.NAMES);
+  }
+
   private VirtualColumnProviderFactory() {
   }
 
@@ -45,11 +67,12 @@ public class VirtualColumnProviderFactory {
   /// values.
   ///
   /// The shape of each column (name, data type, single-value vs multi-value) comes from
-  /// [BuiltInVirtualColumns#DEFINITIONS], which the broker side uses as well, so the two can never disagree on a type.
+  /// [BuiltInVirtualColumnDefinitions#DEFINITIONS], which the broker side uses as well, so the two can never
+  /// disagree on a type.
   /// This method only layers on the provider class, and the constant value for the columns whose value is already
   /// known here.
   public static void addBuiltInVirtualColumnsToSegmentSchema(Schema schema, String segmentName) {
-    for (BuiltInVirtualColumns.Definition definition : BuiltInVirtualColumns.DEFINITIONS) {
+    for (BuiltInVirtualColumnDefinitions.Definition definition : BuiltInVirtualColumnDefinitions.DEFINITIONS) {
       String column = definition.getName();
       if (schema.hasColumn(column)) {
         continue;
@@ -68,26 +91,9 @@ public class VirtualColumnProviderFactory {
   }
 
   private static Class<? extends VirtualColumnProvider> getProviderClass(String column) {
-    switch (column) {
-      case BuiltInVirtualColumn.DOCID:
-        return DocIdVirtualColumnProvider.class;
-      case BuiltInVirtualColumn.HOSTNAME:
-      case BuiltInVirtualColumn.SEGMENTNAME:
-        return DefaultNullValueVirtualColumnProvider.class;
-      case BuiltInVirtualColumn.PARTITIONID:
-        return PartitionIdVirtualColumnProvider.class;
-      case BuiltInVirtualColumn.CREATIONTIME:
-        return SegmentCreationTimeVirtualColumnProvider.class;
-      case BuiltInVirtualColumn.STARTTIMEMS:
-        return SegmentStartTimeVirtualColumnProvider.class;
-      case BuiltInVirtualColumn.ENDTIMEMS:
-        return SegmentEndTimeVirtualColumnProvider.class;
-      case BuiltInVirtualColumn.TOTALDOCS:
-        return SegmentTotalDocsVirtualColumnProvider.class;
-      case BuiltInVirtualColumn.SEGMENTCRC:
-        return SegmentCrcVirtualColumnProvider.class;
-      default:
-        throw new IllegalStateException("No virtual column provider registered for built-in column: " + column);
-    }
+    Class<? extends VirtualColumnProvider> providerClass = PROVIDER_CLASSES.get(column);
+    Preconditions.checkState(providerClass != null, "No virtual column provider registered for built-in column: %s",
+        column);
+    return providerClass;
   }
 }

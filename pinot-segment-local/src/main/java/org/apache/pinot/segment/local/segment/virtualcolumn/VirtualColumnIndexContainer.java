@@ -82,5 +82,8 @@ public class VirtualColumnIndexContainer implements ColumnIndexContainer {
     if (_dictionary != null) {
       _dictionary.close();
     }
+    if (_nullValueVector != null) {
+      _nullValueVector.close();
+    }
   }
 }

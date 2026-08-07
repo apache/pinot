@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.virtualcolumn;
 
-import org.apache.pinot.segment.local.segment.index.column.DefaultNullValueVirtualColumnProvider;
 
 
 /// Virtual column provider for `$totalDocs`, the number of documents in the segment.
@@ -28,7 +27,7 @@ import org.apache.pinot.segment.local.segment.index.column.DefaultNullValueVirtu
 ///
 /// This is the number of documents physically stored in the segment, so for an upsert table it also includes the
 /// documents that have been replaced and are no longer returned by queries.
-public class SegmentTotalDocsVirtualColumnProvider extends DefaultNullValueVirtualColumnProvider {
+public class SegmentTotalDocsVirtualColumnProvider extends BaseConstantValueVirtualColumnProvider {
 
   @Override
   protected Object getValue(VirtualColumnContext context) {

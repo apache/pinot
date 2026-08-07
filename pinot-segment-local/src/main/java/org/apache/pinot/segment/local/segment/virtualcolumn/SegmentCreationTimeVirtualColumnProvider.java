@@ -22,7 +22,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 
 
-/// Virtual column provider for `$creationTime`, the time the segment was created, in milliseconds since epoch.
+/// Virtual column provider for `$creationTime`, the time the segment was created.
 ///
 /// For a CONSUMING segment this is the time the consuming segment was created, not the time it was committed.
 public class SegmentCreationTimeVirtualColumnProvider extends BaseSegmentMetadataVirtualColumnProvider {

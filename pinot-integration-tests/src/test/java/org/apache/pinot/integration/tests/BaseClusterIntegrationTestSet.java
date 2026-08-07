@@ -22,6 +22,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -71,6 +72,7 @@ import org.testng.annotations.BeforeMethod;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
@@ -466,12 +468,51 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     getPinotConnection().execute(
         "select $docId, $segmentName, $hostName, $partitionId from mytable where $docId > 19998 limit 50");
 
-    // Segment metadata virtual columns
-    getPinotConnection().execute(
-        "select $creationTime, $startTimeMs, $endTimeMs, $totalDocs, $segmentCrc from mytable limit 50");
-    getPinotConnection().execute("select $segmentName, $segmentCrc, $totalDocs from mytable "
-        + "group by $segmentName, $segmentCrc, $totalDocs limit 1000");
-    getPinotConnection().execute("select count(*) from mytable where $creationTime > 0");
+    // Segment metadata virtual columns. This method is the only place they are exercised against a table that can
+    // have CONSUMING segments, so assert the results rather than just checking that nothing throws.
+    long numTotalDocs = getCountStarResult();
+
+    // $totalDocs is the number of documents stored in the segment. On a hybrid table the broker's time boundary can
+    // hide some of them, so a segment's $totalDocs is at least the number of rows the query sees from it, never less.
+    ResultSet perSegment = getPinotConnection().execute(
+            "select $segmentName, $crc, max($totalDocs), count(*) from mytable group by $segmentName, $crc limit 10000")
+        .getResultSet(0);
+    assertTrue(perSegment.getRowCount() > 0);
+    long visibleRows = 0;
+    for (int i = 0; i < perSegment.getRowCount(); i++) {
+      String segmentName = perSegment.getString(i, 0);
+      // MAX()/COUNT() render as floating point values in the single-stage engine, so read them as doubles in both
+      long totalDocsInSegment = (long) Double.parseDouble(perSegment.getString(i, 2));
+      long rowsFromSegment = (long) Double.parseDouble(perSegment.getString(i, 3));
+      assertTrue(totalDocsInSegment > 0, "Unexpected $totalDocs: " + totalDocsInSegment + " for: " + segmentName);
+      assertTrue(totalDocsInSegment >= rowsFromSegment,
+          "$totalDocs: " + totalDocsInSegment + " is below the " + rowsFromSegment + " rows returned by: "
+              + segmentName);
+      visibleRows += rowsFromSegment;
+
+      // A committed segment has a numeric CRC; a CONSUMING segment has none yet and reads as the default null value.
+      // Neither may be the unset sentinel that SegmentMetadata renders internally.
+      String crc = perSegment.getString(i, 1);
+      assertNotEquals(crc, String.valueOf(Long.MIN_VALUE), "Leaked unset CRC for segment: " + segmentName);
+      assertTrue(crc.matches("-?\\d+") || crc.equals(FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING),
+          "Unexpected $crc: " + crc + " for segment: " + segmentName);
+    }
+    assertEquals(visibleRows, numTotalDocs, "Grouping by $segmentName should cover every row exactly once");
+
+    // Every segment - CONSUMING included - is created with a creation time, so none of them falls back to the epoch
+    // placeholder used when the metadata is unavailable
+    ResultSet creationTimes = getPinotConnection()
+        .execute("select $segmentName, $creationTime from mytable group by $segmentName, $creationTime limit 10000")
+        .getResultSet(0);
+    assertTrue(creationTimes.getRowCount() > 0);
+    for (int i = 0; i < creationTimes.getRowCount(); i++) {
+      String creationTime = creationTimes.getString(i, 1);
+      assertTrue(Timestamp.valueOf(creationTime).getTime() > 0,
+          "Unexpected $creationTime: " + creationTime + " for segment: " + creationTimes.getString(i, 0));
+    }
+
+    // Selecting them must not fail on any segment type
+    getPinotConnection().execute("select $creationTime, $startTime, $endTime, $totalDocs, $crc from mytable limit 50");
   }
 
   /// Test queries from the query file.

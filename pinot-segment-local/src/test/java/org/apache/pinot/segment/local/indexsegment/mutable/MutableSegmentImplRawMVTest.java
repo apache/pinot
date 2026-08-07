@@ -72,9 +72,9 @@ public class MutableSegmentImplRawMVTest implements PinotBuffersAfterClassCheckR
   private static final Set<String> SEGMENT_LEVEL_VIRTUAL_COLUMNS =
       Set.of(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME,
           CommonConstants.Segment.BuiltInVirtualColumn.CREATIONTIME,
-          CommonConstants.Segment.BuiltInVirtualColumn.STARTTIMEMS,
-          CommonConstants.Segment.BuiltInVirtualColumn.ENDTIMEMS,
-          CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTCRC);
+          CommonConstants.Segment.BuiltInVirtualColumn.STARTTIME,
+          CommonConstants.Segment.BuiltInVirtualColumn.ENDTIME,
+          CommonConstants.Segment.BuiltInVirtualColumn.CRC);
 
   private Schema _schema;
   private MutableSegmentImpl _mutableSegmentImpl;

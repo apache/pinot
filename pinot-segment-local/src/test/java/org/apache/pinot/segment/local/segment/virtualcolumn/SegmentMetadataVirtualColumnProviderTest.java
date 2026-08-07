@@ -39,10 +39,11 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
-/// Tests for the built-in virtual columns exposing segment metadata (`$creationTime`, `$startTimeMs`, `$endTimeMs`,
-/// `$totalDocs` and `$segmentCrc`).
+/// Tests for the built-in virtual columns exposing segment metadata (`$creationTime`, `$startTime`, `$endTime`,
+/// `$totalDocs` and `$crc`).
 public class SegmentMetadataVirtualColumnProviderTest {
   private static final int NUM_DOCS = 17;
   private static final long CREATION_TIME_MS = 1_700_000_000_000L;
@@ -131,13 +132,16 @@ public class SegmentMetadataVirtualColumnProviderTest {
   @Test
   public void testSegmentMetadataColumnTypes() {
     Schema schema = buildSegmentSchema();
-    assertEquals(schema.getFieldSpecFor(BuiltInVirtualColumn.CREATIONTIME).getDataType(), FieldSpec.DataType.LONG);
-    assertEquals(schema.getFieldSpecFor(BuiltInVirtualColumn.STARTTIMEMS).getDataType(), FieldSpec.DataType.LONG);
-    assertEquals(schema.getFieldSpecFor(BuiltInVirtualColumn.ENDTIMEMS).getDataType(), FieldSpec.DataType.LONG);
+    assertEquals(schema.getFieldSpecFor(BuiltInVirtualColumn.CREATIONTIME).getDataType(),
+        FieldSpec.DataType.TIMESTAMP);
+    assertEquals(schema.getFieldSpecFor(BuiltInVirtualColumn.STARTTIME).getDataType(),
+        FieldSpec.DataType.TIMESTAMP);
+    assertEquals(schema.getFieldSpecFor(BuiltInVirtualColumn.ENDTIME).getDataType(),
+        FieldSpec.DataType.TIMESTAMP);
     assertEquals(schema.getFieldSpecFor(BuiltInVirtualColumn.TOTALDOCS).getDataType(), FieldSpec.DataType.INT);
-    assertEquals(schema.getFieldSpecFor(BuiltInVirtualColumn.SEGMENTCRC).getDataType(), FieldSpec.DataType.STRING);
-    for (String column : List.of(BuiltInVirtualColumn.CREATIONTIME, BuiltInVirtualColumn.STARTTIMEMS,
-        BuiltInVirtualColumn.ENDTIMEMS, BuiltInVirtualColumn.TOTALDOCS, BuiltInVirtualColumn.SEGMENTCRC)) {
+    assertEquals(schema.getFieldSpecFor(BuiltInVirtualColumn.CRC).getDataType(), FieldSpec.DataType.STRING);
+    for (String column : List.of(BuiltInVirtualColumn.CREATIONTIME, BuiltInVirtualColumn.STARTTIME,
+        BuiltInVirtualColumn.ENDTIME, BuiltInVirtualColumn.TOTALDOCS, BuiltInVirtualColumn.CRC)) {
       assertTrue(schema.getFieldSpecFor(column).isSingleValueField(), column + " should be single-value");
     }
   }
@@ -149,11 +153,11 @@ public class SegmentMetadataVirtualColumnProviderTest {
 
     assertEquals(buildDictionary(schema, BuiltInVirtualColumn.CREATIONTIME, segmentMetadata).getLongValue(0),
         CREATION_TIME_MS);
-    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.STARTTIMEMS, segmentMetadata).getLongValue(0),
+    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.STARTTIME, segmentMetadata).getLongValue(0),
         START_TIME_MS);
-    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.ENDTIMEMS, segmentMetadata).getLongValue(0), END_TIME_MS);
+    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.ENDTIME, segmentMetadata).getLongValue(0), END_TIME_MS);
     assertEquals(buildDictionary(schema, BuiltInVirtualColumn.TOTALDOCS, segmentMetadata).getIntValue(0), NUM_DOCS);
-    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.SEGMENTCRC, segmentMetadata).getStringValue(0), CRC);
+    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.CRC, segmentMetadata).getStringValue(0), CRC);
   }
 
   @Test
@@ -170,13 +174,13 @@ public class SegmentMetadataVirtualColumnProviderTest {
     assertEquals(creationTimeMetadata.getMinValue(), CREATION_TIME_MS);
     assertEquals(creationTimeMetadata.getMaxValue(), CREATION_TIME_MS);
 
-    ColumnMetadata crcMetadata = buildColumnMetadata(schema, BuiltInVirtualColumn.SEGMENTCRC, segmentMetadata);
+    ColumnMetadata crcMetadata = buildColumnMetadata(schema, BuiltInVirtualColumn.CRC, segmentMetadata);
     assertEquals(crcMetadata.getMinValue(), CRC);
     assertEquals(crcMetadata.getMaxValue(), CRC);
 
     // When the metadata is available the column carries a real value, so there is no null vector
-    for (String column : List.of(BuiltInVirtualColumn.CREATIONTIME, BuiltInVirtualColumn.STARTTIMEMS,
-        BuiltInVirtualColumn.ENDTIMEMS, BuiltInVirtualColumn.TOTALDOCS, BuiltInVirtualColumn.SEGMENTCRC)) {
+    for (String column : List.of(BuiltInVirtualColumn.CREATIONTIME, BuiltInVirtualColumn.STARTTIME,
+        BuiltInVirtualColumn.ENDTIME, BuiltInVirtualColumn.TOTALDOCS, BuiltInVirtualColumn.CRC)) {
       assertNull(buildNullValueVector(schema, column, segmentMetadata), column + " should not be null");
     }
   }
@@ -190,22 +194,46 @@ public class SegmentMetadataVirtualColumnProviderTest {
     SegmentMetadata segmentMetadata = consumingSegmentMetadata(unsetCreationTime);
 
     assertEquals(buildDictionary(schema, BuiltInVirtualColumn.CREATIONTIME, segmentMetadata).getLongValue(0),
-        (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
-    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.STARTTIMEMS, segmentMetadata).getLongValue(0),
-        (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
-    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.ENDTIMEMS, segmentMetadata).getLongValue(0),
-        (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
-    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.SEGMENTCRC, segmentMetadata).getStringValue(0),
+        (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP);
+    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.STARTTIME, segmentMetadata).getLongValue(0),
+        (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP);
+    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.ENDTIME, segmentMetadata).getLongValue(0),
+        (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP);
+    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.CRC, segmentMetadata).getStringValue(0),
         FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
     // The stored value is only a placeholder: the column must additionally report every document as null
     assertColumnIsNull(schema, BuiltInVirtualColumn.CREATIONTIME, segmentMetadata);
-    assertColumnIsNull(schema, BuiltInVirtualColumn.STARTTIMEMS, segmentMetadata);
-    assertColumnIsNull(schema, BuiltInVirtualColumn.ENDTIMEMS, segmentMetadata);
-    assertColumnIsNull(schema, BuiltInVirtualColumn.SEGMENTCRC, segmentMetadata);
+    assertColumnIsNull(schema, BuiltInVirtualColumn.STARTTIME, segmentMetadata);
+    assertColumnIsNull(schema, BuiltInVirtualColumn.ENDTIME, segmentMetadata);
+    assertColumnIsNull(schema, BuiltInVirtualColumn.CRC, segmentMetadata);
 
     // $totalDocs comes from the context, so it is always available and never null
     assertEquals(buildDictionary(schema, BuiltInVirtualColumn.TOTALDOCS, segmentMetadata).getIntValue(0), NUM_DOCS);
     assertNull(buildNullValueVector(schema, BuiltInVirtualColumn.TOTALDOCS, segmentMetadata));
+  }
+
+  /// The type check exists so that a provider returning the wrong box type names the column and the provider instead
+  /// of throwing a bare ClassCastException from deep inside segment loading.
+  @Test
+  public void testWrongValueTypeIsRejectedWithADiagnosticMessage() {
+    FieldSpec fieldSpec = buildSegmentSchema().getFieldSpecFor(BuiltInVirtualColumn.CREATIONTIME);
+    VirtualColumnContext context = new VirtualColumnContext(fieldSpec, NUM_DOCS, mockSegmentMetadata());
+    // A LONG-stored column handed an Integer
+    BaseConstantValueVirtualColumnProvider provider = new BaseConstantValueVirtualColumnProvider() {
+      @Override
+      protected Object getValue(VirtualColumnContext ctx) {
+        return 1;
+      }
+    };
+    try {
+      provider.buildDictionary(context);
+      fail("Expecting an IllegalStateException for a wrongly typed virtual column value");
+    } catch (IllegalStateException e) {
+      String message = e.getMessage();
+      assertTrue(message.contains(BuiltInVirtualColumn.CREATIONTIME), message);
+      assertTrue(message.contains("java.lang.Integer"), message);
+      assertTrue(message.contains("java.lang.Long"), message);
+    }
   }
 
   /// The segment metadata is not always available (e.g. when the virtual column is built for a column that is missing
@@ -215,18 +243,18 @@ public class SegmentMetadataVirtualColumnProviderTest {
     Schema schema = buildSegmentSchema();
 
     assertEquals(buildDictionary(schema, BuiltInVirtualColumn.CREATIONTIME, null).getLongValue(0),
-        (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
-    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.STARTTIMEMS, null).getLongValue(0),
-        (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
-    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.ENDTIMEMS, null).getLongValue(0),
-        (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
-    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.SEGMENTCRC, null).getStringValue(0),
+        (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP);
+    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.STARTTIME, null).getLongValue(0),
+        (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP);
+    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.ENDTIME, null).getLongValue(0),
+        (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP);
+    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.CRC, null).getStringValue(0),
         FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
     assertEquals(buildDictionary(schema, BuiltInVirtualColumn.TOTALDOCS, null).getIntValue(0), NUM_DOCS);
 
     assertColumnIsNull(schema, BuiltInVirtualColumn.CREATIONTIME, null);
-    assertColumnIsNull(schema, BuiltInVirtualColumn.STARTTIMEMS, null);
-    assertColumnIsNull(schema, BuiltInVirtualColumn.ENDTIMEMS, null);
-    assertColumnIsNull(schema, BuiltInVirtualColumn.SEGMENTCRC, null);
+    assertColumnIsNull(schema, BuiltInVirtualColumn.STARTTIME, null);
+    assertColumnIsNull(schema, BuiltInVirtualColumn.ENDTIME, null);
+    assertColumnIsNull(schema, BuiltInVirtualColumn.CRC, null);
   }
 }
