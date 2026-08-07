@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.minion.tasks;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.text.SimpleDateFormat;
@@ -540,22 +539,30 @@ public class MinionTaskUtils {
   /// data CRC (a checksum over only the forward index and dictionary, so index/metadata-only changes don't affect
   /// it) when both copies report one (`>= 0`). A negative data CRC means "not reported". Mirrors the logic of
   /// `BaseTableDataManager.hasSameCRC` and is used by both the generator's pre-scheduling check and the executor's
-  /// per-server check.
-  @VisibleForTesting
-  static boolean crcMatches(long segmentCrc, long dataCrc, long otherSegmentCrc, long otherDataCrc) {
+  /// per-server / deepstore checks.
+  public static boolean crcMatches(long segmentCrc, long dataCrc, long otherSegmentCrc, long otherDataCrc) {
     if (segmentCrc == otherSegmentCrc) {
       return true;
     }
     return dataCrc >= 0 && otherDataCrc >= 0 && dataCrc == otherDataCrc;
   }
 
-  /// Parses a CRC string, returning `-1` ("unavailable") when it is null or unparseable.
-  private static long parseCrc(@Nullable String crc) {
+  /// String overload of {@link #crcMatches(long, long, long, long)}; null/unparseable CRC values are treated as
+  /// unavailable (`-1`).
+  public static boolean crcMatches(@Nullable String segmentCrc, @Nullable String dataCrc,
+      @Nullable String otherSegmentCrc, @Nullable String otherDataCrc) {
+    return crcMatches(parseCrc(segmentCrc), parseCrc(dataCrc), parseCrc(otherSegmentCrc), parseCrc(otherDataCrc));
+  }
+
+  /// Parses a CRC string, returning `-1` ("unavailable") when it is null or unparseable. Values that parse but are
+  /// negative (e.g. {@link Long#MIN_VALUE} from absent on-disk data CRC) are also treated as unavailable.
+  public static long parseCrc(@Nullable String crc) {
     if (crc == null) {
       return -1;
     }
     try {
-      return Long.parseLong(crc);
+      long parsed = Long.parseLong(crc);
+      return parsed >= 0 ? parsed : -1;
     } catch (NumberFormatException e) {
       return -1;
     }
