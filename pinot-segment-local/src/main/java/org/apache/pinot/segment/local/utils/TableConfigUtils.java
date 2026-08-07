@@ -1049,6 +1049,13 @@ public final class TableConfigUtils {
           segmentPartitionConfig != null && MapUtils.isNotEmpty(segmentPartitionConfig.getColumnPartitionMap()),
           "Offline upsert table must have segment partition config to ensure correct partition-based "
               + "segment assignment. Configure segmentPartitionConfig in the indexingConfig.");
+      // A comparison column is required, same as realtime upsert. It resolves to the configured comparison columns, or
+      // the table's time column when comparison columns are not set. Unlike realtime, offline tables do not require a
+      // time column, so reject the case where neither is configured (no implicit segment creation time fallback).
+      Preconditions.checkState(
+          CollectionUtils.isNotEmpty(upsertConfig.getComparisonColumns())
+              || tableConfig.getValidationConfig().getTimeColumnName() != null,
+          "Offline upsert table must have a comparison column or a time column configured");
     }
 
     if (upsertEnabled) {
