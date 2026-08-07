@@ -154,4 +154,5 @@ public class ProtoBufMessageDecoderTest {
     assertEquals(((Map<String, Object>) destination.getValue("sample_record")).get("name"), "Alice");
     assertEquals(((Map<String, Object>) destination.getValue("sample_record")).get("id"), 18);
   }
+
 }
