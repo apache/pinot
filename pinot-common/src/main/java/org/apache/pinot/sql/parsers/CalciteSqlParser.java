@@ -131,9 +131,14 @@ public class CalciteSqlParser {
       SqlNodeList sqlNodeList = sqlParser.parseSqlStmtList();
       // Extract OPTION statements from sql.
       SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
-      // add legacy OPTIONS keyword-based options
+      // Legacy OPTION(...) keys: validate for DQL only. DML (e.g. INSERT INTO FILE OPTION(taskName=...))
+      // intentionally carries free-form task/FS properties, same as DML SET.
       if (!options.isEmpty()) {
-        sqlNodeAndOptions.setExtraOptions(extractOptionsMap(options));
+        Map<String, String> optionMap = extractOptionsMap(options);
+        Map<String, String> resolvedLegacyOptions = sqlNodeAndOptions.getSqlType() == PinotSqlType.DQL
+            ? QueryOptionsUtils.resolveAndValidateSqlQueryOptions(optionMap)
+            : QueryOptionsUtils.resolveCaseInsensitiveOptions(optionMap);
+        sqlNodeAndOptions.setExtraOptions(resolvedLegacyOptions);
       }
       sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parseStartTimeNs);
       return sqlNodeAndOptions;
@@ -191,7 +196,12 @@ public class CalciteSqlParser {
     if (sqlType == null) {
       throw new SqlCompilationException("SqlNode with executable statement not found!");
     }
-    return new SqlNodeAndOptions(statementNode, sqlType, QueryOptionsUtils.resolveCaseInsensitiveOptions(options));
+    // Validate unknown SET options for DQL only. DML (e.g. INSERT INTO FILE) intentionally carries
+    // free-form task/FS properties via SET, and REST/JSON queryOptions use a separate non-validating path.
+    Map<String, String> resolvedOptions = sqlType == PinotSqlType.DQL
+        ? QueryOptionsUtils.resolveAndValidateSqlQueryOptions(options)
+        : QueryOptionsUtils.resolveCaseInsensitiveOptions(options);
+    return new SqlNodeAndOptions(statementNode, sqlType, resolvedOptions);
   }
 
   public static PinotQuery compileToPinotQuery(String sql)

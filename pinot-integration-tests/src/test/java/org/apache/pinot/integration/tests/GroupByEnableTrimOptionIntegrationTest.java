@@ -199,8 +199,9 @@ public class GroupByEnableTrimOptionIntegrationTest extends BaseClusterIntegrati
   public void assertResultAndPlan(String option, String query, String expectedResult, String expectedPlan)
       throws Exception {
     String sql = option
-        //disable timeout in debug
-        + "set timeoutMs=3600000; set brokerReadTimeoutMs=3600000; set brokerConnectTimeoutMs=3600000; "
+        // Query option timeout only — brokerRead/ConnectTimeoutMs are client transport props
+        // (set via getPinotConnectionProperties), not SQL query options.
+        + "set timeoutMs=3600000; "
         + query;
 
     JsonNode result = postV2Query(sql);
