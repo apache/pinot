@@ -28,6 +28,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
+import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.mockito.Mock;
@@ -291,6 +292,39 @@ public class MultiClusterRoutingManagerTest {
     when(querySource.getTableName()).thenReturn(tableName);
     when(brokerRequest.getQuerySource()).thenReturn(querySource);
     return brokerRequest;
+  }
+
+  @Test
+  public void testGetTablePartitionInfoReturnsTheSingleClusterThatHasIt() {
+    TablePartitionReplicatedServersInfo partitionInfo = mock(TablePartitionReplicatedServersInfo.class);
+    when(_localClusterRoutingManager.getTablePartitionReplicatedServersInfo(TEST_TABLE)).thenReturn(null);
+    when(_remoteClusterRoutingManager1.getTablePartitionReplicatedServersInfo(TEST_TABLE)).thenReturn(partitionInfo);
+    when(_remoteClusterRoutingManager2.getTablePartitionReplicatedServersInfo(TEST_TABLE)).thenReturn(null);
+
+    assertEquals(_multiClusterRoutingManager.getTablePartitionReplicatedServersInfo(TEST_TABLE), partitionInfo);
+  }
+
+  /// A partial view would make a partition served only by another cluster look empty, so nothing is reported at all.
+  @Test
+  public void testGetTablePartitionInfoReturnsNullWhenSeveralClustersHaveIt() {
+    when(_localClusterRoutingManager.getTablePartitionReplicatedServersInfo(TEST_TABLE))
+        .thenReturn(mock(TablePartitionReplicatedServersInfo.class));
+    when(_remoteClusterRoutingManager1.getTablePartitionReplicatedServersInfo(TEST_TABLE))
+        .thenReturn(mock(TablePartitionReplicatedServersInfo.class));
+    when(_remoteClusterRoutingManager2.getTablePartitionReplicatedServersInfo(TEST_TABLE)).thenReturn(null);
+
+    assertNull(_multiClusterRoutingManager.getTablePartitionReplicatedServersInfo(TEST_TABLE));
+  }
+
+  @Test
+  public void testGetTablePartitionInfoIgnoresAFailingRemoteCluster() {
+    TablePartitionReplicatedServersInfo partitionInfo = mock(TablePartitionReplicatedServersInfo.class);
+    when(_localClusterRoutingManager.getTablePartitionReplicatedServersInfo(TEST_TABLE)).thenReturn(partitionInfo);
+    when(_remoteClusterRoutingManager1.getTablePartitionReplicatedServersInfo(TEST_TABLE))
+        .thenThrow(new RuntimeException("remote cluster is down"));
+    when(_remoteClusterRoutingManager2.getTablePartitionReplicatedServersInfo(TEST_TABLE)).thenReturn(null);
+
+    assertEquals(_multiClusterRoutingManager.getTablePartitionReplicatedServersInfo(TEST_TABLE), partitionInfo);
   }
 
   private RoutingTable createRoutingTable(String serverName, List<String> segments) {
