@@ -35,6 +35,7 @@ import org.apache.pinot.core.query.scheduler.resources.BinaryWorkloadResourceMan
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +73,7 @@ public class BinaryWorkloadScheduler extends QueryScheduler {
     super(config, instanceId, queryExecutor, threadAccountant, latestQueryTime,
         new BinaryWorkloadResourceManager(config));
 
-    _secondaryQueryQ = new SecondaryWorkloadQueue(config, _resourceManager);
+    _secondaryQueryQ = new SecondaryWorkloadQueue(config, _resourceManager, this::onQueryExpired);
     _numSecondaryRunners = config.getProperty(MAX_SECONDARY_QUERIES, DEFAULT_MAX_SECONDARY_QUERIES);
     LOGGER.info("numSecondaryRunners={}", _numSecondaryRunners);
     _secondaryRunnerSemaphore = new Semaphore(_numSecondaryRunners);
@@ -146,6 +147,9 @@ public class BinaryWorkloadScheduler extends QueryScheduler {
           try {
             SchedulerQueryContext request = _secondaryQueryQ.take();
             if (request == null) {
+              // mirrors query completion callback functionality.
+              _secondaryRunnerSemaphore.release();
+              checkStopResourceManager();
               continue;
             }
             ServerQueryRequest queryRequest = request.getQueryRequest();
@@ -157,6 +161,7 @@ public class BinaryWorkloadScheduler extends QueryScheduler {
               public void run() {
                 executorService.releaseWorkers();
                 schedulerGroup.endQuery();
+                _secondaryQueryQ.signalWorkersReleased();
                 _secondaryRunnerSemaphore.release();
                 checkStopResourceManager();
               }
@@ -209,8 +214,25 @@ public class BinaryWorkloadScheduler extends QueryScheduler {
   synchronized private void failAllPendingQueries() {
     List<SchedulerQueryContext> pending = _secondaryQueryQ.drain();
     for (SchedulerQueryContext queryContext : pending) {
-      ListenableFuture<byte[]> serverShuttingDown = shuttingDown(queryContext.getQueryRequest());
-      queryContext.setResultFuture(serverShuttingDown);
+      try {
+        ListenableFuture<byte[]> serverShuttingDown = shuttingDown(queryContext.getQueryRequest());
+        queryContext.setResultFuture(serverShuttingDown);
+      } catch (Throwable t) {
+        LOGGER.error("Failed to fail pending query: {} on shutdown", queryContext.getQueryRequest().getRequestId(), t);
+        // Last resort, so one bad query does not leave the remaining ones without a response.
+        // No-op if the handler already completed the future.
+        queryContext.getResultFuture().setException(t);
+      }
     }
+  }
+
+  private void onQueryExpired(SchedulerQueryContext queryContext) {
+    ServerQueryRequest queryRequest = queryContext.getQueryRequest();
+    long waitMs = System.currentTimeMillis() - queryRequest.getTimerContext().getQueryArrivalTimeMs();
+    LOGGER.warn("Dropping secondary query: {} for table: {} after waiting: {}ms in the queue",
+        queryRequest.getRequestId(), queryRequest.getTableNameWithType(), waitMs);
+    _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS,
+        1L);
+    queryContext.setResultFuture(immediateErrorResponse(queryRequest, QueryErrorCode.QUERY_SCHEDULING_TIMEOUT));
   }
 }

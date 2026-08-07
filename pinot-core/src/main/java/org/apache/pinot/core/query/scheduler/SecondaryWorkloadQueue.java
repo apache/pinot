@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.fcfs.FCFSSchedulerGroup;
@@ -58,10 +59,13 @@ public class SecondaryWorkloadQueue {
   private final Condition _queryReaderCondition = _queueLock.newCondition();
   private final ResourceManager _resourceManager;
   private final int _queryDeadlineMs;
+  private final Consumer<SchedulerQueryContext> _expiredQueryHandler;
 
-  public SecondaryWorkloadQueue(PinotConfiguration config, ResourceManager resourceManager) {
+  public SecondaryWorkloadQueue(PinotConfiguration config, ResourceManager resourceManager,
+      Consumer<SchedulerQueryContext> expiredQueryHandler) {
     Preconditions.checkNotNull(config);
     Preconditions.checkNotNull(resourceManager);
+    Preconditions.checkNotNull(expiredQueryHandler);
 
     _queryDeadlineMs =
         config.getProperty(SECONDARY_QUEUE_QUERY_TIMEOUT, DEFAULT_SECONDARY_QUEUE_QUERY_TIMEOUT_SEC) * 1000;
@@ -71,6 +75,7 @@ public class SecondaryWorkloadQueue {
         _maxPendingPerGroup);
     _schedulerGroup = new FCFSSchedulerGroup(SECONDARY_WORKLOAD_GROUP_NAME);
     _resourceManager = resourceManager;
+    _expiredQueryHandler = expiredQueryHandler;
   }
 
   /// Adds a query to the secondary workload queue.
@@ -94,21 +99,50 @@ public class SecondaryWorkloadQueue {
   /// @return
   @Nullable
   public SchedulerQueryContext take() {
-    _queueLock.lock();
-    try {
-      while (true) {
-        SchedulerQueryContext schedulerQueryContext;
-        while ((schedulerQueryContext = takeNextInternal()) == null) {
+    while (true) {
+      SchedulerQueryContext schedulerQueryContext = null;
+      List<SchedulerQueryContext> expired;
+      _queueLock.lock();
+      try {
+        expired = _schedulerGroup.trimExpired(System.currentTimeMillis() - _queryDeadlineMs);
+        if (!_schedulerGroup.isEmpty() && _resourceManager.canSchedule(_schedulerGroup)) {
+          schedulerQueryContext = _schedulerGroup.removeFirst();
+        } else if (expired.isEmpty()) {
+          // Nothing to dispatch and nothing to clean up, so wait for a signal.
           try {
-            _queryReaderCondition.await(_wakeUpTimeMs, TimeUnit.MILLISECONDS);
+            if (_schedulerGroup.isEmpty()) {
+              _queryReaderCondition.await(); // woken by put()
+            } else {
+              _queryReaderCondition.await(_wakeUpTimeMs, TimeUnit.MILLISECONDS); // TTL sweep safety net
+            }
           } catch (InterruptedException e) {
             return null;
           }
         }
+      } finally {
+        _queueLock.unlock();
+      }
+
+      // Complete expired queries outside the lock, since the handler writes to the request channel.
+      // A failure must not escape: it would drop the query dequeued above and leak the caller's runner permit.
+      for (SchedulerQueryContext queryContext : expired) {
+        try {
+          _expiredQueryHandler.accept(queryContext);
+        } catch (Throwable t) {
+          LOGGER.error("Failed to complete expired query: {}", queryContext.getQueryRequest().getRequestId(), t);
+          // Last resort, so the request always gets a response. No-op if the handler already completed the future.
+          queryContext.getResultFuture().setException(t);
+        }
+      }
+      if (schedulerQueryContext != null) {
+        if (LOGGER.isDebugEnabled()) {
+          ServerQueryRequest queryRequest = schedulerQueryContext.getQueryRequest();
+          LOGGER.debug("Scheduling query: {} for group: {} with arrivalTimeMs: {} and numSegments: {}",
+              queryRequest.getRequestId(), _schedulerGroup.name(),
+              queryRequest.getTimerContext().getQueryArrivalTimeMs(), queryRequest.getSegmentsToQuery().size());
+        }
         return schedulerQueryContext;
       }
-    } finally {
-      _queueLock.unlock();
     }
   }
 
@@ -125,28 +159,6 @@ public class SecondaryWorkloadQueue {
     return pending;
   }
 
-  private SchedulerQueryContext takeNextInternal() {
-    long startTimeMs = System.currentTimeMillis();
-    long deadlineEpochMillis = startTimeMs - _queryDeadlineMs;
-
-    _schedulerGroup.trimExpired(deadlineEpochMillis);
-    if (_schedulerGroup.isEmpty() || !_resourceManager.canSchedule(_schedulerGroup)) {
-      return null;
-    }
-
-    if (LOGGER.isDebugEnabled()) {
-      StringBuilder sb = new StringBuilder("SchedulerInfo:");
-      sb.append(_schedulerGroup.toString());
-      ServerQueryRequest queryRequest = _schedulerGroup.peekFirst().getQueryRequest();
-      sb.append(" Group: " + _schedulerGroup.name() + ": [" + queryRequest.getTimerContext().getQueryArrivalTimeMs()
-          + "," + queryRequest.getRequestId() + "," + queryRequest.getSegmentsToQuery().size() + "," + startTimeMs
-          + "]");
-      LOGGER.debug(sb.toString());
-    }
-
-    return _schedulerGroup.removeFirst();
-  }
-
   private void checkSchedulerGroupCapacity(SchedulerQueryContext query)
       throws OutOfCapacityException {
     if (_schedulerGroup.numPending() >= _maxPendingPerGroup
@@ -156,6 +168,16 @@ public class SecondaryWorkloadQueue {
               + _schedulerGroup.numPending() + ", maxPending: " + _maxPendingPerGroup + ", reservedThreads: "
               + _schedulerGroup.totalReservedThreads() + " threadsHardLimit: "
               + _resourceManager.getTableThreadsHardLimit());
+    }
+  }
+
+  /// Signals the reader that reserved threads were released, so canSchedule() may now pass.
+  public void signalWorkersReleased() {
+    _queueLock.lock();
+    try {
+      _queryReaderCondition.signal();
+    } finally {
+      _queueLock.unlock();
     }
   }
 }
