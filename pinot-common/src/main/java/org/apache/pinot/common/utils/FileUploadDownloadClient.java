@@ -241,6 +241,14 @@ public class FileUploadDownloadClient implements AutoCloseable {
     return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(), SEGMENT_PATH);
   }
 
+  /// Returns the URI for updating the ZK metadata custom map of a segment.
+  public static URI getUpdateSegmentZKMetadataURI(URI controllerURI, String tableNameWithType, String segmentName)
+      throws URISyntaxException {
+    return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(),
+        OLD_SEGMENT_PATH + "/" + URIUtils.encode(tableNameWithType) + "/" + URIUtils.encode(segmentName)
+            + "/metadata");
+  }
+
   public static URI getReingestedSegmentUploadURI(URI controllerURI)
       throws URISyntaxException {
     return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(),
@@ -887,6 +895,18 @@ public class FileUploadDownloadClient implements AutoCloseable {
       throws IOException, HttpErrorStatusException {
     return HttpClient.wrapAndThrowHttpException(
         _httpClient.sendRequest(getSendSegmentJsonRequest(uri, jsonString, headers, parameters), socketTimeoutMs));
+  }
+
+  /// Updates the ZK metadata custom map of a segment without uploading the segment.
+  public SimpleHttpResponse updateSegmentZKMetadata(URI uri, String customMapModifierJson,
+      @Nullable List<Header> headers, int socketTimeoutMs)
+      throws IOException, HttpErrorStatusException {
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.put(uri).setVersion(HttpVersion.HTTP_1_1)
+        .setEntity(new StringEntity(customMapModifierJson, ContentType.APPLICATION_JSON));
+    if (headers != null) {
+      headers.forEach(requestBuilder::addHeader);
+    }
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(requestBuilder.build(), socketTimeoutMs));
   }
 
   /// Start replace segments with default settings.
