@@ -133,8 +133,46 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
     assertEquals(_mutableSegment.getDataSource(JSON_COL).getJsonIndex().getMatchingDocIds("valid = 'json'"),
         ImmutableRoaringBitmap.bitmapOf(0, 2, 3));
     assertTrue(_mutableSegment.getDataSource(STRING_COL).getNullValueVector().isNull(3));
-    // null string value skipped
+    // Fail-soft (#16316): null string is completed with the field default so forward lengths stay aligned.
+    GenericRow nullResult = _mutableSegment.getRecord(3, new GenericRow());
+    assertEquals(nullResult.getValue(STRING_COL), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
     verify(_serverMetrics, times(1)).addMeteredTableValue(matches("DICTIONARY-indexingError$"),
         eq(ServerMeter.INDEXING_FAILURES), eq(1L));
+    // Incomplete-row meter fires once for the null-string row (dictionary error path).
+    verify(_serverMetrics, atLeastOnce()).addMeteredTableValue(eq(TABLE_NAME + "_REALTIME"),
+        eq(ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED), eq(1L));
+  }
+
+  @Test
+  public void testFailSoftKeepsColumnLengthsAlignedAfterJsonError()
+      throws IOException {
+    // After a secondary-index failure the row must still be fully present on every physical column so seal/query
+    // lengths match numDocsIndexed (issue #16316).
+    GenericRow badRow = new GenericRow();
+    badRow.putValue(INT_COL, 7);
+    badRow.putValue(STRING_COL, "bad-json-row");
+    badRow.putValue(JSON_COL, "{\"truncatedJson...");
+    _mutableSegment.index(badRow, METADATA);
+
+    assertEquals(_mutableSegment.getNumDocsIndexed(), 1);
+    GenericRow result = _mutableSegment.getRecord(0, new GenericRow());
+    assertEquals(result.getValue(INT_COL), 7);
+    assertEquals(result.getValue(STRING_COL), "bad-json-row");
+    // JSON forward index still holds the raw string even when the JSON secondary index fails.
+    assertEquals(result.getValue(JSON_COL), "{\"truncatedJson...");
+
+    // A subsequent good row must land on the next docId without reuse/corruption.
+    GenericRow goodRow = new GenericRow();
+    goodRow.putValue(INT_COL, 8);
+    goodRow.putValue(STRING_COL, "ok");
+    goodRow.putValue(JSON_COL, "{\"valid\": \"json\"}");
+    _mutableSegment.index(goodRow, METADATA);
+    assertEquals(_mutableSegment.getNumDocsIndexed(), 2);
+    GenericRow goodResult = _mutableSegment.getRecord(1, new GenericRow());
+    assertEquals(goodResult.getValue(INT_COL), 8);
+    assertEquals(goodResult.getValue(STRING_COL), "ok");
+
+    verify(_serverMetrics, atLeastOnce()).addMeteredTableValue(eq(TABLE_NAME + "_REALTIME"),
+        eq(ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED), eq(1L));
   }
 }
