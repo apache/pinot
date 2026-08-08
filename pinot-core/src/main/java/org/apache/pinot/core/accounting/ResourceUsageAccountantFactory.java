@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.pinot.core.query.scheduler.ThrottlingRuntime;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
@@ -310,6 +311,13 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
             new QueryMonitorConfig(oldConfig, change.getChangedConfigs(), change.getClusterConfigs());
         _queryMonitorConfig.set(newConfig);
         logQueryMonitorConfig(newConfig);
+
+        // Apply throttling-related settings, if present
+        try {
+          ThrottlingRuntime.applyClusterConfig(change.getClusterConfigs());
+        } catch (Exception e) {
+          LOGGER.warn("Failed to apply throttling runtime config updates", e);
+        }
       }
 
       private void logQueryMonitorConfig(QueryMonitorConfig queryMonitorConfig) {
