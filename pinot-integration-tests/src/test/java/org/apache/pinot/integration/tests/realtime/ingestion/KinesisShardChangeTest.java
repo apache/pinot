@@ -25,6 +25,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.restlet.resources.TableView;
 import org.apache.pinot.integration.tests.realtime.ingestion.utils.KinesisUtils;
@@ -54,23 +55,58 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
 
   private static final String SCHEMA_FILE_PATH = "kinesis/airlineStats_data_reduced.schema";
   private static final String DATA_FILE_PATH = "kinesis/airlineStats_data_reduced.json";
+  private static final String TABLE_NAME = "kinesisShardChange";
+  private static final String STREAM_NAME = "kinesis-shard-change";
   private static final Integer NUM_SHARDS = 2;
+
+  private Thread _publisherThread;
+  private volatile Throwable _publisherFailure;
 
   @BeforeMethod
   public void beforeTest()
-      throws IOException {
+      throws Exception {
+    cleanupKinesisResources();
     createStream(NUM_SHARDS);
-    addSchema(createSchema(SCHEMA_FILE_PATH));
+    Schema schema = createSchema(SCHEMA_FILE_PATH);
+    schema.setSchemaName(getTableName());
+    addTrackedSchema(schema);
     TableConfig tableConfig = createRealtimeTableConfig(null);
-    addTableConfig(tableConfig);
+    addTrackedTable(tableConfig);
   }
 
-  @AfterMethod
+  @AfterMethod(alwaysRun = true)
   public void afterTest()
-      throws IOException {
-    dropRealtimeTable(getTableName());
-    deleteSchema(getTableName());
-    deleteStream();
+      throws Exception {
+    boolean interrupted = Thread.interrupted();
+    Throwable cleanupFailure = null;
+    try {
+      stopPublisherThread();
+    } catch (Throwable t) {
+      cleanupFailure = t;
+    }
+    interrupted |= Thread.interrupted();
+    try {
+      cleanupKinesisResources();
+    } catch (Throwable t) {
+      if (cleanupFailure == null) {
+        cleanupFailure = t;
+      } else {
+        cleanupFailure.addSuppressed(t);
+      }
+    }
+    interrupted |= Thread.interrupted();
+    if (interrupted) {
+      Thread.currentThread().interrupt();
+    }
+    if (cleanupFailure != null) {
+      if (cleanupFailure instanceof Error) {
+        throw (Error) cleanupFailure;
+      }
+      if (cleanupFailure instanceof Exception) {
+        throw (Exception) cleanupFailure;
+      }
+      throw new RuntimeException(cleanupFailure);
+    }
   }
 
   /// Data provider for shard split and merge tests with different offset combinations.
@@ -127,10 +163,10 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
 
     // Perform shard operation (split or merge)
     if ("split".equals(operation)) {
-      KinesisUtils.splitNthShard(_kinesisClient, STREAM_NAME, 0); // splits shard 0 into shard 2 & 3
-      KinesisUtils.splitNthShard(_kinesisClient, STREAM_NAME, 1); // splits shard 1 into shard 4 & 5
+      KinesisUtils.splitNthShard(_kinesisClient, getKinesisStreamName(), 0); // splits shard 0 into shard 2 & 3
+      KinesisUtils.splitNthShard(_kinesisClient, getKinesisStreamName(), 1); // splits shard 1 into shard 4 & 5
     } else if ("merge".equals(operation)) {
-      KinesisUtils.mergeShards(_kinesisClient, STREAM_NAME, 0, 1); // merges shard 0 & 1 into shard 2
+      KinesisUtils.mergeShards(_kinesisClient, getKinesisStreamName(), 0, 1); // merges shard 0 & 1 into shard 2
     }
 
     // Publish more records after shard operation. These will go to the new shards
@@ -196,8 +232,8 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     publishRecordsToKinesis(0, 50);
 
     // Split the shards
-    KinesisUtils.splitNthShard(_kinesisClient, STREAM_NAME, 0); // splits shard 0 into shard 2 & 3
-    KinesisUtils.splitNthShard(_kinesisClient, STREAM_NAME, 1); // splits shard 1 into shard 4 & 5
+    KinesisUtils.splitNthShard(_kinesisClient, getKinesisStreamName(), 0); // splits shard 0 into shard 2 & 3
+    KinesisUtils.splitNthShard(_kinesisClient, getKinesisStreamName(), 1); // splits shard 1 into shard 4 & 5
 
     // new table is created with defined offset criteria but listening to the original stream
     String name = getTableName() + "_" + offsetCriteria;
@@ -215,8 +251,6 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
 
     // Validate the final state of segments
     validateSegmentStates(name, 2, 4);
-
-    dropNewSchemaAndTable(name);
   }
 
   /// Test case to first split shards, then merge some shards.
@@ -230,15 +264,15 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     waitForRecordsToBeConsumed(getTableName(), 50); // pinot has created 2 segments
 
     // Split the shards
-    KinesisUtils.splitNthShard(_kinesisClient, STREAM_NAME, 0); // splits shard 0 into shard 2 & 3
-    KinesisUtils.splitNthShard(_kinesisClient, STREAM_NAME, 1); // splits shard 1 into shard 4 & 5
+    KinesisUtils.splitNthShard(_kinesisClient, getKinesisStreamName(), 0); // splits shard 0 into shard 2 & 3
+    KinesisUtils.splitNthShard(_kinesisClient, getKinesisStreamName(), 1); // splits shard 1 into shard 4 & 5
 
     // Publish more records after shard operation. These will go to the new shards
     publishRecordsToKinesis(50, 175);
 
     // Merge some shards
-    KinesisUtils.mergeShards(_kinesisClient, STREAM_NAME, 2, 3); // merges shard 2 & 3 into shard 6
-    KinesisUtils.mergeShards(_kinesisClient, STREAM_NAME, 4, 5); // merges shard 4 & 5 into shard 7
+    KinesisUtils.mergeShards(_kinesisClient, getKinesisStreamName(), 2, 3); // merges shard 2 & 3 into shard 6
+    KinesisUtils.mergeShards(_kinesisClient, getKinesisStreamName(), 4, 5); // merges shard 4 & 5 into shard 7
 
     // Publish more records after shard operation. These will go to the new shards
     publishRecordsToKinesis(175, 200);
@@ -261,23 +295,27 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
   public void testConcurrentShardSplit()
       throws IOException, InterruptedException {
     // Start a background thread to continuously publish records to kinesis
-    Thread publisherThread = new Thread(() -> {
+    _publisherFailure = null;
+    _publisherThread = new Thread(() -> {
       try {
         for (int i = 0; i < 200; i += 5) {
           publishRecordsToKinesis(i, i + 5);
           Thread.sleep(1000);
         }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
       } catch (Exception e) {
+        _publisherFailure = e;
         LOGGER.error("Error while publishing records to kinesis", e);
       }
-    });
-    publisherThread.start(); // This will take ~40 secs to complete with 5 records ingested per second
+    }, "kinesis-shard-change-publisher");
+    _publisherThread.start(); // This will take ~40 secs to complete with 5 records ingested per second
 
     Thread.sleep(5000);
 
     // Split the shards
-    KinesisUtils.splitNthShard(_kinesisClient, STREAM_NAME, 0); // splits shard 0 into shard 2 & 3
-    KinesisUtils.splitNthShard(_kinesisClient, STREAM_NAME, 1); // splits shard 1 into shard 4 & 5
+    KinesisUtils.splitNthShard(_kinesisClient, getKinesisStreamName(), 0); // splits shard 0 into shard 2 & 3
+    KinesisUtils.splitNthShard(_kinesisClient, getKinesisStreamName(), 1); // splits shard 1 into shard 4 & 5
 
     Thread.sleep(5000);
 
@@ -285,8 +323,8 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     runRealtimeSegmentValidationTask(getTableName()); // This will commit segments 0-1 and start consuming from 2-5
 
     // Merge some shards
-    KinesisUtils.mergeShards(_kinesisClient, STREAM_NAME, 2, 3); // merges shard 2 & 3 into shard 6
-    KinesisUtils.mergeShards(_kinesisClient, STREAM_NAME, 4, 5); // merges shard 4 & 5 into shard 7
+    KinesisUtils.mergeShards(_kinesisClient, getKinesisStreamName(), 2, 3); // merges shard 2 & 3 into shard 6
+    KinesisUtils.mergeShards(_kinesisClient, getKinesisStreamName(), 4, 5); // merges shard 4 & 5 into shard 7
 
     Thread.sleep(5000);
 
@@ -296,10 +334,14 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
 
     // Wait for the publisher thread to finish
     try {
-      publisherThread.join();
+      _publisherThread.join();
+      _publisherThread = null;
     } catch (InterruptedException e) {
       LOGGER.error("Error while waiting for publisher thread to finish", e);
+      Thread.currentThread().interrupt();
+      throw e;
     }
+    throwIfPublisherFailed();
 
     waitForRecordsToBeConsumed(getTableName(), 200);
 
@@ -379,7 +421,7 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
       throws IOException {
     Schema schema = createSchema(SCHEMA_FILE_PATH);
     schema.setSchemaName(name);
-    addSchema(schema);
+    addTrackedSchema(schema);
 
     TableConfigBuilder tableConfigBuilder = getTableConfigBuilder(TableType.REALTIME);
     tableConfigBuilder.setTableName(name);
@@ -388,13 +430,7 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
         StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), offsetCriteria);
     tableConfigBuilder.setStreamConfigs(streamConfigs);
     TableConfig tableConfig = tableConfigBuilder.build();
-    addTableConfig(tableConfig);
-  }
-
-  private void dropNewSchemaAndTable(String name)
-      throws IOException {
-    dropRealtimeTable(name);
-    deleteSchema(name);
+    addTrackedTable(tableConfig);
   }
 
   @Override
@@ -405,5 +441,53 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
   @Override
   public String getSortedColumn() {
     return null;
+  }
+
+  @Override
+  protected String getTableName() {
+    return TABLE_NAME;
+  }
+
+  @Override
+  protected String getKinesisStreamName() {
+    return STREAM_NAME;
+  }
+
+  private void stopPublisherThread() {
+    Thread publisherThread = _publisherThread;
+    if (publisherThread == null) {
+      throwIfPublisherFailed();
+      return;
+    }
+    publisherThread.interrupt();
+    boolean interrupted = Thread.interrupted();
+    long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    while (publisherThread.isAlive()) {
+      long remainingNanos = deadlineNanos - System.nanoTime();
+      if (remainingNanos <= 0) {
+        break;
+      }
+      try {
+        publisherThread.join(Math.max(1L, TimeUnit.NANOSECONDS.toMillis(remainingNanos)));
+      } catch (InterruptedException e) {
+        interrupted = true;
+      }
+    }
+    if (interrupted) {
+      Thread.currentThread().interrupt();
+    }
+    if (publisherThread.isAlive()) {
+      throw new IllegalStateException("Kinesis publisher thread did not stop within 10 seconds");
+    }
+    _publisherThread = null;
+    throwIfPublisherFailed();
+  }
+
+  private void throwIfPublisherFailed() {
+    Throwable publisherFailure = _publisherFailure;
+    _publisherFailure = null;
+    if (publisherFailure != null) {
+      throw new AssertionError("Kinesis publisher thread failed", publisherFailure);
+    }
   }
 }

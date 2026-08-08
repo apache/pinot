@@ -111,6 +111,25 @@ jobs:
         timeout-minutes: 120
         run: |
           .github/workflows/scripts/pr-tests/.pinot_tests_integration.sh
+      - name: Kinesis Ingestion Integration Test
+        if : ${{ matrix.testset == 2 }}
+        env:
+          RUN_INTEGRATION_TESTS: true
+          RUN_TEST_SET: ${{ matrix.testset }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+          MAVEN_OPTS: >
+            -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
+            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+            -B -ntp
+            -XX:+IgnoreUnrecognizedVMOptions
+            --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+        timeout-minutes: 120
+        run: |
+          .github/workflows/scripts/pr-tests/.pinot_tests_kinesis_integration.sh
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         continue-on-error: true
