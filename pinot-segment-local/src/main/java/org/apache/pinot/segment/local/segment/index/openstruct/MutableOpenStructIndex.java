@@ -40,6 +40,7 @@ import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.OpenStructTypeInference;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.slf4j.Logger;
@@ -57,6 +58,7 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   private static final Logger LOGGER = LoggerFactory.getLogger(MutableOpenStructIndex.class);
 
   private final String _openStructColumn;
+  private final String _tableNameWithType;
   private final OpenStructIndexConfig _config;
   private final Map<String, FieldSpec> _childFieldSpecs;
   private final PinotDataBufferMemoryManager _memoryManager;
@@ -65,9 +67,10 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   // Volatile for lock-free reader access; writer always holds the consuming-thread lock.
   private volatile Map<String, MutableKeyColumn> _keyColumns = new HashMap<>();
 
-  public MutableOpenStructIndex(String openStructColumn, ComplexFieldSpec fieldSpec,
+  public MutableOpenStructIndex(String openStructColumn, String tableNameWithType, ComplexFieldSpec fieldSpec,
       OpenStructIndexConfig config, PinotDataBufferMemoryManager memoryManager, int capacity) {
     _openStructColumn = openStructColumn;
+    _tableNameWithType = tableNameWithType;
     _config = config;
     _memoryManager = memoryManager;
     _capacity = capacity;
@@ -144,6 +147,12 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
         LOGGER.warn("OPEN_STRUCT '{}': could not infer DataType for key '{}' from value of class '{}'."
                 + " Dropping the entry.",
             _openStructColumn, key, rawValue.getClass().getName());
+        ServerMetrics serverMetrics = ServerMetrics.get();
+        if (serverMetrics != null) {
+          serverMetrics.addMeteredTableValue(_tableNameWithType,
+              OpenStructNaming.materializedColumnName(_openStructColumn, key),
+              ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, 1);
+        }
         return null;
       }
     }
@@ -162,7 +171,9 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
     } catch (Exception e) {
       ServerMetrics serverMetrics = ServerMetrics.get();
       if (serverMetrics != null) {
-        serverMetrics.addMeteredGlobalValue(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, 1);
+        serverMetrics.addMeteredTableValue(_tableNameWithType,
+            OpenStructNaming.materializedColumnName(_openStructColumn, key),
+            ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, 1);
       }
       return null;
     }
