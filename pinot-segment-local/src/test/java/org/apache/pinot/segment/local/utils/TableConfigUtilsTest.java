@@ -2594,6 +2594,7 @@ public class TableConfigUtilsTest {
   @Test
   public void testValidateUpsertConfig() {
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setComparisonColumn("myCol");
     SegmentPartitionConfig segmentPartitionConfig =
         new SegmentPartitionConfig(Map.of("myCol", new ColumnPartitionConfig("murmur", 4)));
     TableConfig validTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -2620,6 +2621,30 @@ public class TableConfigUtilsTest {
           "Offline upsert table must have segment partition config to ensure correct partition-based "
               + "segment assignment. Configure segmentPartitionConfig in the indexingConfig.");
     }
+
+    // OFFLINE table with neither a comparison column nor a time column should fail, same as realtime upsert
+    // (no implicit segment creation time fallback).
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, validSchema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(),
+          "Offline upsert table must have a comparison column or a time column configured");
+    }
+
+    // OFFLINE table relying on the time column (no explicit comparison column) should be allowed, same as realtime.
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setTimeColumnName("myCol")
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
+        .build();
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, validSchema);
 
     // OFFLINE table with partial upsert should fail
     UpsertConfig partialUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
