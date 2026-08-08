@@ -113,10 +113,29 @@
                 <include>**/org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</include>
               </includes>
               <excludes>
+                <exclude>**/org/apache/pinot/integration/tests/ExactlyOnceKafkaRealtimeClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/KafkaConsumingSegmentToBeMovedSummaryIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/MultiNodesOfflineClusterIntegrationTest.java</exclude>
               </excludes>
             </configuration>
             <executions>
+              <execution>
+                <id>shared-kafka-realtime-integration-test-suite</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <excludes combine.self="override">
+                    <exclude>none</exclude>
+                  </excludes>
+                  <suiteXmlFiles>
+                    <suiteXmlFile>src/test/resources/shared-kafka-realtime-integration-test-suite.xml</suiteXmlFile>
+                  </suiteXmlFiles>
+                </configuration>
+              </execution>
               <execution>
                 <id>multi-nodes-offline-integration-test-suite</id>
                 <phase>test</phase>

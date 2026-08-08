@@ -38,6 +38,7 @@ import org.apache.hc.core5.http.HttpStatus;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -61,6 +62,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -78,7 +80,7 @@ import static org.testng.Assert.assertTrue;
 
 /// Integration test for low-level Kafka consumer.
 /// TODO: Add separate module-level tests and remove the randomness of this test
-public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
+public class LLCRealtimeClusterIntegrationTest extends SharedKafkaRealtimeIntegrationTestSuite {
   private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
   private static final String KAFKA_4_SMOKE_TABLE_NAME = "mytableKafka4Smoke";
   private static final long RANDOM_SEED = System.currentTimeMillis();
@@ -88,6 +90,8 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   private final boolean _isConsumerDirConfigured = RANDOM.nextBoolean();
   private final boolean _enableLeadControllerResource = RANDOM.nextBoolean();
   private final long _startTime = System.currentTimeMillis();
+  private ScenarioLease _canonicalScenario;
+  private ScenarioLease _kafka4Scenario;
 
   @Override
   protected boolean injectTombstones() {
@@ -274,18 +278,136 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
         "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableLeadControllerResource: %s",
         RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableLeadControllerResource));
 
-    // Remove the consumer directory
-    FileUtils.deleteQuietly(new File(CONSUMER_DIRECTORY));
+    _canonicalScenario = newScenario(getTableName(), getKafkaTopic());
+    Throwable primaryFailure = null;
+    try {
+      createScenarioTopic(_canonicalScenario);
+      List<File> avroFiles = unpackScenarioData(_canonicalScenario);
+      Schema schema = addScenarioSchema(_canonicalScenario);
+      TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
+      addScenarioTable(_canonicalScenario, tableConfig);
 
-    super.setUp();
+      pushAvroIntoKafka(avroFiles);
+      createSegmentsAndUpload(avroFiles, schema, tableConfig);
+      setUpH2Connection(avroFiles);
+      setUpQueryGenerator(avroFiles);
+      runValidationJob(600_000L);
+      waitForAllDocsLoaded(getDocsLoadedTimeoutMs());
+    } catch (Throwable t) {
+      primaryFailure = t;
+      if (t instanceof Error) {
+        throw (Error) t;
+      }
+      throw (Exception) t;
+    } finally {
+      if (primaryFailure != null) {
+        closeScenario(_canonicalScenario, primaryFailure, null);
+        _canonicalScenario = null;
+      }
+    }
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   @Override
   public void tearDown()
       throws Exception {
-    FileUtils.deleteDirectory(new File(CONSUMER_DIRECTORY));
-    super.tearDown();
+    Throwable cleanupFailure = scrubClusterStateForHandoff(null);
+    if (_kafka4Scenario != null) {
+      try {
+        closeKafka4Scenario(null);
+      } catch (Throwable t) {
+        cleanupFailure = addCleanupFailure(cleanupFailure, t);
+      }
+    }
+    if (_canonicalScenario != null) {
+      try {
+        closeScenario(_canonicalScenario, null, null);
+      } catch (Throwable t) {
+        cleanupFailure = addCleanupFailure(cleanupFailure, t);
+      } finally {
+        _canonicalScenario = null;
+      }
+    }
+    if (cleanupFailure != null) {
+      if (cleanupFailure instanceof Error) {
+        throw (Error) cleanupFailure;
+      }
+      if (cleanupFailure instanceof Exception) {
+        throw (Exception) cleanupFailure;
+      }
+      throw new RuntimeException(cleanupFailure);
+    }
+  }
+
+  private Throwable scrubClusterStateForHandoff(Throwable cleanupFailure) {
+    try {
+      setUseMultiStageQueryEngine(false);
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+
+    List<String> instances;
+    try {
+      instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
+    } catch (Throwable t) {
+      return addCleanupFailure(cleanupFailure, t);
+    }
+    for (String instance : instances) {
+      if (InstanceTypeUtils.isServer(instance)) {
+        try {
+          getOrCreateAdminClient().getInstanceClient().updateInstanceState(instance, "QUERIES_ENABLE");
+        } catch (Throwable t) {
+          cleanupFailure = addCleanupFailure(cleanupFailure, t);
+        }
+      }
+      try {
+        InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), instance);
+        instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
+        _helixAdmin.setInstanceConfig(getHelixClusterName(), instance, instanceConfig);
+      } catch (Throwable t) {
+        cleanupFailure = addCleanupFailure(cleanupFailure, t);
+      }
+    }
+    return cleanupFailure;
+  }
+
+  @Override
+  protected void prepareSharedSuiteFiles() {
+    FileUtils.deleteQuietly(new File(CONSUMER_DIRECTORY));
+  }
+
+  @Override
+  protected void resetSharedSuiteStatics()
+      throws Exception {
+    Throwable cleanupFailure = null;
+    try {
+      super.resetSharedSuiteStatics();
+    } catch (Throwable t) {
+      cleanupFailure = t;
+    }
+    try {
+      // A table data manager can disappear before its interrupted partition-consumer threads finish. Keep the
+      // table-keyed failure factories intact until the shared-suite owner has stopped every server.
+      resetConsumerFactories();
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+    try {
+      FileUtils.deleteDirectory(new File(CONSUMER_DIRECTORY));
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+    if (cleanupFailure != null) {
+      if (cleanupFailure instanceof Exception) {
+        throw (Exception) cleanupFailure;
+      }
+      throw new RuntimeException(cleanupFailure);
+    }
+  }
+
+  private static void resetConsumerFactories() {
+    ExceptingKafkaConsumerFactory.reset();
+    ExceptingKafka4ConsumerFactory.reset();
   }
 
   @Test
@@ -298,9 +420,11 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   @Test(priority = -1)
   public void testKafka4ConsumerFactory()
       throws Throwable {
+    _kafka4Scenario = newScenario(KAFKA_4_SMOKE_TABLE_NAME, getKafkaTopic());
     Throwable primaryFailure = null;
     try {
-      addSchema(Schema.cloneSchemaWithName(createSchema(), KAFKA_4_SMOKE_TABLE_NAME));
+      addScenarioSchema(_kafka4Scenario);
+      _kafka4Scenario._tableCreated = true;
       addTableConfig(createKafka4SmokeTableConfig());
 
       String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(KAFKA_4_SMOKE_TABLE_NAME);
@@ -315,7 +439,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       primaryFailure = t;
       throw t;
     } finally {
-      cleanupKafka4SmokeTable(primaryFailure);
+      closeKafka4Scenario(primaryFailure);
     }
   }
 
@@ -346,46 +470,13 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     }
   }
 
-  private void cleanupKafka4SmokeTable(Throwable primaryFailure)
-      throws Throwable {
-    Throwable cleanupFailure = null;
-    boolean tableRemoved = true;
-    try {
-      if (_helixResourceManager.getRealtimeTableConfig(KAFKA_4_SMOKE_TABLE_NAME) != null) {
-        dropRealtimeTable(KAFKA_4_SMOKE_TABLE_NAME);
-        String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(KAFKA_4_SMOKE_TABLE_NAME);
-        try {
-          waitForTableDataManagerRemoved(tableNameWithType);
-        } catch (Throwable t) {
-          cleanupFailure = addCleanupFailure(cleanupFailure, t);
-          tableRemoved = false;
-        }
-        try {
-          waitForEVToDisappear(tableNameWithType);
-        } catch (Throwable t) {
-          cleanupFailure = addCleanupFailure(cleanupFailure, t);
-          tableRemoved = false;
-        }
-      }
-    } catch (Throwable t) {
-      cleanupFailure = addCleanupFailure(cleanupFailure, t);
-      tableRemoved = false;
-    }
-    if (tableRemoved) {
-      try {
-        if (_helixResourceManager.getSchema(KAFKA_4_SMOKE_TABLE_NAME) != null) {
-          deleteSchema(KAFKA_4_SMOKE_TABLE_NAME);
-        }
-      } catch (Throwable t) {
-        cleanupFailure = addCleanupFailure(cleanupFailure, t);
-      }
-    }
-    if (cleanupFailure != null) {
-      if (primaryFailure != null) {
-        primaryFailure.addSuppressed(cleanupFailure);
-      } else {
-        throw cleanupFailure;
-      }
+  private void closeKafka4Scenario(Throwable primaryFailure)
+      throws Exception {
+    ScenarioLease scenario = _kafka4Scenario;
+    closeScenario(scenario, primaryFailure, null);
+    if (!scenario._tableCreated && !scenario._schemaCreated && !scenario._topicCreated
+        && scenario._resetAction == null) {
+      _kafka4Scenario = null;
     }
   }
 
@@ -626,6 +717,12 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       _tableName = tableName;
     }
 
+    public static void reset() {
+      _helixAdmin = null;
+      _helixClusterName = null;
+      _tableName = null;
+    }
+
     @Override
     public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
         PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
@@ -703,6 +800,12 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       _helixAdmin = helixAdmin;
       _helixClusterName = helixClusterName;
       _tableName = tableName;
+    }
+
+    public static void reset() {
+      _helixAdmin = null;
+      _helixClusterName = null;
+      _tableName = null;
     }
 
     @Override
