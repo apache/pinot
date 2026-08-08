@@ -16,24 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.index.column;
-
-import org.apache.pinot.segment.local.segment.virtualcolumn.BaseConstantValueVirtualColumnProvider;
-import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
+package org.apache.pinot.segment.local.segment.virtualcolumn;
 
 
-/// Provides the column's default null value for every document.
+
+/// Virtual column provider for `$totalDocs`, the number of documents in the segment.
 ///
-/// This is also how `$hostName` and `$segmentName` are served: their value is constant for the segment and is carried
-/// as the field's default null value.
+/// The count is taken from the virtual column context rather than from [org.apache.pinot.segment.spi.SegmentMetadata],
+/// so that a CONSUMING segment reports the number of documents indexed so far instead of `0`.
 ///
-/// NOTE: The fully-qualified name of this class is stored in field specs (see
-/// `DimensionFieldSpec#DimensionFieldSpec(String, DataType, boolean, Class)`) and resolved reflectively, so it must
-/// not be moved or renamed.
-public class DefaultNullValueVirtualColumnProvider extends BaseConstantValueVirtualColumnProvider {
+/// This is the number of documents physically stored in the segment, so for an upsert table it also includes the
+/// documents that have been replaced and are no longer returned by queries.
+public class SegmentTotalDocsVirtualColumnProvider extends BaseConstantValueVirtualColumnProvider {
 
   @Override
   protected Object getValue(VirtualColumnContext context) {
-    return context.getFieldSpec().getDefaultNullValue();
+    return context.getTotalDocCount();
   }
 }
