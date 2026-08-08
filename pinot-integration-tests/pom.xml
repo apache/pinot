@@ -38,7 +38,8 @@
     <pinot.integration.test.tmp.directory>${java.io.tmpdir}</pinot.integration.test.tmp.directory>
     <pinot.integration.test.port.base>20000</pinot.integration.test.port.base>
     <pinot.integration.test.zk.port.base>0</pinot.integration.test.zk.port.base>
-    <pinot.integration.test.jvm.args>-Xms${pinot.integration.test.heap.min} -Xmx${pinot.integration.test.heap.max} -Djava.io.tmpdir=${pinot.integration.test.tmp.directory} -Dpinot.test.port.base=${pinot.integration.test.port.base} -Dpinot.test.zk.port.base=${pinot.integration.test.zk.port.base} -Dlog4j2.configurationFile=log4j2.xml</pinot.integration.test.jvm.args>
+    <pinot.integration.test.active.processor.args />
+    <pinot.integration.test.jvm.args>-Xms${pinot.integration.test.heap.min} -Xmx${pinot.integration.test.heap.max} ${pinot.integration.test.active.processor.args} -Djava.io.tmpdir=${pinot.integration.test.tmp.directory} -Dpinot.test.port.base=${pinot.integration.test.port.base} -Dpinot.test.zk.port.base=${pinot.integration.test.zk.port.base} -Dlog4j2.configurationFile=log4j2.xml</pinot.integration.test.jvm.args>
   </properties>
 
   <build>
@@ -239,8 +240,6 @@
                 <include>**/org/apache/pinot/integration/tests/F*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/G*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/H*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/MergeRollupMinionClusterIntegrationTest.java</include>
-                <include>**/org/apache/pinot/integration/tests/MultiStageEngineIntegrationTest.java</include>
               </includes>
               <excludes>
                 <exclude>**/org/apache/pinot/integration/tests/ExactlyOnceKafkaRealtimeClusterIntegrationTest.java</exclude>
@@ -261,6 +260,22 @@
                   </excludes>
                   <suiteXmlFiles>
                     <suiteXmlFile>src/test/resources/shared-kafka-realtime-integration-test-suite.xml</suiteXmlFile>
+                  </suiteXmlFiles>
+                </configuration>
+              </execution>
+              <execution>
+                <id>kinesis-integration-test-suite</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <reportNameSuffix>kinesis</reportNameSuffix>
+                  <excludes combine.self="override">
+                    <exclude>none</exclude>
+                  </excludes>
+                  <suiteXmlFiles>
+                    <suiteXmlFile>src/test/resources/kinesis-integration-test-suite.xml</suiteXmlFile>
                   </suiteXmlFiles>
                 </configuration>
               </execution>
@@ -298,9 +313,7 @@
                 <exclude>**/org/apache/pinot/integration/tests/KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/KafkaConsumingSegmentToBeMovedSummaryIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/MergeRollupMinionClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/MultiNodesOfflineClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/MultiStageEngineIntegrationTest.java</exclude>
               </excludes>
             </configuration>
             <executions>
@@ -363,6 +376,7 @@
                 <include>**/org/apache/pinot/integration/tests/R*Test.java</include>
               </includes>
               <excludes>
+                <exclude>**/org/apache/pinot/integration/tests/OfflineClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/PinotLLCRealtimeSegmentManagerIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/QueryThreadContextIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/RealtimeConsumptionRateLimiterClusterIntegrationTest.java</exclude>
@@ -396,6 +410,7 @@
                 <include>**/org/apache/pinot/integration/tests/X*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/Y*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/Z*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/OfflineClusterIntegrationTest.java</include>
                 <include>**/org/apache/pinot/integration/tests/RealtimeConsumptionRateLimiterClusterIntegrationTest.java</include>
                 <include>**/org/apache/pinot/integration/tests/tpch/*Test.java</include>
                 <include>**/org/apache/pinot/server/realtime/**</include>
@@ -405,24 +420,6 @@
                 <exclude>**/org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</exclude>
               </excludes>
             </configuration>
-            <executions>
-              <execution>
-                <id>kinesis-integration-test-suite</id>
-                <phase>test</phase>
-                <goals>
-                  <goal>test</goal>
-                </goals>
-                <configuration>
-                  <reportNameSuffix>kinesis</reportNameSuffix>
-                  <excludes combine.self="override">
-                    <exclude>none</exclude>
-                  </excludes>
-                  <suiteXmlFiles>
-                    <suiteXmlFile>src/test/resources/kinesis-integration-test-suite.xml</suiteXmlFile>
-                  </suiteXmlFiles>
-                </configuration>
-              </execution>
-            </executions>
           </plugin>
         </plugins>
       </build>

@@ -85,6 +85,7 @@ run_lane() {
       "-Dpinot.integration.test.build.directory=${build_dir}" \
       -Dpinot.integration.test.heap.min=1g \
       -Dpinot.integration.test.heap.max=4g \
+      "-Dpinot.integration.test.active.processor.args=-XX:ActiveProcessorCount=2" \
       "-Dpinot.integration.test.tmp.directory=${tmp_dir}" \
       "-Dpinot.integration.test.port.base=${port_base}" \
       "-Dpinot.integration.test.zk.port.base=${zk_port_base}"
