@@ -367,8 +367,16 @@ public class PinotSegmentUploadDownloadRestletResource {
       // Fetch segment name
       String segmentName = segmentMetadata.getName();
 
-      // Prefer request tableName over table name baked into segment metadata (enables staging→prod promote)
-      String rawTableName = resolveRawTableNameForUpload(tableName, segmentMetadata);
+      // Fetch table name. Try to derive the table name from the parameter and then from segment metadata
+      String rawTableName;
+      if (StringUtils.isNotEmpty(tableName)) {
+        rawTableName = TableNameBuilder.extractRawTableName(tableName);
+      } else {
+        // TODO: remove this when we completely deprecate the table name from segment metadata
+        rawTableName = segmentMetadata.getTableName();
+        LOGGER.warn("Table name is not provided as request query parameter when uploading segment: {} for table: {}",
+            segmentName, rawTableName);
+      }
       String tableNameWithType = tableType == TableType.OFFLINE
           ? TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)
           : TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
@@ -1309,38 +1317,6 @@ public class PinotSegmentUploadDownloadRestletResource {
     } else {
       return FileUploadType.getDefaultUploadType();
     }
-  }
-
-  /**
-   * Resolve the raw table name for a segment upload.
-   * <p>
-   * The request {@code tableName} query parameter (also set by admin {@code -tableName} and batch
-   * {@code tableSpec.tableName}) is authoritative. Segment metadata {@code segment.table.name} is only
-   * used when the request omits the parameter. Callers may therefore build a segment for table A and
-   * upload it to table B without rewriting the tar.
-   *
-   * @param requestTableName table name from the upload request (may be null/empty or typed)
-   * @param segmentMetadata metadata read from the uploaded segment
-   * @return raw (untyped) table name used for ZK / deep-store routing
-   */
-  @VisibleForTesting
-  static String resolveRawTableNameForUpload(@Nullable String requestTableName, SegmentMetadata segmentMetadata) {
-    String metadataTableName = segmentMetadata.getTableName();
-    if (StringUtils.isNotEmpty(requestTableName)) {
-      String rawTableName = TableNameBuilder.extractRawTableName(requestTableName);
-      if (StringUtils.isNotEmpty(metadataTableName)) {
-        String metadataRawTableName = TableNameBuilder.extractRawTableName(metadataTableName);
-        if (!rawTableName.equals(metadataRawTableName)) {
-          LOGGER.info("Uploading segment: {} with request table name: {} which differs from segment metadata "
-                  + "table name: {}", segmentMetadata.getName(), rawTableName, metadataRawTableName);
-        }
-      }
-      return rawTableName;
-    }
-    // TODO: remove this when we completely deprecate the table name from segment metadata
-    LOGGER.warn("Table name is not provided as request query parameter when uploading segment: {} for table: {}",
-        segmentMetadata.getName(), metadataTableName);
-    return metadataTableName;
   }
 
   @VisibleForTesting

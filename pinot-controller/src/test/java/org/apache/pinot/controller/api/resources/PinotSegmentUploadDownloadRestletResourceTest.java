@@ -36,8 +36,6 @@ import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.upload.SegmentMetadataInfo;
-import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
-import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.crypt.NoOpPinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -314,22 +312,5 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
     } catch (Exception e) {
       throw new AssertionError("Method threw an exception: " + e.getMessage(), e);
     }
-  }
-
-  /**
-   * Request tableName is authoritative over segment.table.name baked into metadata.
-   * Enables build-for-A / upload-to-B (staging → prod promote) without rewriting the tar.
-   */
-  @Test
-  public void testResolveRawTableNamePrefersRequestOverMetadata() {
-    SegmentMetadata metadata = SegmentMetadataMockUtils.mockSegmentMetadata("tableA", "seg1");
-
-    assertEquals(PinotSegmentUploadDownloadRestletResource.resolveRawTableNameForUpload("tableB", metadata),
-        "tableB");
-    assertEquals(PinotSegmentUploadDownloadRestletResource.resolveRawTableNameForUpload("tableB_OFFLINE", metadata),
-        "tableB");
-    assertEquals(PinotSegmentUploadDownloadRestletResource.resolveRawTableNameForUpload(null, metadata), "tableA");
-    assertEquals(PinotSegmentUploadDownloadRestletResource.resolveRawTableNameForUpload("", metadata), "tableA");
-    assertEquals(PinotSegmentUploadDownloadRestletResource.resolveRawTableNameForUpload("tableA", metadata), "tableA");
   }
 }
