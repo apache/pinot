@@ -110,56 +110,58 @@ public class PauselessRealtimeIngestionIntegrationTest extends BasePauselessReal
   @AfterClass(alwaysRun = true)
   public void tearDown()
       throws IOException {
-    Exception cleanupFailure = tearDownScenario();
-    cleanupFailure = dropScenarioTable(DEFAULT_TABLE_NAME_2, cleanupFailure);
-    cleanupFailure = deleteScenarioSchema(DEFAULT_TABLE_NAME_2, cleanupFailure);
+    Throwable cleanupFailure = tearDownScenario();
+    TableCleanupResult referenceTableCleanup = dropScenarioTable(DEFAULT_TABLE_NAME_2, cleanupFailure);
+    cleanupFailure = referenceTableCleanup._cleanupFailure;
+    if (referenceTableCleanup._tableRemoved) {
+      cleanupFailure = deleteScenarioSchema(DEFAULT_TABLE_NAME_2, cleanupFailure);
+    }
     try {
       if (!_serverStarters.isEmpty()) {
         stopServer();
       }
-    } catch (Exception e) {
-      cleanupFailure = addCleanupFailure(cleanupFailure, e);
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
     }
     try {
       if (!_brokerStarters.isEmpty()) {
         stopBroker();
       }
-    } catch (Exception e) {
-      cleanupFailure = addCleanupFailure(cleanupFailure, e);
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
     }
     try {
       if (_controllerStarter != null) {
         stopController();
       }
-    } catch (Exception e) {
-      cleanupFailure = addCleanupFailure(cleanupFailure, e);
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
     }
     try {
       stopKafka();
-    } catch (Exception e) {
-      cleanupFailure = addCleanupFailure(cleanupFailure, e);
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
     }
-    stopZk();
+    try {
+      stopZk();
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
     try {
       if (_decoderAvroFile != null) {
         Files.deleteIfExists(_decoderAvroFile.toPath());
         _decoderAvroFile = null;
       }
-    } catch (IOException e) {
-      cleanupFailure = addCleanupFailure(cleanupFailure, e);
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
     }
     try {
       FileUtils.deleteDirectory(_tempDir);
-    } catch (IOException e) {
-      cleanupFailure = addCleanupFailure(cleanupFailure, e);
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
     }
 
-    if (cleanupFailure instanceof IOException) {
-      throw (IOException) cleanupFailure;
-    }
-    if (cleanupFailure != null) {
-      throw new IOException("Failed to tear down pauseless ingestion test cluster", cleanupFailure);
-    }
+    throwAsIOException(cleanupFailure);
   }
 
   @Test(description = "Ensure that all the segments are ingested, built and uploaded when pauseless consumption is "
@@ -212,34 +214,41 @@ public class PauselessRealtimeIngestionIntegrationTest extends BasePauselessReal
       testFailure = e;
       throw e;
     } finally {
-      Exception cleanupFailure = tearDownScenario();
+      Throwable cleanupFailure = tearDownScenario();
       if (cleanupFailure != null) {
         if (testFailure != null) {
           testFailure.addSuppressed(cleanupFailure);
         } else {
-          throw cleanupFailure;
+          throwCleanupFailure(cleanupFailure);
         }
       }
     }
   }
 
-  private Exception tearDownScenario() {
-    if (_scenario == null) {
-      return null;
-    }
-    String tableName = getTableName();
-    Exception cleanupFailure = null;
-    if (_failureEnabled) {
-      try {
-        disableFailure();
-      } catch (Exception e) {
-        cleanupFailure = e;
+  private Throwable tearDownScenario() {
+    Scenario scenario = _scenario;
+    try {
+      if (scenario == null) {
+        return null;
       }
+      String tableName = DEFAULT_TABLE_NAME + "_" + scenario._name;
+      Throwable cleanupFailure = null;
+      if (_failureEnabled) {
+        try {
+          disableFailure();
+        } catch (Throwable t) {
+          cleanupFailure = t;
+        }
+      }
+      TableCleanupResult tableCleanup = dropScenarioTable(tableName, cleanupFailure);
+      cleanupFailure = tableCleanup._cleanupFailure;
+      if (tableCleanup._tableRemoved) {
+        cleanupFailure = deleteScenarioSchema(tableName, cleanupFailure);
+      }
+      return cleanupFailure;
+    } finally {
+      _scenario = null;
     }
-    cleanupFailure = dropScenarioTable(tableName, cleanupFailure);
-    cleanupFailure = deleteScenarioSchema(tableName, cleanupFailure);
-    _scenario = null;
-    return cleanupFailure;
   }
 
   private void verifyCommitEndMetadataFailure()
@@ -278,37 +287,99 @@ public class PauselessRealtimeIngestionIntegrationTest extends BasePauselessReal
     runValidationAndVerify();
   }
 
-  private Exception dropScenarioTable(String tableName, Exception cleanupFailure) {
-    try {
-      if (_helixResourceManager != null && _helixResourceManager.getRealtimeTableConfig(tableName) != null) {
-        dropRealtimeTable(tableName);
-        String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-        waitForEVToDisappear(tableNameWithType);
-        waitForTableDataManagerRemoved(tableNameWithType);
-      }
-    } catch (Exception e) {
-      cleanupFailure = addCleanupFailure(cleanupFailure, e);
+  private TableCleanupResult dropScenarioTable(String tableName, Throwable cleanupFailure) {
+    if (_helixResourceManager == null) {
+      return new TableCleanupResult(cleanupFailure, false);
     }
-    return cleanupFailure;
+
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    try {
+      if (_helixResourceManager.getRealtimeTableConfig(tableName) != null) {
+        dropRealtimeTable(tableName);
+      }
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+
+    boolean tableConfigRemoved = false;
+    try {
+      tableConfigRemoved = _helixResourceManager.getRealtimeTableConfig(tableName) == null;
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+
+    boolean externalViewRemoved = false;
+    try {
+      waitForEVToDisappear(tableNameWithType);
+      externalViewRemoved = true;
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+
+    boolean tableDataManagerRemoved = false;
+    try {
+      waitForTableDataManagerRemoved(tableNameWithType);
+      tableDataManagerRemoved = true;
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+
+    return new TableCleanupResult(cleanupFailure,
+        tableConfigRemoved && externalViewRemoved && tableDataManagerRemoved);
   }
 
-  private Exception deleteScenarioSchema(String schemaName, Exception cleanupFailure) {
+  private Throwable deleteScenarioSchema(String schemaName, Throwable cleanupFailure) {
     try {
       if (_helixResourceManager != null && _helixResourceManager.getSchema(schemaName) != null) {
         deleteSchema(schemaName);
       }
-    } catch (Exception e) {
-      cleanupFailure = addCleanupFailure(cleanupFailure, e);
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
     }
     return cleanupFailure;
   }
 
-  private static Exception addCleanupFailure(Exception cleanupFailure, Exception failure) {
+  private static Throwable addCleanupFailure(Throwable cleanupFailure, Throwable failure) {
     if (cleanupFailure == null) {
       return failure;
     }
     cleanupFailure.addSuppressed(failure);
     return cleanupFailure;
+  }
+
+  private static void throwCleanupFailure(Throwable cleanupFailure)
+      throws Exception {
+    if (cleanupFailure instanceof Error) {
+      throw (Error) cleanupFailure;
+    }
+    if (cleanupFailure instanceof Exception) {
+      throw (Exception) cleanupFailure;
+    }
+    throw new AssertionError("Failed to clean up pauseless ingestion scenario", cleanupFailure);
+  }
+
+  private static void throwAsIOException(Throwable cleanupFailure)
+      throws IOException {
+    if (cleanupFailure == null) {
+      return;
+    }
+    if (cleanupFailure instanceof Error) {
+      throw (Error) cleanupFailure;
+    }
+    if (cleanupFailure instanceof IOException) {
+      throw (IOException) cleanupFailure;
+    }
+    throw new IOException("Failed to tear down pauseless ingestion test cluster", cleanupFailure);
+  }
+
+  private static class TableCleanupResult {
+    private final Throwable _cleanupFailure;
+    private final boolean _tableRemoved;
+
+    private TableCleanupResult(Throwable cleanupFailure, boolean tableRemoved) {
+      _cleanupFailure = cleanupFailure;
+      _tableRemoved = tableRemoved;
+    }
   }
 
   private enum Scenario {
