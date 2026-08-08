@@ -2267,7 +2267,8 @@ public class CommonConstants {
       /// far. NOTE: This counts all the documents physically stored in the segment, so for an upsert table it also
       /// includes the documents that have been replaced and are no longer returned by queries.
       public static final String TOTALDOCS = "$totalDocs";
-      /// Segment CRC (STRING). NULL on CONSUMING segments, which have no CRC until they are committed.
+      /// Segment CRC (LONG). NULL on CONSUMING segments, which have no CRC until they are committed.
+      /// NOTE: Do not confuse this constant with the enclosing [Segment#CRC], which is the `segment.crc` metadata key.
       public static final String CRC = "$crc";
 
       /// NOTE: Kept in sync with `BuiltInVirtualColumnDefinitions#DEFINITIONS`, which additionally carries the data

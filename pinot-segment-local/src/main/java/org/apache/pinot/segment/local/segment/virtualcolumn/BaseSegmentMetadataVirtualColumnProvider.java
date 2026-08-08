@@ -19,11 +19,13 @@
 package org.apache.pinot.segment.local.segment.virtualcolumn;
 
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
+import org.apache.pinot.segment.local.segment.index.readers.AllNullValueVectorReader;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /// Base class for the built-in virtual columns that expose a piece of the segment metadata (creation time, time range,
@@ -48,16 +50,33 @@ public abstract class BaseSegmentMetadataVirtualColumnProvider extends BaseConst
   @Nullable
   @Override
   public NullValueVectorReader buildNullValueVector(VirtualColumnContext context) {
-    return extractValueOrNull(context) == null ? new AllNullValueVector(context.getTotalDocCount()) : null;
+    return extractValueOrNull(context) == null ? new AllNullValueVectorReader(context.getTotalDocCount()) : null;
   }
 
   @Override
   public ColumnIndexContainer buildColumnIndexContainer(VirtualColumnContext context) {
-    // Resolve the metadata exactly once, so the dictionary and the null value vector cannot disagree about whether
-    // this column has a value - they are derived from the same read even if the metadata changes underneath.
+    return buildColumnIndexContainer(context, extractValueOrNull(context));
+  }
+
+  @Override
+  public ColumnMetadataImpl buildMetadata(VirtualColumnContext context) {
     Object extracted = extractValueOrNull(context);
+    return buildMetadata(context, valueOrPlaceholder(context, extracted), extracted != null);
+  }
+
+  @Override
+  public DataSource buildDataSource(VirtualColumnContext context) {
+    // Resolve the metadata exactly once for the whole data source, so the dictionary, the column metadata's min/max
+    // and the null value vector all agree about whether this column has a value. buildDataSource is the path a
+    // mutable segment takes, and it rebuilds its virtual data sources on every access.
+    Object extracted = extractValueOrNull(context);
+    return new ImmutableDataSource(buildMetadata(context, valueOrPlaceholder(context, extracted), extracted != null),
+        buildColumnIndexContainer(context, extracted));
+  }
+
+  private ColumnIndexContainer buildColumnIndexContainer(VirtualColumnContext context, @Nullable Object extracted) {
     return buildColumnIndexContainer(context, valueOrPlaceholder(context, extracted),
-        extracted == null ? new AllNullValueVector(context.getTotalDocCount()) : null);
+        extracted == null ? new AllNullValueVectorReader(context.getTotalDocCount()) : null);
   }
 
   /// Falls back to the column's default null value, which is only ever a placeholder: whenever it is used, the column
@@ -75,33 +94,4 @@ public abstract class BaseSegmentMetadataVirtualColumnProvider extends BaseConst
   /// Extracts the value for this column from the given segment metadata, or `null` when it is not available.
   @Nullable
   protected abstract Object extractValue(SegmentMetadata segmentMetadata);
-
-  /// [NullValueVectorReader] where every document is null. The bitmap is built lazily because null value vectors are
-  /// only consulted when null handling is enabled, while the vector itself is created on every data source build.
-  private static class AllNullValueVector implements NullValueVectorReader {
-    private final int _numDocs;
-    private volatile ImmutableRoaringBitmap _nullBitmap;
-
-    AllNullValueVector(int numDocs) {
-      _numDocs = numDocs;
-    }
-
-    @Override
-    public boolean isNull(int docId) {
-      return true;
-    }
-
-    @Override
-    public ImmutableRoaringBitmap getNullBitmap() {
-      ImmutableRoaringBitmap nullBitmap = _nullBitmap;
-      if (nullBitmap == null) {
-        // Benign race: concurrent callers may each build an equivalent bitmap, and publication is safe because the
-        // field is volatile and MutableRoaringBitmap#toImmutableRoaringBitmap returns a fully constructed value.
-        nullBitmap = _numDocs > 0 ? MutableRoaringBitmap.bitmapOfRange(0, _numDocs).toImmutableRoaringBitmap()
-            : new MutableRoaringBitmap().toImmutableRoaringBitmap();
-        _nullBitmap = nullBitmap;
-      }
-      return nullBitmap;
-    }
-  }
 }

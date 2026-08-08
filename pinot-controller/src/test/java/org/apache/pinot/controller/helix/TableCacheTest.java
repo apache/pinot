@@ -321,7 +321,7 @@ public class TableCacheTest {
         .addSingleValueDimension(BuiltInVirtualColumn.STARTTIME, DataType.TIMESTAMP)
         .addSingleValueDimension(BuiltInVirtualColumn.ENDTIME, DataType.TIMESTAMP)
         .addSingleValueDimension(BuiltInVirtualColumn.TOTALDOCS, DataType.INT)
-        .addSingleValueDimension(BuiltInVirtualColumn.CRC, DataType.STRING).build();
+        .addSingleValueDimension(BuiltInVirtualColumn.CRC, DataType.LONG).build();
   }
 
   @DataProvider(name = "testTableCacheDataProvider")

@@ -88,7 +88,7 @@ public class BuiltInVirtualColumnDefinitions {
       new Definition(BuiltInVirtualColumn.STARTTIME, DataType.TIMESTAMP, true),
       new Definition(BuiltInVirtualColumn.ENDTIME, DataType.TIMESTAMP, true),
       new Definition(BuiltInVirtualColumn.TOTALDOCS, DataType.INT, true),
-      new Definition(BuiltInVirtualColumn.CRC, DataType.STRING, true));
+      new Definition(BuiltInVirtualColumn.CRC, DataType.LONG, true));
 
   /// Names of all the built-in virtual columns, derived from [#DEFINITIONS].
   public static final Set<String> NAMES =

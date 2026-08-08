@@ -18,13 +18,20 @@
  */
 package org.apache.pinot.segment.local.segment.virtualcolumn;
 
+import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.spi.data.BuiltInVirtualColumnDefinitions;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
@@ -49,7 +56,7 @@ public class SegmentMetadataVirtualColumnProviderTest {
   private static final long CREATION_TIME_MS = 1_700_000_000_000L;
   private static final long START_TIME_MS = 1_690_000_000_000L;
   private static final long END_TIME_MS = 1_695_000_000_000L;
-  private static final String CRC = "1234567890";
+  private static final long CRC = 1234567890L;
 
   @DataProvider(name = "unsetCreationTimes")
   public Object[][] unsetCreationTimes() {
@@ -67,7 +74,7 @@ public class SegmentMetadataVirtualColumnProviderTest {
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getIndexCreationTime()).thenReturn(CREATION_TIME_MS);
     when(segmentMetadata.getTimeInterval()).thenReturn(new Interval(START_TIME_MS, END_TIME_MS, DateTimeZone.UTC));
-    when(segmentMetadata.getCrc()).thenReturn(CRC);
+    when(segmentMetadata.getCrc()).thenReturn(String.valueOf(CRC));
     when(segmentMetadata.getTotalDocs()).thenReturn(NUM_DOCS);
     return segmentMetadata;
   }
@@ -116,6 +123,20 @@ public class SegmentMetadataVirtualColumnProviderTest {
     return VirtualColumnProviderFactory.buildProvider(context).buildMetadata(context);
   }
 
+  /// Replaces the class-load assertion that used to live in VirtualColumnProviderFactory: a definition added without
+  /// a provider must be caught here at build time rather than at segment load.
+  @Test
+  public void testEveryDefinitionHasAProvider() {
+    Schema schema = buildSegmentSchema();
+    for (BuiltInVirtualColumnDefinitions.Definition definition : BuiltInVirtualColumnDefinitions.DEFINITIONS) {
+      FieldSpec fieldSpec = schema.getFieldSpecFor(definition.getName());
+      assertNotNull(fieldSpec, "No field spec added for: " + definition.getName());
+      assertTrue(fieldSpec.isVirtualColumn(), "No provider configured for: " + definition.getName());
+      assertEquals(fieldSpec.getDataType(), definition.getDataType());
+      assertEquals(fieldSpec.isSingleValueField(), definition.isSingleValueField());
+    }
+  }
+
   @Test
   public void testAllBuiltInVirtualColumnsAreAddedToSegmentSchema() {
     Schema schema = buildSegmentSchema();
@@ -139,7 +160,7 @@ public class SegmentMetadataVirtualColumnProviderTest {
     assertEquals(schema.getFieldSpecFor(BuiltInVirtualColumn.ENDTIME).getDataType(),
         FieldSpec.DataType.TIMESTAMP);
     assertEquals(schema.getFieldSpecFor(BuiltInVirtualColumn.TOTALDOCS).getDataType(), FieldSpec.DataType.INT);
-    assertEquals(schema.getFieldSpecFor(BuiltInVirtualColumn.CRC).getDataType(), FieldSpec.DataType.STRING);
+    assertEquals(schema.getFieldSpecFor(BuiltInVirtualColumn.CRC).getDataType(), FieldSpec.DataType.LONG);
     for (String column : List.of(BuiltInVirtualColumn.CREATIONTIME, BuiltInVirtualColumn.STARTTIME,
         BuiltInVirtualColumn.ENDTIME, BuiltInVirtualColumn.TOTALDOCS, BuiltInVirtualColumn.CRC)) {
       assertTrue(schema.getFieldSpecFor(column).isSingleValueField(), column + " should be single-value");
@@ -157,7 +178,7 @@ public class SegmentMetadataVirtualColumnProviderTest {
         START_TIME_MS);
     assertEquals(buildDictionary(schema, BuiltInVirtualColumn.ENDTIME, segmentMetadata).getLongValue(0), END_TIME_MS);
     assertEquals(buildDictionary(schema, BuiltInVirtualColumn.TOTALDOCS, segmentMetadata).getIntValue(0), NUM_DOCS);
-    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.CRC, segmentMetadata).getStringValue(0), CRC);
+    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.CRC, segmentMetadata).getLongValue(0), CRC);
   }
 
   @Test
@@ -199,8 +220,8 @@ public class SegmentMetadataVirtualColumnProviderTest {
         (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP);
     assertEquals(buildDictionary(schema, BuiltInVirtualColumn.ENDTIME, segmentMetadata).getLongValue(0),
         (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP);
-    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.CRC, segmentMetadata).getStringValue(0),
-        FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
+    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.CRC, segmentMetadata).getLongValue(0),
+        (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
     // The stored value is only a placeholder: the column must additionally report every document as null
     assertColumnIsNull(schema, BuiltInVirtualColumn.CREATIONTIME, segmentMetadata);
     assertColumnIsNull(schema, BuiltInVirtualColumn.STARTTIME, segmentMetadata);
@@ -210,6 +231,130 @@ public class SegmentMetadataVirtualColumnProviderTest {
     // $totalDocs comes from the context, so it is always available and never null
     assertEquals(buildDictionary(schema, BuiltInVirtualColumn.TOTALDOCS, segmentMetadata).getIntValue(0), NUM_DOCS);
     assertNull(buildNullValueVector(schema, BuiltInVirtualColumn.TOTALDOCS, segmentMetadata));
+  }
+
+  /// Segment pruners read `ColumnMetadata` min/max without consulting the null value vector, so a column whose value
+  /// is unavailable must not publish the placeholder as its min/max. Otherwise a CONSUMING segment reporting epoch 0
+  /// for `$creationTime` sorts first in `ORDER BY $creationTime ASC LIMIT n` and prunes away the committed segments
+  /// that actually hold the answer.
+  @Test
+  public void testUnavailableMetadataPublishesNoMinMax() {
+    Schema schema = buildSegmentSchema();
+    SegmentMetadata segmentMetadata = consumingSegmentMetadata(-1L);
+    for (String column : List.of(BuiltInVirtualColumn.CREATIONTIME, BuiltInVirtualColumn.STARTTIME,
+        BuiltInVirtualColumn.ENDTIME, BuiltInVirtualColumn.CRC)) {
+      ColumnMetadata columnMetadata = buildColumnMetadata(schema, column, segmentMetadata);
+      assertNull(columnMetadata.getMinValue(), "Unavailable " + column + " should not publish a min value");
+      assertNull(columnMetadata.getMaxValue(), "Unavailable " + column + " should not publish a max value");
+
+      // The same has to hold through buildDataSource, which is the path a mutable segment takes
+      FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+      VirtualColumnContext context = new VirtualColumnContext(fieldSpec, NUM_DOCS, segmentMetadata);
+      DataSourceMetadata dataSourceMetadata =
+          VirtualColumnProviderFactory.buildProvider(context).buildDataSource(context).getDataSourceMetadata();
+      assertNull(dataSourceMetadata.getMinValue(), column);
+      assertNull(dataSourceMetadata.getMaxValue(), column);
+    }
+
+    // A column whose value IS available still publishes min/max, so pruning keeps working
+    ColumnMetadata available = buildColumnMetadata(schema, BuiltInVirtualColumn.CREATIONTIME, mockSegmentMetadata());
+    assertEquals(available.getMinValue(), CREATION_TIME_MS);
+    assertEquals(available.getMaxValue(), CREATION_TIME_MS);
+  }
+
+  /// A segment that has not indexed anything yet still has to produce a well-formed, empty null bitmap rather than
+  /// failing or reporting a stale document count.
+  @Test
+  public void testNullValueVectorOnAnEmptySegment() {
+    Schema schema = buildSegmentSchema();
+    FieldSpec fieldSpec = schema.getFieldSpecFor(BuiltInVirtualColumn.STARTTIME);
+    VirtualColumnContext context = new VirtualColumnContext(fieldSpec, 0, consumingSegmentMetadata(-1L));
+    NullValueVectorReader nullValueVector =
+        VirtualColumnProviderFactory.buildProvider(context).buildNullValueVector(context);
+    assertNotNull(nullValueVector);
+    assertTrue(nullValueVector.getNullBitmap().isEmpty());
+  }
+
+  /// The null value vector is built on every data source access for a mutable segment, so the bitmap is materialized
+  /// lazily. Repeated reads must return an equal - and stable - bitmap.
+  @Test
+  public void testNullValueVectorBitmapIsStableAcrossReads() {
+    Schema schema = buildSegmentSchema();
+    FieldSpec fieldSpec = schema.getFieldSpecFor(BuiltInVirtualColumn.ENDTIME);
+    VirtualColumnContext context = new VirtualColumnContext(fieldSpec, NUM_DOCS, consumingSegmentMetadata(-1L));
+    NullValueVectorReader nullValueVector =
+        VirtualColumnProviderFactory.buildProvider(context).buildNullValueVector(context);
+    assertNotNull(nullValueVector);
+    assertEquals(nullValueVector.getNullBitmap(), nullValueVector.getNullBitmap());
+    assertEquals(nullValueVector.getNullBitmap().getCardinality(), NUM_DOCS);
+  }
+
+  /// The index container must hand the null value vector to the engine, and must not hand one back for an index type
+  /// a virtual column does not have.
+  @Test
+  public void testIndexContainerExposesTheNullValueVector()
+      throws IOException {
+    Schema schema = buildSegmentSchema();
+    FieldSpec fieldSpec = schema.getFieldSpecFor(BuiltInVirtualColumn.CRC);
+    VirtualColumnContext context = new VirtualColumnContext(fieldSpec, NUM_DOCS, consumingSegmentMetadata(-1L));
+    try (ColumnIndexContainer container =
+        VirtualColumnProviderFactory.buildProvider(context).buildColumnIndexContainer(context)) {
+      assertNotNull(container.getIndex(StandardIndexes.nullValueVector()));
+      assertNotNull(container.getIndex(StandardIndexes.forward()));
+      assertNotNull(container.getIndex(StandardIndexes.dictionary()));
+      assertNull(container.getIndex(StandardIndexes.range()));
+    }
+
+    // With the metadata available there is no null value vector at all
+    VirtualColumnContext availableContext = new VirtualColumnContext(fieldSpec, NUM_DOCS, mockSegmentMetadata());
+    try (ColumnIndexContainer container =
+        VirtualColumnProviderFactory.buildProvider(availableContext).buildColumnIndexContainer(availableContext)) {
+      assertNull(container.getIndex(StandardIndexes.nullValueVector()));
+    }
+  }
+
+  /// Every stored type the constant-value base supports must round-trip through the type check, so that a new virtual
+  /// column of any type is rejected loudly rather than silently mis-cast.
+  @Test(dataProvider = "storedTypeValues")
+  public void testValueTypeCheckAcceptsEveryStoredType(FieldSpec.DataType dataType, Object value) {
+    FieldSpec fieldSpec = new DimensionFieldSpec("col", dataType, true);
+    VirtualColumnContext context = new VirtualColumnContext(fieldSpec, NUM_DOCS, null);
+    BaseConstantValueVirtualColumnProvider provider = new BaseConstantValueVirtualColumnProvider() {
+      @Override
+      protected Object getValue(VirtualColumnContext ctx) {
+        return value;
+      }
+    };
+    assertNotNull(provider.buildDictionary(context));
+    assertNotNull(provider.buildMetadata(context));
+
+    // ... and the same type check rejects a value of the wrong type
+    BaseConstantValueVirtualColumnProvider wrong = new BaseConstantValueVirtualColumnProvider() {
+      @Override
+      protected Object getValue(VirtualColumnContext ctx) {
+        return new Object();
+      }
+    };
+    try {
+      wrong.buildDictionary(context);
+      fail("Expecting an IllegalStateException for data type: " + dataType);
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("col"), e.getMessage());
+    }
+  }
+
+  @DataProvider(name = "storedTypeValues")
+  public Object[][] storedTypeValues() {
+    return new Object[][]{
+        {FieldSpec.DataType.INT, 1},
+        {FieldSpec.DataType.LONG, 1L},
+        {FieldSpec.DataType.FLOAT, 1.0f},
+        {FieldSpec.DataType.DOUBLE, 1.0d},
+        {FieldSpec.DataType.BIG_DECIMAL, BigDecimal.ONE},
+        {FieldSpec.DataType.STRING, "value"},
+        {FieldSpec.DataType.BYTES, new byte[]{1, 2}},
+        {FieldSpec.DataType.TIMESTAMP, 1L}
+    };
   }
 
   /// The type check exists so that a provider returning the wrong box type names the column and the provider instead
@@ -248,8 +393,8 @@ public class SegmentMetadataVirtualColumnProviderTest {
         (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP);
     assertEquals(buildDictionary(schema, BuiltInVirtualColumn.ENDTIME, null).getLongValue(0),
         (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP);
-    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.CRC, null).getStringValue(0),
-        FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
+    assertEquals(buildDictionary(schema, BuiltInVirtualColumn.CRC, null).getLongValue(0),
+        (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
     assertEquals(buildDictionary(schema, BuiltInVirtualColumn.TOTALDOCS, null).getIntValue(0), NUM_DOCS);
 
     assertColumnIsNull(schema, BuiltInVirtualColumn.CREATIONTIME, null);

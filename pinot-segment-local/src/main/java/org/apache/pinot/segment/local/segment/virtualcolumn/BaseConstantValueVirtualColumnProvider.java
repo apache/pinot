@@ -54,9 +54,14 @@ public abstract class BaseConstantValueVirtualColumnProvider implements VirtualC
   /// Reads the value via [#getValue(VirtualColumnContext)] and checks it against the field's stored type, so that a
   /// provider returning the wrong box type fails with the offending column and provider named rather than with a bare
   /// `ClassCastException` from deep inside segment loading.
-  protected final Object getCheckedValue(VirtualColumnContext context) {
+  private Object getCheckedValue(VirtualColumnContext context) {
+    return checkValue(context, getValue(context));
+  }
+
+  /// Checks an already-resolved value against the field's stored type. Every path that turns a value into an index
+  /// goes through here, including the one taken by subclasses that resolve the value themselves.
+  private Object checkValue(VirtualColumnContext context, Object value) {
     FieldSpec fieldSpec = context.getFieldSpec();
-    Object value = getValue(context);
     Class<?> expectedClass = getValueClass(fieldSpec);
     Preconditions.checkState(expectedClass.isInstance(value),
         "Virtual column provider: %s returned value of type: %s for column: %s, expecting: %s", getClass().getName(),
@@ -107,8 +112,9 @@ public abstract class BaseConstantValueVirtualColumnProvider implements VirtualC
 
   /// Builds the dictionary from an already-resolved value, so that callers which need the value more than once can
   /// resolve it a single time.
-  protected final Dictionary buildDictionary(VirtualColumnContext context, Object value) {
+  private Dictionary buildDictionary(VirtualColumnContext context, Object value) {
     FieldSpec fieldSpec = context.getFieldSpec();
+    checkValue(context, value);
     switch (fieldSpec.getDataType().getStoredType()) {
       case INT:
         return new ConstantValueIntDictionary((int) value);
@@ -146,7 +152,18 @@ public abstract class BaseConstantValueVirtualColumnProvider implements VirtualC
 
   /// Builds the column metadata from an already-resolved value.
   protected final ColumnMetadataImpl buildMetadata(VirtualColumnContext context, Object value) {
+    return buildMetadata(context, value, true);
+  }
+
+  /// Builds the column metadata from an already-resolved value.
+  ///
+  /// @param hasValue `false` when `value` is only a placeholder standing in for a value that is not available, in
+  ///                 which case the min/max are left unset. Segment pruners read min/max without consulting the null
+  ///                 value vector, so publishing the placeholder there would let an all-null column prune or reorder
+  ///                 segments as if it held a real extreme value.
+  protected final ColumnMetadataImpl buildMetadata(VirtualColumnContext context, Object value, boolean hasValue) {
     FieldSpec fieldSpec = context.getFieldSpec();
+    checkValue(context, value);
     ColumnMetadataImpl.Builder builder = new ColumnMetadataImpl.Builder().setFieldSpec(fieldSpec)
         .setTotalDocs(context.getTotalDocCount())
         .setCardinality(1)
@@ -158,6 +175,10 @@ public abstract class BaseConstantValueVirtualColumnProvider implements VirtualC
       // set as 1 because the MV column bitmap uses 1 to delimit the rows for a MV column. Each MV column will have a
       // default null value based on column's data type
       builder.setMaxNumberOfMultiValues(1);
+    }
+
+    if (!hasValue) {
+      return builder.build();
     }
 
     switch (fieldSpec.getDataType().getStoredType()) {

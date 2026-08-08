@@ -2462,7 +2462,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "[\"$creationTime\",\"$startTime\",\"$endTime\",\"$totalDocs\",\"$crc\"]");
     // The three time columns are TIMESTAMP, so they render as formatted timestamps rather than raw millis
     assertEquals(dataSchema.get("columnDataTypes").toString(),
-        "[\"TIMESTAMP\",\"TIMESTAMP\",\"TIMESTAMP\",\"INT\",\"STRING\"]");
+        "[\"TIMESTAMP\",\"TIMESTAMP\",\"TIMESTAMP\",\"INT\",\"LONG\"]");
     JsonNode rows = resultTable.get("rows");
     assertEquals(rows.size(), 10);
     for (int i = 0; i < 10; i++) {
@@ -2474,11 +2474,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       assertTrue(startTime > 0, "Unexpected segment start time: " + row.get(1).asText());
       assertTrue(startTime <= endTime, "Segment start time: " + startTime + " is after end time: " + endTime);
       assertTrue(row.get(3).asInt() > 0, "Unexpected total docs: " + row.get(3).asInt());
-      // A real CRC, not the default null value the column falls back to when the metadata is unavailable
-      String crc = row.get(4).asText();
-      assertNotEquals(crc, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING, "Segment CRC should be a real CRC");
-      assertNotEquals(crc, String.valueOf(Long.MIN_VALUE), "Segment CRC should be a real CRC");
-      assertTrue(crc.matches("-?\\d+"), "Unexpected segment CRC: " + crc);
+      // A real CRC, not the placeholder the column falls back to when the metadata is unavailable
+      long crc = row.get(4).asLong();
+      assertNotEquals(crc, (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG, "Segment CRC should be a real CRC");
     }
 
     // $totalDocs is constant within a segment, so the per-segment values must add up to the total number of rows
@@ -2508,9 +2506,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Filtering on a single segment's CRC must return exactly the documents grouped under that CRC
     query = "SELECT $crc, COUNT(*) FROM mytable GROUP BY $crc LIMIT 10000";
     JsonNode crcRow = postQuery(query).get("resultTable").get("rows").get(0);
-    String segmentCrc = crcRow.get(0).asText();
+    long segmentCrc = crcRow.get(0).asLong();
     long docsForCrc = crcRow.get(1).asLong();
-    assertEquals(postQuery("SELECT COUNT(*) FROM mytable WHERE $crc = '" + segmentCrc + "'").get("resultTable")
+    assertEquals(postQuery("SELECT COUNT(*) FROM mytable WHERE $crc = " + segmentCrc).get("resultTable")
         .get("rows").get(0).get(0).asLong(), docsForCrc);
 
     // With null handling on, the engine must consult the null value vector. Every segment of this table has a time

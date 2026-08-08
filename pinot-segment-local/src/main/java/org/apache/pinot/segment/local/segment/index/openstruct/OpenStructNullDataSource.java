@@ -23,19 +23,17 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.datasource.BaseDataSource;
+import org.apache.pinot.segment.local.segment.index.readers.AllNullValueVectorReader;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
-import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /// Typed all-null {@link org.apache.pinot.segment.spi.datasource.DataSource} for an OPEN_STRUCT key
@@ -54,7 +52,7 @@ public class OpenStructNullDataSource extends BaseDataSource {
   public OpenStructNullDataSource(FieldSpec fieldSpec, int numDocs) {
     super(new AllNullMetadata(fieldSpec, numDocs), new ColumnIndexContainer.FromMap(Map.of(
         StandardIndexes.forward(), new TypedNullForwardIndex(fieldSpec.getDataType().getStoredType()),
-        StandardIndexes.nullValueVector(), new AllNullValueVector(numDocs))));
+        StandardIndexes.nullValueVector(), new AllNullValueVectorReader(numDocs))));
   }
 
   /// Creates an all-null DataSource for a key absent from this OPEN_STRUCT segment.
@@ -128,29 +126,6 @@ public class OpenStructNullDataSource extends BaseDataSource {
 
     @Override
     public void close() {
-    }
-  }
-
-  /// {@link NullValueVectorReader} where every document is null.
-  static class AllNullValueVector implements NullValueVectorReader {
-    private final ImmutableRoaringBitmap _nullBitmap;
-
-    AllNullValueVector(int numDocs) {
-      MutableRoaringBitmap bm = new MutableRoaringBitmap();
-      if (numDocs > 0) {
-        bm.add(0L, numDocs);
-      }
-      _nullBitmap = bm.toImmutableRoaringBitmap();
-    }
-
-    @Override
-    public boolean isNull(int docId) {
-      return true;
-    }
-
-    @Override
-    public ImmutableRoaringBitmap getNullBitmap() {
-      return _nullBitmap;
     }
   }
 

@@ -19,10 +19,9 @@
 package org.apache.pinot.segment.local.segment.virtualcolumn;
 
 
-
 /// Virtual column provider for `$totalDocs`, the number of documents in the segment.
 ///
-/// The count is taken from the virtual column context rather than from [org.apache.pinot.segment.spi.SegmentMetadata],
+/// The count is taken from the virtual column context rather than from `SegmentMetadata`,
 /// so that a CONSUMING segment reports the number of documents indexed so far instead of `0`.
 ///
 /// This is the number of documents physically stored in the segment, so for an upsert table it also includes the

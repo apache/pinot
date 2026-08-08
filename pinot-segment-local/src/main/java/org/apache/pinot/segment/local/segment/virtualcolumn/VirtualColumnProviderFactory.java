@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.virtualcolumn;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.column.DefaultNullValueVirtualColumnProvider;
 import org.apache.pinot.spi.data.BuiltInVirtualColumnDefinitions;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -31,9 +32,9 @@ import org.apache.pinot.spi.utils.NetUtils;
 
 /// Factory for virtual column providers.
 public class VirtualColumnProviderFactory {
-  /// Provider for each built-in virtual column. Its key set is asserted against
-  /// [BuiltInVirtualColumnDefinitions#DEFINITIONS] below, so a column added there without a provider here fails at
-  /// class load rather than aborting every segment load on every server.
+  /// Provider for each built-in virtual column. Its key set is asserted to cover
+  /// [BuiltInVirtualColumnDefinitions#DEFINITIONS] by `SegmentMetadataVirtualColumnProviderTest`, so a column added
+  /// there without a provider here is caught at build time; at runtime `getProviderClass` names the offending column.
   private static final Map<String, Class<? extends VirtualColumnProvider>> PROVIDER_CLASSES =
       Map.of(BuiltInVirtualColumn.DOCID, DocIdVirtualColumnProvider.class,
           BuiltInVirtualColumn.HOSTNAME, DefaultNullValueVirtualColumnProvider.class,
@@ -45,17 +46,32 @@ public class VirtualColumnProviderFactory {
           BuiltInVirtualColumn.TOTALDOCS, SegmentTotalDocsVirtualColumnProvider.class,
           BuiltInVirtualColumn.CRC, SegmentCrcVirtualColumnProvider.class);
 
-  static {
-    Preconditions.checkState(PROVIDER_CLASSES.keySet().equals(BuiltInVirtualColumnDefinitions.NAMES),
-        "Virtual column providers: %s do not cover the built-in virtual columns: %s", PROVIDER_CLASSES.keySet(),
-        BuiltInVirtualColumnDefinitions.NAMES);
-  }
+  /// Shared instances of the built-in providers, keyed by the class name stored in the field spec.
+  private static final Map<String, VirtualColumnProvider> BUILT_IN_PROVIDERS = PROVIDER_CLASSES.values()
+      .stream()
+      .distinct()
+      .collect(Collectors.toUnmodifiableMap(Class::getName, VirtualColumnProviderFactory::newInstance));
 
   private VirtualColumnProviderFactory() {
   }
 
+  private static VirtualColumnProvider newInstance(Class<? extends VirtualColumnProvider> providerClass) {
+    try {
+      return providerClass.getDeclaredConstructor().newInstance();
+    } catch (Exception e) {
+      throw new IllegalStateException("Caught exception while creating instance of: " + providerClass.getName(), e);
+    }
+  }
+
   public static VirtualColumnProvider buildProvider(VirtualColumnContext virtualColumnContext) {
     String virtualColumnProvider = virtualColumnContext.getFieldSpec().getVirtualColumnProvider();
+    // The built-in providers are stateless - everything they need comes from the VirtualColumnContext - so a single
+    // shared instance serves every column of every segment. This matters at segment load, which resolves a provider
+    // per virtual column per segment, and on the mutable path, which resolves one per query.
+    VirtualColumnProvider builtInProvider = BUILT_IN_PROVIDERS.get(virtualColumnProvider);
+    if (builtInProvider != null) {
+      return builtInProvider;
+    }
     try {
       return PluginManager.get().createInstance(virtualColumnProvider);
     } catch (Exception e) {

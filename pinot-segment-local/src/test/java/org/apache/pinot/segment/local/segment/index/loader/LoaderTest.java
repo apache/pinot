@@ -230,7 +230,7 @@ public class LoaderTest {
     assertEquals(indexSegment.getDataSource(BuiltInVirtualColumn.TOTALDOCS).getDictionary().get(0),
         segmentMetadata.getTotalDocs());
     assertEquals(indexSegment.getDataSource(BuiltInVirtualColumn.CRC).getDictionary().get(0),
-        segmentMetadata.getCrc());
+        Long.parseLong(segmentMetadata.getCrc()));
     assertEquals(indexSegment.getDataSource(BuiltInVirtualColumn.CREATIONTIME).getDictionary().get(0),
         segmentMetadata.getIndexCreationTime());
     for (String column : List.of(BuiltInVirtualColumn.TOTALDOCS, BuiltInVirtualColumn.CRC,
