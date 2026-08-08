@@ -530,8 +530,14 @@ public class GroupByDataTableReducer implements DataTableReducer {
       case JSON:
         return dataTable.getString(rowId, colId);
       case BYTES:
-      case UUID:
         return dataTable.getBytes(rowId, colId).getBytes();
+      case UUID:
+        // Deliberately delegated to ColumnDataType#convert rather than falling through to BYTES. The other reduce
+        // path (reduceWithIndexedTable) converts group keys with exactly that method, and UUID is the one type
+        // whose converted form is not its stored bytes -- it yields a java.util.UUID. PredicateRowMatcher casts
+        // directly on that, so returning the raw byte[] here makes GROUP BY ... HAVING on a UUID column throw
+        // ClassCastException. Delegating keeps the two paths identical by construction.
+        return columnDataType.convert(dataTable.getBytes(rowId, colId));
       default:
         throw new IllegalStateException("Illegal column data type in group key: " + columnDataType);
     }
