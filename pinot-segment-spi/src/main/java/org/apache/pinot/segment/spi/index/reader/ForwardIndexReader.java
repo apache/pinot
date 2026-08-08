@@ -384,7 +384,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
         break;
       case MAP:
         for (int i = 0; i < length; i++) {
-          values[i] = MapUtils.toString(getMap(docIds[i], context));
+          values[i] = getMapAsJsonString(docIds[i], context);
         }
         break;
       default:
@@ -464,6 +464,19 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
     throw new UnsupportedOperationException("This ForwardIndexReader does not support MAP types. "
         + "This indicates that either the column is getting mistyped or the wrong "
         + "ForwardIndexReader is being created to read this column.");
+  }
+
+  /// Reads the MAP type single-value at the given document id, rendered as a JSON object string.
+  ///
+  /// Readers that store the map as a serialized frame should override this to render straight from those bytes
+  /// (see [MapUtils#frameToJsonString(byte\[\])]); the default here materializes the map first and serializes it
+  /// again, which is what a reader holding the map columnar-decomposed has to do anyway.
+  ///
+  /// @param docId Document id
+  /// @param context Reader context
+  /// @return MAP type single-value at the given document id, as JSON
+  default String getMapAsJsonString(int docId, T context) {
+    return MapUtils.toString(getMap(docId, context));
   }
 
   default int get32BitsMurmur3Hash(int docId, T context) {

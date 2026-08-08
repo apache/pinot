@@ -19,6 +19,8 @@
 package org.apache.pinot.spi.utils;
 
 import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.HashMap;
@@ -289,5 +291,63 @@ public class MapUtilsTest {
     Map<String, Object> map = new HashMap<>();
     map.put("nested", nested);
     assertEquals(MapUtils.toString(map), "{\"nested\":{\"d\":\"2022-02-08\"}}");
+  }
+
+  /// The contract that lets the forward-index read path swap `toString(deserializeMap(frame))` for
+  /// `frameToJsonString(frame)`: for any frame written through the key-sorting [MapUtils#serializeMap(Map)] - which
+  /// is what both forward-index write paths use - the two must produce identical output.
+  @Test
+  void testFrameToJsonStringMatchesToString() {
+    Map<String, Object> nested = new LinkedHashMap<>();
+    nested.put("z", 1);
+    nested.put("a", List.of(1, 2, 3));
+
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("k8s.workload.name", "pinot-server");
+    map.put("int", 42);
+    map.put("long", 9999999999L);
+    map.put("double", 1.5);
+    map.put("bool", true);
+    map.put("nullValue", null);
+    map.put("nested", nested);
+    map.put("list", List.of("a", "b"));
+    map.put("emptyString", "");
+    map.put("unicodeValue", "çöğüşÇÖĞÜŞéÉ");
+    map.put("命名空间", "namespace");
+    map.put("date", LocalDate.of(2022, 2, 8));
+    map.put("quote\"key", "quoted");
+    map.put("back\\slash", "escaped");
+    map.put("tab\tkey", "control");
+    map.put("value with \"quotes\" and \\ backslash", "in value");
+
+    assertEquals(MapUtils.frameToJsonString(MapUtils.serializeMap(map)), MapUtils.toString(map));
+  }
+
+  @Test
+  void testFrameToJsonStringHandlesEmptyMap() {
+    assertEquals(MapUtils.frameToJsonString(MapUtils.serializeMap(Map.of())), "{}");
+    assertEquals(MapUtils.frameToJsonString(MapUtils.serializeMap(Map.of())), MapUtils.toString(Map.of()));
+  }
+
+  /// Rendering must round-trip back through the JSON reader to the same map, independent of the string comparison
+  /// above - that guards against two implementations agreeing on malformed output.
+  @Test
+  void testFrameToJsonStringRoundTrips() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("a", "value");
+    map.put("b", List.of(1, 2));
+    map.put("çö", Map.of("inner", true));
+    assertEquals(MapUtils.fromString(MapUtils.frameToJsonString(MapUtils.serializeMap(map))),
+        MapUtils.deserializeMap(MapUtils.serializeMap(map)));
+  }
+
+  /// An off-heap forward-index view arrives in the platform's native byte order while the frame is written
+  /// big-endian, so the renderer has to force the order rather than trust the buffer.
+  @Test
+  void testFrameToJsonStringForcesBigEndian() {
+    byte[] serialized = MapUtils.serializeMap(Map.of("k8s.workload.name", "pinot-server"));
+    ByteBuffer littleEndian = ByteBuffer.wrap(serialized).order(ByteOrder.LITTLE_ENDIAN);
+
+    assertEquals(MapUtils.frameToJsonString(littleEndian), "{\"k8s.workload.name\":\"pinot-server\"}");
   }
 }
