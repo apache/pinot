@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -64,6 +65,12 @@ public class LookupJoinOperator extends MultiStageOperator {
   private final LeafOperator _rightInput;
   private final JoinRelType _joinType;
   private final int[] _leftKeyIds;
+  private final int[] _rightKeyIds;
+  // For each dimension table primary key column position, the left column index to extract from the
+  // left row, or -1 if the value is a literal from a non-equi condition.
+  private final int[] _keyLeftIndices;
+  // For each dimension table primary key column position, the literal value when _keyLeftIndices[i] < 0.
+  private final Object[] _keyLiteralValues;
   private final DimensionTableDataManager _rightTable;
   private final String[] _rightColumns;
   private final DataSchema _resultSchema;
@@ -96,10 +103,71 @@ public class LookupJoinOperator extends MultiStageOperator {
     _rightColumns = _rightInput.getDataSchema().getColumnNames();
     _resultSchema = node.getDataSchema();
     _resultColumnSize = _resultSchema.size();
+    List<Integer> rightKeys = node.getRightKeys();
+    _rightKeyIds = new int[rightKeys.size()];
+    for (int i = 0; i < rightKeys.size(); i++) {
+      _rightKeyIds[i] = rightKeys.get(i);
+    }
     List<RexExpression> nonEquiConditions = node.getNonEquiConditions();
     _nonEquiEvaluators = new ArrayList<>(nonEquiConditions.size());
     for (RexExpression nonEquiCondition : nonEquiConditions) {
       _nonEquiEvaluators.add(TransformOperandFactory.getTransformOperand(nonEquiCondition, _resultSchema));
+    }
+
+    // Build a complete lookup key in the dimension table's primary key column order. When a join
+    // condition supplies a dimension primary key component as a literal (e.g. "dim_tbl.currency = 'gbp'"),
+    // Calcite's analyzeCondition() classifies it as a non-equi condition rather than an equi-join key, so it
+    // is absent from leftKeys/rightKeys. The lookup key must still include that component, otherwise the
+    // lookup misses and returns 0 rows. Fill each primary key position from either the corresponding left
+    // column (equi-join) or the literal value (non-equi condition).
+    List<String> primaryKeyColumns = _rightTable.getPrimaryKeyColumns();
+    Preconditions.checkState(primaryKeyColumns != null && !primaryKeyColumns.isEmpty(),
+        "Dimension table must have primary key columns for lookup join");
+    _keyLeftIndices = new int[primaryKeyColumns.size()];
+    _keyLiteralValues = new Object[primaryKeyColumns.size()];
+    Arrays.fill(_keyLeftIndices, -1);
+
+    // Map equi-join right keys to their primary key column positions.
+    for (int i = 0; i < rightKeys.size(); i++) {
+      String rightColumnName = _rightColumns[rightKeys.get(i)];
+      int pkPosition = primaryKeyColumns.indexOf(rightColumnName);
+      if (pkPosition >= 0) {
+        _keyLeftIndices[pkPosition] = leftKeys.get(i);
+      }
+    }
+
+    // Extract literal values for primary key components supplied as literals in non-equi conditions of the
+    // form "dimension_column = literal" (or "literal = dimension_column").
+    for (RexExpression nonEquiCondition : nonEquiConditions) {
+      if (nonEquiCondition instanceof RexExpression.FunctionCall) {
+        RexExpression.FunctionCall functionCall = (RexExpression.FunctionCall) nonEquiCondition;
+        if ("EQUALS".equals(functionCall.getFunctionName()) && functionCall.getFunctionOperands().size() == 2) {
+          RexExpression firstOperand = functionCall.getFunctionOperands().get(0);
+          RexExpression secondOperand = functionCall.getFunctionOperands().get(1);
+          int rightColumnIndex = -1;
+          Object literalValue = null;
+          if (firstOperand instanceof RexExpression.InputRef && secondOperand instanceof RexExpression.Literal) {
+            int inputRefIndex = ((RexExpression.InputRef) firstOperand).getIndex();
+            if (inputRefIndex >= _leftColumnSize) {
+              rightColumnIndex = inputRefIndex - _leftColumnSize;
+              literalValue = ((RexExpression.Literal) secondOperand).getValue();
+            }
+          } else if (firstOperand instanceof RexExpression.Literal && secondOperand instanceof RexExpression.InputRef) {
+            int inputRefIndex = ((RexExpression.InputRef) secondOperand).getIndex();
+            if (inputRefIndex >= _leftColumnSize) {
+              rightColumnIndex = inputRefIndex - _leftColumnSize;
+              literalValue = ((RexExpression.Literal) firstOperand).getValue();
+            }
+          }
+          if (rightColumnIndex >= 0 && rightColumnIndex < _rightColumns.length) {
+            String rightColumnName = _rightColumns[rightColumnIndex];
+            int pkPosition = primaryKeyColumns.indexOf(rightColumnName);
+            if (pkPosition >= 0 && _keyLeftIndices[pkPosition] < 0) {
+              _keyLiteralValues[pkPosition] = literalValue;
+            }
+          }
+        }
+      }
     }
   }
 
@@ -192,7 +260,7 @@ public class LookupJoinOperator extends MultiStageOperator {
   private List<Object[]> buildJoinedDataBlockSemi(MseBlock.Data leftBlock) {
     List<Object[]> container = leftBlock.asRowHeap().getRows();
     List<Object[]> rows = new ArrayList<>(container.size());
-    PrimaryKey key = new PrimaryKey(new Object[_leftKeyIds.length]);
+    PrimaryKey key = new PrimaryKey(new Object[_keyLeftIndices.length]);
 
     for (Object[] leftRow : container) {
       fillKey(leftRow, key);
@@ -206,7 +274,7 @@ public class LookupJoinOperator extends MultiStageOperator {
   private List<Object[]> buildJoinedDataBlockAnti(MseBlock.Data leftBlock) {
     List<Object[]> container = leftBlock.asRowHeap().getRows();
     List<Object[]> rows = new ArrayList<>(container.size());
-    PrimaryKey key = new PrimaryKey(new Object[_leftKeyIds.length]);
+    PrimaryKey key = new PrimaryKey(new Object[_keyLeftIndices.length]);
 
     for (Object[] leftRow : container) {
       fillKey(leftRow, key);
@@ -218,17 +286,25 @@ public class LookupJoinOperator extends MultiStageOperator {
   }
 
   private PrimaryKey getKey(Object[] row) {
-    Object[] values = new Object[_leftKeyIds.length];
-    for (int i = 0; i < _leftKeyIds.length; i++) {
-      values[i] = row[_leftKeyIds[i]];
+    Object[] values = new Object[_keyLeftIndices.length];
+    for (int i = 0; i < _keyLeftIndices.length; i++) {
+      if (_keyLeftIndices[i] >= 0) {
+        values[i] = row[_keyLeftIndices[i]];
+      } else {
+        values[i] = _keyLiteralValues[i];
+      }
     }
     return new PrimaryKey(values);
   }
 
   private void fillKey(Object[] row, PrimaryKey key) {
     Object[] values = key.getValues();
-    for (int i = 0; i < _leftKeyIds.length; i++) {
-      values[i] = row[_leftKeyIds[i]];
+    for (int i = 0; i < _keyLeftIndices.length; i++) {
+      if (_keyLeftIndices[i] >= 0) {
+        values[i] = row[_keyLeftIndices[i]];
+      } else {
+        values[i] = _keyLiteralValues[i];
+      }
     }
   }
 
