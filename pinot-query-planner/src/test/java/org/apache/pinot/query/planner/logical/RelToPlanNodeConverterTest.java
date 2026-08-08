@@ -45,6 +45,7 @@ import org.apache.calcite.sql.type.ObjectSqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.planner.physical.v2.PRelToPlanNodeConverter;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
@@ -134,6 +135,13 @@ public class RelToPlanNodeConverterTest {
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 31, 10)),
         DataSchema.ColumnDataType.BIG_DECIMAL);
+  }
+
+  @Test
+  public void testConvertToColumnDataTypeForUUID() {
+    RelDataType uuidType = new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.UUID);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(uuidType), DataSchema.ColumnDataType.UUID);
+    Assert.assertEquals(PRelToPlanNodeConverter.convertToColumnDataType(uuidType), DataSchema.ColumnDataType.UUID);
   }
 
   @Test

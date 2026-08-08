@@ -38,6 +38,8 @@ public class GroupIdGeneratorFactory {
           return new OneFloatKeyGroupIdGenerator(numGroupsLimit, initialCapacity);
         case DOUBLE:
           return new OneDoubleKeyGroupIdGenerator(numGroupsLimit, initialCapacity);
+        case UUID:
+          return new OneUuidKeyGroupIdGenerator(numGroupsLimit, initialCapacity);
         default:
           return new OneObjectKeyGroupIdGenerator(numGroupsLimit, initialCapacity);
       }
