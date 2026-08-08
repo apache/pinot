@@ -18,10 +18,19 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
+import java.util.Map;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 
 public class AnyValueAggregationFunctionTest extends AbstractAggregationFunctionTest {
 
@@ -30,6 +39,20 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
       "select 'testResult', anyValue(myField) from testTable group by 'testResult'";
   private static final String EXPECTED_COLUMN_TYPES = "STRING | STRING";
   private static final String EXPECTED_NULL_RESULT = "testResult | null";
+
+  @Test
+  void rejectsRawVariant() {
+    ExpressionContext expression = ExpressionContext.forIdentifier("myField");
+    AnyValueAggregationFunction function = new AnyValueAggregationFunction(List.of(expression), true);
+    BlockValSet blockValSet = mock(BlockValSet.class);
+    when(blockValSet.getValueType()).thenReturn(FieldSpec.DataType.VARIANT);
+
+    IllegalArgumentException exception = Assert.expectThrows(IllegalArgumentException.class,
+        () -> function.aggregate(1, function.createAggregationResultHolder(), Map.of(expression, blockValSet)));
+
+    Assert.assertEquals(exception.getMessage(),
+        "ANY_VALUE does not support raw VARIANT values; extract a typed path with variantGet first");
+  }
 
   @DataProvider(name = "scenarios")
   Object[] scenarios() {

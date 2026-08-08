@@ -115,7 +115,10 @@ public abstract class FilterOperand implements TransformOperand {
     public In(List<RexExpression> children, DataSchema dataSchema, boolean isNotIn) {
       _childOperands = new ArrayList<>(children.size());
       for (RexExpression child : children) {
-        _childOperands.add(TransformOperandFactory.getTransformOperand(child, dataSchema));
+        TransformOperand operand = TransformOperandFactory.getTransformOperand(child, dataSchema);
+        Preconditions.checkArgument(operand.getResultType().supportsEquality(),
+            "Raw VARIANT values do not support IN; extract a typed path with variantGet first");
+        _childOperands.add(operand);
       }
       _isNotIn = isNotIn;
     }
@@ -193,7 +196,10 @@ public abstract class FilterOperand implements TransformOperand {
 
       ColumnDataType lhsType = _lhs.getResultType();
       ColumnDataType rhsType = _rhs.getResultType();
-      if (lhsType == rhsType) {
+      Preconditions.checkArgument((lhsType == ColumnDataType.UNKNOWN || lhsType.supportsOrdering())
+              && (rhsType == ColumnDataType.UNKNOWN || rhsType.supportsOrdering()),
+          "Raw VARIANT values do not support comparison; extract a typed path with variantGet first");
+      if (lhsType == ColumnDataType.UNKNOWN || rhsType == ColumnDataType.UNKNOWN || lhsType == rhsType) {
         _requireCasting = false;
         _commonCastType = null;
       } else {

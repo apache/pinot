@@ -29,6 +29,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.VariantUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
@@ -74,6 +75,10 @@ public class DataBlockTestUtils {
           break;
         case BYTES:
           row[colId] = new ByteArray(RandomStringUtils.secure().next(RANDOM.nextInt(20)).getBytes());
+          break;
+        case VARIANT:
+          row[colId] =
+              new ByteArray(VariantUtils.parseJsonToVariant("{\"value\":" + RANDOM.nextLong() + "}"));
           break;
         case UUID:
           row[colId] = new ByteArray(UuidUtils.toBytes(new UUID(RANDOM.nextLong(), RANDOM.nextLong())));

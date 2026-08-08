@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -243,6 +244,17 @@ public abstract class DistinctFromTransformFunctionTest {
       }
     }
 
+    testTransformFunction(expression, expectedIntValues, _projectionBlock, _dataSourceMap);
+  }
+
+  @Test
+  public void testDistinctFromLeftNullRightLiteral()
+      throws Exception {
+    ExpressionContext expression = RequestContextUtils.getExpression(String.format(_expression, "NULL", "1"));
+    boolean[] expectedIntValues = new boolean[NUM_ROWS];
+    if (_isDistinctFrom) {
+      Arrays.fill(expectedIntValues, true);
+    }
     testTransformFunction(expression, expectedIntValues, _projectionBlock, _dataSourceMap);
   }
 

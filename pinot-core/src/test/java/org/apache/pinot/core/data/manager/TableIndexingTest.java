@@ -159,10 +159,11 @@ public class TableIndexingTest {
   protected void createSchemas() {
     for (DataType type : DataType.values()) {
       if (type == DataType.UNKNOWN || type == DataType.LIST || type == DataType.MAP || type == DataType.STRUCT
-          || type == DataType.OPEN_STRUCT || type == DataType.UUID) {
+          || type == DataType.OPEN_STRUCT || type == DataType.UUID || type == DataType.VARIANT) {
         // UUID is excluded because this static expectation matrix (TableIndexingTest.csv) has no UUID rows.
         // UUID-specific index behavior (inverted, bloom, range, dictionary/no-dictionary, SV and MV) is covered by
         // dedicated UUID unit and integration tests introduced in later PRs of this stack.
+        // VARIANT is excluded because raw VARIANT indexes are deliberately unsupported in the MVP.
         continue;
       }
 

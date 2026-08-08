@@ -81,6 +81,13 @@ public class MultistageGroupByExecutor {
     _aggType = aggType;
     _leafReturnFinalResult = leafReturnFinalResult;
     _resultSchema = resultSchema;
+    for (int i = 0; i < groupKeyIds.length; i++) {
+      ColumnDataType dataType = resultSchema.getColumnDataType(i);
+      if (!dataType.supportsEquality() || !dataType.supportsHashing()) {
+        throw new IllegalArgumentException(
+            "Raw VARIANT values do not support GROUP BY; extract a typed path with variantGet first");
+      }
+    }
 
     int maxInitialResultHolderCapacity = getResolvedMaxInitialResultHolderCapacity(opChainMetadata, nodeHint);
 
