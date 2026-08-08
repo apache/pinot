@@ -93,6 +93,9 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
       LOGGER.error("Caught exception while deserializing data table of size: {} from server: {}", responseSize,
           _serverRoutingInstance, e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.DATA_TABLE_DESERIALIZATION_EXCEPTIONS, 1);
+      // Notify the query router so this server's response is treated as failed and the latch is decremented.
+      // Without this, the query would block until the full timeout and return a misleading BROKER_TIMEOUT.
+      _queryRouter.receiveDataTableDeserializationError(_serverRoutingInstance);
     }
   }
 

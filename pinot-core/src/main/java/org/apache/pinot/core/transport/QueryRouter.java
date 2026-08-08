@@ -188,6 +188,15 @@ public class QueryRouter {
     }
   }
 
+  /// Handles a deserialization error from a server. Because the DataTable metadata (which carries the request id)
+  /// could not be read, iterate over all in-flight queries and mark the one(s) still waiting on this server.
+  /// This lets the query complete with partial results immediately instead of waiting for the full timeout.
+  void receiveDataTableDeserializationError(ServerRoutingInstance serverRoutingInstance) {
+    for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
+      asyncQueryResponse.receiveDataTableDeserializationError(serverRoutingInstance);
+    }
+  }
+
   void markServerDown(ServerRoutingInstance serverRoutingInstance, Exception exception) {
     for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
       asyncQueryResponse.markServerDown(serverRoutingInstance, exception);

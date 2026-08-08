@@ -186,6 +186,19 @@ public class AsyncQueryResponse implements QueryResponse {
     _countDownLatch.countDown();
   }
 
+  /// Handles a deserialization error for a single server response without failing the entire query. The server
+  /// response is recorded as failed (no DataTable), and the latch is decremented for this server only so that the
+  /// query can complete with partial results from the remaining servers instead of waiting for the full timeout.
+  void receiveDataTableDeserializationError(ServerRoutingInstance serverRoutingInstance) {
+    ServerResponse response = _responseMap.get(serverRoutingInstance);
+    if (response != null && response.getDataTable() == null) {
+      _failedServer = serverRoutingInstance;
+      _exception = new RuntimeException("Failed to deserialize DataTable response from server: " + serverRoutingInstance);
+      _numServersResponded.getAndIncrement();
+      _countDownLatch.countDown();
+    }
+  }
+
   void markQueryFailed(ServerRoutingInstance serverRoutingInstance, Exception exception) {
     _status.set(Status.FAILED);
     _failedServer = serverRoutingInstance;
