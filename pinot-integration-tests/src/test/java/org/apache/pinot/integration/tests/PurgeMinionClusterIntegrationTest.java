@@ -36,12 +36,14 @@ import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.MinionContext;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -56,6 +58,7 @@ import static org.testng.Assert.assertTrue;
 /// Integration test for minion task of type "PurgeTask"
 public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final String PURGE_FIRST_RUN_TABLE = "myTable1";
+  private static final String PURGE_METADATA_PUSH_FIRST_RUN_TABLE = "myTableMetadataPush";
   private static final String PURGE_DELTA_PASSED_TABLE = "myTable2";
   private static final String PURGE_DELTA_NOT_PASSED_TABLE = "myTable3";
   private static final String PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE = "myTable4";
@@ -86,8 +89,8 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     startKafka();
 
     List<String> allOfflineTables =
-        List.of(PURGE_FIRST_RUN_TABLE, PURGE_DELTA_PASSED_TABLE, PURGE_DELTA_NOT_PASSED_TABLE,
-            PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE, PURGE_ALL_RECORDS_TABLE);
+        List.of(PURGE_FIRST_RUN_TABLE, PURGE_METADATA_PUSH_FIRST_RUN_TABLE, PURGE_DELTA_PASSED_TABLE,
+            PURGE_DELTA_NOT_PASSED_TABLE, PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE, PURGE_ALL_RECORDS_TABLE);
     Schema schema = null;
     TableConfig tableConfig = null;
     for (String tableName : allOfflineTables) {
@@ -99,7 +102,8 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
       // create and upload table config
       setTableName(tableName);
       tableConfig = createOfflineTableConfig();
-      tableConfig.setTaskConfig(getPurgeTaskConfig());
+      tableConfig.setTaskConfig(tableName.equals(PURGE_METADATA_PUSH_FIRST_RUN_TABLE)
+          ? getMetadataPushPurgeTaskConfig() : getPurgeTaskConfig());
       addTableConfig(tableConfig);
     }
 
@@ -165,8 +169,8 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     MinionContext minionContext = MinionContext.getInstance();
     minionContext.setRecordPurgerFactory(rawTableName -> {
       List<String> tableNames =
-          Arrays.asList(PURGE_FIRST_RUN_TABLE, PURGE_DELTA_PASSED_TABLE, PURGE_DELTA_NOT_PASSED_TABLE,
-              PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
+          Arrays.asList(PURGE_FIRST_RUN_TABLE, PURGE_METADATA_PUSH_FIRST_RUN_TABLE, PURGE_DELTA_PASSED_TABLE,
+              PURGE_DELTA_NOT_PASSED_TABLE, PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
       if (tableNames.contains(rawTableName)) {
         return row -> row.getValue("ArrTime").equals(1);
       } else if (PURGE_ALL_RECORDS_TABLE.equals(rawTableName) || PURGE_REALTIME_LAST_SEGMENT_TABLE.equals(
@@ -194,9 +198,29 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     return new TableTaskConfig(Map.of(MinionConstants.PurgeTask.TASK_TYPE, tableTaskConfigs));
   }
 
+  private TableTaskConfig getMetadataPushPurgeTaskConfig() {
+    Map<String, String> tableTaskConfigs = new HashMap<>();
+    tableTaskConfigs.put(MinionConstants.PurgeTask.LAST_PURGE_TIME_THREESOLD_PERIOD, "1d");
+    tableTaskConfigs.put(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.METADATA.name());
+    tableTaskConfigs.put(MinionTaskUtils.ALLOW_METADATA_PUSH_WITH_LOCAL_FS, "true");
+    return new TableTaskConfig(Map.of(MinionConstants.PurgeTask.TASK_TYPE, tableTaskConfigs));
+  }
+
   /// Test purge with no metadata on the segments (checking null safe implementation)
   @Test
   public void testFirstRunPurge()
+      throws Exception {
+    runFirstRunPurge(PURGE_FIRST_RUN_TABLE);
+  }
+
+  /// Test the same first-run purge flow using metadata push.
+  @Test(priority = 1)
+  public void testFirstRunMetadataPushPurge()
+      throws Exception {
+    runFirstRunPurge(PURGE_METADATA_PUSH_FIRST_RUN_TABLE);
+  }
+
+  private void runFirstRunPurge(String tableName)
       throws Exception {
     // Expected purge task generation :
     // 1. No previous purge run so all segment should be processed and purge metadata should be added to the segments
@@ -205,7 +229,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     // 4. Check after the first run of the purge if we rerun a purge task generation no task should be scheduled
     // 5. Check the purge process itself by setting an expecting number of rows
 
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(PURGE_FIRST_RUN_TABLE);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
             .setTablesToSchedule(Set.of(offlineTableName)))
         .get(MinionConstants.PurgeTask.TASK_TYPE));
@@ -234,11 +258,11 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     // 115545 totals rows
     // Expecting 115545 - 52 = 115493 rows after purging
     // It might take some time for server to load the purged segments
-    TestUtils.waitForCondition(aVoid -> getCurrentCountStarResult(PURGE_FIRST_RUN_TABLE) == 115493, 60_000L,
+    TestUtils.waitForCondition(aVoid -> getCurrentCountStarResult(tableName) == 115493, 60_000L,
         "Failed to get expected purged records");
 
     // Drop the table
-    dropOfflineTable(PURGE_FIRST_RUN_TABLE);
+    dropOfflineTable(tableName);
 
     // Check if the task metadata is cleaned up on table deletion
     verifyTableDelete(offlineTableName);

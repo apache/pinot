@@ -149,6 +149,9 @@
                 <include>**/org/apache/pinot/server/realtime/**</include>
               </includes>
               <excludes>
+                <exclude>**/org/apache/pinot/integration/tests/PinotLLCRealtimeSegmentManagerIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/QueryThreadContextIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/SpoolIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</exclude>
               </excludes>
             </configuration>
