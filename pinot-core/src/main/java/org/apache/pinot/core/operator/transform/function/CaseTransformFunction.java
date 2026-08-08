@@ -875,7 +875,6 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     return _bytesValuesSV;
   }
 
-
   @Override
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
     int[] selected = getSelectedArray(valueBlock, true);
