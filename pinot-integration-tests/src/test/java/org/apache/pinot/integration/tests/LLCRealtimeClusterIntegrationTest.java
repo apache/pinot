@@ -81,7 +81,8 @@ import static org.testng.Assert.assertTrue;
 /// Integration test for low-level Kafka consumer.
 /// TODO: Add separate module-level tests and remove the randomness of this test
 public class LLCRealtimeClusterIntegrationTest extends SharedKafkaRealtimeIntegrationTestSuite {
-  private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
+  private static final String CONSUMER_DIRECTORY =
+      new File(FileUtils.getTempDirectory(), "consumer-test").getAbsolutePath();
   private static final String KAFKA_4_SMOKE_TABLE_NAME = "mytableKafka4Smoke";
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
