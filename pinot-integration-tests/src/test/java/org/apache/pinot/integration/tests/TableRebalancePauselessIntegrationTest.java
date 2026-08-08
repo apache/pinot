@@ -18,18 +18,35 @@
  */
 package org.apache.pinot.integration.tests;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.List;
 import java.util.Map;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.common.restlet.resources.RebalanceResult;
 import org.apache.pinot.common.restlet.resources.RebalanceSummaryResult;
+import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingControllerStarter;
+import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingPinotLLCRealtimeSegmentManager;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
+import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TenantConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.util.TestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -37,8 +54,17 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtimeIngestionTest {
+/// Tests rebalance and force-commit behavior against a pauseless real-time table.
+///
+/// Sets up a single pauseless table over the standard test data. This used to extend
+/// [BasePauselessRealtimeIngestionTest], which also builds a second, non-pauseless table for the
+/// failure-injection tests to compare segment ZK metadata against. Nothing here compares metadata
+/// across tables, so that second 48-segment table was pure setup cost and is no longer built.
+public class TableRebalancePauselessIntegrationTest extends BaseClusterIntegrationTestSet {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableRebalancePauselessIntegrationTest.class);
+
   private final static int FORCE_COMMIT_REBALANCE_TIMEOUT_MS = 600_000;
+  private static final long MAX_SEGMENT_COMPLETION_TIME_MILLIS = 10_000L;
   // startOneServer() does not register the starter in _serverStarters, so its size doesn't advance across parameterized
   // invocations. Track our own counter so each invocation gets a unique serverId range, and therefore unique on-disk
   // data dirs (TEMP_SERVER_DIR/dataDir-<serverId>); otherwise leftover state from a prior invocation pushes segment
@@ -46,23 +72,8 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
   private int _nextExtraServerId = 1;
 
   @Override
-  protected String getFailurePoint() {
-    return null;  // No failure point for basic test
-  }
-
-  @Override
-  protected int getExpectedSegmentsWithFailure() {
-    return NUM_REALTIME_SEGMENTS;  // Always expect full segments
-  }
-
-  @Override
-  protected int getExpectedZKMetadataWithFailure() {
-    return NUM_REALTIME_SEGMENTS;  // Always expect full metadata
-  }
-
-  @Override
-  protected long getCountStarResultWithFailure() {
-    return DEFAULT_COUNT_STAR_RESULT;  // Always expect full count
+  public BaseControllerStarter createControllerStarter() {
+    return new FailureInjectingControllerStarter();
   }
 
   @Override
@@ -71,6 +82,18 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
   }
 
   @Override
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    try {
+      LOGGER.info("Set segment.store.uri: {} for server with scheme: {}", _controllerConfig.getDataDir(),
+          new URI(_controllerConfig.getDataDir()).getScheme());
+      serverConf.setProperty("pinot.server.instance.segment.store.uri", "file:" + _controllerConfig.getDataDir());
+      serverConf.setProperty("pinot.server.instance." + HelixInstanceDataManagerConfig.UPLOAD_SEGMENT_TO_DEEP_STORE,
+          "true");
+    } catch (URISyntaxException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -83,10 +106,49 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     createServerTenant(getServerTenant(), 0, 1);
     createBrokerTenant(getBrokerTenant(), 1);
     setMaxSegmentCompletionTimeMillis();
-    setupNonPauselessTable();
-    injectFailure();
-    setupPauselessTable();
+    setUpPauselessTable();
     waitForAllDocsLoaded(600_000L);
+  }
+
+  @AfterClass
+  public void tearDown()
+      throws IOException {
+    dropRealtimeTable(getTableName());
+    stopServer();
+    stopBroker();
+    stopController();
+    stopKafka();
+    stopZk();
+    FileUtils.deleteDirectory(_tempDir);
+  }
+
+  private void setUpPauselessTable()
+      throws Exception {
+    List<File> avroFiles = unpackAvroData(_tempDir);
+    pushAvroIntoKafka(avroFiles);
+
+    addSchema(createSchema());
+
+    TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
+    tableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
+    tableConfig.getValidationConfig().setRetentionTimeValue("100000");
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(
+        new StreamIngestionConfig(List.of(tableConfig.getIndexingConfig().getStreamConfigs())));
+    ingestionConfig.getStreamIngestionConfig().setPauselessConsumptionEnabled(true);
+    tableConfig.getIndexingConfig().setStreamConfigs(null);
+    tableConfig.setIngestionConfig(ingestionConfig);
+
+    addTableConfig(tableConfig);
+  }
+
+  private void setMaxSegmentCompletionTimeMillis() {
+    PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
+    if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
+      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).setMaxSegmentCompletionTimeoutMs(
+          MAX_SEGMENT_COMPLETION_TIME_MILLIS);
+    }
   }
 
   @DataProvider(name = "forceCommitTableConfigProvider")
