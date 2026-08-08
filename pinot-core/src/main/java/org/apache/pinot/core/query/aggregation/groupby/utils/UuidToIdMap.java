@@ -35,9 +35,14 @@ public class UuidToIdMap implements ValueToIdMap {
     _idToValueMap = new ArrayList<>();
   }
 
+  /// Both callers -- [org.apache.pinot.core.query.aggregation.groupby.NoDictionaryMultiColumnGroupKeyGenerator] and
+  /// [org.apache.pinot.core.query.aggregation.groupby.NoDictionarySingleColumnGroupKeyGenerator] -- key on
+  /// [UuidKey] already, so this casts directly rather than going through `UuidKey#fromObject`. That matches the
+  /// sibling maps (e.g. [DoubleToIdMap] casts to `double`) and keeps the per-row `instanceof` chain out of the
+  /// group-by loop.
   @Override
   public int put(Object value) {
-    UuidKey uuidKey = UuidKey.fromObject(value);
+    UuidKey uuidKey = (UuidKey) value;
     int id = _valueToIdMap.getInt(uuidKey);
     if (id == INVALID_KEY) {
       id = _valueToIdMap.size();
@@ -49,7 +54,7 @@ public class UuidToIdMap implements ValueToIdMap {
 
   @Override
   public int getId(Object value) {
-    return _valueToIdMap.getInt(UuidKey.fromObject(value));
+    return _valueToIdMap.getInt((UuidKey) value);
   }
 
   @Override
