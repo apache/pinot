@@ -652,6 +652,24 @@ public class RecordTransformerTest {
     assertEquals(result.getTransformedRows().size(), 1);
     assertEquals(result.getTransformedRows().get(0).getValue("metric"), 123.0);
 
+    // Lazy conversion: an already-typed value passes through as the same object reference (no conversion, no
+    // allocation).
+    Double typedValue = 42.5;
+    GenericRow typedRow = new GenericRow();
+    typedRow.putValue("dim", "a");
+    typedRow.putValue("ts", 1L);
+    typedRow.putValue("metric", typedValue);
+    assertSame(pipeline.processRow(typedRow).getTransformedRows().get(0).getValue("metric"), typedValue);
+
+    // Lazy conversion: a compatible Number of a different box (Integer for DOUBLE target) is also passed through
+    // untouched; ValueAggregatorUtils.toDouble accepts any Number.
+    Integer intBoxValue = 7;
+    GenericRow intBoxRow = new GenericRow();
+    intBoxRow.putValue("dim", "a");
+    intBoxRow.putValue("ts", 1L);
+    intBoxRow.putValue("metric", intBoxValue);
+    assertSame(pipeline.processRow(intBoxRow).getTransformedRows().get(0).getValue("metric"), intBoxValue);
+
     // Non-numeric string fails before indexing when continueOnError is false.
     GenericRow bad = new GenericRow();
     bad.putValue("dim", "a");
@@ -676,6 +694,51 @@ public class RecordTransformerTest {
     assertNull(continueResult.getTransformedRows().get(0).getValue("metric"));
     assertTrue(continueResult.getTransformedRows().get(0).isIncomplete());
     assertEquals(continueResult.getIncompleteRowCount(), 1);
+  }
+
+  @Test
+  public void testAggregationSourceMultiValueAutoDataTypeConversion() {
+    // SUMMV source is multi-value: string elements must convert to Double[] (not throw on multi-element arrays), and
+    // an already-typed Double[] must pass through as the same object reference.
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("aggMvSrcSchema")
+        .addSingleValueDimension("dim", DataType.STRING)
+        .addMetric("summvMetric", DataType.DOUBLE)
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig("summvMetric", "SUMMV(metricMv)")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("aggMvSrcTable")
+        .setTimeColumnName("ts")
+        .setNoDictionaryColumns(List.of("summvMetric"))
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    TransformPipeline pipeline = new TransformPipeline(tableConfig, schema);
+    GenericRow row = new GenericRow();
+    row.putValue("dim", "a");
+    row.putValue("ts", 1L);
+    row.putValue("metricMv", new Object[]{"1.5", "2.5"});
+    Object converted = pipeline.processRow(row).getTransformedRows().get(0).getValue("metricMv");
+    assertEquals(converted, new Double[]{1.5, 2.5});
+
+    Double[] typedValues = new Double[]{3.5, 4.5};
+    GenericRow typedRow = new GenericRow();
+    typedRow.putValue("dim", "a");
+    typedRow.putValue("ts", 1L);
+    typedRow.putValue("metricMv", typedValues);
+    assertSame(pipeline.processRow(typedRow).getTransformedRows().get(0).getValue("metricMv"), typedValues);
+
+    // Unparsable element fails in the transformer, before MutableSegmentImpl mutates the row.
+    GenericRow bad = new GenericRow();
+    bad.putValue("dim", "a");
+    bad.putValue("ts", 1L);
+    bad.putValue("metricMv", new Object[]{"1.5", "abc"});
+    try {
+      pipeline.processRow(bad);
+      fail("Expected data type conversion failure for non-numeric multi-value aggregation source");
+    } catch (Exception e) {
+      // expected
+    }
   }
 
   @Test

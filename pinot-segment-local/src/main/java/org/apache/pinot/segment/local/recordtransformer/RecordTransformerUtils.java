@@ -22,8 +22,10 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -168,21 +170,26 @@ public class RecordTransformerUtils {
     }
     // Auto-register aggregation source columns not in the schema so mistyped JSON/Avro string numbers are converted
     // before MutableSegmentImpl indexes them. Explicit SourceFieldConfig wins (already in dataTypes). Only runs in the
-    // post-complex-type phase so flattened/unnested fields are available.
+    // post-complex-type phase so flattened/unnested fields are available. Auto-derived columns are converted lazily
+    // (only when the incoming value is incompatible with the aggregators) to avoid per-record conversion overhead on
+    // the common correctly-typed path.
+    Set<String> lazyColumns = new HashSet<>();
     if (!preComplexTypeTransform && schema != null) {
-      addAggregationSourceDataTypes(tableConfig, schema, dataTypes);
+      addAggregationSourceDataTypes(tableConfig, schema, dataTypes, lazyColumns);
     }
     if (!dataTypes.isEmpty()) {
-      transformers.add(new DataTypeTransformer(tableConfig, dataTypes));
+      transformers.add(new DataTypeTransformer(tableConfig, dataTypes, lazyColumns));
     }
   }
 
   /// Derives [PinotDataType]s for ingestion-aggregation source columns that are absent from the schema (and not already
   /// covered by an explicit [SourceFieldConfig]). Types are inferred from the aggregation function and destination
-  /// metric. Sketch/HLL/COUNT sources are left unconverted so offering semantics (e.g. hashing a string vs a number)
-  /// are preserved. [org.apache.pinot.segment.local.aggregator.ValueAggregatorUtils#toDouble] remains a safety net.
+  /// metric, and recorded in `lazyColumns` so that [DataTypeTransformer] only converts values the aggregators cannot
+  /// consume directly. Sketch/HLL/COUNT sources are left unconverted so offering semantics (e.g. hashing a string vs a
+  /// number) are preserved. [org.apache.pinot.segment.local.aggregator.ValueAggregatorUtils#toDouble] remains a safety
+  /// net.
   static void addAggregationSourceDataTypes(TableConfig tableConfig, Schema schema,
-      Map<String, PinotDataType> dataTypes) {
+      Map<String, PinotDataType> dataTypes, Set<String> lazyColumns) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     if (ingestionConfig == null) {
       return;
@@ -232,18 +239,18 @@ public class RecordTransformerUtils {
       PinotDataType inferredType = inferAggregationSourceDataType(functionType, destFieldSpec);
       if (inferredType != null) {
         dataTypes.put(sourceColumn, inferredType);
+        lazyColumns.add(sourceColumn);
       }
     }
   }
 
-  /// Returns the target type for converting an aggregation source column, or {@code null} when no conversion should be
-  /// applied (COUNT, HLL, sketches — keep raw offering values).
+  /// Returns the target type for converting an aggregation source column, or `null` when no conversion should be
+  /// applied (COUNT, HLL, sketches: keep raw offering values).
   @Nullable
   static PinotDataType inferAggregationSourceDataType(AggregationFunctionType functionType,
       @Nullable FieldSpec destFieldSpec) {
     switch (functionType) {
       case SUM:
-      case SUMMV:
       case MIN:
       case MAX:
         if (destFieldSpec != null) {
@@ -263,8 +270,13 @@ public class RecordTransformerUtils {
           }
         }
         return PinotDataType.DOUBLE;
-      case AVG:
+      case SUMMV:
       case AVGMV:
+        // Multi-value sources must convert to an array type: a single-value target would make
+        // DataTypeTransformerUtils.standardize throw on multi-element arrays. The MV aggregators sum/average the
+        // elements through ValueAggregatorUtils.toDouble, so Double[] matches their expectations.
+        return PinotDataType.DOUBLE_ARRAY;
+      case AVG:
       case MINMAXRANGE:
       case PERCENTILEEST:
       case PERCENTILERAWEST:

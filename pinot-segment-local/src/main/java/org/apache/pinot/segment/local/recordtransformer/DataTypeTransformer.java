@@ -51,6 +51,10 @@ public class DataTypeTransformer implements RecordTransformer {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataTypeTransformer.class);
 
   private final Map<String, PinotDataType> _dataTypes;
+  // Columns converted lazily: the value is passed through untouched when the ValueAggregators can consume it
+  // directly, and only incompatible values (e.g. string numbers) pay for the conversion. Used for auto-derived
+  // ingestion aggregation source columns that are not in the schema.
+  private final Set<String> _lazyColumns;
   private final boolean _continueOnError;
   private final ThrottledLogger _throttledLogger;
   // UUID primary key columns for upsert/dedup tables; non-null and non-empty when applicable.
@@ -64,18 +68,28 @@ public class DataTypeTransformer implements RecordTransformer {
   /// Creates a [DataTypeTransformer] that converts the (non-virtual) schema columns to the data types defined in the
   /// [Schema].
   public DataTypeTransformer(TableConfig tableConfig, Schema schema) {
-    this(tableConfig, extractSchemaDataTypes(schema), schema);
+    this(tableConfig, extractSchemaDataTypes(schema), schema, Set.of());
   }
 
   /// Creates a [DataTypeTransformer] that converts the given columns to the provided [PinotDataType]s. This is useful
   /// for fixing the data types of source fields before other transformers (such as [ExpressionTransformer]) consume
   /// them.
   public DataTypeTransformer(TableConfig tableConfig, Map<String, PinotDataType> dataTypes) {
-    this(tableConfig, dataTypes, null);
+    this(tableConfig, dataTypes, null, Set.of());
   }
 
-  private DataTypeTransformer(TableConfig tableConfig, Map<String, PinotDataType> dataTypes, @Nullable Schema schema) {
+  /// Same as [#DataTypeTransformer(TableConfig, Map)], but the columns in `lazyColumns` are only converted when the
+  /// incoming value cannot be consumed directly by the
+  /// [org.apache.pinot.segment.local.aggregator.ValueAggregator]s, so the common correctly-typed path costs one
+  /// check per record and no allocation.
+  public DataTypeTransformer(TableConfig tableConfig, Map<String, PinotDataType> dataTypes, Set<String> lazyColumns) {
+    this(tableConfig, dataTypes, null, lazyColumns);
+  }
+
+  private DataTypeTransformer(TableConfig tableConfig, Map<String, PinotDataType> dataTypes, @Nullable Schema schema,
+      Set<String> lazyColumns) {
     _dataTypes = dataTypes;
+    _lazyColumns = lazyColumns;
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     _continueOnError = ingestionConfig != null && ingestionConfig.isContinueOnError();
     _throttledLogger = new ThrottledLogger(LOGGER, ingestionConfig);
@@ -127,6 +141,9 @@ public class DataTypeTransformer implements RecordTransformer {
       String column = entry.getKey();
       try {
         Object value = record.getValue(column);
+        if (_lazyColumns.contains(column) && isAggregatorCompatible(value, entry.getValue())) {
+          continue;
+        }
         if (_upsertUuidPrimaryKeyColumns != null && _upsertUuidPrimaryKeyColumns.contains(column)
             && value instanceof CharSequence) {
           validateCanonicalUuidPrimaryKey(column, value.toString());
@@ -142,6 +159,17 @@ public class DataTypeTransformer implements RecordTransformer {
         record.markIncomplete();
       }
     }
+  }
+
+  /// Returns true when a lazily-converted aggregation source value can be consumed directly by the
+  /// [org.apache.pinot.segment.local.aggregator.ValueAggregator]s without conversion: null, any [Number] box
+  /// (`ValueAggregatorUtils.toDouble` and `SumPrecisionValueAggregator` accept them), or a multi-value array that is
+  /// already of the target array type.
+  private static boolean isAggregatorCompatible(@Nullable Object value, PinotDataType targetType) {
+    if (value == null || value instanceof Number) {
+      return true;
+    }
+    return targetType == PinotDataType.DOUBLE_ARRAY && value instanceof Double[];
   }
 
   /// Validates that a UUID primary key string value is in canonical lowercase RFC 4122 form.
