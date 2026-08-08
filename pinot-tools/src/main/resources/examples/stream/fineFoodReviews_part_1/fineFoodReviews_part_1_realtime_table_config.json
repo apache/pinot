@@ -2,19 +2,23 @@
   "tableName": "fineFoodReviews_part_1",
   "tableType": "REALTIME",
   "segmentsConfig": {
-    "segmentPushType": "APPEND",
     "timeColumnName": "ts",
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "5",
     "replication": "1"
   },
-  "tenants": {
-  },
+  "tenants": {},
   "tableIndexConfig": {
     "loadMode": "MMAP",
-    "noDictionaryColumns": ["Text"],
+    "noDictionaryColumns": [
+      "Text"
+    ],
     "multiColumnTextIndexConfig": {
-      "columns": ["UserId", "ProductId", "Summary"]
+      "columns": [
+        "UserId",
+        "ProductId",
+        "Summary"
+      ]
     }
   },
   "routing": {
@@ -46,13 +50,14 @@
     ]
   },
   "metadata": {
-    "customConfigs": {
-    }
+    "customConfigs": {}
   },
   "fieldConfigList": [
     {
       "encodingType": "RAW",
-      "indexType": "VECTOR",
+      "indexTypes": [
+        "VECTOR"
+      ],
       "name": "embedding",
       "properties": {
         "vectorIndexType": "HNSW",
