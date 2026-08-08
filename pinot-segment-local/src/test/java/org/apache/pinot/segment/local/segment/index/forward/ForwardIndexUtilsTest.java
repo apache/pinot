@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.forward;
 
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV6;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.ForwardIndexUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -42,6 +43,22 @@ public class ForwardIndexUtilsTest {
         {100, -1, 1024 * 1024, 1024 * 1024}, // negative targetDocsPerChunk falls back to targetMaxChunkSizeBytes
         {2000, 1000, 1024 * 1024, 1024 * 1024}, // large maxValue limited by targetMaxChunkSizeBytes
         {100, -1, 1024, 4 * 1024} // tiny targetMaxChunkSizeBytes falls back to TARGET_MIN_CHUNK_SIZE
+    };
+  }
+
+  @Test(dataProvider = "docsPerChunkCapProvider")
+  public void testDocsPerChunkCap(Integer targetDocsPerChunk, Boolean enforce, Integer expectedCap) {
+    assertEquals(ForwardIndexUtils.getDocsPerChunkCap(targetDocsPerChunk, enforce), (int) expectedCap);
+  }
+
+  @DataProvider(name = "docsPerChunkCapProvider")
+  public Object[][] docsPerChunkCapProvider() {
+    int noCap = VarByteChunkForwardIndexWriterV6.DISABLE_DOCS_PER_CHUNK;
+    return new Object[][]{
+        {250, true, 250}, // enforced: the target becomes a hard cap
+        {250, false, noCap}, // not enforced: no cap, byte-driven flush only
+        {-1, true, noCap}, // enforcing a disabled target is still no cap
+        {0, true, noCap} // a zero target would stall the writer, so treat it as no cap
     };
   }
 }
