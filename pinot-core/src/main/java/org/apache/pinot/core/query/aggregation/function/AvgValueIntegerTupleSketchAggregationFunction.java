@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.TupleSketchIterator;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
@@ -47,8 +48,13 @@ public class AvgValueIntegerTupleSketchAggregationFunction
     return ColumnDataType.LONG;
   }
 
+  @Nullable
   @Override
-  public Comparable extractFinalResult(TupleIntSketchAccumulator accumulator) {
+  public Comparable extractFinalResult(@Nullable TupleIntSketchAccumulator accumulator) {
+    // A null intermediate result means nothing was aggregated, and there is nothing to average
+    if (accumulator == null) {
+      return null;
+    }
     accumulator.setNominalEntries(_nominalEntries);
     accumulator.setSetOperations(_setOps);
     accumulator.setThreshold(_accumulatorThreshold);

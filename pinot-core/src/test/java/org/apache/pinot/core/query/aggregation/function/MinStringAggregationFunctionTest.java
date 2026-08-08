@@ -36,7 +36,6 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -128,11 +127,6 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
     assertEquals(function.merge("banana", "apple"), "apple");
     assertEquals(function.merge("", "apple"), "");
     assertEquals(function.merge("apple", ""), "");
-
-    // Test null handling
-    assertEquals(function.merge("apple", null), "apple");
-    assertEquals(function.merge(null, "apple"), "apple");
-    assertNull(function.merge(null, null));
 
     // Test final result merging
     assertEquals(function.mergeFinalResult("apple", "banana"), "apple");

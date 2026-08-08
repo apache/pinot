@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -64,11 +65,13 @@ public abstract class BaseArrayAggFunction<I, F extends Comparable>
     return _resultColumnType;
   }
 
+  @Nullable
   @Override
   public I extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public I extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);

@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -249,34 +250,20 @@ public class AvgAggregationFunction extends NullableSingleInputAggregationFuncti
     }
   }
 
+  @Nullable
   @Override
   public AvgPair extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    AvgPair avgPair = aggregationResultHolder.getResult();
-    if (avgPair == null) {
-      return _nullHandlingEnabled ? null : new AvgPair();
-    }
-    return avgPair;
+    return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public AvgPair extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    AvgPair avgPair = groupByResultHolder.getResult(groupKey);
-    if (avgPair == null) {
-      return _nullHandlingEnabled ? null : new AvgPair();
-    }
-    return avgPair;
+    return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
   public AvgPair merge(AvgPair intermediateResult1, AvgPair intermediateResult2) {
-    if (_nullHandlingEnabled) {
-      if (intermediateResult1 == null) {
-        return intermediateResult2;
-      }
-      if (intermediateResult2 == null) {
-        return intermediateResult1;
-      }
-    }
     intermediateResult1.apply(intermediateResult2);
     return intermediateResult1;
   }
@@ -302,10 +289,14 @@ public class AvgAggregationFunction extends NullableSingleInputAggregationFuncti
     return ColumnDataType.DOUBLE;
   }
 
+  @Nullable
   @Override
-  public Double extractFinalResult(AvgPair intermediateResult) {
+  public Double extractFinalResult(@Nullable AvgPair intermediateResult) {
+    // A null intermediate result means nothing was aggregated, and so does a zero count, which is what a
+    // deserialized empty pair carries. With null handling enabled the average of nothing is NULL; with it disabled
+    // it is what an untouched pair renders to, which is the sentinel below.
     if (intermediateResult == null) {
-      return null;
+      return _nullHandlingEnabled ? null : DEFAULT_FINAL_RESULT;
     }
     long count = intermediateResult.getCount();
     if (count == 0L) {

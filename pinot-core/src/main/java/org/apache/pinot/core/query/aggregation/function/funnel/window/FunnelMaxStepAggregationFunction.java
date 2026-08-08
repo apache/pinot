@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function.funnel.window;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.PriorityQueue;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
@@ -45,7 +46,7 @@ public class FunnelMaxStepAggregationFunction extends FunnelBaseAggregationFunct
   }
 
   @Override
-  public Integer extractFinalResult(PriorityQueue<FunnelStepEvent> stepEvents) {
+  public Integer extractFinalResult(@Nullable PriorityQueue<FunnelStepEvent> stepEvents) {
     int finalMaxStep = 0;
     if (stepEvents == null || stepEvents.isEmpty()) {
       return finalMaxStep;

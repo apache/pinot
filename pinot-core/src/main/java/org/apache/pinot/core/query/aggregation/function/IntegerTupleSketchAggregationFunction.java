@@ -232,6 +232,7 @@ public class IntegerTupleSketchAggregationFunction
     return result;
   }
 
+  @Nullable
   @Override
   public TupleIntSketchAccumulator extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
@@ -240,10 +241,10 @@ public class IntegerTupleSketchAggregationFunction
   @Override
   public TupleIntSketchAccumulator merge(TupleIntSketchAccumulator intermediateResult1,
       TupleIntSketchAccumulator intermediateResult2) {
-    if (intermediateResult1 == null || intermediateResult1.isEmpty()) {
+    if (intermediateResult1.isEmpty()) {
       return intermediateResult2;
     }
-    if (intermediateResult2 == null || intermediateResult2.isEmpty()) {
+    if (intermediateResult2.isEmpty()) {
       return intermediateResult1;
     }
     intermediateResult1.setThreshold(_accumulatorThreshold);

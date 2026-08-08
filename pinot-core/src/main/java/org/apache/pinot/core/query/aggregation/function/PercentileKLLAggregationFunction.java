@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.lang.foreign.MemorySegment;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.datasketches.kll.KllDoublesSketch;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -274,11 +275,13 @@ public class PercentileKLLAggregationFunction
     return sketches;
   }
 
+  @Nullable
   @Override
   public KllDoublesSketch extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public KllDoublesSketch extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
@@ -287,12 +290,8 @@ public class PercentileKLLAggregationFunction
   @Override
   public KllDoublesSketch merge(KllDoublesSketch sketch1, KllDoublesSketch sketch2) {
     KllDoublesSketch union = KllDoublesSketch.newHeapInstance(_kValue);
-    if (sketch1 != null) {
-      union.merge(sketch1);
-    }
-    if (sketch2 != null) {
-      union.merge(sketch2);
-    }
+    union.merge(sketch1);
+    union.merge(sketch2);
     return union;
   }
 
@@ -322,9 +321,11 @@ public class PercentileKLLAggregationFunction
     return AggregationFunctionType.PERCENTILEKLL.getName().toLowerCase() + "(" + _expression + ", " + _percentile + ")";
   }
 
+  @Nullable
   @Override
-  public Comparable<?> extractFinalResult(KllDoublesSketch sketch) {
-    if (sketch.isEmpty() && _nullHandlingEnabled) {
+  public Comparable<?> extractFinalResult(@Nullable KllDoublesSketch sketch) {
+    // A null intermediate result means nothing was aggregated, resolved the same way as an empty sketch
+    if (sketch == null || (_nullHandlingEnabled && sketch.isEmpty())) {
       return null;
     }
     return sketch.getQuantile(_percentile / 100);
