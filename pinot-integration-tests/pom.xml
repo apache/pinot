@@ -85,6 +85,9 @@
       <activation>
         <activeByDefault>false</activeByDefault>
       </activation>
+      <properties>
+        <argLine>-Xms4g -Xmx8g -Dlog4j2.configurationFile=log4j2.xml</argLine>
+      </properties>
       <build>
         <plugins>
           <plugin>
@@ -120,6 +123,9 @@
       <activation>
         <activeByDefault>false</activeByDefault>
       </activation>
+      <properties>
+        <argLine>-Xms4g -Xmx8g -Dlog4j2.configurationFile=log4j2.xml</argLine>
+      </properties>
       <build>
         <plugins>
           <plugin>
@@ -155,6 +161,9 @@
       <activation>
         <activeByDefault>false</activeByDefault>
       </activation>
+      <properties>
+        <argLine>-Xms4g -Xmx8g -Dlog4j2.configurationFile=log4j2.xml</argLine>
+      </properties>
       <build>
         <plugins>
           <plugin>
@@ -175,6 +184,9 @@
       <activation>
         <activeByDefault>false</activeByDefault>
       </activation>
+      <properties>
+        <argLine>-Xms4g -Xmx8g -Dlog4j2.configurationFile=log4j2.xml</argLine>
+      </properties>
       <build>
         <plugins>
           <plugin>
