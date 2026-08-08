@@ -24,6 +24,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
@@ -54,12 +55,14 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   protected static final int NUM_REALTIME_SEGMENTS = 48;
   protected static final long DEFAULT_COUNT_STAR_RESULT = 115545L;
   protected static final String DEFAULT_TABLE_NAME_2 = DEFAULT_TABLE_NAME + "_2";
-  private static final long MAX_SEGMENT_COMPLETION_TIME_MILLIS = 10_000;
+  private static final long FAILURE_MAX_SEGMENT_COMPLETION_TIME_MILLIS = 10_000;
 
   protected List<File> _avroFiles;
   protected boolean _failureEnabled = false;
   private static final Logger LOGGER = LoggerFactory.getLogger(BasePauselessRealtimeIngestionTest.class);
 
+  /// Returns the controller failure point to inject, or null when the test injects no failure.
+  @Nullable
   protected abstract String getFailurePoint();
 
   protected abstract int getExpectedSegmentsWithFailure();
@@ -104,7 +107,6 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     startController();
     startBroker();
     startServer();
-    setMaxSegmentCompletionTimeMillis();
     setupNonPauselessTable();
     injectFailure();
     setupPauselessTable();
@@ -155,27 +157,36 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   }
 
   protected void setMaxSegmentCompletionTimeMillis() {
-    PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
-    if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
-      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager)
-          .setMaxSegmentCompletionTimeoutMs(MAX_SEGMENT_COMPLETION_TIME_MILLIS);
-    }
+    PauselessRealtimeTestUtils.setMaxSegmentCompletionTimeoutMs(_helixResourceManager,
+        FAILURE_MAX_SEGMENT_COMPLETION_TIME_MILLIS);
   }
 
   protected void injectFailure() {
+    String failurePoint = getFailurePoint();
+    if (failurePoint == null) {
+      return;
+    }
     PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
     if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
-      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).enableTestFault(getFailurePoint());
+      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).enableTestFault(failurePoint);
     }
     _failureEnabled = true;
   }
 
   protected void disableFailure() {
-    _failureEnabled = false;
+    String failurePoint = getFailurePoint();
+    if (failurePoint == null) {
+      return;
+    }
     PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
     if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
-      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).disableTestFault(getFailurePoint());
+      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).disableTestFault(failurePoint);
     }
+    _failureEnabled = false;
+  }
+
+  protected void restoreMaxSegmentCompletionTimeMillis() {
+    PauselessRealtimeTestUtils.restoreMaxSegmentCompletionTimeoutMs(_helixResourceManager);
   }
 
   @AfterClass
@@ -208,10 +219,17 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
       return segmentZKMetadataList.size() == getExpectedZKMetadataWithFailure();
     }, 1000, 100000, "New Segment ZK Metadata not created");
 
-    Thread.sleep(MAX_SEGMENT_COMPLETION_TIME_MILLIS);
-    disableFailure();
-
-    _controllerStarter.getRealtimeSegmentValidationManager().run();
+    // Shorten the completion deadline only around the repair pass, so the validation manager treats the stuck
+    // commits as expired. Normal segment commits can legitimately take longer than this deadline on a busy CI
+    // runner, so it must never apply to them.
+    setMaxSegmentCompletionTimeMillis();
+    try {
+      Thread.sleep(FAILURE_MAX_SEGMENT_COMPLETION_TIME_MILLIS);
+      disableFailure();
+      _controllerStarter.getRealtimeSegmentValidationManager().run();
+    } finally {
+      restoreMaxSegmentCompletionTimeMillis();
+    }
 
     waitForAllDocsLoaded(600_000L);
     waitForAllDocsLoaded(tableNameWithType2, 600_000L);

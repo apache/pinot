@@ -30,11 +30,10 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingControllerStarter;
-import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingPinotLLCRealtimeSegmentManager;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingTableConfig;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingTableDataManagerProvider;
+import org.apache.pinot.integration.tests.realtime.utils.PauselessRealtimeTestUtils;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -58,13 +57,13 @@ import static org.testng.Assert.assertNotNull;
 
 public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClusterIntegrationTest {
   private static final String DEFAULT_TABLE_NAME_2 = DEFAULT_TABLE_NAME + "_2";
-  private static final long MAX_SEGMENT_COMPLETION_TIME_MILLIS = 10_000L;
+  private static final long FAILURE_MAX_SEGMENT_COMPLETION_TIME_MILLIS = 10_000L;
 
   protected void overrideControllerConf(Map<String, Object> properties) {
     properties.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
     properties.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT, true);
     // Set the delay more than the time we sleep before triggering RealtimeSegmentValidationManager manually, i.e.
-    // MAX_SEGMENT_COMPLETION_TIME_MILLIS, to ensure that the segment level validations are performed.
+    // FAILURE_MAX_SEGMENT_COMPLETION_TIME_MILLIS, to ensure that the segment level validations are performed.
     properties.put(ControllerConf.ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS,
         500);
   }
@@ -103,7 +102,6 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     List<File> avroFiles = unpackAvroData(_tempDir);
     pushAvroIntoKafka(avroFiles);
 
-    setMaxSegmentCompletionTimeMillis();
     // create schema for non-pauseless table
     Schema schema = createSchema();
     schema.setSchemaName(DEFAULT_TABLE_NAME_2);
@@ -149,11 +147,12 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
   }
 
   protected void setMaxSegmentCompletionTimeMillis() {
-    PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
-    if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
-      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).setMaxSegmentCompletionTimeoutMs(
-          MAX_SEGMENT_COMPLETION_TIME_MILLIS);
-    }
+    PauselessRealtimeTestUtils.setMaxSegmentCompletionTimeoutMs(_helixResourceManager,
+        FAILURE_MAX_SEGMENT_COMPLETION_TIME_MILLIS);
+  }
+
+  protected void restoreMaxSegmentCompletionTimeMillis() {
+    PauselessRealtimeTestUtils.restoreMaxSegmentCompletionTimeoutMs(_helixResourceManager);
   }
 
   protected int getNumErrorSegmentsInEV(String realtimeTableName) {
@@ -182,9 +181,17 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     List<String> erroredSegments = getSegmentsInEV(pauselessTableName, SegmentStateModel.ERROR);
     assertFalse(erroredSegments.isEmpty(), "No segments found in ERROR state, expected at least one.");
 
-    // Let the RealtimeSegmentValidationManager run so it can fix up segments
-    Thread.sleep(MAX_SEGMENT_COMPLETION_TIME_MILLIS);
-    _controllerStarter.getRealtimeSegmentValidationManager().run();
+    // Shorten the completion deadline only around the repair pass, so the validation manager treats the failed
+    // commits as expired. Normal segment commits (e.g. the non-pauseless comparison table during setup) must not run
+    // against this artificial deadline.
+    setMaxSegmentCompletionTimeMillis();
+    try {
+      // Let the RealtimeSegmentValidationManager run so it can fix up segments
+      Thread.sleep(FAILURE_MAX_SEGMENT_COMPLETION_TIME_MILLIS);
+      _controllerStarter.getRealtimeSegmentValidationManager().run();
+    } finally {
+      restoreMaxSegmentCompletionTimeMillis();
+    }
 
     // Wait until there are no ERROR segments in the ExternalView
     TestUtils.waitForCondition(aVoid -> getSegmentsInEV(pauselessTableName, SegmentStateModel.ERROR).isEmpty(),
