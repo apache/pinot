@@ -39,6 +39,7 @@
     <pinot.integration.test.port.base>20000</pinot.integration.test.port.base>
     <pinot.integration.test.zk.port.base>0</pinot.integration.test.zk.port.base>
     <pinot.integration.test.active.processor.args />
+    <pinot.integration.test.skip.named.suites>false</pinot.integration.test.skip.named.suites>
     <pinot.integration.test.jvm.args>-Xms${pinot.integration.test.heap.min} -Xmx${pinot.integration.test.heap.max} ${pinot.integration.test.active.processor.args} -Djava.io.tmpdir=${pinot.integration.test.tmp.directory} -Dpinot.test.port.base=${pinot.integration.test.port.base} -Dpinot.test.zk.port.base=${pinot.integration.test.zk.port.base} -Dlog4j2.configurationFile=log4j2.xml</pinot.integration.test.jvm.args>
   </properties>
 
@@ -87,10 +88,22 @@
         </plugins>
       </build>
     </profile>
+    <!-- A direct -Dtest selection must run only in Surefire's default execution. -->
+    <profile>
+      <id>skip-named-integration-test-suites-for-direct-test</id>
+      <activation>
+        <property>
+          <name>test</name>
+        </property>
+      </activation>
+      <properties>
+        <pinot.integration.test.skip.named.suites>true</pinot.integration.test.skip.named.suites>
+      </properties>
+    </profile>
     <!--
-      Keep every top-level A-Z test prefix in exactly one set. Kinesis runs in set 2,
-      and TenantRebalanceIntegrationTest runs in set 1 to balance the observed GitHub
-      Actions runtime across the two jobs.
+      Keep every top-level A-Z test prefix in exactly one set. TenantRebalanceIntegrationTest runs in set 1 to
+      balance the observed GitHub Actions runtime across the two jobs. The CI-only lane profiles below own the
+      focused data-source suites and their finer-grained balancing.
     -->
     <profile>
       <id>integration-tests-set-1</id>
@@ -125,7 +138,10 @@
                 <include>**/org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</include>
               </includes>
               <excludes>
+                <exclude>**/org/apache/pinot/integration/tests/DateTimeFieldSpecHybridClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/ExactlyOnceKafkaRealtimeClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/HybridClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/IngestionConfigHybridIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/KafkaConsumingSegmentToBeMovedSummaryIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeClusterIntegrationTest.java</exclude>
@@ -140,6 +156,7 @@
                   <goal>test</goal>
                 </goals>
                 <configuration>
+                  <skipTests>${pinot.integration.test.skip.named.suites}</skipTests>
                   <reportNameSuffix>shared-kafka</reportNameSuffix>
                   <excludes combine.self="override">
                     <exclude>none</exclude>
@@ -156,12 +173,30 @@
                   <goal>test</goal>
                 </goals>
                 <configuration>
+                  <skipTests>${pinot.integration.test.skip.named.suites}</skipTests>
                   <reportNameSuffix>multi-nodes-offline</reportNameSuffix>
                   <excludes combine.self="override">
                     <exclude>none</exclude>
                   </excludes>
                   <suiteXmlFiles>
                     <suiteXmlFile>src/test/resources/multi-nodes-offline-integration-test-suite.xml</suiteXmlFile>
+                  </suiteXmlFiles>
+                </configuration>
+              </execution>
+              <execution>
+                <id>shared-hybrid-integration-test-suite</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <skipTests>${pinot.integration.test.skip.named.suites}</skipTests>
+                  <reportNameSuffix>shared-hybrid</reportNameSuffix>
+                  <excludes combine.self="override">
+                    <exclude>none</exclude>
+                  </excludes>
+                  <suiteXmlFiles>
+                    <suiteXmlFile>src/test/resources/shared-hybrid-integration-test-suite.xml</suiteXmlFile>
                   </suiteXmlFiles>
                 </configuration>
               </execution>
@@ -242,8 +277,10 @@
                 <include>**/org/apache/pinot/integration/tests/H*Test.java</include>
               </includes>
               <excludes>
+                <exclude>**/org/apache/pinot/integration/tests/DateTimeFieldSpecHybridClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/ExactlyOnceKafkaRealtimeClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/GrpcBrokerClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/HybridClusterIntegrationTest.java</exclude>
               </excludes>
             </configuration>
             <executions>
@@ -254,6 +291,7 @@
                   <goal>test</goal>
                 </goals>
                 <configuration>
+                  <skipTests>${pinot.integration.test.skip.named.suites}</skipTests>
                   <reportNameSuffix>shared-kafka</reportNameSuffix>
                   <excludes combine.self="override">
                     <exclude>none</exclude>
@@ -270,6 +308,7 @@
                   <goal>test</goal>
                 </goals>
                 <configuration>
+                  <skipTests>${pinot.integration.test.skip.named.suites}</skipTests>
                   <reportNameSuffix>kinesis</reportNameSuffix>
                   <excludes combine.self="override">
                     <exclude>none</exclude>
@@ -310,6 +349,7 @@
                 <include>**/org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</include>
               </includes>
               <excludes>
+                <exclude>**/org/apache/pinot/integration/tests/IngestionConfigHybridIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/KafkaConsumingSegmentToBeMovedSummaryIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeClusterIntegrationTest.java</exclude>
@@ -324,6 +364,7 @@
                   <goal>test</goal>
                 </goals>
                 <configuration>
+                  <skipTests>${pinot.integration.test.skip.named.suites}</skipTests>
                   <reportNameSuffix>multi-nodes-offline</reportNameSuffix>
                   <excludes combine.self="override">
                     <exclude>none</exclude>
@@ -340,12 +381,30 @@
                   <goal>test</goal>
                 </goals>
                 <configuration>
+                  <skipTests>${pinot.integration.test.skip.named.suites}</skipTests>
                   <reportNameSuffix>custom-cluster</reportNameSuffix>
                   <excludes combine.self="override">
                     <exclude>none</exclude>
                   </excludes>
                   <suiteXmlFiles>
                     <suiteXmlFile>src/test/resources/custom-cluster-integration-test-suite.xml</suiteXmlFile>
+                  </suiteXmlFiles>
+                </configuration>
+              </execution>
+              <execution>
+                <id>shared-hybrid-integration-test-suite</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <skipTests>${pinot.integration.test.skip.named.suites}</skipTests>
+                  <reportNameSuffix>shared-hybrid</reportNameSuffix>
+                  <excludes combine.self="override">
+                    <exclude>none</exclude>
+                  </excludes>
+                  <suiteXmlFiles>
+                    <suiteXmlFile>src/test/resources/shared-hybrid-integration-test-suite.xml</suiteXmlFile>
                   </suiteXmlFiles>
                 </configuration>
               </execution>
