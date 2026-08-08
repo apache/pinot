@@ -21,7 +21,9 @@ package org.apache.pinot.core.common;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.function.DoubleSupplier;
+import java.util.function.IntSupplier;
 import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -246,6 +248,154 @@ public class SyntheticBlockValSets {
 
     @Override
     public double[] getDoubleValuesSV() {
+      return _values;
+    }
+  }
+
+  /// A simple [BlockValSet] for nullable, not dictionary-encoded string values.
+  ///
+  /// Named `Str` rather than `String`: a nested class called `String` shadows `java.lang.String` across
+  /// the whole of the enclosing class, which silently changes the signature of every `getString*` method
+  /// declared here so that it no longer implements [BlockValSet].
+  public static class Str extends Base {
+
+    @Nullable
+    final RoaringBitmap _nullBitmap;
+    final String[] _values;
+
+    private Str(@Nullable RoaringBitmap nullBitmap, String[] values) {
+      _nullBitmap = nullBitmap;
+      _values = values;
+    }
+
+    public static Str create(int numDocs, @Nullable RoaringBitmap nullBitmap, Supplier<String> supplier) {
+      Preconditions.checkArgument(nullBitmap == null || nullBitmap.last() < numDocs,
+          "null bitmap larger than numDocs");
+      String[] values = new String[numDocs];
+      for (int i = 0; i < numDocs; i++) {
+        values[i] = supplier.get();
+      }
+      return new Str(nullBitmap, values);
+    }
+
+    public static Str create(@Nullable RoaringBitmap nullBitmap, String[] values) {
+      return new Str(nullBitmap, values);
+    }
+
+    @Nullable
+    @Override
+    public RoaringBitmap getNullBitmap() {
+      return _nullBitmap;
+    }
+
+    @Override
+    public FieldSpec.DataType getValueType() {
+      return FieldSpec.DataType.STRING;
+    }
+
+    @Override
+    public boolean isSingleValue() {
+      return true;
+    }
+
+    @Override
+    public String[] getStringValuesSV() {
+      return _values;
+    }
+  }
+
+  /// A simple [BlockValSet] for nullable, not dictionary-encoded byte array values.
+  public static class Bytes extends Base {
+
+    @Nullable
+    final RoaringBitmap _nullBitmap;
+    final byte[][] _values;
+
+    private Bytes(@Nullable RoaringBitmap nullBitmap, byte[][] values) {
+      _nullBitmap = nullBitmap;
+      _values = values;
+    }
+
+    public static Bytes create(int numDocs, @Nullable RoaringBitmap nullBitmap, Supplier<byte[]> supplier) {
+      Preconditions.checkArgument(nullBitmap == null || nullBitmap.last() < numDocs,
+          "null bitmap larger than numDocs");
+      byte[][] values = new byte[numDocs][];
+      for (int i = 0; i < numDocs; i++) {
+        values[i] = supplier.get();
+      }
+      return new Bytes(nullBitmap, values);
+    }
+
+    public static Bytes create(@Nullable RoaringBitmap nullBitmap, byte[][] values) {
+      return new Bytes(nullBitmap, values);
+    }
+
+    @Nullable
+    @Override
+    public RoaringBitmap getNullBitmap() {
+      return _nullBitmap;
+    }
+
+    @Override
+    public FieldSpec.DataType getValueType() {
+      return FieldSpec.DataType.BYTES;
+    }
+
+    @Override
+    public boolean isSingleValue() {
+      return true;
+    }
+
+    @Override
+    public byte[][] getBytesValuesSV() {
+      return _values;
+    }
+  }
+
+  /// A simple [BlockValSet] for nullable, not dictionary-encoded int values.
+  public static class Int extends Base {
+
+    @Nullable
+    final RoaringBitmap _nullBitmap;
+    final int[] _values;
+
+    private Int(@Nullable RoaringBitmap nullBitmap, int[] values) {
+      _nullBitmap = nullBitmap;
+      _values = values;
+    }
+
+    public static Int create(int numDocs, @Nullable RoaringBitmap nullBitmap, IntSupplier supplier) {
+      Preconditions.checkArgument(nullBitmap == null || nullBitmap.last() < numDocs,
+          "null bitmap larger than numDocs");
+      int[] values = new int[numDocs];
+      for (int i = 0; i < numDocs; i++) {
+        values[i] = supplier.getAsInt();
+      }
+      return new Int(nullBitmap, values);
+    }
+
+    public static Int create(@Nullable RoaringBitmap nullBitmap, int[] values) {
+      return new Int(nullBitmap, values);
+    }
+
+    @Nullable
+    @Override
+    public RoaringBitmap getNullBitmap() {
+      return _nullBitmap;
+    }
+
+    @Override
+    public FieldSpec.DataType getValueType() {
+      return FieldSpec.DataType.INT;
+    }
+
+    @Override
+    public boolean isSingleValue() {
+      return true;
+    }
+
+    @Override
+    public int[] getIntValuesSV() {
       return _values;
     }
   }

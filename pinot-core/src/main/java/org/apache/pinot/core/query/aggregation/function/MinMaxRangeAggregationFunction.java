@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -35,6 +36,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregationFunction<MinMaxRangePair, Double> {
+  private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   public MinMaxRangeAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     super(verifySingleArgument(arguments, "MIN_MAX_RANGE"), nullHandlingEnabled);
@@ -254,36 +256,20 @@ public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregati
     }
   }
 
+  @Nullable
   @Override
   public MinMaxRangePair extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    MinMaxRangePair minMaxRangePair = aggregationResultHolder.getResult();
-    if (minMaxRangePair == null && !_nullHandlingEnabled) {
-      return new MinMaxRangePair();
-    } else {
-      return minMaxRangePair;
-    }
+    return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public MinMaxRangePair extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    MinMaxRangePair minMaxRangePair = groupByResultHolder.getResult(groupKey);
-    if (minMaxRangePair == null && !_nullHandlingEnabled) {
-      return new MinMaxRangePair();
-    } else {
-      return minMaxRangePair;
-    }
+    return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
   public MinMaxRangePair merge(MinMaxRangePair intermediateResult1, MinMaxRangePair intermediateResult2) {
-    if (_nullHandlingEnabled) {
-      if (intermediateResult1 == null) {
-        return intermediateResult2;
-      }
-      if (intermediateResult2 == null) {
-        return intermediateResult1;
-      }
-    }
     intermediateResult1.apply(intermediateResult2);
     return intermediateResult1;
   }
@@ -309,10 +295,13 @@ public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregati
     return ColumnDataType.DOUBLE;
   }
 
+  @Nullable
   @Override
-  public Double extractFinalResult(MinMaxRangePair intermediateResult) {
+  public Double extractFinalResult(@Nullable MinMaxRangePair intermediateResult) {
+    // A null intermediate result means nothing was aggregated. With null handling enabled the range of nothing is
+    // NULL; with it disabled it is what an untouched pair renders to, which is the sentinel below.
     if (intermediateResult == null) {
-      return null;
+      return _nullHandlingEnabled ? null : DEFAULT_FINAL_RESULT;
     }
     return intermediateResult.getMax() - intermediateResult.getMin();
   }

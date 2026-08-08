@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -90,25 +91,27 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
     return _resultType != null ? _resultType : ColumnDataType.STRING;
   }
 
+  @Nullable
   @Override
   public Object extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public Object extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
-  public Comparable<?> extractFinalResult(Object intermediateResult) {
+  public Comparable<?> extractFinalResult(@Nullable Object intermediateResult) {
     return (Comparable<?>) intermediateResult;
   }
 
   @Override
   public Object merge(Object left, Object right) {
-    // For ANY_VALUE, we just need any non-null value, so merge by returning the first non-null value
-    return left != null ? left : right;
+    // Any of the two values will do, and both are real values here.
+    return left;
   }
 
   @Override
