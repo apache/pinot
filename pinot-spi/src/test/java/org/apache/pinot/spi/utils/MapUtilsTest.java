@@ -19,6 +19,8 @@
 package org.apache.pinot.spi.utils;
 
 import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.HashMap;
@@ -64,6 +66,69 @@ public class MapUtilsTest {
     assertEquals(deserialized.get("double"), map.get("double"), "Double value should match");
     assertEquals(deserialized.get("boolean"), map.get("boolean"), "Boolean value should match");
     assertNull(deserialized.get("nullValue"), "Null value should be preserved");
+  }
+
+  @Test
+  void testDeserializeMapValue() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("first", Map.of("nested", List.of(1, 2, 3)));
+    map.put("k8s.workload.name", "pinot-server");
+    map.put("nullValue", null);
+    byte[] serialized = MapUtils.serializeMap(map);
+
+    assertEquals(MapUtils.deserializeMapValue(serialized, "k8s.workload.name"), "pinot-server");
+    assertEquals(MapUtils.deserializeMapValue(ByteBuffer.wrap(serialized), "first"),
+        Map.of("nested", List.of(1, 2, 3)));
+    assertNull(MapUtils.deserializeMapValue(serialized, "missing"));
+    assertNull(MapUtils.deserializeMapValue(serialized, "nullValue"));
+    assertNull(MapUtils.deserializeMapValue(MapUtils.serializeMap(Map.of()), "any"));
+  }
+
+  /// Keys that are the same length and differ only in their trailing bytes are the case the scanning extractor can
+  /// get wrong: the length check passes for every entry, so the match has to come from the byte comparison alone.
+  @Test
+  void testDeserializeMapValueWithCollidingKeyShapes() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("k8s.workload.name", "workload");
+    map.put("k8s.workload.kind", "kind");
+    map.put("k8s.namespace.nam", "namespace");
+    map.put("k8s.workload", "prefix-of-another-key");
+    map.put("k8s.workload.name.suffixed", "longer-than-another-key");
+    byte[] serialized = MapUtils.serializeMap(map, false);
+
+    for (Map.Entry<String, Object> entry : map.entrySet()) {
+      assertEquals(MapUtils.deserializeMapValue(serialized, entry.getKey()), entry.getValue(),
+          "Value should match for key: " + entry.getKey());
+    }
+    assertNull(MapUtils.deserializeMapValue(serialized, "k8s.workload.nam"));
+    assertNull(MapUtils.deserializeMapValue(serialized, "k8s.workload.names"));
+  }
+
+  /// The extractor matches on encoded UTF-8 bytes rather than decoding each key, so multi-byte keys - and keys whose
+  /// character count differs from their byte count - have to resolve correctly.
+  @Test
+  void testDeserializeMapValueWithNonAsciiKeys() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("hôte", "host");
+    map.put("hote", "ascii-host");
+    map.put("命名空间", "namespace");
+    byte[] serialized = MapUtils.serializeMap(map, false);
+
+    for (Map.Entry<String, Object> entry : map.entrySet()) {
+      assertEquals(MapUtils.deserializeMapValue(serialized, entry.getKey()), entry.getValue(),
+          "Value should match for key: " + entry.getKey());
+    }
+    assertNull(MapUtils.deserializeMapValue(serialized, "命名"));
+  }
+
+  /// An off-heap forward-index view inherits the platform's native byte order, while the frame is always written
+  /// big-endian. The extractor has to force the order rather than trust the incoming buffer.
+  @Test
+  void testDeserializeMapValueForcesBigEndian() {
+    byte[] serialized = MapUtils.serializeMap(Map.of("k8s.workload.name", "pinot-server"));
+    ByteBuffer littleEndian = ByteBuffer.wrap(serialized).order(ByteOrder.LITTLE_ENDIAN);
+
+    assertEquals(MapUtils.deserializeMapValue(littleEndian, "k8s.workload.name"), "pinot-server");
   }
 
   @Test

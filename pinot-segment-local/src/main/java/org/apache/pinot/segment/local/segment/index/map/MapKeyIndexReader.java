@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.map;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -92,8 +91,7 @@ public class MapKeyIndexReader implements ForwardIndexReader {
   }
 
   private Object extractMapValue(int docId, ForwardIndexReaderContext context, String key) {
-    Map map = _forwardIndexReader.getMap(docId, context);
-    Object object = map.get(key);
+    Object object = _forwardIndexReader.getMapValue(docId, context, key);
     if (object == null) {
       return _defaultNullValue;
     }
