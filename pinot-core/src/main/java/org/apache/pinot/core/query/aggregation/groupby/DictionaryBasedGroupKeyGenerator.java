@@ -40,31 +40,23 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
-/**
- * Class for generating group keys (groupId-stringKey pair) for a given list of dictionary encoded group-by columns.
- * <p>The maximum number of possible group keys is the cardinality product of all the group-by columns.
- * <p>The raw key is generated from the dictionary ids of the group-by columns.
- * <ul>
- *   <li>
- *     If the maximum number of possible group keys is less than a threshold (10K), directly use the raw key as the
- *     group id. (ARRAY_BASED)
- *   </li>
- *   <li>
- *     If the maximum number of possible group keys is larger than the threshold, but still fit into integer, generate
- *     integer raw keys and map them onto contiguous group ids. (INT_MAP_BASED)
- *   </li>
- *   <li>
- *     If the maximum number of possible group keys cannot fit into integer, but still fit into long, generate long
- *     raw keys and map them onto contiguous group ids. (LONG_MAP_BASED)
- *   </li>
- *   <li>
- *     If the maximum number of possible group keys cannot fit into long, use int arrays as the raw keys to store the
- *     dictionary ids of all the group-by columns and map them onto contiguous group ids. (ARRAY_MAP_BASED)
- *   </li>
- * </ul>
- * <p>All the logic is maintained internally, and to the outside world, the group ids are always int type, and are
- * bounded by the number of groups limit (globalGroupIdUpperBound is always smaller or equal to numGroupsLimit).
- */
+/// Class for generating group keys (groupId-stringKey pair) for a given list of dictionary encoded group-by columns.
+///
+/// The maximum number of possible group keys is the cardinality product of all the group-by columns.
+///
+/// The raw key is generated from the dictionary ids of the group-by columns.
+///
+/// - If the maximum number of possible group keys is less than a threshold (10K), directly use the raw key as the
+///   group id. (ARRAY_BASED)
+/// - If the maximum number of possible group keys is larger than the threshold, but still fit into integer, generate
+///   integer raw keys and map them onto contiguous group ids. (INT_MAP_BASED)
+/// - If the maximum number of possible group keys cannot fit into integer, but still fit into long, generate long
+///   raw keys and map them onto contiguous group ids. (LONG_MAP_BASED)
+/// - If the maximum number of possible group keys cannot fit into long, use int arrays as the raw keys to store the
+///   dictionary ids of all the group-by columns and map them onto contiguous group ids. (ARRAY_MAP_BASED)
+///
+/// All the logic is maintained internally, and to the outside world, the group ids are always int type, and are
+/// bounded by the number of groups limit (globalGroupIdUpperBound is always smaller or equal to numGroupsLimit).
 public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   // NOTE: map size = map capacity (power of 2) * load factor
   private static final int INITIAL_MAP_SIZE = (int) ((1 << 9) * 0.75f);
@@ -268,37 +260,27 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
   private interface RawKeyHolder extends AutoCloseable {
 
-    /**
-     * Process a block of documents for all single-valued group-by columns case.
-     *
-     * @param numDocs Number of documents inside the block
-     * @param outGroupIds Buffer for group id results
-     */
+    /// Process a block of documents for all single-valued group-by columns case.
+    ///
+    /// @param numDocs Number of documents inside the block
+    /// @param outGroupIds Buffer for group id results
     void processSingleValue(int numDocs, int[] outGroupIds);
 
-    /**
-     * Process a block of documents for case with multi-valued group-by columns.
-     *
-     * @param numDocs Number of documents inside the block
-     * @param outGroupIds Buffer for group id results
-     */
+    /// Process a block of documents for case with multi-valued group-by columns.
+    ///
+    /// @param numDocs Number of documents inside the block
+    /// @param outGroupIds Buffer for group id results
     void processMultiValue(int numDocs, int[][] outGroupIds);
 
-    /**
-     * Get the upper bound of group id (exclusive) inside the holder.
-     *
-     * @return Upper bound of group id inside the holder
-     */
+    /// Get the upper bound of group id (exclusive) inside the holder.
+    ///
+    /// @return Upper bound of group id inside the holder
     int getGroupIdUpperBound();
 
-    /**
-     * Returns an iterator of {@link GroupKey}. Use this interface to iterate through all the group keys.
-     */
+    /// Returns an iterator of [GroupKey]. Use this interface to iterate through all the group keys.
     Iterator<GroupKey> getGroupKeys();
 
-    /**
-     * Returns current number of unique keys
-     */
+    /// Returns current number of unique keys
     int getNumKeys();
 
     @Override
@@ -527,12 +509,10 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
   }
 
-  /**
-   * Helper method to calculate raw keys that can fit into integer for the given index.
-   *
-   * @param index Index in block
-   * @return Array of integer raw keys
-   */
+  /// Helper method to calculate raw keys that can fit into integer for the given index.
+  ///
+  /// @param index Index in block
+  /// @return Array of integer raw keys
   @SuppressWarnings("Duplicates")
   private int[] getIntRawKeys(int index) {
     int[] rawKeys = null;
@@ -605,9 +585,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     return rawKeys;
   }
 
-  /**
-   * Helper method to get the keys from the raw key.
-   */
+  /// Helper method to get the keys from the raw key.
   private Object[] getKeys(int rawKey) {
     // Specialize single group-by column case
     if (_numGroupByExpressions == 1) {
@@ -721,12 +699,10 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
   }
 
-  /**
-   * Helper method to calculate raw keys that can fit into integer for the given index.
-   *
-   * @param index Index in block
-   * @return Array of long raw keys
-   */
+  /// Helper method to calculate raw keys that can fit into integer for the given index.
+  ///
+  /// @param index Index in block
+  /// @return Array of long raw keys
   @SuppressWarnings("Duplicates")
   private long[] getLongRawKeys(int index) {
     long[] rawKeys = null;
@@ -794,9 +770,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
   }
 
-  /**
-   * Helper method to get the keys from the raw key.
-   */
+  /// Helper method to get the keys from the raw key.
   private Object[] getKeys(long rawKey) {
     Object[] groupKeys = new Object[_numGroupByExpressions];
     for (int i = 0; i < _numGroupByExpressions; i++) {
@@ -890,12 +864,10 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
   }
 
-  /**
-   * Helper method to calculate raw keys that can fit into integer for the given index.
-   *
-   * @param index Index in block
-   * @return Array of IntArray raw keys
-   */
+  /// Helper method to calculate raw keys that can fit into integer for the given index.
+  ///
+  /// @param index Index in block
+  /// @return Array of IntArray raw keys
   @SuppressWarnings("Duplicates")
   private IntArray[] getIntArrayRawKeys(int index) {
     IntArray[] rawKeys = null;
@@ -967,9 +939,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
   }
 
-  /**
-   * Helper method to get the keys from the raw key.
-   */
+  /// Helper method to get the keys from the raw key.
   private Object[] getKeys(IntArray rawKey) {
     Object[] groupKeys = new Object[_numGroupByExpressions];
     for (int i = 0; i < _numGroupByExpressions; i++) {
@@ -978,11 +948,10 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     return groupKeys;
   }
 
-  /**
-   * Fast int-to-int hashmap with {@link #INVALID_ID} as the default return value.
-   * <p>Different from {@link it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap}, this map uses one single array to store
-   * keys and values to reduce the cache miss.
-   */
+  /// Fast int-to-int hashmap with [#INVALID_ID] as the default return value.
+  ///
+  /// Different from [it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap], this map uses one single array to store
+  /// keys and values to reduce the cache miss.
   @VisibleForTesting
   public static class IntGroupIdMap {
     private static final float LOAD_FACTOR = 0.75f;
@@ -1010,10 +979,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       return _size;
     }
 
-    /**
-     * Returns the group id for the given raw key. Create a new group id if the raw key does not exist and the group id
-     * upper bound is not reached.
-     */
+    /// Returns the group id for the given raw key. Create a new group id if the raw key does not exist and the group id
+    /// upper bound is not reached.
     public int getGroupId(int rawKey, int groupIdUpperBound) {
       // NOTE: Key 0 is reserved as the null key. Use (rawKey + 1) as the internal key because rawKey can never be -1.
       int internalKey = rawKey + 1;
@@ -1108,9 +1075,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       };
     }
 
-    /**
-     * Clears the map and trims the map if the size is larger than the {@link #MAX_CACHING_MAP_SIZE}.
-     */
+    /// Clears the map and trims the map if the size is larger than the [#MAX_CACHING_MAP_SIZE].
     public void clearAndTrim() {
       if (_size == 0) {
         return;
@@ -1131,9 +1096,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
   }
 
-  /**
-   * Drop un-necessary checks for highest performance.
-   */
+  /// Drop un-necessary checks for highest performance.
   @VisibleForTesting
   @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
   static class IntArray {

@@ -31,9 +31,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Data table is used to transfer data from server to broker.
- */
+/// Data table is used to transfer data from server to broker.
 public interface DataTable {
 
   void addException(int exceptionCode, String exceptionMsg);
@@ -181,9 +179,7 @@ public interface DataTable {
       _valueType = valueType;
     }
 
-    /**
-     * Returns the MetadataKey for the given id, or {@code null} if the id does not exist.
-     */
+    /// Returns the MetadataKey for the given id, or `null` if the id does not exist.
     @Nullable
     public static MetadataKey getById(int id) {
       if (id >= 0 && id < ID_TO_ENUM_KEY_MAP.length) {
@@ -192,9 +188,7 @@ public interface DataTable {
       return null;
     }
 
-    /**
-     * Returns the MetadataKey for the given name, or {@code null} if the name does not exist.
-     */
+    /// Returns the MetadataKey for the given name, or `null` if the name does not exist.
     @Nullable
     public static MetadataKey getByName(String name) {
       return NAME_TO_ENUM_KEY_MAP.get(name);

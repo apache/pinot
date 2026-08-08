@@ -18,15 +18,12 @@
  */
 package org.apache.pinot.spi.utils;
 
-/**
- * Enum class for segment read mode:
- * <ul>
- *   <li> heap: Segments are loaded on direct-memory. Note, 'heap' here is a legacy misnomer, and it does not
- *        imply JVM heap. This mode should only be used when we want faster performance than memory-mapped files,
- *        and are also sure that we will never run into OOM. </li>
- *   <li> mmap: Segments are loaded on memory-mapped file. This is the default mode. </li>
- * </ul>
- */
+/// Enum class for segment read mode:
+///
+/// - heap: Segments are loaded on direct-memory. Note, 'heap' here is a legacy misnomer, and it does not
+///      imply JVM heap. This mode should only be used when we want faster performance than memory-mapped files,
+///      and are also sure that we will never run into OOM.
+/// - mmap: Segments are loaded on memory-mapped file. This is the default mode.
 public enum ReadMode {
   heap, mmap;
 

@@ -23,13 +23,9 @@ import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetchLis
 import org.apache.pinot.common.request.BrokerRequest;
 
 
-/**
- * The segment pruner prunes the selected segments based on the query.
- */
+/// The segment pruner prunes the selected segments based on the query.
 public interface SegmentPruner extends SegmentZkMetadataFetchListener {
 
-  /**
-   * Prunes the segments queried by the given broker request, returns the selected segments to be queried.
-   */
+  /// Prunes the segments queried by the given broker request, returns the selected segments to be queried.
   Set<String> prune(BrokerRequest brokerRequest, Set<String> segments);
 }

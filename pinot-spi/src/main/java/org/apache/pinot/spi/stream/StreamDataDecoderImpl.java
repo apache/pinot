@@ -40,16 +40,12 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
   private final boolean _isKeyBytesType;
   private final GenericRow _reuse = new GenericRow();
 
-  /**
-   * @return Whether the given key is one of the special types of keys (__key, __header$, etc.)
-   */
+  /// @return Whether the given key is one of the special types of keys (\_\_key, \_\_header$, etc.)
   public static boolean isSpecialKeyType(String key) {
     return key.equals(KEY) || key.startsWith(HEADER_KEY_PREFIX) || key.startsWith(METADATA_KEY_PREFIX);
   }
 
-  /**
-   * @return Whether the __key column is defined as BYTES type in the schema.
-   */
+  /// @return Whether the \_\_key column is defined as BYTES type in the schema.
   public static boolean isKeyBytesType(Schema schema) {
     FieldSpec fieldSpec = schema.getFieldSpecFor(KEY);
     return fieldSpec != null && fieldSpec.getDataType() == FieldSpec.DataType.BYTES;

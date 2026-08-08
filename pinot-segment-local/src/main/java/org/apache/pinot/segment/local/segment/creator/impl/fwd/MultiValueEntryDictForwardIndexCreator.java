@@ -27,9 +27,7 @@ import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Forward index creator for dictionary-encoded multi-value column, where multi-value entries are dictionary encoded.
- */
+/// Forward index creator for dictionary-encoded multi-value column, where multi-value entries are dictionary encoded.
 public class MultiValueEntryDictForwardIndexCreator implements ForwardIndexCreator {
   private final FixedBitMVEntryDictForwardIndexWriter _writer;
 

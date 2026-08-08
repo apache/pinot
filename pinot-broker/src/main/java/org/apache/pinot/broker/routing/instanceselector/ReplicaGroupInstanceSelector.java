@@ -39,32 +39,35 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Instance selector for replica-group routing strategy.
- * <p>The selection algorithm will always evenly distribute the traffic to all replicas of each segment, and will select
- * the same index of the enabled instances for all segments with the same number of replicas. The algorithm is very
- * light-weight and will do best effort to select the least servers for the request.
- * <p>The algorithm relies on the mirror segment assignment from replica-group segment assignment strategy. With mirror
- * segment assignment, any server in one replica-group will always have a corresponding server in other replica-groups
- * that have the same segments assigned. For an example, if S1 is a server in replica-group 1, and it has mirror server
- * S2 in replica-group 2 and S3 in replica-group 3. All segments assigned to S1 will also be assigned to S2 and S3. In
- * stable scenario (external view matches ideal state), all segments assigned to S1 will have the same enabled instances
- * of [S1, S2, S3] sorted (in alphabetical order). If we pick the same index of enabled instances for all segments for a
- * request, only one of S1, S2, S3 will be picked, so it is guaranteed that we pick the least server instances for the
- * request (there is no guarantee on choosing servers from the same replica-group though). In transitioning/error
- * scenario (external view does not match ideal state), there is no guarantee on picking the least server instances, but
- * the traffic is guaranteed to be evenly distributed to all available instances to avoid overwhelming hotspot servers.
- *<p> If the query option NUM_REPLICA_GROUPS_TO_QUERY is provided, the servers to be picked will be from different
- * replica groups such that segments are evenly distributed amongst the provided value of NUM_REPLICA_GROUPS_TO_QUERY.
- * Thus in case of [S1, S2, S3] if NUM_REPLICA_GROUPS_TO_QUERY = 2, the ReplicaGroup S1 and ReplicaGroup S2 will be
- * selected such that half the segments will come from S1 and other half from S2. If NUM_REPLICA_GROUPS_TO_QUERY value
- * is much greater than available servers, then ReplicaGroupInstanceSelector will behave similar to
- * BalancedInstanceSelector.
- * <p>If AdaptiveServerSelection is enabled, a single snapshot of the server ranking is fetched. This ranking is
- * referenced to pick the best available server for each segment. The algorithm ends up picking the minimum number of
- * servers required to process a query because it references a single snapshot of the server rankings. Currently,
- * NUM_REPLICA_GROUPS_TO_QUERY is not supported if AdaptiveServerSelection is enabled.
- */
+/// Instance selector for replica-group routing strategy.
+///
+/// The selection algorithm will always evenly distribute the traffic to all replicas of each segment, and will select
+/// the same index of the enabled instances for all segments with the same number of replicas. The algorithm is very
+/// light-weight and will do best effort to select the least servers for the request.
+///
+/// The algorithm relies on the mirror segment assignment from replica-group segment assignment strategy. With mirror
+/// segment assignment, any server in one replica-group will always have a corresponding server in other replica-groups
+/// that have the same segments assigned. For an example, if S1 is a server in replica-group 1, and it has mirror server
+/// S2 in replica-group 2 and S3 in replica-group 3. All segments assigned to S1 will also be assigned to S2 and S3. In
+/// stable scenario (external view matches ideal state), all segments assigned to S1 will have the same enabled
+/// instances of \[S1, S2, S3\] sorted (in alphabetical order). If we pick the same index of enabled instances for all
+/// segments for a request, only one of S1, S2, S3 will be picked, so it is guaranteed that we pick the least server
+/// instances for the request (there is no guarantee on choosing servers from the same replica-group though). In
+/// transitioning/error scenario (external view does not match ideal state), there is no guarantee on picking the least
+/// server instances, but the traffic is guaranteed to be evenly distributed to all available instances to avoid
+/// overwhelming hotspot servers.
+///
+/// If the query option NUM_REPLICA_GROUPS_TO_QUERY is provided, the servers to be picked will be from different
+/// replica groups such that segments are evenly distributed amongst the provided value of NUM_REPLICA_GROUPS_TO_QUERY.
+/// Thus in case of \[S1, S2, S3\] if NUM_REPLICA_GROUPS_TO_QUERY = 2, the ReplicaGroup S1 and ReplicaGroup S2 will be
+/// selected such that half the segments will come from S1 and other half from S2. If NUM_REPLICA_GROUPS_TO_QUERY value
+/// is much greater than available servers, then ReplicaGroupInstanceSelector will behave similar to
+/// BalancedInstanceSelector.
+///
+/// If AdaptiveServerSelection is enabled, a single snapshot of the server ranking is fetched. This ranking is
+/// referenced to pick the best available server for each segment. The algorithm ends up picking the minimum number of
+/// servers required to process a query because it references a single snapshot of the server rankings. Currently,
+/// NUM_REPLICA_GROUPS_TO_QUERY is not supported if AdaptiveServerSelection is enabled.
 public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ReplicaGroupInstanceSelector.class);
@@ -175,19 +178,16 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     }
   }
 
-  /**
-   *
-   * <pre>
-   * Instances unavailable for any old segment should not exist in _oldSegmentCandidatesMap or _newSegmentStateMap for
-   * segments with the same instances in ideal state.
-   *
-   * The maps are calculated in the following steps to meet the strict replica-group guarantee:
-   *   1. Compute the online instances for both old and new segments
-   *   2. Compare online instances for old segments with instances in ideal state and gather the unavailable instances
-   *   for each set of instances
-   *   3. Exclude the unavailable instances from the online instances map for both old and new segment map
-   * </pre>
-   */
+  /// ```
+  /// Instances unavailable for any old segment should not exist in _oldSegmentCandidatesMap or _newSegmentStateMap for
+  /// segments with the same instances in ideal state.
+  ///
+  /// The maps are calculated in the following steps to meet the strict replica-group guarantee:
+  ///   1. Compute the online instances for both old and new segments
+  ///   2. Compare online instances for old segments with instances in ideal state and gather the unavailable instances
+  ///   for each set of instances
+  ///   3. Exclude the unavailable instances from the online instances map for both old and new segment map
+  /// ```
   void updateSegmentMapsForUpsertTable(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
       Map<String, Long> newSegmentCreationTimeMap) {
     _oldSegmentCandidatesMap.clear();

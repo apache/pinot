@@ -44,15 +44,14 @@ import org.apache.thrift.TDeserializer;
 import org.apache.thrift.protocol.TCompactProtocol;
 
 
-/**
- * The <code>ServerQueryRequest</code> class encapsulates the <b>SSE</b> query related information as well as the query
- * processing context.
- * <p>All segment independent information should be pre-computed and stored in this class to avoid repetitive work on a
- * per segment basis.
- *
- * Please notice that although given the name of this class seems to indicate that it applies to all request, in fact it
- * is only used for SSE queries or the leaf stages in MSE.
- */
+/// The `ServerQueryRequest` class encapsulates the **SSE** query related information as well as the query
+/// processing context.
+///
+/// All segment independent information should be pre-computed and stored in this class to avoid repetitive work on a
+/// per segment basis.
+///
+/// Please notice that although given the name of this class seems to indicate that it applies to all request, in
+/// fact it is only used for SSE queries or the leaf stages in MSE.
 public class ServerQueryRequest {
   private final long _requestId;
   private final String _cid;
@@ -75,16 +74,12 @@ public class ServerQueryRequest {
   // Timing information for different phases of query execution
   private final TimerContext _timerContext;
 
-  /**
-   * This is called from the Netty server to create a ServerQueryRequest from the InstanceRequest
-   */
+  /// This is called from the Netty server to create a ServerQueryRequest from the InstanceRequest
   public ServerQueryRequest(InstanceRequest instanceRequest, ServerMetrics serverMetrics, long queryArrivalTimeMs) {
     this(instanceRequest, serverMetrics, queryArrivalTimeMs, false);
   }
 
-  /**
-   * This is called from by MSE to create a ServerQueryRequest to be used in the leaf stages.
-   */
+  /// This is called from by MSE to create a ServerQueryRequest to be used in the leaf stages.
   public ServerQueryRequest(InstanceRequest instanceRequest, ServerMetrics serverMetrics, long queryArrivalTimeMs,
       boolean enableStreaming) {
     _requestId = instanceRequest.getRequestId();
@@ -111,12 +106,10 @@ public class ServerQueryRequest {
     }
   }
 
-  /**
-   * This is called from the grpc SSE server to create a ServerQueryRequest from the grpc request.
-   *
-   * Notice that this is not used for MSE, which only build ServerQueryRequest using
-   * {@link #ServerQueryRequest(InstanceRequest, ServerMetrics, long, boolean)}.
-   */
+  /// This is called from the grpc SSE server to create a ServerQueryRequest from the grpc request.
+  ///
+  /// Notice that this is not used for MSE, which only build ServerQueryRequest using
+  /// [#ServerQueryRequest(InstanceRequest, ServerMetrics, long, boolean)].
   public ServerQueryRequest(Server.ServerRequest serverRequest, ServerMetrics serverMetrics)
       throws Exception {
     long queryArrivalTimeMs = System.currentTimeMillis();
@@ -161,9 +154,7 @@ public class ServerQueryRequest {
     }
   }
 
-  /**
-   * To be used by Time Series Query Engine.
-   */
+  /// To be used by Time Series Query Engine.
   public ServerQueryRequest(QueryContext queryContext, List<String> segmentsToQuery, Map<String, String> metadata,
       ServerMetrics serverMetrics) {
     long queryArrivalTimeMs = System.currentTimeMillis();

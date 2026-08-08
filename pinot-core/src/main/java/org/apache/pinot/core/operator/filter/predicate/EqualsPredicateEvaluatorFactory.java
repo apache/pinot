@@ -33,33 +33,27 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
 
-/**
- * Factory for EQ predicate evaluators.
- */
+/// Factory for EQ predicate evaluators.
 public class EqualsPredicateEvaluatorFactory {
   private EqualsPredicateEvaluatorFactory() {
   }
 
-  /**
-   * Create a new instance of dictionary based EQ predicate evaluator.
-   *
-   * @param eqPredicate EQ predicate to evaluate
-   * @param dictionary Dictionary for the column
-   * @param dataType Data type for the column
-   * @return Dictionary based EQ predicate evaluator
-   */
+  /// Create a new instance of dictionary based EQ predicate evaluator.
+  ///
+  /// @param eqPredicate EQ predicate to evaluate
+  /// @param dictionary Dictionary for the column
+  /// @param dataType Data type for the column
+  /// @return Dictionary based EQ predicate evaluator
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(EqPredicate eqPredicate,
       Dictionary dictionary, DataType dataType) {
     return new DictionaryBasedEqPredicateEvaluator(eqPredicate, dictionary, dataType);
   }
 
-  /**
-   * Create a new instance of raw value based EQ predicate evaluator.
-   *
-   * @param eqPredicate EQ predicate to evaluate
-   * @param dataType Data type for the column
-   * @return Raw value based EQ predicate evaluator
-   */
+  /// Create a new instance of raw value based EQ predicate evaluator.
+  ///
+  /// @param eqPredicate EQ predicate to evaluate
+  /// @param dataType Data type for the column
+  /// @return Raw value based EQ predicate evaluator
   public static EqRawPredicateEvaluator newRawValueBasedEvaluator(EqPredicate eqPredicate, DataType dataType) {
     String value = eqPredicate.getValue();
     switch (dataType) {

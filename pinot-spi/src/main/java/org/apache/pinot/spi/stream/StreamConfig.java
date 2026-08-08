@@ -30,9 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Provides all the configs related to the stream as configured in the table config
- */
+/// Provides all the configs related to the stream as configured in the table config
 public class StreamConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamConfig.class);
 
@@ -89,9 +87,7 @@ public class StreamConfig {
   // level config
   private final Boolean _serverUploadToDeepStore;
 
-  /**
-   * Initializes a StreamConfig using the map of stream configs from the table config
-   */
+  /// Initializes a StreamConfig using the map of stream configs from the table config
   public StreamConfig(String tableNameWithType, Map<String, String> streamConfigMap) {
     _type = streamConfigMap.get(StreamConfigProperties.STREAM_TYPE);
     Preconditions.checkNotNull(_type, StreamConfigProperties.STREAM_TYPE + " cannot be null");

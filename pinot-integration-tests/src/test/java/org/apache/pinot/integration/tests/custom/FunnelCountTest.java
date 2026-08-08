@@ -36,76 +36,76 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-/**
- * Integration test for FUNNEL_COUNT aggregation function across all strategy combinations
- * (bitmap, set, theta_sketch, partitioned, partitioned+sorted, partitioned+theta_sketch).
- *
- * <p>Uses an e-commerce funnel with 4 steps: view → cart → checkout → purchase.
- * Data is split across 2 segments with no user overlap (properly partitioned),
- * so all strategies produce identical results.
- *
- * <p>Each segment contains multiple category values (electronics, clothing, home) to
- * exercise GROUP BY across categories within a single segment. Users 3 and 9 are
- * "cross-category" — their funnel actions span two categories, which is specifically
- * designed to support future "hold constant columns" feature testing.
- *
- * <h3>Test data layout (2 segments)</h3>
- * <pre>
- * Segment 1 — users 1–6 (mixed categories):
- *   user_id | action   | category
- *   --------|----------|-------------
- *       1   | view     | electronics       user 1: 4 steps, all electronics
- *       1   | cart     | electronics
- *       1   | checkout | electronics
- *       1   | purchase | electronics
- *       2   | view     | clothing          user 2: 4 steps, all clothing
- *       2   | cart     | clothing
- *       2   | checkout | clothing
- *       2   | purchase | clothing
- *       3   | view     | electronics       user 3: 3 steps, MIXED (elec → cloth)
- *       3   | cart     | electronics
- *       3   | checkout | clothing
- *       4   | view     | clothing          user 4: 2 steps, all clothing
- *       4   | cart     | clothing
- *       5   | view     | home              user 5: 2 steps, all home
- *       5   | cart     | home
- *       6   | view     | electronics       user 6: 1 step, electronics
- *
- * Segment 2 — users 7–12 (mixed categories):
- *   user_id | action   | category
- *   --------|----------|-------------
- *       7   | view     | clothing          user 7: 4 steps, all clothing
- *       7   | cart     | clothing
- *       7   | checkout | clothing
- *       7   | purchase | clothing
- *       8   | view     | electronics       user 8: 3 steps, all electronics
- *       8   | cart     | electronics
- *       8   | checkout | electronics
- *       9   | view     | home              user 9: 3 steps, MIXED (home → elec)
- *       9   | cart     | home
- *       9   | checkout | electronics
- *      10   | view     | electronics       user 10: 2 steps, all electronics
- *      10   | cart     | electronics
- *      11   | view     | clothing          user 11: 2 steps, all clothing
- *      11   | cart     | clothing
- *      12   | view     | home              user 12: 1 step, home
- * </pre>
- *
- * <h3>Expected funnel counts</h3>
- * <pre>
- * Single-key CORRELATE_BY(user_id):
- *   Overall:       [12, 10, 6, 3]
- *   clothing:      [ 4,  4, 2, 2]
- *   electronics:   [ 5,  4, 2, 1]
- *   home:          [ 3,  2, 0, 0]
- *
- * Multi-key CORRELATE_BY(user_id, category):
- *   Overall:       [12, 10, 4, 3]   (step 3 drops from 6→4: users 3,9 cross-category)
- *   clothing:      [ 4,  4, 2, 2]   (same — grouping already separates by category)
- *   electronics:   [ 5,  4, 2, 1]   (same)
- *   home:          [ 3,  2, 0, 0]   (same)
- * </pre>
- */
+/// Integration test for FUNNEL_COUNT aggregation function across all strategy combinations
+/// (bitmap, set, theta_sketch, partitioned, partitioned+sorted, partitioned+theta_sketch).
+///
+/// Uses an e-commerce funnel with 4 steps: view → cart → checkout → purchase.
+/// Data is split across 2 segments with no user overlap (properly partitioned),
+/// so all strategies produce identical results.
+///
+/// Each segment contains multiple category values (electronics, clothing, home) to
+/// exercise GROUP BY across categories within a single segment. Users 3 and 9 are
+/// "cross-category" — their funnel actions span two categories, which is specifically
+/// designed to support future "hold constant columns" feature testing.
+///
+/// ## Test data layout (2 segments)
+///
+/// ```
+/// Segment 1 — users 1–6 (mixed categories):
+///   user_id | action   | category
+///   --------|----------|-------------
+///       1   | view     | electronics       user 1: 4 steps, all electronics
+///       1   | cart     | electronics
+///       1   | checkout | electronics
+///       1   | purchase | electronics
+///       2   | view     | clothing          user 2: 4 steps, all clothing
+///       2   | cart     | clothing
+///       2   | checkout | clothing
+///       2   | purchase | clothing
+///       3   | view     | electronics       user 3: 3 steps, MIXED (elec → cloth)
+///       3   | cart     | electronics
+///       3   | checkout | clothing
+///       4   | view     | clothing          user 4: 2 steps, all clothing
+///       4   | cart     | clothing
+///       5   | view     | home              user 5: 2 steps, all home
+///       5   | cart     | home
+///       6   | view     | electronics       user 6: 1 step, electronics
+///
+/// Segment 2 — users 7–12 (mixed categories):
+///   user_id | action   | category
+///   --------|----------|-------------
+///       7   | view     | clothing          user 7: 4 steps, all clothing
+///       7   | cart     | clothing
+///       7   | checkout | clothing
+///       7   | purchase | clothing
+///       8   | view     | electronics       user 8: 3 steps, all electronics
+///       8   | cart     | electronics
+///       8   | checkout | electronics
+///       9   | view     | home              user 9: 3 steps, MIXED (home → elec)
+///       9   | cart     | home
+///       9   | checkout | electronics
+///      10   | view     | electronics       user 10: 2 steps, all electronics
+///      10   | cart     | electronics
+///      11   | view     | clothing          user 11: 2 steps, all clothing
+///      11   | cart     | clothing
+///      12   | view     | home              user 12: 1 step, home
+/// ```
+///
+/// ## Expected funnel counts
+///
+/// ```
+/// Single-key CORRELATE_BY(user_id):
+///   Overall:       [12, 10, 6, 3]
+///   clothing:      [ 4,  4, 2, 2]
+///   electronics:   [ 5,  4, 2, 1]
+///   home:          [ 3,  2, 0, 0]
+///
+/// Multi-key CORRELATE_BY(user_id, category):
+///   Overall:       [12, 10, 4, 3]   (step 3 drops from 6→4: users 3,9 cross-category)
+///   clothing:      [ 4,  4, 2, 2]   (same — grouping already separates by category)
+///   electronics:   [ 5,  4, 2, 1]   (same)
+///   home:          [ 3,  2, 0, 0]   (same)
+/// ```
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class FunnelCountTest extends CustomDataQueryClusterIntegrationTest {
 

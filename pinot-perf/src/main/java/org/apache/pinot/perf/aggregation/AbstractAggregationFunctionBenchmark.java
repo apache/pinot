@@ -30,61 +30,45 @@ import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.infra.Blackhole;
 
-/**
- * Base class for aggregation function benchmarks.
- */
+/// Base class for aggregation function benchmarks.
 public abstract class AbstractAggregationFunctionBenchmark {
 
-  /**
-   * Returns the aggregation function to benchmark.
-   *
-   * This method will be called in the benchmark method, so it must be fast.
-   */
+  /// Returns the aggregation function to benchmark.
+  ///
+  /// This method will be called in the benchmark method, so it must be fast.
   protected abstract AggregationFunction<?, ?> getAggregationFunction();
 
-  /**
-   * Returns the result holder to use for the aggregation function.
-   *
-   * This method will be called in the benchmark method, so it must be fast.
-   * @return
-   */
+  /// Returns the result holder to use for the aggregation function.
+  ///
+  /// This method will be called in the benchmark method, so it must be fast.
+  /// @return
   protected abstract AggregationResultHolder getResultHolder();
 
-  /**
-   * Resets the result holder to prepare for the next aggregation.
-   *
-   * This method will be called in the benchmark method, so it must be fast.
-   */
+  /// Resets the result holder to prepare for the next aggregation.
+  ///
+  /// This method will be called in the benchmark method, so it must be fast.
   protected abstract void resetResultHolder(AggregationResultHolder resultHolder);
 
-  /**
-   * Returns the expected result of the aggregation function.
-   *
-   * This method will be called in the benchmark method, so it must be fast.
-   */
+  /// Returns the expected result of the aggregation function.
+  ///
+  /// This method will be called in the benchmark method, so it must be fast.
   protected abstract Object getExpectedResult();
 
-  /**
-   * Returns the block value set map to use for the aggregation function.
-   *
-   * This method will be called in the benchmark method, so it must be fast.
-   */
+  /// Returns the block value set map to use for the aggregation function.
+  ///
+  /// This method will be called in the benchmark method, so it must be fast.
   protected abstract Map<ExpressionContext, BlockValSet> getBlockValSetMap();
 
-  /**
-   * Returns the comparable final result extracted from the aggregation result holder.
-   * <p>
-   * This method will be called in the benchmark method, so it must be fast.
-   */
+  /// Returns the comparable final result extracted from the aggregation result holder.
+  ///
+  /// This method will be called in the benchmark method, so it must be fast.
   protected Comparable extractFinalResult(AggregationResultHolder aggregationResultHolder) {
     return getAggregationFunction().extractFinalResult(aggregationResultHolder.getResult());
   }
 
-  /**
-   * Verifies the final result of the aggregation function.
-   *
-   * This method will be called in the benchmark method, so it must be fast.
-   */
+  /// Verifies the final result of the aggregation function.
+  ///
+  /// This method will be called in the benchmark method, so it must be fast.
   protected void verifyResult(Blackhole bh, Comparable finalResult, Object expectedResult) {
     if (expectedResult == null) {
       Preconditions.checkArgument(finalResult == null, "Expected final result to be null, actual: %s", finalResult);
@@ -95,81 +79,63 @@ public abstract class AbstractAggregationFunctionBenchmark {
     bh.consume(finalResult);
   }
 
-  /**
-   * Base class for benchmarks that are stable on each {@link Level#Trial} or {@link Level#Iteration}.
-   */
+  /// Base class for benchmarks that are stable on each [Level#Trial] or [Level#Iteration].
   public static abstract class Stable extends AbstractAggregationFunctionBenchmark {
     protected AggregationFunction<?, ?> _aggregationFunction;
     protected AggregationResultHolder _resultHolder;
     protected Object _expectedResult;
     protected Map<ExpressionContext, BlockValSet> _blockValSetMap;
 
-    /**
-     * Returns the level at which the aggregation function should be created.
-     *
-     * By default, the aggregation function is created at the {@link Level#Trial} level.
-     */
+    /// Returns the level at which the aggregation function should be created.
+    ///
+    /// By default, the aggregation function is created at the [Level#Trial] level.
     protected Level getAggregationFunctionLevel() {
       return Level.Trial;
     }
 
-    /**
-     * Creates the aggregation function to benchmark.
-     *
-     * This method will be called at the level returned by {@link #getAggregationFunctionLevel()}.
-     * Therefore, time spent here is not counted towards the benchmark time.
-     */
+    /// Creates the aggregation function to benchmark.
+    ///
+    /// This method will be called at the level returned by [#getAggregationFunctionLevel()].
+    /// Therefore, time spent here is not counted towards the benchmark time.
     protected abstract AggregationFunction<?, ?> createAggregationFunction();
 
-    /**
-     * Returns the level at which the result holder should be created.
-     *
-     * By default, the result holder is created at the {@link Level#Trial} level.
-     */
+    /// Returns the level at which the result holder should be created.
+    ///
+    /// By default, the result holder is created at the [Level#Trial] level.
     protected Level getResultHolderLevel() {
       return Level.Trial;
     }
 
-    /**
-     * Creates the result holder to use for the aggregation function.
-     *
-     * This method will be called at the level returned by {@link #getResultHolderLevel()}.
-     * Therefore, time spent here is not counted towards the benchmark time.
-     */
+    /// Creates the result holder to use for the aggregation function.
+    ///
+    /// This method will be called at the level returned by [#getResultHolderLevel()].
+    /// Therefore, time spent here is not counted towards the benchmark time.
     protected abstract AggregationResultHolder createResultHolder();
 
-    /**
-     * Returns the level at which the block value set map should be created.
-     *
-     * By default, the block value set map is created at the {@link Level#Trial} level.
-     */
+    /// Returns the level at which the block value set map should be created.
+    ///
+    /// By default, the block value set map is created at the [Level#Trial] level.
     protected Level getBlockValSetMapLevel() {
       return Level.Trial;
     }
 
-    /**
-     * Creates the block value set map to use for the aggregation function.
-     *
-     * This method will be called at the level returned by {@link #getBlockValSetMapLevel()}.
-     * Therefore, time spent here is not counted towards the benchmark time.
-     */
+    /// Creates the block value set map to use for the aggregation function.
+    ///
+    /// This method will be called at the level returned by [#getBlockValSetMapLevel()].
+    /// Therefore, time spent here is not counted towards the benchmark time.
     protected abstract Map<ExpressionContext, BlockValSet> createBlockValSetMap();
 
-    /**
-     * Returns the level at which the expected result should be created.
-     *
-     * By default, the expected result is created at the {@link Level#Trial} level.
-     */
+    /// Returns the level at which the expected result should be created.
+    ///
+    /// By default, the expected result is created at the [Level#Trial] level.
     protected Level getExpectedResultLevel() {
       return Level.Trial;
     }
 
-    /**
-     * Creates the expected result of the aggregation function.
-     *
-     * This method will be called at the level returned by {@link #getExpectedResultLevel()}.
-     * Therefore, time spent here is not counted towards the benchmark time.
-     */
+    /// Creates the expected result of the aggregation function.
+    ///
+    /// This method will be called at the level returned by [#getExpectedResultLevel()].
+    /// Therefore, time spent here is not counted towards the benchmark time.
     protected abstract Object createExpectedResult(Map<ExpressionContext, BlockValSet> map);
 
     @Override

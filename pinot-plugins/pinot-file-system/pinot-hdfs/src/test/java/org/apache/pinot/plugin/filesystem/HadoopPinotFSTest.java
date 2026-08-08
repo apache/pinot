@@ -463,4 +463,20 @@ public class HadoopPinotFSTest {
       hadoopFS.delete(baseURI, true);
     }
   }
+
+  @Test
+  public void testInitWithUnauthenticatedUser()
+      throws IOException {
+    String testUser = "pinot-test-user-" + System.currentTimeMillis();
+
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty("hadoop.allow.insecure", "true");
+    config.setProperty("hadoop.user.name", testUser);
+
+    try (HadoopPinotFS hadoopFS = new HadoopPinotFS()) {
+      hadoopFS.init(config);
+      String currentUser = org.apache.hadoop.security.UserGroupInformation.getLoginUser().getUserName();
+      Assert.assertEquals(currentUser, testUser, "The Hadoop login user was not set correctly!");
+    }
+  }
 }

@@ -53,9 +53,7 @@ import org.apache.pinot.spi.utils.TimestampUtils;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 
 
-/**
- * PinotEvaluateLiteralRule that matches the literal only function calls and evaluates them.
- */
+/// PinotEvaluateLiteralRule that matches the literal only function calls and evaluates them.
 public class PinotEvaluateLiteralRule {
 
   public static class Project extends RelOptRule {
@@ -80,9 +78,7 @@ public class PinotEvaluateLiteralRule {
     }
   }
 
-  /**
-   * Constructs a new LogicalProject that matches the type of the old LogicalProject.
-   */
+  /// Constructs a new LogicalProject that matches the type of the old LogicalProject.
   private static LogicalProject constructNewProject(LogicalProject oldProject, LogicalProject newProject,
       RexBuilder rexBuilder) {
     List<RexNode> oldProjects = oldProject.getProjects();
@@ -128,9 +124,7 @@ public class PinotEvaluateLiteralRule {
     }
   }
 
-  /**
-   * A RexShuttle that recursively evaluates all the calls with literal only operands.
-   */
+  /// A RexShuttle that recursively evaluates all the calls with literal only operands.
   private static class EvaluateLiteralShuttle extends RexShuttle {
     final RexBuilder _rexBuilder;
 
@@ -152,10 +146,8 @@ public class PinotEvaluateLiteralRule {
     }
   }
 
-  /**
-   * Evaluates the literal only function and returns the result as a RexLiteral if it can be evaluated, or the function
-   * itself (RexCall) if it cannot be evaluated.
-   */
+  /// Evaluates the literal only function and returns the result as a RexLiteral if it can be evaluated, or the function
+  /// itself (RexCall) if it cannot be evaluated.
   private static RexNode evaluateLiteralOnlyFunction(RexCall rexCall, RexBuilder rexBuilder) {
     List<RexNode> operands = rexCall.getOperands();
     assert operands.stream().allMatch(

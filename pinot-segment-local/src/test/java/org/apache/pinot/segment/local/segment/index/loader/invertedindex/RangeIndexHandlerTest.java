@@ -39,18 +39,15 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for {@link RangeIndexHandler}.
- *
- * <p>Covers:
- * <ul>
- *   <li>Version change detection (v1 on disk, v2 configured → rebuild required)</li>
- *   <li>No rebuild when on-disk version matches configured version</li>
- *   <li>Index removal when column is no longer in config</li>
- *   <li>New index creation when column is added to config (unsorted column)</li>
- *   <li>Sorted columns are skipped even when range index is configured</li>
- * </ul>
- */
+/// Unit tests for [RangeIndexHandler].
+///
+/// Covers:
+///
+/// - Version change detection (v1 on disk, v2 configured → rebuild required)
+/// - No rebuild when on-disk version matches configured version
+/// - Index removal when column is no longer in config
+/// - New index creation when column is added to config (unsorted column)
+/// - Sorted columns are skipped even when range index is configured
 public class RangeIndexHandlerTest {
   private static final String COLUMN = "price";
 
@@ -204,9 +201,7 @@ public class RangeIndexHandlerTest {
         mock(TableConfig.class), mock(Schema.class));
   }
 
-  /**
-   * Creates a {@link SegmentDirectory} mock where {@code column} already has a range index on disk.
-   */
+  /// Creates a [SegmentDirectory] mock where `column` already has a range index on disk.
   private static SegmentDirectory mockSegmentDirectory(String column) {
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getName()).thenReturn("testSegment");
@@ -219,10 +214,8 @@ public class RangeIndexHandlerTest {
     return segmentDirectory;
   }
 
-  /**
-   * Creates a {@link SegmentDirectory.Reader} mock whose range index buffer for {@code column}
-   * reports the given on-disk {@code version} at offset 0.
-   */
+  /// Creates a [SegmentDirectory.Reader] mock whose range index buffer for `column`
+  /// reports the given on-disk `version` at offset 0.
   private static SegmentDirectory.Reader mockReaderWithVersion(SegmentDirectory segmentDirectory,
       String column, int version)
       throws Exception {

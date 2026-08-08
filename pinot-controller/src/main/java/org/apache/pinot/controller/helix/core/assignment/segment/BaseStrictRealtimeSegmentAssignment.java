@@ -33,29 +33,22 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 
 
-/**
- * Segment assignment for LLC real-time table using upsert/dedup. The assignSegment() of RealtimeSegmentAssignment is
- * overridden to add new segment for a table partition in a way that's consistent with the assignment in idealState to
- * make sure that at any time the segments from the same table partition is hosted by the same server.
- * <ul>
- *   <li>
- *     For the CONSUMING segments, in addition to what's done in RealtimeSegmentAssignment, the assignment has to be
- *     checked if it's consistent with the current idealState. If the assignment calculated according to the
- *     InstancePartition and the one in idealState are different, the one in idealState must be used so that segments
- *     from the same table partition are always hosted on the same server as set in current idealState. If the
- *     idealState is not honored, segments from the same table partition may be assigned to different servers,
- *     breaking the key assumption for queries to be correct for the table using upsert/dedup.
- *   </li>
- *   <li>
- *     There is no need to handle COMPLETED segments for tables using upsert/dedup, because their completed
- *     segments should not be relocated to servers tagged to host COMPLETED segments. Basically, upsert/dedup-enabled
- *     tables can only use servers tagged for CONSUMING segments to host both consuming and completed segments from a
- *     table partition.
- *   </li>
- * </ul>
- *
- * The rebalanceTable() method is to be implemented by subclasses to support multi tiers differently.
- */
+/// Segment assignment for LLC real-time table using upsert/dedup. The assignSegment() of RealtimeSegmentAssignment is
+/// overridden to add new segment for a table partition in a way that's consistent with the assignment in idealState to
+/// make sure that at any time the segments from the same table partition is hosted by the same server.
+///
+/// - For the CONSUMING segments, in addition to what's done in RealtimeSegmentAssignment, the assignment has to be
+///   checked if it's consistent with the current idealState. If the assignment calculated according to the
+///   InstancePartition and the one in idealState are different, the one in idealState must be used so that segments
+///   from the same table partition are always hosted on the same server as set in current idealState. If the
+///   idealState is not honored, segments from the same table partition may be assigned to different servers,
+///   breaking the key assumption for queries to be correct for the table using upsert/dedup.
+/// - There is no need to handle COMPLETED segments for tables using upsert/dedup, because their completed
+///   segments should not be relocated to servers tagged to host COMPLETED segments. Basically, upsert/dedup-enabled
+///   tables can only use servers tagged for CONSUMING segments to host both consuming and completed segments from a
+///   table partition.
+///
+/// The rebalanceTable() method is to be implemented by subclasses to support multi tiers differently.
 public abstract class BaseStrictRealtimeSegmentAssignment extends RealtimeSegmentAssignment {
 
   // Cache segment partition id to avoid ZK reads.
@@ -98,10 +91,8 @@ public abstract class BaseStrictRealtimeSegmentAssignment extends RealtimeSegmen
     return instancesAssigned;
   }
 
-  /**
-   * Returns the existing assignment for the given partition id, or {@code null} if there is no existing segment for the
-   * partition. We try to derive the partition id from segment name to avoid ZK reads.
-   */
+  /// Returns the existing assignment for the given partition id, or `null` if there is no existing segment for
+  /// the partition. We try to derive the partition id from segment name to avoid ZK reads.
   @Nullable
   protected Set<String> getExistingAssignment(int partitionId, Map<String, Map<String, String>> currentAssignment) {
     List<String> uploadedSegments = new ArrayList<>();
@@ -128,17 +119,13 @@ public abstract class BaseStrictRealtimeSegmentAssignment extends RealtimeSegmen
     return null;
   }
 
-  /**
-   * Returns {@code true} if all instances are OFFLINE (neither ONLINE nor CONSUMING), {@code false} otherwise.
-   */
+  /// Returns `true` if all instances are OFFLINE (neither ONLINE nor CONSUMING), `false` otherwise.
   protected boolean isOfflineSegment(Map<String, String> instanceStateMap) {
     return !instanceStateMap.containsValue(SegmentStateModel.ONLINE) && !instanceStateMap.containsValue(
         SegmentStateModel.CONSUMING);
   }
 
-  /**
-   * Returns the partition id of the given segment.
-   */
+  /// Returns the partition id of the given segment.
   private int getPartitionId(String segmentName) {
     Integer partitionId =
         SegmentUtils.getSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, _partitionColumn);
@@ -147,16 +134,12 @@ public abstract class BaseStrictRealtimeSegmentAssignment extends RealtimeSegmen
     return partitionId;
   }
 
-  /**
-   * Returns {@code true} if the ideal assignment and the actual assignment are the same, {@code false} otherwise.
-   */
+  /// Returns `true` if the ideal assignment and the actual assignment are the same, `false` otherwise.
   private boolean isSameAssignment(Set<String> idealAssignment, List<String> instancesAssigned) {
     return idealAssignment.size() == instancesAssigned.size() && idealAssignment.containsAll(instancesAssigned);
   }
 
-  /**
-   * Returns the partition id of the given segment, using cached partition id if exists.
-   */
+  /// Returns the partition id of the given segment, using cached partition id if exists.
   protected int getPartitionIdUsingCache(String segmentName) {
     return _segmentPartitionIdMap.computeIntIfAbsent(segmentName, this::getPartitionId);
   }

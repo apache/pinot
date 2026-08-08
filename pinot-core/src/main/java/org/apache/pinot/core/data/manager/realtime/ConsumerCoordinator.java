@@ -40,9 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The ConsumerCoordinator coordinates the offline->consuming helix transitions.
- */
+/// The ConsumerCoordinator coordinates the offline->consuming helix transitions.
 public class ConsumerCoordinator {
   private static final Logger LOGGER = LoggerFactory.getLogger(ConsumerCoordinator.class);
   private static final long WAIT_INTERVAL_MS = TimeUnit.MINUTES.toMillis(3);
@@ -71,19 +69,17 @@ public class ConsumerCoordinator {
     _serverMetrics = ServerMetrics.get();
   }
 
-  /**
-   * Acquires the consumer semaphore for the given LLC segment. When consumption order is enforced, it waits for the
-   * previous segment to be registered.
-   *
-   * TODO: Revisit if we want to handle the following corner case:
-   *   - Seg 100 (OFFLINE -> CONSUMING pending)
-   *   - Seg 101 (OFFLINE -> CONSUMING returned because of status change)
-   *   - Seg 101 (CONSUMING -> ONLINE processed)
-   *   - Seg 102 (OFFLINE -> CONSUMING started consuming while 100 is not registered)
-   *   It should be extremely rare because there has to be multiple CONSUMING state transitions pending, which means
-   *   state transition for Seg 100 has been delayed for at least the consumption time of Seg 101. Since we are not
-   *   blocking the state transition of OFFLINE -> CONSUMING, the chance of this happening is very low.
-   */
+  /// Acquires the consumer semaphore for the given LLC segment. When consumption order is enforced, it waits for the
+  /// previous segment to be registered.
+  ///
+  /// TODO: Revisit if we want to handle the following corner case:
+  ///   - Seg 100 (OFFLINE -> CONSUMING pending)
+  ///   - Seg 101 (OFFLINE -> CONSUMING returned because of status change)
+  ///   - Seg 101 (CONSUMING -> ONLINE processed)
+  ///   - Seg 102 (OFFLINE -> CONSUMING started consuming while 100 is not registered)
+  ///   It should be extremely rare because there has to be multiple CONSUMING state transitions pending, which means
+  ///   state transition for Seg 100 has been delayed for at least the consumption time of Seg 101. Since we are not
+  ///   blocking the state transition of OFFLINE -> CONSUMING, the chance of this happening is very low.
   public void acquire(LLCSegmentName llcSegmentName)
       throws InterruptedException, ShouldNotConsumeException {
     String segmentName = llcSegmentName.getSegmentName();
@@ -143,10 +139,8 @@ public class ConsumerCoordinator {
     }
   }
 
-  /**
-   * Waits for the previous segment to be registered to the server. Returns the segment ZK metadata fetched during the
-   * wait to reduce unnecessary ZK read.
-   */
+  /// Waits for the previous segment to be registered to the server. Returns the segment ZK metadata fetched during the
+  /// wait to reduce unnecessary ZK read.
   private void waitForPreviousSegment(LLCSegmentName currentSegment)
       throws InterruptedException, ShouldNotConsumeException {
     if (!_firstTransitionProcessed.get() || _useIdealStateToCalculatePreviousSegment) {
@@ -161,10 +155,8 @@ public class ConsumerCoordinator {
     }
   }
 
-  /**
-   * Waits for the previous segment with the sequence number to be registered to the server. Returns the segment ZK
-   * metadata fetched during the wait to reduce unnecessary ZK read..
-   */
+  /// Waits for the previous segment with the sequence number to be registered to the server. Returns the segment ZK
+  /// metadata fetched during the wait to reduce unnecessary ZK read..
   @VisibleForTesting
   void waitForPreviousSegment(LLCSegmentName currentSegment, int previousSegmentSequenceNumber)
       throws InterruptedException, ShouldNotConsumeException {
@@ -272,15 +264,13 @@ public class ConsumerCoordinator {
     }
   }
 
-  /**
-   * This exception is thrown when attempting to acquire the consumer semaphore for a segment that should not be
-   * consumed anymore:
-   * - Segment is in completed status (DONE/UPLOADED)
-   * - Segment is deleted
-   *
-   * We allow consumption when segment is COMMITTING (for pauseless consumption) because there is no guarantee that the
-   * segment will be committed soon. This way the slow server can still catch up.
-   */
+  /// This exception is thrown when attempting to acquire the consumer semaphore for a segment that should not be
+  /// consumed anymore:
+  /// - Segment is in completed status (DONE/UPLOADED)
+  /// - Segment is deleted
+  ///
+  /// We allow consumption when segment is COMMITTING (for pauseless consumption) because there is no guarantee that the
+  /// segment will be committed soon. This way the slow server can still catch up.
   public static class ShouldNotConsumeException extends Exception {
     public ShouldNotConsumeException(String message) {
       super(message);

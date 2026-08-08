@@ -22,9 +22,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * Interface to decouple minion task progress storage from task progress tracking
- */
+/// Interface to decouple minion task progress storage from task progress tracking
 public interface MinionTaskObserverStorageManager {
 
   void init(PinotConfiguration configuration);
@@ -36,9 +34,7 @@ public interface MinionTaskObserverStorageManager {
 
   MinionTaskBaseObserverStats deleteTaskProgress(String taskId);
 
-  /**
-   * Use this to achieve batch updates on the progress tracked in the storage
-   */
+  /// Use this to achieve batch updates on the progress tracked in the storage
   default int getProgressBufferSize() {
     return 1;
   }

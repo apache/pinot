@@ -24,14 +24,12 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * Backward-compatible shim for code that still constructs the old sink class name.
- *
- * <p>Flink 2.x removed the legacy {@code SinkFunction} API. Use {@link PinotSink} together with
- * {@code DataStream#sinkTo(Sink)} for new code.
- *
- * @param <T> type of record supported by the sink
- */
+/// Backward-compatible shim for code that still constructs the old sink class name.
+///
+/// Flink 2.x removed the legacy `SinkFunction` API. Use [PinotSink] together with
+/// `DataStream#sinkTo(Sink)` for new code.
+///
+/// @param <T> type of record supported by the sink
 @Deprecated
 public class PinotSinkFunction<T> extends PinotSink<T> {
   private static final long serialVersionUID = 1L;

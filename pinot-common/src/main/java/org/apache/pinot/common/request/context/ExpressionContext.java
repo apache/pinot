@@ -26,13 +26,13 @@ import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * The {@code ExpressionContext} class represents an expression in the query.
- * <p>The expression can be a LITERAL (e.g. 1, "abc"), an IDENTIFIER (e.g. memberId, timestamp), or a FUNCTION (e.g.
- * SUM(price), ADD(foo, bar)).
- * <p>Currently the query engine processes all literals as strings, so we store literals in string format (1 is stored
- * as "1").
- */
+/// The {@code ExpressionContext} class represents an expression in the query.
+///
+/// The expression can be a LITERAL (e.g. 1, "abc"), an IDENTIFIER (e.g. memberId, timestamp), or a FUNCTION (e.g.
+/// SUM(price), ADD(foo, bar)).
+///
+/// Currently the query engine processes all literals as strings, so we store literals in string format (1 is stored
+/// as "1").
 public class ExpressionContext {
   public enum Type {
     LITERAL, IDENTIFIER, FUNCTION
@@ -89,9 +89,7 @@ public class ExpressionContext {
     return _function;
   }
 
-  /**
-   * Adds the columns (IDENTIFIER expressions) in the expression to the given set.
-   */
+  /// Adds the columns (IDENTIFIER expressions) in the expression to the given set.
   public void getColumns(Set<String> columns) {
     if (_type == Type.IDENTIFIER) {
       if (!_identifier.equals("*")) {

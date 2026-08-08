@@ -22,15 +22,13 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 
 
-/**
- * Intermediate state used by some aggregation functions which gives the end user more control over how custom objects
- * are merged for performance reasons.  Some custom objects such as DataSketches have better merge performance when
- * more than two items are merged at once through the elimination of intermediate bookkeeping overheads.
- *
- * The end user can set a value for the "threshold" parameter that defers the merge operation until at least as many
- * items are ready to be merged, or the callee forces the merge directly via "getResult" - e.g. on serialization.
- * This data structure trades-off more memory usage for a greater degree of pre-aggregation in the accumulator state.
- */
+/// Intermediate state used by some aggregation functions which gives the end user more control over how custom objects
+/// are merged for performance reasons.  Some custom objects such as DataSketches have better merge performance when
+/// more than two items are merged at once through the elimination of intermediate bookkeeping overheads.
+///
+/// The end user can set a value for the "threshold" parameter that defers the merge operation until at least as many
+/// items are ready to be merged, or the callee forces the merge directly via "getResult" - e.g. on serialization.
+/// This data structure trades-off more memory usage for a greater degree of pre-aggregation in the accumulator state.
 public abstract class CustomObjectAccumulator<T> {
   protected ArrayList<T> _accumulator;
   private int _threshold;
@@ -44,48 +42,36 @@ public abstract class CustomObjectAccumulator<T> {
     setThreshold(threshold);
   }
 
-  /**
-   * Sets the threshold that determines how much memory to use for the internal accumulator state before
-   * the intermediate state is merged.
-   * @param threshold the threshold [> 0].
-   */
+  /// Sets the threshold that determines how much memory to use for the internal accumulator state before
+  /// the intermediate state is merged.
+  /// @param threshold the threshold \[> 0\].
   public void setThreshold(int threshold) {
     Preconditions.checkArgument(threshold > 0, "Invalid threshold: %s, must be positive", threshold);
     _threshold = threshold;
   }
 
-  /**
-   * Returns the configured threshold for this accumulator.
-   */
+  /// Returns the configured threshold for this accumulator.
   public int getThreshold() {
     return _threshold;
   }
 
-  /**
-   * Returns the number of inputs that have been added to the accumulator state.
-   */
+  /// Returns the number of inputs that have been added to the accumulator state.
   public int getNumInputs() {
     return _numInputs;
   }
 
-  /**
-   * Returns true if no inputs have been added to the accumulator state.
-   */
+  /// Returns true if no inputs have been added to the accumulator state.
   public boolean isEmpty() {
     return _numInputs == 0;
   }
 
-  /**
-   * Forces the item T in internal state to be merged with all pending items in the accumulator state
-   * and returns the result.  This should not result in the accumulator state being updated or cleared.
-   * @return T result of the merge.
-   */
+  /// Forces the item T in internal state to be merged with all pending items in the accumulator state
+  /// and returns the result.  This should not result in the accumulator state being updated or cleared.
+  /// @return T result of the merge.
   public abstract T getResult();
 
-  /**
-   * Merges another accumulator with this one, by extracting the result from "other".
-   * @param other the custom object accumulator to merge.
-   */
+  /// Merges another accumulator with this one, by extracting the result from "other".
+  /// @param other the custom object accumulator to merge.
   public void merge(CustomObjectAccumulator<T> other) {
     if (other.isEmpty()) {
       return;
@@ -94,11 +80,9 @@ public abstract class CustomObjectAccumulator<T> {
     applyInternal(result);
   }
 
-  /**
-   * Adds a new item to the accumulator state.  If the accumulator state is equal to the threshold value,
-   * the internal state is updated and the accumulator state is cleared.
-   * @param item the item to add to the accumulator state, cannot be null.
-   */
+  /// Adds a new item to the accumulator state.  If the accumulator state is equal to the threshold value,
+  /// the internal state is updated and the accumulator state is cleared.
+  /// @param item the item to add to the accumulator state, cannot be null.
   public void apply(T item) {
     Preconditions.checkNotNull(item);
     applyInternal(item);

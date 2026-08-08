@@ -64,13 +64,11 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Input data - Scores of players
- * Schema
- *  - Dimension fields: playerId:int (primary key), name:string, game:string, deleted:boolean
- *  - Metric fields: score:float
- *  - DataTime fields: timestampInEpoch:long
- */
+/// Input data - Scores of players
+/// Schema
+///  - Dimension fields: playerId:int (primary key), name:string, game:string, deleted:boolean
+///  - Metric fields: score:float
+///  - DataTime fields: timestampInEpoch:long
 public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
   private static final String INPUT_DATA_SMALL_TAR_FILE = "gameScores_csv.tar.gz";
   private static final String INPUT_DATA_LARGE_TAR_FILE = "gameScores_large_csv.tar.gz";

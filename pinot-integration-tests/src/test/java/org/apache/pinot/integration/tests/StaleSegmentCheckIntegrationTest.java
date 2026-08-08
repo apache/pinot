@@ -102,8 +102,8 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
   }
 
   private FieldConfig getH3FieldConfig() {
-    return new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3, null,
-        H3_INDEX_PROPERTIES);
+    return new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.H3),
+        null, H3_INDEX_PROPERTIES);
   }
 
   @Override

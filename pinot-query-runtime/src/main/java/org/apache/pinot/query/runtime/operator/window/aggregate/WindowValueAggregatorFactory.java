@@ -26,27 +26,23 @@ public class WindowValueAggregatorFactory {
   private WindowValueAggregatorFactory() {
   }
 
-  /**
-   * Returns an instance of a window value aggregator for the given window function name and column data type.
-   *
-   * @param functionName The window function name
-   * @param columnDataType The column data type for the value being aggregated
-   * @param supportRemoval Whether the window aggregator should support removal of values; some cases require only
-   *                       addition of values and certain window functions can be more efficiently computed in these
-   *                       cases
-   * @return The window value aggregator instance
-   */
+  /// Returns an instance of a window value aggregator for the given window function name and column data type.
+  ///
+  /// @param functionName The window function name
+  /// @param columnDataType The column data type for the value being aggregated
+  /// @param supportRemoval Whether the window aggregator should support removal of values; some cases require only
+  ///                       addition of values and certain window functions can be more efficiently computed in these
+  ///                       cases
+  /// @return The window value aggregator instance
   public static WindowValueAggregator<Object> getWindowValueAggregator(String functionName,
       DataSchema.ColumnDataType columnDataType, boolean supportRemoval) {
     return getWindowValueAggregator(functionName, columnDataType, supportRemoval, false);
   }
 
-  /**
-   * Returns a window value aggregator for the given function/type. When {@code arbitraryRemoval} is set, MIN / MAX
-   * aggregators that normally use a monotonic deque (which assumes values are removed in arrival order) are replaced
-   * with a sorted-multiset implementation so callers may remove any value at any time — required for window frames
-   * with a non-default {@code EXCLUDE} clause.
-   */
+  /// Returns a window value aggregator for the given function/type. When `arbitraryRemoval` is set, MIN / MAX
+  /// aggregators that normally use a monotonic deque (which assumes values are removed in arrival order) are replaced
+  /// with a sorted-multiset implementation so callers may remove any value at any time — required for window frames
+  /// with a non-default `EXCLUDE` clause.
   public static WindowValueAggregator<Object> getWindowValueAggregator(String functionName,
       DataSchema.ColumnDataType columnDataType, boolean supportRemoval, boolean arbitraryRemoval) {
     DataSchema.ColumnDataType storedType = columnDataType.getStoredType();

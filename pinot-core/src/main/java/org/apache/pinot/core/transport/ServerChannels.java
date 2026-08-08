@@ -58,11 +58,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code ServerChannels} class manages the channels between broker to all the connected servers.
- * <p>There is only one channel between the broker and each connected server (we count OFFLINE and REALTIME as different
- * servers)
- */
+/// The `ServerChannels` class manages the channels between broker to all the connected servers.
+///
+/// There is only one channel between the broker and each connected server (we count OFFLINE and REALTIME as different
+/// servers)
 @ThreadSafe
 public class ServerChannels {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerChannels.class);
@@ -88,12 +87,10 @@ public class ServerChannels {
   private final BrokerMetrics _brokerMetrics = BrokerMetrics.get();
   private final ConcurrentHashMap<ServerRoutingInstance, ServerChannel> _serverToChannelMap = new ConcurrentHashMap<>();
 
-  /**
-   * Create a server channel with TLS config
-   *
-   * @param queryRouter query router
-   * @param tlsConfig TLS/SSL config
-   */
+  /// Create a server channel with TLS config
+  ///
+  /// @param queryRouter query router
+  /// @param tlsConfig TLS/SSL config
   public ServerChannels(QueryRouter queryRouter, @Nullable NettyConfig nettyConfig, @Nullable TlsConfig tlsConfig,
       ThreadAccountant threadAccountant) {
     boolean enableNativeTransports = nettyConfig != null && nettyConfig.isNativeTransportsEnabled();

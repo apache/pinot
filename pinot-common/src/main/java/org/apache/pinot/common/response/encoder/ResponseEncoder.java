@@ -25,22 +25,18 @@ import org.apache.pinot.common.utils.DataSchema;
 
 public interface ResponseEncoder {
 
-  /**
-   * Encode the result table into a byte array.
-   * @param resultTable Result table to encode
-   * @return Encoded byte array
-   */
+  /// Encode the result table into a byte array.
+  /// @param resultTable Result table to encode
+  /// @return Encoded byte array
   byte[] encodeResultTable(ResultTable resultTable, int startRow, int length)
       throws IOException;
 
-  /**
-   * Decode the result table from a byte array.
-   *
-   * @param bytes  Encoded byte array
-   * @param rowSize Number of rows in the result table
-   * @param schema Schema of the result table
-   * @return Decoded result table
-   */
+  /// Decode the result table from a byte array.
+  ///
+  /// @param bytes  Encoded byte array
+  /// @param rowSize Number of rows in the result table
+  /// @param schema Schema of the result table
+  /// @return Decoded result table
   ResultTable decodeResultTable(byte[] bytes, int rowSize, DataSchema schema)
       throws IOException;
 }

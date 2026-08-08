@@ -24,11 +24,9 @@ import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
-/**
- * Base class for unary arithmetic scalar functions.
- *
- * <p>Instances are immutable and thread-safe.
- */
+/// Base class for unary arithmetic scalar functions.
+///
+/// Instances are immutable and thread-safe.
 public abstract class BaseUnaryArithmeticScalarFunction implements PinotScalarFunction {
 
   @Nullable
@@ -53,9 +51,7 @@ public abstract class BaseUnaryArithmeticScalarFunction implements PinotScalarFu
     return defaultFunctionInfo();
   }
 
-  /**
-   * Get the unary arithmetic scalar function's {@link FunctionInfo} for the given argument type.
-   */
+  /// Get the unary arithmetic scalar function's [FunctionInfo] for the given argument type.
   protected abstract FunctionInfo functionInfoForType(ColumnDataType argumentType);
 
   protected FunctionInfo defaultFunctionInfo() {

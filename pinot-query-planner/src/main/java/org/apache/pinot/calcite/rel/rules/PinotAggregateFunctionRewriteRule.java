@@ -80,9 +80,7 @@ public class PinotAggregateFunctionRewriteRule extends RelOptRule {
         rewrittenCalls));
   }
 
-  /**
-   * Rewrite aggregation functions to type specific variants based on the operand type.
-   */
+  /// Rewrite aggregation functions to type specific variants based on the operand type.
   private static AggregateCall maybeRewriteAggCall(AggregateCall call, RelNode input, int numGroups) {
     SqlAggFunction aggFunction = call.getAggregation();
     SqlKind aggKind = aggFunction.getKind();

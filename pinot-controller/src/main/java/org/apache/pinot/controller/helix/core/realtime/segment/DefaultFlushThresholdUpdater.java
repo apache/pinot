@@ -23,10 +23,8 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 
 
-/**
- * The default flush threshold updating strategy, which computes the flush threshold size of the segment by dividing the
- * flush threshold of the table by the max number of partitions consuming on an instance.
- */
+/// The default flush threshold updating strategy, which computes the flush threshold size of the segment by dividing
+/// the flush threshold of the table by the max number of partitions consuming on an instance.
 public class DefaultFlushThresholdUpdater implements FlushThresholdUpdater {
   private final int _tableFlushSize;
 

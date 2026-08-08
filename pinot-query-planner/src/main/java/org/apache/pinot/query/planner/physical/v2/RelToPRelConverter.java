@@ -57,9 +57,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Converts a tree of RelNode to a tree of PRelNode, running the configured Physical Optimizers in the process.
- */
+/// Converts a tree of RelNode to a tree of PRelNode, running the configured Physical Optimizers in the process.
 public class RelToPRelConverter {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelToPRelConverter.class);
 

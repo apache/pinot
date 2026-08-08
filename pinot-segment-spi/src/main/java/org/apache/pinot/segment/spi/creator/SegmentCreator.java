@@ -30,11 +30,9 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Interface for segment creators, which create an index over a set of rows and writes the resulting index to disk.
- * NOTE: this interface is, in practice, meant only for single-column indexes because of the implicit requirement of
- * handling both indexRow() and indexColumn() methods.
- */
+/// Interface for segment creators, which create an index over a set of rows and writes the resulting index to disk.
+/// NOTE: this interface is, in practice, meant only for single-column indexes because of the implicit requirement of
+/// handling both indexRow() and indexColumn() methods.
 public interface SegmentCreator extends Closeable, Serializable {
 
   /// Initializes the segment creation.
@@ -42,36 +40,30 @@ public interface SegmentCreator extends Closeable, Serializable {
       File outDir)
       throws Exception;
 
-  /**
-   * Adds a row to the index.
-   *
-   * @param row The row to index.
-   */
+  /// Adds a row to the index.
+  ///
+  /// @param row The row to index.
   void indexRow(GenericRow row)
       throws IOException;
 
-  /**
-   * Adds a column to the index.
-   *
-   * @param columnName - The name of the column being added to.
-   * @param sortedDocIds - If not null, then this provides the sorted order of documents.
-   * @param segment - Used to get the values of the column.
-   */
+  /// Adds a column to the index.
+  ///
+  /// @param columnName - The name of the column being added to.
+  /// @param sortedDocIds - If not null, then this provides the sorted order of documents.
+  /// @param segment - Used to get the values of the column.
   void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)
       throws IOException;
 
   void indexColumn(String columnName, ColumnReader columnReader)
       throws IOException;
 
-  /**
-   * Adds a column to the index.
-   *
-   * @param columnName - The name of the column being added to.
-   * @param sortedDocIds - If not null, then this provides the sorted order of documents.
-   * @param segment - Used to get the values of the column.
-   * @param validDocIds - If not null, then will only iterate over valid doc ids and skip invalid doc ids.
-   *                      When null, all documents in the segment will be processed.
-   */
+  /// Adds a column to the index.
+  ///
+  /// @param columnName - The name of the column being added to.
+  /// @param sortedDocIds - If not null, then this provides the sorted order of documents.
+  /// @param segment - Used to get the values of the column.
+  /// @param validDocIds - If not null, then will only iterate over valid doc ids and skip invalid doc ids.
+  ///                      When null, all documents in the segment will be processed.
   default void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment,
       @Nullable RoaringBitmap validDocIds)
       throws IOException {
@@ -81,17 +73,15 @@ public interface SegmentCreator extends Closeable, Serializable {
 
   String getSegmentName();
 
-  /**
-   * Seals and creates the final segment in outDir provided in init().
-   * This method is supposed to
-   * 1. flush all column indexes to disk
-   * 2. generate the segment name
-   * 3. convert the segment to the final format
-   * 4. build other indexes (startree index, etc.) if needed.
-   * 5. persist the segment metadata and creation info files.
-   *
-   * @throws Exception If finalization fails
-   */
+  /// Seals and creates the final segment in outDir provided in init().
+  /// This method is supposed to
+  /// 1. flush all column indexes to disk
+  /// 2. generate the segment name
+  /// 3. convert the segment to the final format
+  /// 4. build other indexes (startree index, etc.) if needed.
+  /// 5. persist the segment metadata and creation info files.
+  ///
+  /// @throws Exception If finalization fails
   void seal()
       throws Exception;
 }

@@ -35,9 +35,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Test for the service status.
- */
+/// Test for the service status.
 public class ServiceStatusTest {
   private static final ServiceStatus.ServiceStatusCallback ALWAYS_GOOD = new ServiceStatus.ServiceStatusCallback() {
     @Override

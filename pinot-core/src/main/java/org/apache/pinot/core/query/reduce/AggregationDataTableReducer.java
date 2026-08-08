@@ -40,9 +40,7 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Helper class to reduce and set Aggregation results into the BrokerResponseNative
- */
+/// Helper class to reduce and set Aggregation results into the BrokerResponseNative
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class AggregationDataTableReducer implements DataTableReducer {
   private final QueryContext _queryContext;
@@ -54,9 +52,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
     assert _aggregationFunctions != null;
   }
 
-  /**
-   * Reduces data tables and sets aggregations results into ResultTable.
-   */
+  /// Reduces data tables and sets aggregations results into ResultTable.
   @Override
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
       Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
@@ -95,10 +91,8 @@ public class AggregationDataTableReducer implements DataTableReducer {
     brokerResponseNative.setResultTable(reduceToResultTable(getPrePostAggregationDataSchema(dataSchema), finalResults));
   }
 
-  /**
-   * Merges the per-server intermediate aggregation results into a single {@code Object[]} of merged
-   * intermediate results (one per aggregation function), WITHOUT finalizing.
-   */
+  /// Merges the per-server intermediate aggregation results into a single `Object[]` of merged
+  /// intermediate results (one per aggregation function), WITHOUT finalizing.
   private Object[] mergeIntermediateResults(DataSchema dataSchema, Collection<DataTable> dataTables) {
     int numAggregationFunctions = _aggregationFunctions.length;
     Object[] intermediateResults = new Object[numAggregationFunctions];
@@ -152,11 +146,9 @@ public class AggregationDataTableReducer implements DataTableReducer {
     }
   }
 
-  /**
-   * Serializes the merged intermediate results into a single-row intermediate {@link DataTable},
-   * mirroring the non-final branch of {@code AggregationResultsBlock#getDataTable()} so the output is
-   * byte-shape identical to a single server's intermediate response. Never finalizes.
-   */
+  /// Serializes the merged intermediate results into a single-row intermediate [DataTable],
+  /// mirroring the non-final branch of `AggregationResultsBlock#getDataTable()` so the output is
+  /// byte-shape identical to a single server's intermediate response. Never finalizes.
   private DataTable buildIntermediateDataTable(DataSchema dataSchema, Object[] intermediateResults)
       throws IOException {
     ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
@@ -264,9 +256,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
         reduceToResultTable(getPrePostAggregationDataSchema(dataSchema), convertedFinalResults));
   }
 
-  /**
-   * Sets aggregation results into ResultsTable
-   */
+  /// Sets aggregation results into ResultsTable
   private ResultTable reduceToResultTable(DataSchema dataSchema, Object[] finalResults) {
     PostAggregationHandler postAggregationHandler = new PostAggregationHandler(_queryContext, dataSchema);
     DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
@@ -288,9 +278,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
     return new ResultTable(resultDataSchema, rows);
   }
 
-  /**
-   * Constructs the DataSchema for the rows before the post-aggregation (SQL mode).
-   */
+  /// Constructs the DataSchema for the rows before the post-aggregation (SQL mode).
   private DataSchema getPrePostAggregationDataSchema(DataSchema dataSchema) {
     int numAggregationFunctions = _aggregationFunctions.length;
     ColumnDataType[] columnDataTypes = new ColumnDataType[numAggregationFunctions];

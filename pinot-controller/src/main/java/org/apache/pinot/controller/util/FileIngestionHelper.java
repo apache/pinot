@@ -54,10 +54,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A driver for the ingestion process of the provided file.
- * Responsible for copying the file locally, building a segment and uploading it to the controller.
- */
+/// A driver for the ingestion process of the provided file.
+/// Responsible for copying the file locally, building a segment and uploading it to the controller.
 public class FileIngestionHelper {
   private static final Logger LOGGER = LoggerFactory.getLogger(FileIngestionHelper.class);
   private static final String SEGMENT_UPLOADER_CLASS = "org.apache.pinot.plugin.segmentuploader.SegmentUploaderDefault";
@@ -87,9 +85,7 @@ public class FileIngestionHelper {
     _allowLocalFileSystemInUri = allowLocalFileSystemInUri;
   }
 
-  /**
-   * Creates a segment using the provided data file/URI and uploads to Pinot
-   */
+  /// Creates a segment using the provided data file/URI and uploads to Pinot
   public SuccessResponse buildSegmentAndPush(DataPayload payload)
       throws Exception {
     String tableNameWithType = _tableConfig.getTableName();
@@ -174,9 +170,7 @@ public class FileIngestionHelper {
     }
   }
 
-  /**
-   * Copy the file from given URI to local file
-   */
+  /// Copy the file from given URI to local file
   public static void copyURIToLocal(Map<String, String> batchConfigMap, URI sourceFileURI, File destFile)
       throws Exception {
     copyURIToLocal(batchConfigMap, sourceFileURI, destFile, true);
@@ -221,9 +215,7 @@ public class FileIngestionHelper {
     return LocalPinotFS.class.getName().equals(PluginManager.loadClassWithBackwardCompatibleCheck(rawClassName));
   }
 
-  /**
-   * Copy the file from the uploaded multipart to a local file
-   */
+  /// Copy the file from the uploaded multipart to a local file
   public static void copyMultipartToLocal(FormDataMultiPart multiPart, File destFile)
       throws IOException {
     FormDataBodyPart formDataBodyPart = multiPart.getFields().values().iterator().next().get(0);
@@ -235,16 +227,12 @@ public class FileIngestionHelper {
     }
   }
 
-  /**
-   * Enum to identify the source of ingestion file
-   */
+  /// Enum to identify the source of ingestion file
   private enum PayloadType {
     URI, FILE
   }
 
-  /**
-   * Wrapper around file payload
-   */
+  /// Wrapper around file payload
   public static class DataPayload {
     PayloadType _payloadType;
     FormDataMultiPart _multiPart;

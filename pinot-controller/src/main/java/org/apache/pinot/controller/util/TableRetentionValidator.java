@@ -39,27 +39,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>TableRetentionValidator</code> class validates the retention policy in table config, and the start/end
- * timestamp in segment metadata.
- * <p>Will validate the followings:
- * <ul>
- *   <li>
- *     Table Config
- *     <ul>
- *       <li>"segmentsConfig" is set.</li>
- *       <li>"segmentPushType" is set to APPEND or REFRESH.</li>
- *       <li>Retention setting is valid for APPEND push type.</li>
- *     </ul>
- *   </li>
- *   <li>
- *     Segment Metadata
- *     <ul>
- *       <li>For APPEND push type, offline segment start/end time and time unit is valid.</li>
- *     </ul>
- *   </li>
- * </ul>
- */
+/// The `TableRetentionValidator` class validates the retention policy in table config, and the start/end
+/// timestamp in segment metadata.
+///
+/// Will validate the followings:
+///
+/// - Table Config
+///   - "segmentsConfig" is set.
+///   - "segmentPushType" is set to APPEND or REFRESH.
+///   - Retention setting is valid for APPEND push type.
+/// - Segment Metadata
+///   - For APPEND push type, offline segment start/end time and time unit is valid.
 public class TableRetentionValidator {
   public static final long DEFAULT_DURATION_IN_DAYS_THRESHOLD = 365;
 

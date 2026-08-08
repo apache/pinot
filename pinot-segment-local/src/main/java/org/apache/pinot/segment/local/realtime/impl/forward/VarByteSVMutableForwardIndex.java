@@ -33,9 +33,7 @@ import org.apache.pinot.spi.utils.Utf8Utils;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * Single-value forward index reader-writer for variable length values (STRING and BYTES).
- */
+/// Single-value forward index reader-writer for variable length values (STRING and BYTES).
 public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
   private final DataType _storedType;
   private final MutableOffHeapByteArrayStore _byteArrayStore;

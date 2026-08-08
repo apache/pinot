@@ -18,39 +18,32 @@
  */
 package org.apache.pinot.core.common;
 
-import org.apache.pinot.segment.spi.Constants;
-
-
-/**
- * The interface <code>BlockDocIdIterator</code> represents the iterator for <code>BlockDocIdSet</code>. The document
- * ids returned from the iterator should be in ascending order.
- */
+/// The interface `BlockDocIdIterator` represents the iterator for `BlockDocIdSet`. The document
+/// ids returned from the iterator should be in ascending order.
 public interface BlockDocIdIterator extends AutoCloseable {
 
-  /**
-   * Returns the next matching document id, or {@link Constants#EOF} if there is no more matching documents.
-   * <p>NOTE: There should be no more calls to this method after it returns {@link Constants#EOF}.
-   */
+  /// Returns the next matching document id, or [org.apache.pinot.segment.spi.Constants#EOF] if there is no
+  /// more matching documents.
+  ///
+  /// NOTE: There should be no more calls to this method after it returns
+  /// [org.apache.pinot.segment.spi.Constants#EOF].
   int next();
 
-  /**
-   * Returns the first matching document whose id is greater than or equal to the given target document id, or
-   * {@link Constants#EOF} if there is no such document.
-   * <p>NOTE: The target document id should be GREATER THAN the document id previous returned because the iterator
-   *          should not return the same value twice.
-   * <p>NOTE: There should be no more calls to this method after it returns {@link Constants#EOF}.
-   */
+  /// Returns the first matching document whose id is greater than or equal to the given target document id, or
+  /// [org.apache.pinot.segment.spi.Constants#EOF] if there is no such document.
+  ///
+  /// NOTE: The target document id should be GREATER THAN the document id previous returned because the iterator
+  ///          should not return the same value twice.
+  ///
+  /// NOTE: There should be no more calls to this method after it returns
+  /// [org.apache.pinot.segment.spi.Constants#EOF].
   int advance(int targetDocId);
 
-  /**
-   * Empirically determined to be the best batch size for batch iterators.
-   * @see {https://github.com/RoaringBitmap/RoaringBitmap/pull/243#issuecomment-381278304}
-   */
+  /// Empirically determined to be the best batch size for batch iterators.
+  /// @see {https://github.com/RoaringBitmap/RoaringBitmap/pull/243#issuecomment-381278304}
   int OPTIMAL_ITERATOR_BATCH_SIZE = 256;
 
-  /**
-   * Close resources if applicable.
-   */
+  /// Close resources if applicable.
   @Override
   default void close() {
     // do nothing by default

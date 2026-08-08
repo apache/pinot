@@ -22,9 +22,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 
 
-/**
- * Column-wise data table. It stores data in columnar-major format.
- */
+/// Column-wise data table. It stores data in columnar-major format.
 public class ColumnarDataBlock extends BaseDataBlock {
   protected int[] _cumulativeColumnOffsetSizeInBytes;
   protected int[] _columnSizeInBytes;

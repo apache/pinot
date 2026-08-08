@@ -25,9 +25,7 @@ import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
 
 
-/**
- * Pinot custom SqlFunction to be registered into SqlOperatorTable.
- */
+/// Pinot custom SqlFunction to be registered into SqlOperatorTable.
 public class PinotSqlFunction extends SqlFunction {
   private final boolean _deterministic;
 

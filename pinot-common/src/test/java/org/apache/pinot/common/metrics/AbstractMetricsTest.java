@@ -39,24 +39,21 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTORY_CLASS_NAME;
 
 
-/**
- * Base test for {@link AbstractMetrics} behavior. Concrete subclasses supply the {@link PinotMetricsRegistry}
- * implementation, a matching {@link MetricsInspector}, and a gauge-value reader — allowing the same test suite to run
- * against the in-memory fake registry (in pinot-common) and against real yammer/dropwizard registries (in their
- * respective plugin modules).
- *
- * <p>Subclasses must:
- * <ul>
- *   <li>Implement {@link #metricsFactoryClassName()} with the fully-qualified class name of a
- *       {@link org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory}.</li>
- *   <li>Implement {@link #buildRegistry()} to return a fresh registry per test invocation.</li>
- *   <li>Implement {@link #createInspector(PinotMetricsRegistry)} with a {@link MetricsInspector} that wires against
- *       the registry returned above.</li>
- *   <li>Implement {@link #getGaugeValue(AbstractMetrics, String)} — reading supplier-registered gauges requires a
- *       registry-level read, not {@code AbstractMetrics.getGaugeValue()} (which only covers gauges that populated
- *       {@code _gaugeValues}).</li>
- * </ul>
- */
+/// Base test for [AbstractMetrics] behavior. Concrete subclasses supply the [PinotMetricsRegistry]
+/// implementation, a matching [MetricsInspector], and a gauge-value reader — allowing the same test suite to run
+/// against the in-memory fake registry (in pinot-common) and against real yammer/dropwizard registries (in their
+/// respective plugin modules).
+///
+/// Subclasses must:
+///
+/// - Implement [#metricsFactoryClassName()] with the fully-qualified class name of a
+///      [org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory].
+/// - Implement [#buildRegistry()] to return a fresh registry per test invocation.
+/// - Implement [#createInspector(PinotMetricsRegistry)] with a [MetricsInspector] that wires against
+///      the registry returned above.
+/// - Implement [#getGaugeValue(AbstractMetrics, String)] — reading supplier-registered gauges requires a
+///      registry-level read, not `AbstractMetrics.getGaugeValue()` (which only covers gauges that populated
+///      `_gaugeValues`).
 public abstract class AbstractMetricsTest {
 
   protected abstract String metricsFactoryClassName();
@@ -74,11 +71,9 @@ public abstract class AbstractMetricsTest {
     return new ControllerMetrics(buildRegistry());
   }
 
-  /**
-   * Tear down the PinotMetricUtils static factory after each subclass finishes. The factory installs a
-   * {@link org.apache.pinot.spi.metrics.PinotJmxReporter}; leaving it registered can cause cross-test JMX collisions
-   * (e.g. duplicate MBean names) when multiple subclasses run in the same JVM.
-   */
+  /// Tear down the PinotMetricUtils static factory after each subclass finishes. The factory installs a
+  /// [org.apache.pinot.spi.metrics.PinotJmxReporter]; leaving it registered can cause cross-test JMX collisions
+  /// (e.g. duplicate MBean names) when multiple subclasses run in the same JVM.
   @AfterClass
   public void cleanUpMetricsFactory() {
     PinotMetricUtils.cleanUp();

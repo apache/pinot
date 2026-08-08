@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
-import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManagerTest;
 import org.apache.pinot.client.BrokerResponse;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
@@ -53,11 +52,9 @@ import static org.apache.pinot.client.Connection.FAIL_ON_EXCEPTIONS;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * This test suite is focused only on validating that the config changes are propagated properly as expected.
- * Validations around different cases arising from cluster config, database config and table config are extensively
- * tested as part of {@link HelixExternalViewBasedQueryQuotaManagerTest}
- */
+/// This test suite is focused only on validating that the config changes are propagated properly as expected.
+/// Validations around different cases arising from cluster config, database config and table config are extensively
+/// tested as part of [org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManagerTest]
 public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest {
   private PinotClientTransport _pinotClientTransport;
   private String _brokerHostPort;
@@ -319,11 +316,9 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     runQueriesOnBroker(databaseMaxQps * 2, true, getLogicalTableName());
   }
 
-  /**
-   * Runs the query load with the max rate that the quota can allow and ensures queries are not failing.
-   * Then runs the query load with double the max rate and expects queries to fail due to quota breach.
-   * @param maxRate max rate allowed by the quota
-   */
+  /// Runs the query load with the max rate that the quota can allow and ensures queries are not failing.
+  /// Then runs the query load with double the max rate and expects queries to fail due to quota breach.
+  /// @param maxRate max rate allowed by the quota
   void testQueryRate(int maxRate) {
     verifyQuotaUpdate(maxRate);
     runQueries(maxRate, false);

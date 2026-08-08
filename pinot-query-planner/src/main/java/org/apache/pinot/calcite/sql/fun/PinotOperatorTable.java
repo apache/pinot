@@ -39,7 +39,6 @@ import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlPostfixOperator;
 import org.apache.calcite.sql.SqlSplittableAggFunction;
 import org.apache.calcite.sql.SqlSyntax;
-import org.apache.calcite.sql.fun.SqlLeadLagAggFunction;
 import org.apache.calcite.sql.fun.SqlMonotonicBinaryOperator;
 import org.apache.calcite.sql.fun.SqlNtileAggFunction;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
@@ -60,19 +59,18 @@ import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * This class defines all the {@link SqlOperator}s allowed by Pinot.
- * <p>It contains the following types of operators:
- * <ul>
- *   <li>Standard operators from {@link SqlStdOperatorTable}</li>
- *   <li>Custom aggregation functions from {@link AggregationFunctionType}</li>
- *   <li>Custom transform functions from {@link TransformFunctionType}</li>
- *   <li>Custom scalar functions from {@link FunctionRegistry}</li>
- *   <li>Other custom operators directly registered</li>
- * </ul>
- * <p>The core method is {@link #lookupOperatorOverloads} which is used to look up the {@link SqlOperator} with the
- * {@link SqlIdentifier} during query parsing.
- */
+/// This class defines all the [SqlOperator]s allowed by Pinot.
+///
+/// It contains the following types of operators:
+///
+/// - Standard operators from [SqlStdOperatorTable]
+/// - Custom aggregation functions from [AggregationFunctionType]
+/// - Custom transform functions from [TransformFunctionType]
+/// - Custom scalar functions from [FunctionRegistry]
+/// - Other custom operators directly registered
+///
+/// The core method is [#lookupOperatorOverloads] which is used to look up the [SqlOperator] with the
+/// [SqlIdentifier] during query parsing.
 @SuppressWarnings("unused") // unused fields are accessed by reflection
 public class PinotOperatorTable implements SqlOperatorTable {
   private static final Supplier<PinotOperatorTable> WITH_NULL_HANDLING =
@@ -128,12 +126,10 @@ public class PinotOperatorTable implements SqlOperatorTable {
           InferTypes.VARCHAR_1024,
           OperandTypes.ANY);
 
-  /**
-   * This list includes the supported standard {@link SqlOperator}s defined in {@link SqlStdOperatorTable}.
-   * NOTE: The operator order follows the same order as defined in {@link SqlStdOperatorTable} for easier search.
-   *       Some operators are commented out and re-declared in {@link #STANDARD_OPERATORS_WITH_ALIASES}.
-   * TODO: Add more operators as needed.
-   */
+  /// This list includes the supported standard [SqlOperator]s defined in [SqlStdOperatorTable].
+  /// NOTE: The operator order follows the same order as defined in [SqlStdOperatorTable] for easier search.
+  ///       Some operators are commented out and re-declared in [#STANDARD_OPERATORS_WITH_ALIASES].
+  /// TODO: Add more operators as needed.
   //@formatter:off
   private static final List<SqlOperator> STANDARD_OPERATORS = List.of(
       // SET OPERATORS
@@ -204,6 +200,10 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.VAR_POP,
       SqlStdOperatorTable.VAR_SAMP,
       SqlStdOperatorTable.SUM0,
+      /// GROUPING() / GROUPING_ID() for GROUP BY GROUPING SETS / ROLLUP / CUBE. These are computed from the synthetic
+      /// $groupingId discriminator in the grouping-set final projection (see PinotAggregateExchangeNodeInsertRule).
+      SqlStdOperatorTable.GROUPING,
+      SqlStdOperatorTable.GROUPING_ID,
 
       // WINDOW Rank Functions
       SqlStdOperatorTable.DENSE_RANK,
@@ -217,10 +217,8 @@ public class PinotOperatorTable implements SqlOperatorTable {
       // WINDOW Functions (non-aggregate)
       SqlStdOperatorTable.LAST_VALUE,
       SqlStdOperatorTable.FIRST_VALUE,
-      // TODO: Replace these with SqlStdOperatorTable.LEAD and SqlStdOperatorTable.LAG when the function implementations
-      // are updated to support the IGNORE NULLS option.
-      PinotLeadWindowFunction.INSTANCE,
-      PinotLagWindowFunction.INSTANCE,
+      SqlStdOperatorTable.LEAD,
+      SqlStdOperatorTable.LAG,
 
       // SPECIAL OPERATORS
       SqlStdOperatorTable.IGNORE_NULLS,
@@ -288,9 +286,7 @@ public class PinotOperatorTable implements SqlOperatorTable {
       Pair.of(SqlStdOperatorTable.MULTIPLY, List.of("MULT", "TIMES"))
   );
 
-  /**
-   * This list includes the customized {@link SqlOperator}s.
-   */
+  /// This list includes the customized [SqlOperator]s.
   private static final List<SqlOperator> PINOT_OPERATORS = List.of(
       new PinotSqlFunction("JSON_MATCH", ReturnTypes.BOOLEAN,
           OperandTypes.family(List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
@@ -387,10 +383,8 @@ public class PinotOperatorTable implements SqlOperatorTable {
     _operatorList = List.copyOf(allOperators);
   }
 
-  /**
-   * Registers an operator under the given name. Multiple operators with different syntax (e.g. binary "-" and
-   * prefix unary "-") are allowed to share the same canonical name; all other duplicates are rejected.
-   */
+  /// Registers an operator under the given name. Multiple operators with different syntax (e.g. binary "-" and
+  /// prefix unary "-") are allowed to share the same canonical name; all other duplicates are rejected.
   private void register(String name, SqlOperator sqlOperator, Map<String, List<SqlOperator>> operatorMap) {
     String canonicalName = FunctionRegistry.canonicalize(name);
     List<SqlOperator> existing = operatorMap.get(canonicalName);
@@ -405,10 +399,8 @@ public class PinotOperatorTable implements SqlOperatorTable {
     }
   }
 
-  /**
-   * Forcibly registers an operator under the given canonical name, replacing any existing entry.
-   * Used to override standard Calcite operators (e.g. PINOT_IS_NULL / PINOT_IS_NOT_NULL).
-   */
+  /// Forcibly registers an operator under the given canonical name, replacing any existing entry.
+  /// Used to override standard Calcite operators (e.g. PINOT_IS_NULL / PINOT_IS_NOT_NULL).
   private void registerOverride(String canonicalName, SqlOperator sqlOperator,
       Map<String, List<SqlOperator>> operatorMap) {
     operatorMap.put(canonicalName, new ArrayList<>(List.of(sqlOperator)));
@@ -487,32 +479,6 @@ public class PinotOperatorTable implements SqlOperatorTable {
     return _operatorList;
   }
 
-  private static class PinotLeadWindowFunction extends SqlLeadLagAggFunction {
-    static final SqlOperator INSTANCE = new PinotLeadWindowFunction();
-
-    public PinotLeadWindowFunction() {
-      super(SqlKind.LEAD);
-    }
-
-    @Override
-    public boolean allowsNullTreatment() {
-      return false;
-    }
-  }
-
-  private static class PinotLagWindowFunction extends SqlLeadLagAggFunction {
-    static final SqlOperator INSTANCE = new PinotLagWindowFunction();
-
-    public PinotLagWindowFunction() {
-      super(SqlKind.LAG);
-    }
-
-    @Override
-    public boolean allowsNullTreatment() {
-      return false;
-    }
-  }
-
   private static final class PinotNtileWindowFunction extends SqlNtileAggFunction {
     static final SqlOperator INSTANCE = new PinotNtileWindowFunction();
 
@@ -523,9 +489,9 @@ public class PinotOperatorTable implements SqlOperatorTable {
   }
 
   /// Pinot's custom SUM aggregation function that can aggregate on SV or MV numeric inputs. We can't simply override
-  /// the return type inference and operand type checker in {@link AggregationFunctionType} like we do for other
-  /// functions because {@link org.apache.calcite.sql.fun.SqlSumAggFunction} has some customizations that we need to
-  /// retain here to ensure that rules like {@link org.apache.calcite.rel.rules.AggregateRemoveRule} work as expected.
+  /// the return type inference and operand type checker in [AggregationFunctionType] like we do for other
+  /// functions because [org.apache.calcite.sql.fun.SqlSumAggFunction] has some customizations that we need to
+  /// retain here to ensure that rules like [org.apache.calcite.rel.rules.AggregateRemoveRule] work as expected.
   private static final class PinotSumFunction extends PinotSqlAggFunction {
     static final SqlOperator INSTANCE = new PinotSumFunction();
 
@@ -548,13 +514,14 @@ public class PinotOperatorTable implements SqlOperatorTable {
   }
 
   /// Pinot's custom AVG aggregation function that can aggregate on SV or MV numeric inputs. Using a custom function
-  /// (instead of {@link SqlStdOperatorTable#AVG}) also avoids the standard Calcite convertlet that rewrites window
+  /// (instead of [SqlStdOperatorTable#AVG]) also avoids the standard Calcite convertlet that rewrites window
   /// AVG into SUM / COUNT, since Pinot has native window AVG support via
-  /// {@link org.apache.pinot.query.runtime.operator.window.aggregate.AvgWindowValueAggregator}.
-  /// <p>NOTE: Unlike {@link PinotSumFunction} and {@link PinotMinMaxFunction}, this class intentionally does not
-  /// override {@code unwrap(SqlSplittableAggFunction)} or {@code getRollup()}, matching the standard
-  /// {@link org.apache.calcite.sql.fun.SqlAvgAggFunction}. Calcite's {@code AggregateReduceFunctionsRule} reduces
-  /// {@code AVG} to {@code SUM / COUNT} before any rule that needs a splitter (e.g. {@code AggregateRemoveRule})
+  /// [org.apache.pinot.query.runtime.operator.window.aggregate.AvgWindowValueAggregator].
+  ///
+  /// NOTE: Unlike [PinotSumFunction] and [PinotMinMaxFunction], this class intentionally does not
+  /// override `unwrap(SqlSplittableAggFunction)` or `getRollup()`, matching the standard
+  /// [org.apache.calcite.sql.fun.SqlAvgAggFunction]. Calcite's `AggregateReduceFunctionsRule` reduces
+  /// `AVG` to `SUM / COUNT` before any rule that needs a splitter (e.g. `AggregateRemoveRule`)
   /// would fire on it, so a splitter override is unnecessary.
   private static final class PinotAvgFunction extends PinotSqlAggFunction {
     static final SqlOperator INSTANCE = new PinotAvgFunction();
@@ -566,9 +533,9 @@ public class PinotOperatorTable implements SqlOperatorTable {
   }
 
   /// Pinot's custom MIN / MAX aggregation function that can aggregate on SV or MV comparable inputs. We can't simply
-  /// override the return type inference and operand type checker in {@link AggregationFunctionType} like we do for
-  /// other functions because {@link org.apache.calcite.sql.fun.SqlMinMaxAggFunction} has some customizations that we
-  /// need to retain here to ensure that rules like {@link org.apache.calcite.rel.rules.AggregateRemoveRule} work as
+  /// override the return type inference and operand type checker in [AggregationFunctionType] like we do for
+  /// other functions because [org.apache.calcite.sql.fun.SqlMinMaxAggFunction] has some customizations that we
+  /// need to retain here to ensure that rules like [org.apache.calcite.rel.rules.AggregateRemoveRule] work as
   /// expected.
   private static final class PinotMinMaxFunction extends PinotSqlAggFunction {
     static final SqlOperator MIN = new PinotMinMaxFunction(SqlKind.MIN);

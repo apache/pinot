@@ -29,12 +29,10 @@ import org.apache.pinot.query.validate.Validator;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * Wrapper for pinot internal info for a table.
- *
- * <p>This construct is used to connect a Pinot table to Apache Calcite's relational planner by providing a
- * {@link RelDataType} of the table to the planner.
- */
+/// Wrapper for pinot internal info for a table.
+///
+/// This construct is used to connect a Pinot table to Apache Calcite's relational planner by providing a
+/// [RelDataType] of the table to the planner.
 public class PinotTable extends AbstractTable implements ScannableTable {
   private Schema _schema;
   private boolean _excludeVirtualColumns = false;
@@ -43,11 +41,9 @@ public class PinotTable extends AbstractTable implements ScannableTable {
     this(schema, false);
   }
 
-  /**
-   * Constructor with option to exclude virtual columns.
-   * This is typically used for NATURAL JOIN operations where virtual columns
-   * should not participate in join condition matching.
-   */
+  /// Constructor with option to exclude virtual columns.
+  /// This is typically used for NATURAL JOIN operations where virtual columns
+  /// should not participate in join condition matching.
   public PinotTable(Schema schema, boolean excludeVirtualColumns) {
     _schema = schema;
     _excludeVirtualColumns = excludeVirtualColumns;

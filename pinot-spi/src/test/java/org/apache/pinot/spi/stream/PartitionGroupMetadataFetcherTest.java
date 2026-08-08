@@ -365,11 +365,9 @@ public class PartitionGroupMetadataFetcherTest {
     }
   }
 
-  /**
-   * When one topic in a multi-topic table is inaccessible (e.g. deleted from Kafka), the fetcher must
-   * continue fetching metadata for the remaining topics and return partial results rather than re-throwing
-   * and killing ingestion for all healthy topics.
-   */
+  /// When one topic in a multi-topic table is inaccessible (e.g. deleted from Kafka), the fetcher must
+  /// continue fetching metadata for the remaining topics and return partial results rather than re-throwing
+  /// and killing ingestion for all healthy topics.
   @Test
   public void testFetchMultipleStreamsOneTopicPermanentFailure()
       throws Exception {

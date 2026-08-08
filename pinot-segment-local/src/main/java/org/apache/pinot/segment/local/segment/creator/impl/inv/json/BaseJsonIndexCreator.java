@@ -44,17 +44,15 @@ import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
 
 
-/**
- * Base implementation of the json index creator.
- * <p>Header format:
- * <ul>
- *   <li>Version (int)</li>
- *   <li>Max value length (int)</li>
- *   <li>Dictionary file length (long)</li>
- *   <li>Inverted index file length (long)</li>
- *   <li>Doc id mapping file length (long)</li>
- * </ul>
- */
+/// Base implementation of the json index creator.
+///
+/// Header format:
+///
+/// - Version (int)
+/// - Max value length (int)
+/// - Dictionary file length (long)
+/// - Inverted index file length (long)
+/// - Doc id mapping file length (long)
 public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   // NOTE: V1 is deprecated because it does not support top-level value, top-level array and nested array
   public static final int VERSION_1 = 1;
@@ -141,9 +139,7 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
     add(valueToAdd);
   }
 
-  /**
-   * Adds the flattened records for the next document.
-   */
+  /// Adds the flattened records for the next document.
   void addFlattenedRecords(List<Map<String, String>> records)
       throws IOException {
     int numRecords = records.size();
@@ -162,9 +158,7 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
     }
   }
 
-  /**
-   * Adds the given value to the posting list.
-   */
+  /// Adds the given value to the posting list.
   void addToPostingList(String value) {
     RoaringBitmapWriter<RoaringBitmap> bitmapWriter = _postingListMap.get(value);
     if (bitmapWriter == null) {
@@ -174,10 +168,9 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
     bitmapWriter.add(_nextFlattenedDocId);
   }
 
-  /**
-   * Generates the index file based on _maxValueLength, _dictionaryFile, _invertedIndexFile, _numFlattenedRecordsList,
-   * _nextFlattenedDocId.
-   */
+  /// Generates the index file based on \_maxValueLength, \_dictionaryFile, \_invertedIndexFile,
+  /// \_numFlattenedRecordsList,
+  /// \_nextFlattenedDocId.
   void generateIndexFile()
       throws IOException {
     ByteBuffer headerBuffer = ByteBuffer.allocate(HEADER_LENGTH);

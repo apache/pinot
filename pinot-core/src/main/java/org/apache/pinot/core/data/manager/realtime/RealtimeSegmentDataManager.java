@@ -124,9 +124,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Segment data manager for low level consumer realtime segments, which manages consumption and segment completion.
- */
+/// Segment data manager for low level consumer realtime segments, which manages consumption and segment completion.
 @SuppressWarnings("jol")
 public class RealtimeSegmentDataManager extends SegmentDataManager {
 
@@ -340,10 +338,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private String _stopReason = null;
   private final Semaphore _segBuildSemaphore;
   private final boolean _isOffHeap;
-  /**
-   * Whether null handling is enabled by default. This value is only used if
-   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-   */
+  /// Whether null handling is enabled by default. This value is only used if
+  /// [Schema#isEnableColumnBasedNullHandling()] is false.
   private final boolean _defaultNullHandlingEnabled;
   private final SegmentCommitterFactory _segmentCommitterFactory;
   private final ConsumptionRateLimiter _partitionRateLimiter;
@@ -602,12 +598,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return true;
   }
 
-  /**
-   * @param messageBatch batch of messages to process
-   * @param idlePipeSleepTimeMillis wait time in case no messages were read
-   * @return returns <code>true</code> if the process loop ended before processing the batch, <code>false</code>
-   * otherwise
-   */
+  /// @param messageBatch batch of messages to process
+  /// @param idlePipeSleepTimeMillis wait time in case no messages were read
+  /// @return returns `true` if the process loop ended before processing the batch, `false`
+  /// otherwise
   private boolean processStreamEvents(MessageBatch messageBatch, long idlePipeSleepTimeMillis) {
     int messageCount = messageBatch.getMessageCount();
     _partitionRateLimiter.throttle(messageBatch);
@@ -1127,30 +1121,22 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /**
-   * Returns the current offset for the partition group.
-   */
+  /// Returns the current offset for the partition group.
   public Map<String, String> getPartitionToCurrentOffset() {
     return Map.of(String.valueOf(_partitionGroupId), _currentOffset.toString());
   }
 
-  /**
-   * Returns the state of the consumer.
-   */
+  /// Returns the state of the consumer.
   public ConsumerState getConsumerState() {
     return _state == State.ERROR ? ConsumerState.NOT_CONSUMING : ConsumerState.CONSUMING;
   }
 
-  /**
-   * Returns the timestamp of the last consumed message.
-   */
+  /// Returns the timestamp of the last consumed message.
   public long getLastConsumedTimestamp() {
     return _lastConsumedTimestampMs;
   }
 
-  /**
-   * Returns the {@link ConsumerPartitionState} for the partition group.
-   */
+  /// Returns the [ConsumerPartitionState] for the partition group.
   public Map<String, ConsumerPartitionState> getConsumerPartitionState(
       @Nullable StreamPartitionMsgOffset latestMsgOffset) {
     String partitionGroupId = String.valueOf(_partitionGroupId);
@@ -1159,11 +1145,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             _lastRowMetadata));
   }
 
-  /**
-   * Checks and reports if the consumer is going through data loss.
-   *
-   * @param messageBatch Message batch to validate
-   */
+  /// Checks and reports if the consumer is going through data loss.
+  ///
+  /// @param messageBatch Message batch to validate
   private void reportDataLoss(MessageBatch messageBatch) {
     if (messageBatch.hasDataLoss()) {
       _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.STREAM_DATA_LOSS, 1L);
@@ -1484,15 +1468,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /**
-   * Cleans up the metrics that reflects the state of the realtime segment.
-   * This step is essential as the instance may not be the target location for some of the partitions.
-   * E.g. if the number of partitions increases, or a host swap is needed, the target location for some partitions
-   * may change,
-   * and the current host remains to run. In this case, the current server would still keep the state of the old
-   * partitions,
-   * which no longer resides in this host any more, thus causes false positive information to the metric system.
-   */
+  /// Cleans up the metrics that reflects the state of the realtime segment.
+  /// This step is essential as the instance may not be the target location for some of the partitions.
+  /// E.g. if the number of partitions increases, or a host swap is needed, the target location for some partitions
+  /// may change,
+  /// and the current host remains to run. In this case, the current server would still keep the state of the old
+  /// partitions,
+  /// which no longer resides in this host any more, thus causes false positive information to the metric system.
   private void cleanupMetrics() {
     _serverMetrics.removeTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING);
     _serverMetrics.removeTableGauge(_clientId, ServerGauge.STREAM_DATA_LOSS);
@@ -1565,9 +1547,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return indicator.postSegmentStoppedConsuming();
   }
 
-  /**
-   * Returns true when another manager is currently registered for this segment.
-   */
+  /// Returns true when another manager is currently registered for this segment.
   @VisibleForTesting
   boolean hasDifferentSegmentDataManagerRegistered() {
     if (_realtimeTableDataManager == null) {
@@ -1792,16 +1772,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _consumerThread.start();
   }
 
-  /**
-   * Stop the consuming thread.
-   *
-   * This method is invoked in 2 places:
-   * 1. By the Helix thread when handling the segment state transition from CONSUMING to ONLINE. When this method is
-   *    invoked, Helix thread should already hold the segment lock, and the consumer thread is not building the segment.
-   *    We can safely interrupt the consumer thread and wait for it to join.
-   * 2. By either the Helix thread or consumer thread to offload the segment. In this case, we can also safely interrupt
-   *    the consumer thread because there is no need to build the segment.
-   */
+  /// Stop the consuming thread.
+  ///
+  /// This method is invoked in 2 places:
+  /// 1. By the Helix thread when handling the segment state transition from CONSUMING to ONLINE. When this method is
+  ///    invoked, Helix thread should already hold the segment lock, and the consumer thread is not building the
+  ///    segment. We can safely interrupt the consumer thread and wait for it to join.
+  /// 2. By either the Helix thread or consumer thread to offload the segment. In this case, we can also safely
+  ///    interrupt the consumer thread because there is no need to build the segment.
   public void stop()
       throws InterruptedException {
     _shouldStop = true;
@@ -2163,9 +2141,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /**
-   * Creates a new stream consumer
-   */
+  /// Creates a new stream consumer
   private void makeStreamConsumer(String reason) {
     if (_partitionGroupConsumer != null) {
       closePartitionGroupConsumer();
@@ -2183,10 +2159,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /**
-   * Checkpoints existing consumer before creating a new consumer instance
-   * Assumes there is a valid instance of {@link PartitionGroupConsumer}
-   */
+  /// Checkpoints existing consumer before creating a new consumer instance
+  /// Assumes there is a valid instance of [PartitionGroupConsumer]
   private void recreateStreamConsumer(String reason) {
     _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
     _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
@@ -2204,9 +2178,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /**
-   * Creates a new stream metadata provider
-   */
+  /// Creates a new stream metadata provider
   private void createPartitionMetadataProvider(String reason) {
     closePartitionMetadataProvider();
     _segmentLogger.info("Creating new partition metadata provider, reason: {}", reason);
@@ -2225,10 +2197,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /**
-   * Sets ingestion delay to zero in situations where we are caught up processing events.
-   * TODO: Revisit if we should preserve the offset info.
-   */
+  /// Sets ingestion delay to zero in situations where we are caught up processing events.
+  /// TODO: Revisit if we should preserve the offset info.
   private void setIngestionDelayToZero() {
     long currentTimeMs = System.currentTimeMillis();
     _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId, currentTimeMs, currentTimeMs,
@@ -2269,12 +2239,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /**
-   * Creates a {@link StreamMessageDecoder} using properties in {@link StreamConfig}.
-   *
-   * @param fieldsToRead The fields to read from the source stream
-   * @return The initialized StreamMessageDecoder
-   */
+  /// Creates a [StreamMessageDecoder] using properties in [StreamConfig].
+  ///
+  /// @param fieldsToRead The fields to read from the source stream
+  /// @return The initialized StreamMessageDecoder
   private StreamMessageDecoder createMessageDecoder(Set<String> fieldsToRead) {
     String decoderClass = _streamConfig.getDecoderClass();
     try {
@@ -2306,13 +2274,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return _consumerSemaphoreAcquired;
   }
 
-  /**
-   * Parses the stopOnDecodeError configuration with proper validation and type safety.
-   * Implements the suggested improvement from code review to add input validation.
-   *
-   * @param streamConfig The stream configuration to parse
-   * @return true if stopOnDecodeError is enabled, false otherwise
-   */
+  /// Parses the stopOnDecodeError configuration with proper validation and type safety.
+  /// Implements the suggested improvement from code review to add input validation.
+  ///
+  /// @param streamConfig The stream configuration to parse
+  /// @return true if stopOnDecodeError is enabled, false otherwise
   private boolean parseStopOnDecodeErrorConfig(StreamConfig streamConfig) {
     String stopOnDecodeErrorConfig = streamConfig.getStreamConfigsMap().get(STOP_ON_DECODE_ERROR_CONFIG);
     boolean stopOnDecodeError;

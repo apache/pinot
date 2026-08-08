@@ -33,17 +33,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Column statistics collector for no-dictionary columns that avoids storing unique values and thus reduces memory
- * Behavior:
- * - getUniqueValuesSet() returns null
- * - getCardinality() returns approximate cardinality using HLL++
- * - Doesn't handle cases where values are of different types (e.g. int and long). This is expected.
- *   Individual type collectors (e.g. IntColumnPreIndexStatsCollector) also don't handle this case.
- *   At this point in the Pinot process, the type consistency of a key should already be enforced.
- *   So if such a case is encountered, it will be raised as an exception during collect()
- * Doesn't handle MAP data type as MapColumnPreIndexStatsCollector is optimized for no-dictionary collection
- */
+/// Column statistics collector for no-dictionary columns that avoids storing unique values and thus reduces memory
+/// Behavior:
+/// - getUniqueValuesSet() returns null
+/// - getCardinality() returns approximate cardinality using HLL++
+/// - Doesn't handle cases where values are of different types (e.g. int and long). This is expected.
+///   Individual type collectors (e.g. IntColumnPreIndexStatsCollector) also don't handle this case.
+///   At this point in the Pinot process, the type consistency of a key should already be enforced.
+///   So if such a case is encountered, it will be raised as an exception during collect()
+/// Doesn't handle MAP data type as MapColumnPreIndexStatsCollector is optimized for no-dictionary collection
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCollector {
   private static final Logger LOGGER = LoggerFactory.getLogger(NoDictColumnStatisticsCollector.class);

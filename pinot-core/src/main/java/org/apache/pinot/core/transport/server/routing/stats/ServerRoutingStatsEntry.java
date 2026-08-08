@@ -26,11 +26,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.pinot.common.utils.ExponentialMovingAverage;
 
 
-/**
- *
- *  {@code ServerRoutingStatsEntry} contains the query routing stats for a server. All access to
- *  ServerRoutingStatsEntry should be made through ServerRoutingStatsManager.
- */
+/// `ServerRoutingStatsEntry` contains the query routing stats for a server. All access to
+/// ServerRoutingStatsEntry should be made through ServerRoutingStatsManager.
 public class ServerRoutingStatsEntry {
   String _serverInstanceId;
   private final ReentrantReadWriteLock _serverLock;

@@ -60,9 +60,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit test for {@link NoDictionaryMultiColumnGroupKeyGenerator}
- */
+/// Unit test for [NoDictionaryMultiColumnGroupKeyGenerator]
 public class NoDictionaryGroupKeyGeneratorTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "NoDictionaryGroupKeyGeneratorTest");
   private static final Random RANDOM = new Random();
@@ -161,9 +159,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
     _valueBlock = _projectOperator.nextBlock();
   }
 
-  /**
-   * Unit test for {@link NoDictionarySingleColumnGroupKeyGenerator}
-   */
+  /// Unit test for [NoDictionarySingleColumnGroupKeyGenerator]
   @Test
   public void testSingleColumnGroupKeyGenerator() {
     for (int i = 0; i < NUM_COLUMNS - 1; i++) {
@@ -171,9 +167,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
     }
   }
 
-  /**
-   * Unit test for {@link NoDictionaryMultiColumnGroupKeyGenerator}
-   */
+  /// Unit test for [NoDictionaryMultiColumnGroupKeyGenerator]
   @Test
   public void testMultiColumnGroupKeyGenerator() {
     testGroupKeyGenerator(new int[]{0, 1});
@@ -184,9 +178,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
     testGroupKeyGenerator(new int[]{5, 4, 3, 2, 1, 0});
   }
 
-  /**
-   * Tests multi-column group key generator when at least one column as dictionary, and others don't.
-   */
+  /// Tests multi-column group key generator when at least one column as dictionary, and others don't.
   @Test
   public void testMultiColumnHybridGroupKeyGenerator() {
     for (int i = 0; i < NUM_COLUMNS - 1; i++) {

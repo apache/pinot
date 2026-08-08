@@ -39,9 +39,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * Provide the default null value.
- */
+/// Provide the default null value.
 public class DefaultNullValueVirtualColumnProvider implements VirtualColumnProvider {
 
   @Override

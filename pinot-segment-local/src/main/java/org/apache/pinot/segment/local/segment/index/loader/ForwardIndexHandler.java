@@ -82,20 +82,18 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
 
 
-/**
- * Helper class used by {@link SegmentPreProcessor} to make changes to forward index and dictionary configs. Note
- * that this handler only works for segment versions >= 3.0. Support for segment version < 3.0 is not added because
- * majority of the usecases are in versions >= 3.0 and this avoids adding tech debt. The currently supported
- * operations are:
- * 1. Change compression type for a raw column
- * 2. Enable dictionary
- * 3. Disable dictionary
- * 4. Disable forward index
- * 5. Rebuild the forward index for a forwardIndexDisabled column
- *
- *  TODO: Add support for the following:
- *  1. Segment versions < V3
- */
+/// Helper class used by [SegmentPreProcessor] to make changes to forward index and dictionary configs. Note
+/// that this handler only works for segment versions >= 3.0. Support for segment version < 3.0 is not added because
+/// majority of the usecases are in versions >= 3.0 and this avoids adding tech debt. The currently supported
+/// operations are:
+/// 1. Change compression type for a raw column
+/// 2. Enable dictionary
+/// 3. Disable dictionary
+/// 4. Disable forward index
+/// 5. Rebuild the forward index for a forwardIndexDisabled column
+///
+///  TODO: Add support for the following:
+///  1. Segment versions < V3
 public class ForwardIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(ForwardIndexHandler.class);
 
@@ -474,9 +472,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         == EncodingType.DICTIONARY;
   }
 
-  /// Returns {@code true} when removing the dictionary on this column would leave another enabled index
-  /// orphaned. Aggregates {@link IndexType#requiresDictionary} over every enabled index in the new config
-  /// via {@link DictionaryIndexConfig#requiresDictionary(FieldSpec, FieldIndexConfigs)}, so this automatically
+  /// Returns `true` when removing the dictionary on this column would leave another enabled index
+  /// orphaned. Aggregates [IndexType#requiresDictionary] over every enabled index in the new config
+  /// via [DictionaryIndexConfig#requiresDictionary(FieldSpec, FieldIndexConfigs)], so this automatically
   /// covers inverted, FST, IFST, and any future dict-requiring index type. Only the new config matters — any
   /// existing on-disk index no longer present in the new config is removed by its own handler later in
   /// preprocessing and does not need to keep the dictionary alive.

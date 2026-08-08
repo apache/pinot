@@ -44,10 +44,8 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for GcsPinotFS.listFilesWithMetadata(URI, boolean, Predicate, int)
- * — the paginated listing with early termination using Page&lt;Blob&gt;.
- */
+/// Unit tests for GcsPinotFS.listFilesWithMetadata(URI, boolean, Predicate, int)
+/// — the paginated listing with early termination using Page&lt;Blob&gt;.
 public class GcsPinotFSPaginatedListTest {
 
   private static final Predicate<String> ACCEPT_ALL = path -> true;

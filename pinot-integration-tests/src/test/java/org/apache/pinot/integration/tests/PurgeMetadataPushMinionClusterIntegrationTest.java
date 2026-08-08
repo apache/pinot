@@ -27,11 +27,9 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.testng.annotations.Test;
 
 
-/**
- * Integration test that runs the Purge minion task with METADATA {@link
- * org.apache.pinot.spi.ingestion.batch.BatchConfigProperties.SegmentPushType} to verify the full flow.
- * Only {@link #testFirstRunPurge()} is enabled; other tests from the base class are disabled.
- */
+/// Integration test that runs the Purge minion task with METADATA
+/// [org.apache.pinot.spi.ingestion.batch.BatchConfigProperties.SegmentPushType] to verify the full flow.
+/// Only [#testFirstRunPurge()] is enabled; other tests from the base class are disabled.
 public class PurgeMetadataPushMinionClusterIntegrationTest extends PurgeMinionClusterIntegrationTest {
 
   @Override
