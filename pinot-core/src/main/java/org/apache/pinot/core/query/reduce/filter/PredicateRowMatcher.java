@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.reduce.filter;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -80,7 +81,7 @@ public class PredicateRowMatcher implements RowMatcher {
       case BYTES:
         return _predicateEvaluator.applySV((byte[]) value);
       case UUID:
-        return _predicateEvaluator.applySV(UuidUtils.toBytes(value));
+        return _predicateEvaluator.applySV(UuidUtils.toBytes((UUID) value));
       default:
         throw new IllegalStateException();
     }
