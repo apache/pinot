@@ -26,15 +26,11 @@ import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * Class to merge KLL doubles sketch for minion merge/rollup tasks.
- */
+/// Class to merge KLL doubles sketch for minion merge/rollup tasks.
 public class PercentileKLLSketchAggregator implements ValueAggregator {
 
-  /**
-   * Given two kll doubles sketches, return the aggregated kll doubles sketches
-   * @return aggregated sketch given two kll doubles sketches
-   */
+  /// Given two kll doubles sketches, return the aggregated kll doubles sketches
+  /// @return aggregated sketch given two kll doubles sketches
   @Override
   public Object aggregate(Object value1, Object value2, Map<String, String> functionParameters) {
     try {

@@ -45,24 +45,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * <p>Pair-wise Combine operator for sort-aggregation</p>
- *
- * <p>In this algorithm, an {@link AtomicReference} is used as a "pit" to store
- * the processed {@link SortedRecordTable} to be merged.</p>
- *
- * <p>Each worker thread first processes a segment to a {@link SortedRecordTable},
- * then greedily take waiting tables from the pit and merge them in, until there
- * is no table waiting, then the merged table is placed in the pit. The worker
- * thread then proceed to process the next segment.</p>
- *
- * <p>When there is a table that merged together {@code _numOperators} tables, it
- * is put into {@code _satisfiedTable} as the combine result.</p>
- *
- * <p>This pair-wise approach allows higher level of parallelism for the first rounds
- * of combine, while keeping the processing in a streaming fashion without
- * having to wait for all segments to be ready.</p>
- */
+/// Pair-wise Combine operator for sort-aggregation
+///
+/// In this algorithm, an [AtomicReference] is used as a "pit" to store
+/// the processed [SortedRecordTable] to be merged.
+///
+/// Each worker thread first processes a segment to a [SortedRecordTable],
+/// then greedily take waiting tables from the pit and merge them in, until there
+/// is no table waiting, then the merged table is placed in the pit. The worker
+/// thread then proceed to process the next segment.
+///
+/// When there is a table that merged together `_numOperators` tables, it
+/// is put into `_satisfiedTable` as the combine result.
+///
+/// This pair-wise approach allows higher level of parallelism for the first rounds
+/// of combine, while keeping the processing in a streaming fashion without
+/// having to wait for all segments to be ready.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SortedGroupByCombineOperator.class);
@@ -95,10 +93,8 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
         GroupByUtils.getSortedReduceMerger(queryContext, queryContext.getLimit(), recordKeyComparator);
   }
 
-  /**
-   * For group-by queries, when maxExecutionThreads is not explicitly configured, override it to create as many tasks as
-   * the default number of query worker threads (or the number of operators / segments if that's lower).
-   */
+  /// For group-by queries, when maxExecutionThreads is not explicitly configured, override it to create as many
+  /// tasks as the default number of query worker threads (or the number of operators / segments if that's lower).
   private static QueryContext overrideMaxExecutionThreads(QueryContext queryContext, int numOperators) {
     int maxExecutionThreads = queryContext.getMaxExecutionThreads();
     if (maxExecutionThreads <= 0) {
@@ -112,9 +108,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
     return EXPLAIN_NAME;
   }
 
-  /**
-   * Executes query on sorted segments in a worker thread and merges the results using the pair-wise combine algorithm.
-   */
+  /// Executes query on sorted segments in a worker thread and merges the results using the pair-wise combine algorithm.
   @Override
   protected void processSegments() {
     int operatorId;
@@ -197,10 +191,9 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
     _operatorLatch.countDown();
   }
 
-  /**
-   * <p>Collect the merged group by result and wraps it into a result block
-   * <li>Set all exceptions encountered during execution into the merged result block</li>
-   */
+  /// Collect the merged group by result and wraps it into a result block
+  ///
+  /// - Set all exceptions encountered during execution into the merged result block
   @Override
   public BaseResultsBlock mergeResults()
       throws Exception {

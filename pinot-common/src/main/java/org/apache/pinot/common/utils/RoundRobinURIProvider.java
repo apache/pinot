@@ -29,11 +29,9 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hc.core5.net.URIBuilder;
 
 
-/**
- * RoundRobinURIProvider accept a list of URIs and whether to resolve them into multiple URIs with IP address.
- * If resolveHost = true, it returns a IP address URI in a Round Robin way.
- * If resolveHost = false, then it returns a URI in a Round Robin way.
- */
+/// RoundRobinURIProvider accept a list of URIs and whether to resolve them into multiple URIs with IP address.
+/// If resolveHost = true, it returns a IP address URI in a Round Robin way.
+/// If resolveHost = false, then it returns a URI in a Round Robin way.
 public class RoundRobinURIProvider {
 
   private final List<URI> _uris;

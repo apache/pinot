@@ -27,10 +27,8 @@ import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 import org.apache.pinot.query.runtime.operator.window.WindowFunction;
 
 
-/**
- * Rank based window functions don't support custom window frames (ROWS / RANGE) and are computed over the
- * entire partition. Calcite enforces that a custom window frame cannot be specified for these functions.
- */
+/// Rank based window functions don't support custom window frames (ROWS / RANGE) and are computed over the
+/// entire partition. Calcite enforces that a custom window frame cannot be specified for these functions.
 public abstract class RankBasedWindowFunction extends WindowFunction {
   //@formatter:off
   public static final Map<String, Class<? extends WindowFunction>> WINDOW_FUNCTION_MAP =

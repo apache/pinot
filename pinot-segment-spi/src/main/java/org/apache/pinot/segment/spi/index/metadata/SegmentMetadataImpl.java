@@ -104,9 +104,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   private MultiColumnTextMetadata _multiColumnTextMetadata;
 
-  /**
-   * For segments that can only provide the inputstream to the metadata
-   */
+  /// For segments that can only provide the inputstream to the metadata
   public SegmentMetadataImpl(InputStream metadataPropertiesInputStream, InputStream creationMetaInputStream)
       throws IOException, ConfigurationException {
     _indexDir = null;
@@ -121,11 +119,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     loadCreationMeta(creationMetaInputStream);
   }
 
-  /**
-   * For segments on disk.
-   * <p>Index directory passed in should be top level segment directory.
-   * <p>If segment metadata file exists in multiple segment version, load the one in highest segment version.
-   */
+  /// For segments on disk.
+  ///
+  /// Index directory passed in should be top level segment directory.
+  ///
+  /// If segment metadata file exists in multiple segment version, load the one in highest segment version.
   public SegmentMetadataImpl(File indexDir)
       throws IOException, ConfigurationException {
     _indexDir = indexDir;
@@ -143,9 +141,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
   }
 
-  /**
-   * For REALTIME consuming segments.
-   */
+  /// For REALTIME consuming segments.
   public SegmentMetadataImpl(String rawTableName, String segmentName, Schema schema, long creationTime) {
     _indexDir = null;
     _columnMetadataMap = null;
@@ -156,15 +152,12 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _zkCreationTime = creationTime;
   }
 
-  /**
-   * Helper method to set time related information:
-   * <ul>
-   *   <li> Time column Name. </li>
-   *   <li> Tine Unit. </li>
-   *   <li> Time Interval. </li>
-   *   <li> Start and End time. </li>
-   * </ul>
-   */
+  /// Helper method to set time related information:
+  ///
+  /// - Time column Name.
+  /// - Tine Unit.
+  /// - Time Interval.
+  /// - Start and End time.
   private void setTimeInfo(PropertiesConfiguration segmentMetadataPropertiesConfiguration) {
     _timeColumn = segmentMetadataPropertiesConfiguration.getString(Segment.TIME_COLUMN_NAME);
     if (segmentMetadataPropertiesConfiguration.containsKey(Segment.SEGMENT_START_TIME)
@@ -315,9 +308,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
   }
 
-  /**
-   * Helper method to add the physical columns from source list to destination set.
-   */
+  /// Helper method to add the physical columns from source list to destination set.
   private static void addPhysicalColumns(List<Object> src, Set<String> dest) {
     for (Object o : src) {
       String column = o.toString();
@@ -414,39 +405,31 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return _creationTime;
   }
 
-  /**
-   * Returns the ZooKeeper creation time for upsert consistency.
-   * For REALTIME tables, this is set by the controller when the consuming segment is created, ensuring consistent
-   * creation time across replicas. For segments loaded from disk, this returns {@code Long.MIN_VALUE} until
-   * {@link #setZkCreationTime(long)} is explicitly called (e.g. from ZK metadata during segment loading).
-   * @return ZK creation time in milliseconds, or {@code Long.MIN_VALUE} if not explicitly set
-   */
+  /// Returns the ZooKeeper creation time for upsert consistency.
+  /// For REALTIME tables, this is set by the controller when the consuming segment is created, ensuring consistent
+  /// creation time across replicas. For segments loaded from disk, this returns `Long.MIN_VALUE` until
+  /// [#setZkCreationTime(long)] is explicitly called (e.g. from ZK metadata during segment loading).
+  /// @return ZK creation time in milliseconds, or `Long.MIN_VALUE` if not explicitly set
   public long getZkCreationTime() {
     return _zkCreationTime;
   }
 
-  /**
-   * Sets the ZooKeeper creation time for upsert consistency.
-   * @param zkCreationTime ZK creation time in milliseconds
-   */
+  /// Sets the ZooKeeper creation time for upsert consistency.
+  /// @param zkCreationTime ZK creation time in milliseconds
   public void setZkCreationTime(long zkCreationTime) {
     _zkCreationTime = zkCreationTime;
   }
 
-  /**
-   * Returns the ZooKeeper push time for upsert consistency.
-   * This refers to the time set by controller while pushing the segment. It is used to ensure consistent
-   * push time across replicas for upsert operations.
-   * @return ZK push time in milliseconds, or Long.MIN_VALUE if not set
-   */
+  /// Returns the ZooKeeper push time for upsert consistency.
+  /// This refers to the time set by controller while pushing the segment. It is used to ensure consistent
+  /// push time across replicas for upsert operations.
+  /// @return ZK push time in milliseconds, or Long.MIN_VALUE if not set
   public long getZkPushTime() {
     return _zkPushTime;
   }
 
-  /**
-   * Sets the ZooKeeper push time for upsert consistency.
-   * @param zkPushTime ZK push time in milliseconds
-   */
+  /// Sets the ZooKeeper push time for upsert consistency.
+  /// @param zkPushTime ZK push time in milliseconds
   public void setZkPushTime(long zkPushTime) {
     _zkPushTime = zkPushTime;
   }

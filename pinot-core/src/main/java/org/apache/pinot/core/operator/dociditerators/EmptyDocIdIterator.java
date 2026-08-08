@@ -22,10 +22,8 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.segment.spi.Constants;
 
 
-/**
- * The {@code EmptyDocIdIterator} is a singleton class iterator for EmptyDocIdSet. It always returns
- * {@link Constants#EOF}.
- */
+/// The `EmptyDocIdIterator` is a singleton class iterator for EmptyDocIdSet. It always returns
+/// [Constants#EOF].
 public final class EmptyDocIdIterator implements BlockDocIdIterator {
   private EmptyDocIdIterator() {
   }

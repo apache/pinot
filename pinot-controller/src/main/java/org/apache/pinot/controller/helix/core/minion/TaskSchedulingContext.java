@@ -22,56 +22,55 @@ import java.util.Set;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * Wrapper class to manage all the inputs passed to schedule a task on minion.
- * Tasks will be scheduled based on the combination on tables, databases and taskTypes passed
- * <p>Y -> contains elements
- * <p>N -> is null or empty
- * <table>
- *   <tr>
- *     <th> tablesToSchedule </th> <th> databasesToSchedule </th> <th> tasksToSchedule </th>
- *     <th> {@link PinotTaskManager} behavior </th>
- *   </tr>
- *   <tr>
- *     <td> N </td> <td> N </td> <td> N </td>
- *     <td>schedule all the configured tasks on all tables</td>
- *   </tr>
- *   <tr>
- *     <td> Y </td> <td> N </td> <td> N </td>
- *     <td>schedule all the configured tasks on tables in tablesToSchedule</td>
- *   </tr>
- *   <tr>
- *     <td> N </td> <td> Y </td> <td> N </td>
- *     <td>schedule all the configured tasks on all tables under the databases in databasesToSchedule</td>
- *   </tr>
- *   <tr>
- *     <td> N </td> <td> N </td> <td> Y </td>
- *     <td>schedule tasksToSchedule on all tables</td>
- *   </tr>
- *   <tr>
- *     <td> N </td> <td> Y </td> <td> Y </td>
- *     <td>schedule tasksToSchedule on all tables under the databases in databasesToSchedule</td>
- *   </tr>
- *   <tr>
- *     <td> Y </td> <td> N </td> <td> Y </td>
- *     <td>schedule tasksToSchedule on tables in tablesToSchedule</td>
- *   </tr>
- *   <tr>
- *     <td> Y </td> <td> Y </td> <td> N </td>
- *     <td>schedule all the configured tasks on tables in tablesToSchedule
- *     and also on all tables under the databases in databasesToSchedule</td>
- *   </tr>
- *   <tr>
- *     <td> Y </td> <td> Y </td> <td> Y </td>
- *     <td>schedule tasksToSchedule on tables in tablesToSchedule and also
- *     on all tables under the databases in databasesToSchedule</td>
- *   </tr>
- * </table>
- *
- * In short empty tasksToSchedule will schedule tasks for all types and
- * empty tablesToSchedule and databasesToSchedule will schedule tasks for all tables
- *
- */
+/// Wrapper class to manage all the inputs passed to schedule a task on minion.
+/// Tasks will be scheduled based on the combination on tables, databases and taskTypes passed
+///
+/// Y -> contains elements
+///
+/// N -> is null or empty
+/// <table>
+///   <tr>
+///     <th> tablesToSchedule </th> <th> databasesToSchedule </th> <th> tasksToSchedule </th>
+///     <th> [PinotTaskManager] behavior </th>
+///   </tr>
+///   <tr>
+///     <td> N </td> <td> N </td> <td> N </td>
+///     <td>schedule all the configured tasks on all tables</td>
+///   </tr>
+///   <tr>
+///     <td> Y </td> <td> N </td> <td> N </td>
+///     <td>schedule all the configured tasks on tables in tablesToSchedule</td>
+///   </tr>
+///   <tr>
+///     <td> N </td> <td> Y </td> <td> N </td>
+///     <td>schedule all the configured tasks on all tables under the databases in databasesToSchedule</td>
+///   </tr>
+///   <tr>
+///     <td> N </td> <td> N </td> <td> Y </td>
+///     <td>schedule tasksToSchedule on all tables</td>
+///   </tr>
+///   <tr>
+///     <td> N </td> <td> Y </td> <td> Y </td>
+///     <td>schedule tasksToSchedule on all tables under the databases in databasesToSchedule</td>
+///   </tr>
+///   <tr>
+///     <td> Y </td> <td> N </td> <td> Y </td>
+///     <td>schedule tasksToSchedule on tables in tablesToSchedule</td>
+///   </tr>
+///   <tr>
+///     <td> Y </td> <td> Y </td> <td> N </td>
+///     <td>schedule all the configured tasks on tables in tablesToSchedule
+///     and also on all tables under the databases in databasesToSchedule</td>
+///   </tr>
+///   <tr>
+///     <td> Y </td> <td> Y </td> <td> Y </td>
+///     <td>schedule tasksToSchedule on tables in tablesToSchedule and also
+///     on all tables under the databases in databasesToSchedule</td>
+///   </tr>
+/// </table>
+///
+/// In short empty tasksToSchedule will schedule tasks for all types and
+/// empty tablesToSchedule and databasesToSchedule will schedule tasks for all tables
 public class TaskSchedulingContext {
   private Set<String> _tablesToSchedule;
   private Set<String> _tasksToSchedule;

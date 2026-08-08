@@ -24,9 +24,7 @@ import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Helper class to represent a value range.
- */
+/// Helper class to represent a value range.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class Range {
   private Comparable _lowerBound;
@@ -42,9 +40,7 @@ public class Range {
     _upperInclusive = upperInclusive;
   }
 
-  /**
-   * Intersects the current range with another range.
-   */
+  /// Intersects the current range with another range.
   public void intersect(Range range) {
     if (range._lowerBound != null) {
       if (_lowerBound == null) {
@@ -76,9 +72,7 @@ public class Range {
     }
   }
 
-  /**
-   * Returns the string representation of the range. See {@link RangePredicate} for details.
-   */
+  /// Returns the string representation of the range. See [RangePredicate] for details.
   public String getRangeString() {
     StringBuilder stringBuilder = new StringBuilder();
     if (_lowerBound == null) {
@@ -97,10 +91,8 @@ public class Range {
     return stringBuilder.toString();
   }
 
-  /**
-   * Creates a Range from the given string representation of the range and data type. See {@link RangePredicate} for
-   * details.
-   */
+  /// Creates a Range from the given string representation of the range and data type. See [RangePredicate] for
+  /// details.
   public static Range getRange(String rangeString, DataType dataType) {
     String[] split = StringUtils.split(rangeString, RangePredicate.DELIMITER);
     String lower = split[0];

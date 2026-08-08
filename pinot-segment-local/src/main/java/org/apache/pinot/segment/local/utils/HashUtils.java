@@ -45,19 +45,17 @@ public class HashUtils {
     return Hashing.md5().hashBytes(bytes).asBytes();
   }
 
-  /**
-   * Returns a byte array that is a concatenation of the binary representation of each of the passed UUID values.
-   * If any of the values is not a valid UUID, then we return the result of {@link PrimaryKey#asBytes()}.
-   *
-   * <p>String inputs are parsed via {@link UUID#fromString(String)} (lenient — accepts non-canonical short
-   * forms like {@code "1-2-3-4-5"}) for backward compatibility with tables that have been hashed under the
-   * pre-UUID-type {@code HashFunction.UUID} contract. Binary inputs ({@code byte[]} or {@link UUID}) go
-   * through {@link UuidUtils#toBytes(Object)} since they carry no parse ambiguity. Un-parseable strings
-   * (and any other invalid value) still fall through to {@link PrimaryKey#asBytes()} via the outer
-   * {@code catch (RuntimeException)} below — matching master's behavior. Newly-declared
-   * {@code DataType.UUID} primary-key columns are independently constrained to canonical form at ingest
-   * time by {@code DataTypeTransformer.validateCanonicalUuidPrimaryKey}.
-   */
+  /// Returns a byte array that is a concatenation of the binary representation of each of the passed UUID values.
+  /// If any of the values is not a valid UUID, then we return the result of [PrimaryKey#asBytes()].
+  ///
+  /// String inputs are parsed via [UUID#fromString(String)] (lenient — accepts non-canonical short
+  /// forms like `"1-2-3-4-5"`) for backward compatibility with tables that have been hashed under the
+  /// pre-UUID-type `HashFunction.UUID` contract. Binary inputs (`byte[]` or [UUID]) go
+  /// through [UuidUtils#toBytes(Object)] since they carry no parse ambiguity. Un-parseable strings
+  /// (and any other invalid value) still fall through to [PrimaryKey#asBytes()] via the outer
+  /// `catch (RuntimeException)` below — matching master's behavior. Newly-declared
+  /// `DataType.UUID` primary-key columns are independently constrained to canonical form at ingest
+  /// time by `DataTypeTransformer.validateCanonicalUuidPrimaryKey`.
   public static byte[] hashUUID(PrimaryKey primaryKey) {
     Object[] values = primaryKey.getValues();
     byte[] result = new byte[values.length * 16];
@@ -81,7 +79,7 @@ public class HashUtils {
     return result;
   }
 
-  /** Compute 64-bit xxHash (XXH64) with seed=0, returned as big-endian 8-byte array. */
+  /// Compute 64-bit xxHash (XXH64) with seed=0, returned as big-endian 8-byte array.
   public static byte[] hashXXHash(byte[] bytes) {
     XXHashFactory xxhFactory = XXHashFactory.fastestInstance();
     long hash64 = xxhFactory.hash64().hash(bytes, 0, bytes.length, 0L);
@@ -90,9 +88,7 @@ public class HashUtils {
     return buf.array();
   }
 
-  /**
-   * Compute xxh128 using hash4j (XXH3-128). Returns a 16-byte array (big-endian order for each 64-bit half).
-   */
+  /// Compute xxh128 using hash4j (XXH3-128). Returns a 16-byte array (big-endian order for each 64-bit half).
   public static byte[] hashXXH128(byte[] bytes) {
     Hasher128 hasher = com.dynatrace.hash4j.hashing.Hashing.xxh3_128();
     HashValue128 hashValue128 = hasher.hashBytesTo128Bits(bytes);

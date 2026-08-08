@@ -21,9 +21,11 @@ package org.apache.pinot.core.operator.streaming;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
@@ -57,7 +59,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-/// Test for {@link StreamingGroupByCombineOperator}.
+/// Test for [StreamingGroupByCombineOperator].
 public class StreamingGroupByCombineOperatorTest {
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), "StreamingGroupByCombineOperatorTest");
@@ -236,6 +238,200 @@ public class StreamingGroupByCombineOperatorTest {
       assertEquals(groupCounts.get(g).longValue(), NUM_SEGMENTS * 2L,
           "Incorrect count for group " + g);
     }
+  }
+
+  /// Regression test for a data race in the streaming group-by leaf (see
+  /// {@link StreamingGroupByCombineOperator#detachFromWorkerThreadState}).
+  ///
+  /// <p>The per-segment {@link org.apache.pinot.core.query.aggregation.groupby.DictionaryBasedGroupKeyGenerator}
+  /// switches from a per-instance array holder to a REUSED thread-local {@code IntGroupIdMap} once a segment's
+  /// group cardinality exceeds {@code maxInitialResultHolderCapacity} (default 10000). If the streaming operator
+  /// hands a raw per-segment result to the consumer thread, that consumer iterates the thread-local map while
+  /// the producing worker clears/expands it for its next segment — corrupting group ids and blowing past the
+  /// result holder bounds. This test forces the thread-local holder (>10000 groups/segment) across many
+  /// segments with a low flush threshold, and asserts the merged sums are exact over several iterations.
+  @Test
+  public void testHighCardinalityConcurrentMergeIsCorrect()
+      throws Exception {
+    int numSegments = 16;
+    // > maxInitialResultHolderCapacity (10000) so the group-key generator uses the reused thread-local
+    // IntGroupIdMap instead of the per-instance ArrayBasedHolder.
+    int numGroups = 20_000;
+    int flushThreshold = 1000;
+
+    File stressDir = new File(FileUtils.getTempDirectory(), "StreamingGroupByCombineOperatorTest_highCard");
+    FileUtils.deleteDirectory(stressDir);
+    List<IndexSegment> segments = new ArrayList<>(numSegments);
+    try {
+      for (int i = 0; i < numSegments; i++) {
+        segments.add(createHighCardinalitySegment(stressDir, i, numGroups));
+      }
+
+      // Run several times: a data race may not manifest on every run.
+      for (int iteration = 0; iteration < 5; iteration++) {
+        QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+            "SELECT groupColumn, SUM(intColumn) FROM testTable GROUP BY groupColumn LIMIT " + numGroups);
+        queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+        // A single worker thread processes all segments sequentially, reusing (and clearing) the same
+        // thread-local group-key map for each one, while the consumer (this) thread drains the queue. This
+        // maximizes the window in which the consumer reads a per-segment result the worker has since reused.
+        queryContext.setMaxExecutionThreads(1);
+
+        List<Operator> operators = new ArrayList<>(numSegments);
+        for (IndexSegment segment : segments) {
+          operators.add(PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(segment), queryContext).run());
+        }
+        StreamingGroupByCombineOperator combineOperator =
+            new StreamingGroupByCombineOperator(operators, queryContext, EXECUTOR, flushThreshold);
+
+        Map<Integer, Double> groupSums = new HashMap<>();
+        combineOperator.start();
+        try {
+          BaseResultsBlock block = combineOperator.nextBlock();
+          while (!(block instanceof MetadataResultsBlock)) {
+            assertNull(block.getErrorMessages(), "Iteration " + iteration + " error: " + block.getErrorMessages());
+            for (Object[] row : ((GroupByResultsBlock) block).getRows()) {
+              groupSums.merge((int) row[0], ((Number) row[1]).doubleValue(), Double::sum);
+            }
+            block = combineOperator.nextBlock();
+          }
+        } finally {
+          combineOperator.stop();
+        }
+
+        assertEquals(groupSums.size(), numGroups, "Iteration " + iteration + ": wrong number of groups");
+        for (int g = 0; g < numGroups; g++) {
+          // Each group appears once per segment with value (g + 1).
+          assertEquals(groupSums.get(g), numSegments * (double) (g + 1), 0.001,
+              "Iteration " + iteration + ": incorrect sum for group " + g);
+        }
+      }
+    } finally {
+      for (IndexSegment segment : segments) {
+        segment.destroy();
+      }
+      FileUtils.deleteDirectory(stressDir);
+    }
+  }
+
+  /// Creates a segment with {@code numGroups} distinct group keys, each appearing once with intColumn = key + 1.
+  ///
+  /// <p>Rows are shuffled with a per-segment seed so the first-seen order of dictionary ids — and therefore the
+  /// group-id assigned to each key by the group-key generator — differs across segments. This is essential to
+  /// the race regression: if every segment mapped key → group-id identically, a torn cross-segment read of the
+  /// reused thread-local map would coincidentally yield correct values. With distinct mappings, reading one
+  /// segment's result through another's group ids produces wrong sums (or an out-of-bounds group id).
+  private IndexSegment createHighCardinalitySegment(File outDir, int index, int numGroups)
+      throws Exception {
+    List<GenericRow> records = new ArrayList<>(numGroups);
+    for (int g = 0; g < numGroups; g++) {
+      GenericRow record = new GenericRow();
+      record.putValue(GROUP_COLUMN, g);
+      record.putValue(INT_COLUMN, (long) (g + 1));
+      records.add(record);
+    }
+    Collections.shuffle(records, new Random(index + 1L));
+
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
+    segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
+    String segmentName = "highCardSegment_" + index;
+    segmentGeneratorConfig.setSegmentName(segmentName);
+    segmentGeneratorConfig.setOutDir(outDir.getPath());
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
+    driver.build();
+
+    return ImmutableSegmentLoader.load(new File(outDir, segmentName), ReadMode.mmap);
+  }
+
+  /// Covers the pass-through branch of {@link StreamingGroupByCombineOperator#detachFromWorkerThreadState}:
+  /// with ORDER BY and segment trim enabled, the per-segment operator emits blocks that already carry (sorted,
+  /// trimmed) intermediate records, which must flow through the streaming combine unchanged — including the
+  /// groups-trimmed flag.
+  @Test
+  public void testOrderByWithSegmentTrimPassesTrimmedRecordsThrough() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT groupColumn, SUM(intColumn) FROM testTable GROUP BY groupColumn ORDER BY SUM(intColumn) DESC "
+            + "LIMIT 5");
+    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    // ORDER BY on an aggregation is an unsafe trim, so enabling segment trim makes the effective per-segment trim
+    // size max(5 * LIMIT, minSegmentGroupTrimSize) = 25 < 50 groups, forcing each segment down the trim path that
+    // produces intermediate-records blocks.
+    queryContext.setMinSegmentGroupTrimSize(1);
+    int trimSize = 25;
+
+    List<Operator> operators = buildOperators(queryContext);
+    StreamingGroupByCombineOperator combineOperator =
+        new StreamingGroupByCombineOperator(operators, queryContext, EXECUTOR, 10);
+
+    Map<Integer, Double> groupSums = new HashMap<>();
+    combineOperator.start();
+    try {
+      BaseResultsBlock block = combineOperator.nextBlock();
+      while (!(block instanceof MetadataResultsBlock)) {
+        assertNull(block.getErrorMessages(), "Expected no errors but got: " + block.getErrorMessages());
+        GroupByResultsBlock groupByBlock = (GroupByResultsBlock) block;
+        assertTrue(groupByBlock.isGroupsTrimmed(), "Groups-trimmed flag should propagate to the flushed blocks");
+        for (Object[] row : groupByBlock.getRows()) {
+          groupSums.merge((int) row[0], ((Number) row[1]).doubleValue(), Double::sum);
+        }
+        block = combineOperator.nextBlock();
+      }
+    } finally {
+      combineOperator.stop();
+    }
+
+    // Every segment keeps its top 25 groups by SUM(intColumn) — groups 25..49, since the per-segment sum is
+    // 2 * (g + 1) — and all segments agree on that set, so the merged sums are exact for those groups.
+    assertEquals(groupSums.size(), trimSize, "Expected exactly the per-segment trimmed group set");
+    for (int g = NUM_DISTINCT_GROUPS - trimSize; g < NUM_DISTINCT_GROUPS; g++) {
+      assertEquals(groupSums.get(g), NUM_SEGMENTS * 2.0 * (g + 1), 0.001, "Incorrect sum for group " + g);
+    }
+  }
+
+  /// Regression test for the group-by key column count used when materializing raw per-segment results (see
+  /// {@link StreamingGroupByCombineOperator#detachFromWorkerThreadState}): grouping-set queries carry a synthetic
+  /// trailing {@code $groupingId} key column, so the layout must be based on
+  /// {@link QueryContext#getNumGroupByKeyColumns()} rather than the number of group-by expressions. With the
+  /// expression count, the first aggregation value overwrites the {@code $groupingId} slot and the record comes out
+  /// one column narrower than the data schema.
+  @Test
+  public void testGroupingSetsKeyColumnLayout() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT groupColumn, SUM(intColumn) FROM testTable GROUP BY ROLLUP(groupColumn) LIMIT 100");
+    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+
+    List<Operator> operators = buildOperators(queryContext);
+    StreamingGroupByCombineOperator combineOperator =
+        new StreamingGroupByCombineOperator(operators, queryContext, EXECUTOR, 10);
+
+    // Keyed on the group value (null for the rollup-total row); the $groupingId discriminator is asserted
+    // positionally instead of by value to avoid coupling to the bitmask encoding.
+    Map<Integer, Double> groupSums = new HashMap<>();
+    combineOperator.start();
+    try {
+      BaseResultsBlock block = combineOperator.nextBlock();
+      while (!(block instanceof MetadataResultsBlock)) {
+        assertNull(block.getErrorMessages(), "Expected no errors but got: " + block.getErrorMessages());
+        for (Object[] row : ((GroupByResultsBlock) block).getRows()) {
+          assertEquals(row.length, 3, "Expected [groupColumn, $groupingId, sum] row layout");
+          assertNotNull(row[1], "Missing $groupingId discriminator");
+          groupSums.merge((Integer) row[0], ((Number) row[2]).doubleValue(), Double::sum);
+        }
+        block = combineOperator.nextBlock();
+      }
+    } finally {
+      combineOperator.stop();
+    }
+
+    // 50 per-group rows plus the rollup grand-total row (null group value)
+    assertEquals(groupSums.size(), NUM_DISTINCT_GROUPS + 1, "Expected all groups plus the rollup total");
+    for (int g = 0; g < NUM_DISTINCT_GROUPS; g++) {
+      assertEquals(groupSums.get(g), NUM_SEGMENTS * 2.0 * (g + 1), 0.001, "Incorrect sum for group " + g);
+    }
+    // Per segment, the total over all rows is sum over g of 2 * (g + 1) = 2550
+    assertEquals(groupSums.get(null), NUM_SEGMENTS * 2550.0, 0.001, "Incorrect rollup total");
   }
 
   private List<Operator> buildOperators(QueryContext queryContext) {

@@ -39,19 +39,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Periodic task to check if tenant rebalance jobs are stuck and retry them. Controller crashes or restarts could
- * make a tenant rebalance job stuck.
- * The task checks for each tenant rebalance job's metadata in ZK, look at the TenantTableRebalanceJobContext in
- * ongoingJobsQueue, which is a list with table rebalance job ids that the controller is currently processing, to see
- * if any of these table rebalance jobs has not updated their progress stats longer than the configured heartbeat
- * timeout. If so, the tenant rebalance job is considered stuck, and the task will resume the tenant rebalance job by
- * aborting all the ongoing table rebalance jobs, move the ongoing TenantTableRebalanceJobContext back to the head of
- * the parallel queue, and then trigger the tenant rebalance job again with the updated context, with an attempt job ID
- * <p>
- * Notice that fundamentally this is not a retry but a resume, since we will not re-do the table rebalance for those
- * tables that have already been processed.
- */
+/// Periodic task to check if tenant rebalance jobs are stuck and retry them. Controller crashes or restarts could
+/// make a tenant rebalance job stuck.
+/// The task checks for each tenant rebalance job's metadata in ZK, look at the TenantTableRebalanceJobContext in
+/// ongoingJobsQueue, which is a list with table rebalance job ids that the controller is currently processing, to see
+/// if any of these table rebalance jobs has not updated their progress stats longer than the configured heartbeat
+/// timeout. If so, the tenant rebalance job is considered stuck, and the task will resume the tenant rebalance job by
+/// aborting all the ongoing table rebalance jobs, move the ongoing TenantTableRebalanceJobContext back to the head of
+/// the parallel queue, and then trigger the tenant rebalance job again with the updated context, with an attempt job ID
+///
+/// Notice that fundamentally this is not a retry but a resume, since we will not re-do the table rebalance for those
+/// tables that have already been processed.
 public class TenantRebalanceChecker extends BasePeriodicTask {
   private final static String TASK_NAME = TenantRebalanceChecker.class.getSimpleName();
   private static final Logger LOGGER = LoggerFactory.getLogger(TenantRebalanceChecker.class);
@@ -141,28 +139,26 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
     _tenantRebalancer.rebalanceWithObserver(observer, tenantRebalanceContextForRetry.getConfig());
   }
 
-  /**
-   * Check if the tenant rebalance job is stuck, and prepare to retry it if necessary.
-   * A tenant rebalance job is considered stuck if:
-   * <ol>
-   *   <li>There are no ongoing jobs, but there are jobs in the parallel or sequential queue, and the stats have not
-   *   been updated for longer than the heartbeat timeout.</li>
-   *   <li>There are ongoing table rebalance jobs, and at least one of them has not updated its status for longer
-   *   than the heartbeat timeout.</li>
-   * </ol>
-   * We cannot simply check whether the tenant rebalance job's metadata was updated within the heartbeat timeout to
-   * determine if this tenant rebalance job is stuck, because a tenant rebalance job can have no updates for a
-   * longer period if the underlying table rebalance jobs take extra long time to finish, while they individually do
-   * update regularly within heartbeat timeout.
-   * The retry is prepared by creating a new tenant rebalance job with an incremented attempt ID, and persisting it to
-   * ZK.
-   *
-   * @param jobZKMetadata The ZK metadata of the tenant rebalance job.
-   * @param tenantRebalanceContext The context of the tenant rebalance job.
-   * @param statsUpdatedAt The timestamp when the stats were last updated.
-   * @return The TenantRebalanceContext for retry if the tenant rebalance job is stuck and should be retried, null if
-   * the job is not stuck, or it's stuck but other controller has prepared the retry first.
-   */
+  /// Check if the tenant rebalance job is stuck, and prepare to retry it if necessary.
+  /// A tenant rebalance job is considered stuck if:
+  ///
+  /// 1. There are no ongoing jobs, but there are jobs in the parallel or sequential queue, and the stats have not
+  ///    been updated for longer than the heartbeat timeout.
+  /// 2. There are ongoing table rebalance jobs, and at least one of them has not updated its status for longer
+  ///    than the heartbeat timeout.
+  ///
+  /// We cannot simply check whether the tenant rebalance job's metadata was updated within the heartbeat timeout to
+  /// determine if this tenant rebalance job is stuck, because a tenant rebalance job can have no updates for a
+  /// longer period if the underlying table rebalance jobs take extra long time to finish, while they individually do
+  /// update regularly within heartbeat timeout.
+  /// The retry is prepared by creating a new tenant rebalance job with an incremented attempt ID, and persisting it to
+  /// ZK.
+  ///
+  /// @param jobZKMetadata The ZK metadata of the tenant rebalance job.
+  /// @param tenantRebalanceContext The context of the tenant rebalance job.
+  /// @param statsUpdatedAt The timestamp when the stats were last updated.
+  /// @return The TenantRebalanceContext for retry if the tenant rebalance job is stuck and should be retried, null if
+  /// the job is not stuck, or it's stuck but other controller has prepared the retry first.
   private TenantRebalanceContext prepareRetryIfTenantRebalanceJobStuck(
       Map<String, String> jobZKMetadata, TenantRebalanceContext tenantRebalanceContext, long statsUpdatedAt) {
     boolean isStuck = false;
@@ -225,24 +221,22 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
     return null;
   }
 
-  /**
-   * Check if the table rebalance job in tenant job's ongoing queue is stuck.
-   * A table rebalance job is considered stuck if:
-   * <ol>
-   * <li> The job metadata does not exist in ZK, and the tenant rebalance job stats have not been updated for longer
-   * than the heartbeat timeout.</li>
-   * <li> The job metadata exists, but it has not been updated for longer than the heartbeat timeout.</li>
-   * </ol>
-   * This is different to how we consider a table rebalance job is stuck in
-   * {@link org.apache.pinot.controller.helix.core.rebalance.RebalanceChecker}, where we consider a table rebalance
-   * job stuck even if it's DONE, ABORTED, FAILED, or CANCELLED for more than heartbeat timeout, because they should
-   * have been removed from the ongoing queue once they are DONE or ABORTED etc., if the controller is working properly.
-   *
-   * @param jobId The ID of the table rebalance job.
-   * @param tenantRebalanceJobStatsUpdatedAt The timestamp when the tenant rebalance job stats were last updated.
-   * @param heartbeatTimeoutMs The heartbeat timeout in milliseconds.
-   * @return True if the table rebalance job is stuck, false otherwise.
-   */
+  /// Check if the table rebalance job in tenant job's ongoing queue is stuck.
+  /// A table rebalance job is considered stuck if:
+  ///
+  /// 1. The job metadata does not exist in ZK, and the tenant rebalance job stats have not been updated for longer
+  ///    than the heartbeat timeout.
+  /// 2. The job metadata exists, but it has not been updated for longer than the heartbeat timeout.
+  ///
+  /// This is different to how we consider a table rebalance job is stuck in
+  /// [org.apache.pinot.controller.helix.core.rebalance.RebalanceChecker], where we consider a table rebalance job
+  /// stuck even if it's DONE, ABORTED, FAILED, or CANCELLED for more than heartbeat timeout, because they should have
+  /// been removed from the ongoing queue once they are DONE or ABORTED etc., if the controller is working properly.
+  ///
+  /// @param jobId The ID of the table rebalance job.
+  /// @param tenantRebalanceJobStatsUpdatedAt The timestamp when the tenant rebalance job stats were last updated.
+  /// @param heartbeatTimeoutMs The heartbeat timeout in milliseconds.
+  /// @return True if the table rebalance job is stuck, false otherwise.
   private boolean isOngoingTableRebalanceJobStuck(String jobId, long tenantRebalanceJobStatsUpdatedAt,
       long heartbeatTimeoutMs) {
     Map<String, String> jobMetadata =

@@ -22,9 +22,7 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 
 
-/**
- * Exceptions that occur while compiling SQL.
- */
+/// Exceptions that occur while compiling SQL.
 public class SqlCompilationException extends QueryException {
 
   public SqlCompilationException(String msg) {

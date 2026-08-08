@@ -76,12 +76,10 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
     call.transformTo(newRel);
   }
 
-  /**
-   * Returns the kv options of the explicit table options hint to be rewritten with the inferred partition options
-   * (empty if the scan does not have an explicit table options hint), or {@code null} when no rewrite is required —
-   * either the explicit hint already provides the complete partition config (key, function and size), or the table is
-   * hinted as replicated across all workers (each worker scans all the segments, so partition options are irrelevant).
-   */
+  /// Returns the kv options of the explicit table options hint to be rewritten with the inferred partition options
+  /// (empty if the scan does not have an explicit table options hint), or `null` when no rewrite is required —
+  /// either the explicit hint already provides the complete partition config (key, function and size), or the table is
+  /// hinted as replicated across all workers (each worker scans all the segments, so partition options are irrelevant).
   @Nullable
   private static Map<String, String> getHintOptionsToRewrite(TableScan tableScan) {
     RelHint hint = PinotHintStrategyTable.getHint(tableScan, PinotHintOptions.TABLE_HINT_OPTIONS);
@@ -100,9 +98,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
     return kvOptions;
   }
 
-  /**
-   * Returns a new node which is a copy of the given table scan with the new table options hint.
-   */
+  /// Returns a new node which is a copy of the given table scan with the new table options hint.
   private static RelNode withNewTableOptions(TableScan tableScan, TableOptions tableOptions) {
     ArrayList<RelHint> newHints = new ArrayList<>(tableScan.getHints());
 
@@ -128,12 +124,10 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
     return tableScan.withHints(newHints);
   }
 
-  /**
-   * Creates a new table options hint based on the given table partition info and the explicitly supplied options, if
-   * any.
-   *
-   * Any explicitly supplied option will override the implicit one obtained from the table partition info.
-   */
+  /// Creates a new table options hint based on the given table partition info and the explicitly supplied options, if
+  /// any.
+  ///
+  /// Any explicitly supplied option will override the implicit one obtained from the table partition info.
   private static TableOptions calculateTableOptions(Map<String, String> kvOptions,
       TableOptions implicitTableOptions, TableScan tableScan) {
     if (kvOptions.isEmpty()) {
@@ -150,11 +144,9 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
     return newTableOptions;
   }
 
-  /**
-   * Returns a table options hint with the replicated flag carried over from the explicit hint, if any. Note that this
-   * rule does not match when the table is hinted as replicated across all workers, so this only ever carries over an
-   * explicit {@code is_replicated='false'}.
-   */
+  /// Returns a table options hint with the replicated flag carried over from the explicit hint, if any. Note that this
+  /// rule does not match when the table is hinted as replicated across all workers, so this only ever carries over an
+  /// explicit `is_replicated='false'`.
   private static ImmutableTableOptions carryOverIsReplicated(ImmutableTableOptions base,
       Map<String, String> kvOptions) {
     String isReplicated = kvOptions.get(PinotHintOptions.TableHintOptions.IS_REPLICATED);
@@ -164,9 +156,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
     return base.withIsReplicated(Boolean.parseBoolean(isReplicated));
   }
 
-  /**
-   * Returns a table options hint with the partition key overridden by the hint, if any.
-   */
+  /// Returns a table options hint with the partition key overridden by the hint, if any.
   private static ImmutableTableOptions overridePartitionKey(ImmutableTableOptions base, TableScan tableScan,
       Map<String, String> kvOptions) {
     String partitionKey = kvOptions.get(PinotHintOptions.TableHintOptions.PARTITION_KEY);
@@ -177,9 +167,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
     return base.withPartitionKey(partitionKey);
   }
 
-  /**
-   * Returns a table options hint with the partition function overridden by the hint, if any.
-   */
+  /// Returns a table options hint with the partition function overridden by the hint, if any.
   private static ImmutableTableOptions overridePartitionFunction(ImmutableTableOptions base,
       TableScan tableScan, Map<String, String> kvOptions) {
     String partitionFunction = kvOptions.get(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION);
@@ -191,9 +179,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
     return base.withPartitionFunction(partitionFunction);
   }
 
-  /**
-   * Returns a table options hint with the partition parallelism overridden by the hint, if any.
-   */
+  /// Returns a table options hint with the partition parallelism overridden by the hint, if any.
   private static ImmutableTableOptions overridePartitionParallelism(ImmutableTableOptions base,
       TableScan tableScan, Map<String, String> kvOptions) {
     String partitionParallelismStr = kvOptions.get(PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM);
@@ -211,9 +197,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
     }
   }
 
-  /**
-   * Returns a table options hint with the partition size overridden by the hint, if any.
-   */
+  /// Returns a table options hint with the partition size overridden by the hint, if any.
   private static ImmutableTableOptions overridePartitionSize(ImmutableTableOptions base,
       TableScan tableScan, Map<String, String> kvOptions) {
     String partitionSizeStr = kvOptions.get(PinotHintOptions.TableHintOptions.PARTITION_SIZE);

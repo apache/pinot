@@ -26,22 +26,18 @@ import java.util.Properties;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * A specialized PinotDataBuffer implementation for zero-size index entries that configuration.
- * This buffer is useful for debugging and tracking purposes when dealing with empty index entries.
- */
+/// A specialized PinotDataBuffer implementation for zero-size index entries that configuration.
+/// This buffer is useful for debugging and tracking purposes when dealing with empty index entries.
 public class EmptyIndexBuffer extends PinotDataBuffer {
   private final Properties _properties;
   private final String _segmentName;
   private final String _tableNameWithType;
 
-  /**
-   * Creates a new EmptyIndexBuffer for a zero-size index entry
-   *
-   * @param properties Properties containing configuration
-   * @param segmentName The name of the segment
-   * @param tableNameWithType The table name with type
-   */
+  /// Creates a new EmptyIndexBuffer for a zero-size index entry
+  ///
+  /// @param properties Properties containing configuration
+  /// @param segmentName The name of the segment
+  /// @param tableNameWithType The table name with type
   public EmptyIndexBuffer(Properties properties, String segmentName, String tableNameWithType) {
     super(false); // Not closeable since it's just metadata
     _properties = properties;
@@ -49,10 +45,8 @@ public class EmptyIndexBuffer extends PinotDataBuffer {
     _tableNameWithType = tableNameWithType;
   }
 
-  /**
-   * Gets the properties containing configuration information
-   * @return The properties
-   */
+  /// Gets the properties containing configuration information
+  /// @return The properties
   public Properties getProperties() {
     return _properties;
   }
@@ -220,18 +214,14 @@ public class EmptyIndexBuffer extends PinotDataBuffer {
   }
 
 
-  /**
-   * Gets the segment name for this empty buffer
-   * @return The segment name
-   */
+  /// Gets the segment name for this empty buffer
+  /// @return The segment name
   public String getSegmentName() {
     return _segmentName;
   }
 
-  /**
-   * Gets the table name with type for this empty buffer
-   * @return The table name with type
-   */
+  /// Gets the table name with type for this empty buffer
+  /// @return The table name with type
   public String getTableNameWithType() {
     return _tableNameWithType;
   }

@@ -34,9 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Utility class for workload budget operations shared between broker and server debug endpoints.
- */
+/// Utility class for workload budget operations shared between broker and server debug endpoints.
 public class WorkloadBudgetUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadBudgetUtils.class);
 
@@ -44,55 +42,53 @@ public class WorkloadBudgetUtils {
     // Utility class
   }
 
-  /**
-   * Get the instance cost (budget) information for workloads.
-   * <p>
-   * If workloadNames is null or empty, returns budget information for all workloads.
-   * Otherwise, returns budget information for the specified workloads.
-   * </p>
-   *
-   * <p>Example response for single workload:
-   * <pre>
-   * [
-   *  {
-   *   "workloadName": "testWorkload",
-   *   "cpuBudgetNs": 5000000,
-   *   "memoryBudgetBytes": 104857600,
-   *   "cpuRemainingNs": 3500000,
-   *   "memoryRemainingBytes": 73400320
-   *  }
-   * ]
-   * </pre>
-   *
-   * <p>Example response for multiple workloads:
-   * <pre>
-   * [
-   *   {
-   *     "workloadName": "testWorkload1",
-   *     "cpuBudgetNs": 5000000,
-   *     "memoryBudgetBytes": 104857600,
-   *     "cpuRemainingNs": 3500000,
-   *     "memoryRemainingBytes": 73400320
-   *   },
-   *   {
-   *     "workloadName": "testWorkload2",
-   *     "cpuBudgetNs": 10000000,
-   *     "memoryBudgetBytes": 209715200,
-   *     "cpuRemainingNs": 8000000,
-   *     "memoryRemainingBytes": 157286400
-   *   }
-   * ]
-   * </pre>
-   *
-   * @param workloadNames comma-separated list of workload names to query, or null/empty for all workloads
-   * @param instanceId the instance ID for logging purposes
-   * @return JSON string containing workload budget information including CPU and memory limits and remaining capacity.
-   * @throws WebApplicationException with one of the following status codes:
-   *         <ul>
-   *         <li>404 - if a specific workload is not found</li>
-   *         <li>500 - if the WorkloadBudgetManager is not available</li>
-   *         </ul>
-   */
+  /// Get the instance cost (budget) information for workloads.
+  ///
+  /// If workloadNames is null or empty, returns budget information for all workloads.
+  /// Otherwise, returns budget information for the specified workloads.
+  ///
+  /// Example response for single workload:
+  ///
+  /// ```
+  /// [
+  ///  {
+  ///   "workloadName": "testWorkload",
+  ///   "cpuBudgetNs": 5000000,
+  ///   "memoryBudgetBytes": 104857600,
+  ///   "cpuRemainingNs": 3500000,
+  ///   "memoryRemainingBytes": 73400320
+  ///  }
+  /// ]
+  /// ```
+  ///
+  /// Example response for multiple workloads:
+  ///
+  /// ```
+  /// [
+  ///   {
+  ///     "workloadName": "testWorkload1",
+  ///     "cpuBudgetNs": 5000000,
+  ///     "memoryBudgetBytes": 104857600,
+  ///     "cpuRemainingNs": 3500000,
+  ///     "memoryRemainingBytes": 73400320
+  ///   },
+  ///   {
+  ///     "workloadName": "testWorkload2",
+  ///     "cpuBudgetNs": 10000000,
+  ///     "memoryBudgetBytes": 209715200,
+  ///     "cpuRemainingNs": 8000000,
+  ///     "memoryRemainingBytes": 157286400
+  ///   }
+  /// ]
+  /// ```
+  ///
+  /// @param workloadNames comma-separated list of workload names to query, or null/empty for all workloads
+  /// @param instanceId the instance ID for logging purposes
+  /// @return JSON string containing workload budget information including CPU and memory limits and remaining capacity.
+  /// @throws WebApplicationException with one of the following status codes:
+  ///
+  /// - 404 - if a specific workload is not found
+  /// - 500 - if the WorkloadBudgetManager is not available
   public static String getWorkloadBudgetStats(String workloadNames, String instanceId) {
     try {
       WorkloadBudgetManager workloadBudgetManager = requireWorkloadBudgetManager();
@@ -129,21 +125,19 @@ public class WorkloadBudgetUtils {
     }
   }
 
-  /**
-   * Handles a workload refresh request for a server or broker instance.
-   * This method enforces strict error handling - any null InstanceCost or processing failure
-   * will cause the entire operation to fail immediately without applying partial updates.
-   *
-   * @param requestString The JSON request string containing workload refresh data
-   * @param instanceId The instance ID for logging and error messages
-   * @return JAX-RS Response with appropriate status code and message
-   *
-   * example requestString:
-   * {
-   *     "foo": {"cpuCostNs": 1000000, "memoryCostBytes": 1000000},
-   *     "bar": {"cpuCostNs": 500000, "memoryCostBytes": 500000}
-   * }
-   */
+  /// Handles a workload refresh request for a server or broker instance.
+  /// This method enforces strict error handling - any null InstanceCost or processing failure
+  /// will cause the entire operation to fail immediately without applying partial updates.
+  ///
+  /// @param requestString The JSON request string containing workload refresh data
+  /// @param instanceId The instance ID for logging and error messages
+  /// @return JAX-RS Response with appropriate status code and message
+  ///
+  /// example requestString:
+  /// {
+  ///     "foo": {"cpuCostNs": 1000000, "memoryCostBytes": 1000000},
+  ///     "bar": {"cpuCostNs": 500000, "memoryCostBytes": 500000}
+  /// }
   public static Response handleRefreshRequest(String requestString, String instanceId) {
     try {
       WorkloadBudgetManager budgetManager = requireWorkloadBudgetManager();
@@ -186,16 +180,14 @@ public class WorkloadBudgetUtils {
     }
   }
 
-  /**
-   * Handles delete workload configuration requests via query parameter.
-   * Accepts comma-separated workload names and deletes them from the WorkloadBudgetManager.
-   * This method enforces strict error handling - any deletion failure will cause the entire
-   * operation to fail immediately without continuing to delete remaining workloads.
-   *
-   * @param workloadNamesParam Comma-separated workload names (e.g., "foo,bar,baz")
-   * @param instanceId The instance ID for logging and error messages
-   * @return JAX-RS Response with appropriate status code and message
-   */
+  /// Handles delete workload configuration requests via query parameter.
+  /// Accepts comma-separated workload names and deletes them from the WorkloadBudgetManager.
+  /// This method enforces strict error handling - any deletion failure will cause the entire
+  /// operation to fail immediately without continuing to delete remaining workloads.
+  ///
+  /// @param workloadNamesParam Comma-separated workload names (e.g., "foo,bar,baz")
+  /// @param instanceId The instance ID for logging and error messages
+  /// @return JAX-RS Response with appropriate status code and message
   public static Response handleDeleteRequest(String workloadNamesParam, String instanceId) {
     try {
       WorkloadBudgetManager budgetManager = requireWorkloadBudgetManager();
@@ -230,7 +222,7 @@ public class WorkloadBudgetUtils {
     }
   }
 
-  /** Returns a non-null WorkloadBudgetManager or throws a 500 WebApplicationException (and logs a warning). */
+  /// Returns a non-null WorkloadBudgetManager or throws a 500 WebApplicationException (and logs a warning).
   private static WorkloadBudgetManager requireWorkloadBudgetManager() {
     WorkloadBudgetManager workloadBudgetManager = WorkloadBudgetManagerFactory.get();
     if (workloadBudgetManager == null) {
@@ -240,9 +232,7 @@ public class WorkloadBudgetUtils {
     return workloadBudgetManager;
   }
 
-  /**
-   * Builds an error Response with logging and optional exception.
-   */
+  /// Builds an error Response with logging and optional exception.
   private static Response buildErrorResponse(Response.Status status, String errorMsg, Exception e) {
     if (e != null) {
       LOGGER.error(errorMsg, e);
@@ -252,11 +242,9 @@ public class WorkloadBudgetUtils {
     return Response.status(status).entity(errorMsg).build();
   }
 
-  /**
-   * Parses a comma-separated string into a list of trimmed, non-empty values.
-   * @param commaSeparated the comma-separated string
-   * @return list of trimmed, non-empty values
-   */
+  /// Parses a comma-separated string into a list of trimmed, non-empty values.
+  /// @param commaSeparated the comma-separated string
+  /// @return list of trimmed, non-empty values
   private static List<String> parseCommaSeparatedNames(String commaSeparated) {
     List<String> result = new ArrayList<>();
     if (commaSeparated != null) {
@@ -270,7 +258,7 @@ public class WorkloadBudgetUtils {
     return result;
   }
 
-  /** Builds a stable JSON-serializable map for a single workload's budget stats. */
+  /// Builds a stable JSON-serializable map for a single workload's budget stats.
   private static Map<String, Object> toWorkloadBudgetMap(String workloadName,
                                                          WorkloadBudgetManager.BudgetStats stats) {
     Map<String, Object> map = new HashMap<>();

@@ -24,25 +24,23 @@ import org.apache.helix.model.Message;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 
 
-/**
- * Manages the custom Helix state transition thread pools for Pinot server.
- * <br/>
- * The implementation of this interface can be passed to {@link SegmentOnlineOfflineStateModelFactory} to provide custom
- * thread pools for different state transition messages, instead of using Helix's managed thread pools.
- * <br/>
- * Helix maintains a cache from message identifier to assigned thread pool. Message identifiers are:
- * <ol>
- *   <li> {@link org.apache.helix.model.Message.MessageInfo} </li>
- *   <li> (resourceName, fromState, toState) combination </li>
- *   <li> resourceName </li>
- * </ol>
- * For each state transition message, Helix gets the message identifiers by the above order, and looks up the cache
- * to find if it's mapped to a thread pool, executes the state transition on it if it's non-null in the cache. If
- * three of the identifiers all map to null, the default Helix-managed thread pool would be used. During the lookup,
- * it calls {@link SegmentOnlineOfflineStateModelFactory#getExecutorService} upon cache misses. The cache is never
- * cleaned up until the server shuts down, so the method would only be called once for each argument combination
- * (even if it returns null).
- */
+/// Manages the custom Helix state transition thread pools for Pinot server.
+///
+/// The implementation of this interface can be passed to [SegmentOnlineOfflineStateModelFactory] to provide
+/// custom thread pools for different state transition messages, instead of using Helix's managed thread pools.
+///
+/// Helix maintains a cache from message identifier to assigned thread pool. Message identifiers are:
+///
+/// 1. [org.apache.helix.model.Message.MessageInfo]
+/// 2. (resourceName, fromState, toState) combination
+/// 3. resourceName
+///
+/// For each state transition message, Helix gets the message identifiers by the above order, and looks up the cache
+/// to find if it's mapped to a thread pool, executes the state transition on it if it's non-null in the cache. If
+/// three of the identifiers all map to null, the default Helix-managed thread pool would be used. During the lookup,
+/// it calls [SegmentOnlineOfflineStateModelFactory#getExecutorService] upon cache misses. The cache is never
+/// cleaned up until the server shuts down, so the method would only be called once for each argument combination
+/// (even if it returns null).
 public interface StateTransitionThreadPoolManager {
   @Nullable
   StateModelFactory.CustomizedExecutorService getExecutorService(Message.MessageInfo messageInfo);

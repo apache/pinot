@@ -30,9 +30,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -42,6 +40,30 @@ import static org.testng.Assert.assertTrue;
 /// BYTES), single-value and multi-value columns, with and without `sortedDocIds`, with partial and full valid doc sets,
 /// and edge cases such as empty bitmaps and the `isSortedColumn` flag.
 public class CompactedColumnStatisticsTest {
+
+  // ======== Single-value dictionary ========
+
+  @Test
+  public void testSingleValueDictionarySkipsScan() {
+    MutableForwardIndex forwardIndex = mock(MutableForwardIndex.class);
+    when(forwardIndex.isSingleValue()).thenReturn(true);
+
+    Dictionary dictionary = mockIntDictionary(new int[]{42});
+    when(dictionary.length()).thenReturn(1);
+
+    RoaringBitmap validDocIds = RoaringBitmap.bitmapOf(0, 1, 2);
+    CompactedColumnStatistics stats =
+        new CompactedColumnStatistics(mockDataSource(forwardIndex, dictionary), null, false, validDocIds);
+
+    assertEquals(stats.getMinValue(), 42);
+    assertEquals(stats.getMaxValue(), 42);
+    assertEquals((int[]) stats.getUniqueValuesSet(), new int[]{42});
+    assertEquals(stats.getCardinality(), 1);
+    assertTrue(stats.isSorted());
+    assertEquals(stats.getTotalNumberOfEntries(), 3);
+    // Every document maps to the only dict id, so the forward index is never read
+    verify(forwardIndex, never()).getDictId(anyInt());
+  }
 
   // ======== INT SV ========
 
@@ -992,7 +1014,7 @@ public class CompactedColumnStatisticsTest {
 
   // ======== Helpers ========
 
-  /** Mocks a Dictionary with INT values at consecutive IDs starting from 0. */
+  /// Mocks a Dictionary with INT values at consecutive IDs starting from 0.
   private Dictionary mockIntDictionary(int[] values) {
     Dictionary dict = mock(Dictionary.class);
     when(dict.getValueType()).thenReturn(DataType.INT);

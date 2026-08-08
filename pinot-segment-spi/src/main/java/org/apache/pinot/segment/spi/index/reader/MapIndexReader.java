@@ -25,26 +25,18 @@ import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
 
 
-/**
- * Interface for reading from the Mutable Map Index.
- *
- * @param <T> Type of the ReaderContext
- */
+/// Interface for reading from the Mutable Map Index.
+///
+/// @param <T> Type of the ReaderContext
 @SuppressWarnings("rawtypes")
 public interface MapIndexReader<T extends ForwardIndexReaderContext> extends ForwardIndexReader<T> {
 
-  /**
-   * Returns the keys in the map index.
-   */
+  /// Returns the keys in the map index.
   Set<String> getKeys();
 
-  /**
-   * Returns all the indexes for the given key.
-   */
+  /// Returns all the indexes for the given key.
   Map<IndexType, IndexReader> getIndexes(String key);
 
-  /**
-   * Returns the column metadata for the given key.
-   */
+  /// Returns the column metadata for the given key.
   ColumnMetadata getColumnMetadata(String key);
 }

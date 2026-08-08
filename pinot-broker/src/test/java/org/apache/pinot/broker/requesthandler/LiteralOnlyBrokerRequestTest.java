@@ -348,7 +348,7 @@ public class LiteralOnlyBrokerRequestTest {
     assertEquals(brokerResponse.getExceptions().get(0).getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
   }
 
-  /** Tests for EXPLAIN PLAN for literal only queries. */
+  /// Tests for EXPLAIN PLAN for literal only queries.
   @Test
   public void testExplainPlanLiteralOnly()
       throws Exception {

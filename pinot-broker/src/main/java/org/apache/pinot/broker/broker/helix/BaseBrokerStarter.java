@@ -132,18 +132,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base class for broker startable implementations
- */
+/// Base class for broker startable implementations
 @SuppressWarnings("unused")
 public abstract class BaseBrokerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerStarter.class);
 
-  /**
-   * When {@link CommonConstants.CursorConfigs#RESPONSE_STORE_CLEANER_INITIAL_DELAY} is unset, the first cleanup run
-   * is scheduled after one full frequency period plus jitter in {@code [0, frequencyMs / this value)}, to
-   * desynchronize brokers on shared storage.
-   */
+  /// When [CommonConstants.CursorConfigs#RESPONSE_STORE_CLEANER_INITIAL_DELAY] is unset, the first cleanup run
+  /// is scheduled after one full frequency period plus jitter in `[0, frequencyMs / this value)`, to
+  /// desynchronize brokers on shared storage.
   private static final int RESPONSE_STORE_CLEANUP_INITIAL_DELAY_JITTER_DIVISOR = 4;
 
   protected PinotConfiguration _brokerConf;
@@ -251,26 +247,20 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected void applyCustomConfigs(PinotConfiguration brokerConf) {
   }
 
-  /**
-   * Override to customize the query operator factory provider used by the broker multi-stage engine.
-   */
+  /// Override to customize the query operator factory provider used by the broker multi-stage engine.
   protected QueryOperatorFactoryProvider createQueryOperatorFactoryProvider(PinotConfiguration brokerConf) {
     return DefaultQueryOperatorFactoryProvider.INSTANCE;
   }
 
-  /**
-   * Override to customize the {@link WorkerManager} used for multi-stage query engine worker assignment.
-   */
+  /// Override to customize the [WorkerManager] used for multi-stage query engine worker assignment.
   protected WorkerManager createWorkerManager(String brokerId, String hostname, int port,
       RoutingManager routingManager) {
     return new WorkerManager(brokerId, hostname, port, routingManager);
   }
 
-  /**
-   * Override to supply a custom {@link SingleConnectionBrokerRequestHandler} subclass (e.g. one
-   * that overrides {@code onQueryCompletion(RequestContext, BrokerResponse)} for async query
-   * logging). Pass {@code null} for {@code materializedViewHandler} to skip MV rewrite.
-   */
+  /// Override to supply a custom [SingleConnectionBrokerRequestHandler] subclass (e.g. one
+  /// that overrides `onQueryCompletion(RequestContext, BrokerResponse)` for async query
+  /// logging). Pass `null` for `materializedViewHandler` to skip MV rewrite.
   protected SingleConnectionBrokerRequestHandler createSingleStageBrokerRequestHandler(
       PinotConfiguration config, String brokerId, BrokerRequestIdGenerator requestIdGenerator,
       RoutingManager routingManager, AccessControlFactory accessControlFactory,
@@ -285,10 +275,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         materializedViewHandler);
   }
 
-  /**
-   * Override to supply a custom {@link GrpcBrokerRequestHandler} subclass. Pass {@code null} for
-   * {@code materializedViewHandler} to skip MV rewrite.
-   */
+  /// Override to supply a custom [GrpcBrokerRequestHandler] subclass. Pass `null` for
+  /// `materializedViewHandler` to skip MV rewrite.
   protected GrpcBrokerRequestHandler createGrpcBrokerRequestHandler(
       PinotConfiguration config, String brokerId, BrokerRequestIdGenerator requestIdGenerator,
       RoutingManager routingManager, AccessControlFactory accessControlFactory,
@@ -300,11 +288,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         multiClusterRoutingContext, materializedViewHandler);
   }
 
-  /**
-   * Override to supply a custom {@link MultiStageBrokerRequestHandler} subclass (e.g. one that
-   * overrides {@code onQueryCompletion(RequestContext, BrokerResponse)} for async query logging).
-   * The default implementation returns a plain {@link MultiStageBrokerRequestHandler}.
-   */
+  /// Override to supply a custom [MultiStageBrokerRequestHandler] subclass (e.g. one that
+  /// overrides `onQueryCompletion(RequestContext, BrokerResponse)` for async query logging).
+  /// The default implementation returns a plain [MultiStageBrokerRequestHandler].
   protected MultiStageBrokerRequestHandler createMultiStageBrokerRequestHandler(
       PinotConfiguration config, String brokerId, BrokerRequestIdGenerator requestIdGenerator,
       RoutingManager routingManager, AccessControlFactory accessControlFactory,
@@ -331,47 +317,42 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     return _port;
   }
 
-  /**
-   * Adds an ideal state change handler to handle Helix ideal state change callbacks.
-   * <p>NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
-   * handlers from running. For slow change handler, make it asynchronous.
-   */
+  /// Adds an ideal state change handler to handle Helix ideal state change callbacks.
+  ///
+  /// NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
+  /// handlers from running. For slow change handler, make it asynchronous.
   public void addIdealStateChangeHandler(ClusterChangeHandler idealStateChangeHandler) {
     _idealStateChangeHandlers.add(idealStateChangeHandler);
   }
 
-  /**
-   * Adds an external view change handler to handle Helix external view change callbacks.
-   * <p>NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
-   * handlers from running. For slow change handler, make it asynchronous.
-   */
+  /// Adds an external view change handler to handle Helix external view change callbacks.
+  ///
+  /// NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
+  /// handlers from running. For slow change handler, make it asynchronous.
   public void addExternalViewChangeHandler(ClusterChangeHandler externalViewChangeHandler) {
     _externalViewChangeHandlers.add(externalViewChangeHandler);
   }
 
-  /**
-   * Adds an instance config change handler to handle Helix instance config change callbacks.
-   * <p>NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
-   * handlers from running. For slow change handler, make it asynchronous.
-   */
+  /// Adds an instance config change handler to handle Helix instance config change callbacks.
+  ///
+  /// NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
+  /// handlers from running. For slow change handler, make it asynchronous.
   public void addInstanceConfigChangeHandler(ClusterChangeHandler instanceConfigChangeHandler) {
     _instanceConfigChangeHandlers.add(instanceConfigChangeHandler);
   }
 
-  /**
-   * Adds a cluster config change handler to handle Helix cluster config change callbacks.
-   * <p>NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
-   * handlers from running. For slow change handler, make it asynchronous.
-   */
+  /// Adds a cluster config change handler to handle Helix cluster config change callbacks.
+  ///
+  /// NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
+  /// handlers from running. For slow change handler, make it asynchronous.
   public void addClusterConfigChangeHandler(ClusterChangeHandler clusterConfigChangeHandler) {
     _clusterConfigChangeHandlers.add(clusterConfigChangeHandler);
   }
 
-  /**
-   * Adds a live instance change handler to handle Helix live instance change callbacks.
-   * <p>NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
-   * handlers from running. For slow change handler, make it asynchronous.
-   */
+  /// Adds a live instance change handler to handle Helix live instance change callbacks.
+  ///
+  /// NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
+  /// handlers from running. For slow change handler, make it asynchronous.
   public void addLiveInstanceChangeHandler(ClusterChangeHandler liveInstanceChangeHandler) {
     _liveInstanceChangeHandlers.add(liveInstanceChangeHandler);
   }
@@ -764,20 +745,16 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _helixDataAccessor = _spectatorHelixManager.getHelixDataAccessor();
   }
 
-  /**
-   * Can be overridden to inject a custom MultiClusterRoutingContext from MultiClusterBrokerStarter.
-   */
+  /// Can be overridden to inject a custom MultiClusterRoutingContext from MultiClusterBrokerStarter.
   protected MultiClusterRoutingContext getMultiClusterRoutingContext() {
     return null;
   }
 
-  /**
-   * @deprecated Use {@link #createBrokerAdminApp()} instead.
-   * This method is called after initialization of BrokerAdminApiApplication object
-   * and before calling start to allow custom broker starters to register additional
-   * components.
-   * @param brokerAdminApplication is the application
-   */
+  /// @deprecated Use [#createBrokerAdminApp()] instead.
+  /// This method is called after initialization of BrokerAdminApiApplication object
+  /// and before calling start to allow custom broker starters to register additional
+  /// components.
+  /// @param brokerAdminApplication is the application
   protected void registerExtraComponents(BrokerAdminApiApplication brokerAdminApplication) {
   }
 
@@ -855,10 +832,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
   }
 
-  /**
-   * Fetches the resources to monitor and registers the
-   * {@link org.apache.pinot.common.utils.ServiceStatus.ServiceStatusCallback}s
-   */
+  /// Fetches the resources to monitor and registers the
+  /// [org.apache.pinot.common.utils.ServiceStatus.ServiceStatusCallback]s
   private void registerServiceStatusHandler() {
     List<String> resourcesToMonitor = new ArrayList<>(1);
     IdealState brokerResourceIdealState =

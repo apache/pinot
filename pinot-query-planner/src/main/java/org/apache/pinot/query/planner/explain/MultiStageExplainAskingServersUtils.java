@@ -34,20 +34,18 @@ public class MultiStageExplainAskingServersUtils {
   private MultiStageExplainAskingServersUtils() {
   }
 
-  /**
-   * Returns a node where the leaf nodes are replaced with other nodes that contain physical information.
-   *
-   * <strong>notice:</strong>The receiving node may be modified.
-   *
-   * Some of the new nodes may be {@link org.apache.pinot.core.plan.PinotExplainedRelNode}, so once this method is
-   * called the received RelNode should not be used for execution.
-   *
-   * @param rootNode the root {@link RelNode} of the query plan, <strong>which may be modified</strong>.
-   * @param queryStages a collection of {@link DispatchablePlanFragment}s that represent the stages of the query.
-   * @param tracker a {@link TransformationTracker} that keeps track of the creator of each {@link PlanNode}.
-   *                This is used to find the RelNodes that need to be substituted.
-   * @param serversExplainer an {@link AskingServerStageExplainer} that is used to ask the servers for their plans.
-   */
+  /// Returns a node where the leaf nodes are replaced with other nodes that contain physical information.
+  ///
+  /// **notice:** The receiving node may be modified.
+  ///
+  /// Some of the new nodes may be [org.apache.pinot.core.plan.PinotExplainedRelNode], so once this method is
+  /// called the received RelNode should not be used for execution.
+  ///
+  /// @param rootNode the root [RelNode] of the query plan, **which may be modified**.
+  /// @param queryStages a collection of [DispatchablePlanFragment]s that represent the stages of the query.
+  /// @param tracker a [TransformationTracker] that keeps track of the creator of each [PlanNode].
+  ///                This is used to find the RelNodes that need to be substituted.
+  /// @param serversExplainer an [AskingServerStageExplainer] that is used to ask the servers for their plans.
   public static RelNode modifyRel(RelNode rootNode, Collection<DispatchablePlanFragment> queryStages,
       TransformationTracker<PlanNode, RelNode> tracker, AskingServerStageExplainer serversExplainer) {
     // extract a key node operator

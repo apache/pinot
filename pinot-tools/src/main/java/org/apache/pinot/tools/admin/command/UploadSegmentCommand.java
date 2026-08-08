@@ -41,11 +41,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class for command to upload data into Pinot.
- *
- *
- */
+/// Class for command to upload data into Pinot.
 @CommandLine.Command(name = "UploadSegment", mixinStandardHelpOptions = true)
 public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(UploadSegmentCommand.class);

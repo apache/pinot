@@ -38,10 +38,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests the PinotSegmentRecordReader to check that the records being generated
- * are the same as the records used to create the segment
- */
+/// Tests the PinotSegmentRecordReader to check that the records being generated
+/// are the same as the records used to create the segment
 public class PinotSegmentRecordReaderTest {
   private static final int NUM_ROWS = 10000;
   private static final String D_SV_1 = "d_sv_1";

@@ -28,7 +28,7 @@ import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 
-public class ColocatedJoinQuickStart extends MultistageEngineQuickStart {
+public class ColocatedJoinQuickStart extends Quickstart {
   private static final String QUICKSTART_IDENTIFIER = "COLOCATED_JOIN";
   private static final String[] COLOCATED_JOIN_DIRECTORIES = new String[]{
       "examples/batch/colocated/userAttributes", "examples/batch/colocated/userGroups",

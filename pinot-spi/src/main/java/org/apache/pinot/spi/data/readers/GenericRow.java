@@ -34,22 +34,20 @@ import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * The generic row is the value holder returned from {@link RecordReader#next()} and
- * {RecordReader#next(GenericRow)}, and can be modified with {RecordTransformer}. The generic row returned
- * from the {NullValueTransformer} should have {@code defaultNullValue} filled to the fields with {@code null}
- * value, so that for fields with {@code null} value, {@link #getValue(String)} will return the {@code defaultNullValue}
- * and {@link #isNullValue(String)} will return {@code true}.
- *
- * The fixed set of allowed data types for the fields in the GenericRow should be:
- * Integer, Long, Float, Double, String, byte[], Object[] of the single-value types
- * This is the fixed set of data types to be used by RecordExtractor and RecordReader to extract fields from the row,
- * and by the ExpressionEvaluator to evaluate the result
- * FIXME: Based on the current behavior, we support the following data types:
- *  SV: Boolean, Byte, Character, Short, Integer, Long, Float, Double, String, byte[]
- *  MV: Object[] or List of Byte, Character, Short, Integer, Long, Float, Double, String
- *  We should not be using Boolean, Byte, Character and Short to keep it simple
- */
+/// The generic row is the value holder returned from [RecordReader#next()] and {RecordReader#next(GenericRow)},
+/// and can be modified with {RecordTransformer}. The generic row returned from the {NullValueTransformer} should have
+/// `defaultNullValue` filled to the fields with `null` value, so that for fields with `null` value,
+/// [#getValue(String)] will return the `defaultNullValue` and [#isNullValue(String)] will return
+/// `true`.
+///
+/// The fixed set of allowed data types for the fields in the GenericRow should be:
+/// Integer, Long, Float, Double, String, byte\[\], Object\[\] of the single-value types
+/// This is the fixed set of data types to be used by RecordExtractor and RecordReader to extract fields from the row,
+/// and by the ExpressionEvaluator to evaluate the result
+/// FIXME: Based on the current behavior, we support the following data types:
+///  SV: Boolean, Byte, Character, Short, Integer, Long, Float, Double, String, byte\[\]
+///  MV: Object\[\] or List of Byte, Character, Short, Integer, Long, Float, Double, String
+///  We should not be using Boolean, Byte, Character and Short to keep it simple
 public class GenericRow implements Serializable {
 
   /// This key is used by [org.apache.pinot.spi.stream.StreamMessageDecoder] to handle the case of single stream message
@@ -69,10 +67,8 @@ public class GenericRow implements Serializable {
   private boolean _incomplete;
   private boolean _sanitized;
 
-  /**
-   * Initializes the generic row from the given generic row (shallow copy). The row should be new created or cleared
-   * before calling this method.
-   */
+  /// Initializes the generic row from the given generic row (shallow copy). The row should be new created or cleared
+  /// before calling this method.
   public void init(GenericRow row) {
     _fieldToValueMap.putAll(row._fieldToValueMap);
     _nullValueFields.addAll(row._nullValueFields);
@@ -80,29 +76,26 @@ public class GenericRow implements Serializable {
     _sanitized = row._sanitized;
   }
 
-  /**
-   * Returns the map from fields to values.
-   * <p>Before setting the {@code defaultNullValue} for a field by calling {@link #putDefaultNullValue(String, Object)},
-   * the value for the field can be {@code null}.
-   */
+  /// Returns the map from fields to values.
+  ///
+  /// Before setting the `defaultNullValue` for a field by calling [#putDefaultNullValue(String, Object)],
+  /// the value for the field can be `null`.
   public Map<String, Object> getFieldToValueMap() {
     return _fieldToValueMap;
   }
 
-  /**
-   * Returns the fields with {@code null} value.
-   * <p>The {@code nullField} will be set when setting the {@code nullDefaultValue} for field by calling
-   * {@link #putDefaultNullValue(String, Object)}.
-   */
+  /// Returns the fields with `null` value.
+  ///
+  /// The `nullField` will be set when setting the `nullDefaultValue` for field by calling
+  /// [#putDefaultNullValue(String, Object)].
   public Set<String> getNullValueFields() {
     return _nullValueFields;
   }
 
-  /**
-   * Returns the value for the given field.
-   * <p>Before setting the {@code defaultNullValue} for a field by calling {@link #putDefaultNullValue(String, Object)},
-   * the value for the field can be {@code null}.
-   */
+  /// Returns the value for the given field.
+  ///
+  /// Before setting the `defaultNullValue` for a field by calling [#putDefaultNullValue(String, Object)],
+  /// the value for the field can be `null`.
   public Object getValue(String fieldName) {
     return _fieldToValueMap.get(fieldName);
   }
@@ -121,18 +114,15 @@ public class GenericRow implements Serializable {
     return new PrimaryKey(values);
   }
 
-  /**
-   * Returns whether the value is {@code null} for the given field.
-   * <p>The {@code nullField} will be set when setting the {@code nullDefaultValue} for field by calling
-   * {@link #putDefaultNullValue(String, Object)}.
-   */
+  /// Returns whether the value is `null` for the given field.
+  ///
+  /// The `nullField` will be set when setting the `nullDefaultValue` for field by calling
+  /// [#putDefaultNullValue(String, Object)].
   public boolean isNullValue(String fieldName) {
     return _nullValueFields.contains(fieldName);
   }
 
-  /**
-   * Returns whether this row has null values for any of the columns
-   */
+  /// Returns whether this row has null values for any of the columns
   public boolean hasNullValues() {
     return !_nullValueFields.isEmpty();
   }
@@ -149,9 +139,7 @@ public class GenericRow implements Serializable {
     return _sanitized;
   }
 
-  /**
-   * @return a deep copy of the generic row
-   */
+  /// @return a deep copy of the generic row
   public GenericRow copy() {
     GenericRow copy = new GenericRow();
     copy.init(this);
@@ -161,9 +149,7 @@ public class GenericRow implements Serializable {
     return copy;
   }
 
-  /**
-   * @return a deep copy of the generic row for the given fields
-   */
+  /// @return a deep copy of the generic row for the given fields
   public GenericRow copy(List<String> fieldsToCopy) {
     GenericRow copy = new GenericRow();
     for (String field : fieldsToCopy) {
@@ -172,9 +158,7 @@ public class GenericRow implements Serializable {
     return copy;
   }
 
-  /**
-   * @return a deep copy of the object.
-   */
+  /// @return a deep copy of the object.
   private Object copy(Object value) {
     if (value == null) {
       return null;
@@ -206,9 +190,7 @@ public class GenericRow implements Serializable {
     }
   }
 
-  /**
-   * Sets the value for the given field.
-   */
+  /// Sets the value for the given field.
   public void putValue(String fieldName, @Nullable Object value) {
     _fieldToValueMap.put(fieldName, value);
   }
@@ -223,24 +205,18 @@ public class GenericRow implements Serializable {
     return _fieldToValueMap.remove(fieldName);
   }
 
-  /**
-   * Sets the {@code defaultNullValue} for the given {@code nullField}.
-   */
+  /// Sets the `defaultNullValue` for the given `nullField`.
   public void putDefaultNullValue(String fieldName, Object defaultNullValue) {
     _fieldToValueMap.put(fieldName, defaultNullValue);
     _nullValueFields.add(fieldName);
   }
 
-  /**
-   * Marks a field as {@code null}.
-   */
+  /// Marks a field as `null`.
   public void addNullValueField(String fieldName) {
     _nullValueFields.add(fieldName);
   }
 
-  /**
-   * Marks a field as {@code non-null} and returns whether the field was marked as {@code null}.
-   */
+  /// Marks a field as `non-null` and returns whether the field was marked as `null`.
   public boolean removeNullValueField(String fieldName) {
     return _nullValueFields.remove(fieldName);
   }
@@ -255,9 +231,7 @@ public class GenericRow implements Serializable {
     _sanitized = true;
   }
 
-  /**
-   * Removes all the fields from the row.
-   */
+  /// Removes all the fields from the row.
   public void clear() {
     _fieldToValueMap.clear();
     _nullValueFields.clear();
@@ -290,15 +264,5 @@ public class GenericRow implements Serializable {
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
-  }
-
-  @Deprecated
-  public void init(Map<String, Object> fieldToValueMap) {
-    putValues(fieldToValueMap);
-  }
-
-  @Deprecated
-  public void putField(String fieldName, @Nullable Object value) {
-    putValue(fieldName, value);
   }
 }

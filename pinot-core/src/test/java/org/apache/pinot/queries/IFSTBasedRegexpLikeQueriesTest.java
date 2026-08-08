@@ -24,10 +24,8 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.testng.annotations.Test;
 
 
-/**
- * IFST-based regexp like queries test.
- * Extends the base class and uses IFST index type.
- */
+/// IFST-based regexp like queries test.
+/// Extends the base class and uses IFST index type.
 public class IFSTBasedRegexpLikeQueriesTest extends BaseFSTBasedRegexpLikeQueriesTest {
 
   @Override

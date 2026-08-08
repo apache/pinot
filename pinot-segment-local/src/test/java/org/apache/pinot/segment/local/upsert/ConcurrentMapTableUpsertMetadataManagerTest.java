@@ -43,11 +43,9 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 
 
-/**
- * Covers the mode-dispatch branch that a prior review pass regressed: NONE/skipUpsertView must take the direct,
- * unlocked read; SYNC/SNAPSHOT must delegate to {@link UpsertViewManager}, which is the only path that respects
- * segment tracking.
- */
+/// Covers the mode-dispatch branch that a prior review pass regressed: NONE/skipUpsertView must take the direct,
+/// unlocked read; SYNC/SNAPSHOT must delegate to [UpsertViewManager], which is the only path that respects
+/// segment tracking.
 public class ConcurrentMapTableUpsertMetadataManagerTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final Schema SCHEMA = new Schema.SchemaBuilder()

@@ -23,9 +23,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 
-/**
- * Encapsulates information for a stale segment. It captures segment name, staleness and reason if it is stale.
- */
+/// Encapsulates information for a stale segment. It captures segment name, staleness and reason if it is stale.
 public class StaleSegment {
   private final String _segmentName;
   private final boolean _isStale;

@@ -22,9 +22,7 @@ import java.util.Objects;
 import org.apache.pinot.common.request.context.ExpressionContext;
 
 
-/**
- * Predicate for EQ.
- */
+/// Predicate for EQ.
 public class EqPredicate extends BasePredicate {
   private final String _value;
 

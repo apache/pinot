@@ -29,114 +29,88 @@ import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
-/**
- * The {@code RouteManager} provides the routing information for a query that requests access to a Pinot table.
- *
- * The implementation of this interface should ensure the routing and server information are up-to-date at the
- * time when the routing request was made.
- *
- * set by the user. This needs to be added to support features like segment pruning.
- */
+/// The `RouteManager` provides the routing information for a query that requests access to a Pinot table.
+///
+/// The implementation of this interface should ensure the routing and server information are up-to-date at the
+/// time when the routing request was made.
+///
+/// set by the user. This needs to be added to support features like segment pruning.
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public interface RoutingManager {
 
-  /**
-   * Get all enabled server instances in the cluster.
-   *
-   * @return all currently enabled server instances.
-   */
+  /// Get all enabled server instances in the cluster.
+  ///
+  /// @return all currently enabled server instances.
   Map<String, ServerInstance> getEnabledServerInstanceMap();
 
-  /**
-   * Get all routable server instances in the cluster -- enabled servers that have not been excluded from routing by
-   * the broker (e.g. by the FailureDetector). Callers that pick workers without going through per-table instance
-   * selection (such as MSE intermediate stage worker selection) should prefer this over
-   * {@link #getEnabledServerInstanceMap()} so that FailureDetector exclusions are honored.
-   *
-   * <p>The default implementation delegates to {@link #getEnabledServerInstanceMap()} for backward compatibility with
-   * implementations that do not track exclusions separately.
-   */
+  /// Get all routable server instances in the cluster -- enabled servers that have not been excluded from routing by
+  /// the broker (e.g. by the FailureDetector). Callers that pick workers without going through per-table instance
+  /// selection (such as MSE intermediate stage worker selection) should prefer this over
+  /// [#getEnabledServerInstanceMap()] so that FailureDetector exclusions are honored.
+  ///
+  /// The default implementation delegates to [#getEnabledServerInstanceMap()] for backward compatibility with
+  /// implementations that do not track exclusions separately.
   default Map<String, ServerInstance> getRoutableServerInstanceMap() {
     return getEnabledServerInstanceMap();
   }
 
-  /**
-   * Returns whether the given table is enabled
-   * @param tableNameWithType Table name with type
-   * @return Whether the given table is enabled
-   */
+  /// Returns whether the given table is enabled
+  /// @param tableNameWithType Table name with type
+  /// @return Whether the given table is enabled
   default boolean isTableDisabled(String tableNameWithType) {
     return false;
   }
 
-  /**
-   * Get the {@link RoutingTable} for a specific broker request.
-   *
-   * @param brokerRequest the broker request constructed from a query.
-   * @return the route table.
-   */
+  /// Get the [RoutingTable] for a specific broker request.
+  ///
+  /// @param brokerRequest the broker request constructed from a query.
+  /// @return the route table.
   @Nullable
   RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId);
 
-  /**
-   * Get the {@link RoutingTable} for a specific broker request.
-   * @param brokerRequest the broker request constructed from a query.
-   * @param tableNameWithType the name of the table.
-   * @param requestId the request id.
-   * @return the route table.
-   */
+  /// Get the [RoutingTable] for a specific broker request.
+  /// @param brokerRequest the broker request constructed from a query.
+  /// @param tableNameWithType the name of the table.
+  /// @param requestId the request id.
+  /// @return the route table.
   @Nullable
   RoutingTable getRoutingTable(BrokerRequest brokerRequest, String tableNameWithType, long requestId);
 
-  /**
-   * Returns the segments that are relevant for the given broker request. Returns {@code null} if the table does not
-   * exist.
-   */
+  /// Returns the segments that are relevant for the given broker request. Returns `null` if the table does not
+  /// exist.
   @Nullable
   List<String> getSegments(BrokerRequest brokerRequest);
 
-  /**
-   * Returns the segments that are relevant for the given broker request and optional sampler name.
-   * Returns {@code null} if the table does not exist.
-   */
+  /// Returns the segments that are relevant for the given broker request and optional sampler name.
+  /// Returns `null` if the table does not exist.
   @Nullable
   default List<String> getSegments(BrokerRequest brokerRequest, @Nullable String samplerName) {
     return getSegments(brokerRequest);
   }
 
-  /**
-   * Validate routing exist for a table
-   *
-   * @param tableNameWithType the name of the table.
-   * @return true if the route table exists.
-   */
+  /// Validate routing exist for a table
+  ///
+  /// @param tableNameWithType the name of the table.
+  /// @return true if the route table exists.
   boolean routingExists(String tableNameWithType);
 
-  /**
-   * Acquire the time boundary info. Useful for hybrid logical table queries that needs to split between
-   * realtime and offline.
-   * @param offlineTableName offline table name
-   * @return time boundary info.
-   */
+  /// Acquire the time boundary info. Useful for hybrid logical table queries that needs to split between
+  /// realtime and offline.
+  /// @param offlineTableName offline table name
+  /// @return time boundary info.
   @Nullable
   TimeBoundaryInfo getTimeBoundaryInfo(String offlineTableName);
 
-  /**
-   * Returns the {@link TablePartitionInfo} for a given table.
-   */
+  /// Returns the [TablePartitionInfo] for a given table.
   @Nullable
   TablePartitionInfo getTablePartitionInfo(String tableNameWithType);
 
-  /**
-   * Returns the {@link TablePartitionReplicatedServersInfo} for a given table.
-   */
+  /// Returns the [TablePartitionReplicatedServersInfo] for a given table.
   @Nullable
   TablePartitionReplicatedServersInfo getTablePartitionReplicatedServersInfo(String tableNameWithType);
 
-  /**
-   * Returns the enabled server instances currently serving the given table.
-   */
+  /// Returns the enabled server instances currently serving the given table.
   @Nullable
   Set<String> getServingInstances(String tableNameWithType);
 }

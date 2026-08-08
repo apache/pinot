@@ -28,9 +28,7 @@ import static org.testng.Assert.*;
 
 public class QueryFingerprintVisitorTest {
 
-  /**
-   * Helper method to parse SQL and apply the visitor
-   */
+  /// Helper method to parse SQL and apply the visitor
   private String generateFingerprint(String sql) throws Exception {
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
     SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();

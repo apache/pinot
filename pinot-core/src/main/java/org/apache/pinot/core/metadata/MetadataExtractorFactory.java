@@ -22,10 +22,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The MetadataExtractorFactory will instantiate the MetadataExtractor class, which is used to extract metadata from
- * a given file during segment upload.
- */
+/// The MetadataExtractorFactory will instantiate the MetadataExtractor class, which is used to extract metadata from
+/// a given file during segment upload.
 public class MetadataExtractorFactory {
   public static final Logger LOGGER = LoggerFactory.getLogger(MetadataExtractorFactory.class);
 

@@ -32,24 +32,22 @@ public class PauselessSegmentCommitter extends SplitSegmentCommitter {
     super(segmentLogger, protocolHandler, params, segmentUploader, peerDownloadScheme);
   }
 
-  /**
-   * Commits a built segment without executing the segmentCommitStart step. This method assumes that
-   * segmentCommitStart has already been executed prior to building the segment.
-   *
-   * The commit process follows these steps:
-   * 1. Uploads the segment tar file to the designated storage location
-   * 2. Updates the parameters with the new segment location
-   * 3. Executes the segment commit end protocol with associated metadata
-   *
-   * @param segmentBuildDescriptor Contains the built segment information including the tar file
-   *                              and associated metadata files
-   * @return A SegmentCompletionProtocol.Response object indicating the commit status:
-   *         - Returns the successful commit response if all steps complete successfully
-   *         - Returns RESP_FAILED if either the upload fails or the commit end protocol fails
-   *
-   * @see SegmentCompletionProtocol
-   * @see RealtimeSegmentDataManager.SegmentBuildDescriptor
-   */
+  /// Commits a built segment without executing the segmentCommitStart step. This method assumes that
+  /// segmentCommitStart has already been executed prior to building the segment.
+  ///
+  /// The commit process follows these steps:
+  /// 1. Uploads the segment tar file to the designated storage location
+  /// 2. Updates the parameters with the new segment location
+  /// 3. Executes the segment commit end protocol with associated metadata
+  ///
+  /// @param segmentBuildDescriptor Contains the built segment information including the tar file
+  ///                              and associated metadata files
+  /// @return A SegmentCompletionProtocol.Response object indicating the commit status:
+  ///         - Returns the successful commit response if all steps complete successfully
+  ///         - Returns RESP_FAILED if either the upload fails or the commit end protocol fails
+  ///
+  /// @see SegmentCompletionProtocol
+  /// @see RealtimeSegmentDataManager.SegmentBuildDescriptor
   @Override
   public SegmentCompletionProtocol.Response commit(
       RealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor) {

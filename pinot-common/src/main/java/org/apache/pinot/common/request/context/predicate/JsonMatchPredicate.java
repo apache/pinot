@@ -22,9 +22,7 @@ import java.util.Objects;
 import org.apache.pinot.common.request.context.ExpressionContext;
 
 
-/**
- * Predicate for JSON_MATCH.
- */
+/// Predicate for JSON_MATCH.
 public class JsonMatchPredicate extends BasePredicate {
   private final String _value;
   private final String _countPredicate;

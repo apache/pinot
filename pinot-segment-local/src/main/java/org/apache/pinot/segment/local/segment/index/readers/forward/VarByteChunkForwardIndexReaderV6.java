@@ -27,20 +27,18 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Reader for the V6 forward index format, extending V5 (which extends V4).
- *
- * <p>When compressed, V6 stores individual entry sizes in the chunk header instead of cumulative
- * offsets (V4). After decompression, sizes are converted to cumulative offsets in a single forward
- * pass, then V4's standard random-access read logic is reused unchanged.
- *
- * <p>When uncompressed (PASS_THROUGH), V6 writes V4 offsets directly, so V4's standard
- * uncompressed context is reused with no delta decoding overhead.
- *
- * <p>MV fixed-byte deserialization (without length prefix) is inherited from V5.
- *
- * @see VarByteChunkForwardIndexWriterV6
- */
+/// Reader for the V6 forward index format, extending V5 (which extends V4).
+///
+/// When compressed, V6 stores individual entry sizes in the chunk header instead of cumulative
+/// offsets (V4). After decompression, sizes are converted to cumulative offsets in a single forward
+/// pass, then V4's standard random-access read logic is reused unchanged.
+///
+/// When uncompressed (PASS_THROUGH), V6 writes V4 offsets directly, so V4's standard
+/// uncompressed context is reused with no delta decoding overhead.
+///
+/// MV fixed-byte deserialization (without length prefix) is inherited from V5.
+///
+/// @see VarByteChunkForwardIndexWriterV6
 public class VarByteChunkForwardIndexReaderV6 extends VarByteChunkForwardIndexReaderV5 {
 
   public VarByteChunkForwardIndexReaderV6(PinotDataBuffer dataBuffer, FieldSpec.DataType storedType,
@@ -63,10 +61,8 @@ public class VarByteChunkForwardIndexReaderV6 extends VarByteChunkForwardIndexRe
         _chunkCompressionType, _targetDecompressedChunkSize);
   }
 
-  /**
-   * Converts sizes to cumulative offsets in a single forward pass.
-   * After conversion, the buffer has the same layout as V4 and standard read logic applies.
-   */
+  /// Converts sizes to cumulative offsets in a single forward pass.
+  /// After conversion, the buffer has the same layout as V4 and standard read logic applies.
   private static void convertSizesToOffsets(ByteBuffer buffer, int numDocs) {
     int headerSize = (numDocs + 1) * Integer.BYTES;
     int cumOffset = headerSize;
@@ -79,10 +75,8 @@ public class VarByteChunkForwardIndexReaderV6 extends VarByteChunkForwardIndexRe
     }
   }
 
-  /**
-   * Compressed reader context for V6. After decompression, converts sizes to offsets
-   * in-place so V4's readSmallUncompressedValue works unchanged.
-   */
+  /// Compressed reader context for V6. After decompression, converts sizes to offsets
+  /// in-place so V4's readSmallUncompressedValue works unchanged.
   private static final class V6CompressedReaderContext extends CompressedReaderContext {
 
     V6CompressedReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks, long chunkStartOffset,

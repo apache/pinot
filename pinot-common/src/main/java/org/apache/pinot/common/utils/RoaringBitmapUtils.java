@@ -54,12 +54,10 @@ public class RoaringBitmapUtils {
     return bitmap;
   }
 
-  /**
-   * Iterates over the ranges of unset bits and calls the consumer for each range. This is more performant to
-   * alternatives like calling {@link RoaringBitmap#contains(int)} in a loop or cloning and flipping the bitmap before
-   * iterating, especially for sparse bitmaps.
-   * @param nullIndexIterator an int iterator that returns values in ascending order whose min value is 0.
-   */
+  /// Iterates over the ranges of unset bits and calls the consumer for each range. This is more performant to
+  /// alternatives like calling [RoaringBitmap#contains(int)] in a loop or cloning and flipping the bitmap before
+  /// iterating, especially for sparse bitmaps.
+  /// @param nullIndexIterator an int iterator that returns values in ascending order whose min value is 0.
   public static void forEachUnset(int length, IntIterator nullIndexIterator, BatchConsumer consumer) {
     int prev = 0;
     while (nullIndexIterator.hasNext() && prev < length) {
@@ -74,16 +72,12 @@ public class RoaringBitmapUtils {
     }
   }
 
-  /**
-   * A consumer that is being used to consume batch of indexes.
-   */
+  /// A consumer that is being used to consume batch of indexes.
   @FunctionalInterface
   public interface BatchConsumer {
-    /**
-     * Consumes a batch of indexes.
-     * @param fromInclusive the start index (inclusive)
-     * @param toExclusive the end index (exclusive)
-     */
+    /// Consumes a batch of indexes.
+    /// @param fromInclusive the start index (inclusive)
+    /// @param toExclusive the end index (exclusive)
     void consume(int fromInclusive, int toExclusive);
   }
 }

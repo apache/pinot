@@ -66,10 +66,8 @@ public class DistinctCountHLLAggregationFunctionTest {
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, "16")));
   }
 
-  /**
-   * Verifies that BitSet deduplication produces the correct cardinality when dictIds contain duplicates.
-   * The BitSet should count each distinct dict entry exactly once.
-   */
+  /// Verifies that BitSet deduplication produces the correct cardinality when dictIds contain duplicates.
+  /// The BitSet should count each distinct dict entry exactly once.
   @Test
   public void testBitSetDeduplicationProducesCorrectCardinality() {
     int numDistinct = 100;
@@ -101,10 +99,8 @@ public class DistinctCountHLLAggregationFunctionTest {
         "Expected cardinality close to " + numDistinct + ", got: " + result.cardinality());
   }
 
-  /**
-   * Verifies that DictIdsWrapper correctly handles a large dictionary (1M entries), matching the reviewer's
-   * expectation that BitSet overhead is negligible (128 KB) and the cardinality estimate stays accurate.
-   */
+  /// Verifies that DictIdsWrapper correctly handles a large dictionary (1M entries), matching the reviewer's
+  /// expectation that BitSet overhead is negligible (128 KB) and the cardinality estimate stays accurate.
   @Test
   public void testBitSetLargeCardinalityDictionary() {
     int numDistinct = 10_000;
@@ -136,10 +132,8 @@ public class DistinctCountHLLAggregationFunctionTest {
         "Expected cardinality close to " + numDistinct + ", got: " + result.cardinality());
   }
 
-  /**
-   * Verifies that getDictIdBitSet reuses the same DictIdsWrapper across multiple calls on the same holder,
-   * accumulating all dict IDs correctly.
-   */
+  /// Verifies that getDictIdBitSet reuses the same DictIdsWrapper across multiple calls on the same holder,
+  /// accumulating all dict IDs correctly.
   @Test
   public void testDictIdBitSetIsReusedAcrossBatches() {
     int numDistinct = 200;

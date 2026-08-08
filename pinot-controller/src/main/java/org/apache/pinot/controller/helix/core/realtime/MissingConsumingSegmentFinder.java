@@ -51,13 +51,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * For a given table, this class finds out if there is any partition group for which there's no consuming segment in
- * ideal state. If so, it emits three metrics:
- *   - Total number of partitions with missing consuming segments including
- *   - Number of newly added partitions for which there's no consuming segment (there's no completed segment either)
- *   - Maximum duration (in minutes) that a partition hasn't had a consuming segment
- */
+/// For a given table, this class finds out if there is any partition group for which there's no consuming segment in
+/// ideal state. If so, it emits three metrics:
+///   - Total number of partitions with missing consuming segments including
+///   - Number of newly added partitions for which there's no consuming segment (there's no completed segment either)
+///   - Maximum duration (in minutes) that a partition hasn't had a consuming segment
 public class MissingConsumingSegmentFinder {
   private static final Logger LOGGER = LoggerFactory.getLogger(MissingConsumingSegmentFinder.class);
 

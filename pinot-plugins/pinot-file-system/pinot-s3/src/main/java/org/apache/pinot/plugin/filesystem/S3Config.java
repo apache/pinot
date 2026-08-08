@@ -37,9 +37,7 @@ import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.services.s3.model.StorageClass;
 
 
-/**
- * S3 related config
- */
+/// S3 related config
 public class S3Config {
   private static final Logger LOGGER = LoggerFactory.getLogger(S3Config.class);
 

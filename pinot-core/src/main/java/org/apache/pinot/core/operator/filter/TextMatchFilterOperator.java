@@ -33,10 +33,8 @@ import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * Filter operator for supporting the execution of text search
- * queries: WHERE TEXT_MATCH(column_name, query_string, options_string)
- */
+/// Filter operator for supporting the execution of text search
+/// queries: WHERE TEXT_MATCH(column_name, query_string, options_string)
 public class TextMatchFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_TEXT_INDEX";
 

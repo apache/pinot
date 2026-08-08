@@ -49,12 +49,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * {@code GrpcMailboxServer} manages GRPC-based mailboxes by creating a stream-stream GRPC server.
- *
- * <p>This GRPC server is responsible for constructing {@link StreamObserver} out of an initial "open" request
- * send by the sender of the sender/receiver pair.
- */
+/// `GrpcMailboxServer` manages GRPC-based mailboxes by creating a stream-stream GRPC server.
+///
+/// This GRPC server is responsible for constructing [StreamObserver] out of an initial "open" request
+/// send by the sender of the sender/receiver pair.
 public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcMailboxServer.class);
   private static final long DEFAULT_SHUTDOWN_TIMEOUT_MS = 10_000L;
@@ -66,17 +64,15 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   private final int _inboundMessageCredit;
   private final boolean _manualInboundFlowControlEnabled;
 
-  /**
-   * Constructs a gRPC-based mailbox server.
-   *
-   * @param mailboxService mailbox service providing configuration such as port and instance type
-   * @param config Pinot configuration used to initialize access control and server options
-   * @param tlsConfig optional TLS configuration; when {@code null}, the server is started without TLS
-   * @param sslContext optional pre-built SSL context; when non-null, this context is used instead of creating a new one
-   *                   from {@code tlsConfig}
-   * @param accessControlFactory optional factory for building query access control; when {@code null}, a factory is
-   *                             created from {@code config}
-   */
+  /// Constructs a gRPC-based mailbox server.
+  ///
+  /// @param mailboxService mailbox service providing configuration such as port and instance type
+  /// @param config Pinot configuration used to initialize access control and server options
+  /// @param tlsConfig optional TLS configuration; when `null`, the server is started without TLS
+  /// @param sslContext optional pre-built SSL context; when non-null, this context is used instead of creating a new
+  ///                   one from `tlsConfig`
+  /// @param accessControlFactory optional factory for building query access control; when `null`, a factory is
+  ///                             created from `config`
   public GrpcMailboxServer(MailboxService mailboxService, PinotConfiguration config, @Nullable TlsConfig tlsConfig,
       @Nullable SslContext sslContext, @Nullable QueryAccessControlFactory accessControlFactory) {
     _mailboxService = mailboxService;

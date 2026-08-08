@@ -247,7 +247,7 @@ public class QueryMonitorConfigTest {
     assertTrue(accountant.getQueryMonitorConfig().isOomPanicPreQueryKillPauseEnabled());
   }
 
-  /// Verifies the role-specific prefix takes precedence over {@link Accounting#COMMON_PREFIX} on a server accountant,
+  /// Verifies the role-specific prefix takes precedence over [Accounting#COMMON_PREFIX] on a server accountant,
   /// and that the broker-specific prefix is ignored.
   @Test
   void testServerPrefixOverridesCommonAndIgnoresBrokerPrefix() {
@@ -266,8 +266,8 @@ public class QueryMonitorConfigTest {
         "Server-specific prefix value should override the common prefix value");
   }
 
-  /// Same as above but asserts the broker accountant picks up {@link Accounting#BROKER_PREFIX} and ignores
-  /// {@link Accounting#SERVER_PREFIX}.
+  /// Same as above but asserts the broker accountant picks up [Accounting#BROKER_PREFIX] and ignores
+  /// [Accounting#SERVER_PREFIX].
   @Test
   void testBrokerPrefixOverridesCommonAndIgnoresServerPrefix() {
     PerQueryCPUMemResourceUsageAccountant accountant =

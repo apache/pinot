@@ -36,20 +36,16 @@ import org.apache.pinot.tsdb.spi.series.TimeSeries;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
 
-/**
- * POJO returned by the Pinot broker in a time-series query response. Format is defined
- * <a href="https://prometheus.io/docs/prometheus/latest/querying/api/">in the prometheus docs.</a>
- * TODO: We will evolve this until Pinot 1.3. At present we are mimicking Prometheus HTTP API.
- */
+/// POJO returned by the Pinot broker in a time-series query response. Format is defined
+/// [in the prometheus docs.](https://prometheus.io/docs/prometheus/latest/querying/api/)
+/// TODO: We will evolve this until Pinot 1.3. At present we are mimicking Prometheus HTTP API.
 @InterfaceStability.Evolving
 public class PinotBrokerTimeSeriesResponse {
   public static final String SUCCESS_STATUS = "success";
   public static final String ERROR_STATUS = "error";
-  /**
-   * Prometheus returns a __name__ tag to denote the "name" of a time-series query. Time series language developers
-   * can set this tag in the final operator in their queries, which would allow them to configure the name tag
-   * returned by the Pinot Broker. By default, we use {@link TimeSeries#getTagsSerialized()} as the name of a series.
-   */
+  /// Prometheus returns a \_\_name\_\_ tag to denote the "name" of a time-series query. Time series language developers
+  /// can set this tag in the final operator in their queries, which would allow them to configure the name tag
+  /// returned by the Pinot Broker. By default, we use [TimeSeries#getTagsSerialized()] as the name of a series.
   public static final String METRIC_NAME_KEY = "__name__";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private String _status;

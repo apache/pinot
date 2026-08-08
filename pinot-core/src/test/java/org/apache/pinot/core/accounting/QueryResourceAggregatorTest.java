@@ -41,7 +41,7 @@ public class QueryResourceAggregatorTest {
     return createAggregator(oomPauseTimeoutMs, false);
   }
 
-  /// Creates an aggregator that always hits critical level. When {@code pauseOnPanic} is true, the panic ratio is
+  /// Creates an aggregator that always hits critical level. When `pauseOnPanic` is true, the panic ratio is
   /// also set to 0 so that the aggregator always hits panic level instead.
   private QueryResourceAggregator createAggregator(long oomPauseTimeoutMs, boolean pauseOnPanic) {
     PinotConfiguration config = new PinotConfiguration();

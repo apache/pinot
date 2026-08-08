@@ -28,9 +28,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 
-/**
- * The <code>PinotSegmentToCsvConverter</code> class is the tool to convert Pinot segment to CSV format.
- */
+/// The `PinotSegmentToCsvConverter` class is the tool to convert Pinot segment to CSV format.
 public class PinotSegmentToCsvConverter implements PinotSegmentConverter {
   private final String _segmentDir;
   private final String _outputFile;

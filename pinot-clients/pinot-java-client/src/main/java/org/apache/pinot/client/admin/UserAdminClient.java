@@ -23,9 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 
-/**
- * Admin client for user management endpoints.
- */
+/// Admin client for user management endpoints.
 public class UserAdminClient extends BaseServiceAdminClient {
 
   UserAdminClient(PinotAdminTransport transport, String controllerAddress, Map<String, String> headers) {

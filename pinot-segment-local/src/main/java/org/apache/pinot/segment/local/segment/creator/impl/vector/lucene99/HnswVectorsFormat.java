@@ -25,31 +25,24 @@ import org.apache.lucene.codecs.KnnVectorsWriter;
 import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat;
 import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.SegmentWriteState;
-import org.apache.lucene.util.hnsw.HnswGraph;
 
 
-/**
- * Extend Lucene 9.5 vector format to support HNSW graph
- * The major change here is to allow higher dimension vectors
- */
+/// Extend Lucene 9.5 vector format to support HNSW graph
+/// The major change here is to allow higher dimension vectors
 public final class HnswVectorsFormat extends KnnVectorsFormat {
-  /**
-   * The maximum number of dimensions supported by this format. This is a limitation of the
-   * underlying implementation of {@link HnswGraph} which uses a fixed size array to store the
-   * vector values.
-   */
+  /// The maximum number of dimensions supported by this format. This is a limitation of the
+  /// underlying implementation of [org.apache.lucene.util.hnsw.HnswGraph] which uses a fixed size array to
+  /// store the vector values.
   public static final int DEFAULT_MAX_DIMENSIONS = 2048;
 
   private final int _maxDimensions;
   private final Lucene99HnswVectorsFormat _delegate;
 
-  /**
-   * Constructs a format using the given graph construction parameters.
-   *
-   * @param maxConn       the maximum number of connections to a node in the HNSW graph
-   * @param beamWidth     the size of the queue maintained during graph construction.
-   * @param maxDimensions the maximum number of dimensions supported by this format
-   */
+  /// Constructs a format using the given graph construction parameters.
+  ///
+  /// @param maxConn       the maximum number of connections to a node in the HNSW graph
+  /// @param beamWidth     the size of the queue maintained during graph construction.
+  /// @param maxDimensions the maximum number of dimensions supported by this format
   public HnswVectorsFormat(int maxConn, int beamWidth, int maxDimensions) {
     super("Lucene99HnswVectorsFormat");
     if (maxDimensions <= 0 || maxDimensions > DEFAULT_MAX_DIMENSIONS) {

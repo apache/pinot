@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.inputformat.json;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.plugin.inputformat.json.format.JsonPayloadFormat;
 import org.apache.pinot.plugin.inputformat.json.format.JsonPayloadParser;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -29,20 +30,18 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 
 
-/**
- * An implementation of StreamMessageDecoder to read JSON records from a stream.
- *
- * <p>Set the {@value #JSON_FORMAT_CONFIG_KEY} decoder property to pin the payload encoding to one of
- * {@code TEXT}, {@code POSTGRES_JSONB}, {@code SQLITE_JSONB}, {@code SMILE} or {@code CBOR}. When unset the
- * encoding is {@code TEXT}, the decoder's historical behavior.
- *
- * <p>Set it to {@code AUTO} to instead detect the encoding per message from its leading magic / version bytes,
- * falling back to text JSON. Detection is allocation-free and cannot mis-route a well-formed text JSON
- * document: a top-level <code>&#123;</code> or <code>[</code> (optionally after whitespace) collides with none
- * of the binary signatures. It is opt-in rather than the default because it is still a heuristic over a few
- * leading bytes, so it may claim a corrupt message that text decoding would have rejected outright.
- * See {@link JsonPayloadFormat}.
- */
+/// An implementation of StreamMessageDecoder to read JSON records from a stream.
+///
+/// Set the {@value #JSON_FORMAT_CONFIG_KEY} decoder property to pin the payload encoding to one of
+/// `TEXT`, `POSTGRES_JSONB`, `SQLITE_JSONB`, `SMILE` or `CBOR`. When unset the
+/// encoding is `TEXT`, the decoder's historical behavior.
+///
+/// Set it to `AUTO` to instead detect the encoding per message from its leading magic / version bytes,
+/// falling back to text JSON. Detection is allocation-free and cannot mis-route a well-formed text JSON
+/// document: a top-level `&#123;` or `[` (optionally after whitespace) collides with none
+/// of the binary signatures. It is opt-in rather than the default because it is still a heuristic over a few
+/// leading bytes, so it may claim a corrupt message that text decoding would have rejected outright.
+/// See [JsonPayloadFormat].
 public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   public static final String JSON_FORMAT_CONFIG_KEY = "jsonFormat";
 
@@ -55,6 +54,8 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
       "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
 
   private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
+  private Set<String> _fieldsToRead;
+  private boolean _usesDefaultRecordExtractor;
   // For AUTO this resolves the concrete format per message; otherwise it is the pinned format's parser.
   private JsonPayloadParser _parser;
 
@@ -72,6 +73,10 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
     }
     _jsonRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
     _jsonRecordExtractor.init(fieldsToRead, null);
+    _fieldsToRead = CollectionUtils.isNotEmpty(fieldsToRead) ? Set.copyOf(fieldsToRead) : null;
+    // Direct parsing implements JSONRecordExtractor's conversion contract and bypasses extract(). Require the
+    // exact default class so a configured extractor or subclass cannot lose custom extraction behavior.
+    _usesDefaultRecordExtractor = _jsonRecordExtractor.getClass() == JSONRecordExtractor.class;
     _parser = JsonPayloadFormat.fromConfig(jsonFormat).getParser();
   }
 
@@ -83,7 +88,9 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
     try {
-      // Parse directly to Map, avoiding an intermediate JsonNode representation for better performance.
+      if (_usesDefaultRecordExtractor && _parser.parse(payload, offset, length, destination, _fieldsToRead)) {
+        return destination;
+      }
       Map<String, Object> jsonMap = _parser.parse(payload, offset, length);
       return _jsonRecordExtractor.extract(jsonMap, destination);
     } catch (Exception e) {

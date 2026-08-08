@@ -28,24 +28,19 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 
 public interface SegmentPruner {
 
-  /**
-   * Initializes the segment pruner.
-   */
+  /// Initializes the segment pruner.
   void init(PinotConfiguration config);
 
-  /**
-   * Inspect the query context to determine if the pruner should be applied
-   * @return true if the pruner applies to the query
-   */
+  /// Inspect the query context to determine if the pruner should be applied
+  /// @return true if the pruner applies to the query
   boolean isApplicableTo(QueryContext query);
 
-  /**
-   * Prunes the segments based on the query, returns the segments that are not pruned.
-   * <p>Override this method for the pruner logic.
-   *
-   * @param segments The list of segments to be pruned. Implementations must not modify the list.
-   *                 TODO: Revisit this because the caller doesn't require not changing the input segments
-   */
+  /// Prunes the segments based on the query, returns the segments that are not pruned.
+  ///
+  /// Override this method for the pruner logic.
+  ///
+  /// @param segments The list of segments to be pruned. Implementations must not modify the list.
+  ///                 TODO: Revisit this because the caller doesn't require not changing the input segments
   List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query);
 
   default List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query,

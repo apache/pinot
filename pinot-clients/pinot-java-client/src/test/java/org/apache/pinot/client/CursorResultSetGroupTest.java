@@ -23,9 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-/**
- * Unit tests for CursorResultSetGroup class.
- */
+/// Unit tests for CursorResultSetGroup class.
 public class CursorResultSetGroupTest {
 
   @Test

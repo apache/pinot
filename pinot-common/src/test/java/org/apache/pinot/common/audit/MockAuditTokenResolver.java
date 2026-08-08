@@ -23,15 +23,12 @@ import org.apache.pinot.spi.audit.AuditTokenResolver;
 import org.apache.pinot.spi.audit.AuditUserIdentity;
 
 
-/**
- * Mock implementation of AuditTokenResolver for unit testing.
- * <p>
- * Supports two modes:
- * <ul>
- *   <li>Direct instantiation with configurable return value</li>
- *   <li>PluginManager loading (no-arg constructor) with static configuration</li>
- * </ul>
- */
+/// Mock implementation of AuditTokenResolver for unit testing.
+///
+/// Supports two modes:
+///
+/// - Direct instantiation with configurable return value
+/// - PluginManager loading (no-arg constructor) with static configuration
 public class MockAuditTokenResolver implements AuditTokenResolver {
 
   private static final String TEST_PREFIX = "Bearer test-";
@@ -43,16 +40,12 @@ public class MockAuditTokenResolver implements AuditTokenResolver {
   @Nullable
   private final String _returnValue;
 
-  /**
-   * No-arg constructor for PluginManager loading.
-   */
+  /// No-arg constructor for PluginManager loading.
   public MockAuditTokenResolver() {
     _returnValue = null;
   }
 
-  /**
-   * Constructor for direct instantiation with configurable return value.
-   */
+  /// Constructor for direct instantiation with configurable return value.
   public MockAuditTokenResolver(@Nullable String returnValue) {
     _returnValue = returnValue;
   }
@@ -75,17 +68,13 @@ public class MockAuditTokenResolver implements AuditTokenResolver {
     return null;
   }
 
-  /**
-   * Resets static state to defaults.
-   */
+  /// Resets static state to defaults.
   public static void reset() {
     _staticReturnValue = DEFAULT_PRINCIPAL;
     _lastAuthHeader = null;
   }
 
-  /**
-   * Returns the last auth header value passed to resolve().
-   */
+  /// Returns the last auth header value passed to resolve().
   @Nullable
   public static String getLastAuthHeader() {
     return _lastAuthHeader;

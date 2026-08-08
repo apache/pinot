@@ -67,10 +67,8 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
     }
   }
 
-  /**
-   * Assigns the segment for the replica-group based segment assignment strategy and returns the assigned instances.
-   * Assign to the instance with the least number of segments for each replica-group.
-   */
+  /// Assigns the segment for the replica-group based segment assignment strategy and returns the assigned instances.
+  /// Assign to the instance with the least number of segments for each replica-group.
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
       InstancePartitions instancePartitions) {
@@ -134,12 +132,10 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
     return rawPartitionId % numPartitions;
   }
 
-  /**
-   * Helper method to check whether the number of replica-groups matches the table replication for replica-group based
-   * instance partitions. Log a warning if they do not match and use the one inside the instance partitions. The
-   * mismatch can happen when table is not configured correctly (table replication and numReplicaGroups does not match
-   * or replication changed without reassigning instances).
-   */
+  /// Helper method to check whether the number of replica-groups matches the table replication for replica-group based
+  /// instance partitions. Log a warning if they do not match and use the one inside the instance partitions. The
+  /// mismatch can happen when table is not configured correctly (table replication and numReplicaGroups does not match
+  /// or replication changed without reassigning instances).
   protected static void checkReplication(InstancePartitions instancePartitions, int replication, String tableName) {
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     if (numReplicaGroups != replication) {

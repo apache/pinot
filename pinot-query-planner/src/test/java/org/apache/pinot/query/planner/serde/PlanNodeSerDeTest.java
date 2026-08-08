@@ -27,6 +27,8 @@ import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -82,10 +84,10 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
     assertEquals(deserialized.getPassthroughInputIndexes(), List.of());
   }
 
-  /// Enriched joins have been removed, but {@link EnrichedJoinNode}, proto field 17 and the serde are retained so a
-  /// plan produced by an older-version broker still round-trips (see {@link EnrichedJoinNode} deprecation note). The
+  /// Enriched joins have been removed, but [EnrichedJoinNode], proto field 17 and the serde are retained so a
+  /// plan produced by an older-version broker still round-trips (see [EnrichedJoinNode] deprecation note). The
   /// planner no longer produces this node, so this direct round-trip is the only guard on that wire format. Because
-  /// {@code JoinNode#equals} ignores the enriched-specific fields, assert on them explicitly rather than via equals.
+  /// `JoinNode#equals` ignores the enriched-specific fields, assert on them explicitly rather than via equals.
   @Test
   @SuppressWarnings("deprecation")
   public void testEnrichedJoinNodeSerDe() {
@@ -113,5 +115,20 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
     assertEquals(roundTripped.get(1).getProjectAndResultSchema().getProject(),
         List.of(new RexExpression.InputRef(1)));
     assertEquals(roundTripped.get(1).getProjectAndResultSchema().getSchema(), projectResultSchema);
+  }
+
+  @Test
+  public void testAggregateGroupingSetsSerDe() {
+    /// The grouping sets (member indexes over the union group keys, in ordinal order) must survive serialization
+    /// to the worker. ROLLUP(g0, g1) over the union {g0, g1} expands to the sets (g0, g1), (g0), (). The empty
+    /// grand-total set in particular must round-trip as an entry (not vanish as a proto default).
+    DataSchema schema = new DataSchema(new String[]{"g0", "g1", "sum"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.DOUBLE});
+    List<List<Integer>> groupingSets = List.of(List.of(0, 1), List.of(0), List.of());
+    AggregateNode node = new AggregateNode(0, schema, PlanNode.NodeHint.EMPTY, List.of(), List.of(), List.of(),
+        List.of(0, 1), AggType.DIRECT, false, List.of(), 0, groupingSets);
+    AggregateNode deserialized = (AggregateNode) PlanNodeDeserializer.process(PlanNodeSerializer.process(node));
+    assertEquals(deserialized.getGroupingSets(), groupingSets);
+    assertEquals(deserialized, node);
   }
 }

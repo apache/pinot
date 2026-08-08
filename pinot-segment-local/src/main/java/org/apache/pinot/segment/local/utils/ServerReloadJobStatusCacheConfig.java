@@ -21,10 +21,8 @@ package org.apache.pinot.segment.local.utils;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-/**
- * Configuration for ReloadJobStatusCache.
- * Uses Jackson annotations for automatic JSON mapping from ClusterConfiguration.
- */
+/// Configuration for ReloadJobStatusCache.
+/// Uses Jackson annotations for automatic JSON mapping from ClusterConfiguration.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ServerReloadJobStatusCacheConfig {
 

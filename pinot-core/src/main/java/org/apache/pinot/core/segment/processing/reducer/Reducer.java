@@ -21,14 +21,10 @@ package org.apache.pinot.core.segment.processing.reducer;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
 
 
-/**
- * Reducer reduces the GenericRows based on the strategy.
- */
+/// Reducer reduces the GenericRows based on the strategy.
 public interface Reducer {
 
-  /**
-   * Reduces the GenericRows based on the strategy, returns the file manager that contains the reduced rows.
-   */
+  /// Reduces the GenericRows based on the strategy, returns the file manager that contains the reduced rows.
   GenericRowFileManager reduce()
       throws Exception;
 }

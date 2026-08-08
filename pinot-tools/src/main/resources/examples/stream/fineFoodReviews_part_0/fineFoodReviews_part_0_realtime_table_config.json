@@ -41,7 +41,7 @@
     "transformConfigs": [
       {
         "columnName": "ts",
-        "transformFunction": "now()"
+        "transformFunction": "1704067200000"
       }
     ]
   },

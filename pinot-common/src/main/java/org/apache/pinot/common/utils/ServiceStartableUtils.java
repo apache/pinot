@@ -44,15 +44,13 @@ public class ServiceStartableUtils {
   private static final String PINOT_INSTANCE_CONFIG_KEY_PREFIX_TEMPLATE = "pinot.%s.";
   protected static String _timeZone;
 
-  /**
-   * Applies the ZK cluster config to:
-   * - The given instance config if it does not already exist.
-   * - Set the timezone.
-   * - Initialize the default values in {@link ForwardIndexConfig}.
-   *
-   * In the ZK cluster config:
-   * - pinot.all.* will be replaced to role specific config, e.g. pinot.controller.* for controllers
-   */
+  /// Applies the ZK cluster config to:
+  /// - The given instance config if it does not already exist.
+  /// - Set the timezone.
+  /// - Initialize the default values in [ForwardIndexConfig].
+  ///
+  /// In the ZK cluster config:
+  /// - pinot.all.\* will be replaced to role specific config, e.g. pinot.controller.\* for controllers
   public static void applyClusterConfig(PinotConfiguration instanceConfig, String zkAddress, String clusterName,
       ServiceRole serviceRole) {
     int zkClientSessionConfig =

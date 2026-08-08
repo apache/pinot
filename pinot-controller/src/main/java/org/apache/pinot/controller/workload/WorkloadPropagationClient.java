@@ -69,11 +69,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Class responsible for HTTP communication with brokers and servers for workload propagation.
- * Handles request building, sending, retries, and endpoint discovery.
- * Encapsulates async HTTP client configuration and lifecycle management.
- */
+/// Class responsible for HTTP communication with brokers and servers for workload propagation.
+/// Handles request building, sending, retries, and endpoint discovery.
+/// Encapsulates async HTTP client configuration and lifecycle management.
 public class WorkloadPropagationClient implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadPropagationClient.class);
 
@@ -156,10 +154,8 @@ public class WorkloadPropagationClient implements AutoCloseable {
     return client;
   }
 
-  /**
-   * Sends workload refresh messages to instances via HTTP in parallel.
-   * Uses dedicated executor pool for callback processing and RateLimiter to control QPS.
-   */
+  /// Sends workload refresh messages to instances via HTTP in parallel.
+  /// Uses dedicated executor pool for callback processing and RateLimiter to control QPS.
   public void sendQueryWorkloadMessage(Map<String, QueryWorkloadRequest> instanceToRefreshRequestMap) {
     long startTime = System.currentTimeMillis();
     int totalInstances = instanceToRefreshRequestMap.size();
@@ -244,11 +240,9 @@ public class WorkloadPropagationClient implements AutoCloseable {
         _brokerHttpSchemeAndPort.getRight());
   }
 
-  /**
-   * Discovers endpoint configurations (protocol scheme and port) for node types.
-   * @param targetType Specific node type to discover, or null to discover both broker and server
-   * @return Map of node type to endpoint config (scheme, port)
-   */
+  /// Discovers endpoint configurations (protocol scheme and port) for node types.
+  /// @param targetType Specific node type to discover, or null to discover both broker and server
+  /// @return Map of node type to endpoint config (scheme, port)
   private Map<NodeConfig.Type, Pair<String, Integer>> discoverHttpSchemesAndPort(
       @Nullable NodeConfig.Type targetType) {
     List<NodeConfig.Type> typesToDiscover = targetType == null
@@ -296,10 +290,8 @@ public class WorkloadPropagationClient implements AutoCloseable {
     return httpSchemesAndPort;
   }
 
-  /**
-   * Sends a workload refresh request with automatic retries and exponential backoff.
-   * Uses async HTTP client for non-blocking I/O with callbacks processed on dedicated executor.
-   */
+  /// Sends a workload refresh request with automatic retries and exponential backoff.
+  /// Uses async HTTP client for non-blocking I/O with callbacks processed on dedicated executor.
   private CompletableFuture<Boolean> sendWorkloadRequestWithRetry(SimpleHttpRequest request, String instanceId) {
     return sendWorkloadRequestWithRetryInternal(request, instanceId, 0);
   }
@@ -376,18 +368,14 @@ public class WorkloadPropagationClient implements AutoCloseable {
     }, _httpCallbackExecutor);
   }
 
-  /**
-   * Checks if the HTTP status code indicates a non-retriable error.
-   * Non-retriable errors: 400 (Bad Request), 403 (Forbidden), 404 (Not Found)
-   */
+  /// Checks if the HTTP status code indicates a non-retriable error.
+  /// Non-retriable errors: 400 (Bad Request), 403 (Forbidden), 404 (Not Found)
   private boolean isNonRetriableStatusCode(int statusCode) {
     return statusCode == HttpStatus.SC_BAD_REQUEST
         || statusCode == HttpStatus.SC_FORBIDDEN || statusCode == HttpStatus.SC_NOT_FOUND;
   }
 
-  /**
-   * Sends an HTTP request asynchronously using non-blocking I/O.
-   */
+  /// Sends an HTTP request asynchronously using non-blocking I/O.
   private CompletableFuture<SimpleHttpResponse> sendHttpRequestAsync(SimpleHttpRequest request) {
     CompletableFuture<SimpleHttpResponse> future = new CompletableFuture<>();
 
@@ -436,9 +424,7 @@ public class WorkloadPropagationClient implements AutoCloseable {
     }
   }
 
-  /**
-   * HTTP client configuration for workload propagation.
-   */
+  /// HTTP client configuration for workload propagation.
   private static class AsyncHttpClientConfig {
     private static final String MAX_CONNS_CONFIG_NAME = "workload.async.http.client.maxConnTotal";
     private static final String MAX_CONNS_PER_ROUTE_CONFIG_NAME = "workload.async.http.client.maxConnPerRoute";

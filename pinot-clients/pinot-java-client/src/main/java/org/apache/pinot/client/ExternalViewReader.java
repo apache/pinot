@@ -41,9 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Reads brokers external view from Zookeeper
- */
+/// Reads brokers external view from Zookeeper
 public class ExternalViewReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExternalViewReader.class);
   private static final ObjectReader OBJECT_READER = JsonUtils.DEFAULT_READER;

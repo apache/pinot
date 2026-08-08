@@ -75,12 +75,10 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
 
-/**
- * This class tries to replicate the behaviour for {@code ConcurrentMapPartitionUpsertMetadataManagerTest} assuming
- * that _enableDeletedKeysCompactionConsistency is enabled, and accordingly we set all the params in
- * {@code setUpContextBuilder}. We have removed preload and metadataTTL unit-tests for now as we don't allow
- * them along with _enableDeletedKeysCompactionConsistency.
- */
+/// This class tries to replicate the behaviour for `ConcurrentMapPartitionUpsertMetadataManagerTest` assuming
+/// that \_enableDeletedKeysCompactionConsistency is enabled, and accordingly we set all the params in
+/// `setUpContextBuilder`. We have removed preload and metadataTTL unit-tests for now as we don't allow
+/// them along with \_enableDeletedKeysCompactionConsistency.
 public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
@@ -844,9 +842,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
     return recordInfoList;
   }
 
-  /**
-   * Get recordInfo from validDocIdsSnapshot (enabledSnapshot = True).
-   */
+  /// Get recordInfo from validDocIdsSnapshot (enabledSnapshot = True).
   private List<RecordInfo> getRecordInfoList(MutableRoaringBitmap validDocIdsSnapshot, int[] primaryKeys,
       int[] timestamps, @Nullable boolean[] deleteRecordFlags) {
     List<RecordInfo> recordInfoList = new ArrayList<>();

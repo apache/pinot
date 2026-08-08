@@ -30,9 +30,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * Aggregation function to compute the count of distinct values for an SV column.
- */
+/// Aggregation function to compute the count of distinct values for an SV column.
 public class DistinctCountAggregationFunction extends BaseDistinctAggregateAggregationFunction<Integer> {
 
   public DistinctCountAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {

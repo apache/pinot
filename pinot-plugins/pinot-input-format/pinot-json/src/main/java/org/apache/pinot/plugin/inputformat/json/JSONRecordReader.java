@@ -34,9 +34,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * Record reader for JSON file.
- */
+/// Record reader for JSON file.
 public class JSONRecordReader implements RecordReader {
   private File _dataFile;
   private InputStream _inputStream;

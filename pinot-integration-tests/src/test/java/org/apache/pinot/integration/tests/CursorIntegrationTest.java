@@ -134,10 +134,8 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
     return Map.of();
   }
 
-  /**
-   * Deletes all cursor responses currently in the broker's response store.
-   * Call at the start of tests that need a known clean state.
-   */
+  /// Deletes all cursor responses currently in the broker's response store.
+  /// Call at the start of tests that need a known clean state.
   protected void deleteAllResponses()
       throws Exception {
     List<CursorResponseNative> responses = JsonUtils.stringToObject(

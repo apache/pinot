@@ -53,10 +53,10 @@ public final class GroupByUtils {
   public static final int DEFAULT_MIN_NUM_GROUPS = 5000;
   public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
 
-  /// Builds the segment-level {@link GroupByResultsBlock} for a GROUP BY GROUPING SETS / ROLLUP / CUBE query,
-  /// shared by {@code GroupByOperator} and {@code FilteredGroupByOperator}. When the group count exceeds the
-  /// per-set budget ({@code perSetTrimSize * numGroupingSets}), a per-set bucketed trim (keyed on the
-  /// {@code $groupingId} discriminator at {@code discriminatorColumnIndex}) keeps each grouping set's own top
+  /// Builds the segment-level [GroupByResultsBlock] for a GROUP BY GROUPING SETS / ROLLUP / CUBE query,
+  /// shared by `GroupByOperator` and `FilteredGroupByOperator`. When the group count exceeds the
+  /// per-set budget (`perSetTrimSize * numGroupingSets`), a per-set bucketed trim (keyed on the
+  /// `$groupingId` discriminator at `discriminatorColumnIndex`) keeps each grouping set's own top
   /// candidates so a global top-K cannot starve low-magnitude sets such as the grand total; otherwise the full
   /// segment result is returned. The broker still applies the final ORDER BY + LIMIT across all sets.
   ///
@@ -87,29 +87,23 @@ public final class GroupByUtils {
     return resultsBlock;
   }
 
-  /**
-   * Returns the capacity of the table required by the given query. NOTE: It returns {@code max(limit * 5, 5000)} to
-   * ensure the result accuracy.
-   */
+  /// Returns the capacity of the table required by the given query. NOTE: It returns `max(limit * 5, 5000)` to
+  /// ensure the result accuracy.
   public static int getTableCapacity(int limit) {
     return getTableCapacity(limit, DEFAULT_MIN_NUM_GROUPS);
   }
 
-  /**
-   * Returns the capacity of the table required by the given query. NOTE: It returns
-   * {@code max(limit * 5, minNumGroups)} where minNumGroups is configurable to tune the table size and result
-   * accuracy.
-   */
+  /// Returns the capacity of the table required by the given query. NOTE: It returns
+  /// `max(limit * 5, minNumGroups)` where minNumGroups is configurable to tune the table size and result
+  /// accuracy.
   public static int getTableCapacity(int limit, int minNumGroups) {
     long capacityByLimit = limit * 5L;
     return capacityByLimit > Integer.MAX_VALUE ? Integer.MAX_VALUE : Math.max((int) capacityByLimit, minNumGroups);
   }
 
-  /**
-   * Returns the actual trim threshold used for the indexed table. Trim threshold should be at least (2 * trimSize) to
-   * avoid excessive trimming. When trim threshold is non-positive or higher than 10^9, trim is considered disabled,
-   * where {@code Integer.MAX_VALUE} is returned.
-   */
+  /// Returns the actual trim threshold used for the indexed table. Trim threshold should be at least (2 \* trimSize) to
+  /// avoid excessive trimming. When trim threshold is non-positive or higher than 10^9, trim is considered disabled,
+  /// where `Integer.MAX_VALUE` is returned.
   @VisibleForTesting
   static int getIndexedTableTrimThreshold(int trimSize, int trimThreshold) {
     if (trimThreshold <= 0 || trimThreshold > MAX_TRIM_THRESHOLD || trimSize > MAX_TRIM_THRESHOLD / 2) {
@@ -118,9 +112,7 @@ public final class GroupByUtils {
     return Math.max(trimThreshold, 2 * trimSize);
   }
 
-  /**
-   * Returns the initial capacity of the indexed table required by the given query.
-   */
+  /// Returns the initial capacity of the indexed table required by the given query.
   @VisibleForTesting
   static int getIndexedTableInitialCapacity(int maxRowsToKeep, int minNumGroups, int minCapacity) {
     // The upper bound of the initial capacity is the capacity required to hold all the required rows. The indexed table
@@ -138,9 +130,7 @@ public final class GroupByUtils {
     return Math.max(minCapacity, lowerBound);
   }
 
-  /**
-   * Creates an indexed table for the combine operator given a sample results block.
-   */
+  /// Creates an indexed table for the combine operator given a sample results block.
   public static IndexedTable createIndexedTableForCombineOperator(GroupByResultsBlock resultsBlock,
       QueryContext queryContext, int numThreads, ExecutorService executorService) {
     DataSchema dataSchema = resultsBlock.getDataSchema();
@@ -201,9 +191,7 @@ public final class GroupByUtils {
     }
   }
 
-  /**
-   * Creates an indexed table for the data table reducer given a sample data table.
-   */
+  /// Creates an indexed table for the data table reducer given a sample data table.
   public static IndexedTable createIndexedTableForDataTableReducer(DataTable dataTable, QueryContext queryContext,
       DataTableReducerContext reducerContext, int numThreads, ExecutorService executorService) {
     DataSchema dataSchema = dataTable.getDataSchema();

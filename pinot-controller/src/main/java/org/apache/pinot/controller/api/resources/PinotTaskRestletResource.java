@@ -110,25 +110,23 @@ import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-/**
- * Task related rest APIs.
- * <ul>
- *   <li>GET '/tasks/tasktypes': List all task types</li>
- *   <li>GET '/tasks/{taskType}/state': Get the state (task queue state) for the given task type</li>
- *   <li>GET '/tasks/{taskType}/tasks': List all tasks for the given task type</li>
- *   <li>GET '/tasks/{taskType}/taskstates': Get a map from task to task state for the given task type</li>
- *   <li>GET '/tasks/task/{taskName}/state': Get the task state for the given task</li>
- *   <li>GET '/tasks/task/{taskName}/config': Get the task config (a list of child task configs) for the given task</li>
- *   <li>POST '/tasks/schedule': Schedule tasks</li>
- *   <li>POST '/tasks/execute': Execute an adhoc task</li>
- *   <li>PUT '/tasks/{taskType}/cleanup': Clean up finished tasks (COMPLETED, FAILED) for the given task type</li>
- *   <li>PUT '/tasks/{taskType}/stop': Stop all running/pending tasks (as well as the task queue) for the given task
- *   type</li>
- *   <li>PUT '/tasks/{taskType}/resume': Resume all stopped tasks (as well as the task queue) for the given task
- *   type</li>
- *   <li>DELETE '/tasks/{taskType}': Delete all tasks (as well as the task queue) for the given task type</li>
- * </ul>
- */
+/// Task related rest APIs.
+///
+/// - GET '/tasks/tasktypes': List all task types
+/// - GET '/tasks/{taskType}/state': Get the state (task queue state) for the given task type
+/// - GET '/tasks/{taskType}/tasks': List all tasks for the given task type
+/// - GET '/tasks/{taskType}/taskstates': Get a map from task to task state for the given task type
+/// - GET '/tasks/task/{taskName}/state': Get the task state for the given task
+/// - GET '/tasks/task/{taskName}/config': Get the task config (a list of child task configs) for the given
+///   task
+/// - POST '/tasks/schedule': Schedule tasks
+/// - POST '/tasks/execute': Execute an adhoc task
+/// - PUT '/tasks/{taskType}/cleanup': Clean up finished tasks (COMPLETED, FAILED) for the given task type
+/// - PUT '/tasks/{taskType}/stop': Stop all running/pending tasks (as well as the task queue) for the given task
+///   type
+/// - PUT '/tasks/{taskType}/resume': Resume all stopped tasks (as well as the task queue) for the given task
+///   type
+/// - DELETE '/tasks/{taskType}': Delete all tasks (as well as the task queue) for the given task type
 @Api(tags = Constants.TASK_TAG, authorizations = {
     @Authorization(value = SWAGGER_AUTHORIZATION_KEY),
     @Authorization(value = DATABASE)
