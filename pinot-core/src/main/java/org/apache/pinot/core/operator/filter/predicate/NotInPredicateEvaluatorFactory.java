@@ -144,6 +144,19 @@ public class NotInPredicateEvaluatorFactory {
         }
         return new BytesRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
+      // UUID is a logical type stored as 16 raw bytes, so -- like TIMESTAMP over LONG above -- convert the
+      // literals to their stored form and reuse the stored-type evaluator.
+      case UUID: {
+        ByteArray[] uuidValues = notInPredicate.getUuidValues();
+        Set<ByteArray> nonMatchingValues = new ObjectOpenHashSet<>(HashUtil.getMinHashSetSize(uuidValues.length));
+        // NOTE: Add value-by-value to avoid overhead
+        //noinspection ManualArrayToCollectionCopy
+        for (ByteArray value : uuidValues) {
+          //noinspection UseBulkOperation
+          nonMatchingValues.add(value);
+        }
+        return new BytesRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
+      }
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }
