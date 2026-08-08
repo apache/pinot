@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.realtime.impl.forward;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.MutableOffHeapByteArrayStore;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -98,6 +99,18 @@ public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
   @Override
   public Map<String, Object> getMap(int docId, ForwardIndexReaderContext context) {
     return MapUtils.deserializeMap(getBytes(docId));
+  }
+
+  @Override
+  @Nullable
+  public Object getMapValue(int docId, ForwardIndexReaderContext context, String key) {
+    return MapUtils.deserializeMapValue(_byteArrayStore.getByteBuffer(docId), key);
+  }
+
+  @Override
+  @Nullable
+  public String getMapValueAsString(int docId, ForwardIndexReaderContext context, String key) {
+    return MapUtils.deserializeMapValueAsString(_byteArrayStore.getByteBuffer(docId), key);
   }
 
   @Override
