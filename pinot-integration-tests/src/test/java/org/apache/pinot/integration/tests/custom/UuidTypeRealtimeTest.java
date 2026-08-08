@@ -16,30 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.aggregation.groupby.utils;
-
-import org.apache.pinot.spi.data.FieldSpec.DataType;
+package org.apache.pinot.integration.tests.custom;
 
 
-/// Factory for various implementations for [ValueToIdMap]
-public class ValueToIdMapFactory {
-  private ValueToIdMapFactory() {
+public class UuidTypeRealtimeTest extends UuidTypeTest {
+  private static final String REALTIME_TABLE_NAME = "UuidTypeRealtimeTest";
+
+  @Override
+  public String getTableName() {
+    return REALTIME_TABLE_NAME;
   }
 
-  public static ValueToIdMap get(DataType dataType) {
-    switch (dataType) {
-      case INT:
-        return new IntToIdMap();
-      case LONG:
-        return new LongToIdMap();
-      case FLOAT:
-        return new FloatToIdMap();
-      case DOUBLE:
-        return new DoubleToIdMap();
-      case UUID:
-        return new UuidToIdMap();
-      default:
-        return new ObjectToIdMap();
-    }
+  @Override
+  public boolean isRealtimeTable() {
+    return true;
   }
 }
