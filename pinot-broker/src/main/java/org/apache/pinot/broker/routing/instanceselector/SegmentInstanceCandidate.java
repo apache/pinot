@@ -24,9 +24,7 @@ import javax.annotation.concurrent.Immutable;
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID;
 
 
-/**
- * Represents an instance candidate for a segment.
- */
+/// Represents an instance candidate for a segment.
 @Immutable
 public class SegmentInstanceCandidate {
   private final String _instance;

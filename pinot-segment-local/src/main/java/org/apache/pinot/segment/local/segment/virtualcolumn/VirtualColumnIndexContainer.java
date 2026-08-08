@@ -29,9 +29,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 
 
-/**
- * Column index container for virtual columns.
- */
+/// Column index container for virtual columns.
 public class VirtualColumnIndexContainer implements ColumnIndexContainer {
   private final ForwardIndexReader<?> _forwardIndex;
   private final InvertedIndexReader<?> _invertedIndex;

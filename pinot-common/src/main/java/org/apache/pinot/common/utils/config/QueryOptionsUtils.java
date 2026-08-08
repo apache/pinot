@@ -36,9 +36,7 @@ import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOver
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
 
 
-/**
- * Utils to parse query options.
- */
+/// Utils to parse query options.
 public class QueryOptionsUtils {
   private QueryOptionsUtils() {
   }
@@ -297,21 +295,17 @@ public class QueryOptionsUtils {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_STAR_TREE));
   }
 
-  /**
-   * When true, use index-based distinct operators when applicable:
-   * {@link org.apache.pinot.core.operator.query.JsonIndexDistinctOperator} for JSON columns and
-   * {@link org.apache.pinot.core.operator.query.InvertedIndexDistinctOperator} for dictionary + inverted index columns.
-   * Set via query option useIndexBasedDistinctOperator=true.
-   */
+  /// When true, use index-based distinct operators when applicable:
+  /// [org.apache.pinot.core.operator.query.JsonIndexDistinctOperator] for JSON columns and
+  /// [org.apache.pinot.core.operator.query.InvertedIndexDistinctOperator] for dictionary + inverted index
+  /// columns. Set via query option useIndexBasedDistinctOperator=true.
   public static boolean isUseIndexBasedDistinctOperator(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_INDEX_BASED_DISTINCT_OPERATOR));
   }
 
-  /**
-   * Returns the cost ratio for the inverted-index-based distinct heuristic, or null if not set.
-   * The inverted index path is chosen when dictionaryCardinality * costRatio <= filteredDocCount.
-   * A cost ratio of 0 forces the inverted index path for any non-empty filter result.
-   */
+  /// Returns the cost ratio for the inverted-index-based distinct heuristic, or null if not set.
+  /// The inverted index path is chosen when dictionaryCardinality \* costRatio <= filteredDocCount.
+  /// A cost ratio of 0 forces the inverted index path for any non-empty filter result.
   @Nullable
   public static Double getInvertedIndexDistinctCostRatio(Map<String, String> queryOptions) {
     return checkedParseDoubleNonNegative(QueryOptionKey.INVERTED_INDEX_DISTINCT_COST_RATIO,
@@ -661,10 +655,8 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
-  /**
-   * Reads the {@code streamStats} query option that opts a single query into the {@code SubmitWithStream}
-   * dispatch path. See {@link QueryOptionKey#STREAM_STATS}.
-   */
+  /// Reads the `streamStats` query option that opts a single query into the `SubmitWithStream`
+  /// dispatch path. See [QueryOptionKey#STREAM_STATS].
   public static boolean isStreamStats(Map<String, String> queryOptions, boolean defaultValue) {
     String option = queryOptions.get(QueryOptionKey.STREAM_STATS);
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
@@ -842,18 +834,14 @@ public class QueryOptionsUtils {
 
   // --- Vector search query option accessors ---
 
-  /**
-   * Returns the configured nprobe value for IVF_FLAT vector search, or {@code null} if not set.
-   */
+  /// Returns the configured nprobe value for IVF_FLAT vector search, or `null` if not set.
   @Nullable
   public static Integer getVectorNprobe(Map<String, String> queryOptions) {
     String nprobe = queryOptions.get(QueryOptionKey.VECTOR_NPROBE);
     return checkedParseIntPositive(QueryOptionKey.VECTOR_NPROBE, nprobe);
   }
 
-  /**
-   * Returns whether exact rerank is enabled for vector search. Defaults to {@code false}.
-   */
+  /// Returns whether exact rerank is enabled for vector search. Defaults to `false`.
   public static boolean isVectorExactRerank(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.VECTOR_EXACT_RERANK));
   }
@@ -864,18 +852,14 @@ public class QueryOptionsUtils {
     return exactRerank != null ? Boolean.parseBoolean(exactRerank) : null;
   }
 
-  /**
-   * Returns the maximum number of ANN candidates for vector search, or {@code null} if not set.
-   */
+  /// Returns the maximum number of ANN candidates for vector search, or `null` if not set.
   @Nullable
   public static Integer getVectorMaxCandidates(Map<String, String> queryOptions) {
     String maxCandidates = queryOptions.get(QueryOptionKey.VECTOR_MAX_CANDIDATES);
     return checkedParseIntPositive(QueryOptionKey.VECTOR_MAX_CANDIDATES, maxCandidates);
   }
 
-  /**
-   * Returns the distance threshold for vector radius/threshold search, or {@code null} if not set.
-   */
+  /// Returns the distance threshold for vector radius/threshold search, or `null` if not set.
   @Nullable
   public static Float getVectorDistanceThreshold(Map<String, String> queryOptions) {
     String threshold = queryOptions.get(QueryOptionKey.VECTOR_DISTANCE_THRESHOLD);
@@ -897,27 +881,21 @@ public class QueryOptionsUtils {
     }
   }
 
-  /**
-   * Returns the configured efSearch value for HNSW vector search, or {@code null} if not set.
-   */
+  /// Returns the configured efSearch value for HNSW vector search, or `null` if not set.
   @Nullable
   public static Integer getVectorEfSearch(Map<String, String> queryOptions) {
     String efSearch = queryOptions.get(QueryOptionKey.VECTOR_EF_SEARCH);
     return checkedParseIntPositive(QueryOptionKey.VECTOR_EF_SEARCH, efSearch);
   }
 
-  /**
-   * Returns whether HNSW should use relative-distance competitive checks, or {@code null} if not set.
-   */
+  /// Returns whether HNSW should use relative-distance competitive checks, or `null` if not set.
   @Nullable
   public static Boolean getVectorUseRelativeDistance(Map<String, String> queryOptions) {
     return checkedParseBooleanNullable(QueryOptionKey.VECTOR_USE_RELATIVE_DISTANCE,
         queryOptions.get(QueryOptionKey.VECTOR_USE_RELATIVE_DISTANCE));
   }
 
-  /**
-   * Returns whether HNSW should use a bounded collector queue, or {@code null} if not set.
-   */
+  /// Returns whether HNSW should use a bounded collector queue, or `null` if not set.
   @Nullable
   public static Boolean getVectorUseBoundedQueue(Map<String, String> queryOptions) {
     return checkedParseBooleanNullable(QueryOptionKey.VECTOR_USE_BOUNDED_QUEUE,

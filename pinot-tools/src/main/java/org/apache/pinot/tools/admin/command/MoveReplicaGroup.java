@@ -55,11 +55,9 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Command to migrate a subset of replica group from current servers to the provided destination servers.
- * This command is intended to be run multiple times to migrate all the replicas of a table to the destination
- * servers (if intended).
- */
+/// Command to migrate a subset of replica group from current servers to the provided destination servers.
+/// This command is intended to be run multiple times to migrate all the replicas of a table to the destination
+/// servers (if intended).
 @CommandLine.Command(name = "MoveReplicaGroup", mixinStandardHelpOptions = true)
 public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(MoveReplicaGroup.class);

@@ -25,11 +25,9 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 
 
-/**
- * A Delta of delta implementation of {@link ChunkCompressor}, that simply returns the input uncompressed data
- * with performing delta of delta encoding. This is useful in cases where cost of de-compression out-weighs benefit of
- * compression.
- */
+/// A Delta of delta implementation of [ChunkCompressor], that simply returns the input uncompressed data
+/// with performing delta of delta encoding. This is useful in cases where cost of de-compression out-weighs benefit of
+/// compression.
 class DeltaDeltaCompressor implements ChunkCompressor {
 
   static final DeltaDeltaCompressor INSTANCE = new DeltaDeltaCompressor();
@@ -40,18 +38,16 @@ class DeltaDeltaCompressor implements ChunkCompressor {
   private DeltaDeltaCompressor() {
   }
 
-  /**
-   * The compression works by:
-   * (1) Storing the first value as-is
-   * (2) Computing and storing the first delta (difference between second and first value)
-   * (3) For all subsequent values, storing the difference between consecutive deltas (delta of delta)
-   * (4) During decompression, the process is reversed to reconstruct the original values
-   *
-   * The following scenarios data will be benefited from delta of delta compression
-   * The data is sorted
-   * The differences between consecutive values are relatively constant
-   * The data consists of integers (it's specifically designed for integer sequences)
-   * */
+  /// The compression works by:
+  /// (1) Storing the first value as-is
+  /// (2) Computing and storing the first delta (difference between second and first value)
+  /// (3) For all subsequent values, storing the difference between consecutive deltas (delta of delta)
+  /// (4) During decompression, the process is reversed to reconstruct the original values
+  ///
+  /// The following scenarios data will be benefited from delta of delta compression
+  /// The data is sorted
+  /// The differences between consecutive values are relatively constant
+  /// The data consists of integers (it's specifically designed for integer sequences)
   @Override
   public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
       throws IOException {

@@ -230,9 +230,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
         _helixResourceManager.getSegmentsZKMetadata(tableNameWithType2));
   }
 
-  /**
-   * Basic test to verify segment assignment and metadata without any failures
-   */
+  /// Basic test to verify segment assignment and metadata without any failures
   protected void testBasicSegmentAssignment() {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
 

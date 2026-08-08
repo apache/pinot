@@ -25,7 +25,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.Immutable;
 
 
-/// The {@code SegmentStates} contains the candidate instances for each segment, and the unavailable segments for
+/// The `SegmentStates` contains the candidate instances for each segment, and the unavailable segments for
 /// routing purpose.
 ///
 /// For old segments, the instance candidates should always have online flag set to true.
@@ -33,7 +33,6 @@ import javax.annotation.concurrent.Immutable;
 ///
 /// For new segments, the online flag within the instance candidates indicates whether the instance is online or not.
 /// We don't report new segments as unavailable segments because it is valid for new segments to be offline.
-///
 @Immutable
 public class SegmentStates {
   private final Map<String, List<SegmentInstanceCandidate>> _instanceCandidatesMap;

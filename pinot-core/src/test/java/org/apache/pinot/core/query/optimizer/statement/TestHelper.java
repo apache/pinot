@@ -33,10 +33,8 @@ class TestHelper {
     // Utility classes should not have a public or default constructor.
   }
 
-  /**
-   * Given two queries, this function will validate that the query obtained after rewriting the first query is the
-   * same as the second query.
-   */
+  /// Given two queries, this function will validate that the query obtained after rewriting the first query is the
+  /// same as the second query.
   static void assertEqualsQuery(String queryOriginal, String queryAfterRewrite, Schema schema) {
     PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(queryOriginal);
     OPTIMIZER.optimize(userQuery, schema);

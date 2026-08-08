@@ -33,9 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * BrokerManagedAsyncExecutorProvider provides a bounded thread pool.
- */
+/// BrokerManagedAsyncExecutorProvider provides a bounded thread pool.
 @ManagedAsyncExecutor
 public class BrokerManagedAsyncExecutorProvider extends ThreadPoolExecutorProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerManagedAsyncExecutorProvider.class);
@@ -87,14 +85,12 @@ public class BrokerManagedAsyncExecutorProvider extends ThreadPoolExecutorProvid
       _brokerMetrics = brokerMetrics;
     }
 
-    /**
-     * Reject the runnable if it can’t be accommodated by the thread pool.
-     *
-     * <p> Response returned will have SERVICE_UNAVAILABLE(503) error code with error msg.
-     *
-     * @param r Runnable
-     * @param executor ThreadPoolExecutor
-     */
+    /// Reject the runnable if it can’t be accommodated by the thread pool.
+    ///
+    /// Response returned will have SERVICE_UNAVAILABLE(503) error code with error msg.
+    ///
+    /// @param r Runnable
+    /// @param executor ThreadPoolExecutor
     @Override
     public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_REJECTED_EXCEPTIONS, 1L);

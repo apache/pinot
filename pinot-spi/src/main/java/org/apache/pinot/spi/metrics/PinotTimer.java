@@ -21,24 +21,18 @@ package org.apache.pinot.spi.metrics;
 import java.util.concurrent.TimeUnit;
 
 
-/**
- * A timer metric which aggregates timing durations and provides duration statistics, plus
- * throughput statistics via {@link PinotMeter}.
- */
+/// A timer metric which aggregates timing durations and provides duration statistics, plus
+/// throughput statistics via [PinotMeter].
 public interface PinotTimer extends PinotMetered {
 
-  /**
-   * Adds a recorded duration. It's basically the same as using time() and then stop().
-   * Hereby we can update the time duration by calling just one method.
-   * This is used to log the time span of each of the phase during query execution in Pinot.
-   *
-   * @param duration the length of the duration
-   * @param unit     the scale unit of {@code duration}
-   */
+  /// Adds a recorded duration. It's basically the same as using time() and then stop().
+  /// Hereby we can update the time duration by calling just one method.
+  /// This is used to log the time span of each of the phase during query execution in Pinot.
+  ///
+  /// @param duration the length of the duration
+  /// @param unit     the scale unit of `duration`
   void update(long duration, TimeUnit unit);
 
-  /**
-   * Returns the actual object of timer.
-   */
+  /// Returns the actual object of timer.
   Object getTimer();
 }

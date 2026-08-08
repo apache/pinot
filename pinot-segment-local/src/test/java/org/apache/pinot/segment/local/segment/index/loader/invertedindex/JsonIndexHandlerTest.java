@@ -49,7 +49,7 @@ import static org.testng.Assert.assertTrue;
 public class JsonIndexHandlerTest {
   private static final String COLUMN = "details";
 
-  /** FieldIndexConfigs that explicitly has no JSON index — used for the "column removed" tests. */
+  /// FieldIndexConfigs that explicitly has no JSON index — used for the "column removed" tests.
   private static final FieldIndexConfigs NO_JSON = new FieldIndexConfigs.Builder().build();
 
   @Test

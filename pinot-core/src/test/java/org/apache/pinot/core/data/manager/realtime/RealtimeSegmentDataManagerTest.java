@@ -1216,13 +1216,11 @@ public class RealtimeSegmentDataManagerTest {
     runCompletionModeDownloadTest("", "", expectedResult);
   }
 
-  /**
-   * Helper method to run completion mode download tests with different download URL scenarios.
-   *
-   * @param freshMetadataDownloadUrl The download URL returned by fetchZKMetadata (fresh metadata)
-   * @param initialSegmentDownloadUrl The download URL in the initial segment metadata
-   * @param expectedResult The expected test result (state and buildAndReplaceCalled flag)
-   */
+  /// Helper method to run completion mode download tests with different download URL scenarios.
+  ///
+  /// @param freshMetadataDownloadUrl The download URL returned by fetchZKMetadata (fresh metadata)
+  /// @param initialSegmentDownloadUrl The download URL in the initial segment metadata
+  /// @param expectedResult The expected test result (state and buildAndReplaceCalled flag)
   private void runCompletionModeDownloadTest(String freshMetadataDownloadUrl,
       String initialSegmentDownloadUrl, TestResult expectedResult)
       throws Exception {
@@ -1261,9 +1259,7 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
-  /**
-   * Creates a table config with DOWNLOAD completion mode.
-   */
+  /// Creates a table config with DOWNLOAD completion mode.
   private TableConfig createTableConfigWithDownloadCompletionMode()
       throws Exception {
     TableConfig tableConfig = createTableConfig();
@@ -1272,9 +1268,7 @@ public class RealtimeSegmentDataManagerTest {
     return tableConfig;
   }
 
-  /**
-   * Creates a mock table data manager that returns the specified download URL in fresh metadata.
-   */
+  /// Creates a mock table data manager that returns the specified download URL in fresh metadata.
   private RealtimeTableDataManager createMockTableDataManager(String downloadUrl) {
     RealtimeTableDataManager mockTableDataManager = mock(RealtimeTableDataManager.class);
     when(mockTableDataManager.getInstanceId()).thenReturn("server-1");
@@ -1299,9 +1293,7 @@ public class RealtimeSegmentDataManagerTest {
     return mockTableDataManager;
   }
 
-  /**
-   * Executes the consumer with a KEEP response to trigger the completion mode logic.
-   */
+  /// Executes the consumer with a KEEP response to trigger the completion mode logic.
   private void executeConsumerWithKeepResponse(FakeRealtimeSegmentDataManager segmentDataManager) {
     RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset endOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
@@ -1316,28 +1308,20 @@ public class RealtimeSegmentDataManagerTest {
     consumer.run();
   }
 
-  /**
-   * Helper class to encapsulate expected test results for segment state transitions.
-   * <p>
-   * This class holds the expected state of a {@link RealtimeSegmentDataManager} after a test,
-   * as well as whether the build-and-replace operation was expected to be called.
-   */
+  /// Helper class to encapsulate expected test results for segment state transitions.
+  ///
+  /// This class holds the expected state of a [RealtimeSegmentDataManager] after a test,
+  /// as well as whether the build-and-replace operation was expected to be called.
   private static class TestResult {
-    /**
-     * The expected state of the {@link RealtimeSegmentDataManager} after the test execution.
-     */
+    /// The expected state of the [RealtimeSegmentDataManager] after the test execution.
     final RealtimeSegmentDataManager.State _expectedState;
-    /**
-     * Whether the build-and-replace operation was expected to be called during the test.
-     */
+    /// Whether the build-and-replace operation was expected to be called during the test.
     final boolean _expectedBuildAndReplaceCalled;
 
-    /**
-     * Constructs a TestResult with the expected state and build-and-replace flag.
-     *
-     * @param expectedState The expected state of the segment manager after the test.
-     * @param expectedBuildAndReplaceCalled Whether build-and-replace was expected to be called.
-     */
+    /// Constructs a TestResult with the expected state and build-and-replace flag.
+    ///
+    /// @param expectedState The expected state of the segment manager after the test.
+    /// @param expectedBuildAndReplaceCalled Whether build-and-replace was expected to be called.
     TestResult(RealtimeSegmentDataManager.State expectedState, boolean expectedBuildAndReplaceCalled) {
       _expectedState = expectedState;
       _expectedBuildAndReplaceCalled = expectedBuildAndReplaceCalled;

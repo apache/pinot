@@ -33,9 +33,7 @@ import org.joda.time.MutableDateTime;
 import org.joda.time.format.DateTimeFormatter;
 
 
-/**
- * Equivalent to {@code DateTimeConversionTransformFunction}.
- */
+/// Equivalent to `DateTimeConversionTransformFunction`.
 public class DateTimeConvert {
   private DateTimeFormatSpec _inputFormatSpec;
   private DateTimeFormatSpec _outputFormatSpec;

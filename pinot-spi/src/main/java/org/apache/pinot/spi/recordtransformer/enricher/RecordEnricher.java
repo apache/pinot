@@ -27,9 +27,7 @@ import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 /// TODO: Clean up this interface as it is the same as [RecordTransformer].
 public interface RecordEnricher extends RecordTransformer {
 
-  /**
-   * Enriches the given record, by adding new columns to the same record.
-   */
+  /// Enriches the given record, by adding new columns to the same record.
   void enrich(GenericRow record);
 
   @Override

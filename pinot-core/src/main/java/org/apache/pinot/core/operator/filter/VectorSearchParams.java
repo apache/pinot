@@ -24,21 +24,19 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 
 
-/**
- * Immutable parameter object carrying vector search query options from the broker through to
- * segment-level execution. Constructed once per query from {@code QueryContext.getQueryOptions()}.
- *
- * <p>All fields have sensible defaults so that queries without vector-specific options behave
- * identically to the existing HNSW path (backward compatible).</p>
- *
- * <p>This class is thread-safe (immutable).</p>
- */
+/// Immutable parameter object carrying vector search query options from the broker through to
+/// segment-level execution. Constructed once per query from `QueryContext.getQueryOptions()`.
+///
+/// All fields have sensible defaults so that queries without vector-specific options behave
+/// identically to the existing HNSW path (backward compatible).
+///
+/// This class is thread-safe (immutable).
 public final class VectorSearchParams {
 
-  /** Default nprobe for IVF_FLAT when the query option is not set. */
+  /// Default nprobe for IVF_FLAT when the query option is not set.
   public static final int DEFAULT_NPROBE = 4;
 
-  /** Singleton instance with all defaults, used when no query options are specified. */
+  /// Singleton instance with all defaults, used when no query options are specified.
   public static final VectorSearchParams DEFAULT =
       new VectorSearchParams(null, null, null, null, null, null, null);
 
@@ -56,18 +54,16 @@ public final class VectorSearchParams {
   @Nullable
   private final Boolean _hnswUseBoundedQueue;
 
-  /**
-   * Full constructor with all query option values.
-   *
-   * @param nprobe number of IVF probes, or null for default
-   * @param exactRerankOverride whether to re-score ANN candidates with exact distance, or null to use the backend
-   *                           default
-   * @param maxCandidates max candidates before final top-K, or null for default (topK * 10)
-   * @param distanceThreshold distance threshold for radius search, or null for top-K mode
-   * @param efSearch HNSW efSearch parameter, or null to use default
-   * @param hnswUseRelativeDistance HNSW relative-distance check toggle, or null to use default
-   * @param hnswUseBoundedQueue HNSW bounded queue toggle, or null to use default
-   */
+  /// Full constructor with all query option values.
+  ///
+  /// @param nprobe number of IVF probes, or null for default
+  /// @param exactRerankOverride whether to re-score ANN candidates with exact distance, or null to use the backend
+  ///                           default
+  /// @param maxCandidates max candidates before final top-K, or null for default (topK \* 10)
+  /// @param distanceThreshold distance threshold for radius search, or null for top-K mode
+  /// @param efSearch HNSW efSearch parameter, or null to use default
+  /// @param hnswUseRelativeDistance HNSW relative-distance check toggle, or null to use default
+  /// @param hnswUseBoundedQueue HNSW bounded queue toggle, or null to use default
   public VectorSearchParams(@Nullable Integer nprobe, @Nullable Boolean exactRerankOverride,
       @Nullable Integer maxCandidates, @Nullable Float distanceThreshold, @Nullable Integer efSearch,
       @Nullable Boolean hnswUseRelativeDistance, @Nullable Boolean hnswUseBoundedQueue) {
@@ -82,13 +78,11 @@ public final class VectorSearchParams {
     _hnswUseBoundedQueue = hnswUseBoundedQueue;
   }
 
-  /**
-   * Creates a {@link VectorSearchParams} from the query options map, extracting all
-   * vector-specific options. Returns {@link #DEFAULT} if no vector options are present.
-   *
-   * @param queryOptions the query options map (may be null or empty)
-   * @return the search params
-   */
+  /// Creates a [VectorSearchParams] from the query options map, extracting all
+  /// vector-specific options. Returns [#DEFAULT] if no vector options are present.
+  ///
+  /// @param queryOptions the query options map (may be null or empty)
+  /// @return the search params
   public static VectorSearchParams fromQueryOptions(@Nullable Map<String, String> queryOptions) {
     if (queryOptions == null || queryOptions.isEmpty()) {
       return DEFAULT;
@@ -111,16 +105,12 @@ public final class VectorSearchParams {
         hnswUseRelativeDistance, hnswUseBoundedQueue);
   }
 
-  /**
-   * Returns the nprobe value for IVF_FLAT index search.
-   */
+  /// Returns the nprobe value for IVF_FLAT index search.
   public int getNprobe() {
     return _nprobe;
   }
 
-  /**
-   * Returns whether exact rerank is enabled.
-   */
+  /// Returns whether exact rerank is enabled.
   public boolean isExactRerank(VectorBackendType backendType) {
     return _exactRerankOverride != null ? _exactRerankOverride : backendType.defaultExactRerankEnabled();
   }
@@ -130,15 +120,13 @@ public final class VectorSearchParams {
     return _exactRerankOverride;
   }
 
-  /**
-   * Returns the effective max candidates for a given top-K value.
-   * If maxCandidates was explicitly set, returns that value.
-   * Otherwise, returns {@code topK * 10} as the default.
-   *
-   * @param topK the top-K value from the predicate
-   * @param numDocs the number of documents in the segment
-   * @return effective max candidates
-   */
+  /// Returns the effective max candidates for a given top-K value.
+  /// If maxCandidates was explicitly set, returns that value.
+  /// Otherwise, returns `topK * 10` as the default.
+  ///
+  /// @param topK the top-K value from the predicate
+  /// @param numDocs the number of documents in the segment
+  /// @return effective max candidates
   public int getEffectiveMaxCandidates(int topK, int numDocs) {
     int requested = _maxCandidatesExplicit ? _maxCandidates : topK * 10;
     if (numDocs <= 0) {
@@ -149,46 +137,34 @@ public final class VectorSearchParams {
     return Math.min(effectiveMaxCandidates, numDocs);
   }
 
-  /**
-   * Returns whether maxCandidates was explicitly set by the user.
-   */
+  /// Returns whether maxCandidates was explicitly set by the user.
   public boolean isMaxCandidatesExplicit() {
     return _maxCandidatesExplicit;
   }
 
-  /**
-   * Returns the distance threshold for radius/threshold search, or NaN if not set.
-   */
+  /// Returns the distance threshold for radius/threshold search, or NaN if not set.
   public float getDistanceThreshold() {
     return _distanceThreshold;
   }
 
-  /**
-   * Returns true if a distance threshold is set, indicating radius/threshold search mode.
-   */
+  /// Returns true if a distance threshold is set, indicating radius/threshold search mode.
   public boolean hasDistanceThreshold() {
     return _hasDistanceThreshold;
   }
 
-  /**
-   * Returns the efSearch value for HNSW index search, or {@code null} if not set.
-   */
+  /// Returns the efSearch value for HNSW index search, or `null` if not set.
   @Nullable
   public Integer getEfSearch() {
     return _efSearch;
   }
 
-  /**
-   * Returns whether HNSW should use relative-distance checks, or {@code null} if not explicitly set.
-   */
+  /// Returns whether HNSW should use relative-distance checks, or `null` if not explicitly set.
   @Nullable
   public Boolean getHnswUseRelativeDistance() {
     return _hnswUseRelativeDistance;
   }
 
-  /**
-   * Returns whether HNSW should use bounded queue mode, or {@code null} if not explicitly set.
-   */
+  /// Returns whether HNSW should use bounded queue mode, or `null` if not explicitly set.
   @Nullable
   public Boolean getHnswUseBoundedQueue() {
     return _hnswUseBoundedQueue;

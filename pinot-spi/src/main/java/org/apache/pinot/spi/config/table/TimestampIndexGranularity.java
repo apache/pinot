@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.spi.config.table;
 
-/**
- * TimestampIndexGranularity is the enum of different time granularities from MILLIS to YEAR.
- */
+/// TimestampIndexGranularity is the enum of different time granularities from MILLIS to YEAR.
 public enum TimestampIndexGranularity {
   MILLISECOND, SECOND, MINUTE, HOUR, DAY, WEEK, MONTH, QUARTER, YEAR
 }

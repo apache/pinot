@@ -26,12 +26,11 @@ import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
 
 
-/**
- * H3 Index creator that uses on-heap memory.
- * <p>On-heap creator uses more heap memory, but is cheaper on computation and does not flush data to disk which can
- * slow down the creation because of the IO latency. Use on-heap creator in the environment where there is enough heap
- * memory and garbage collection won't cause performance issue (e.g. Hadoop/Spark/Pinot Minion).
- */
+/// H3 Index creator that uses on-heap memory.
+///
+/// On-heap creator uses more heap memory, but is cheaper on computation and does not flush data to disk which can
+/// slow down the creation because of the IO latency. Use on-heap creator in the environment where there is enough heap
+/// memory and garbage collection won't cause performance issue (e.g. Hadoop/Spark/Pinot Minion).
 public class OnHeapH3IndexCreator extends BaseH3IndexCreator {
 
   public OnHeapH3IndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,

@@ -25,20 +25,15 @@ import org.apache.pinot.spi.data.readers.ColumnarDataSource;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * ColumnarDataSource implementation that wraps a Pinot segment.
- * Provides columnar access to segment data via ColumnReaderFactory.
- */
+/// ColumnarDataSource implementation that wraps a Pinot segment.
+/// Provides columnar access to segment data via ColumnReaderFactory.
 public class PinotSegmentColumnarDataSource implements ColumnarDataSource {
 
   private final IndexSegment _indexSegment;
   private final int _totalDocs;
   private final RoaringBitmap _validDocIds;
 
-  /**
-   * @param indexSegment Source segment to read from
-   *
-   */
+  /// @param indexSegment Source segment to read from
   public PinotSegmentColumnarDataSource(IndexSegment indexSegment, RoaringBitmap validDocIds) {
     _indexSegment = indexSegment;
     _totalDocs = indexSegment.getSegmentMetadata().getTotalDocs();

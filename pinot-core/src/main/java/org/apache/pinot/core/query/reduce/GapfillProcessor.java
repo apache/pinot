@@ -43,9 +43,7 @@ import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
-/**
- * Helper class to reduce and set gap fill results into the BrokerResponseNative
- */
+/// Helper class to reduce and set gap fill results into the BrokerResponseNative
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class GapfillProcessor extends BaseGapfillProcessor {
 
@@ -61,12 +59,10 @@ public class GapfillProcessor extends BaseGapfillProcessor {
     _groupByKeys = new HashSet<>();
   }
 
-  /**
-   * Here are three things that happen
-   * 1. Sort the result sets from all pinot servers based on timestamp
-   * 2. Gapfill the data for missing entities per time bucket
-   * 3. Aggregate the dataset per time bucket.
-   */
+  /// Here are three things that happen
+  /// 1. Sort the result sets from all pinot servers based on timestamp
+  /// 2. Gapfill the data for missing entities per time bucket
+  /// 3. Aggregate the dataset per time bucket.
   public void process(BrokerResponseNative brokerResponseNative) {
     DataSchema dataSchema = brokerResponseNative.getResultTable().getDataSchema();
     replaceColumnNameWithAlias(dataSchema);
@@ -338,9 +334,7 @@ public class GapfillProcessor extends BaseGapfillProcessor {
     }
   }
 
-  /**
-   * Merge all result tables from different pinot servers and sort the rows based on timebucket.
-   */
+  /// Merge all result tables from different pinot servers and sort the rows based on timebucket.
   private List<Object[]>[] putRawRowsIntoTimeBucket(List<Object[]> rows) {
     List<Object[]>[] bucketedItems = new List[_numOfTimeBuckets];
 

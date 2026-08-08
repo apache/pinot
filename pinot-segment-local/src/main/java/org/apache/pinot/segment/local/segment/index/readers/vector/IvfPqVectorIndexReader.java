@@ -40,18 +40,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Reader for IVF_PQ (Inverted File with residual Product Quantization) index.
- *
- * <p>The reader loads the entire index into memory and performs ANN search by probing the
- * nearest coarse centroids, then scoring candidates with either asymmetric L2 lookup tables
- * or full reconstructed-vector distance evaluation for non-L2 metrics.</p>
- */
+/// Reader for IVF_PQ (Inverted File with residual Product Quantization) index.
+///
+/// The reader loads the entire index into memory and performs ANN search by probing the
+/// nearest coarse centroids, then scoring candidates with either asymmetric L2 lookup tables
+/// or full reconstructed-vector distance evaluation for non-L2 metrics.
 public class IvfPqVectorIndexReader
     implements FilterAwareVectorIndexReader, ApproximateRadiusVectorIndexReader, NprobeAware {
   private static final Logger LOGGER = LoggerFactory.getLogger(IvfPqVectorIndexReader.class);
 
-  /** Default nprobe value when not explicitly configured. */
+  /// Default nprobe value when not explicitly configured.
   static final int DEFAULT_NPROBE = 4;
 
   private final int _dimension;
@@ -78,25 +76,21 @@ public class IvfPqVectorIndexReader
   private final PinotDataBuffer _buffer;
   private final boolean _ownsBuffer;
 
-  /**
-   * Opens and loads an IVF_PQ index from the given buffer. The reader takes ownership of the
-   * buffer and closes it in {@link #close()}; use the four-arg overload to pass a borrowed
-   * buffer (e.g. one owned by the segment directory).
-   */
+  /// Opens and loads an IVF_PQ index from the given buffer. The reader takes ownership of the
+  /// buffer and closes it in [#close()]; use the four-arg overload to pass a borrowed
+  /// buffer (e.g. one owned by the segment directory).
   public IvfPqVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config) {
     this(column, buffer, config, /* ownsBuffer */ true);
   }
 
-  /**
-   * Opens and loads an IVF_PQ index from the given buffer.
-   *
-   * @param column      the column name
-   * @param buffer      the IVF_PQ index buffer (mapped or in-memory)
-   * @param config      vector index configuration
-   * @param ownsBuffer  when {@code true}, the reader closes the buffer in {@link #close()} (or
-   *                    on constructor failure). Pass {@code false} when the buffer is owned by
-   *                    the segment directory (typed entry inside {@code columns.psf}).
-   */
+  /// Opens and loads an IVF_PQ index from the given buffer.
+  ///
+  /// @param column      the column name
+  /// @param buffer      the IVF_PQ index buffer (mapped or in-memory)
+  /// @param config      vector index configuration
+  /// @param ownsBuffer  when `true`, the reader closes the buffer in [#close()] (or
+  ///                    on constructor failure). Pass `false` when the buffer is owned by
+  ///                    the segment directory (typed entry inside `columns.psf`).
   public IvfPqVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config,
       boolean ownsBuffer) {
     _column = column;

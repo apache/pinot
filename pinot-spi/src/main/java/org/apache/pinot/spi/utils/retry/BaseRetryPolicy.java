@@ -21,11 +21,10 @@ package org.apache.pinot.spi.utils.retry;
 import java.util.concurrent.Callable;
 
 
-/**
- * The {@link BaseRetryPolicy} is the base class for all retry policies. To implement a new retry policy, extends
- * this class and implements the method {@link #getDelayMs(int)}.
- * <p>NOTE: All the retry policies should be stateless so that they can be cached and reused.
- */
+/// The [BaseRetryPolicy] is the base class for all retry policies. To implement a new retry policy, extends
+/// this class and implements the method [#getDelayMs(int)].
+///
+/// NOTE: All the retry policies should be stateless so that they can be cached and reused.
 public abstract class BaseRetryPolicy implements RetryPolicy {
   private final int _maxNumAttempts;
 
@@ -33,12 +32,10 @@ public abstract class BaseRetryPolicy implements RetryPolicy {
     _maxNumAttempts = maxNumAttempts;
   }
 
-  /**
-   * Gets the delay in milliseconds before the next attempt.
-   *
-   * @param currentAttempt Current attempt number
-   * @return Delay in milliseconds
-   */
+  /// Gets the delay in milliseconds before the next attempt.
+  ///
+  /// @param currentAttempt Current attempt number
+  /// @return Delay in milliseconds
   protected abstract long getDelayMs(int currentAttempt);
 
   @Override

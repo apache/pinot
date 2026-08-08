@@ -54,9 +54,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 
 
-/**
- * Queries test for BIG_DECIMAL data type.
- */
+/// Queries test for BIG_DECIMAL data type.
 public class BigDecimalQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "BigDecimalQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";

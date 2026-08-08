@@ -26,9 +26,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.glassfish.grizzly.http.server.Request;
 
 
-/**
- * Identity container for HTTP requests with (optional) authorization headers
- */
+/// Identity container for HTTP requests with (optional) authorization headers
 public class HttpRequesterIdentity extends RequesterIdentity {
   private Multimap<String, String> _httpHeaders;
   private String _endpointUrl;
@@ -59,12 +57,10 @@ public class HttpRequesterIdentity extends RequesterIdentity {
     _endpointUrl = endpointUrl;
   }
 
-  /**
-   * If reverse proxy is used X-Forwarded-For will be populated
-   * If X-Forwarded-For is not present, check if x-real-ip is present
-   * Since X-Forwarded-For can contain comma separated list of values, we convert it to ";" delimiter to avoid
-   * downstream parsing errors for other fields where "," is being used
-   */
+  /// If reverse proxy is used X-Forwarded-For will be populated
+  /// If X-Forwarded-For is not present, check if x-real-ip is present
+  /// Since X-Forwarded-For can contain comma separated list of values, we convert it to ";" delimiter to avoid
+  /// downstream parsing errors for other fields where "," is being used
   @Override
   public String getClientIp() {
     if (_httpHeaders != null) {

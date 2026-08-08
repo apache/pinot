@@ -32,17 +32,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * ColumnReaderFactory implementation for immutable Pinot segments.
- *
- * <p>This factory creates ColumnReader instances for reading data from Pinot segments
- * in a columnar fashion. It handles:
- * <ul>
- *   <li>Creating readers for existing columns in the segment</li>
- *   <li>Creating default value readers for new columns</li>
- *   <li>Resource management for all created readers</li>
- * </ul>
- */
+/// ColumnReaderFactory implementation for immutable Pinot segments.
+///
+/// This factory creates ColumnReader instances for reading data from Pinot segments
+/// in a columnar fashion. It handles:
+///
+/// - Creating readers for existing columns in the segment
+/// - Creating default value readers for new columns
+/// - Resource management for all created readers
 public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentColumnReaderFactory.class);
 
@@ -53,27 +50,23 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
   private final boolean _skipDefaultNullValues;
   private final boolean _initializeDefaultValueReaders;
 
-  /**
-   * Create a PinotSegmentColumnReaderFactory.
-   *
-   * @param indexSegment Source segment to read from
-   */
+  /// Create a PinotSegmentColumnReaderFactory.
+  ///
+  /// @param indexSegment Source segment to read from
   public PinotSegmentColumnReaderFactory(IndexSegment indexSegment) {
     this(indexSegment, false, true);
   }
 
-  /**
-   * Create a PinotSegmentColumnReaderFactory.
-   *
-   * @param indexSegment Source segment to read from
-   * @param skipDefaultNullValues Whether to read null values as default values or as nulls
-   *                              If true, nulls will be read as nulls.
-   *                              If false, nulls will be read as default values.
-   * @param initializeDefaultValueReaders Whether to initialize default value readers for missing columns
-   *           TODO - Ideally this factory shouldn't initialize default value readers.
-   *                  The clients of this factory should decide whether to create default value readers or not.
-   *                  This parameter is kept for backward compatibility and will be removed in future.
-   */
+  /// Create a PinotSegmentColumnReaderFactory.
+  ///
+  /// @param indexSegment Source segment to read from
+  /// @param skipDefaultNullValues Whether to read null values as default values or as nulls
+  ///                              If true, nulls will be read as nulls.
+  ///                              If false, nulls will be read as default values.
+  /// @param initializeDefaultValueReaders Whether to initialize default value readers for missing columns
+  ///           TODO - Ideally this factory shouldn't initialize default value readers.
+  ///                  The clients of this factory should decide whether to create default value readers or not.
+  ///                  This parameter is kept for backward compatibility and will be removed in future.
   public PinotSegmentColumnReaderFactory(IndexSegment indexSegment, boolean skipDefaultNullValues,
       boolean initializeDefaultValueReaders) {
     _indexSegment = indexSegment;
@@ -103,11 +96,9 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
     return _indexSegment.getPhysicalColumnNames();
   }
 
-  /**
-   * Get the total number of documents/rows in the data source.
-   *
-   * @return Total number of documents
-   */
+  /// Get the total number of documents/rows in the data source.
+  ///
+  /// @return Total number of documents
   public int getNumDocs() {
     return _indexSegment.getSegmentMetadata().getTotalDocs();
   }
@@ -121,10 +112,8 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
     return _columnReaders.get(columnName);
   }
 
-  /**
-   * Internal method to create a column reader for the specified column.
-   * This method is called during initialization to create all readers.
-   */
+  /// Internal method to create a column reader for the specified column.
+  /// This method is called during initialization to create all readers.
   @Nullable
   private ColumnReader createColumnReader(String columnName, FieldSpec targetFieldSpec) {
     if (targetFieldSpec.isVirtualColumn()) {
@@ -153,9 +142,7 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
     return _columnReaders;
   }
 
-  /**
-   * Internal method to initialize all column readers during factory initialization.
-   */
+  /// Internal method to initialize all column readers during factory initialization.
   private Map<String, ColumnReader> initializeAllColumnReaders() {
     if (_targetSchema == null) {
       throw new IllegalStateException("Factory not initialized. Call init() first.");
@@ -178,12 +165,10 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
     return allReaders;
   }
 
-  /**
-   * Check if the specified column exists in the source data.
-   *
-   * @param columnName Column name to check
-   * @return true if the column exists in source, false otherwise
-   */
+  /// Check if the specified column exists in the source data.
+  ///
+  /// @param columnName Column name to check
+  /// @return true if the column exists in source, false otherwise
   public boolean hasColumn(String columnName) {
     return _indexSegment.getPhysicalColumnNames().contains(columnName);
   }

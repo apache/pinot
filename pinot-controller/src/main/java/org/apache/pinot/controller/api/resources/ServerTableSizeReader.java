@@ -34,10 +34,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Get the size information details from the server. Only the servers returning success are returned by the method
- * For servers returning errors (http error or otherwise), no entry is created in the return map
- */
+/// Get the size information details from the server. Only the servers returning success are returned by the method
+/// For servers returning errors (http error or otherwise), no entry is created in the return map
 public class ServerTableSizeReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerTableSizeReader.class);
 
@@ -94,7 +92,7 @@ public class ServerTableSizeReader {
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     boolean requestCompressionStats = includeCompressionStats || includeColumnCompressionStats;
     for (String endpoint : endpointsToServers.keySet()) {
-      String tableSizeUri = endpoint + "/table/" + tableNameWithType + "/size"
+      String tableSizeUri = endpoint + "/tables/" + tableNameWithType + "/size"
           + (requestCompressionStats ? "?includeCompressionStats=true" : "")
           + (includeColumnCompressionStats ? "&includeColumnCompressionStats=true" : "");
       serverUrls.add(tableSizeUri);

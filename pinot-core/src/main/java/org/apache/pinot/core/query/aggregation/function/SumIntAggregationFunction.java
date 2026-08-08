@@ -32,17 +32,15 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * Specialized INT sum aggregation function that avoids type conversion overhead.
- * This function is optimized for INT columns and uses native INT arithmetic.
- *
- * Performance optimizations:
- * - Direct INT arithmetic without DOUBLE conversion
- * - Vectorized operations for better CPU utilization
- * - Minimal object allocations
- * - Optimized for the specific case of INT column aggregation
- * - Proper null handling support using foldNotNull and forEachNotNull
- */
+/// Specialized INT sum aggregation function that avoids type conversion overhead.
+/// This function is optimized for INT columns and uses native INT arithmetic.
+///
+/// Performance optimizations:
+/// - Direct INT arithmetic without DOUBLE conversion
+/// - Vectorized operations for better CPU utilization
+/// - Minimal object allocations
+/// - Optimized for the specific case of INT column aggregation
+/// - Proper null handling support using foldNotNull and forEachNotNull
 public class SumIntAggregationFunction extends NullableSingleInputAggregationFunction<Long, Long> {
   public static final String FUNCTION_NAME = "sumInt";
   private static final long DEFAULT_VALUE = 0L;

@@ -50,9 +50,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Queries test for TIMESTAMP data type.
- */
+/// Queries test for TIMESTAMP data type.
 public class TimestampQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TimestampQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";

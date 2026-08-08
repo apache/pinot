@@ -37,7 +37,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/// Focused unit tests for {@link PinotHelixResourceManager#getAllRawMaterializedViewNames}.
+/// Focused unit tests for [PinotHelixResourceManager#getAllRawMaterializedViewNames].
 ///
 /// The filter is a five-line pipeline over `getAllResources()` whose correctness hinges on three
 /// contracts: (1) skipping REALTIME resources without a ZK fetch, (2) reading the canonical

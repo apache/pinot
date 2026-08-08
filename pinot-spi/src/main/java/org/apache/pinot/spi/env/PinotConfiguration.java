@@ -38,57 +38,48 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * <p>
- * Provides a configuration abstraction for Pinot to decouple services from configuration sources and frameworks.
- * </p>
- * <p>
- * Pinot services may retrieve configurations from PinotConfiguration independently from any source of configuration.
- * {@link PinotConfiguration} currently supports configuration loaded from the following sources :
- *
- * <ul>
- * <li>Apache Commons {@link Configuration} (see {@link #PinotConfiguration(Configuration)})</li>
- * <li>Generic key-value properties provided with a {@link Map} (see
- * {@link PinotConfiguration#PinotConfiguration(Map)}</li>
- * <li>Environment variables through env.dynamic.config (see {@link PinotConfiguration#PinotConfiguration(Map, Map)}
- * </li>
- * <li>{@link PinotFSSpec} (see {@link PinotConfiguration#PinotConfiguration(PinotFSSpec)}</li>
- * </ul>
- * </p>
- * <p>
- * These different sources will all merged in an underlying {@link CompositeConfiguration} for which all
- * configuration keys will have
- * been sanitized.
- * Through this mechanism, properties can be configured and retrieved with kebab case, camel case and snake case
- * conventions.
- * </p>
- * <strong>Dynamic configuration</strong>
- * <p>
- * In order to enable loading configurations through environment variables you can specify
- * {@value ENV_DYNAMIC_CONFIG_KEY} as a list of property keys to dynamically template.
- * {@link PinotConfiguration#applyDynamicEnvConfig(List, Map)}}. This enables loading secrets safely
- * into the configuration.
- * <p/>
- * <table>
- * <tr>
- * <th>Property</th>
- * <th>Note</th>
- * </tr>
- * <tr>
- * <td>module.sub-module.alerts.email-address</td>
- * <td>Kebab case, which is recommended for use in .properties and .yml files.</td>
- * </tr>
- * <tr>
- * <td>module.subModule.alerts.emailAddress</td>
- * <td>Standard camel case syntax.</td>
- * </tr>
- * <tr>
- * <td>controller.sub_module.alerts.email_address</td>
- * <td>Snake case notation, which is an alternative format for use in .properties and .yml files.</td>
- * </tr>
- * </table>
- *
- */
+/// Provides a configuration abstraction for Pinot to decouple services from configuration sources and frameworks.
+///
+/// Pinot services may retrieve configurations from PinotConfiguration independently from any source of configuration.
+/// [PinotConfiguration] currently supports configuration loaded from the following sources :
+///
+/// - Apache Commons [Configuration] (see [#PinotConfiguration(Configuration)])
+/// - Generic key-value properties provided with a [Map] (see
+///   [PinotConfiguration#PinotConfiguration(Map)]
+/// - Environment variables through env.dynamic.config (see [PinotConfiguration#PinotConfiguration(Map, Map)]
+/// - [PinotFSSpec] (see [PinotConfiguration#PinotConfiguration(PinotFSSpec)]
+///
+/// These different sources will all merged in an underlying [CompositeConfiguration] for which all
+/// configuration keys will have
+/// been sanitized.
+/// Through this mechanism, properties can be configured and retrieved with kebab case, camel case and snake case
+/// conventions.
+///
+/// **Dynamic configuration**
+///
+/// In order to enable loading configurations through environment variables you can specify
+/// {@value ENV_DYNAMIC_CONFIG_KEY} as a list of property keys to dynamically template.
+/// [PinotConfiguration#applyDynamicEnvConfig(List, Map)]}. This enables loading secrets safely
+/// into the configuration.
+///
+/// <table>
+/// <tr>
+/// <th>Property</th>
+/// <th>Note</th>
+/// </tr>
+/// <tr>
+/// <td>module.sub-module.alerts.email-address</td>
+/// <td>Kebab case, which is recommended for use in .properties and .yml files.</td>
+/// </tr>
+/// <tr>
+/// <td>module.subModule.alerts.emailAddress</td>
+/// <td>Standard camel case syntax.</td>
+/// </tr>
+/// <tr>
+/// <td>controller.sub_module.alerts.email_address</td>
+/// <td>Snake case notation, which is an alternative format for use in .properties and .yml files.</td>
+/// </tr>
+/// </table>
 public class PinotConfiguration {
   public static final String CONFIG_PATHS_KEY = "config.paths";
   public static final String ENV_DYNAMIC_CONFIG_KEY = "dynamic.env.config";
@@ -97,56 +88,46 @@ public class PinotConfiguration {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotConfiguration.class);
   private final CompositeConfiguration _configuration;
 
-  /**
-   * Creates an empty instance.
-   */
+  /// Creates an empty instance.
   public PinotConfiguration() {
     this(new HashMap<>());
   }
 
-  /**
-   * Builds a new instance out of an existing Apache Commons {@link Configuration} instance. Will apply property key
-   * sanitization to
-   * enable relaxed binding.
-   * Properties from the base configuration will be copied and won't be linked.
-   *
-   * @param baseConfiguration an existing {@link Configuration} for which all properties will be duplicated and
-   *                          sanitized for relaxed
-   *                          binding.
-   */
+  /// Builds a new instance out of an existing Apache Commons [Configuration] instance. Will apply property key
+  /// sanitization to
+  /// enable relaxed binding.
+  /// Properties from the base configuration will be copied and won't be linked.
+  ///
+  /// @param baseConfiguration an existing [Configuration] for which all properties will be duplicated and
+  ///                          sanitized for relaxed
+  ///                          binding.
   public PinotConfiguration(Configuration baseConfiguration) {
     _configuration = new CompositeConfiguration(computeConfigurationsFromSources(baseConfiguration, new HashMap<>()));
   }
 
-  /**
-   * Creates a new instance with existing properties provided through a map.
-   *
-   * @param baseProperties to provide programmatically through a {@link Map}.
-   */
+  /// Creates a new instance with existing properties provided through a map.
+  ///
+  /// @param baseProperties to provide programmatically through a [Map].
   public PinotConfiguration(Map<String, ? extends Object> baseProperties) {
     this(baseProperties, new SystemEnvironment().getEnvironmentVariables());
   }
 
-  /**
-   * Creates a new instance with existing properties provided through a map as well as environment variables.
-   * Base properties will have priority offers properties defined in environment variables. Keys will be
-   * sanitized for relaxed binding. See {@link PinotConfiguration} for further details.
-   *
-   * @param baseProperties with highest precedences (e.g. CLI arguments)
-   * @param environmentVariables as a {@link Map}.
-   */
+  /// Creates a new instance with existing properties provided through a map as well as environment variables.
+  /// Base properties will have priority offers properties defined in environment variables. Keys will be
+  /// sanitized for relaxed binding. See [PinotConfiguration] for further details.
+  ///
+  /// @param baseProperties with highest precedences (e.g. CLI arguments)
+  /// @param environmentVariables as a [Map].
   public PinotConfiguration(Map<String, ? extends Object> baseProperties, Map<String, String> environmentVariables) {
     _configuration = new CompositeConfiguration(
         applyDynamicEnvConfig(computeConfigurationsFromSources(baseProperties, environmentVariables),
             environmentVariables));
   }
 
-  /**
-   * Helper constructor to create an instance from configurations found in a PinotFSSpec instance.
-   * Intended for use by Job Runners
-   *
-   * @param pinotFSSpec
-   */
+  /// Helper constructor to create an instance from configurations found in a PinotFSSpec instance.
+  /// Intended for use by Job Runners
+  ///
+  /// @param pinotFSSpec
   public PinotConfiguration(PinotFSSpec pinotFSSpec) {
     this(Optional.ofNullable(pinotFSSpec.getConfigs()).map(configs -> configs.entrySet().stream()
             .collect(Collectors.<Entry<String, String>, String, Object>toMap(Entry::getKey, Entry::getValue)))
@@ -158,18 +139,16 @@ public class PinotConfiguration {
     return computeConfigurationsFromSources(relaxConfigurationKeys(baseConfiguration), environmentVariables);
   }
 
-  /**
-   * This function templates the configuration from the env variables using env.dynamic.config to
-   * specify the mapping.
-   * E.g.
-   * env.dynamic.mapping=test.property
-   * test.property=ENV_VAR_NAME
-   * This function will look up `ENV_VAR_NAME` and insert its content in test.property.
-   *
-   * @param configurations List of configurations to template.
-   * @param environmentVariables Env used to fetch content to insert in the configuration.
-   * @return returns configuration
-   */
+  /// This function templates the configuration from the env variables using env.dynamic.config to
+  /// specify the mapping.
+  /// E.g.
+  /// env.dynamic.mapping=test.property
+  /// test.property=ENV_VAR_NAME
+  /// This function will look up `ENV_VAR_NAME` and insert its content in test.property.
+  ///
+  /// @param configurations List of configurations to template.
+  /// @param environmentVariables Env used to fetch content to insert in the configuration.
+  /// @return returns configuration
   public static List<Configuration> applyDynamicEnvConfig(List<Configuration> configurations,
       Map<String, String> environmentVariables) {
     return configurations.stream().peek(configuration -> {
@@ -275,135 +254,111 @@ public class PinotConfiguration {
     return propertyName.replace("-", "").replace("_", "").toLowerCase();
   }
 
-  /**
-   * Overwrites a property value in memory.
-   *
-   * @param name of the property to append in memory. Applies relaxed binding on the property name.
-   * @param value to overwrite in memory
-   *
-   * @deprecated Configurations should be immutable. Prefer creating a new {@link #PinotConfiguration} with base
-   * properties to overwrite
-   * properties.
-   */
+  /// Overwrites a property value in memory.
+  ///
+  /// @param name of the property to append in memory. Applies relaxed binding on the property name.
+  /// @param value to overwrite in memory
+  ///
+  /// @deprecated Configurations should be immutable. Prefer creating a new [#PinotConfiguration] with base
+  /// properties to overwrite
+  /// properties.
   public void addProperty(String name, Object value) {
     _configuration.addProperty(relaxPropertyName(name), value);
   }
 
-  /**
-   * Creates a new instance of {@link PinotConfiguration} by closing the underlying {@link CompositeConfiguration}.
-   * Useful to mutate configurations {@link PinotConfiguration} without impacting the original configurations.
-   *
-   *  @return a new {@link PinotConfiguration} instance with a cloned {@link CompositeConfiguration}.
-   */
+  /// Creates a new instance of [PinotConfiguration] by closing the underlying [CompositeConfiguration].
+  /// Useful to mutate configurations [PinotConfiguration] without impacting the original configurations.
+  ///
+  ///  @return a new [PinotConfiguration] instance with a cloned [CompositeConfiguration].
   public PinotConfiguration clone() {
     return new PinotConfiguration(_configuration);
   }
 
-  /**
-   * Check if the configuration contains the specified key after being sanitized.
-   * @param key to sanitized and lookup
-   * @return true if key exists.
-   */
+  /// Check if the configuration contains the specified key after being sanitized.
+  /// @param key to sanitized and lookup
+  /// @return true if key exists.
   public boolean containsKey(String key) {
     return _configuration.containsKey(relaxPropertyName(key));
   }
 
-  /**
-   * @return all the sanitized keys defined in the underlying {@link CompositeConfiguration}.
-   */
+  /// @return all the sanitized keys defined in the underlying [CompositeConfiguration].
   public List<String> getKeys() {
     return CommonsConfigurationUtils.getKeys(_configuration);
   }
 
-  /**
-   * Retrieves a String value with the given property name. See {@link PinotConfiguration} for supported key naming
-   * conventions.
-   *
-   * If multiple properties exists with the same key, all values will be joined as a comma separated String.
-   *
-   * @param name of the property to retrieve a value. Property name will be sanitized.
-   * @return the property String value. Null if missing.
-   */
+  /// Retrieves a String value with the given property name. See [PinotConfiguration] for supported key naming
+  /// conventions.
+  ///
+  /// If multiple properties exists with the same key, all values will be joined as a comma separated String.
+  ///
+  /// @param name of the property to retrieve a value. Property name will be sanitized.
+  /// @return the property String value. Null if missing.
   public String getProperty(String name) {
     return getProperty(name, _configuration);
   }
 
-  /**
-   * Retrieves a boolean value with the given property name. See {@link PinotConfiguration} for supported key naming
-   * conventions.
-   *
-   * @param name of the property to retrieve a value. Property name will be sanitized.
-   * @return the property boolean value. Fallback to default value if missing.
-   */
+  /// Retrieves a boolean value with the given property name. See [PinotConfiguration] for supported key naming
+  /// conventions.
+  ///
+  /// @param name of the property to retrieve a value. Property name will be sanitized.
+  /// @return the property boolean value. Fallback to default value if missing.
   public boolean getProperty(String name, boolean defaultValue) {
     return getProperty(name, defaultValue, Boolean.class);
   }
 
-  /**
-   * Retrieves a typed value with the given property name. See {@link PinotConfiguration} for supported key naming
-   * conventions.
-   *
-   * @param name of the property to retrieve a value. Property name will be sanitized.
-   * @param returnType a class reference of the value type.
-   * @return the typed configuration value. Null if missing.
-   */
+  /// Retrieves a typed value with the given property name. See [PinotConfiguration] for supported key naming
+  /// conventions.
+  ///
+  /// @param name of the property to retrieve a value. Property name will be sanitized.
+  /// @param returnType a class reference of the value type.
+  /// @return the typed configuration value. Null if missing.
   public <T> T getProperty(String name, Class<T> returnType) {
     return getProperty(name, null, returnType);
   }
 
-  /**
-   * Retrieves a double value with the given property name. See {@link PinotConfiguration} for supported key naming
-   * conventions.
-   *
-   * @param name of the property to retrieve a value. Property name will be sanitized.
-   * @return the property double value. Fallback to default value if missing.
-   */
+  /// Retrieves a double value with the given property name. See [PinotConfiguration] for supported key naming
+  /// conventions.
+  ///
+  /// @param name of the property to retrieve a value. Property name will be sanitized.
+  /// @return the property double value. Fallback to default value if missing.
   public double getProperty(String name, double defaultValue) {
     return getProperty(name, defaultValue, Double.class);
   }
 
-  /**
-   * Retrieves a integer value with the given property name. See {@link PinotConfiguration} for supported key naming
-   * conventions.
-   *
-   * @param name of the property to retrieve a value. Property name will be sanitized.
-   * @return the property integer value. Fallback to default value if missing.
-   */
+  /// Retrieves a integer value with the given property name. See [PinotConfiguration] for supported key naming
+  /// conventions.
+  ///
+  /// @param name of the property to retrieve a value. Property name will be sanitized.
+  /// @return the property integer value. Fallback to default value if missing.
   public int getProperty(String name, int defaultValue) {
     return getProperty(name, defaultValue, Integer.class);
   }
 
-  /**
-   * Retrieves a list of String values with the given property name. See {@link PinotConfiguration} for supported key
-   * naming conventions.
-   *
-   * @param name of the property to retrieve a list of values. Property name will be sanitized.
-   * @return the property String value. Fallback to the provided default values if no property is found.
-   */
+  /// Retrieves a list of String values with the given property name. See [PinotConfiguration] for supported key
+  /// naming conventions.
+  ///
+  /// @param name of the property to retrieve a list of values. Property name will be sanitized.
+  /// @return the property String value. Fallback to the provided default values if no property is found.
   public List<String> getProperty(String name, List<String> defaultValues) {
     return Optional.of(
             Arrays.stream(_configuration.getStringArray(relaxPropertyName(name))).collect(Collectors.toList()))
         .filter(list -> !list.isEmpty()).orElse(defaultValues);
   }
 
-  /**
-   * Retrieves a long value with the given property name. See {@link PinotConfiguration} for supported key naming
-   * conventions.
-   *
-   * @param name of the property to retrieve a value. Property name will be sanitized.
-   * @return the property long value. Fallback to default value if missing.
-   */
+  /// Retrieves a long value with the given property name. See [PinotConfiguration] for supported key naming
+  /// conventions.
+  ///
+  /// @param name of the property to retrieve a value. Property name will be sanitized.
+  /// @return the property long value. Fallback to default value if missing.
   public long getProperty(String name, long defaultValue) {
     return getProperty(name, defaultValue, Long.class);
   }
 
-  /**
-   * Retrieves a String value with the given property name. See {@link PinotConfiguration} for supported key naming
-   * conventions.
-   *
-   * @param name of the property to retrieve a value. Property name will be sanitized.
-   * @return the property String value. Fallback to default value if missing.
-   */
+  /// Retrieves a String value with the given property name. See [PinotConfiguration] for supported key naming
+  /// conventions.
+  ///
+  /// @param name of the property to retrieve a value. Property name will be sanitized.
+  /// @return the property String value. Fallback to default value if missing.
   public String getProperty(String name, String defaultValue) {
     String relaxedPropertyName = relaxPropertyName(name);
     if (!_configuration.containsKey(relaxedPropertyName)) {
@@ -425,26 +380,22 @@ public class PinotConfiguration {
     return CommonsConfigurationUtils.convert(rawProperty, returnType);
   }
 
-  /**
-   * Returns the raw object stored within the underlying {@link CompositeConfiguration}.
-   *
-   * See {@link PinotConfiguration} for supported key naming conventions.
-   *
-   * @param name of the property to retrieve a raw object value. Property name will be sanitized.
-   * @return the object referenced. Null if key is not found.
-   */
+  /// Returns the raw object stored within the underlying [CompositeConfiguration].
+  ///
+  /// See [PinotConfiguration] for supported key naming conventions.
+  ///
+  /// @param name of the property to retrieve a raw object value. Property name will be sanitized.
+  /// @return the object referenced. Null if key is not found.
   public Object getRawProperty(String name) {
     return getRawProperty(name, null);
   }
 
-  /**
-   * Returns the raw object stored within the underlying {@link CompositeConfiguration}.
-   *
-   * See {@link PinotConfiguration} for supported key naming conventions.
-   *
-   * @param name of the property to retrieve a raw object value. Property name will be sanitized.
-   * @return the object referenced. Fallback to provided default value if key is not found.
-   */
+  /// Returns the raw object stored within the underlying [CompositeConfiguration].
+  ///
+  /// See [PinotConfiguration] for supported key naming conventions.
+  ///
+  /// @param name of the property to retrieve a raw object value. Property name will be sanitized.
+  /// @return the object referenced. Fallback to provided default value if key is not found.
   public Object getRawProperty(String name, Object defaultValue) {
     String relaxedPropertyName = relaxPropertyName(name);
     if (!_configuration.containsKey(relaxedPropertyName)) {
@@ -454,46 +405,34 @@ public class PinotConfiguration {
     return _configuration.getProperty(relaxedPropertyName);
   }
 
-  /**
-   * Overwrites a property value in memory.
-   *
-   * @param name of the property to overwrite in memory. Applies relaxed binding on the property name.
-   * @param value to overwrite in memory
-   */
+  /// Overwrites a property value in memory.
+  ///
+  /// @param name of the property to overwrite in memory. Applies relaxed binding on the property name.
+  /// @param value to overwrite in memory
   public void setProperty(String name, Object value) {
     _configuration.setProperty(relaxPropertyName(name), value);
   }
 
-  /**
-   * Delete a property value in memory.
-   *
-   * @param name of the property to remove in memory. Applies relaxed binding on the property name.
-   */
+  /// Delete a property value in memory.
+  ///
+  /// @param name of the property to remove in memory. Applies relaxed binding on the property name.
   public void clearProperty(String name) {
     _configuration.clearProperty(relaxPropertyName(name));
   }
 
-  /**
-   * <p>
-   * Creates a copy of the configuration only containing properties matching a property prefix.
-   * Changes made on the source {@link PinotConfiguration} will not be available in the subset instance
-   * since properties are copied.
-   * </p>
-   *
-   * <p>
-   * The prefix is removed from the keys in the subset. See {@link Configuration#subset(String)} for further details.
-   * </p>
-   *
-   * @param prefix of the properties to copy. Applies relaxed binding on the properties prefix.
-   * @return a new {@link PinotConfiguration} instance with
-   */
+  /// Creates a copy of the configuration only containing properties matching a property prefix.
+  /// Changes made on the source [PinotConfiguration] will not be available in the subset instance
+  /// since properties are copied.
+  ///
+  /// The prefix is removed from the keys in the subset. See [Configuration#subset(String)] for further details.
+  ///
+  /// @param prefix of the properties to copy. Applies relaxed binding on the properties prefix.
+  /// @return a new [PinotConfiguration] instance with
   public PinotConfiguration subset(String prefix) {
     return new PinotConfiguration(_configuration.subset(relaxPropertyName(prefix)));
   }
 
-  /**
-   * @return a key-value {@link Map} found in the underlying {@link CompositeConfiguration}
-   */
+  /// @return a key-value [Map] found in the underlying [CompositeConfiguration]
   public Map<String, Object> toMap() {
     return CommonsConfigurationUtils.toMap(_configuration);
   }

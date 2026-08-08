@@ -309,9 +309,7 @@ public class PerfBenchmarkDriver {
     }
   }
 
-  /**
-   * Register and connect to Helix cluster as Spectator role.
-   */
+  /// Register and connect to Helix cluster as Spectator role.
   private HelixManager registerAndConnectAsHelixSpectator(String instanceId) {
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(_clusterName, instanceId, InstanceType.SPECTATOR, _zkAddress);
@@ -351,11 +349,9 @@ public class PerfBenchmarkDriver {
     _helixResourceManager.addTable(tableConfig);
   }
 
-  /**
-   * Add segment while segment data is already in server data directory.
-   *
-   * @param segmentMetadata segment metadata.
-   */
+  /// Add segment while segment data is already in server data directory.
+  ///
+  /// @param segmentMetadata segment metadata.
   public void addSegment(String tableNameWithType, SegmentMetadata segmentMetadata) {
     _helixResourceManager.addNewSegment(tableNameWithType, segmentMetadata,
         "http://" + _controllerAddress + "/" + segmentMetadata.getName());
@@ -462,16 +458,14 @@ public class PerfBenchmarkDriver {
     }
   }
 
-  /**
-   * Start cluster components with default configuration.
-   *
-   * @param isStartZookeeper whether to start zookeeper.
-   * @param isStartController whether to start controller.
-   * @param isStartBroker whether to start broker.
-   * @param isStartServer whether to start server.
-   * @return perf benchmark driver.
-   * @throws Exception
-   */
+  /// Start cluster components with default configuration.
+  ///
+  /// @param isStartZookeeper whether to start zookeeper.
+  /// @param isStartController whether to start controller.
+  /// @param isStartBroker whether to start broker.
+  /// @param isStartServer whether to start server.
+  /// @return perf benchmark driver.
+  /// @throws Exception
   public static PerfBenchmarkDriver startComponents(boolean isStartZookeeper, boolean isStartController,
       boolean isStartBroker, boolean isStartServer, @Nullable String serverDataDir)
       throws Exception {

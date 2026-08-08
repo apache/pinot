@@ -59,15 +59,13 @@ public class PinotControllerAuthResource {
   @Context
   HttpHeaders _httpHeaders;
 
-  /**
-   * Verify a token is both authenticated and authorized to perform an operation.
-   *
-   * @param tableName table name (optional)
-   * @param accessType access type (optional)
-   * @param endpointUrl endpoint url (optional)
-   *
-   * @return {@code true} if authenticated and authorized, {@code false} otherwise
-   */
+  /// Verify a token is both authenticated and authorized to perform an operation.
+  ///
+  /// @param tableName table name (optional)
+  /// @param accessType access type (optional)
+  /// @param endpointUrl endpoint url (optional)
+  ///
+  /// @return `true` if authenticated and authorized, `false` otherwise
   @Deprecated
   @GET
   @Path("auth/verify")
@@ -85,15 +83,13 @@ public class PinotControllerAuthResource {
     return accessControl.hasAccess(tableName, accessType, _httpHeaders, endpointUrl);
   }
 
-  /**
-   * Verify a token is both authenticated and authorized to perform an operation.
-   *
-   * @param tableName table name (optional)
-   * @param accessType access type (optional)
-   * @param endpointUrl endpoint url (optional)
-   *
-   * @return {@code true} if authenticated and authorized, {@code false} otherwise
-   */
+  /// Verify a token is both authenticated and authorized to perform an operation.
+  ///
+  /// @param tableName table name (optional)
+  /// @param accessType access type (optional)
+  /// @param endpointUrl endpoint url (optional)
+  ///
+  /// @return `true` if authenticated and authorized, `false` otherwise
   @GET
   @Path("auth/verify/v2")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_AUTH)
@@ -110,12 +106,10 @@ public class PinotControllerAuthResource {
     return accessControl.hasAccess(_httpHeaders, TargetType.CLUSTER);
   }
 
-  /**
-   * Provide the auth workflow configuration for the Pinot UI to perform user authentication. Currently supports NONE
-   * (no auth) and BASIC (basic auth with username and password)
-   *
-   * @return auth workflow info/configuration
-   */
+  /// Provide the auth workflow configuration for the Pinot UI to perform user authentication. Currently supports NONE
+  /// (no auth) and BASIC (basic auth with username and password)
+  ///
+  /// @return auth workflow info/configuration
   @GET
   @Path("auth/info")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_AUTH)

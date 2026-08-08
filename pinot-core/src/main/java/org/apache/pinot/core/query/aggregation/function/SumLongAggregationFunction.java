@@ -32,17 +32,15 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * Specialized LONG sum aggregation function that avoids type conversion overhead.
- * This function is optimized for LONG columns and uses native LONG arithmetic.
- *
- * Performance optimizations:
- * - Direct LONG arithmetic without DOUBLE conversion
- * - Vectorized operations for better CPU utilization
- * - Minimal object allocations
- * - Optimized for the specific case of LONG column aggregation
- * - Proper null handling support using foldNotNull and forEachNotNull
- */
+/// Specialized LONG sum aggregation function that avoids type conversion overhead.
+/// This function is optimized for LONG columns and uses native LONG arithmetic.
+///
+/// Performance optimizations:
+/// - Direct LONG arithmetic without DOUBLE conversion
+/// - Vectorized operations for better CPU utilization
+/// - Minimal object allocations
+/// - Optimized for the specific case of LONG column aggregation
+/// - Proper null handling support using foldNotNull and forEachNotNull
 public class SumLongAggregationFunction extends NullableSingleInputAggregationFunction<Long, Long> {
   public static final String FUNCTION_NAME = "SUMLONG";
   private static final long DEFAULT_VALUE = 0L;

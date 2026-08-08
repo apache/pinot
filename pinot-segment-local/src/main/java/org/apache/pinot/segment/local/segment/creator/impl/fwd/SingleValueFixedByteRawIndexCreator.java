@@ -27,25 +27,21 @@ import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Raw (non-dictionary-encoded) forward index creator for single-value column of fixed length data type (INT, LONG,
- * FLOAT, DOUBLE).
- */
+/// Raw (non-dictionary-encoded) forward index creator for single-value column of fixed length data type (INT, LONG,
+/// FLOAT, DOUBLE).
 public class SingleValueFixedByteRawIndexCreator implements CompressionStatsTrackingForwardIndexCreator {
   private final FixedByteChunkForwardIndexWriter _indexWriter;
   private final DataType _valueType;
   private final ChunkCompressionType _chunkCompressionType;
 
-  /**
-   * Constructor for the class
-   *
-   * @param baseIndexDir Index directory
-   * @param compressionType Type of compression to use
-   * @param column Name of column to index
-   * @param totalDocs Total number of documents to index
-   * @param valueType Type of the values
-   * @throws IOException
-   */
+  /// Constructor for the class
+  ///
+  /// @param baseIndexDir Index directory
+  /// @param compressionType Type of compression to use
+  /// @param column Name of column to index
+  /// @param totalDocs Total number of documents to index
+  /// @param valueType Type of the values
+  /// @throws IOException
   public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
       int totalDocs, DataType valueType)
       throws IOException {
@@ -53,17 +49,15 @@ public class SingleValueFixedByteRawIndexCreator implements CompressionStatsTrac
         ForwardIndexConfig.getDefaultTargetDocsPerChunk());
   }
 
-  /**
-   * Constructor for the class
-   *
-   * @param baseIndexDir Index directory
-   * @param compressionType Type of compression to use
-   * @param column Name of column to index
-   * @param totalDocs Total number of documents to index
-   * @param valueType Type of the values
-   * @param writerVersion writer format version
-   * @throws IOException
-   */
+  /// Constructor for the class
+  ///
+  /// @param baseIndexDir Index directory
+  /// @param compressionType Type of compression to use
+  /// @param column Name of column to index
+  /// @param totalDocs Total number of documents to index
+  /// @param valueType Type of the values
+  /// @param writerVersion writer format version
+  /// @throws IOException
   public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
       int totalDocs, DataType valueType, int writerVersion, int targetDocsPerChunk)
       throws IOException {

@@ -28,19 +28,16 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * {@code WorkerMetadata} is used to send worker-level info about how to execute a stage on a particular worker.
- *
- * <p>It contains information specific to a single worker within a stage, such as:</p>
- * <ul>
- *   <li>the underlying segments this particular worker needs to execute.</li>
- *   <li>the mailbox info required to construct data transfer linkages.</li>
- *   <li>the partition mechanism of the data being execute on this worker.</li>
- * </ul>
- *
- * TODO: WorkerMetadata now doesn't have info directly about how to construct the mailboxes. instead it rely on
- * MailboxSendNode and MailboxReceiveNode to derive the info during runtime. this should changed to plan time soon.
- */
+/// `WorkerMetadata` is used to send worker-level info about how to execute a stage on a particular worker.
+///
+/// It contains information specific to a single worker within a stage, such as:
+///
+/// - the underlying segments this particular worker needs to execute.
+/// - the mailbox info required to construct data transfer linkages.
+/// - the partition mechanism of the data being execute on this worker.
+///
+/// TODO: WorkerMetadata now doesn't have info directly about how to construct the mailboxes. instead it rely on
+/// MailboxSendNode and MailboxReceiveNode to derive the info during runtime. this should changed to plan time soon.
 public class WorkerMetadata {
   public static final String TABLE_SEGMENTS_MAP_KEY = "tableSegmentsMap";
   public static final String LOGICAL_TABLE_SEGMENTS_MAP_KEY = "logicalTableSegmentsMap";

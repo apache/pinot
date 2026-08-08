@@ -29,26 +29,30 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
+import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 
 
-/**
- * Table level index loading config.
- */
+/// Table level index loading config.
 public class IndexLoadingConfig {
   private static final int DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT = 2;
   public static final String READ_MODE_KEY = "readMode";
@@ -88,11 +92,9 @@ public class IndexLoadingConfig {
 
   private MultiColumnTextIndexConfig _multiColTextIndexConfig;
 
-  /**
-   * NOTE: This step might modify the passed in table config and schema.
-   *
-   * TODO: Revisit the init handling. Currently it doesn't apply tiered config override
-   */
+  /// NOTE: This step might modify the passed in table config and schema.
+  ///
+  /// TODO: Revisit the init handling. Currently it doesn't apply tiered config override
   public IndexLoadingConfig(@Nullable InstanceDataManagerConfig instanceDataManagerConfig,
       @Nullable TableConfig tableConfig, @Nullable Schema schema) {
     _instanceDataManagerConfig = instanceDataManagerConfig;
@@ -111,9 +113,7 @@ public class IndexLoadingConfig {
     this(null, tableConfig, schema);
   }
 
-  /**
-   * NOTE: Can be used in production code when we want to load a segment as is without any modifications.
-   */
+  /// NOTE: Can be used in production code when we want to load a segment as is without any modifications.
   public IndexLoadingConfig() {
     this(null, null, null);
   }
@@ -282,9 +282,7 @@ public class IndexLoadingConfig {
     return _segmentVersion;
   }
 
-  /**
-   * For tests only.
-   */
+  /// For tests only.
   public void setSegmentVersion(SegmentVersion segmentVersion) {
     _segmentVersion = segmentVersion;
   }
@@ -370,13 +368,11 @@ public class IndexLoadingConfig {
     return unmodifiable(_indexConfigsByColName);
   }
 
-  /**
-   * Returns a subset of the columns on the table.
-   *
-   * When {@link #getSchema()} is defined, the subset is equal the columns on the schema. In other cases, this method
-   * tries its bests to get the columns from other attributes like {@link #getTableConfig()}, which may also not be
-   * defined or may not be complete.
-   */
+  /// Returns a subset of the columns on the table.
+  ///
+  /// When [#getSchema()] is defined, the subset is equal the columns on the schema. In other cases, this method
+  /// tries its bests to get the columns from other attributes like [#getTableConfig()], which may also not be
+  /// defined or may not be complete.
   private Set<String> getAllKnownColumns() {
     assert _tableConfig != null && _schema == null;
     if (_knownColumns == null) {
@@ -406,6 +402,43 @@ public class IndexLoadingConfig {
 
   private <K, V> Map<K, V> unmodifiable(Map<K, V> map) {
     return map == null ? null : Collections.unmodifiableMap(map);
+  }
+
+  public void addOpenStructChildConfigs(SegmentMetadataImpl segmentMetadata) {
+    if (_indexConfigsByColName == null || _dirty) {
+      refreshIndexConfigs();
+    }
+    for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
+      String childColumn = entry.getKey();
+      if (!childColumn.contains(OpenStructNaming.SEPARATOR) || _indexConfigsByColName.containsKey(childColumn)) {
+        continue;
+      }
+      if (OpenStructNaming.isSparseColumn(childColumn)) {
+        continue;
+      }
+      String parentColumn = OpenStructNaming.parseParentColumn(childColumn);
+      FieldIndexConfigs parentConfigs = _indexConfigsByColName.get(parentColumn);
+      if (parentConfigs == null) {
+        continue;
+      }
+      IndexConfig osConfig = parentConfigs.getConfig(StandardIndexes.openStruct());
+      if (!(osConfig instanceof OpenStructIndexConfig)) {
+        continue;
+      }
+      OpenStructIndexConfig openStructConfig = (OpenStructIndexConfig) osConfig;
+      String key = OpenStructNaming.parseKey(childColumn);
+      FieldConfig keyFieldConfig = openStructConfig.getValueFieldConfig(key);
+      if (keyFieldConfig == null) {
+        keyFieldConfig = openStructConfig.getDefaultValueFieldConfig();
+      }
+      FieldSpec childFieldSpec = entry.getValue().getFieldSpec();
+      boolean enableInverted = openStructConfig.shouldEnableInvertedIndexForKey(key);
+      FieldIndexConfigs childConfigs = new FieldIndexConfigs.Builder(
+          FieldIndexConfigsUtil.fromFieldConfig(keyFieldConfig, childFieldSpec))
+          .add(StandardIndexes.inverted(), enableInverted ? IndexConfig.ENABLED : IndexConfig.DISABLED)
+          .build();
+      _indexConfigsByColName.put(childColumn, childConfigs);
+    }
   }
 
   public void addKnownColumns(Set<String> columns) {

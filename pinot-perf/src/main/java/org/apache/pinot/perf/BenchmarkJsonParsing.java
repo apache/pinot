@@ -25,7 +25,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder;
+import org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -45,18 +49,16 @@ import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
-/**
- * Benchmark to compare JSON parsing performance:
- * - Old approach: bytesToJsonNode() + jsonNodeToMap() (two-step parsing)
- * - New approach: bytesToMap() (single-step parsing)
- *
- * This benchmark simulates the JSON decoding path in RealtimeSegmentDataManager.consumeLoop()
- * where JSONMessageDecoder.decode() is called for each message from the stream.
- *
- * Run with: mvn exec:exec -Dexec.executable="java" -Dexec.args="-cp %classpath org.apache.pinot.perf
- * .BenchmarkJsonParsing"
- * Or compile and run: java -jar pinot-perf/target/pinot-perf-*-shaded.jar BenchmarkJsonParsing
- */
+/// Benchmark to compare JSON parsing performance:
+/// - Old approach: bytesToJsonNode() + jsonNodeToMap() (two-step parsing)
+/// - New approach: bytesToMap() (single-step parsing)
+///
+/// This benchmark simulates the JSON decoding path in RealtimeSegmentDataManager.consumeLoop()
+/// where JSONMessageDecoder.decode() is called for each message from the stream.
+///
+/// Run with: mvn exec:exec -Dexec.executable="java" -Dexec.args="-cp %classpath org.apache.pinot.perf
+/// .BenchmarkJsonParsing"
+/// Or compile and run: java -jar pinot-perf/target/pinot-perf-\*-shaded.jar BenchmarkJsonParsing
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @Fork(1)
@@ -82,9 +84,18 @@ public class BenchmarkJsonParsing {
 
   private List<byte[]> _jsonPayloads;
   private int _currentIndex = 0;
+  private JSONMessageDecoder _allFieldsDecoder;
+  private JSONMessageDecoder _selectedFieldsDecoder;
+  private JSONRecordExtractor _allFieldsExtractor;
+  private JSONRecordExtractor _selectedFieldsExtractor;
+  private GenericRow _mapAllFieldsRow;
+  private GenericRow _directAllFieldsRow;
+  private GenericRow _mapSelectedFieldsRow;
+  private GenericRow _directSelectedFieldsRow;
 
   @Setup(Level.Trial)
-  public void setUp() {
+  public void setUp()
+      throws Exception {
     _jsonPayloads = new ArrayList<>(NUM_MESSAGES);
     Random random = new Random(42);
 
@@ -92,11 +103,23 @@ public class BenchmarkJsonParsing {
       String json = generateJsonPayload(_payloadType, random, i);
       _jsonPayloads.add(json.getBytes(StandardCharsets.UTF_8));
     }
+
+    Set<String> selectedFields = selectedFields(_payloadType);
+    _allFieldsDecoder = new JSONMessageDecoder();
+    _allFieldsDecoder.init(Map.of(), null, "benchmark");
+    _selectedFieldsDecoder = new JSONMessageDecoder();
+    _selectedFieldsDecoder.init(Map.of(), selectedFields, "benchmark");
+    _allFieldsExtractor = new JSONRecordExtractor();
+    _allFieldsExtractor.init(null, null);
+    _selectedFieldsExtractor = new JSONRecordExtractor();
+    _selectedFieldsExtractor.init(selectedFields, null);
+    _mapAllFieldsRow = new GenericRow();
+    _directAllFieldsRow = new GenericRow();
+    _mapSelectedFieldsRow = new GenericRow();
+    _directSelectedFieldsRow = new GenericRow();
   }
 
-  /**
-   * Generates different types of JSON payloads to simulate real-world streaming data.
-   */
+  /// Generates different types of JSON payloads to simulate real-world streaming data.
   private String generateJsonPayload(String type, Random random, int index) {
     switch (type) {
       case "small":
@@ -203,10 +226,8 @@ public class BenchmarkJsonParsing {
     return payload;
   }
 
-  /**
-   * OLD APPROACH: Two-step parsing (bytesToJsonNode + jsonNodeToMap)
-   * This was the original implementation that caused high CPU usage.
-   */
+  /// OLD APPROACH: Two-step parsing (bytesToJsonNode + jsonNodeToMap)
+  /// This was the original implementation that caused high CPU usage.
   @Benchmark
   public Map<String, Object> oldApproachTwoStepParsing(Blackhole blackhole)
       throws IOException {
@@ -222,10 +243,8 @@ public class BenchmarkJsonParsing {
     return result;
   }
 
-  /**
-   * NEW APPROACH: Single-step parsing (bytesToMap)
-   * This is the optimized implementation that parses directly to Map.
-   */
+  /// NEW APPROACH: Single-step parsing (bytesToMap)
+  /// This is the optimized implementation that parses directly to Map.
   @Benchmark
   public Map<String, Object> newApproachDirectParsing(Blackhole blackhole)
       throws IOException {
@@ -235,6 +254,55 @@ public class BenchmarkJsonParsing {
     Map<String, Object> result = JsonUtils.bytesToMap(payload, 0, payload.length);
 
     return result;
+  }
+
+  /// BASELINE DECODER: materialize the top-level map, then copy all fields into GenericRow.
+  @Benchmark
+  public GenericRow mapThenExtractAllFields()
+      throws IOException {
+    _mapAllFieldsRow.clear();
+    byte[] payload = getNextPayload();
+    return _allFieldsExtractor.extract(JsonUtils.bytesToMap(payload, 0, payload.length), _mapAllFieldsRow);
+  }
+
+  /// OPTIMIZED DECODER: stream all top-level values directly into GenericRow.
+  @Benchmark
+  public GenericRow directToGenericRowAllFields() {
+    _directAllFieldsRow.clear();
+    byte[] payload = getNextPayload();
+    return _allFieldsDecoder.decode(payload, _directAllFieldsRow);
+  }
+
+  /// BASELINE DECODER: materialize the full top-level map, then copy selected fields into GenericRow.
+  @Benchmark
+  public GenericRow mapThenExtractSelectedFields()
+      throws IOException {
+    _mapSelectedFieldsRow.clear();
+    byte[] payload = getNextPayload();
+    return _selectedFieldsExtractor.extract(JsonUtils.bytesToMap(payload, 0, payload.length), _mapSelectedFieldsRow);
+  }
+
+  /// OPTIMIZED DECODER: materialize selected values only and skip unselected containers.
+  @Benchmark
+  public GenericRow directToGenericRowSelectedFields() {
+    _directSelectedFieldsRow.clear();
+    byte[] payload = getNextPayload();
+    return _selectedFieldsDecoder.decode(payload, _directSelectedFieldsRow);
+  }
+
+  private static Set<String> selectedFields(String payloadType) {
+    switch (payloadType) {
+      case "small":
+        return Set.of("id", "status");
+      case "medium":
+        return Set.of("eventId", "userId", "timestamp", "country");
+      case "large":
+        return Set.of("eventId", "timestamp");
+      case "nested":
+        return Set.of("order");
+      default:
+        return Set.of("id");
+    }
   }
 
   // Helper methods for generating realistic test data

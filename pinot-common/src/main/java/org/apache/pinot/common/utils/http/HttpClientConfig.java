@@ -60,12 +60,10 @@ public class HttpClientConfig {
     return _connectionTimeoutMs;
   }
 
-  /**
-   * Creates a {@link HttpClientConfig.Builder} and initializes it with relevant configs from the provided
-   * configuration. Since http-clients are used in a bunch of places in the code, each use-case can have their own
-   * prefix for their config. The caller should call {@link PinotConfiguration#subset(String)} to remove their prefix
-   * and this builder will look for exact matches of its relevant configs.
-   */
+  /// Creates a [HttpClientConfig.Builder] and initializes it with relevant configs from the provided
+  /// configuration. Since http-clients are used in a bunch of places in the code, each use-case can have their own
+  /// prefix for their config. The caller should call [PinotConfiguration#subset(String)] to remove their prefix
+  /// and this builder will look for exact matches of its relevant configs.
   public static Builder newBuilder(PinotConfiguration pinotConfiguration) {
     Builder builder = new Builder();
     String maxConns = pinotConfiguration.getProperty(MAX_CONNS_CONFIG_NAME);

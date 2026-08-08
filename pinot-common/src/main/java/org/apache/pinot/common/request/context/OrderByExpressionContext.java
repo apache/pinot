@@ -22,10 +22,8 @@ import java.util.Objects;
 import java.util.Set;
 
 
-/**
- * The {@code OrderByExpressionContext} class represents an expression in the ORDER-BY clause. It encapsulates an
- * expression and the expected ordering of the expression.
- */
+/// The {@code OrderByExpressionContext} class represents an expression in the ORDER-BY clause. It encapsulates an
+/// expression and the expected ordering of the expression.
 public class OrderByExpressionContext {
   private final ExpressionContext _expression;
   private final boolean _isAsc;
@@ -61,9 +59,7 @@ public class OrderByExpressionContext {
     }
   }
 
-  /**
-   * Adds the columns (IDENTIFIER expressions) in the order-by expression to the given set.
-   */
+  /// Adds the columns (IDENTIFIER expressions) in the order-by expression to the given set.
   public void getColumns(Set<String> columns) {
     _expression.getColumns(columns);
   }

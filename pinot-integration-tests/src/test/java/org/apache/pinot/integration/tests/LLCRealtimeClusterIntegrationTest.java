@@ -76,10 +76,8 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test for low-level Kafka consumer.
- * TODO: Add separate module-level tests and remove the randomness of this test
- */
+/// Integration test for low-level Kafka consumer.
+/// TODO: Add separate module-level tests and remove the randomness of this test
 public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
   private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
   private static final long RANDOM_SEED = System.currentTimeMillis();

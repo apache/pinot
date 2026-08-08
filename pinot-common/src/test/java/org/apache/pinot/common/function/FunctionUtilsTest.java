@@ -26,14 +26,40 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.annotations.FunctionVolatility;
+import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class FunctionUtilsTest {
+  /// Test fixture for class-level function volatility.
+  @ScalarFunction(enabled = false, volatility = FunctionVolatility.STABLE)
+  private static class AnnotatedFunction {
+    @ScalarFunction(enabled = false)
+    public static long classAnnotated() {
+      return 0L;
+    }
+  }
+
+  /// Test fixture for method-level and legacy volatility metadata.
+  private static class VolatilityAnnotatedFunction {
+    @ScalarFunction(enabled = false, isDeterministic = false)
+    public static long legacyVolatile() {
+      return 0L;
+    }
+
+    @ScalarFunction(enabled = false, volatility = FunctionVolatility.STABLE)
+    public static long stable() {
+      return 0L;
+    }
+  }
 
   @Test
   public void testGetArgumentType() {
@@ -54,6 +80,100 @@ public class FunctionUtilsTest {
     assertEquals(FunctionUtils.getArgumentType((byte) 1), PinotDataType.BYTE);
     assertEquals(FunctionUtils.getArgumentType('a'), PinotDataType.CHARACTER);
     assertEquals(FunctionUtils.getArgumentType((short) 1), PinotDataType.SHORT);
+  }
+
+  @Test
+  public void testFunctionVolatilityMetadata() {
+    FunctionInfo now = FunctionRegistry.lookupFunctionInfo("now", 0);
+    assertTrue(now.isDeterministic());
+    assertEquals(now.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo ago = FunctionRegistry.lookupFunctionInfo("ago", 1);
+    assertTrue(ago.isDeterministic());
+    assertEquals(ago.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo agoMv = FunctionRegistry.lookupFunctionInfo("agomv", 1);
+    assertTrue(agoMv.isDeterministic());
+    assertEquals(agoMv.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo random = FunctionRegistry.lookupFunctionInfo("rand", 0);
+    assertFalse(random.isDeterministic());
+    assertEquals(random.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo seededRandom = FunctionRegistry.lookupFunctionInfo("rand", 1);
+    assertTrue(seededRandom.isDeterministic());
+    assertEquals(seededRandom.getVolatility(), FunctionVolatility.IMMUTABLE);
+
+    FunctionInfo sleep = FunctionRegistry.lookupFunctionInfo("sleep", 1);
+    assertTrue(sleep.isDeterministic());
+    assertEquals(sleep.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo cid = FunctionRegistry.lookupFunctionInfo("cid", 1);
+    assertTrue(cid.isDeterministic());
+    assertEquals(cid.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo requestId = FunctionRegistry.lookupFunctionInfo("reqid", 1);
+    assertTrue(requestId.isDeterministic());
+    assertEquals(requestId.getVolatility(), FunctionVolatility.STABLE);
+
+    FunctionInfo startTime = FunctionRegistry.lookupFunctionInfo("starttime", 1);
+    assertTrue(startTime.isDeterministic());
+    assertEquals(startTime.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo workerId = FunctionRegistry.lookupFunctionInfo("workerid", 1);
+    assertTrue(workerId.isDeterministic());
+    assertEquals(workerId.getVolatility(), FunctionVolatility.VOLATILE);
+  }
+
+  @Test
+  public void testFunctionVolatilityResolution()
+      throws NoSuchMethodException {
+    FunctionInfo classAnnotated =
+        FunctionInfo.fromMethod(AnnotatedFunction.class.getMethod("classAnnotated"));
+    assertTrue(classAnnotated.isDeterministic());
+    assertEquals(classAnnotated.getVolatility(), FunctionVolatility.STABLE);
+
+    FunctionInfo classAnnotationAwareConstructor =
+        new FunctionInfo(AnnotatedFunction.class.getMethod("classAnnotated"), AnnotatedFunction.class, false);
+    assertTrue(classAnnotationAwareConstructor.isDeterministic());
+    assertEquals(classAnnotationAwareConstructor.getVolatility(), FunctionVolatility.STABLE);
+
+    FunctionInfo legacyVolatile =
+        FunctionInfo.fromMethod(VolatilityAnnotatedFunction.class.getMethod("legacyVolatile"));
+    assertFalse(legacyVolatile.isDeterministic());
+    assertEquals(legacyVolatile.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo annotationAwareConstructor =
+        new FunctionInfo(VolatilityAnnotatedFunction.class.getMethod("legacyVolatile"),
+            VolatilityAnnotatedFunction.class, false, true);
+    assertTrue(annotationAwareConstructor.isDeterministic());
+    assertEquals(annotationAwareConstructor.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo deterministicOverride =
+        new FunctionInfo(VolatilityAnnotatedFunction.class.getMethod("stable"),
+            VolatilityAnnotatedFunction.class, false, false);
+    assertFalse(deterministicOverride.isDeterministic());
+    assertEquals(deterministicOverride.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo explicitVolatilityOverride = new FunctionInfo(
+        AnnotatedFunction.class.getMethod("classAnnotated"), AnnotatedFunction.class, false, true,
+        FunctionVolatility.IMMUTABLE);
+    assertTrue(explicitVolatilityOverride.isDeterministic());
+    assertEquals(explicitVolatilityOverride.getVolatility(), FunctionVolatility.IMMUTABLE);
+
+    PinotScalarFunction scalarFunction =
+        PinotScalarFunction.fromMethod(VolatilityAnnotatedFunction.class.getMethod("stable"), false, true);
+    FunctionInfo dynamicFunctionInfo = scalarFunction.getFunctionInfo(0);
+    assertNotNull(dynamicFunctionInfo);
+    assertTrue(dynamicFunctionInfo.isDeterministic());
+    assertEquals(dynamicFunctionInfo.getVolatility(), FunctionVolatility.STABLE);
+
+    PinotScalarFunction legacyDynamicFunction =
+        PinotScalarFunction.fromMethod(VolatilityAnnotatedFunction.class.getMethod("legacyVolatile"), false, true);
+    FunctionInfo legacyDynamicFunctionInfo = legacyDynamicFunction.getFunctionInfo(0);
+    assertNotNull(legacyDynamicFunctionInfo);
+    assertTrue(legacyDynamicFunctionInfo.isDeterministic());
+    assertEquals(legacyDynamicFunctionInfo.getVolatility(), FunctionVolatility.VOLATILE);
   }
 
   @Test

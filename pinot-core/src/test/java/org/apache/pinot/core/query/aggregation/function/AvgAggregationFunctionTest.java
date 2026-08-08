@@ -195,8 +195,7 @@ public class AvgAggregationFunctionTest extends AbstractAggregationFunctionTest 
                 .build(),
             new TableConfigBuilder(TableType.OFFLINE)
                 .setTableName("testTable")
-                .addFieldConfig(
-                    new FieldConfig("key", encoding, (FieldConfig.IndexType) null, PASS_THROUGH, null))
+                .addFieldConfig(new FieldConfig("key", encoding, null, PASS_THROUGH, null))
                 .build())
         .onFirstInstance(new Object[]{7, 1}, new Object[]{6, 2}, new Object[]{5, 3}, new Object[]{4, 4})
         .andOnSecondInstance(new Object[]{7, 1}, new Object[]{6, 2}, new Object[]{5, 3}, new Object[]{4, 4})
@@ -227,10 +226,8 @@ public class AvgAggregationFunctionTest extends AbstractAggregationFunctionTest 
                 .build(),
             new TableConfigBuilder(TableType.OFFLINE)
                 .setTableName("testTable")
-                .addFieldConfig(
-                    new FieldConfig("key1", encoding, (FieldConfig.IndexType) null, PASS_THROUGH, null))
-                .addFieldConfig(
-                    new FieldConfig("key2", encoding, (FieldConfig.IndexType) null, PASS_THROUGH, null))
+                .addFieldConfig(new FieldConfig("key1", encoding, null, PASS_THROUGH, null))
+                .addFieldConfig(new FieldConfig("key2", encoding, null, PASS_THROUGH, null))
                 .build())
         .onFirstInstance(new Object[]{7, 1}, new Object[]{6, 2}, new Object[]{5, 3}, new Object[]{4, 4})
         .andOnSecondInstance(new Object[]{7, 1}, new Object[]{6, 2}, new Object[]{5, 3}, new Object[]{4, 4})

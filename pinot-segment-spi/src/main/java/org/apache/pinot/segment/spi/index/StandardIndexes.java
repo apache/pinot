@@ -45,29 +45,25 @@ import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.spi.config.table.NullValueVectorConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 
 
-/**
- * This is a utility class that can be used to get references to the standard index types in a safe way.
- * <p>
- *   The ultimate container of valid index types (and therefore the source of truth) is {@link IndexService}.
- *   In order to get some specific index type, callers have to use {@link IndexService#get(String)}.
- *   The usability of this method is not great, given that the caller needs to use a literal (which imply that typos
- *   may produce exceptions at runtime) and it returns the most generic IndexType signature. This signature is so
- *   general that most of the time caller is forced to do castings.
- * </p>
- * <p>
- *   These usability problems are a cost we have to pay in order to have the ability to get references to index types
- *   that are not know at compile time, which is a requirement when we have custom index types. But Pinot includes
- *   a bunch of predefined index types (like forward index, dictionary, null value vector, etc) that should always be
- *   included in a Pinot distribution. {@link StandardIndexes} contains one get method for each standard index,
- *   providing a typesafe way to get these references. Instead of having to write something like
- *   {@code (IndexType<BloomFilterConfig, BloomFilterReader, IndexCreator>)
- *   IndexService.getInstance().get("bloom_filter")},
- *   a caller can simply use {@link StandardIndexes#bloomFilter()}
- * </p>
- */
+/// This is a utility class that can be used to get references to the standard index types in a safe way.
+///
+///   The ultimate container of valid index types (and therefore the source of truth) is [IndexService].
+///   In order to get some specific index type, callers have to use [IndexService#get(String)].
+///   The usability of this method is not great, given that the caller needs to use a literal (which imply that typos
+///   may produce exceptions at runtime) and it returns the most generic IndexType signature. This signature is so
+///   general that most of the time caller is forced to do castings.
+///
+///   These usability problems are a cost we have to pay in order to have the ability to get references to index types
+///   that are not know at compile time, which is a requirement when we have custom index types. But Pinot includes
+///   a bunch of predefined index types (like forward index, dictionary, null value vector, etc) that should always be
+///   included in a Pinot distribution. [StandardIndexes] contains one get method for each standard index,
+///   providing a typesafe way to get these references. Instead of having to write something like
+///   `(IndexType<BloomFilterConfig, BloomFilterReader, IndexCreator>) IndexService.getInstance().get("bloom_filter")`,
+///   a caller can simply use [StandardIndexes#bloomFilter()]
 @SuppressWarnings("unchecked")
 public class StandardIndexes {
   public static final String FORWARD_ID = "forward_index";
@@ -97,8 +93,8 @@ public class StandardIndexes {
         IndexService.getInstance().get(DICTIONARY_ID);
   }
 
-  public static IndexType<IndexConfig, NullValueVectorReader, ?> nullValueVector() {
-    return (IndexType<IndexConfig, NullValueVectorReader, ?>)
+  public static IndexType<NullValueVectorConfig, NullValueVectorReader, ?> nullValueVector() {
+    return (IndexType<NullValueVectorConfig, NullValueVectorReader, ?>)
         IndexService.getInstance().get(NULL_VALUE_VECTOR_ID);
   }
 

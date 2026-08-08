@@ -57,13 +57,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * gRPC implementation of the {@link SendingMailbox}. The gRPC stream is created on the first call to {@link #send}.
- *
- * <p>Thread-safety: {@code _readyLock} serializes every call to {@code _contentObserver.onNext} / {@code onCompleted}.
- * The underlying {@link ClientCallStreamObserver} is not thread-safe, and the sender, cancel, and EOS paths can run
- * concurrently. Acquire {@code _readyLock} around any new outbound call site you add.
- */
+/// gRPC implementation of the [SendingMailbox]. The gRPC stream is created on the first call to [#send].
+///
+/// Thread-safety: `_readyLock` serializes every call to `_contentObserver.onNext` / `onCompleted`.
+/// The underlying [ClientCallStreamObserver] is not thread-safe, and the sender, cancel, and EOS paths can run
+/// concurrently. Acquire `_readyLock` around any new outbound call site you add.
 public class GrpcSendingMailbox implements SendingMailbox {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcSendingMailbox.class);
   private static final String SEND_SCOPE = "GrpcSendingMailbox";
@@ -227,10 +225,8 @@ public class GrpcSendingMailbox implements SendingMailbox {
     }
   }
 
-  /**
-   * Process the data block to split it into multiple ByteStrings that fit into the maxByteStringSize, and send them
-   * one by one.
-   */
+  /// Process the data block to split it into multiple ByteStrings that fit into the maxByteStringSize, and send them
+  /// one by one.
   protected int processAndSend(DataBlock dataBlock)
       throws IOException {
     return processAndSend(dataBlock, false);

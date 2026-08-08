@@ -23,15 +23,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.List;
 
 
-/**
- * Deprecated forwarding wrapper for the legacy Groovy static analyzer config type name.
- *
- * <p>This value object is immutable and thread-safe.
- *
- * <p>TODO: Delete this shim after Pinot 1.6.0 is released.
- *
- * @deprecated Use {@link org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig} instead.
- */
+/// Deprecated forwarding wrapper for the legacy Groovy static analyzer config type name.
+///
+/// This value object is immutable and thread-safe.
+///
+/// TODO: Delete this shim after Pinot 1.6.0 is released.
+///
+/// @deprecated Use [org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig] instead.
 @Deprecated
 public class GroovyStaticAnalyzerConfig extends org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig {
   public GroovyStaticAnalyzerConfig(

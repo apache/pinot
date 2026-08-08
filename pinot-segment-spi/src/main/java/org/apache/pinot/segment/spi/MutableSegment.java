@@ -27,25 +27,19 @@ import org.apache.pinot.spi.stream.StreamMessageMetadata;
 
 public interface MutableSegment extends IndexSegment {
 
-  /**
-   * Indexes a record into the segment with optionally provided metadata.
-   *
-   * @param row Record represented as a {@link GenericRow}
-   * @param metadata the metadata associated with the message
-   * @return Whether the segment is full (i.e. cannot index more record into it)
-   */
+  /// Indexes a record into the segment with optionally provided metadata.
+  ///
+  /// @param row Record represented as a [GenericRow]
+  /// @param metadata the metadata associated with the message
+  /// @return Whether the segment is full (i.e. cannot index more record into it)
   boolean index(GenericRow row, @Nullable StreamMessageMetadata metadata)
       throws IOException;
 
-  /**
-   * Returns the number of records already indexed into the segment.
-   *
-   * @return The number of records indexed
-   */
+  /// Returns the number of records already indexed into the segment.
+  ///
+  /// @return The number of records indexed
   int getNumDocsIndexed();
 
-  /**
-   * Returns the consumer dir containing any segment files.
-   */
+  /// Returns the consumer dir containing any segment files.
   File getConsumerDir();
 }

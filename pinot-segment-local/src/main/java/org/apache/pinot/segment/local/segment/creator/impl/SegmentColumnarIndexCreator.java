@@ -26,6 +26,8 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.ColumnReader;
@@ -36,9 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Segment creator which writes data in a columnar form.
- */
+/// Segment creator which writes data in a columnar form.
 // TODO: check resource leaks
 public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentColumnarIndexCreator.class);
@@ -88,45 +88,52 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
     _nextDocId++;
   }
 
-  /**
-   * Indexes a column from the given segment.
-   *
-   * @param columnName The name of the column to index
-   * @param sortedDocIds If not null, provides the sorted order of documents for processing
-   * @param segment The segment containing the column data
-   */
+  /// Indexes a column from the given segment.
+  ///
+  /// @param columnName The name of the column to index
+  /// @param sortedDocIds If not null, provides the sorted order of documents for processing
+  /// @param segment The segment containing the column data
   @Override
   public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)
       throws IOException {
     indexColumn(columnName, sortedDocIds, segment, null);
   }
 
-  /**
-   * Indexes a column from the given segment.
-   *
-   * @param columnName The name of the column to index
-   * @param sortedDocIds If not null, provides the sorted order of documents for processing
-   * @param segment The segment containing the column data
-   * @param validDocIds If not null, only processes documents that are marked as valid in this bitmap.
-   *                    When null, all documents in the segment are processed. This is used for
-   *                    commit-time compaction to skip invalid/deleted documents during indexing.
-   */
+  /// Indexes a column from the given segment.
+  ///
+  /// @param columnName The name of the column to index
+  /// @param sortedDocIds If not null, provides the sorted order of documents for processing
+  /// @param segment The segment containing the column data
+  /// @param validDocIds If not null, only processes documents that are marked as valid in this bitmap.
+  ///                    When null, all documents in the segment are processed. This is used for
+  ///                    commit-time compaction to skip invalid/deleted documents during indexing.
   @Override
   public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment,
       @Nullable RoaringBitmap validDocIds)
       throws IOException {
-    // Iterate over each value in the column
     int numDocs = segment.getSegmentMetadata().getTotalDocs();
     if (numDocs == 0) {
       return;
     }
+
+    FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+
+    // OPEN_STRUCT parent columns have no forward index — their per-doc value is reconstructed as a
+    // map from the per-key child columns via OpenStructDataSource.getMapValue(). Feed that map to
+    // the OpenStructColumnSplitter so it can classify keys and write the child column indexes.
+    if (fieldSpec.getDataType() == FieldSpec.DataType.OPEN_STRUCT) {
+      DataSource dataSource = segment.getDataSourceNullable(columnName);
+      if (dataSource instanceof OpenStructDataSource) {
+        indexOpenStructColumn(columnName, (OpenStructDataSource) dataSource, numDocs, sortedDocIds, validDocIds);
+      }
+      return;
+    }
+
     try (PinotSegmentColumnReader colReader = new PinotSegmentColumnReader(segment, columnName)) {
-      FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
       ColumnIndexCreators colIndexes = _colIndexes.get(columnName);
       if (sortedDocIds != null) {
         int onDiskDocId = 0;
         for (int docId : sortedDocIds) {
-          // If validDodIds are provided, only index column if it's a valid doc
           if (validDocIds == null || validDocIds.contains(docId)) {
             indexColumnValue(colReader, columnName, fieldSpec, colIndexes, docId, onDiskDocId);
             onDiskDocId++;
@@ -135,7 +142,6 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
       } else {
         int onDiskDocId = 0;
         for (int docId = 0; docId < numDocs; docId++) {
-          // If validDodIds are provided, only index column if it's a valid doc
           if (validDocIds == null || validDocIds.contains(docId)) {
             indexColumnValue(colReader, columnName, fieldSpec, colIndexes, docId, onDiskDocId);
             onDiskDocId++;
@@ -145,14 +151,40 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
     }
   }
 
-  /**
-   * Index a column using a ColumnReader (column-major approach).
-   * This method processes the column values by document ID using random access from ColumnReader.
-   *
-   * @param columnName Name of the column to index
-   * @param columnReader ColumnReader for the column data
-   * @throws IOException if indexing fails
-   */
+  private void indexOpenStructColumn(String columnName, OpenStructDataSource dataSource, int numDocs,
+      @Nullable int[] sortedDocIds, @Nullable RoaringBitmap validDocIds)
+      throws IOException {
+    List<IndexCreator> creators = _colIndexes.get(columnName).getIndexCreators();
+    if (sortedDocIds != null) {
+      for (int docId : sortedDocIds) {
+        if (validDocIds == null || validDocIds.contains(docId)) {
+          indexOpenStructDoc(dataSource, docId, creators);
+        }
+      }
+    } else {
+      for (int docId = 0; docId < numDocs; docId++) {
+        if (validDocIds == null || validDocIds.contains(docId)) {
+          indexOpenStructDoc(dataSource, docId, creators);
+        }
+      }
+    }
+  }
+
+  private static void indexOpenStructDoc(OpenStructDataSource dataSource, int docId, List<IndexCreator> creators)
+      throws IOException {
+    Map<String, Object> value = dataSource.getMapValue(docId);
+    Object toIndex = value != null ? value : Map.of();
+    for (IndexCreator creator : creators) {
+      creator.add(toIndex, -1);
+    }
+  }
+
+  /// Index a column using a ColumnReader (column-major approach).
+  /// This method processes the column values by document ID using random access from ColumnReader.
+  ///
+  /// @param columnName Name of the column to index
+  /// @param columnReader ColumnReader for the column data
+  /// @throws IOException if indexing fails
   @Override
   public void indexColumn(String columnName, ColumnReader columnReader)
       throws IOException {
@@ -212,16 +244,15 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
     }
   }
 
-  /**
-   * Typed, allocation-free index write for a single-value primitive column. Returns {@code true} if it consumed
-   * the column (the reader served it as INT / LONG / FLOAT / DOUBLE directly). Otherwise it returns {@code false}
-   * — without reading any value — either because the column is not a fast-path primitive, or because it is
-   * one but the reader serves a different physical type, so the caller falls back to the Object path. Drives each
-   * value through {@code ColumnReader.getInt(docId)}/... -> {@code indexOfSV(primitive)} -> {@code
-   * IndexCreator.addInt(primitive, dictId)}, avoiding the box that {@code getValue(docId) -> indexOfSV(Object) ->
-   * add(Object, ...)} incurs. Null docs (rare) are routed through the shared Object handling for exact parity,
-   * including whole-value-null marking in the null-value vector.
-   */
+  /// Typed, allocation-free index write for a single-value primitive column. Returns `true` if it consumed
+  /// the column (the reader served it as INT / LONG / FLOAT / DOUBLE directly). Otherwise it returns `false`
+  /// — without reading any value — either because the column is not a fast-path primitive, or because it is
+  /// one but the reader serves a different physical type, so the caller falls back to the Object path. Drives each
+  /// value through `ColumnReader.getInt(docId)` /... -> `indexOfSV(primitive)` ->
+  /// `IndexCreator.addInt(primitive, dictId)` , avoiding the box that
+  /// `getValue(docId) -> indexOfSV(Object) -> add(Object, ...)` incurs. Null docs (rare) are routed through the shared
+  /// Object handling for exact parity,
+  /// including whole-value-null marking in the null-value vector.
   private boolean indexSingleValuePrimitive(String columnName, FieldSpec fieldSpec, PinotDataType destDataType,
       ColumnReader columnReader, SegmentDictionaryCreator dictionaryCreator, List<IndexCreator> creatorsByIndex,
       NullValueVectorCreator nullVec, int numDocs)
@@ -305,12 +336,10 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
     }
   }
 
-  /**
-   * Read a whole-value-null doc on the typed fast path and resolve it exactly as the Object path does:
-   * read the raw value (an actual {@code null}, or a stored sentinel from a segment source), mark the
-   * null-value vector only for an actual {@code null}, and return the normalized value (the column
-   * default) for the shared single-value row helper to index.
-   */
+  /// Read a whole-value-null doc on the typed fast path and resolve it exactly as the Object path does:
+  /// read the raw value (an actual `null`, or a stored sentinel from a segment source), mark the
+  /// null-value vector only for an actual `null`, and return the normalized value (the column
+  /// default) for the shared single-value row helper to index.
   private Object normalizeNullRow(String columnName, FieldSpec fieldSpec, PinotDataType destDataType,
       ColumnReader columnReader, NullValueVectorCreator nullVec, int docId)
       throws IOException {
@@ -321,11 +350,9 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
     return ColumnarValueNormalizer.normalize(columnName, fieldSpec, destDataType, rawValue);
   }
 
-  /**
-   * Emit a single INFO line, once per column-major build after all columns are indexed, reporting how many
-   * single-value primitive columns took the typed allocation-free fast path versus the Object path (multi-value,
-   * non-primitive single-value, or a fast-path primitive whose source type did not match the schema).
-   */
+  /// Emit a single INFO line, once per column-major build after all columns are indexed, reporting how many
+  /// single-value primitive columns took the typed allocation-free fast path versus the Object path (multi-value,
+  /// non-primitive single-value, or a fast-path primitive whose source type did not match the schema).
   void logColumnMajorBuildPathSummary() {
     LOGGER.info("Column-major build path for segment {}: {} column(s) via typed single-value primitive fast path, "
             + "{} column(s) via Object path",

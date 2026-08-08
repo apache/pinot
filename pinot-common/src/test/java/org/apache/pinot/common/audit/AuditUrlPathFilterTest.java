@@ -26,10 +26,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 
-/**
- * Unit tests for {@link AuditUrlPathFilter}.
- * Tests the filter's delegation to PathMatcher and its input handling logic.
- */
+/// Unit tests for [AuditUrlPathFilter].
+/// Tests the filter's delegation to PathMatcher and its input handling logic.
 public class AuditUrlPathFilterTest {
 
   private AuditUrlPathFilter _filter;

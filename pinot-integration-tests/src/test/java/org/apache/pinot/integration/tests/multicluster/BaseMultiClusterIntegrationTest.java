@@ -69,10 +69,8 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
-/**
- * Base class for multi-cluster integration tests. Contains common setup/teardown logic,
- * utility methods, and helper functions for managing multi-cluster test environments.
- */
+/// Base class for multi-cluster integration tests. Contains common setup/teardown logic,
+/// utility methods, and helper functions for managing multi-cluster test environments.
 public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseMultiClusterIntegrationTest.class);
 
@@ -125,9 +123,7 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
     LOGGER.info("BaseMultiClusterIntegrationTest setup complete");
   }
 
-  /**
-   * Starts a broker configured with cluster2 (valid) and an unavailable cluster (invalid ZK).
-   */
+  /// Starts a broker configured with cluster2 (valid) and an unavailable cluster (invalid ZK).
   private void startBrokerWithUnavailableCluster() throws Exception {
     _brokerWithUnavailableCluster = new ClusterComponents();
     _brokerWithUnavailableCluster._brokerPort = findAvailablePort(55000);
@@ -490,9 +486,7 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
 
   // ========== Result Parsing and Validation Methods ==========
 
-  /**
-   * Helper to verify physical table validation error when enableMultiClusterRouting=true is used.
-   */
+  /// Helper to verify physical table validation error when enableMultiClusterRouting=true is used.
   protected void assertPhysicalTableValidationError(JsonNode exceptions) {
     assertNotNull(exceptions, "Expected validation error for physical table with enableMultiClusterRouting=true");
     assertTrue(exceptions.size() > 0, "Expected validation error exceptions");
@@ -511,9 +505,7 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
         "Expected validation error stating physical tables cannot be queried with enableMultiClusterRouting=true");
   }
 
-  /**
-   * Helper to verify no federation-related exceptions are present.
-   */
+  /// Helper to verify no federation-related exceptions are present.
   protected void assertNoFederationExceptions(JsonNode exceptions) {
     if (exceptions != null && exceptions.size() > 0) {
       for (JsonNode ex : exceptions) {
@@ -580,9 +572,7 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
 
   // ========== Query Option Helpers ==========
 
-  /**
-   * Builds query option string based on the provided flags.
-   */
+  /// Builds query option string based on the provided flags.
   protected String buildQueryOptions(boolean enableMultiClusterRouting, boolean useMultistageEngine,
       boolean usePhysicalOptimizer, boolean runInBroker) {
     StringBuilder opts = new StringBuilder();
@@ -601,17 +591,15 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
     return opts.toString();
   }
 
-  /**
-   * Common test logic for verifying physical tables always query local cluster only.
-   * Physical tables should be rejected when enableMultiClusterRouting=true, and should
-   * return local-only data otherwise.
-   *
-   * @param physicalTableName The physical table name (with _OFFLINE suffix)
-   * @param queryOptions Query options string
-   * @param brokerPort Broker port to query
-   * @param expectValidationError Whether to expect a validation error
-   * @param testName Test name for logging
-   */
+  /// Common test logic for verifying physical tables always query local cluster only.
+  /// Physical tables should be rejected when enableMultiClusterRouting=true, and should
+  /// return local-only data otherwise.
+  ///
+  /// @param physicalTableName The physical table name (with \_OFFLINE suffix)
+  /// @param queryOptions Query options string
+  /// @param brokerPort Broker port to query
+  /// @param expectValidationError Whether to expect a validation error
+  /// @param testName Test name for logging
   protected void verifyPhysicalTableLocalOnly(String physicalTableName, String queryOptions, int brokerPort,
       boolean expectValidationError, String testName) throws Exception {
     LOGGER.info("Running {} on broker port {} - physical tables should always query local cluster only",

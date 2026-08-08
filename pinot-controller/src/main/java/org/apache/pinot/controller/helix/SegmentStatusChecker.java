@@ -63,14 +63,13 @@ import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Manages the segment status metrics, regarding tables with fewer replicas than requested
- * and segments in error state.
- */
+/// Manages the segment status metrics, regarding tables with fewer replicas than requested
+/// and segments in error state.
 public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusChecker.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStatusChecker.class);
   private static final ZNRecordSerializer RECORD_SERIALIZER = new ZNRecordSerializer();
@@ -90,11 +89,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
   private long _lastDisabledTableLogTimestamp = 0;
 
-  /**
-   * Constructs the segment status checker.
-   * @param pinotHelixResourceManager The resource checker used to interact with Helix
-   * @param config The controller configuration object
-   */
+  /// Constructs the segment status checker.
+  /// @param pinotHelixResourceManager The resource checker used to interact with Helix
+  /// @param config The controller configuration object
   public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
       TableSizeReader tableSizeReader) {
@@ -169,10 +166,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     });
   }
 
-  /**
-   * Updates metrics related to the table config.
-   * If table config not found, resets the metrics
-   */
+  /// Updates metrics related to the table config.
+  /// If table config not found, resets the metrics
   private void updateTableConfigMetrics(String tableNameWithType, TableConfig tableConfig, Context context) {
     if (tableConfig == null) {
       LOGGER.warn("Found null table config for table: {}. Resetting table config metrics.", tableNameWithType);
@@ -211,14 +206,12 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     updateTenantInfoGauge(tableNameWithType, tableConfig);
   }
 
-  /**
-   * Emits one {@code tableTenantInfo} gauge per (tenantType, tenantName) pair for a table so Prometheus can extract
-   * both as labels and join them onto other table-scoped metrics.  Every gauge is always set to {@code 1}.
-   * TenantType values: {@code "server"} (server tenant), {@code "broker"} (broker tenant), {@code "tier"} (tier
-   * server tenant).  The compound key {@code "<tenantType>.<tenantName>"} is embedded in the JMX metric name.
-   * Gauges are only written on first registration or when the tenant assignment changes, not on every periodic cycle.
-   * When assignments change, new gauges are registered before stale ones are removed to avoid a scrape-window gap.
-   */
+  /// Emits one `tableTenantInfo` gauge per (tenantType, tenantName) pair for a table so Prometheus can extract
+  /// both as labels and join them onto other table-scoped metrics.  Every gauge is always set to `1`.
+  /// TenantType values: `"server"` (server tenant), `"broker"` (broker tenant), `"tier"` (tier
+  /// server tenant).  The compound key `"<tenantType>.<tenantName>"` is embedded in the JMX metric name.
+  /// Gauges are only written on first registration or when the tenant assignment changes, not on every periodic cycle.
+  /// When assignments change, new gauges are registered before stale ones are removed to avoid a scrape-window gap.
   private void updateTenantInfoGauge(String tableNameWithType, TableConfig tableConfig) {
     TenantConfig tenantConfig = tableConfig.getTenantConfig();
 
@@ -277,10 +270,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
   }
 
-  /**
-   * Runs a segment status pass over the given table.
-   * TODO: revisit the logic and reduce the ZK access
-   */
+  /// Runs a segment status pass over the given table.
+  /// TODO: revisit the logic and reduce the ZK access
   private boolean updateSegmentMetrics(String tableNameWithType, TableConfig tableConfig, Context context) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
 
@@ -417,18 +408,24 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         tableCompressedSize += sizeInBytes;
       }
 
-      // NOTE: We want to skip segments that are just created/pushed to avoid false alerts because it is expected for
-      //       servers to take some time to load them. For consuming (IN_PROGRESS) segments, we use creation time from
-      //       the ZK metadata; for pushed segments, we use push time from the ZK metadata. Both of them are the time
-      //       when segment is newly created. For committed segments from real-time table, push time doesn't exist, and
-      //       creationTimeMs will be Long.MIN_VALUE, which is fine because we want to include them in the check.
+      // NOTE: We want to skip segments that were recently created/committed/pushed to avoid false alerts, because it
+      //       is expected for servers to take some time to load them. We use the segment ZK znode's modification time
+      //       (mtime), which tracks the last state change: creation for consuming (IN_PROGRESS) segments, the
+      //       CONSUMING -> COMMITTING -> ONLINE commit transition for real-time (LLC) segments, and the push time for
+      //       offline segments. Creation time is not a correct proxy for a COMMITTING/DONE segment: it marks when
+      //       consumption STARTED, which can be long before commit, so a segment still transitioning to ONLINE would
+      //       be flagged. If the znode stat is unavailable we fall back to creation time (mtime == creation for a
+      //       freshly created IN_PROGRESS segment).
+      //       The grace window is _waitForPushTimeSeconds. Once a segment is older than it and still
+      //       under-replicated, it is checked normally, so genuinely stuck commits and real replica losses still alert.
       //       The comparison uses evSnapshotTimestamp instead of System.currentTimeMillis() because for large tables
       //       with many segments, the status check can take several minutes. A segment updated after
       //       the EV snapshot was taken but before this individual segment check runs could be incorrectly flagged as
       //       OFFLINE when using current time.
-      long creationTimeMs = segmentZKMetadata.getStatus() == Status.IN_PROGRESS ? segmentZKMetadata.getCreationTime()
-          : segmentZKMetadata.getPushTime();
-      if (creationTimeMs > evSnapshotTimestamp - _waitForPushTimeSeconds * 1000L) {
+      Stat segmentStat = propertyStore == null ? null : propertyStore.getStat(
+          ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segment), AccessOption.PERSISTENT);
+      long refTimeMs = segmentStat != null ? segmentStat.getMtime() : segmentZKMetadata.getCreationTime();
+      if (refTimeMs > evSnapshotTimestamp - _waitForPushTimeSeconds * 1000L) {
         continue;
       }
 

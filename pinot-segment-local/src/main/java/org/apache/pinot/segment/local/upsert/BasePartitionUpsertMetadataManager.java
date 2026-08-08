@@ -23,8 +23,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.AtomicDouble;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +34,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.HelixManager;
@@ -101,11 +102,18 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // is not managed by the manager currently.
   protected final Set<IndexSegment> _trackedSegments = ConcurrentHashMap.newKeySet();
   // Track all the immutable segments where changes took place since last snapshot was taken.
-  // Note: we need take to take _snapshotLock RLock while updating this set as it may be updated by the multiple
-  // Helix threads. Otherwise, segments might be missed by the consuming thread when taking snapshots, which takes
-  // snapshotLock WLock and clear the tracking set to avoid keeping segment object references around.
+  // Note: the set can be updated by multiple Helix task threads and the consuming thread concurrently. To not miss
+  // segments updated while a snapshot is being taken, the snapshot flow removes the exact segments it has persisted
+  // instead of clearing the set, and it retains only the tracked segments at the end of each snapshot round to avoid
+  // keeping stale segment object references around.
   // Skip mutableSegments as only immutable segments are for taking snapshots.
-  protected final Set<IndexSegment> _updatedSegmentsSinceLastSnapshot = ConcurrentHashMap.newKeySet();
+  protected final Set<ImmutableSegmentImpl> _updatedSegmentsSinceLastSnapshot = ConcurrentHashMap.newKeySet();
+  // Track all the immutable segments that have their validDocIds snapshot file persisted on disk. The snapshot flow
+  // persists the snapshots of these segments before creating snapshot files for the other segments, and uses this
+  // set to classify the segments without checking the segment directory or acquiring the segmentLock. The
+  // queryableDocIds snapshot file is persisted along with the validDocIds snapshot file, but doesn't decide the
+  // membership of this set. Only maintained when snapshot is enabled.
+  protected final Set<ImmutableSegmentImpl> _segmentsWithSnapshot = ConcurrentHashMap.newKeySet();
 
   // NOTE: We do not persist snapshot on the first consuming segment because most segments might not be loaded yet
   // We only do this for Full-Upsert tables, for partial-upsert tables, we have a check allSegmentsLoaded
@@ -148,7 +156,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _comparisonColumns = context.getComparisonColumns();
     _deleteRecordColumn = context.getDeleteRecordColumn();
     _hashFunction = context.getHashFunction();
-    _partialUpsertHandler = context.getPartialUpsertHandler();
+    // Build a handler owned by this partition. PartialUpsertHandler is not thread safe, and merges for a partition
+    // run on one consumer thread at a time, same as the _reusePreviousRow scratch state used alongside it.
+    Supplier<PartialUpsertHandler> partialUpsertHandlerSupplier = context.getPartialUpsertHandlerSupplier();
+    _partialUpsertHandler = partialUpsertHandlerSupplier != null ? partialUpsertHandlerSupplier.get() : null;
     _enableSnapshot = context.isSnapshotEnabled();
     _isPreloading = context.isPreloadEnabled();
     _metadataTTL = context.getMetadataTTL();
@@ -291,27 +302,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip adding segment: {} because metadata manager is already stopped", segment.getSegmentName());
       return;
     }
+    ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
     try {
-      doAddSegment((ImmutableSegmentImpl) segment);
-      _trackedSegments.add(segment);
-      if (_enableSnapshot) {
-        _updatedSegmentsSinceLastSnapshot.add(segment);
-      }
+      doAddSegment(immutableSegment);
+      _trackedSegments.add(immutableSegment);
+      trackSegmentForSnapshot(immutableSegment);
     } finally {
       finishOperation();
     }
-  }
-
-  /**
-   * Creates a RecordInfoReader for the given segment. When comparison columns are configured, reads comparison values
-   * from the columns. When comparison columns are empty, uses segment creation time as the comparison value.
-   */
-  protected UpsertUtils.RecordInfoReader createRecordInfoReader(IndexSegment segment) {
-    if (_comparisonColumns.isEmpty()) {
-      long segmentCreationTime = getAuthoritativeUpdateOrCreationTime(segment);
-      return new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns, segmentCreationTime, _deleteRecordColumn);
-    }
-    return new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn);
   }
 
   protected boolean isTTLEnabled() {
@@ -366,7 +364,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected void doAddSegment(ImmutableSegmentImpl segment) {
     String segmentName = segment.getSegmentName();
     _logger.info("Adding segment: {}, current primary key count: {}", segmentName, getNumPrimaryKeys());
-    if (isTTLEnabled() && !_comparisonColumns.isEmpty()) {
+    if (isTTLEnabled()) {
       double maxComparisonValue = getMaxComparisonValue(segment);
       _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
       if (isOutOfMetadataTTL(maxComparisonValue) && skipAddSegmentOutOfTTL(segment)) {
@@ -377,7 +375,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (!_enableSnapshot) {
       deleteSnapshot(segment);
     }
-    try (UpsertUtils.RecordInfoReader recordInfoReader = createRecordInfoReader(segment)) {
+    try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
+        _comparisonColumns, _deleteRecordColumn)) {
       Iterator<RecordInfo> recordInfoIterator =
           UpsertUtils.getRecordInfoIterator(recordInfoReader, segment.getSegmentMetadata().getTotalDocs());
       addSegment(segment, null, null, recordInfoIterator);
@@ -417,10 +416,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip preloading segment: {} because metadata manager is already stopped", segmentName);
       return;
     }
+    ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
     try {
-      doPreloadSegment((ImmutableSegmentImpl) segment);
-      _trackedSegments.add(segment);
-      _updatedSegmentsSinceLastSnapshot.add(segment);
+      doPreloadSegment(immutableSegment);
+      _trackedSegments.add(immutableSegment);
+      trackSegmentForSnapshot(immutableSegment);
     } finally {
       finishOperation();
     }
@@ -442,14 +442,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(), queryableDocIds);
       return;
     }
-    if (isTTLEnabled() && !_comparisonColumns.isEmpty()) {
+    if (isTTLEnabled()) {
       double maxComparisonValue = getMaxComparisonValue(segment);
       _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
       if (isOutOfMetadataTTL(maxComparisonValue) && skipPreloadSegmentOutOfTTL(segment, validDocIds)) {
         return;
       }
     }
-    try (UpsertUtils.RecordInfoReader recordInfoReader = createRecordInfoReader(segment)) {
+    try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
+        _comparisonColumns, _deleteRecordColumn)) {
       doPreloadSegment(segment, null, null, UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIds));
     } catch (Exception e) {
       throw new RuntimeException(
@@ -464,11 +465,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         System.currentTimeMillis() - startTimeMs, numPrimaryKeys);
   }
 
-  /**
-   * NOTE: no need to get segmentLock to preload segment as callers ensure the segment is processed by a single thread.
-   * NOTE: We allow passing in validDocIds and queryableDocIds here so that the value can be easily accessed from the
-   *       tests. The passed in bitmaps should always be empty.
-   */
+  /// NOTE: no need to get segmentLock to preload segment as callers ensure the segment is processed by a single thread.
+  /// NOTE: We allow passing in validDocIds and queryableDocIds here so that the value can be easily accessed from the
+  ///       tests. The passed in bitmaps should always be empty.
   @VisibleForTesting
   void doPreloadSegment(ImmutableSegmentImpl segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator) {
@@ -481,10 +480,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     addSegmentWithoutUpsert(segment, validDocIds, queryableDocIds, recordInfoIterator);
   }
 
-  /**
-   * NOTE: We allow passing in validDocIds and queryableDocIds here so that the value can be easily accessed from the
-   *       tests. The passed in bitmaps should always be empty.
-   */
+  /// NOTE: We allow passing in validDocIds and queryableDocIds here so that the value can be easily accessed from the
+  ///       tests. The passed in bitmaps should always be empty.
   @VisibleForTesting
   public void addSegment(ImmutableSegmentImpl segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator) {
@@ -507,20 +504,18 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     doAddOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
   }
 
-  /**
-   * <li> When the replacing segment and current segment are of {@link LLCSegmentName} then the PK should resolve to
-   * row in segment with higher sequence id.
-   * <li> If either or both are not LLC segment, then resolve based on creation time of segment. If creation time is
-   * same then prefer uploaded segment if other is LLCSegmentName
-   * <li> If both are uploaded segment, prefer standard UploadedRealtimeSegmentName, if still a tie, then resolve to
-   * current segment.
-   *
-   * @param segmentName replacing segment name
-   * @param currentSegmentName current segment name having the record for the given primary key
-   * @param segmentCreationTimeMs replacing segment creation time
-   * @param currentSegmentCreationTimeMs current segment creation time
-   * @return true if the record in replacing segment should replace the record in current segment
-   */
+  /// - When the replacing segment and current segment are of [LLCSegmentName] then the PK should resolve to
+  ///   row in segment with higher sequence id.
+  /// - If either or both are not LLC segment, then resolve based on creation time of segment. If creation time is
+  ///   same then prefer uploaded segment if other is LLCSegmentName
+  /// - If both are uploaded segment, prefer standard UploadedRealtimeSegmentName, if still a tie, then resolve to
+  ///   current segment.
+  ///
+  ///   @param segmentName replacing segment name
+  ///   @param currentSegmentName current segment name having the record for the given primary key
+  ///   @param segmentCreationTimeMs replacing segment creation time
+  ///   @param currentSegmentCreationTimeMs current segment creation time
+  ///   @return true if the record in replacing segment should replace the record in current segment
   protected boolean shouldReplaceOnComparisonTie(String segmentName, String currentSegmentName,
       long segmentCreationTimeMs, long currentSegmentCreationTimeMs) {
     // resolve using sequence id if both are LLCSegmentName
@@ -552,8 +547,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           segment.getSegmentName());
       return false;
     }
-    // NOTE: We don't acquire snapshot read lock here because snapshot is always taken before a new consuming segment
-    //       starts consuming, so it won't overlap with this method
+    // NOTE: Snapshot is always taken by the consuming thread before a new consuming segment starts consuming, so
+    //       taking snapshot won't overlap with this method
     try {
       boolean addRecord = doAddRecord(segment, recordInfo);
       _trackedSegments.add(segment);
@@ -563,10 +558,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  /**
-   * Returns {@code true} when the record is added to the upsert metadata manager, {@code false} when the record is
-   * out-of-order thus not added.
-   */
+  /// Returns `true` when the record is added to the upsert metadata manager, `false` when the record is
+  /// out-of-order thus not added.
   protected abstract boolean doAddRecord(MutableSegment segment, RecordInfo recordInfo);
 
   @Override
@@ -577,15 +570,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     try {
       doReplaceSegment(segment, oldSegment);
-      if (!(segment instanceof EmptyIndexSegment)) {
-        _trackedSegments.add(segment);
-        if (_enableSnapshot) {
-          _updatedSegmentsSinceLastSnapshot.add(segment);
-        }
+      if (segment instanceof ImmutableSegmentImpl immutableSegment) {
+        _trackedSegments.add(immutableSegment);
+        // The snapshot file is evaluated on the new segment object because the replacement might have kept it
+        // (e.g. segment reload) or started from a clean segment directory (e.g. segment re-download).
+        trackSegmentForSnapshot(immutableSegment);
       }
-      _trackedSegments.remove(oldSegment);
-      // Remove the segment eagerly so we need not wait until next snapshot cycle to remove replaced segment
-      _updatedSegmentsSinceLastSnapshot.remove(oldSegment);
+      untrackSegment(oldSegment);
     } finally {
       finishOperation();
     }
@@ -605,21 +596,21 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       replaceSegment(segment, null, null, null, oldSegment);
       return;
     }
-    if (isTTLEnabled() && !_comparisonColumns.isEmpty()) {
+    if (isTTLEnabled()) {
       double maxComparisonValue = getMaxComparisonValue(segment);
       _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
       // Segment might be uploaded directly to the table to replace an old segment. So update the TTL watermark but
       // we can't skip segment even if it's out of TTL as its validDocIds bitmap is not updated yet.
     }
-    try (UpsertUtils.RecordInfoReader recordInfoReader = createRecordInfoReader(segment)) {
+    try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
+        _comparisonColumns, _deleteRecordColumn)) {
       // Reload-only fast path for an upsert + TTL table. The incoming segment carries a validDocIds snapshot ONLY when
       // the reload flow placed it there (see BaseTableDataManager.reloadSegment); segment commits and uploads always
       // build a fresh segment without one and fall through to the full scan below, unaffected. Rebuilding from just the
       // snapshot's valid docs avoids resurrecting primary keys already expired/deleted by TTL.
       MutableRoaringBitmap validDocIdsSnapshot = null;
-      if (isTTLEnabled() && segment instanceof ImmutableSegmentImpl) {
-        validDocIdsSnapshot =
-            ((ImmutableSegmentImpl) segment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+      if (isTTLEnabled() && segment instanceof ImmutableSegmentImpl immutableSegment) {
+        validDocIdsSnapshot = immutableSegment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
       }
       Iterator<RecordInfo> recordInfoIterator;
       if (validDocIdsSnapshot != null) {
@@ -650,10 +641,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         System.currentTimeMillis() - startTimeMs, numPrimaryKeys);
   }
 
-  /**
-   * NOTE: We allow passing in validDocIds and queryableDocIds here so that the value can be easily accessed from tests.
-   *       The passed-in bitmaps should always be empty.
-   */
+  /// NOTE: We allow passing in validDocIds and queryableDocIds here so that the value can be easily accessed from
+  /// tests.
+  ///       The passed-in bitmaps should always be empty.
   @VisibleForTesting
   public void replaceSegment(ImmutableSegment segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, @Nullable Iterator<RecordInfo> recordInfoIterator,
@@ -689,37 +679,33 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       validDocIdsForOldSegment = getValidDocIdsForOldSegment(oldSegment);
     }
     if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
-      if (_context.isTableTypeInconsistentDuringConsumption()) {
-        if (shouldRevertMetadataOnInconsistency(oldSegment)) {
-          // If there are still valid docs in the old segment, validate and revert the metadata of the
-          // consuming segment in place
-          revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
-          return;
-        } else {
-          logInconsistentResults(segmentName, validDocIdsForOldSegment.getCardinality());
-        }
+      if (shouldRevertMetadataOnInconsistency(oldSegment)) {
+        // If there are still valid docs in the old segment, validate and revert the metadata of the
+        // consuming segment in place
+        revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
+        return;
       }
+      _logger.warn("Found {} primary keys not replaced for segment: {}",
+          validDocIdsForOldSegment.getCardinality(), segmentName);
+      updateInconsistentRowsMetric(segmentName, validDocIdsForOldSegment.getCardinality());
       removeSegment(oldSegment, validDocIdsForOldSegment);
     }
   }
 
-  /**
-   * Determines whether metadata should be reverted when inconsistencies are detected during segment replacement.
-   * This is only applicable when in PROTECTED mode, the old segment is a mutable segment,
-   * and the table has inconsistent state configurations.
-   *
-   * @param oldSegment the old segment being replaced
-   * @return true if metadata revert should be performed on inconsistency
-   */
+  /// Determines whether metadata should be reverted when inconsistencies are detected during segment replacement.
+  /// This is only applicable when in PROTECTED mode, the old segment is a mutable segment,
+  /// and the table has inconsistent state configurations.
+  ///
+  /// @param oldSegment the old segment being replaced
+  /// @return true if metadata revert should be performed on inconsistency
   public boolean shouldRevertMetadataOnInconsistency(IndexSegment oldSegment) {
     return ConsumingSegmentConsistencyModeListener.getInstance().getConsistencyMode()
-        .equals(ConsumingSegmentConsistencyModeListener.Mode.PROTECTED) && oldSegment instanceof MutableSegment
+        == ConsumingSegmentConsistencyModeListener.Mode.PROTECTED
+        && oldSegment instanceof MutableSegment
         && _context.isTableTypeInconsistentDuringConsumption();
   }
 
-  /**
-   * Reverts segment upsert metadata
-   */
+  /// Reverts segment upsert metadata
   protected void revertSegmentUpsertMetadata(IndexSegment oldSegment, String segmentName,
       MutableRoaringBitmap validDocIdsForOldSegment) {
     _logger.info("Inconsistencies noticed for the segment: {} across servers, reverting the metadata to resolve...",
@@ -732,22 +718,20 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     int numKeysStillNotReplaced = getPrevKeyToRecordLocationSize();
     if (numKeysStillNotReplaced > 0) {
-      logInconsistentResults(segmentName, numKeysStillNotReplaced);
+      _logger.warn("Found {} primary keys not replaced for segment: {} after revert attempt",
+          numKeysStillNotReplaced, segmentName);
+      updateInconsistentRowsMetric(segmentName, numKeysStillNotReplaced);
       // Clear the map when inconsistencies still exist for the consuming segments
       clearPrevKeyToRecordLocation();
     }
   }
 
-  protected void logInconsistentResults(String segmentName, int numKeysStillNotReplaced) {
-    _logger.error("Found {} primary keys not replaced for segment: {}. "
-            + "Proceeding with current state which may cause inconsistency. To correct this behaviour from now, set "
-            + "cluster config: `pinot.server.consuming.segment.consistency.mode` to `PROTECTED`",
-        numKeysStillNotReplaced, segmentName);
-    if (_context.isDropOutOfOrderRecord() || _context.getOutOfOrderRecordColumn() != null) {
-      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_UPSERT_INCONSISTENT_ROWS,
-          numKeysStillNotReplaced);
-    } else if (_partialUpsertHandler != null) {
+  protected void updateInconsistentRowsMetric(String segmentName, int numKeysStillNotReplaced) {
+    if (_partialUpsertHandler != null) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_KEYS_NOT_REPLACED,
+          numKeysStillNotReplaced);
+    } else {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_UPSERT_INCONSISTENT_ROWS,
           numKeysStillNotReplaced);
     }
   }
@@ -777,14 +761,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     try {
       // Skip removing the upsert metadata of segment that is out of metadata TTL. The expired metadata is removed
       // while creating new consuming segment in batches.
-      if (!_comparisonColumns.isEmpty() && isOutOfMetadataTTL(segment)) {
+      if (isOutOfMetadataTTL(segment)) {
         _logger.info("Skip removing segment: {} because it's out of TTL", segmentName);
       } else {
         doRemoveSegment(segment);
       }
-      _trackedSegments.remove(segment);
-      // Remove the segment eagerly so we need not wait until next snapshot cycle to remove dropped segment
-      _updatedSegmentsSinceLastSnapshot.remove(segment);
+      untrackSegment(segment);
     } finally {
       finishOperation();
     }
@@ -852,24 +834,20 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  /**
-   * When we have to process a new segment, if there are comparison value ties for the same primary-key within the
-   * segment, then for Partial Upsert tables we need to make sure that the record location map is updated only
-   * for the latest version of the record. This is specifically a concern for Partial Upsert tables because Realtime
-   * consumption can potentially end up reading the wrong version of a record, which will lead to permanent
-   * data-inconsistency.
-   *
-   * <p>
-   *  This function returns an iterator that will de-dup records with the same primary-key. Moreover, for comparison
-   *  ties, it will only keep the latest record. This iterator can then further be used to update the primary-key
-   *  record location map safely.
-   * </p>
-   *
-   * @param recordInfoIterator iterator over the new segment
-   * @param hashFunction       hash function configured for Upsert's primary keys
-   * @return iterator that returns de-duplicated records. To resolve ties for comparison column values, we prefer to
-   *         return the latest record.
-   */
+  /// When we have to process a new segment, if there are comparison value ties for the same primary-key within the
+  /// segment, then for Partial Upsert tables we need to make sure that the record location map is updated only
+  /// for the latest version of the record. This is specifically a concern for Partial Upsert tables because Realtime
+  /// consumption can potentially end up reading the wrong version of a record, which will lead to permanent
+  /// data-inconsistency.
+  ///
+  ///  This function returns an iterator that will de-dup records with the same primary-key. Moreover, for comparison
+  ///  ties, it will only keep the latest record. This iterator can then further be used to update the primary-key
+  ///  record location map safely.
+  ///
+  /// @param recordInfoIterator iterator over the new segment
+  /// @param hashFunction       hash function configured for Upsert's primary keys
+  /// @return iterator that returns de-duplicated records. To resolve ties for comparison column values, we prefer to
+  ///         return the latest record.
   @SuppressWarnings({"rawtypes", "unchecked"})
   protected static Iterator<RecordInfo> resolveComparisonTies(Iterator<RecordInfo> recordInfoIterator,
       HashFunction hashFunction) {
@@ -930,69 +908,76 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     int numImmutableSegments = 0;
     int numConsumingSegments = 0;
     int numUnchangedSegments = 0;
-    // The segments without validDocIds & queryable docId snapshots should take their snapshots at last. So that when
-    // there is failure to take snapshots, the validDocIds snapshot on disk still keep track of an exclusive set of
-    // valid docs across segments. Because the valid docs as tracked by the existing validDocIds snapshots can only
-    // get less. That no overlap of valid docs among segments with snapshots is required by the preloading to work
-    // correctly. We wouldn't be using queryableDocIds anywhere currently during preload - storing them so we
-    // could better extend the functionality. Best case scenario, if both validDocs and queryableDocs are not persisted,
-    // we will be considering that segment is not storing updated bitmap copies on disk
-    Set<ImmutableSegmentImpl> segmentsWithoutSnapshot = new HashSet<>();
+    // The segments without snapshots on disk should take their snapshots after the segments with existing snapshots
+    // persist theirs, so that when there is failure to persist the existing snapshots, no new snapshot file is added
+    // on disk, and the validDocIds snapshots kept on disk still track an exclusive set of valid docs across
+    // segments. This works because the valid docs as tracked by the existing snapshots can only get less, and the
+    // preloading requires no overlap of valid docs among the snapshots on disk to work correctly. The
+    // queryableDocIds snapshots are not used during preload currently - storing them so we could better extend the
+    // functionality.
+    List<ImmutableSegmentImpl> segmentsWithSnapshot = new ArrayList<>();
+    List<ImmutableSegmentImpl> segmentsWithoutSnapshot = new ArrayList<>();
+    for (IndexSegment segment : _trackedSegments) {
+      if (segment instanceof ImmutableSegmentImpl immutableSegment) {
+        if (!_updatedSegmentsSinceLastSnapshot.contains(segment)) {
+          // if no updates since last snapshot then skip
+          numUnchangedSegments++;
+          continue;
+        }
+        if (_segmentsWithSnapshot.contains(segment)) {
+          segmentsWithSnapshot.add(immutableSegment);
+        } else {
+          segmentsWithoutSnapshot.add(immutableSegment);
+        }
+      } else {
+        numConsumingSegments++;
+      }
+    }
     TableDataManager tableDataManager = _context.getTableDataManager();
     Preconditions.checkNotNull(tableDataManager, "Taking snapshot requires tableDataManager");
     boolean isSegmentSkipped = false;
-    for (IndexSegment segment : _trackedSegments) {
-      if (!(segment instanceof ImmutableSegmentImpl)) {
-        numConsumingSegments++;
-        continue;
-      }
-      if (!_updatedSegmentsSinceLastSnapshot.contains(segment)) {
-        // if no updates since last snapshot then skip
-        numUnchangedSegments++;
-        continue;
-      }
-      // Try to acquire the segmentLock when taking snapshot for the segment because the segment directory can be
-      // modified, e.g. a new snapshot file can be added to the directory. If not taking the lock, the Helix task
-      // thread replacing the segment could fail. For example, we found FileUtils.cleanDirectory() failed due to
+    for (ImmutableSegmentImpl segment : segmentsWithSnapshot) {
+      // Acquire the segmentLock when taking snapshot for the segment because the segment directory can be modified,
+      // e.g. a new snapshot file can be added to the directory. If not taking the lock, the Helix task thread
+      // replacing the segment could fail. For example, we found FileUtils.cleanDirectory() failed due to
       // DirectoryNotEmptyException because a new snapshot file got added into the segment directory just between two
       // major cleanup steps in the cleanDirectory() method.
+      // The lock is acquired in a non-blocking manner so that the consuming thread is not blocked by the thread
+      // processing the segment, which can hold the segmentLock for long, e.g. reloading the segment.
       String segmentName = segment.getSegmentName();
       Lock segmentLock = tableDataManager.getSegmentLock(segmentName);
       boolean locked = segmentLock.tryLock();
       if (!locked) {
-        // Try to get the segmentLock in a non-blocking manner to avoid deadlock. The Helix task thread takes
-        // segmentLock first and then the snapshot RLock when replacing a segment. However, the consuming thread has
-        // already acquired the snapshot WLock when reaching here, and if it has to wait for segmentLock, it may
-        // enter deadlock with the Helix task threads waiting for snapshot RLock.
-        // If we can't get the segmentLock, we'd better skip taking snapshot for this tracked segment, because its
-        // validDocIds/queryableDocIds might become stale or wrong when the segment is being processed by another
-        // thread right now.
+        // The snapshot kept on disk might have become stale, so skip creating new snapshot files in the next loop to
+        // keep all the snapshots on disk disjoint with each other.
         _logger.warn("Could not get segmentLock to take snapshot for segment: {}, skipping", segmentName);
         isSegmentSkipped = true;
         continue;
       }
       try {
-        ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
-        if (!immutableSegment.hasSnapshotFile(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME) || (
-            _deleteRecordColumn != null && !immutableSegment.hasSnapshotFile(
-                V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME))) {
-          segmentsWithoutSnapshot.add(immutableSegment);
+        // The segment can be replaced or removed by another thread before the segmentLock is acquired. The replaced
+        // segment object no longer owns the segment directory, and its bitmaps might have been drained by the
+        // replacement, so skip persisting them. The new segment object is tracked as updated, and will be covered by
+        // the next snapshot round. The snapshot kept on disk for the segment might be stale though, so also skip
+        // creating new snapshot files in the next loop.
+        if (!_trackedSegments.contains(segment)) {
+          _logger.warn("Segment: {} got replaced or removed before taking snapshot, skipping", segmentName);
+          isSegmentSkipped = true;
           continue;
         }
-        ThreadSafeMutableRoaringBitmap validDocIds = immutableSegment.getValidDocIds();
+        ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
         // NOTE: Segment out of TTL without snapshot might have null validDocIds
         if (validDocIds != null) {
           ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsSnapshot = validDocIds.getBytesAndCardinality();
-          immutableSegment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsSnapshot);
+          segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsSnapshot);
           numPrimaryKeysInSnapshot += validDocIdsSnapshot.getCardinality();
         }
         if (_deleteRecordColumn != null) {
-          ThreadSafeMutableRoaringBitmap queryableDocIds = immutableSegment.getQueryableDocIds();
+          ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
           if (queryableDocIds != null) {
             ThreadSafeMutableRoaringBitmap.CardinalityAndBytes queryableDocIdsSnapshot =
                 queryableDocIds.getBytesAndCardinality();
-            immutableSegment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME,
-                queryableDocIdsSnapshot);
+            segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, queryableDocIdsSnapshot);
             numQueryableDocIdsInSnapshot += queryableDocIdsSnapshot.getCardinality();
           }
         }
@@ -1006,13 +991,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
     }
     // If we have skipped any segments in the previous for-loop, we should skip the next for-loop, basically to not
-    // add new snapshot files on disk. This ensures all the validDocIds & queryable docIds snapshots kept on disk are
-    // still disjoint with each other, although some of them may have become stale, i.e. tracking more valid docs than
-    // expected.
+    // add new snapshot files on disk. This ensures all the validDocIds snapshots kept on disk are still disjoint
+    // with each other, although some of them may have become stale, i.e. tracking more valid docs than expected.
     if (!isSegmentSkipped) {
       for (ImmutableSegmentImpl segment : segmentsWithoutSnapshot) {
         String segmentName = segment.getSegmentName();
         Lock segmentLock = tableDataManager.getSegmentLock(segmentName);
+        // Unlike the previous loop, skipping a segment here on lock contention is benign: no snapshot file is
+        // written for it, so the snapshots kept on disk remain disjoint, and the segment stays tracked as updated
+        // to be retried in the next snapshot round. This is expected for the just committed segment, whose
+        // segmentLock can still be held by the thread replacing it with the immutable one.
         boolean locked = segmentLock.tryLock();
         if (!locked) {
           _logger.warn("Could not get segmentLock to take snapshot for segment: {} w/o snapshot, skipping",
@@ -1020,12 +1008,21 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           continue;
         }
         try {
+          // The segment can be replaced or removed by another thread after it was classified without snapshot.
+          // The replaced segment object no longer owns the segment directory, so skip persisting its bitmaps.
+          if (!_trackedSegments.contains(segment)) {
+            _logger.warn("Segment: {} got replaced or removed before taking snapshot, skipping", segmentName);
+            continue;
+          }
           ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
           // NOTE: Segment out of TTL without snapshot might have null validDocIds
           if (validDocIds != null) {
             ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsSnapshot =
                 validDocIds.getBytesAndCardinality();
             segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsSnapshot);
+            // The segment has its validDocIds snapshot file on disk now, so handle it as a segment with snapshot
+            // from now on, even if persisting the queryableDocIds snapshot below fails.
+            _segmentsWithSnapshot.add(segment);
             numPrimaryKeysInSnapshot += validDocIdsSnapshot.getCardinality();
           }
           if (_deleteRecordColumn != null) {
@@ -1047,6 +1044,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
     }
     _updatedSegmentsSinceLastSnapshot.retainAll(_trackedSegments);
+    _segmentsWithSnapshot.retainAll(_trackedSegments);
     // Persist TTL watermark after taking snapshots if TTL is enabled, so that segments out of TTL can be loaded with
     // updated validDocIds bitmaps. If the TTL watermark is persisted first, segments out of TTL may get loaded with
     // stale bitmaps or even no bitmap snapshots to use.
@@ -1131,9 +1129,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected abstract void revertAndRemoveSegment(IndexSegment segment,
       Iterator<Map.Entry<Integer, PrimaryKey>> primaryKeyIterator);
 
-  /**
-   * Removes all primary keys that have comparison value smaller than (largestSeenComparisonValue - TTL).
-   */
+  /// Removes all primary keys that have comparison value smaller than (largestSeenComparisonValue - TTL).
   protected abstract void doRemoveExpiredPrimaryKeys();
 
   protected synchronized boolean startOperation() {
@@ -1190,13 +1186,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _logger.info("Closed the metadata manager");
   }
 
-  /**
-   * The same R/WLock is used by the two consistency modes, but they are independent:
-   * - For sync mode, upsert threads take WLock to make updates on two segments' bitmaps atomically, and query threads
-   *   take RLock when to access the segment bitmaps.
-   * - For snapshot mode, upsert threads take RLock to make updates on segments' bitmaps so that they can be
-   *   synchronized with threads taking the snapshot of bitmaps, which take the WLock.
-   */
+  /// The same R/WLock is used by the two consistency modes, but they are independent:
+  /// - For sync mode, upsert threads take WLock to make updates on two segments' bitmaps atomically, and query threads
+  ///   take RLock when to access the segment bitmaps.
+  /// - For snapshot mode, upsert threads take RLock to make updates on segments' bitmaps so that they can be
+  ///   synchronized with threads taking the snapshot of bitmaps, which take the WLock.
   protected void replaceDocId(IndexSegment newSegment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, IndexSegment oldSegment, int oldDocId, int newDocId,
       RecordInfo recordInfo) {
@@ -1210,12 +1204,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     trackUpdatedSegmentsSinceLastSnapshot(oldSegment);
   }
 
-  /**
-   *  There is no need to take the R/WLock to update single bitmap, as all methods to update the bitmap is synchronized.
-   *  But for upsertViewBatchRefresh to work correctly, we need to block updates on bitmaps while doing batch refresh,
-   *  which takes WLock. So wrap bitmap update logic inside RLock to allow concurrent updates but to be blocked when
-   *  there is thread doing batch refresh, i.e. to take copies of all bitmaps.
-   */
+  /// There is no need to take the R/WLock to update single bitmap, as all methods to update the bitmap is synchronized.
+  /// But for upsertViewBatchRefresh to work correctly, we need to block updates on bitmaps while doing batch refresh,
+  /// which takes WLock. So wrap bitmap update logic inside RLock to allow concurrent updates but to be blocked when
+  /// there is thread doing batch refresh, i.e. to take copies of all bitmaps.
   protected void replaceDocId(IndexSegment segment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int oldDocId, int newDocId, RecordInfo recordInfo) {
     if (_upsertViewManager == null) {
@@ -1244,9 +1236,43 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected void trackUpdatedSegmentsSinceLastSnapshot(IndexSegment segment) {
-    if (_enableSnapshot && segment instanceof ImmutableSegment) {
-      _updatedSegmentsSinceLastSnapshot.add(segment);
+    if (_enableSnapshot && segment instanceof ImmutableSegmentImpl immutableSegment) {
+      _updatedSegmentsSinceLastSnapshot.add(immutableSegment);
     }
+  }
+
+  /// Tracks the segment as updated since the last snapshot, and as a segment with snapshot when its validDocIds
+  /// snapshot file already exists on disk. No-op when snapshot is not enabled.
+  ///
+  /// The segment is added to [#_segmentsWithSnapshot] before [#_updatedSegmentsSinceLastSnapshot] because the
+  /// snapshot flow checks the updated set before the with-snapshot set, so observing the updated marker guarantees
+  /// observing the with-snapshot membership as well, and a segment can never be misclassified as without snapshot
+  /// while its snapshot file is on disk.
+  protected void trackSegmentForSnapshot(ImmutableSegmentImpl segment) {
+    if (!_enableSnapshot) {
+      return;
+    }
+    if (hasValidDocIdsSnapshotFile(segment)) {
+      _segmentsWithSnapshot.add(segment);
+    }
+    _updatedSegmentsSinceLastSnapshot.add(segment);
+  }
+
+  /// Removes the segment from all the tracking sets. The segment is removed eagerly instead of waiting for the next
+  /// snapshot round to clean it up, to not keep stale segment object references around.
+  protected void untrackSegment(IndexSegment segment) {
+    _trackedSegments.remove(segment);
+    _updatedSegmentsSinceLastSnapshot.remove(segment);
+    _segmentsWithSnapshot.remove(segment);
+  }
+
+  /// Returns `true` when the segment has the validDocIds snapshot file on disk. The queryableDocIds snapshot file is
+  /// not checked because only the validDocIds snapshots are unioned across segments during preload, so only their
+  /// staleness can break the disjointness of the snapshots kept on disk. Both snapshot files are always persisted
+  /// together, so a missing queryableDocIds snapshot file gets recreated the next time the segment's snapshot is
+  /// taken.
+  protected boolean hasValidDocIdsSnapshotFile(ImmutableSegmentImpl segment) {
+    return segment.hasSnapshotFile(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
   }
 
   protected void doClose()
@@ -1293,17 +1319,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     return Set.of();
   }
 
-  /**
-   * Returns the ZooKeeper update time for upsert consistency.
-   * For realtime table, this refers to the time set by the controller when creating new consuming segment.
-   * For offline table, this refers to the segment push time.
-   * This is used to ensure consistent creation time across replicas for upsert operations.
-   * @return ZK push time or creation time in milliseconds, or Long.MIN_VALUE if not set
-   */
+  /// Returns the ZooKeeper update time for upsert consistency.
+  /// For realtime table, this refers to the time set by the controller when creating new consuming segment.
+  /// For offline table, this refers to the segment push time.
+  /// This is used to ensure consistent creation time across replicas for upsert operations.
+  /// @return ZK push time or creation time in milliseconds, or Long.MIN_VALUE if not set
   protected long getAuthoritativeUpdateOrCreationTime(IndexSegment segment) {
     SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
-    if (segmentMetadata instanceof SegmentMetadataImpl) {
-      SegmentMetadataImpl segmentMetadataImpl = (SegmentMetadataImpl) segmentMetadata;
+    if (segmentMetadata instanceof SegmentMetadataImpl segmentMetadataImpl) {
       if (_tableType == TableType.OFFLINE) {
         long zkPushTime = segmentMetadataImpl.getZkPushTime();
         if (zkPushTime != Long.MIN_VALUE) {

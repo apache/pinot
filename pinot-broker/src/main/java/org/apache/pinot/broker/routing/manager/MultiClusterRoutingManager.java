@@ -41,15 +41,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code MultiClusterRoutingManager} implements the {@link RoutingManager} to support multi-cluster routing.
- * It contains a local {@link BrokerRoutingManager} and multiple remote {@link RemoteClusterBrokerRoutingManager}
- * instances. For each routing request, it first queries the local cluster routing manager, and then queries the remote
- * cluster routing managers to combine the results.
- * For example, when getting the routing table for a table, it first gets the routing table from the local cluster
- * routing manager, and then gets the routing tables from the remote cluster routing managers to merge into a combined
- * routing table.
- */
+/// The `MultiClusterRoutingManager` implements the [RoutingManager] to support multi-cluster routing.
+/// It contains a local [BrokerRoutingManager] and multiple remote [RemoteClusterBrokerRoutingManager]
+/// instances. For each routing request, it first queries the local cluster routing manager, and then queries the remote
+/// cluster routing managers to combine the results.
+/// For example, when getting the routing table for a table, it first gets the routing table from the local cluster
+/// routing manager, and then gets the routing tables from the remote cluster routing managers to merge into a combined
+/// routing table.
 public class MultiClusterRoutingManager implements RoutingManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiClusterRoutingManager.class);
 

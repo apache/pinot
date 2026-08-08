@@ -40,27 +40,20 @@ import org.apache.pinot.sql.parsers.dml.DataManipulationStatement;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatementParser;
 
 
-/**
- * SqlQueryExecutor executes all SQL queries including DQL, DML, DCL, DDL.
- *
- */
+/// SqlQueryExecutor executes all SQL queries including DQL, DML, DCL, DDL.
 public class SqlQueryExecutor {
   private final String _controllerUrl;
   private final HelixManager _helixManager;
 
-  /**
-   * Fetch the lead controller from helix, HA is not guaranteed.
-   * @param helixManager is used to query leader controller from helix.
-   */
+  /// Fetch the lead controller from helix, HA is not guaranteed.
+  /// @param helixManager is used to query leader controller from helix.
   public SqlQueryExecutor(HelixManager helixManager) {
     _helixManager = helixManager;
     _controllerUrl = null;
   }
 
-  /**
-   * Recommended to provide the controller vip or service name for access.
-   * @param controllerUrl controller service name for sending minion task requests
-   */
+  /// Recommended to provide the controller vip or service name for access.
+  /// @param controllerUrl controller service name for sending minion task requests
   public SqlQueryExecutor(String controllerUrl) {
     _controllerUrl = controllerUrl;
     _helixManager = null;
@@ -83,13 +76,11 @@ public class SqlQueryExecutor {
     return controllerBaseUrl;
   }
 
-  /**
-   * Execute DML Statement
-   *
-   * @param sqlNodeAndOptions Parsed DML object
-   * @param headers extra headers map for minion task submission
-   * @return BrokerResponse is the DML executed response
-   */
+  /// Execute DML Statement
+  ///
+  /// @param sqlNodeAndOptions Parsed DML object
+  /// @param headers extra headers map for minion task submission
+  /// @return BrokerResponse is the DML executed response
   public BrokerResponse executeDMLStatement(SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable Map<String, String> headers) {
     DataManipulationStatement statement = DataManipulationStatementParser.parse(sqlNodeAndOptions);

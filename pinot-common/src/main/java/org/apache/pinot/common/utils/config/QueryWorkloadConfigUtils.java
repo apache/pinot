@@ -79,12 +79,10 @@ public class QueryWorkloadConfigUtils {
           .setDaemon(true)
           .build());
 
-  /**
-   * Converts a ZNRecord into a QueryWorkloadConfig object by extracting mapFields.
-   *
-   * @param znRecord The ZNRecord containing workload config data.
-   * @return A QueryWorkloadConfig object.
-   */
+  /// Converts a ZNRecord into a QueryWorkloadConfig object by extracting mapFields.
+  ///
+  /// @param znRecord The ZNRecord containing workload config data.
+  /// @return A QueryWorkloadConfig object.
   public static QueryWorkloadConfig fromZNRecord(ZNRecord znRecord) {
     Preconditions.checkNotNull(znRecord, "ZNRecord cannot be null");
     String queryWorkloadName = znRecord.getSimpleField(QueryWorkloadConfig.QUERY_WORKLOAD_NAME);
@@ -100,12 +98,10 @@ public class QueryWorkloadConfigUtils {
     }
   }
 
-  /**
-   * Updates a ZNRecord with the fields from a WorkloadConfig object.
-   *
-   * @param queryWorkloadConfig The QueryWorkloadConfig object to convert.
-   * @param znRecord The ZNRecord to update.
-   */
+  /// Updates a ZNRecord with the fields from a WorkloadConfig object.
+  ///
+  /// @param queryWorkloadConfig The QueryWorkloadConfig object to convert.
+  /// @param znRecord The ZNRecord to update.
   public static void updateZNRecordWithWorkloadConfig(ZNRecord znRecord, QueryWorkloadConfig queryWorkloadConfig) {
     znRecord.setSimpleField(QueryWorkloadConfig.QUERY_WORKLOAD_NAME, queryWorkloadConfig.getQueryWorkloadName());
     try {
@@ -119,13 +115,11 @@ public class QueryWorkloadConfigUtils {
   }
 
 
-  /**
-   * Gets a random controller URL by dynamically discovering all live controller instances from Helix.
-   * This distributes load across all available controllers instead of always hitting the lead controller.
-   *
-   * @param helixManager The Helix manager to use for dynamic discovery
-   * @return controller URL or null if not available
-   */
+  /// Gets a random controller URL by dynamically discovering all live controller instances from Helix.
+  /// This distributes load across all available controllers instead of always hitting the lead controller.
+  ///
+  /// @param helixManager The Helix manager to use for dynamic discovery
+  /// @return controller URL or null if not available
   public static String getControllerUrl(HelixManager helixManager) {
     try {
       HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
@@ -168,15 +162,13 @@ public class QueryWorkloadConfigUtils {
     }
   }
 
-  /**
-   * Fetches and updates the query workload budgets that this instance should use.
-   * This method is called by the instance at startup. It runs asynchronously in a background thread
-   * to avoid blocking the main thread.
-   *
-   * @param instanceId The ID of the instance to fetch configs for.
-   * @param helixManager The Helix manager to use for dynamic controller discovery.
-   * @param budgetFetchStatusCallback Callback to set the fetch status metric (1=success, 0=failure).
-   */
+  /// Fetches and updates the query workload budgets that this instance should use.
+  /// This method is called by the instance at startup. It runs asynchronously in a background thread
+  /// to avoid blocking the main thread.
+  ///
+  /// @param instanceId The ID of the instance to fetch configs for.
+  /// @param helixManager The Helix manager to use for dynamic controller discovery.
+  /// @param budgetFetchStatusCallback Callback to set the fetch status metric (1=success, 0=failure).
   public static void getAndUpdateWorkloadBudgets(String instanceId, HelixManager helixManager,
                                                  IntConsumer budgetFetchStatusCallback) {
     WORKLOAD_CONFIG_EXECUTOR.submit(() -> {
@@ -248,12 +240,10 @@ public class QueryWorkloadConfigUtils {
     });
   }
 
-  /**
-   * Validates the given QueryWorkloadConfig and returns a list of validation error messages.
-   *
-   * @param config the QueryWorkloadConfig to validate
-   * @return a list of validation errors; empty if config is valid
-   */
+  /// Validates the given QueryWorkloadConfig and returns a list of validation error messages.
+  ///
+  /// @param config the QueryWorkloadConfig to validate
+  /// @return a list of validation errors; empty if config is valid
   public static List<String> validateQueryWorkloadConfig(QueryWorkloadConfig config) {
     List<String> errors = new ArrayList<>();
     if (config == null) {
@@ -311,21 +301,17 @@ public class QueryWorkloadConfigUtils {
     return errors;
   }
 
-  /**
-   * Validates a list of PropagationEntity objects.
-   * <p>
-   * This method performs comprehensive validation including:
-   * <ul>
-   *   <li>Ensures the list is non-null and non-empty</li>
-   *   <li>Checks for duplicate propagationEntity IDs</li>
-   *   <li>Validates cpuCostNs and memoryCostBytes for non-null/positive values</li>
-   *   <li>Ensures consistency in cost definitions across all entities (either all or none define costs)</li>
-   *   <li>Validates that total costs do not exceed provided limits (if any)</li>
-   *   <li>Validates any overrides within each entity for the same cost rules</li>
-   *   <li>Rewrites empty costs to evenly distribute parent limits if all entities have empty costs</li>
-   * </ul>
-   *
-   */
+  /// Validates a list of PropagationEntity objects.
+  ///
+  /// This method performs comprehensive validation including:
+  ///
+  /// - Ensures the list is non-null and non-empty
+  /// - Checks for duplicate propagationEntity IDs
+  /// - Validates cpuCostNs and memoryCostBytes for non-null/positive values
+  /// - Ensures consistency in cost definitions across all entities (either all or none define costs)
+  /// - Validates that total costs do not exceed provided limits (if any)
+  /// - Validates any overrides within each entity for the same cost rules
+  /// - Rewrites empty costs to evenly distribute parent limits if all entities have empty costs
   private static void validateEntityList(List<PropagationEntity> entities, String prefix,
                                          List<String> errors, Long limitCpu, Long limitMem) {
     if (entities == null || entities.isEmpty()) {
@@ -434,7 +420,7 @@ public class QueryWorkloadConfigUtils {
     }
   }
 
-  /** Validate non-null/non-negative and return the positive value (else 0) for accumulation. */
+  /// Validate non-null/non-negative and return the positive value (else 0) for accumulation.
   private static long costOrZero(String prefix, String field, Long value, List<String> errors) {
     if (value == null) {
       errors.add(prefix + "." + field + " cannot be null");

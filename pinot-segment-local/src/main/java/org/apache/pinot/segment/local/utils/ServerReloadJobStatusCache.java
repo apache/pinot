@@ -39,16 +39,14 @@ import org.slf4j.LoggerFactory;
 import static java.util.Objects.requireNonNull;
 
 
-/**
- * In-memory cache for tracking reload job status on server side.
- *
- * <p>Thread-safe for concurrent access. Uses Guava Cache with LRU eviction
- * and time-based expiration.
- *
- * <p>Implements PinotClusterConfigChangeListener to support dynamic configuration
- * updates from ZooKeeper cluster config. When config changes, cache is rebuilt
- * with new settings and existing entries are migrated.
- */
+/// In-memory cache for tracking reload job status on server side.
+///
+/// Thread-safe for concurrent access. Uses Guava Cache with LRU eviction
+/// and time-based expiration.
+///
+/// Implements PinotClusterConfigChangeListener to support dynamic configuration
+/// updates from ZooKeeper cluster config. When config changes, cache is rebuilt
+/// with new settings and existing entries are migrated.
 @ThreadSafe
 public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListener {
   private static final Logger LOG = LoggerFactory.getLogger(ServerReloadJobStatusCache.class);
@@ -71,12 +69,10 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
     LOG.info("Initialized ReloadJobStatusCache for instance {} with {}", _instanceId, _currentConfig);
   }
 
-  /**
-   * Gets the complete job status for the given job.
-   *
-   * @param jobId Reload job ID (UUID)
-   * @return Job status, or null if not found in cache
-   */
+  /// Gets the complete job status for the given job.
+  ///
+  /// @param jobId Reload job ID (UUID)
+  /// @return Job status, or null if not found in cache
   @Nullable
   public ReloadJobStatus getJobStatus(String jobId) {
     requireNonNull(jobId, "jobId cannot be null");
@@ -89,9 +85,7 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
     LOG.info("Cleared all entries from reload job status cache");
   }
 
-  /**
-   * Gets or creates a job status entry atomically.
-   */
+  /// Gets or creates a job status entry atomically.
   public ReloadJobStatus getOrCreate(String jobId) {
     ReloadJobStatus status = _cache.getIfPresent(jobId);
     if (status == null) {
@@ -107,18 +101,16 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
     return status;
   }
 
-  /**
-   * Records a segment reload failure in the cache.
-   * Handles all business logic: counting, limit enforcement, thread safety.
-   *
-   * <p>This method ALWAYS increments the failure count, but only stores detailed
-   * failure information (segment name, exception, stack trace) for the first N failures
-   * where N is configured by maxFailureDetailsToCapture.
-   *
-   * @param jobId reload job ID (UUID)
-   * @param segmentName name of failed segment
-   * @param exception the exception that caused the failure
-   */
+  /// Records a segment reload failure in the cache.
+  /// Handles all business logic: counting, limit enforcement, thread safety.
+  ///
+  /// This method ALWAYS increments the failure count, but only stores detailed
+  /// failure information (segment name, exception, stack trace) for the first N failures
+  /// where N is configured by maxFailureDetailsToCapture.
+  ///
+  /// @param jobId reload job ID (UUID)
+  /// @param segmentName name of failed segment
+  /// @param exception the exception that caused the failure
   public void recordFailure(String jobId, String segmentName, Throwable exception) {
     requireNonNull(jobId, "jobId cannot be null");
     requireNonNull(segmentName, "segmentName cannot be null");
@@ -141,12 +133,10 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
     }
   }
 
-  /**
-   * Rebuilds the cache with new configuration and migrates existing entries.
-   * This method is synchronized to prevent concurrent rebuilds.
-   *
-   * @param newConfig new cache configuration to apply
-   */
+  /// Rebuilds the cache with new configuration and migrates existing entries.
+  /// This method is synchronized to prevent concurrent rebuilds.
+  ///
+  /// @param newConfig new cache configuration to apply
   private synchronized void rebuildCache(ServerReloadJobStatusCacheConfig newConfig) {
     LOG.info("Rebuilding reload status cache with new config: {}", newConfig);
 
@@ -169,15 +159,13 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
     LOG.info("Successfully rebuilt reload status cache (size: {})", newCache.size());
   }
 
-  /**
-   * Maps cluster configuration properties with a common prefix to a config POJO using Jackson.
-   * Uses PinotConfiguration.subset() to extract properties with the given prefix and
-   * Jackson's convertValue() for automatic object mapping.
-   *
-   * @param clusterConfigs map of all cluster configs from ZooKeeper
-   * @param configPrefix prefix to filter configs (e.g., "pinot.server.table.reload.status.cache")
-   * @return ServerReloadJobStatusCacheConfig with values from cluster config, defaults for missing values
-   */
+  /// Maps cluster configuration properties with a common prefix to a config POJO using Jackson.
+  /// Uses PinotConfiguration.subset() to extract properties with the given prefix and
+  /// Jackson's convertValue() for automatic object mapping.
+  ///
+  /// @param clusterConfigs map of all cluster configs from ZooKeeper
+  /// @param configPrefix prefix to filter configs (e.g., "pinot.server.table.reload.status.cache")
+  /// @return ServerReloadJobStatusCacheConfig with values from cluster config, defaults for missing values
   @VisibleForTesting
   static ServerReloadJobStatusCacheConfig buildFromClusterConfig(Map<String, String> clusterConfigs,
       String configPrefix) {

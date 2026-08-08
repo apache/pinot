@@ -39,10 +39,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * <code>ZkBasedTableRebalanceObserver</code> observes rebalance progress and tracks rebalance status,
- * stats in Zookeeper. This will be used to show the progress of rebalance to users via rebalanceStatus API.
- */
+/// `ZkBasedTableRebalanceObserver` observes rebalance progress and tracks rebalance status,
+/// stats in Zookeeper. This will be used to show the progress of rebalance to users via rebalanceStatus API.
 public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZkBasedTableRebalanceObserver.class);
   private final String _tableNameWithType;
@@ -232,11 +230,9 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     trackStatsInZk();
   }
 
-  /**
-   * Safely computes elapsed time in seconds since rebalance started.
-   * Returns 0 if startTimeMs was never set (i.e. still at default 0), which happens
-   * when the rebalance completes as NO_OP or fails before START_TRIGGER fires.
-   */
+  /// Safely computes elapsed time in seconds since rebalance started.
+  /// Returns 0 if startTimeMs was never set (i.e. still at default 0), which happens
+  /// when the rebalance completes as NO_OP or fails before START_TRIGGER fires.
   private long computeElapsedTimeInSeconds() {
     long startTimeMs = _tableRebalanceProgressStats.getStartTimeMs();
     if (startTimeMs <= 0) {
@@ -268,19 +264,17 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     return _numUpdatesToZk;
   }
 
-  /**
-   * Emits the rebalance progress in percent to the metrics, which is calculated as:
-   *          (totalRemainingSegmentsToBeAdded + totalRemainingSegmentsToBeDeleted + totalRemainingSegmentsToConverge
-   *                       + totalCarryOverSegmentsToBeAdded + totalCarryOverSegmentsToBeDeleted)
-   * 100%  -   ------------------------------------------------------------------------------------------------- * 100%
-   *                                (totalSegmentsToBeAdded + totalSegmentsToBeDeleted)
-   * Notice that for some jobs, the metrics may not be exactly accurate and would not be 100% when the job is done.
-   * (e.g. when `lowDiskMode=false`, the job finishes without waiting for `totalRemainingSegmentsToBeDeleted` become
-   * 0, or when `bestEffort=true` the job finishes without waiting for both `totalRemainingSegmentsToBeAdded`,
-   * `totalRemainingSegmentsToBeDeleted`, and `totalRemainingSegmentsToConverge` become 0)
-   * Therefore `emitProgressMetricDone()` should be called to emit the final progress as the time job exits.
-   * @param overallProgress the latest overall progress
-   */
+  /// Emits the rebalance progress in percent to the metrics, which is calculated as:
+  ///          (totalRemainingSegmentsToBeAdded + totalRemainingSegmentsToBeDeleted + totalRemainingSegmentsToConverge
+  ///                       + totalCarryOverSegmentsToBeAdded + totalCarryOverSegmentsToBeDeleted)
+  /// 100% - ------------------------------------------------------------------------------------------------- \* 100%
+  ///                                (totalSegmentsToBeAdded + totalSegmentsToBeDeleted)
+  /// Notice that for some jobs, the metrics may not be exactly accurate and would not be 100% when the job is done.
+  /// (e.g. when `lowDiskMode=false`, the job finishes without waiting for `totalRemainingSegmentsToBeDeleted` become
+  /// 0, or when `bestEffort=true` the job finishes without waiting for both `totalRemainingSegmentsToBeAdded`,
+  /// `totalRemainingSegmentsToBeDeleted`, and `totalRemainingSegmentsToConverge` become 0)
+  /// Therefore `emitProgressMetricDone()` should be called to emit the final progress as the time job exits.
+  /// @param overallProgress the latest overall progress
   private void emitProgressMetric(TableRebalanceProgressStats.RebalanceProgressStats overallProgress) {
     // Round this up so the metric is 100 only when no segment remains
     long progressPercent = 100 - (long) Math.ceil(TableRebalanceProgressStats.calculatePercentageChange(
@@ -292,10 +286,8 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         progressPercent < 0 ? 0 : progressPercent);
   }
 
-  /**
-   * Emits the rebalance progress as 100 (%) to the metrics. This is to ensure that the progress is at least aligned
-   * when the job done to avoid confusion
-   */
+  /// Emits the rebalance progress as 100 (%) to the metrics. This is to ensure that the progress is at least aligned
+  /// when the job done to avoid confusion
   private void emitProgressMetricDone() {
     _controllerMetrics.setValueOfTableGauge(_tableNameWithType, ControllerGauge.TABLE_REBALANCE_JOB_PROGRESS_PERCENT,
         100);
@@ -369,16 +361,15 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     return _tableRebalanceProgressStats;
   }
 
-  /**
-   * Takes in targetState and sourceState and computes stats based on the comparison between sourceState and
-   * targetState.This captures how far the source state is from the target state. Example - if there are 4 segments and
-   * 16 replicas in the source state not matching the target state, _segmentsToRebalance is 4 and _replicasToRebalance
-   * is 16.
-   *
-   * @param targetState - The state that we want to get to
-   * @param sourceState - A given state that needs to converge to targetState
-   * @return RebalanceStats
-   */
+  /// Takes in targetState and sourceState and computes stats based on the comparison between sourceState and
+  /// targetState.This captures how far the source state is from the target state. Example - if there are 4 segments and
+  /// 16 replicas in the source state not matching the target state, \_segmentsToRebalance is 4 and
+  /// \_replicasToRebalance
+  /// is 16.
+  ///
+  /// @param targetState - The state that we want to get to
+  /// @param sourceState - A given state that needs to converge to targetState
+  /// @return RebalanceStats
   @VisibleForTesting
   static TableRebalanceProgressStats.RebalanceStateStats getDifferenceBetweenTableRebalanceStates(
       Map<String, Map<String, String>> targetState, Map<String, Map<String, String>> sourceState) {
@@ -421,15 +412,13 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     return rebalanceStats;
   }
 
-  /**
-   * Calculates the progress stats for the given step or for the overall based on the trigger type
-   * @param targetAssignment target assignment (either updated IS or the target end IS depending on the step)
-   * @param currentAssignment current assignment (either EV or the current IS depending on the step)
-   * @param rebalanceContext rebalance context
-   * @param trigger reason to trigger the stats update
-   * @param rebalanceProgressStats current value of the rebalance progress stats, used to calculate the next
-   * @return the calculated step or progress stats
-   */
+  /// Calculates the progress stats for the given step or for the overall based on the trigger type
+  /// @param targetAssignment target assignment (either updated IS or the target end IS depending on the step)
+  /// @param currentAssignment current assignment (either EV or the current IS depending on the step)
+  /// @param rebalanceContext rebalance context
+  /// @param trigger reason to trigger the stats update
+  /// @param rebalanceProgressStats current value of the rebalance progress stats, used to calculate the next
+  /// @return the calculated step or progress stats
   @VisibleForTesting
   static TableRebalanceProgressStats.RebalanceProgressStats calculateUpdatedProgressStats(
       Map<String, Map<String, String>> targetAssignment, Map<String, Map<String, String>> currentAssignment,

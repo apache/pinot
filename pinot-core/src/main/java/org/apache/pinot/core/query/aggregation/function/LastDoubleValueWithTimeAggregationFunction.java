@@ -30,16 +30,15 @@ import org.apache.pinot.segment.local.customobject.ValueLongPair;
 import org.roaringbitmap.IntIterator;
 
 
-/**
- * This function is used for LastWithTime calculations for data column with double type.
- * <p>The function can be used as LastWithTime(dataExpression, timeExpression, 'double')
- * <p>Following arguments are supported:
- * <ul>
- *   <li>dataExpression: expression that contains the double data column to be calculated last on</li>
- *   <li>timeExpression: expression that contains the column to be used to decide which data is last, can be any
- *   Numeric column</li>
- * </ul>
- */
+/// This function is used for LastWithTime calculations for data column with double type.
+///
+/// The function can be used as LastWithTime(dataExpression, timeExpression, 'double')
+///
+/// Following arguments are supported:
+///
+/// - dataExpression: expression that contains the double data column to be calculated last on
+/// - timeExpression: expression that contains the column to be used to decide which data is last, can be any
+///   Numeric column
 public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggregationFunction<Double> {
   private final static ValueLongPair<Double> DEFAULT_VALUE_TIME_PAIR = new DoubleLongPair(Double.NaN, Long.MIN_VALUE);
 

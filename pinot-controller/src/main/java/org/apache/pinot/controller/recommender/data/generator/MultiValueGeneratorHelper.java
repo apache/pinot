@@ -25,21 +25,17 @@ import java.util.Random;
 import java.util.function.Supplier;
 
 
-/**
- * A helper class for generating multi value entries
- */
+/// A helper class for generating multi value entries
 public class MultiValueGeneratorHelper {
   private MultiValueGeneratorHelper() {
   }
 
-  /**
-   * Generate MV entries
-   *
-   * @param numberOfValuesPerEntry number of values per each row
-   * @param rand random object
-   * @param nextItemFunc function to get the next random item
-   * @return
-   */
+  /// Generate MV entries
+  ///
+  /// @param numberOfValuesPerEntry number of values per each row
+  /// @param rand random object
+  /// @param nextItemFunc function to get the next random item
+  /// @return
   public static List<Object> generateMultiValueEntries(double numberOfValuesPerEntry, Random rand,
       Supplier<Object> nextItemFunc) {
     List<Object> entries = new ArrayList<>();

@@ -42,13 +42,11 @@ import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
 import org.apache.pinot.segment.spi.index.reader.EfSearchAware;
 
 
-/**
- * Feature workload benchmark for Pinot-specific runtime surfaces.
- *
- * <p>This suite focuses on the feature areas that do not show up in broad ANN frontiers:
- * quantized IVF build/search trade-offs, HNSW runtime knobs on immutable and mutable indexes,
- * mutable ingestion cost, and mixed immutable/mutable candidate fan-out.</p>
- */
+/// Feature workload benchmark for Pinot-specific runtime surfaces.
+///
+/// This suite focuses on the feature areas that do not show up in broad ANN frontiers:
+/// quantized IVF build/search trade-offs, HNSW runtime knobs on immutable and mutable indexes,
+/// mutable ingestion cost, and mixed immutable/mutable candidate fan-out.
 public final class BenchmarkVectorFeatureWorkloads {
   private static final String COLUMN_NAME = "embedding";
   private static final long SEED = 20260412L;

@@ -20,11 +20,13 @@ package org.apache.pinot.common.request.context;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.UUID;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -221,5 +223,14 @@ public class LiteralContextTest {
     assertEquals(literalContext.getBytesValue(), BytesUtils.toBytes("deadbeef"));
     assertFalse(literalContext.isNull());
     assertEquals(literalContext.toString(), "'deadbeef'");
+  }
+
+  @Test
+  public void testUuidLiteral() {
+    UUID uuid = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+    LiteralContext literalContext = new LiteralContext(DataType.UUID, uuid);
+
+    assertEquals(literalContext.getStringValue(), uuid.toString());
+    assertEquals(literalContext.getBytesValue(), UuidUtils.toBytes(uuid));
   }
 }

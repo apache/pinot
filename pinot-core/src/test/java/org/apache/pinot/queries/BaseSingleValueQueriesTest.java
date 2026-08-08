@@ -44,25 +44,23 @@ import org.testng.annotations.BeforeTest;
 import static org.testng.Assert.assertNotNull;
 
 
-/**
- * The <code>BaseSingleValueQueriesTest</code> class sets up the index segment for the single-value queries test.
- * <p>There are totally 18 columns, 30000 records inside the original Avro file where 11 columns are selected to build
- * the index segment. Selected columns information are as following:
- * <ul>
- *   ColumnName, FieldType, DataType, Cardinality, IsSorted, HasInvertedIndex
- *   <li>column1, METRIC, INT, 6582, F, F</li>
- *   <li>column3, METRIC, INT, 21910, F, F</li>
- *   <li>column5, DIMENSION, STRING, 1, T, F</li>
- *   <li>column6, DIMENSION, INT, 608, F, T</li>
- *   <li>column7, DIMENSION, INT, 146, F, T</li>
- *   <li>column9, DIMENSION, INT, 1737, F, F</li>
- *   <li>column11, DIMENSION, STRING, 5, F, T</li>
- *   <li>column12, DIMENSION, STRING, 5, F, F</li>
- *   <li>column17, METRIC, INT, 24, F, T</li>
- *   <li>column18, METRIC, INT, 1440, F, T</li>
- *   <li>daysSinceEpoch, TIME, INT, 2, T, F</li>
- * </ul>
- */
+/// The `BaseSingleValueQueriesTest` class sets up the index segment for the single-value queries test.
+///
+/// There are totally 18 columns, 30000 records inside the original Avro file where 11 columns are selected to build
+/// the index segment. Selected columns information are as following:
+///
+///   ColumnName, FieldType, DataType, Cardinality, IsSorted, HasInvertedIndex
+/// - column1, METRIC, INT, 6582, F, F
+/// - column3, METRIC, INT, 21910, F, F
+/// - column5, DIMENSION, STRING, 1, T, F
+/// - column6, DIMENSION, INT, 608, F, T
+/// - column7, DIMENSION, INT, 146, F, T
+/// - column9, DIMENSION, INT, 1737, F, F
+/// - column11, DIMENSION, STRING, 5, F, T
+/// - column12, DIMENSION, STRING, 5, F, F
+/// - column17, METRIC, INT, 24, F, T
+/// - column18, METRIC, INT, 1440, F, T
+/// - daysSinceEpoch, TIME, INT, 2, T, F
 public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "SingleValueQueriesTest");
   private static final String AVRO_DATA = "data" + File.separator + "test_data-sv.avro";

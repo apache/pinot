@@ -125,13 +125,11 @@ public class IntegerTupleSketchValueAggregator implements ValueAggregator<byte[]
     return true;
   }
 
-  /**
-   * Returns the maximum number of storage bytes required for a Compact Integer Tuple Sketch with the given
-   * number of actual entries. Note that this assumes the worst case of the sketch in
-   * estimation mode, which requires storing theta and count.
-   * @return the maximum number of storage bytes required for a Compact Integer Tuple Sketch with the given number
-   * of entries.
-   */
+  /// Returns the maximum number of storage bytes required for a Compact Integer Tuple Sketch with the given
+  /// number of actual entries. Note that this assumes the worst case of the sketch in
+  /// estimation mode, which requires storing theta and count.
+  /// @return the maximum number of storage bytes required for a Compact Integer Tuple Sketch with the given number
+  /// of entries.
   @Override
   public int getMaxAggregatedValueByteSize() {
     if (_nominalEntries == 0) {

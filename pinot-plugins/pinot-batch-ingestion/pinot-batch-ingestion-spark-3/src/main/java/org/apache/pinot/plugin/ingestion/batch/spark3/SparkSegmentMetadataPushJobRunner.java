@@ -292,12 +292,10 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
     }
   }
 
-  /**
-   * Returns segment names, which will be supplied to the segment replacement protocol as the new set of segments to
-   * atomically update when consistent data push is enabled.
-   * @param segmentsUriToTarPathMap Map from segment URI to corresponding tar path. Either the URIs (keys), the
-   *                                tarPaths (values), or both may be used depending on upload mode.
-   */
+  /// Returns segment names, which will be supplied to the segment replacement protocol as the new set of segments to
+  /// atomically update when consistent data push is enabled.
+  /// @param segmentsUriToTarPathMap Map from segment URI to corresponding tar path. Either the URIs (keys), the
+  ///                                tarPaths (values), or both may be used depending on upload mode.
   public List<String> getSegmentsToReplace(Map<String, String> segmentsUriToTarPathMap) {
     Collection<String> tarFilePaths = segmentsUriToTarPathMap.values();
     List<String> segmentNames = new ArrayList<>(tarFilePaths.size());

@@ -46,10 +46,8 @@ public interface MutableJsonIndex extends JsonIndexReader, MutableIndex {
     throw new UnsupportedOperationException("Mutable JSON indexes are not supported for multi-valued columns");
   }
 
-  /**
-   * Index a JSON document
-   * @param jsonString the JSON
-   */
+  /// Index a JSON document
+  /// @param jsonString the JSON
   void add(String jsonString)
       throws IOException;
 }

@@ -36,12 +36,10 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 
 
-/**
- * Histogram for single-value numerical columns
- * usage example:
- * `Histogram(columnName, ARRAY[0,1,10,100])` to specify bins [0,1), [1,10), [10,1000] or
- * `Histogram(columnName, 0, 1000, 10)` to specify 10 equal-length bins [0,100), [100,200), ..., [900,1000]
- */
+/// Histogram for single-value numerical columns
+/// usage example:
+/// `Histogram(columnName, ARRAY\[0,1,10,100\])` to specify bins \[0,1), \[1,10), \[10,1000\] or
+/// `Histogram(columnName, 0, 1000, 10)` to specify 10 equal-length bins \[0,100), \[100,200), ..., \[900,1000\]
 public class HistogramAggregationFunction extends BaseSingleInputAggregationFunction<DoubleArrayList, DoubleArrayList> {
 
   private static final String ARRAY_CONSTRUCTOR = "arrayvalueconstructor";
@@ -147,12 +145,10 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
     return ret;
   }
 
-  /**
-   * Find the bin id for the input value. Use division for equal-length bins, and binary search otherwise.
-   *
-   * @param val input value
-   * @return bin id
-   */
+  /// Find the bin id for the input value. Use division for equal-length bins, and binary search otherwise.
+  ///
+  /// @param val input value
+  /// @return bin id
   private int getBinId(double val) {
     if (val > _upper || val < _lower) {
       return INVALID_BIN;

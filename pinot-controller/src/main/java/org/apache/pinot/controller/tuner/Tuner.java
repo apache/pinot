@@ -24,14 +24,12 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 
-/**
- * Annotation class for TableConfigTuner implementations. The corresponding classes
- * are auto-registered during startup.
- *
- * NOTE:
- * 1. The annotated class must be under the package of name 'org.apache.pinot.*.tuner.*'
- * to be auto-registered.
- */
+/// Annotation class for TableConfigTuner implementations. The corresponding classes
+/// are auto-registered during startup.
+///
+/// NOTE:
+/// 1. The annotated class must be under the package of name 'org.apache.pinot.\*.tuner.\*'
+/// to be auto-registered.
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface Tuner {

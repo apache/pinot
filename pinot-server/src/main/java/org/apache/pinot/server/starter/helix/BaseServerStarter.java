@@ -146,25 +146,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Starter for Pinot server.
- * <p>When the server starts for the first time, it will automatically join the Helix cluster with the default tag.
- * <ul>
- *   <li>
- *     Optional start-up checks:
- *     <ul>
- *       <li>Service status check (ON by default)</li>
- *     </ul>
- *   </li>
- *   <li>
- *     Optional shut-down checks:
- *     <ul>
- *       <li>Query check (drains and finishes existing queries, ON by default)</li>
- *       <li>Resource check (wait for all resources OFFLINE, OFF by default)</li>
- *     </ul>
- *   </li>
- * </ul>
- */
+/// Starter for Pinot server.
+///
+/// When the server starts for the first time, it will automatically join the Helix cluster with the default tag.
+///
+/// - Optional start-up checks:
+///   - Service status check (ON by default)
+/// - Optional shut-down checks:
+///   - Query check (drains and finishes existing queries, ON by default)
+///   - Resource check (wait for all resources OFFLINE, OFF by default)
 public abstract class BaseServerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseServerStarter.class);
 
@@ -306,9 +296,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     NettyInspector.logAllChecks();
   }
 
-  /**
-   * Override to provide custom transition thread pool manager
-   */
+  /// Override to provide custom transition thread pool manager
   protected void initTransitionThreadPoolManager() {
     _transitionThreadPoolManager = null;
   }
@@ -317,9 +305,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected void applyCustomConfigs(PinotConfiguration serverConf) {
   }
 
-  /**
-   * Override to customize the query operator factory provider used by the multi-stage engine.
-   */
+  /// Override to customize the query operator factory provider used by the multi-stage engine.
   protected QueryOperatorFactoryProvider createQueryOperatorFactoryProvider(PinotConfiguration serverConf) {
     return DefaultQueryOperatorFactoryProvider.INSTANCE;
   }
@@ -335,10 +321,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
         : NetUtils.getHostAddress();
   }
 
-  /**
-   *  Invoke pinot environment provider factory's init method to register the environment provider &
-   *  return the instantiated environment provider.
-   */
+  /// Invoke pinot environment provider factory's init method to register the environment provider &
+  /// return the instantiated environment provider.
   @Nullable
   private PinotEnvironmentProvider initializePinotEnvironmentProvider() {
     PinotConfiguration environmentProviderConfigs =
@@ -362,10 +346,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
     return PinotEnvironmentProviderFactory.getEnvironmentProvider(environmentProviderClassName.toLowerCase());
   }
 
-  /**
-   * Fetches the resources to monitor and registers the
-   * {@link org.apache.pinot.common.utils.ServiceStatus.ServiceStatusCallback}s
-   */
+  /// Fetches the resources to monitor and registers the
+  /// [org.apache.pinot.common.utils.ServiceStatus.ServiceStatusCallback]s
   private void registerServiceStatusHandler() {
     double minResourcePercentForStartup =
         _serverConf.getProperty(Server.CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START,
@@ -615,11 +597,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _serverConf.getProperty(Helix.CONFIG_OF_SERVER_FLAPPING_TIME_WINDOW_MS, Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
-  /**
-   * When the server starts, check if the service status turns GOOD.
-   *
-   * @param endTimeMs Timeout for the check
-   */
+  /// When the server starts, check if the service status turns GOOD.
+  ///
+  /// @param endTimeMs Timeout for the check
   private void startupServiceStatusCheck(long endTimeMs) {
     LOGGER.info("Starting startup service status check");
     long startTimeMs = System.currentTimeMillis();
@@ -1042,9 +1022,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
         false, ServerGauge.SEGMENT_DOWNLOAD_THROTTLE_THRESHOLD, ServerGauge.SEGMENT_DOWNLOAD_COUNT, "SegmentDownload");
   }
 
-  /**
-   * Can be overridden to perform operations before server starts serving queries.
-   */
+  /// Can be overridden to perform operations before server starts serving queries.
   protected void preServeQueries() {
     _segmentOperationsThrottlerSet.startServingQueries();
   }
@@ -1090,11 +1068,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Finish shutting down Pinot server for {}", _instanceId);
   }
 
-  /**
-   * When shutting down the server, drains the queries (no incoming queries and all existing queries finished).
-   *
-   * @param endTimeMs Timeout for the check
-   */
+  /// When shutting down the server, drains the queries (no incoming queries and all existing queries finished).
+  ///
+  /// @param endTimeMs Timeout for the check
   private void shutdownQueryCheck(long endTimeMs) {
     LOGGER.info("Starting shutdown query check");
     long startTimeMs = System.currentTimeMillis();
@@ -1147,12 +1123,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
   }
 
-  /**
-   * When shutting down the server, waits for all the resources turn OFFLINE (all partitions served by the server are
-   * neither ONLINE nor CONSUMING).
-   *
-   * @param endTimeMs Timeout for the check
-   */
+  /// When shutting down the server, waits for all the resources turn OFFLINE (all partitions served by the server are
+  /// neither ONLINE nor CONSUMING).
+  ///
+  /// @param endTimeMs Timeout for the check
   private void shutdownResourceCheck(long endTimeMs) {
     LOGGER.info("Starting shutdown resource check");
     long startTimeMs = System.currentTimeMillis();
@@ -1267,12 +1241,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     return _serverInstance;
   }
 
-  /**
-   * Initialize the components to download segments from deep store. They used to be
-   * initialized in SegmentFetcherAndLoader, which has been removed to consolidate
-   * segment download functionality for both Offline and Realtime tables. So those
-   * components are initialized where SegmentFetcherAndLoader was initialized.
-   */
+  /// Initialize the components to download segments from deep store. They used to be
+  /// initialized in SegmentFetcherAndLoader, which has been removed to consolidate
+  /// segment download functionality for both Offline and Realtime tables. So those
+  /// components are initialized where SegmentFetcherAndLoader was initialized.
   private void initSegmentFetcher(PinotConfiguration config)
       throws Exception {
     PinotConfiguration pinotFSConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
@@ -1290,30 +1262,24 @@ public abstract class BaseServerStarter implements ServiceStartable {
     return new AdminApiApplication(_serverInstance, _accessControlFactory, _reloadJobStatusCache, _serverConf);
   }
 
-  /**
-   * Creates the {@link SegmentMessageHandlerFactory} used to handle user-defined Helix messages for segments.
-   * Subclasses can override to return a custom factory that handles additional message sub-types.
-   */
+  /// Creates the [SegmentMessageHandlerFactory] used to handle user-defined Helix messages for segments.
+  /// Subclasses can override to return a custom factory that handles additional message sub-types.
   protected SegmentMessageHandlerFactory createSegmentMessageHandlerFactory(InstanceDataManager instanceDataManager,
       ServerMetrics serverMetrics) {
     return new SegmentMessageHandlerFactory(instanceDataManager, serverMetrics);
   }
 
-  /**
-   * Creates the {@link SegmentOnlineOfflineStateModelFactory} used to handle Helix state transitions for segments.
-   * Subclasses can override to return a custom factory.
-   */
+  /// Creates the [SegmentOnlineOfflineStateModelFactory] used to handle Helix state transitions for segments.
+  /// Subclasses can override to return a custom factory.
   protected SegmentOnlineOfflineStateModelFactory createSegmentOnlineOfflineStateModelFactory(
       InstanceDataManager instanceDataManager, StateTransitionThreadPoolManager transitionThreadPoolManager) {
     return new SegmentOnlineOfflineStateModelFactory(instanceDataManager, transitionThreadPoolManager);
   }
 
-  /**
-   * Wraps a {@link ServiceStatus.ServiceStatusCallback} and records the elapsed time (in ms since this wrapper was
-   * constructed) into the supplied gauge the first time the delegate reports {@link Status#GOOD}. Subsequent calls
-   * leave the gauge value frozen. {@code getServiceStatus} can be called concurrently by the startup poll loop and
-   * by HTTP threads (health/tables endpoints), so the record-once latch uses CAS for visibility.
-   */
+  /// Wraps a [ServiceStatus.ServiceStatusCallback] and records the elapsed time (in ms since this wrapper was
+  /// constructed) into the supplied gauge the first time the delegate reports [Status#GOOD]. Subsequent calls
+  /// leave the gauge value frozen. `getServiceStatus` can be called concurrently by the startup poll loop and
+  /// by HTTP threads (health/tables endpoints), so the record-once latch uses CAS for visibility.
   private static final class TimeToHealthyTrackingCallback implements ServiceStatus.ServiceStatusCallback {
     private final ServiceStatus.ServiceStatusCallback _delegate;
     private final ServerGauge _gauge;

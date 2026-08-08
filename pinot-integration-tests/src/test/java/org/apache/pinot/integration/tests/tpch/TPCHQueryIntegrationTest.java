@@ -48,12 +48,10 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 // TODO: extract common functions from TPCHQueryIntegrationTest and SSBQueryIntegrationTest
-/**
- * Integration test that tests Pinot using TPCH data.
- * Data is loaded into Pinot and H2 from /resources/examples/batch/tpch. The dataset size is very small, please follow
- * REAME.md to generate a larger dataset for better testing.
- * Queries are executed against Pinot and H2, and the results are compared.
- */
+/// Integration test that tests Pinot using TPCH data.
+/// Data is loaded into Pinot and H2 from /resources/examples/batch/tpch. The dataset size is very small, please follow
+/// REAME.md to generate a larger dataset for better testing.
+/// Queries are executed against Pinot and H2, and the results are compared.
 public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_TPCH_QUERIES = 24;
 

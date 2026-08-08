@@ -142,7 +142,7 @@ public class ArrowMessageDecoder implements StreamMessageDecoder<byte[]> {
     return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
   }
 
-  /** Clean up resources */
+  /// Clean up resources
   public void close() {
     _record.close();
     if (_allocator != null) {

@@ -39,9 +39,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests the evaluation of transform expressions by the ExpressionTransformer
- */
+/// Tests the evaluation of transform expressions by the ExpressionTransformer
 public class ExpressionTransformerTest {
 
   @Test
@@ -128,11 +126,9 @@ public class ExpressionTransformerTest {
     Assert.assertEquals(genericRow.getValue("hoursSinceEpoch"), 437222L);
   }
 
-  /**
-   * TODO: transform functions have moved to tableConfig#ingestionConfig. However, these tests remain to test
-   * backward compatibility/
-   *  Remove these when we totally stop honoring transform functions in schema
-   */
+  /// TODO: transform functions have moved to tableConfig#ingestionConfig. However, these tests remain to test
+  /// backward compatibility/
+  ///  Remove these when we totally stop honoring transform functions in schema
   @Test
   public void testTransformConfigsFromSchema() {
     Schema pinotSchema = new Schema.SchemaBuilder().addSingleValueDimension("userId", FieldSpec.DataType.LONG)
@@ -245,9 +241,33 @@ public class ExpressionTransformerTest {
     Assert.assertFalse(row.isNullValue("payload"));
   }
 
-  /**
-   * If destination field already exists in the row, do not execute transform function
-   */
+  @Test
+  public void testLegacyNonDeterministicTransformFunctionRemainsRuntimeCompatible() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("eventTimeMs", FieldSpec.DataType.LONG)
+        .build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("eventTimeMs", "now()")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testNonDeterministicTransformFunctionStillRunsAtRuntime")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    long lowerBound = System.currentTimeMillis();
+    expressionTransformer.transform(row);
+    long upperBound = System.currentTimeMillis();
+
+    Object value = row.getValue("eventTimeMs");
+    Assert.assertTrue(value instanceof Long, "Expected now() transform to produce a LONG value");
+    long eventTimeMs = (Long) value;
+    long toleranceMs = 1000;
+    Assert.assertTrue(eventTimeMs >= lowerBound - toleranceMs);
+    Assert.assertTrue(eventTimeMs <= upperBound + toleranceMs);
+  }
+
+  /// If destination field already exists in the row, do not execute transform function
   @Test
   public void testValueAlreadyExists() {
     Schema pinotSchema = new Schema();
@@ -383,7 +403,7 @@ public class ExpressionTransformerTest {
     Assert.assertEquals(record.getValue("f"), 210.0);
   }
 
-  /** Check if there is more than one transform function definition for the same column. */
+  /// Check if there is more than one transform function definition for the same column.
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Cannot set more than one"
       + " transform function on column: a.")
   public void testMultipleTransformFunctionSortOrder() {

@@ -25,9 +25,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
-/**
- * Aggregation strategy leveraging theta sketch algebra (unions/intersections).
- */
+/// Aggregation strategy leveraging theta sketch algebra (unions/intersections).
 class ThetaSketchAggregationStrategy extends AggregationStrategy<UpdatableThetaSketch[]> {
   final UpdatableThetaSketchBuilder _updateSketchBuilder;
 

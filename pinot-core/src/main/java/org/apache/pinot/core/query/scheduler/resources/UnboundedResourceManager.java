@@ -23,11 +23,9 @@ import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * Resource manager that does not limit resources for a query.
- * This resource manager maintains the legacy approach of
- * letting operators add parallel jobs to the same executor service.
- */
+/// Resource manager that does not limit resources for a query.
+/// This resource manager maintains the legacy approach of
+/// letting operators add parallel jobs to the same executor service.
 public class UnboundedResourceManager extends ResourceManager {
 
   public UnboundedResourceManager(PinotConfiguration config) {

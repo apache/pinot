@@ -18,23 +18,15 @@
  */
 package org.apache.pinot.core.segment.processing.framework;
 
-/**
- * The MergeType defines how the segments should be merged.
- */
+/// The MergeType defines how the segments should be merged.
 public enum MergeType {
 
-  /**
-   * Concatenates the rows.
-   */
+  /// Concatenates the rows.
   CONCAT,
 
-  /**
-   * Aggregates the metric values based on the configured aggregation types on unique dimension + time column values.
-   */
+  /// Aggregates the metric values based on the configured aggregation types on unique dimension + time column values.
   ROLLUP,
 
-  /**
-   * Deduplicates rows with the same values.
-   */
+  /// Deduplicates rows with the same values.
   DEDUP
 }

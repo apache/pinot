@@ -30,16 +30,15 @@ import org.apache.pinot.segment.local.customobject.ValueLongPair;
 import org.roaringbitmap.IntIterator;
 
 
-/**
- * This function is used for LastWithTime calculations for data column with string type.
- * <p>The function can be used as LastWithTime(dataExpression, timeExpression, 'string')
- * <p>Following arguments are supported:
- * <ul>
- *   <li>dataExpression: expression that contains the string data column to be calculated last on</li>
- *   <li>timeExpression: expression that contains the column to be used to decide which data is last, can be any
- *   Numeric column</li>
- * </ul>
- */
+/// This function is used for LastWithTime calculations for data column with string type.
+///
+/// The function can be used as LastWithTime(dataExpression, timeExpression, 'string')
+///
+/// Following arguments are supported:
+///
+/// - dataExpression: expression that contains the string data column to be calculated last on
+/// - timeExpression: expression that contains the column to be used to decide which data is last, can be any
+///   Numeric column
 public class LastStringValueWithTimeAggregationFunction extends LastWithTimeAggregationFunction<String> {
   private final static ValueLongPair<String> DEFAULT_VALUE_TIME_PAIR = new StringLongPair("", Long.MIN_VALUE);
 

@@ -22,9 +22,7 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 
 
-/**
- * Segment data manager for immutable segment.
- */
+/// Segment data manager for immutable segment.
 public class ImmutableSegmentDataManager extends SegmentDataManager {
 
   private final ImmutableSegment _immutableSegment;

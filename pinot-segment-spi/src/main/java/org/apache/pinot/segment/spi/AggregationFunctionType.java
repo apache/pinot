@@ -39,16 +39,14 @@ import org.apache.commons.lang3.Strings;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * NOTES:
- * - No underscore is allowed in the enum name.
- * - '$' is allowed in the name field but not in the enum name.
- *
- * This enum is used both in the v1 engine and multistage engine to define the allowed Pinot aggregation functions.
- * The v1 engine only relies on the 'name' field, whereas all the other fields are used in the multistage engine
- * to register the aggregation function with Calcite. This allows using a unified approach to aggregations across both
- * the v1 and multistage engines.
- */
+/// NOTES:
+/// - No underscore is allowed in the enum name.
+/// - '$' is allowed in the name field but not in the enum name.
+///
+/// This enum is used both in the v1 engine and multistage engine to define the allowed Pinot aggregation functions.
+/// The v1 engine only relies on the 'name' field, whereas all the other fields are used in the multistage engine
+/// to register the aggregation function with Calcite. This allows using a unified approach to aggregations across both
+/// the v1 and multistage engines.
 public enum AggregationFunctionType {
   // Aggregation functions for single-valued columns
   COUNT("count"),
@@ -73,11 +71,9 @@ public enum AggregationFunctionType {
       OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
   MINMAXRANGE("minMaxRange", ReturnTypes.DOUBLE, OperandTypes.ANY, SqlTypeName.OTHER, SqlTypeName.DOUBLE),
 
-  /**
-   * for all distinct count family functions:
-   * (1) distinct_count only supports single argument;
-   * (2) count(distinct ...) support multi-argument and will be converted into DISTINCT + COUNT
-   */
+  /// for all distinct count family functions:
+  /// (1) distinct_count only supports single argument;
+  /// (2) count(distinct ...) support multi-argument and will be converted into DISTINCT + COUNT
   DISTINCTCOUNT("distinctCount", ReturnTypes.BIGINT, OperandTypes.ANY, SqlTypeName.OTHER, SqlTypeName.INTEGER),
   DISTINCTCOUNTOFFHEAP("distinctCountOffHeap", ReturnTypes.BIGINT,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER,
@@ -359,10 +355,9 @@ public enum AggregationFunctionType {
     return Strings.CS.remove(StringUtils.remove(functionName, '_').toUpperCase(), "$");
   }
 
-  /**
-   * Returns the corresponding aggregation function type for the given function name.
-   * <p>NOTE: Underscores in the function name are ignored.
-   */
+  /// Returns the corresponding aggregation function type for the given function name.
+  ///
+  /// NOTE: Underscores in the function name are ignored.
   public static AggregationFunctionType getAggregationFunctionType(String functionName) {
     String normalizedFunctionName = getNormalizedAggregationFunctionName(functionName);
     if (normalizedFunctionName.regionMatches(false, 0, "PERCENTILE", 0, 10)) {
@@ -423,10 +418,8 @@ public enum AggregationFunctionType {
     }
   }
 
-  /**
-   * Returns ARRAY of the component type of the first operand when the first operand is an ARRAY.
-   * Falls back to ARRAY of the operand type if the component type is unavailable.
-   */
+  /// Returns ARRAY of the component type of the first operand when the first operand is an ARRAY.
+  /// Falls back to ARRAY of the operand type if the component type is unavailable.
   private static class ArrayOfComponentReturnTypeInference implements SqlReturnTypeInference {
     @Override
     public RelDataType inferReturnType(SqlOperatorBinding opBinding) {

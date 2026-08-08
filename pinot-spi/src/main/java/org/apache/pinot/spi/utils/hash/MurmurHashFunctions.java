@@ -28,13 +28,11 @@ public class MurmurHashFunctions {
   private MurmurHashFunctions() {
   }
 
-  /**
-   * NOTE: This code has been copied over from org.apache.kafka.common.utils.Utils::murmurHash2
-   *
-   * Generates 32 bit murmurHash2 hash from byte array
-   * @param data byte array to hash
-   * @return 32 bit hash of the given array
-   */
+  /// NOTE: This code has been copied over from org.apache.kafka.common.utils.Utils::murmurHash2
+  ///
+  /// Generates 32 bit murmurHash2 hash from byte array
+  /// @param data byte array to hash
+  /// @return 32 bit hash of the given array
   public static int murmurHash2(final byte[] data) {
     int length = data.length;
     int seed = 0x9747b28c;
@@ -79,22 +77,18 @@ public class MurmurHashFunctions {
     return h;
   }
 
-  /**
-   * Implement 64-bit Murmur2 hash.
-   * @param data byte array to hash
-   * @return 64-bit hash
-   */
+  /// Implement 64-bit Murmur2 hash.
+  /// @param data byte array to hash
+  /// @return 64-bit hash
   public static long murmurHash2Bit64(final byte[] data) {
     return murmurHash2Bit64(data, data.length, 0xe17a1465);
   }
 
-  /**
-   * Implement 64-bit Murmur2 hash.
-   * @param data byte array to hash
-   * @param length byte array length
-   * @param seed hash seed
-   * @return 64-bit hash
-   */
+  /// Implement 64-bit Murmur2 hash.
+  /// @param data byte array to hash
+  /// @param length byte array length
+  /// @param seed hash seed
+  /// @return 64-bit hash
   public static long murmurHash2Bit64(final byte[] data, int length, int seed) {
     final long m = 0xc6a4a7935bd1e995L;
     final int r = 47;
@@ -148,24 +142,22 @@ public class MurmurHashFunctions {
     return Hashing.murmur3_32_fixed(seed).hashBytes(data).asInt();
   }
 
-  /**
-   * Taken from <a href=
-   * "https://github.com/infinispan/infinispan/blob/main/commons/all/src/main/java/org/infinispan/commons/hash
-   * /MurmurHash3.java"
-   * >Infinispan code base</a>.
-   *
-   * MurmurHash3 implementation in Java, based on Austin Appleby's <a href=
-   * "https://code.google.com/p/smhasher/source/browse/trunk/MurmurHash3.cpp"
-   * >original in C</a>s
-   *
-   * This is an implementation of MurmurHash3 to generate 32 bit hash for x64 architecture (not part of the original
-   * Murmur3 implementations) used by Infinispan and Debezium, Removed the parts that we don't need and formatted
-   * the code to Apache Pinot's Checkstyle.
-   *
-   * @author Patrick McFarland
-   * @see <a href="http://sites.google.com/site/murmurhash/">MurmurHash website</a>
-   * @see <a href="http://en.wikipedia.org/wiki/MurmurHash">MurmurHash entry on Wikipedia</a>
-   */
+  /// Taken from <a href=
+  /// "https://github.com/infinispan/infinispan/blob/main/commons/all/src/main/java/org/infinispan/commons/hash
+  /// /MurmurHash3.java"
+  /// >Infinispan code base</a>.
+  ///
+  /// MurmurHash3 implementation in Java, based on Austin Appleby's <a href=
+  /// "https://code.google.com/p/smhasher/source/browse/trunk/MurmurHash3.cpp"
+  /// >original in C</a>s
+  ///
+  /// This is an implementation of MurmurHash3 to generate 32 bit hash for x64 architecture (not part of the original
+  /// Murmur3 implementations) used by Infinispan and Debezium, Removed the parts that we don't need and formatted
+  /// the code to Apache Pinot's Checkstyle.
+  ///
+  /// @author Patrick McFarland
+  /// @see <a href="http://sites.google.com/site/murmurhash/">MurmurHash website</a>
+  /// @see <a href="http://en.wikipedia.org/wiki/MurmurHash">MurmurHash entry on Wikipedia</a>
   public static int murmurHash3X64Bit32(String s, int seed) {
     State state = new State();
 
@@ -278,9 +270,7 @@ public class MurmurHashFunctions {
     return (int) (state._h1 >> 32);
   }
 
-  /**
-   * Hash a value using the x64 128 bit variant of MurmurHash3.
-   */
+  /// Hash a value using the x64 128 bit variant of MurmurHash3.
   public static byte[] murmurHash3X64Bit128(byte[] key, int length, int seed) {
     State state = murmurHash3X64(key, length, seed);
     ByteBuffer buffer = ByteBuffer.allocate(16);
@@ -293,9 +283,7 @@ public class MurmurHashFunctions {
     return murmurHash3X64Bit128(key, key.length, seed);
   }
 
-  /**
-   * Hash a value using the x64 128 bit variant of MurmurHash3.
-   */
+  /// Hash a value using the x64 128 bit variant of MurmurHash3.
   public static long[] murmurHash3X64Bit128AsLongs(byte[] key, int length, int seed) {
     State state = murmurHash3X64(key, length, seed);
     return new long[]{state._h1, state._h2};
@@ -305,9 +293,7 @@ public class MurmurHashFunctions {
     return murmurHash3X64Bit128AsLongs(key, key.length, seed);
   }
 
-  /**
-   * Hash a value using the x64 64 bit variant of murmurHash3.
-   */
+  /// Hash a value using the x64 64 bit variant of murmurHash3.
   public static long murmurHash3X64Bit64(byte[] key, int length, int seed) {
     return murmurHash3X64(key, length, seed)._h1;
   }
@@ -316,9 +302,7 @@ public class MurmurHashFunctions {
     return murmurHash3X64Bit64(key, key.length, seed);
   }
 
-  /**
-   * Hash a value using the x64 64 bit variant of murmurHash3.
-   */
+  /// Hash a value using the x64 64 bit variant of murmurHash3.
   public static int murmurHash3X64Bit32(byte[] key, int length, int seed) {
     return (int) (murmurHash3X64(key, length, seed)._h1 >>> 32);
   }
@@ -327,11 +311,9 @@ public class MurmurHashFunctions {
     return murmurHash3X64Bit32(key, key.length, seed);
   }
 
-  /**
-   * Taken and modified from
-   * <a href="https://github.com/infinispan/infinispan/blob/main/commons/all/src/main/java/org/infinispan/commons/hash/
-   * MurmurHash3.java">Infinispan code base</a>.
-   */
+  /// Taken and modified from
+  /// <a href="https://github.com/infinispan/infinispan/blob/main/commons/all/src/main/java/org/infinispan/commons/hash/
+  /// MurmurHash3.java">Infinispan code base</a>.
   private static State murmurHash3X64(byte[] key, int length, int seed) {
     State state = new State();
 

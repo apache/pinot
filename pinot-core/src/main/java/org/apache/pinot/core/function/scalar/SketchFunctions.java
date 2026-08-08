@@ -45,72 +45,66 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * Inbuilt Sketch Transformation Functions
- * The functions can be used as UDFs in Query when added in the FunctionRegistry.
- * @ScalarFunction annotation is used with each method for the registration
- *
- * Note these will just make sketches that contain a single item, these are intended to be used during ingestion to
- * create sketches from raw data, which can be rolled up later.
- *
- * Note this is defined in pinot-core rather than pinot-common because pinot-core has dependencies on
- * datasketches/clearspring analytics.
- *
- * Example usage:
- *
- * {
- *   "transformConfigs": [
- *     {
- *       "columnName": "players",
- *       "transformFunction": "toThetaSketch(playerID)"
- *     },
- *     {
- *       "columnName": "players",
- *       "transformFunction": "toThetaSketch(playerID, 1024)"
- *     },
- *     {
- *       "columnName": "names",
- *       "transformFunction": "toHLL(playerName)"
- *     },
- *     {
- *       "columnName": "names",
- *       "transformFunction": "toHLL(playerName, 8)"
- *     },
- *     {
- *       "columnName": "players",
- *       "transformFunction": "toCpcSketch(playerID)"
- *     },
- *     {
- *       "columnName": "players",
- *       "transformFunction": "toCpcSketch(playerID, 11)"
- *     }
- *   ]
- * }
- */
+/// Inbuilt Sketch Transformation Functions
+/// The functions can be used as UDFs in Query when added in the FunctionRegistry.
+/// @ScalarFunction annotation is used with each method for the registration
+///
+/// Note these will just make sketches that contain a single item, these are intended to be used during ingestion to
+/// create sketches from raw data, which can be rolled up later.
+///
+/// Note this is defined in pinot-core rather than pinot-common because pinot-core has dependencies on
+/// datasketches/clearspring analytics.
+///
+/// Example usage:
+///
+/// {
+///   "transformConfigs": \[
+///     {
+///       "columnName": "players",
+///       "transformFunction": "toThetaSketch(playerID)"
+///     },
+///     {
+///       "columnName": "players",
+///       "transformFunction": "toThetaSketch(playerID, 1024)"
+///     },
+///     {
+///       "columnName": "names",
+///       "transformFunction": "toHLL(playerName)"
+///     },
+///     {
+///       "columnName": "names",
+///       "transformFunction": "toHLL(playerName, 8)"
+///     },
+///     {
+///       "columnName": "players",
+///       "transformFunction": "toCpcSketch(playerID)"
+///     },
+///     {
+///       "columnName": "players",
+///       "transformFunction": "toCpcSketch(playerID, 11)"
+///     }
+///   \]
+/// }
 public class SketchFunctions {
   private static final ThetaSetOperationBuilder SET_OPERATION_BUILDER = new ThetaSetOperationBuilder();
 
   private SketchFunctions() {
   }
 
-  /**
-   * Create a Theta Sketch containing the input
-   *
-   * @param input an Object we want to insert into the sketch, may be null to return an empty sketch
-   * @return serialized theta sketch as bytes
-   */
+  /// Create a Theta Sketch containing the input
+  ///
+  /// @param input an Object we want to insert into the sketch, may be null to return an empty sketch
+  /// @return serialized theta sketch as bytes
   @ScalarFunction(nullableParameters = true)
   public static byte[] toThetaSketch(@Nullable Object input) {
     return toThetaSketch(input, CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES);
   }
 
-  /**
-   * Create a Theta Sketch containing the input, with a configured nominal entries
-   *
-   * @param input an Object we want to insert into the sketch, may be null to return an empty sketch
-   * @param nominalEntries number of nominal entries the sketch is configured to keep
-   * @return serialized theta sketch as bytes
-   */
+  /// Create a Theta Sketch containing the input, with a configured nominal entries
+  ///
+  /// @param input an Object we want to insert into the sketch, may be null to return an empty sketch
+  /// @param nominalEntries number of nominal entries the sketch is configured to keep
+  /// @return serialized theta sketch as bytes
   @ScalarFunction(nullableParameters = true)
   public static byte[] toThetaSketch(@Nullable Object input, int nominalEntries) {
     UpdatableThetaSketch sketch = UpdatableThetaSketch.builder().setNominalEntries(nominalEntries).build();
@@ -137,24 +131,20 @@ public class SketchFunctions {
     return ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(sketch.compact());
   }
 
-  /**
-   * Create a HyperLogLog containing the input
-   *
-   * @param input an Object we want to insert into the HLL, may be null to return an empty HLL
-   * @return serialized HLL as bytes
-   */
+  /// Create a HyperLogLog containing the input
+  ///
+  /// @param input an Object we want to insert into the HLL, may be null to return an empty HLL
+  /// @return serialized HLL as bytes
   @ScalarFunction(nullableParameters = true)
   public static byte[] toHLL(@Nullable Object input) {
     return toHLL(input, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
   }
 
-  /**
-   * Create a HyperLogLog containing the input, with a configurable log2m
-   *
-   * @param input an Object we want to insert into the HLL, may be null to return an empty HLL
-   * @param log2m the log2m value for the created HyperLogLog
-   * @return serialized HLL as bytes
-   */
+  /// Create a HyperLogLog containing the input, with a configurable log2m
+  ///
+  /// @param input an Object we want to insert into the HLL, may be null to return an empty HLL
+  /// @param log2m the log2m value for the created HyperLogLog
+  /// @return serialized HLL as bytes
   @ScalarFunction(nullableParameters = true)
   public static byte[] toHLL(@Nullable Object input, int log2m) {
     HyperLogLog hll = new HyperLogLog(log2m);
@@ -164,28 +154,24 @@ public class SketchFunctions {
     return ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hll);
   }
 
-  /**
-   * Create a Tuple Sketch containing the key and value supplied
-   *
-   * @param key an Object we want to insert as the key of the sketch, may be null to return an empty sketch
-   * @param value an Integer we want to associate as the value to go along with the key, may be null to return an
-   *              empty sketch
-   * @return serialized tuple sketch as bytes
-   */
+  /// Create a Tuple Sketch containing the key and value supplied
+  ///
+  /// @param key an Object we want to insert as the key of the sketch, may be null to return an empty sketch
+  /// @param value an Integer we want to associate as the value to go along with the key, may be null to return an
+  ///              empty sketch
+  /// @return serialized tuple sketch as bytes
   @ScalarFunction(nullableParameters = true)
   public static byte[] toIntegerSumTupleSketch(@Nullable Object key, @Nullable Integer value) {
     return toIntegerSumTupleSketch(key, value, CommonConstants.Helix.DEFAULT_TUPLE_SKETCH_LGK);
   }
 
-  /**
-   * Create a Tuple Sketch containing the key and value supplied
-   *
-   * @param key an Object we want to insert as the key of the sketch, may be null to return an empty sketch
-   * @param value an Integer we want to associate as the value to go along with the key, may be null to return an
-   *              empty sketch
-   * @param lgK integer representing the log of the maximum number of retained entries in the sketch, between 4 and 26
-   * @return serialized tuple sketch as bytes
-   */
+  /// Create a Tuple Sketch containing the key and value supplied
+  ///
+  /// @param key an Object we want to insert as the key of the sketch, may be null to return an empty sketch
+  /// @param value an Integer we want to associate as the value to go along with the key, may be null to return an
+  ///              empty sketch
+  /// @param lgK integer representing the log of the maximum number of retained entries in the sketch, between 4 and 26
+  /// @return serialized tuple sketch as bytes
   @ScalarFunction(nullableParameters = true)
   public static byte[] toIntegerSumTupleSketch(@Nullable Object key, Integer value, int lgK) {
     IntegerTupleSketch is = new IntegerTupleSketch(lgK, IntegerSummary.Mode.Sum);
@@ -389,12 +375,10 @@ public class SketchFunctions {
     return Math.round(asIntegerSketch(o1).getEstimate());
   }
 
-  /**
-   * Create a CPC Sketch containing the input
-   *
-   * @param input an Object we want to insert into the sketch, may be null to return an empty sketch
-   * @return serialized CPC sketch as bytes
-   */
+  /// Create a CPC Sketch containing the input
+  ///
+  /// @param input an Object we want to insert into the sketch, may be null to return an empty sketch
+  /// @return serialized CPC sketch as bytes
   @ScalarFunction(nullableParameters = true)
   public static byte[] toCpcSketch(@Nullable Object input) {
     return toCpcSketch(input, CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK);
@@ -430,13 +414,11 @@ public class SketchFunctions {
     return asCpcSketch(sketchObject).toString();
   }
 
-  /**
-   * Create a CPC Sketch containing the input, with a configured nominal entries
-   *
-   * @param input an Object we want to insert into the sketch, may be null to return an empty sketch
-   * @param lgK the given log_base2 of k, which is the nominal entries that the sketch is configured to keep
-   * @return serialized CPC sketch as bytes
-   */
+  /// Create a CPC Sketch containing the input, with a configured nominal entries
+  ///
+  /// @param input an Object we want to insert into the sketch, may be null to return an empty sketch
+  /// @param lgK the given log_base2 of k, which is the nominal entries that the sketch is configured to keep
+  /// @return serialized CPC sketch as bytes
   @ScalarFunction(nullableParameters = true)
   public static byte[] toCpcSketch(@Nullable Object input, int lgK) {
     CpcSketch sketch = new CpcSketch(lgK);
@@ -485,24 +467,20 @@ public class SketchFunctions {
     return union.getResult().toByteArray();
   }
 
-  /**
-   * Create an UltraLogLog containing the input
-   *
-   * @param input an Object we want to insert into the ULL, may be null to return an empty ULL
-   * @return serialized ULL as bytes
-   */
+  /// Create an UltraLogLog containing the input
+  ///
+  /// @param input an Object we want to insert into the ULL, may be null to return an empty ULL
+  /// @return serialized ULL as bytes
   @ScalarFunction(nullableParameters = true)
   public static byte[] toULL(@Nullable Object input) {
     return toULL(input, CommonConstants.Helix.DEFAULT_ULTRALOGLOG_P);
   }
 
-  /**
-   * Create an UltraLogLog containing the input, with a configurable p
-   *
-   * @param input an Object we want to insert into the ULL, may be null to return an empty HLL
-   * @param p the p value for the created UltraLogLog
-   * @return serialized HLL as bytes
-   */
+  /// Create an UltraLogLog containing the input, with a configurable p
+  ///
+  /// @param input an Object we want to insert into the ULL, may be null to return an empty HLL
+  /// @param p the p value for the created UltraLogLog
+  /// @return serialized HLL as bytes
   @ScalarFunction(nullableParameters = true)
   public static byte[] toULL(@Nullable Object input, int p) {
     UltraLogLog sketch = UltraLogLog.create(p);
@@ -510,11 +488,9 @@ public class SketchFunctions {
     return ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.serialize(sketch);
   }
 
-  /**
-   * Takes a default UltraLogLog byte array and loads it into the format used in Pinot
-   *
-   * This adds the P value into the serialized byte stream, so it can be used easily
-   */
+  /// Takes a default UltraLogLog byte array and loads it into the format used in Pinot
+  ///
+  /// This adds the P value into the serialized byte stream, so it can be used easily
   @ScalarFunction
   public static byte[] fromULL(byte[] input) {
     UltraLogLog ull = UltraLogLog.wrap(input);

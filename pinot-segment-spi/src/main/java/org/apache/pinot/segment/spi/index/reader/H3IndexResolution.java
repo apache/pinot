@@ -34,12 +34,10 @@ import java.util.List;
 import java.util.Objects;
 
 
-/**
- * Stores the resolutions for an index. There are in total of H3 resolutions
- * https://h3geo.org/#/documentation/core-library/resolution-table
- * To efficiently serialize the resolutions, we use two bytes for encoding th enabled resolutions. The resolution level
- * maps to the corresponding bit.
- */
+/// Stores the resolutions for an index. There are in total of H3 resolutions
+/// https://h3geo.org/#/documentation/core-library/resolution-table
+/// To efficiently serialize the resolutions, we use two bytes for encoding th enabled resolutions. The resolution level
+/// maps to the corresponding bit.
 @JsonSerialize(converter = H3IndexResolution.ToIntListConverted.class)
 @JsonDeserialize(using = H3IndexResolution.Deserializator.class)
 public class H3IndexResolution {
@@ -51,17 +49,13 @@ public class H3IndexResolution {
     }
   }
 
-  /**
-   * Creates the resolutions with the serialized short value
-   * @param resolutions
-   */
+  /// Creates the resolutions with the serialized short value
+  /// @param resolutions
   public H3IndexResolution(short resolutions) {
     _resolutions = resolutions;
   }
 
-  /**
-   * @return the encoding of the resolutions into a short value (two bytes)
-   */
+  /// @return the encoding of the resolutions into a short value (two bytes)
   public short serialize() {
     return _resolutions;
   }

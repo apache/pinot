@@ -25,16 +25,14 @@ import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 
 
-/**
- * Intermediate state used by {@code IntegerTupleSketchAggregationFunction} which gives
- * the end user more control over how sketches are merged for performance.
- * In particular, the Theta Sketch Union "early-stop" optimisation can be used - ordered sketches require no further
- * processing beyond the minimum Theta value.  This applies to Tuple sketches because they are an extension of the
- * Theta sketch.
- * The union operation initialises an empty "gadget" bookkeeping sketch that is updated with hashed entries
- * that fall below the minimum Theta value for all input sketches ("Broder Rule").  When the initial Theta value is
- * set to the minimum immediately, further gains can be realised.
- */
+/// Intermediate state used by `IntegerTupleSketchAggregationFunction` which gives
+/// the end user more control over how sketches are merged for performance.
+/// In particular, the Theta Sketch Union "early-stop" optimisation can be used - ordered sketches require no further
+/// processing beyond the minimum Theta value.  This applies to Tuple sketches because they are an extension of the
+/// Theta sketch.
+/// The union operation initialises an empty "gadget" bookkeeping sketch that is updated with hashed entries
+/// that fall below the minimum Theta value for all input sketches ("Broder Rule").  When the initial Theta value is
+/// set to the minimum immediately, further gains can be realised.
 public class TupleIntSketchAccumulator extends CustomObjectAccumulator<TupleSketch<IntegerSummary>> {
   private IntegerSummarySetOperations _setOperations;
   private int _nominalEntries;

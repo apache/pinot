@@ -27,11 +27,9 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 
 
-/**
- * The {@code NumInFlightReqSelector} is an AdaptiveServerSelector implementation that picks the best server based on
- * the number of in-flight queries being processed by the server. The server with the lowest number of in-flight
- * queries is picked.
- */
+/// The `NumInFlightReqSelector` is an AdaptiveServerSelector implementation that picks the best server based on
+/// the number of in-flight queries being processed by the server. The server with the lowest number of in-flight
+/// queries is picked.
 public class NumInFlightReqSelector implements AdaptiveServerSelector {
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
 

@@ -42,12 +42,10 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Base class that encapsulates the common raw-value handling for Smart distinct-count functions
- * that switch from exact Set aggregation to a sketch when a threshold is exceeded.
- *
- * Subclasses provide the sketch-specific behavior (conversion and dictionary handling).
- */
+/// Base class that encapsulates the common raw-value handling for Smart distinct-count functions
+/// that switch from exact Set aggregation to a sketch when a threshold is exceeded.
+///
+/// Subclasses provide the sketch-specific behavior (conversion and dictionary handling).
 @SuppressWarnings({"rawtypes", "unchecked"})
 abstract class BaseDistinctCountSmartSketchAggregationFunction
     extends BaseSingleInputAggregationFunction<Object, Integer> {
@@ -66,11 +64,9 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
 
   protected abstract IllegalStateException getIllegalDataTypeException(DataType dataType, boolean singleValue);
 
-  /**
-   * Returns the dictionary cardinality threshold for adaptive conversion.
-   * If the cardinality exceeds this threshold, the bitmap is converted to a sketch.
-   * Return Integer.MAX_VALUE to disable adaptive conversion during aggregation.
-   */
+  /// Returns the dictionary cardinality threshold for adaptive conversion.
+  /// If the cardinality exceeds this threshold, the bitmap is converted to a sketch.
+  /// Return Integer.MAX_VALUE to disable adaptive conversion during aggregation.
   protected int getDictIdCardinalityThreshold() {
     return Integer.MAX_VALUE;
   }
@@ -85,10 +81,8 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
     return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
   }
 
-  /**
-   * Common aggregation for non-dictionary-encoded expressions into a per-segment Set.
-   * Subclasses can call this from their aggregate(...) when the current result is not a sketch.
-   */
+  /// Common aggregation for non-dictionary-encoded expressions into a per-segment Set.
+  /// Subclasses can call this from their aggregate(...) when the current result is not a sketch.
   protected final void aggregateIntoSet(int length, AggregationResultHolder aggregationResultHolder,
       BlockValSet blockValSet) {
     DataType valueType = blockValSet.getValueType();
@@ -521,7 +515,7 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
     }
   }
 
-  /** Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist. */
+  /// Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
   protected static RoaringBitmap getDictIdBitmap(AggregationResultHolder aggregationResultHolder,
       Dictionary dictionary) {
     DictIdsWrapper dictIdsWrapper = aggregationResultHolder.getResult();
@@ -532,7 +526,7 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
     return dictIdsWrapper._dictIdBitmap;
   }
 
-  /** Returns the value set from the result holder or creates a new one if it does not exist. */
+  /// Returns the value set from the result holder or creates a new one if it does not exist.
   protected static Set getValueSet(AggregationResultHolder aggregationResultHolder, DataType valueType) {
     Set valueSet = aggregationResultHolder.getResult();
     if (valueSet == null) {
@@ -542,7 +536,7 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
     return valueSet;
   }
 
-  /** Helper method to create a value set for the given value type. */
+  /// Helper method to create a value set for the given value type.
   protected static Set getValueSet(DataType valueType) {
     switch (valueType) {
       case INT:
@@ -562,7 +556,7 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
     }
   }
 
-  /** Returns the dictionary id bitmap for the given group key or creates a new one if it does not exist. */
+  /// Returns the dictionary id bitmap for the given group key or creates a new one if it does not exist.
   protected static RoaringBitmap getDictIdBitmap(GroupByResultHolder groupByResultHolder, int groupKey,
       Dictionary dictionary) {
     DictIdsWrapper dictIdsWrapper = groupByResultHolder.getResult(groupKey);
@@ -573,7 +567,7 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
     return dictIdsWrapper._dictIdBitmap;
   }
 
-  /** Returns the value set for the given group key or creates a new one if it does not exist. */
+  /// Returns the value set for the given group key or creates a new one if it does not exist.
   protected static Set getValueSet(GroupByResultHolder groupByResultHolder, int groupKey, DataType valueType) {
     Set valueSet = groupByResultHolder.getResult(groupKey);
     if (valueSet == null) {
@@ -583,7 +577,7 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
     return valueSet;
   }
 
-  /** Helper method to set dictionary id for the given group keys into the result holder. */
+  /// Helper method to set dictionary id for the given group keys into the result holder.
   protected static void setDictIdForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys,
       Dictionary dictionary, int dictId) {
     for (int groupKey : groupKeys) {
@@ -591,42 +585,42 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
     }
   }
 
-  /** Helper method to set INT value for the given group keys into the result holder. */
+  /// Helper method to set INT value for the given group keys into the result holder.
   protected static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, int value) {
     for (int groupKey : groupKeys) {
       ((IntOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.INT)).add(value);
     }
   }
 
-  /** Helper method to set LONG value for the given group keys into the result holder. */
+  /// Helper method to set LONG value for the given group keys into the result holder.
   protected static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, long value) {
     for (int groupKey : groupKeys) {
       ((LongOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.LONG)).add(value);
     }
   }
 
-  /** Helper method to set FLOAT value for the given group keys into the result holder. */
+  /// Helper method to set FLOAT value for the given group keys into the result holder.
   protected static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, float value) {
     for (int groupKey : groupKeys) {
       ((FloatOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.FLOAT)).add(value);
     }
   }
 
-  /** Helper method to set DOUBLE value for the given group keys into the result holder. */
+  /// Helper method to set DOUBLE value for the given group keys into the result holder.
   protected static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, double value) {
     for (int groupKey : groupKeys) {
       ((DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKey, DataType.DOUBLE)).add(value);
     }
   }
 
-  /** Helper method to set STRING value for the given group keys into the result holder. */
+  /// Helper method to set STRING value for the given group keys into the result holder.
   protected static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, String value) {
     for (int groupKey : groupKeys) {
       ((ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKey, DataType.STRING)).add(value);
     }
   }
 
-  /** Helper method to set BYTES value for the given group keys into the result holder. */
+  /// Helper method to set BYTES value for the given group keys into the result holder.
   protected static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys,
       ByteArray value) {
     for (int groupKey : groupKeys) {
@@ -634,7 +628,7 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
     }
   }
 
-  /** Helper method to read dictionary and convert dictionary ids to a value set for dictionary-encoded expression. */
+  /// Helper method to read dictionary and convert dictionary ids to a value set for dictionary-encoded expression.
   protected static Set convertToValueSet(DictIdsWrapper dictIdsWrapper) {
     Dictionary dictionary = dictIdsWrapper._dictionary;
     RoaringBitmap dictIdBitmap = dictIdsWrapper._dictIdBitmap;
@@ -690,10 +684,8 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
     }
   }
 
-  /**
-   * Aggregate a single dictionary ID for a group. If already a sketch, offer directly.
-   * Otherwise add to bitmap and track as modified.
-   */
+  /// Aggregate a single dictionary ID for a group. If already a sketch, offer directly.
+  /// Otherwise add to bitmap and track as modified.
   private void aggregateDictIdForGroup(GroupByResultHolder groupByResultHolder, int groupKey, Dictionary dictionary,
       int dictId, IntSet modifiedGroups) {
     Object result = groupByResultHolder.getResult(groupKey);
@@ -707,10 +699,8 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
     }
   }
 
-  /**
-   * Aggregate multiple dictionary IDs for a group. If already a sketch, offer directly.
-   * Otherwise add to bitmap and track as modified.
-   */
+  /// Aggregate multiple dictionary IDs for a group. If already a sketch, offer directly.
+  /// Otherwise add to bitmap and track as modified.
   private void aggregateDictIdsForGroup(GroupByResultHolder groupByResultHolder, int groupKey, Dictionary dictionary,
       int[] dictIds, IntSet modifiedGroups) {
     Object result = groupByResultHolder.getResult(groupKey);
@@ -726,9 +716,7 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
     }
   }
 
-  /**
-   * Check and convert to sketch if cardinality threshold exceeded for group-by aggregation.
-   */
+  /// Check and convert to sketch if cardinality threshold exceeded for group-by aggregation.
   private void checkAndConvertToSketchForGroups(GroupByResultHolder groupByResultHolder, IntSet modifiedGroups) {
     int threshold = getDictIdCardinalityThreshold();
     // Skip conversion check if adaptive conversion is disabled (threshold is Integer.MAX_VALUE)
@@ -746,7 +734,7 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
     }
   }
 
-  /** Wrapper of dictionary and dict-id bitmap used during aggregation. */
+  /// Wrapper of dictionary and dict-id bitmap used during aggregation.
   protected static final class DictIdsWrapper {
     final Dictionary _dictionary;
     final RoaringBitmap _dictIdBitmap;

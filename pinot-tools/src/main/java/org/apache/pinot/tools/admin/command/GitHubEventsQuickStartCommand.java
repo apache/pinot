@@ -24,9 +24,7 @@ import org.apache.pinot.tools.GitHubEventsQuickstart;
 import picocli.CommandLine;
 
 
-/**
- * Command to run GitHubEventsQuickStart
- */
+/// Command to run GitHubEventsQuickStart
 @CommandLine.Command(name = "GitHubEventsQuickStart", mixinStandardHelpOptions = true)
 public class GitHubEventsQuickStartCommand extends AbstractBaseAdminCommand implements Command {
 

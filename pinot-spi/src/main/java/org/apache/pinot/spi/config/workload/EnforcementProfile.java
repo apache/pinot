@@ -24,16 +24,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
-/**
- * Defines the resource enforcement profile for a node within a query workload.
- * <p>
- * This profile specifies the maximum CPU time (in nanoseconds) and maximum memory (in bytes)
- * that queries under this workload are allowed to consume on the node.
- * </p>
- *
- * @see QueryWorkloadConfig
- * @see NodeConfig
- */
+/// Defines the resource enforcement profile for a node within a query workload.
+///
+/// This profile specifies the maximum CPU time (in nanoseconds) and maximum memory (in bytes)
+/// that queries under this workload are allowed to consume on the node.
+///
+/// @see QueryWorkloadConfig
+/// @see NodeConfig
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class EnforcementProfile extends BaseJsonConfig {
@@ -46,32 +43,26 @@ public class EnforcementProfile extends BaseJsonConfig {
   @JsonPropertyDescription("Max memory cost allowed for the workload")
   private long _memoryCostBytes;
 
-  /**
-   * Constructs an EnforcementProfile with specified resource limits.
-   *
-   * @param cpuCostNs maximum allowed CPU cost in nanoseconds for the workload
-   * @param memoryCostBytes maximum allowed memory cost in bytes for the workload
-   */
+  /// Constructs an EnforcementProfile with specified resource limits.
+  ///
+  /// @param cpuCostNs maximum allowed CPU cost in nanoseconds for the workload
+  /// @param memoryCostBytes maximum allowed memory cost in bytes for the workload
   public EnforcementProfile(@JsonProperty(CPU_COST_NS) long cpuCostNs,
                             @JsonProperty(MEMORY_COST_BYTES) long memoryCostBytes) {
     _cpuCostNs = cpuCostNs;
     _memoryCostBytes = memoryCostBytes;
   }
 
-  /**
-   * Returns the maximum CPU cost allowed for this workload.
-   *
-   * @return CPU cost limit in nanoseconds
-   */
+  /// Returns the maximum CPU cost allowed for this workload.
+  ///
+  /// @return CPU cost limit in nanoseconds
   public long getCpuCostNs() {
     return _cpuCostNs;
   }
 
-  /**
-   * Returns the maximum memory cost allowed for this workload.
-   *
-   * @return memory cost limit in bytes
-   */
+  /// Returns the maximum memory cost allowed for this workload.
+  ///
+  /// @return memory cost limit in bytes
   public long getMemoryCostBytes() {
     return _memoryCostBytes;
   }

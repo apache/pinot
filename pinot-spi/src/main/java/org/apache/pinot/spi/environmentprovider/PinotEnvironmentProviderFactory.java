@@ -27,10 +27,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This factory class initializes the PinotEnvironmentProvider class.
- * It creates a PinotEnvironment object based on the URI found.
- */
+/// This factory class initializes the PinotEnvironmentProvider class.
+/// It creates a PinotEnvironment object based on the URI found.
 public class PinotEnvironmentProviderFactory {
   private PinotEnvironmentProviderFactory() {
   }
