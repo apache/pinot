@@ -77,8 +77,8 @@
     </profile>
     <!--
       Keep every top-level A-Z test prefix in exactly one set. Kinesis runs in set 2,
-      so the O-prefix tests and TenantRebalanceIntegrationTest run in set 1 to balance
-      the observed GitHub Actions runtime across the two jobs.
+      and TenantRebalanceIntegrationTest runs in set 1 to balance the observed GitHub
+      Actions runtime across the two jobs.
     -->
     <profile>
       <id>integration-tests-set-1</id>
@@ -110,7 +110,6 @@
                 <include>**/org/apache/pinot/integration/tests/L*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/M*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/N*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/O*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</include>
               </includes>
             </configuration>
@@ -134,6 +133,7 @@
             <configuration>
               <skipTests>false</skipTests>
               <includes>
+                <include>**/org/apache/pinot/integration/tests/O*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/P*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/Q*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/R*Test.java</include>
