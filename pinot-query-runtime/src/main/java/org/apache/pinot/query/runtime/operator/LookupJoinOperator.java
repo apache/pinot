@@ -20,7 +20,9 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
@@ -64,12 +66,20 @@ public class LookupJoinOperator extends MultiStageOperator {
   private final LeafOperator _rightInput;
   private final JoinRelType _joinType;
   private final int[] _leftKeyIds;
+  private final int[] _rightKeyIds;
   private final DimensionTableDataManager _rightTable;
   private final String[] _rightColumns;
   private final DataSchema _resultSchema;
   private final int _resultColumnSize;
   private final List<TransformOperand> _nonEquiEvaluators;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
+
+  /// Pre-computed mapping for building the PrimaryKey in the dimension table's primary key column order.
+  /// For each dimension table primary key column, _primaryKeyValueSources[i] is:
+  /// - ≥ 0 : index into _leftKeyIds (value comes from the left row at _leftKeyIds[sourceIndex])
+  /// - < 0  : value comes from _primaryKeyLiteralValues[i] (a literal constant)
+  private final int[] _primaryKeyValueSources;
+  private final Object[] _primaryKeyLiteralValues;
 
   public LookupJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
       MultiStageOperator rightInput, JoinNode node) {
@@ -87,6 +97,11 @@ public class LookupJoinOperator extends MultiStageOperator {
     for (int i = 0; i < leftKeys.size(); i++) {
       _leftKeyIds[i] = leftKeys.get(i);
     }
+    List<Integer> rightKeys = node.getRightKeys();
+    _rightKeyIds = new int[rightKeys.size()];
+    for (int i = 0; i < rightKeys.size(); i++) {
+      _rightKeyIds[i] = rightKeys.get(i);
+    }
     List<ServerQueryRequest> leafStageRequests = _rightInput.getRequests();
     Preconditions.checkState(leafStageRequests.size() == 1, "Lookup join cannot be applied to hybrid tables");
     QueryContext queryContext = leafStageRequests.get(0).getQueryContext();
@@ -100,6 +115,89 @@ public class LookupJoinOperator extends MultiStageOperator {
     _nonEquiEvaluators = new ArrayList<>(nonEquiConditions.size());
     for (RexExpression nonEquiCondition : nonEquiConditions) {
       _nonEquiEvaluators.add(TransformOperandFactory.getTransformOperand(nonEquiCondition, _resultSchema));
+    }
+
+    // Pre-compute the mapping from dimension table primary key columns to value sources.
+    // This is needed because the lookup key must include ALL primary key columns, but not all of them
+    // may be matched by equi-join conditions — some may be matched by literal conditions (e.g.,
+    // dim_tbl.currency = 'gbp').
+    List<String> pkColumns = _rightTable.getPrimaryKeyColumns();
+    int pkSize = pkColumns.size();
+    _primaryKeyValueSources = new int[pkSize];
+    _primaryKeyLiteralValues = new Object[pkSize];
+
+    // Build a map from right column name to its index in _rightColumns
+    Map<String, Integer> rightColumnNameToIndex = new HashMap<>();
+    for (int i = 0; i < _rightColumns.length; i++) {
+      rightColumnNameToIndex.put(_rightColumns[i], i);
+    }
+
+    // Build a map from right column index to left key index for equi-join keys
+    // _rightKeyIds[j] is matched by _leftKeyIds[j]
+    Map<Integer, Integer> rightColToLeftKeyIndex = new HashMap<>();
+    for (int i = 0; i < _rightKeyIds.length; i++) {
+      rightColToLeftKeyIndex.put(_rightKeyIds[i], i);
+    }
+
+    // Extract literal key values from non-equi conditions
+    // A non-equi condition like "dim_tbl.currency = 'gbp'" is a FunctionCall with name "="
+    // where one operand is an InputRef (to a dim table column) and the other is a Literal
+    Map<String, Object> literalKeyValues = new HashMap<>();
+    for (RexExpression condition : nonEquiConditions) {
+      if (condition instanceof RexExpression.FunctionCall) {
+        RexExpression.FunctionCall fc = (RexExpression.FunctionCall) condition;
+        if ("=".equals(fc.getFunctionName()) && fc.getFunctionOperands().size() == 2) {
+          RexExpression left = fc.getFunctionOperands().get(0);
+          RexExpression right = fc.getFunctionOperands().get(1);
+          RexExpression.InputRef inputRef = null;
+          RexExpression.Literal literal = null;
+          if (left instanceof RexExpression.InputRef && right instanceof RexExpression.Literal) {
+            inputRef = (RexExpression.InputRef) left;
+            literal = (RexExpression.Literal) right;
+          } else if (right instanceof RexExpression.InputRef && left instanceof RexExpression.Literal) {
+            inputRef = (RexExpression.InputRef) right;
+            literal = (RexExpression.Literal) left;
+          }
+          if (inputRef != null && literal != null) {
+            // InputRef in non-equi conditions refers to the result schema (left + right columns).
+            // Right column indices start at _leftColumnSize.
+            int refIndex = inputRef.getIndex();
+            if (refIndex >= _leftColumnSize) {
+              int rightColIdx = refIndex - _leftColumnSize;
+              if (rightColIdx < _rightColumns.length) {
+                String colName = _rightColumns[rightColIdx];
+                if (pkColumns.contains(colName)) {
+                  literalKeyValues.put(colName, literal.getValue());
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Now populate _primaryKeyValueSources and _primaryKeyLiteralValues
+    // For each primary key column, determine if the value comes from:
+    // 1. An equi-join key (left row column) — store the left key index (≥ 0)
+    // 2. A literal — store -1 and put the literal value in _primaryKeyLiteralValues
+    for (int i = 0; i < pkSize; i++) {
+      String pkCol = pkColumns.get(i);
+      Integer rightColIdx = rightColumnNameToIndex.get(pkCol);
+      Preconditions.checkState(rightColIdx != null, "Primary key column %s not found in right table schema", pkCol);
+
+      Integer leftKeyIndex = rightColToLeftKeyIndex.get(rightColIdx);
+      if (leftKeyIndex != null) {
+        // This primary key column is matched by an equi-join key
+        _primaryKeyValueSources[i] = leftKeyIndex;
+        _primaryKeyLiteralValues[i] = null;
+      } else {
+        // This primary key column must be matched by a literal
+        Object literalVal = literalKeyValues.get(pkCol);
+        Preconditions.checkState(literalVal != null,
+            "Primary key column %s is not matched by any equi-join key or literal condition", pkCol);
+        _primaryKeyValueSources[i] = -1;
+        _primaryKeyLiteralValues[i] = literalVal;
+      }
     }
   }
 
@@ -192,7 +290,7 @@ public class LookupJoinOperator extends MultiStageOperator {
   private List<Object[]> buildJoinedDataBlockSemi(MseBlock.Data leftBlock) {
     List<Object[]> container = leftBlock.asRowHeap().getRows();
     List<Object[]> rows = new ArrayList<>(container.size());
-    PrimaryKey key = new PrimaryKey(new Object[_leftKeyIds.length]);
+    PrimaryKey key = new PrimaryKey(new Object[_primaryKeyValueSources.length]);
 
     for (Object[] leftRow : container) {
       fillKey(leftRow, key);
@@ -206,7 +304,7 @@ public class LookupJoinOperator extends MultiStageOperator {
   private List<Object[]> buildJoinedDataBlockAnti(MseBlock.Data leftBlock) {
     List<Object[]> container = leftBlock.asRowHeap().getRows();
     List<Object[]> rows = new ArrayList<>(container.size());
-    PrimaryKey key = new PrimaryKey(new Object[_leftKeyIds.length]);
+    PrimaryKey key = new PrimaryKey(new Object[_primaryKeyValueSources.length]);
 
     for (Object[] leftRow : container) {
       fillKey(leftRow, key);
@@ -217,18 +315,33 @@ public class LookupJoinOperator extends MultiStageOperator {
     return rows;
   }
 
+  /// Builds the PrimaryKey for the dimension table lookup, using the dimension table's primary key column
+  /// order. For each primary key column, the value is either:
+  /// - Extracted from the left row at the mapped equi-join key index (from _primaryKeyValueSources)
+  /// - A literal constant (from _primaryKeyLiteralValues)
   private PrimaryKey getKey(Object[] row) {
-    Object[] values = new Object[_leftKeyIds.length];
-    for (int i = 0; i < _leftKeyIds.length; i++) {
-      values[i] = row[_leftKeyIds[i]];
+    Object[] values = new Object[_primaryKeyValueSources.length];
+    for (int i = 0; i < _primaryKeyValueSources.length; i++) {
+      int sourceIdx = _primaryKeyValueSources[i];
+      if (sourceIdx >= 0) {
+        values[i] = row[_leftKeyIds[sourceIdx]];
+      } else {
+        values[i] = _primaryKeyLiteralValues[i];
+      }
     }
     return new PrimaryKey(values);
   }
 
+  /// Fills an existing PrimaryKey with values for the current left row, using the same mapping as getKey().
   private void fillKey(Object[] row, PrimaryKey key) {
     Object[] values = key.getValues();
-    for (int i = 0; i < _leftKeyIds.length; i++) {
-      values[i] = row[_leftKeyIds[i]];
+    for (int i = 0; i < _primaryKeyValueSources.length; i++) {
+      int sourceIdx = _primaryKeyValueSources[i];
+      if (sourceIdx >= 0) {
+        values[i] = row[_leftKeyIds[sourceIdx]];
+      } else {
+        values[i] = _primaryKeyLiteralValues[i];
+      }
     }
   }
 
