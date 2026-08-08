@@ -1316,18 +1316,14 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(ControllerPeriodicTasksConf.ENABLE_PARTIAL_OFFLINE_REPLICA_REPAIR, false);
   }
 
-  /**
-   * Whether RSVM should auto force-commit partitions with partial OFFLINE consuming replicas.
-   * Default false. See issue #15897.
-   */
+  /// Whether RSVM should auto force-commit partitions with partial OFFLINE consuming replicas.
+  /// Default false. See issue #15897.
   public boolean isAutoForceCommitOnPartialOfflineEnabled() {
     return getProperty(ControllerPeriodicTasksConf.ENABLE_AUTO_FORCE_COMMIT_ON_PARTIAL_OFFLINE, false);
   }
 
-  /**
-   * Minimum age (ms) of an IN_PROGRESS consuming segment before auto force-commit on partial OFFLINE.
-   * Default 5 minutes. Age is derived from LLC segment name creation time (fallback: ZK creation time).
-   */
+  /// Minimum age (ms) of an IN_PROGRESS consuming segment before auto force-commit on partial OFFLINE.
+  /// Default 5 minutes. Age is derived from LLC segment name creation time (fallback: ZK creation time).
   public long getAutoForceCommitOnPartialOfflineMinAgeMs() {
     return getProperty(ControllerPeriodicTasksConf.AUTO_FORCE_COMMIT_ON_PARTIAL_OFFLINE_MIN_AGE_MS, 300_000L);
   }

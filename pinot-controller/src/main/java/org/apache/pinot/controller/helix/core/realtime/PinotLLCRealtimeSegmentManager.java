@@ -222,7 +222,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   // Segments for which auto force-commit on partial OFFLINE has already been attempted (leader lifetime).
   // Pruned when the segment is no longer CONSUMING in IdealState for its table (see pruneAutoForceCommitTracking).
   private final Set<String> _autoForceCommitRequestedSegments = ConcurrentHashMap.newKeySet();
-  /** Hard cap so a pruning bug cannot grow this set without bound on a long-lived controller leader. */
+  /// Hard cap so a pruning bug cannot grow this set without bound on a long-lived controller leader.
   private static final int MAX_AUTO_FORCE_COMMIT_TRACKED_SEGMENTS = 10_000;
 
   private volatile boolean _isStopping = false;
@@ -1986,15 +1986,13 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return newSegmentName;
   }
 
-  /**
-   * Auto force-commit a partition that has mixed CONSUMING + OFFLINE IdealState replicas while ZK status is
-   * IN_PROGRESS (issue #15897). Seals healthy replicas and lets completion create a new CONSUMING segment for all
-   * replicas. Gated by age (proxy for progress) and at-most-once per segment name on this controller leader.
-   *
-   * @return true if this path owns recovery for the segment (force-commit initiated, already requested, or
-   *     permanently skipped after a failed attempt) so OFFLINE→CONSUMING flip should not also run; false if gates
-   *     are not yet satisfied and another repair tool may act
-   */
+  /// Auto force-commit a partition that has mixed CONSUMING + OFFLINE IdealState replicas while ZK status is
+  /// IN_PROGRESS (issue #15897). Seals healthy replicas and lets completion create a new CONSUMING segment for all
+  /// replicas. Gated by age (proxy for progress) and at-most-once per segment name on this controller leader.
+  ///
+  /// @return true if this path owns recovery for the segment (force-commit initiated, already requested, or
+  ///     permanently skipped after a failed attempt) so OFFLINE→CONSUMING flip should not also run; false if gates
+  ///     are not yet satisfied and another repair tool may act
   @VisibleForTesting
   boolean maybeAutoForceCommitOnPartialOffline(String realtimeTableName, int partitionId, String segmentName,
       LLCSegmentName llcSegmentName, SegmentZKMetadata segmentZKMetadata, long currentTimeMs) {
@@ -2056,10 +2054,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     }
   }
 
-  /**
-   * Drop tracking entries for this table's segments that are no longer CONSUMING in IdealState so the set cannot grow
-   * without bound across segment generations on a long-lived controller leader.
-   */
+  /// Drop tracking entries for this table's segments that are no longer CONSUMING in IdealState so the set cannot grow
+  /// without bound across segment generations on a long-lived controller leader.
   @VisibleForTesting
   void pruneAutoForceCommitTracking(String realtimeTableName, Map<String, Map<String, String>> instanceStatesMap) {
     if (_autoForceCommitRequestedSegments.isEmpty()) {
