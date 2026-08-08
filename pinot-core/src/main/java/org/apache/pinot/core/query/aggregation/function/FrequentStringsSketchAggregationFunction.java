@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.lang.foreign.MemorySegment;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.datasketches.common.ArrayOfStringsSerDe;
 import org.apache.datasketches.frequencies.FrequentItemsSketch;
 import org.apache.pinot.common.CustomObject;
@@ -194,11 +195,13 @@ public class FrequentStringsSketchAggregationFunction
     return sketches;
   }
 
+  @Nullable
   @Override
   public FrequentItemsSketch<String> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public FrequentItemsSketch<String> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
@@ -207,12 +210,8 @@ public class FrequentStringsSketchAggregationFunction
   @Override
   public FrequentItemsSketch<String> merge(FrequentItemsSketch<String> sketch1, FrequentItemsSketch<String> sketch2) {
     FrequentItemsSketch<String> union = new FrequentItemsSketch<>(_maxMapSize);
-    if (sketch1 != null) {
-      union.merge(sketch1);
-    }
-    if (sketch2 != null) {
-      union.merge(sketch2);
-    }
+    union.merge(sketch1);
+    union.merge(sketch2);
     return union;
   }
 
@@ -243,8 +242,10 @@ public class FrequentStringsSketchAggregationFunction
         + "(" + _expression + ")";
   }
 
+  @Nullable
   @Override
-  public Comparable<?> extractFinalResult(FrequentItemsSketch<String> sketch) {
-    return new SerializedFrequentStringsSketch(sketch);
+  public Comparable<?> extractFinalResult(@Nullable FrequentItemsSketch<String> sketch) {
+    // A null intermediate result means nothing was aggregated, and there is no sketch to serialize
+    return sketch != null ? new SerializedFrequentStringsSketch(sketch) : null;
   }
 }

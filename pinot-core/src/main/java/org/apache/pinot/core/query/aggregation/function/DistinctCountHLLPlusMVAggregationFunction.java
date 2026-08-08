@@ -19,11 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
@@ -36,28 +32,5 @@ public class DistinctCountHLLPlusMVAggregationFunction extends DistinctCountHLLP
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.DISTINCTCOUNTHLLPLUSMV;
-  }
-
-  @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
-    aggregateMV(length, aggregationResultHolder, blockValSet, blockValSet.getValueType().getStoredType());
-  }
-
-  @Override
-  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
-    aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet,
-        blockValSet.getValueType().getStoredType());
-  }
-
-  @Override
-  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
-    aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet,
-        blockValSet.getValueType().getStoredType());
   }
 }
