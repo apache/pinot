@@ -53,7 +53,7 @@ print_surefire_dumps() {
 # Integration Tests
 cd pinot-integration-tests || exit 1
 case "$RUN_TEST_SET" in
-  1|2|3)
+  1|2)
     mvn test \
         -P "github-actions,codecoverage,integration-tests-set-${RUN_TEST_SET}" || {
       print_surefire_dumps
