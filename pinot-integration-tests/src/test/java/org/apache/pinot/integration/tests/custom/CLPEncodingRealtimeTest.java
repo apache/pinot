@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests.custom;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -107,10 +108,9 @@ public class CLPEncodingRealtimeTest extends CustomDataQueryClusterIntegrationTe
 
   @Override
   protected List<FieldConfig> getFieldConfigs() {
-    List<FieldConfig> fieldConfigs = new ArrayList<>();
-    fieldConfigs.add(new FieldConfig.Builder("logLine").withEncodingType(FieldConfig.EncodingType.RAW)
-        .withCompressionCodec(_selectedCompressionCodec).build());
-    return fieldConfigs;
+    ObjectNode indexes = indexesWithForwardEncoding(FieldConfig.EncodingType.RAW);
+    withForwardCompression(indexes, _selectedCompressionCodec);
+    return List.of(new FieldConfig.Builder("logLine").withIndexes(indexes).build());
   }
 
   @Override
