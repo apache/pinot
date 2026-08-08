@@ -56,6 +56,12 @@ public abstract class LookupTable {
   /// table, and before looking up rows.
   public abstract void finish();
 
+  /// Normalizes a join key into the internal lookup-table key shape.
+  @Nullable
+  public Object normalizeKey(@Nullable Object key) {
+    return key;
+  }
+
   protected static void convertValueToList(Map.Entry<?, Object> entry) {
     Object value = entry.getValue();
     if (value instanceof Object[]) {

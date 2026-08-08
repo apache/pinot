@@ -32,6 +32,8 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.testng.annotations.AfterMethod;
@@ -47,6 +49,9 @@ import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
 
 
 public class HashJoinOperatorTest {
+  private static final ByteArray UUID_A = uuid("550e8400-e29b-41d4-a716-446655440000");
+  private static final ByteArray UUID_B = uuid("550e8400-e29b-41d4-a716-446655440001");
+  private static final ByteArray UUID_C = uuid("550e8400-e29b-41d4-a716-446655440002");
   private AutoCloseable _mocks;
   private MultiStageOperator _leftInput;
   private MultiStageOperator _rightInput;
@@ -55,6 +60,8 @@ public class HashJoinOperatorTest {
 
   private static final DataSchema DEFAULT_CHILD_SCHEMA = new DataSchema(new String[]{"int_col", "string_col"},
       new ColumnDataType[] {ColumnDataType.INT, ColumnDataType.STRING});
+  private static final DataSchema UUID_CHILD_SCHEMA = new DataSchema(new String[]{"uuid_col", "int_col"},
+      new ColumnDataType[] {ColumnDataType.UUID, ColumnDataType.INT});
   @BeforeMethod
   public void setUp() {
     _mocks = openMocks(this);
@@ -112,6 +119,34 @@ public class HashJoinOperatorTest {
         OperatorTestUtil.getStatMap(HashJoinOperator.StatKey.class, operator.calculateStats());
     assertEquals(statMap.getLong(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN), 3,
         "Max rows in join should equal right table size");
+  }
+
+  @Test
+  public void shouldHandleRightJoinOnUuid() {
+    _leftInput = new BlockListMultiStageOperator.Builder(UUID_CHILD_SCHEMA)
+        .addRow(UUID_A, 1)
+        .addRow(UUID_B, 2)
+        .buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(UUID_CHILD_SCHEMA)
+        .addRow(UUID_B, 20)
+        .addRow(UUID_B, 21)
+        .addRow(UUID_C, 30)
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(new String[]{"uuid_col1", "int_col1", "uuid_col2", "int_col2"},
+        new ColumnDataType[]{ColumnDataType.UUID, ColumnDataType.INT, ColumnDataType.UUID, ColumnDataType.INT});
+
+    HashJoinOperator operator = getOperator(UUID_CHILD_SCHEMA, resultSchema, JoinRelType.RIGHT, List.of(0), List.of(0),
+        List.of(), PlanNode.NodeHint.EMPTY);
+
+    List<Object[]> resultRows1 = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(resultRows1.size(), 2);
+    assertTrue(containsRow(resultRows1, new Object[]{UUID_B, 2, UUID_B, 20}));
+    assertTrue(containsRow(resultRows1, new Object[]{UUID_B, 2, UUID_B, 21}));
+
+    List<Object[]> resultRows2 = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(resultRows2.size(), 1);
+    assertTrue(containsRow(resultRows2, new Object[]{null, null, UUID_C, 30}));
+    assertTrue(operator.nextBlock().isSuccess());
   }
 
   @Test
@@ -568,6 +603,10 @@ public class HashJoinOperatorTest {
       }
     }
     return false;
+  }
+
+  private static ByteArray uuid(String value) {
+    return new ByteArray(UuidUtils.toBytes(value));
   }
 
 
