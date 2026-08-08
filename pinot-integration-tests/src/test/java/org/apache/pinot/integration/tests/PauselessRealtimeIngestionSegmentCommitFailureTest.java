@@ -184,13 +184,17 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
       testFailure = e;
       throw e;
     } finally {
-      Exception cleanupFailure = tearDownFailureScenario(failureScenario);
-      _failureScenario = null;
+      Throwable cleanupFailure;
+      try {
+        cleanupFailure = tearDownFailureScenario(failureScenario);
+      } finally {
+        _failureScenario = null;
+      }
       if (cleanupFailure != null) {
         if (testFailure != null) {
           testFailure.addSuppressed(cleanupFailure);
         } else {
-          throw cleanupFailure;
+          rethrowCleanupFailure(cleanupFailure);
         }
       }
     }
@@ -319,14 +323,14 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     return DEFAULT_TABLE_NAME + "_" + failureScenario._tableNameSuffix;
   }
 
-  private Exception tearDownFailureScenario(FailureScenario failureScenario) {
+  private Throwable tearDownFailureScenario(FailureScenario failureScenario) {
     return cleanUpTableAndSchema(getPauselessTableName(failureScenario), null);
   }
 
   @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    Exception cleanupFailure = null;
+    Throwable cleanupFailure = null;
     for (FailureScenario failureScenario : FailureScenario.values()) {
       cleanupFailure = cleanUpTableAndSchema(getPauselessTableName(failureScenario), cleanupFailure);
     }
@@ -335,86 +339,108 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
       if (!_serverStarters.isEmpty()) {
         stopServer();
       }
-    } catch (Exception e) {
-      cleanupFailure = addCleanupFailure(cleanupFailure, e);
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
     }
     try {
       if (!_brokerStarters.isEmpty()) {
         stopBroker();
       }
-    } catch (Exception e) {
-      cleanupFailure = addCleanupFailure(cleanupFailure, e);
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
     }
     try {
       if (_controllerStarter != null) {
         stopController();
       }
-    } catch (Exception e) {
-      cleanupFailure = addCleanupFailure(cleanupFailure, e);
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
     }
     try {
       stopKafka();
-    } catch (Exception e) {
-      cleanupFailure = addCleanupFailure(cleanupFailure, e);
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
     }
-    stopZk();
+    try {
+      stopZk();
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
     try {
       FileUtils.deleteDirectory(_tempDir);
-    } catch (Exception e) {
-      cleanupFailure = addCleanupFailure(cleanupFailure, e);
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
     }
     if (cleanupFailure != null) {
-      throw cleanupFailure;
+      rethrowCleanupFailure(cleanupFailure);
     }
   }
 
-  private Exception cleanUpTableAndSchema(String rawTableName, Exception cleanupFailure) {
-    boolean canDeleteSchema = true;
-    boolean tableDeleted = false;
+  private Throwable cleanUpTableAndSchema(String rawTableName, Throwable cleanupFailure) {
+    if (_helixResourceManager == null) {
+      return cleanupFailure;
+    }
+
     try {
-      if (_helixResourceManager != null && _helixResourceManager.getRealtimeTableConfig(rawTableName) != null) {
+      if (_helixResourceManager.getRealtimeTableConfig(rawTableName) != null) {
         dropRealtimeTable(rawTableName);
-        tableDeleted = true;
       }
-    } catch (Exception e) {
-      cleanupFailure = addCleanupFailure(cleanupFailure, e);
-      canDeleteSchema = false;
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
     }
 
-    if (tableDeleted) {
-      String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
-      try {
-        waitForEVToDisappear(tableNameWithType);
-      } catch (Exception e) {
-        cleanupFailure = addCleanupFailure(cleanupFailure, e);
-        canDeleteSchema = false;
-      }
-      try {
-        waitForTableDataManagerRemoved(tableNameWithType);
-      } catch (Exception e) {
-        cleanupFailure = addCleanupFailure(cleanupFailure, e);
-        canDeleteSchema = false;
-      }
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+    boolean externalViewRemoved = false;
+    try {
+      waitForEVToDisappear(tableNameWithType);
+      externalViewRemoved = true;
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+    boolean tableDataManagerRemoved = false;
+    try {
+      waitForTableDataManagerRemoved(tableNameWithType);
+      tableDataManagerRemoved = true;
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
     }
 
-    if (canDeleteSchema) {
+    boolean tableConfigRemoved = false;
+    try {
+      tableConfigRemoved = _helixResourceManager.getRealtimeTableConfig(rawTableName) == null;
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+
+    if (tableConfigRemoved && externalViewRemoved && tableDataManagerRemoved) {
       try {
-        if (_helixResourceManager != null && _helixResourceManager.getSchema(rawTableName) != null) {
+        if (_helixResourceManager.getSchema(rawTableName) != null) {
           deleteSchema(rawTableName);
         }
-      } catch (Exception e) {
-        cleanupFailure = addCleanupFailure(cleanupFailure, e);
+      } catch (Throwable t) {
+        cleanupFailure = addCleanupFailure(cleanupFailure, t);
       }
     }
     return cleanupFailure;
   }
 
-  private static Exception addCleanupFailure(Exception cleanupFailure, Exception failure) {
+  private static Throwable addCleanupFailure(Throwable cleanupFailure, Throwable failure) {
     if (cleanupFailure == null) {
       return failure;
     }
     cleanupFailure.addSuppressed(failure);
     return cleanupFailure;
+  }
+
+  private static void rethrowCleanupFailure(Throwable cleanupFailure)
+      throws Exception {
+    if (cleanupFailure instanceof Error) {
+      throw (Error) cleanupFailure;
+    }
+    if (cleanupFailure instanceof Exception) {
+      throw (Exception) cleanupFailure;
+    }
+    throw new RuntimeException(cleanupFailure);
   }
 
   private enum FailureScenario {
