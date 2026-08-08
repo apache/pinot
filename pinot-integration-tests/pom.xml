@@ -112,7 +112,27 @@
                 <include>**/org/apache/pinot/integration/tests/N*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</include>
               </includes>
+              <excludes>
+                <exclude>**/org/apache/pinot/integration/tests/MultiNodesOfflineClusterIntegrationTest.java</exclude>
+              </excludes>
             </configuration>
+            <executions>
+              <execution>
+                <id>multi-nodes-offline-integration-test-suite</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <excludes combine.self="override">
+                    <exclude>none</exclude>
+                  </excludes>
+                  <suiteXmlFiles>
+                    <suiteXmlFile>src/test/resources/multi-nodes-offline-integration-test-suite.xml</suiteXmlFile>
+                  </suiteXmlFiles>
+                </configuration>
+              </execution>
+            </executions>
           </plugin>
         </plugins>
       </build>
