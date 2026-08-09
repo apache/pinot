@@ -216,16 +216,21 @@ public class LuceneMutableTextIndexTest {
     _realtimeLuceneTextIndex.commit();
 
     // Wait for the async NRT index refresh to make the committed documents searchable. A fixed
-    // sleep is flaky under CPU load (the refresh thread may not run in time), so poll a sentinel
-    // query ("stream" -> doc 0 from getTextData) until it is visible, up to a generous timeout.
-    awaitIndexRefreshed();
+    // sleep is flaky under CPU load (the refresh thread may not run in time), so poll until a
+    // sentinel query is visible, up to a generous timeout.
+    //
+    // The sentinel is the regex /.*house.*/ -> doc 1 ("...data warehouses"), which every test in
+    // this class also asserts and which matches under both the default StandardAnalyzer and the
+    // custom KeywordTokenizer (regex matches the single keyword-tokenized term). A term sentinel
+    // like "stream" would never match the keyword-tokenized custom-analyzer cases, making the
+    // barrier spin the full timeout for those tests.
+    awaitIndexRefreshed("/.*house.*/", ImmutableRoaringBitmap.bitmapOf(1));
   }
 
-  private void awaitIndexRefreshed() {
+  private void awaitIndexRefreshed(String sentinelQuery, ImmutableRoaringBitmap expected) {
     long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
-    ImmutableRoaringBitmap expected = ImmutableRoaringBitmap.bitmapOf(0);
     while (true) {
-      if (expected.equals(_realtimeLuceneTextIndex.getDocIds("stream"))) {
+      if (expected.equals(_realtimeLuceneTextIndex.getDocIds(sentinelQuery))) {
         return;
       }
       if (System.nanoTime() >= deadlineNanos) {
