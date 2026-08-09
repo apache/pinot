@@ -26,8 +26,8 @@ ifconfig
 netstat -i
 
 # Unit Tests
-#   - TEST_SET#1 runs install and test together so the module list must ensure no additional modules were tested
-#     due to the -am flag (include dependency modules)
+#   - Both test sets run plain `mvn test` (no install, no -am): the modules were already built
+#     and installed by .pinot_tests_build.sh, so only the modules listed here are tested.
 #
 # Parallelism / memory:
 #   - UNIT_TEST_FORK_COUNT (default 3) sets surefire forkCount so test *classes* run in
@@ -44,13 +44,21 @@ netstat -i
 UNIT_TEST_FORK_COUNT="${UNIT_TEST_FORK_COUNT:-3}"
 # 2500m/fork: 3 forks * 2500m + the 2g Maven JVM (~9.5g) stays well under the runner's 16g.
 UNIT_TEST_FORK_HEAP="${UNIT_TEST_FORK_HEAP:-2500m}"
-FORK_OPTS="-Dunit.test.fork.count=${UNIT_TEST_FORK_COUNT} -Dunit.test.fork.heap=${UNIT_TEST_FORK_HEAP}"
+# Fork-scope the JaCoCo exec file (jacoco-<forkNumber>.exec) so parallel forks don't append to
+# one shared jacoco.exec and corrupt coverage. Only the unit lane sets this; other lanes keep
+# the default empty suffix (target/jacoco.exec).
+FORK_OPTS="-Dunit.test.fork.count=${UNIT_TEST_FORK_COUNT} -Dunit.test.fork.heap=${UNIT_TEST_FORK_HEAP} -Djacoco.exec.suffix=-\${surefire.forkNumber}"
 if [ "$RUN_TEST_SET" == "1" ]; then
+  # pinot-segment-local's tests run here (not in set #2) to balance the two shards: it is the
+  # largest single test module and is already built in set #1 (see .pinot_tests_build.sh), so
+  # moving its tests off the slower set #2 (which has a ~3x longer build) keeps both shards
+  # near-equal in total wall-clock. No -am on this command, so only the listed modules test.
   mvn test ${FORK_OPTS} \
       -pl 'pinot-spi' \
       -pl 'pinot-segment-spi' \
       -pl 'pinot-common' \
       -pl ':pinot-yammer' \
+      -pl 'pinot-segment-local' \
       -pl 'pinot-core' \
       -pl 'pinot-query-planner' \
       -pl 'pinot-query-runtime' \
@@ -61,6 +69,7 @@ if [ "$RUN_TEST_SET" == "2" ]; then
     -pl '!pinot-spi' \
     -pl '!pinot-segment-spi' \
     -pl '!pinot-common' \
+    -pl '!pinot-segment-local' \
     -pl '!pinot-core' \
     -pl '!pinot-query-planner' \
     -pl '!pinot-query-runtime' \

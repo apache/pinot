@@ -155,6 +155,13 @@
       shorten the unit-test phase. Must be a positive integer.
     -->
     <unit.test.fork.count>1</unit.test.fork.count>
+    <!--
+      Suffix for the JaCoCo exec file name. Empty by default so coverage writes the
+      historical target/jacoco.exec (used by report / report-aggregate everywhere). The
+      unit-test script sets this to -${surefire.forkNumber} so parallel forks each write a
+      distinct jacoco-<n>.exec instead of appending to one shared file.
+    -->
+    <jacoco.exec.suffix></jacoco.exec.suffix>
 
     <!-- Checkstyle violation prop.-->
     <checkstyle.violation.severity>warning</checkstyle.violation.severity>
@@ -593,12 +600,13 @@
                   <includes>
                     <include>org/apache/pinot/**/*</include>
                   </includes>
-                  <!-- Fork-scope the exec file so concurrent forks (forkCount > 1,
-                       reuseForks=false) never append to the same jacoco.exec and corrupt
-                       coverage. surefire.forkNumber is empty for single-fork runs, yielding
-                       the historical target/jacoco.exec. report-aggregate is invoked with a
-                       matching dataFileIncludes glob (see .pinot_tests_unit.sh). -->
-                  <destFile>${project.build.directory}/jacoco-${surefire.forkNumber}.exec</destFile>
+                  <!-- Exec file suffix defaults to empty, keeping the historical
+                       target/jacoco.exec used by report / report-aggregate everywhere (incl.
+                       the integration lanes). The unit-test script sets jacoco.exec.suffix to
+                       -${surefire.forkNumber} so parallel forks (forkCount > 1) each write a
+                       distinct jacoco-<n>.exec instead of appending to one shared file; it
+                       then aggregates with a matching jacoco-*.exec glob. -->
+                  <destFile>${project.build.directory}/jacoco${jacoco.exec.suffix}.exec</destFile>
                 </configuration>
               </execution>
             </executions>

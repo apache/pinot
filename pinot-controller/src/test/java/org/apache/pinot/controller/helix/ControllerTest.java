@@ -136,8 +136,10 @@ public class ControllerTest {
 
   /// Per-fork port offset so that concurrent surefire forks (forkCount > 1, reuseForks=false)
   /// allocate disjoint port ranges. surefire injects a 1-based `surefire.forkNumber` into each
-  /// fork; it is absent (0) for single-fork/local runs, leaving the historical bases unchanged.
-  /// The stride (5000) comfortably exceeds the ~3000-port span one ControllerTest instance uses.
+  /// fork (so it is 1 even at forkCount=1, 1..N under parallel forks); it is 0 only outside a
+  /// surefire fork. The stride (5000) comfortably exceeds the ~3000-port span one ControllerTest
+  /// instance uses. Ports are still probed with findOpenPort, so the offset only separates the
+  /// per-fork starting points; no test depends on a literal base port.
   private static final int FORK_PORT_OFFSET = forkNumber() * 5000;
 
   private static int forkNumber() {

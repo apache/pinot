@@ -45,8 +45,14 @@ public class ZkStarter {
 
   /// Per-fork offset applied to the default test port so that concurrent surefire forks
   /// (forkCount > 1, reuseForks=false) do not scan from the same base port and collide.
-  /// surefire injects `surefire.forkNumber` (1-based) into each fork; it is absent (0) for
-  /// single-fork/local runs, preserving the historical default of {@link #DEFAULT_ZK_TEST_PORT}.
+  ///
+  /// This is purely a test-harness hook: the offset is derived from the `surefire.forkNumber`
+  /// system property, which surefire injects only inside a forked test JVM (1-based, so it is 1
+  /// even at forkCount=1, and 1..N under parallel forks). In any production process that property
+  /// is absent, so `forkNumber()` returns 0 and the no-arg {@link #startLocalZkServer()} scans
+  /// from the historical {@link #DEFAULT_ZK_TEST_PORT}. Under tests each fork scans from a distinct
+  /// base ({@code DEFAULT_ZK_TEST_PORT + forkNumber*1000}); the exact port is still chosen by
+  /// findOpenPort and read back via {@code getZkUrl()}, so no caller depends on the literal base.
   /// The stride (1000) is large enough that a fork exhausting ports below the next boundary
   /// (findOpenPort scans upward) does not spill into the neighboring fork's band.
   private static final int FORK_PORT_OFFSET = forkNumber() * 1000;
