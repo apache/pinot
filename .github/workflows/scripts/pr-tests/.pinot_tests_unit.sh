@@ -41,13 +41,15 @@ netstat -i
 #     their time blocked on ZK/Helix/socket startup, so the extra fork still pays off.
 #   - UNIT_TEST_FORK_HEAP (default 2500m) caps per-fork heap so N forks fit in the
 #     runner's memory (N * heap + the mvn JVM must stay under the runner's RAM).
-#   - UNIT_TEST_RERUN_COUNT (default 2) retries a failing test before failing the build, to
-#     absorb a few pre-existing load-sensitive flaky tests exposed by parallel forks. Surefire
-#     reports a test that only passes on retry as flaky, so real failures still fail the build.
+#   - UNIT_TEST_RERUN_COUNT (default 0) retries a failing test before failing the build. Left at 0
+#     because the load-sensitive flaky tests parallel forks exposed are fixed at the root cause
+#     (SegmentPreProcessorTest mtime granularity, LuceneMutableTextIndexTest NRT-refresh wait). It
+#     remains overridable as an escape hatch if a new flake appears, but is intentionally not a
+#     standing default so real failures are never masked.
 UNIT_TEST_FORK_COUNT="${UNIT_TEST_FORK_COUNT:-3}"
 # 2500m/fork: 3 forks * 2500m + the 2g Maven JVM (~9.5g) stays well under the runner's 16g.
 UNIT_TEST_FORK_HEAP="${UNIT_TEST_FORK_HEAP:-2500m}"
-UNIT_TEST_RERUN_COUNT="${UNIT_TEST_RERUN_COUNT:-2}"
+UNIT_TEST_RERUN_COUNT="${UNIT_TEST_RERUN_COUNT:-0}"
 # Coverage adds ~30% to the test phase (JaCoCo agent per fork + aggregate report). Keep it on by
 # default to preserve Codecov behavior; set RUN_CODECOVERAGE=false (e.g. on PRs) to trade coverage
 # for a faster run.

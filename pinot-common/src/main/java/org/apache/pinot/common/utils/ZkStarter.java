@@ -55,6 +55,11 @@ public class ZkStarter {
   /// findOpenPort and read back via {@code getZkUrl()}, so no caller depends on the literal base.
   /// The stride (1000) is large enough that a fork exhausting ports below the next boundary
   /// (findOpenPort scans upward) does not spill into the neighboring fork's band.
+  ///
+  /// The offset is deliberately centralized on the no-arg entry point rather than pushed into each
+  /// test: several tests across different modules call {@link #startLocalZkServer()} directly, and
+  /// duplicating the fork math into each caller (or introducing a parallel test-only start helper)
+  /// is more surface and more error-prone than one guarded, production-inert read here.
   private static final int FORK_PORT_OFFSET = forkNumber() * 1000;
 
   private static int forkNumber() {

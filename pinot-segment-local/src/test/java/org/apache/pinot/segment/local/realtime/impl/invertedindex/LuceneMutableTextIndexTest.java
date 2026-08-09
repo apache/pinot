@@ -24,6 +24,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
@@ -214,11 +215,29 @@ public class LuceneMutableTextIndexTest {
     // ensure searches work after .commit() is called
     _realtimeLuceneTextIndex.commit();
 
-    // sleep for index refresh
-    try {
-      Thread.sleep(100);
-    } catch (Exception e) {
-      // no-op
+    // Wait for the async NRT index refresh to make the committed documents searchable. A fixed
+    // sleep is flaky under CPU load (the refresh thread may not run in time), so poll a sentinel
+    // query ("stream" -> doc 0 from getTextData) until it is visible, up to a generous timeout.
+    awaitIndexRefreshed();
+  }
+
+  private void awaitIndexRefreshed() {
+    long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+    ImmutableRoaringBitmap expected = ImmutableRoaringBitmap.bitmapOf(0);
+    while (true) {
+      if (expected.equals(_realtimeLuceneTextIndex.getDocIds("stream"))) {
+        return;
+      }
+      if (System.nanoTime() >= deadlineNanos) {
+        // Fall through and let the caller's assertions report the actual mismatch.
+        return;
+      }
+      try {
+        Thread.sleep(10);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return;
+      }
     }
   }
 
