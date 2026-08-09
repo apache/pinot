@@ -74,7 +74,6 @@ import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /// The `AggregationFunctionUtils` class provides utility methods for aggregation function.
@@ -803,18 +802,11 @@ public class AggregationFunctionUtils {
   private static HyperLogLog getDistinctCountHLLResult(DataSource dataSource,
       DistinctCountHLLAggregationFunction function, String explainPlanName) {
     Dictionary dictionary = Objects.requireNonNull(dataSource.getDictionary());
-    // UUID dictionary entries are logical scalar values, not serialized HyperLogLogs. Offer their canonical string
-    // representation to match the scan-based path and DISTINCTCOUNTHLL(CAST(uuidColumn AS STRING)).
-    if (dataSource.getDataSourceMetadata().getDataType() == FieldSpec.DataType.UUID) {
-      HyperLogLog hll = new HyperLogLog(function.getLog2m());
-      int length = dictionary.length();
-      for (int i = 0; i < length; i++) {
-        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainPlanName);
-        hll.offer(UuidUtils.toString(dictionary.getBytesValue(i)));
-      }
-      return hll;
-    }
-    if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
+    // A UUID column's dictionary reports BYTES (it is a plain BytesDictionary), but its entries are logical
+    // scalars, not serialized sketch state. Excluding it here lets it fall through to the scalar path
+    // below, which offers dictionary.get(i) -- the stored byte[] -- exactly as the scan path does.
+    if (dataSource.getDataSourceMetadata().getDataType() != FieldSpec.DataType.UUID
+        && dictionary.getValueType() == FieldSpec.DataType.BYTES) {
       // Treat BYTES value as serialized HyperLogLog
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
@@ -836,18 +828,11 @@ public class AggregationFunctionUtils {
   private static HyperLogLogPlus getDistinctCountHLLPlusResult(DataSource dataSource,
       DistinctCountHLLPlusAggregationFunction function, String explainPlanName) {
     Dictionary dictionary = Objects.requireNonNull(dataSource.getDictionary());
-    // UUID dictionary entries are logical scalar values, not serialized HyperLogLogPluses. Offer their canonical
-    // string representation to match the scan-based path and DISTINCTCOUNTHLLPLUS(CAST(uuidColumn AS STRING)).
-    if (dataSource.getDataSourceMetadata().getDataType() == FieldSpec.DataType.UUID) {
-      HyperLogLogPlus hllPlus = new HyperLogLogPlus(function.getP(), function.getSp());
-      int length = dictionary.length();
-      for (int i = 0; i < length; i++) {
-        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainPlanName);
-        hllPlus.offer(UuidUtils.toString(dictionary.getBytesValue(i)));
-      }
-      return hllPlus;
-    }
-    if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
+    // A UUID column's dictionary reports BYTES (it is a plain BytesDictionary), but its entries are logical
+    // scalars, not serialized sketch state. Excluding it here lets it fall through to the scalar path
+    // below, which offers dictionary.get(i) -- the stored byte[] -- exactly as the scan path does.
+    if (dataSource.getDataSourceMetadata().getDataType() != FieldSpec.DataType.UUID
+        && dictionary.getValueType() == FieldSpec.DataType.BYTES) {
       // Treat BYTES value as serialized HyperLogLogPlus
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
@@ -889,18 +874,11 @@ public class AggregationFunctionUtils {
   private static UltraLogLog getDistinctCountULLResult(DataSource dataSource,
       DistinctCountULLAggregationFunction function, String explainPlanName) {
     Dictionary dictionary = Objects.requireNonNull(dataSource.getDictionary());
-    // UUID dictionary entries are logical scalar values, not serialized UltraLogLogs. Hash their canonical string
-    // representation to match the scan-based path and DISTINCTCOUNTULL(CAST(uuidColumn AS STRING)).
-    if (dataSource.getDataSourceMetadata().getDataType() == FieldSpec.DataType.UUID) {
-      UltraLogLog ull = UltraLogLog.create(function.getP());
-      int length = dictionary.length();
-      for (int i = 0; i < length; i++) {
-        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainPlanName);
-        UltraLogLogUtils.hashObject(UuidUtils.toString(dictionary.getBytesValue(i))).ifPresent(ull::add);
-      }
-      return ull;
-    }
-    if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
+    // A UUID column's dictionary reports BYTES (it is a plain BytesDictionary), but its entries are logical
+    // scalars, not serialized sketch state. Excluding it here lets it fall through to the scalar path
+    // below, which offers dictionary.get(i) -- the stored byte[] -- exactly as the scan path does.
+    if (dataSource.getDataSourceMetadata().getDataType() != FieldSpec.DataType.UUID
+        && dictionary.getValueType() == FieldSpec.DataType.BYTES) {
       // Treat BYTES value as serialized UltraLogLog and merge
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);

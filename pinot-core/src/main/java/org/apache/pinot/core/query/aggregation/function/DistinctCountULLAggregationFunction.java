@@ -38,7 +38,6 @@ import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -92,7 +91,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       UltraLogLog ull = getULL(aggregationResultHolder);
       for (int i = 0; i < length; i++) {
-        UltraLogLogUtils.hashObject(UuidUtils.toString(uuidBytesValues[i])).ifPresent(ull::add);
+        UltraLogLogUtils.hashObject(uuidBytesValues[i]).ifPresent(ull::add);
       }
       return;
     }
@@ -177,7 +176,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
         UltraLogLog ull = getULL(groupByResultHolder, groupKeyArray[i]);
-        UltraLogLogUtils.hashObject(UuidUtils.toString(uuidBytesValues[i])).ifPresent(ull::add);
+        UltraLogLogUtils.hashObject(uuidBytesValues[i]).ifPresent(ull::add);
       }
       return;
     }
@@ -267,7 +266,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     if (dataType == DataType.UUID) {
       byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
-        String canonical = UuidUtils.toString(uuidBytesValues[i]);
+        byte[] canonical = uuidBytesValues[i];
         for (int groupKey : groupKeysArray[i]) {
           UltraLogLog ull = getULL(groupByResultHolder, groupKey);
           UltraLogLogUtils.hashObject(canonical).ifPresent(ull::add);

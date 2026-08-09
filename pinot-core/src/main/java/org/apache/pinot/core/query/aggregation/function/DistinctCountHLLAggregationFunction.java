@@ -38,7 +38,6 @@ import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -94,7 +93,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       HyperLogLog hyperLogLog = getHyperLogLog(aggregationResultHolder);
       for (int i = 0; i < length; i++) {
-        hyperLogLog.offer(UuidUtils.toString(uuidBytesValues[i]));
+        hyperLogLog.offer(uuidBytesValues[i]);
       }
       return;
     }
@@ -256,7 +255,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     if (dataType == DataType.UUID) {
       byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
-        getHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(UuidUtils.toString(uuidBytesValues[i]));
+        getHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(uuidBytesValues[i]);
       }
       return;
     }
@@ -416,7 +415,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     if (dataType == DataType.UUID) {
       byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
-        String canonical = UuidUtils.toString(uuidBytesValues[i]);
+        byte[] canonical = uuidBytesValues[i];
         for (int groupKey : groupKeysArray[i]) {
           getHyperLogLog(groupByResultHolder, groupKey).offer(canonical);
         }

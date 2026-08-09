@@ -55,8 +55,8 @@ import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
 
@@ -1237,32 +1237,32 @@ public class DistinctCountThetaSketchAggregationFunction
       DataType storedType = dataType.getStoredType();
       singleValues[i] = singleValue;
       // UUID columns are stored as 16-byte BYTES but a UUID value is a logical scalar, not a pre-serialized
-      // theta sketch. Surface UUID as STRING (canonical UUID form) so the downstream update-sketch path
-      // matches DISTINCTCOUNTTHETASKETCH(CAST(uuidCol AS STRING)). Without this branch, the function would
-      // take the serialized-sketch path below and Sketch.wrap would fail on raw 16-byte UUID content.
-      // NOTE: fetch raw bytes and convert explicitly — for identifier expressions the BlockValSet is a
-      // ProjectionBlockValSet whose getStringValuesSV() renders stored BYTES as bare hex, not canonical form.
+      // theta sketch: without this branch the function takes the serialized-sketch path below and Sketch.wrap
+      // fails on raw 16-byte UUID content. Unlike the other distinct-count functions this one cannot consume the
+      // stored bytes directly -- DataType.BYTES here means "serialized sketch", with no scalar-bytes mode -- so
+      // the stored value is surfaced as its hex rendering, the same form used at every other String-typed UUID
+      // boundary (see PredicateUtils#getStoredValue and the Bloom filter key).
       if (dataType == DataType.UUID) {
         valueTypes[i] = DataType.STRING;
         if (singleValue) {
           byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
-          String[] canonicalValues = new String[length];
+          String[] hexValues = new String[length];
           for (int j = 0; j < length; j++) {
-            canonicalValues[j] = UuidUtils.toString(uuidBytesValues[j]);
+            hexValues[j] = BytesUtils.toHexString(uuidBytesValues[j]);
           }
-          valueArrays[i] = canonicalValues;
+          valueArrays[i] = hexValues;
         } else {
           byte[][][] uuidBytesValuesMV = blockValSet.getBytesValuesMV();
-          String[][] canonicalValuesMV = new String[length][];
+          String[][] hexValuesMV = new String[length][];
           for (int j = 0; j < length; j++) {
             byte[][] row = uuidBytesValuesMV[j];
-            String[] canonicalRow = new String[row.length];
+            String[] hexRow = new String[row.length];
             for (int k = 0; k < row.length; k++) {
-              canonicalRow[k] = UuidUtils.toString(row[k]);
+              hexRow[k] = BytesUtils.toHexString(row[k]);
             }
-            canonicalValuesMV[j] = canonicalRow;
+            hexValuesMV[j] = hexRow;
           }
-          valueArrays[i] = canonicalValuesMV;
+          valueArrays[i] = hexValuesMV;
         }
         continue;
       }

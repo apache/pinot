@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -34,7 +35,6 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -82,7 +82,7 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
       byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       RoaringBitmap bitmap = getValueBitmap(aggregationResultHolder);
       for (int i = 0; i < length; i++) {
-        bitmap.add(UuidUtils.toString(uuidBytesValues[i]).hashCode());
+        bitmap.add(Arrays.hashCode(uuidBytesValues[i]));
       }
       return;
     }
@@ -232,7 +232,7 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
       byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
         getValueBitmap(groupByResultHolder, groupKeyArray[i])
-            .add(UuidUtils.toString(uuidBytesValues[i]).hashCode());
+            .add(Arrays.hashCode(uuidBytesValues[i]));
       }
       return;
     }
@@ -384,7 +384,7 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     if (dataType == DataType.UUID) {
       byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
-        int hash = UuidUtils.toString(uuidBytesValues[i]).hashCode();
+        int hash = Arrays.hashCode(uuidBytesValues[i]);
         for (int groupKey : groupKeysArray[i]) {
           getValueBitmap(groupByResultHolder, groupKey).add(hash);
         }

@@ -41,7 +41,6 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -148,7 +147,7 @@ public class DistinctCountCPCSketchAggregationFunction
       // Calling getAccumulator here would read the holder slot already occupied by the sketch and fail.
       CpcSketch cpcSketch = getCpcSketch(aggregationResultHolder);
       for (int i = 0; i < length; i++) {
-        cpcSketch.update(UuidUtils.toString(uuidBytesValues[i]));
+        cpcSketch.update(uuidBytesValues[i]);
       }
       return;
     }
@@ -231,7 +230,7 @@ public class DistinctCountCPCSketchAggregationFunction
     if (dataType == DataType.UUID) {
       byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
-        getCpcSketch(groupByResultHolder, groupKeyArray[i]).update(UuidUtils.toString(uuidBytesValues[i]));
+        getCpcSketch(groupByResultHolder, groupKeyArray[i]).update(uuidBytesValues[i]);
       }
       return;
     }
@@ -314,7 +313,7 @@ public class DistinctCountCPCSketchAggregationFunction
     if (dataType == DataType.UUID && singleValue) {
       byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
-        String canonical = UuidUtils.toString(uuidBytesValues[i]);
+        byte[] canonical = uuidBytesValues[i];
         for (int groupKey : groupKeysArray[i]) {
           getCpcSketch(groupByResultHolder, groupKey).update(canonical);
         }
