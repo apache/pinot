@@ -75,5 +75,41 @@
         "ignoreLiteMode": true
       }
     ]
+  },
+  "lookup_join_literal_key": {
+    "comment": "Tests a lookup join where one dimension primary-key component is supplied as a literal in the join condition.",
+    "tables": {
+      "fact_tbl": {
+        "schema": [
+          {"name": "rate_start_date", "type": "LONG"}
+        ],
+        "inputs": [
+          [1]
+        ]
+      },
+      "dim_tbl": {
+        "schema": [
+          {"name": "currency", "type": "STRING"},
+          {"name": "rate_start_date", "type": "LONG"},
+          {"name": "rate", "type": "INT"}
+        ],
+        "inputs": [
+          ["gbp", 1, 125],
+          ["usd", 1, 100]
+        ],
+        "replicated": true,
+        "isDimTable": true,
+        "primaryKeyColumns": ["currency", "rate_start_date"]
+      }
+    },
+    "queries": [
+      {
+        "description": "Lookup join with a literal dimension primary-key component",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.currency, {dim_tbl}.rate FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.currency = 'gbp' AND {dim_tbl}.rate_start_date = {fact_tbl}.rate_start_date",
+        "outputs": [
+          ["gbp", 125]
+        ]
+      }
+    ]
   }
 }
