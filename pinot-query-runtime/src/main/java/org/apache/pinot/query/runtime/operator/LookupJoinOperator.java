@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
 /// row, it looks up for the corresponding row from the dimension table and create a joint row.
 ///
 /// For each of the data block received from the left table, it generates a joint data block. The output is in the
-/// format of \\[left_row, right_row\\].
+/// format of \[left_row, right_row\].
 ///
 /// Since right table is a dimension table which is replicated across all servers, RIGHT and FULL join are not
 /// supported to avoid duplication.
