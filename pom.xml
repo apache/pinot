@@ -151,7 +151,7 @@
     <!--
       Number of parallel JVM forks used by surefire for unit tests. Defaults to 1 to
       preserve the historical single-fork behavior for local/dev builds. CI overrides
-      this (e.g. -Dunit.test.fork.count=2) to run test classes in parallel forks and
+      this (e.g. -Dunit.test.fork.count=3) to run test classes in parallel forks and
       shorten the unit-test phase. Must be a positive integer.
     -->
     <unit.test.fork.count>1</unit.test.fork.count>

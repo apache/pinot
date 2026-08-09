@@ -30,19 +30,20 @@ netstat -i
 #     due to the -am flag (include dependency modules)
 #
 # Parallelism / memory:
-#   - UNIT_TEST_FORK_COUNT (default 2) sets surefire forkCount so test *classes* run in
+#   - UNIT_TEST_FORK_COUNT (default 3) sets surefire forkCount so test *classes* run in
 #     separate parallel JVMs (reuseForks=false keeps one class per JVM). This is
 #     process-level isolation, not TestNG intra-JVM threading, so tests that were unsafe
 #     to run multi-threaded within a single JVM (e.g. pinot-plugins) are unaffected.
 #     Cross-fork resource collisions (ZK/controller ports, temp dirs) are avoided by
 #     offsetting per surefire.forkNumber; embedded Kafka clusters use ephemeral ports.
-#     This is the main lever for shortening the unit-test phase.
-#   - UNIT_TEST_FORK_HEAP (default 3g) caps per-fork heap so N forks fit in the
+#     This is the main lever for shortening the unit-test phase. 3 forks on the 4-vCPU
+#     runner keeps a core free for the Maven reactor / GC while test JVMs spend much of
+#     their time blocked on ZK/Helix/socket startup, so the extra fork still pays off.
+#   - UNIT_TEST_FORK_HEAP (default 2500m) caps per-fork heap so N forks fit in the
 #     runner's memory (N * heap + the mvn JVM must stay under the runner's RAM).
-UNIT_TEST_FORK_COUNT="${UNIT_TEST_FORK_COUNT:-2}"
-# 3g/fork: 2 forks * 3g + the 2g Maven JVM stays well under the runner's 16g while leaving
-# heap headroom for memory-heavy modules (e.g. pinot-segment-local) that previously had 4g.
-UNIT_TEST_FORK_HEAP="${UNIT_TEST_FORK_HEAP:-3g}"
+UNIT_TEST_FORK_COUNT="${UNIT_TEST_FORK_COUNT:-3}"
+# 2500m/fork: 3 forks * 2500m + the 2g Maven JVM (~9.5g) stays well under the runner's 16g.
+UNIT_TEST_FORK_HEAP="${UNIT_TEST_FORK_HEAP:-2500m}"
 FORK_OPTS="-Dunit.test.fork.count=${UNIT_TEST_FORK_COUNT} -Dunit.test.fork.heap=${UNIT_TEST_FORK_HEAP}"
 if [ "$RUN_TEST_SET" == "1" ]; then
   mvn test ${FORK_OPTS} \
