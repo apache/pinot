@@ -65,8 +65,9 @@ public class InTransformFunction extends BaseTransformFunction {
         + "transform function: (expression, values)", getName());
     _mainFunction = arguments.get(0);
     for (TransformFunction argument : arguments) {
+      // Reject raw VARIANT operands only; preserve existing IN behavior for all other types.
       DataType dataType = argument.getResultMetadata().getDataType();
-      Preconditions.checkArgument(dataType.supportsEquality() && dataType.supportsHashing(),
+      Preconditions.checkArgument(dataType != DataType.VARIANT,
           "Raw VARIANT values do not support IN; extract a typed path with variantGet first");
     }
 
