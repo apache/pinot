@@ -182,6 +182,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected QueryKillingManager _queryKillingManager;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
+  protected volatile BrokerRoutingReadyChecker _brokerRoutingReadyChecker;
   protected ScheduledExecutorService _helixMessageCountScheduler;
   protected ServerReloadJobStatusCache _reloadJobStatusCache;
   // Override this to provide custom thread pool for Helix state transitions. Null means using Helix's default
@@ -912,6 +913,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixAdmin.setConfig(_instanceConfigScope,
         Map.of(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(false)));
     _isServerReadyToServeQueries = true;
+    _brokerRoutingReadyChecker = createBrokerRoutingReadyChecker();
+    _brokerRoutingReadyChecker.start();
     // Throttling for realtime consumption is disabled up to this point to allow maximum consumption during startup time
     RealtimeConsumptionRateManager.getInstance().enablePartitionRateLimiter();
 
@@ -966,6 +969,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
   protected boolean isServerReadyToServeQueries() {
     return _isServerReadyToServeQueries;
+  }
+
+  protected boolean isServerReadyForHealthCheck() {
+    return isServerReadyToServeQueries() && _brokerRoutingReadyChecker != null && _brokerRoutingReadyChecker.isReady();
+  }
+
+  protected BrokerRoutingReadyChecker createBrokerRoutingReadyChecker() {
+    return new BrokerRoutingReadyChecker(_helixManager, _instanceId);
   }
 
   protected SegmentOperationsThrottler createMultiColumnIndexPreprocessThrottler() {
@@ -1035,6 +1046,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _adminApiApplication.startShuttingDown();
     _helixAdmin.setConfig(_instanceConfigScope,
         Map.of(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true)));
+    if (_brokerRoutingReadyChecker != null) {
+      _brokerRoutingReadyChecker.close();
+    }
     if (_transitionThreadPoolManager != null) {
       _transitionThreadPoolManager.shutdown();
     }
@@ -1260,7 +1274,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
   protected AdminApiApplication createServerAdminApp() {
     return new AdminApiApplication(_serverInstance, _accessControlFactory, _reloadJobStatusCache, _serverConf,
-        this::isServerReadyToServeQueries);
+        this::isServerReadyForHealthCheck);
   }
 
   /// Creates the [SegmentMessageHandlerFactory] used to handle user-defined Helix messages for segments.
