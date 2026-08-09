@@ -32,6 +32,7 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -263,69 +264,59 @@ public class BytesDistinctTable extends DistinctTable {
     }
     int numValues = sortedValues.length;
     assert numValues <= _limit;
+    ColumnDataType columnDataType = _dataSchema.getColumnDataType(0);
     List<Object[]> rows;
     if (_hasNull) {
       if (numValues == _limit) {
         rows = new ArrayList<>(_limit);
         if (_orderByExpression.isNullsLast()) {
-          addRows(sortedValues, numValues, rows);
+          addRows(columnDataType, sortedValues, numValues, rows);
         } else {
           rows.add(new Object[]{null});
-          addRows(sortedValues, numValues - 1, rows);
+          addRows(columnDataType, sortedValues, numValues - 1, rows);
         }
       } else {
         rows = new ArrayList<>(numValues + 1);
         if (_orderByExpression.isNullsLast()) {
-          addRows(sortedValues, numValues, rows);
+          addRows(columnDataType, sortedValues, numValues, rows);
           rows.add(new Object[]{null});
         } else {
           rows.add(new Object[]{null});
-          addRows(sortedValues, numValues, rows);
+          addRows(columnDataType, sortedValues, numValues, rows);
         }
       }
     } else {
       rows = new ArrayList<>(numValues);
-      addRows(sortedValues, numValues, rows);
+      addRows(columnDataType, sortedValues, numValues, rows);
     }
-    formatRows(rows);
     return new ResultTable(_dataSchema, rows);
   }
 
-  private static void addRows(ByteArray[] values, int length, List<Object[]> rows) {
+  private static void addRows(ColumnDataType columnDataType, ByteArray[] values, int length, List<Object[]> rows) {
     for (int i = 0; i < length; i++) {
-      rows.add(new Object[]{values[i]});
+      rows.add(new Object[]{columnDataType.convertAndFormat(values[i])});
     }
   }
 
   private ResultTable toResultTableWithoutOrderBy() {
     int numValues = _valueSet.size();
     assert numValues <= _limit;
+    ColumnDataType columnDataType = _dataSchema.getColumnDataType(0);
     List<Object[]> rows;
     if (_hasNull && numValues < _limit) {
       rows = new ArrayList<>(numValues + 1);
-      addRows(_valueSet, rows);
+      addRows(columnDataType, _valueSet, rows);
       rows.add(new Object[]{null});
     } else {
       rows = new ArrayList<>(numValues);
-      addRows(_valueSet, rows);
+      addRows(columnDataType, _valueSet, rows);
     }
-    formatRows(rows);
     return new ResultTable(_dataSchema, rows);
   }
 
-  private static void addRows(HashSet<ByteArray> values, List<Object[]> rows) {
+  private static void addRows(ColumnDataType columnDataType, HashSet<ByteArray> values, List<Object[]> rows) {
     for (ByteArray value : values) {
-      rows.add(new Object[]{value});
-    }
-  }
-
-  private void formatRows(List<Object[]> rows) {
-    DataSchema.ColumnDataType columnDataType = _dataSchema.getColumnDataType(0);
-    for (Object[] row : rows) {
-      Object value = row[0];
-      if (value != null) {
-        row[0] = columnDataType.convertAndFormat(value);
-      }
+      rows.add(new Object[]{columnDataType.convertAndFormat(value)});
     }
   }
 }
