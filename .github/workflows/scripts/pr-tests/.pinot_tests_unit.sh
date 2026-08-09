@@ -48,10 +48,19 @@ UNIT_TEST_FORK_COUNT="${UNIT_TEST_FORK_COUNT:-3}"
 # 2500m/fork: 3 forks * 2500m + the 2g Maven JVM (~9.5g) stays well under the runner's 16g.
 UNIT_TEST_FORK_HEAP="${UNIT_TEST_FORK_HEAP:-2500m}"
 UNIT_TEST_RERUN_COUNT="${UNIT_TEST_RERUN_COUNT:-2}"
+# Coverage adds ~30% to the test phase (JaCoCo agent per fork + aggregate report). Keep it on by
+# default to preserve Codecov behavior; set RUN_CODECOVERAGE=false (e.g. on PRs) to trade coverage
+# for a faster run.
+RUN_CODECOVERAGE="${RUN_CODECOVERAGE:-true}"
 # Fork-scope the JaCoCo exec file (jacoco-<forkNumber>.exec) so parallel forks don't append to
 # one shared jacoco.exec and corrupt coverage. Only the unit lane sets this; other lanes keep
 # the default empty suffix (target/jacoco.exec).
 FORK_OPTS="-Dunit.test.fork.count=${UNIT_TEST_FORK_COUNT} -Dunit.test.fork.heap=${UNIT_TEST_FORK_HEAP} -Dunit.test.rerun.count=${UNIT_TEST_RERUN_COUNT} -Djacoco.exec.suffix=-\${surefire.forkNumber}"
+if [ "$RUN_CODECOVERAGE" == "true" ]; then
+  COVERAGE_PROFILE=",codecoverage"
+else
+  COVERAGE_PROFILE=""
+fi
 if [ "$RUN_TEST_SET" == "1" ]; then
   # pinot-segment-local's tests run here (not in set #2) to balance the two shards: it is the
   # largest single test module and is already built in set #1 (see .pinot_tests_build.sh), so
@@ -66,7 +75,7 @@ if [ "$RUN_TEST_SET" == "1" ]; then
       -pl 'pinot-core' \
       -pl 'pinot-query-planner' \
       -pl 'pinot-query-runtime' \
-      -P github-actions,codecoverage,no-integration-tests || exit 1
+      -P github-actions,no-integration-tests${COVERAGE_PROFILE} || exit 1
 fi
 if [ "$RUN_TEST_SET" == "2" ]; then
   mvn test ${FORK_OPTS} \
@@ -78,10 +87,13 @@ if [ "$RUN_TEST_SET" == "2" ]; then
     -pl '!pinot-query-planner' \
     -pl '!pinot-query-runtime' \
     -pl '!:pinot-yammer' \
-    -P github-actions,codecoverage,no-integration-tests || exit 1
+    -P github-actions,no-integration-tests${COVERAGE_PROFILE} || exit 1
 fi
 
 # Aggregate coverage across all per-fork exec files (jacoco-*.exec) written under forkCount>1,
-# while still matching the single-fork jacoco.exec produced by non-parallel runs.
-mvn jacoco:report-aggregate@report -P codecoverage \
-  -Djacoco.dataFileIncludes='**/target/jacoco-*.exec,**/target/jacoco.exec' || exit 1
+# while still matching the single-fork jacoco.exec produced by non-parallel runs. Skipped when
+# coverage is disabled.
+if [ "$RUN_CODECOVERAGE" == "true" ]; then
+  mvn jacoco:report-aggregate@report -P codecoverage \
+    -Djacoco.dataFileIncludes='**/target/jacoco-*.exec,**/target/jacoco.exec' || exit 1
+fi
