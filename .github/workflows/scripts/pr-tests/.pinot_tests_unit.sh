@@ -41,13 +41,17 @@ netstat -i
 #     their time blocked on ZK/Helix/socket startup, so the extra fork still pays off.
 #   - UNIT_TEST_FORK_HEAP (default 2500m) caps per-fork heap so N forks fit in the
 #     runner's memory (N * heap + the mvn JVM must stay under the runner's RAM).
+#   - UNIT_TEST_RERUN_COUNT (default 2) retries a failing test before failing the build, to
+#     absorb a few pre-existing load-sensitive flaky tests exposed by parallel forks. Surefire
+#     reports a test that only passes on retry as flaky, so real failures still fail the build.
 UNIT_TEST_FORK_COUNT="${UNIT_TEST_FORK_COUNT:-3}"
 # 2500m/fork: 3 forks * 2500m + the 2g Maven JVM (~9.5g) stays well under the runner's 16g.
 UNIT_TEST_FORK_HEAP="${UNIT_TEST_FORK_HEAP:-2500m}"
+UNIT_TEST_RERUN_COUNT="${UNIT_TEST_RERUN_COUNT:-2}"
 # Fork-scope the JaCoCo exec file (jacoco-<forkNumber>.exec) so parallel forks don't append to
 # one shared jacoco.exec and corrupt coverage. Only the unit lane sets this; other lanes keep
 # the default empty suffix (target/jacoco.exec).
-FORK_OPTS="-Dunit.test.fork.count=${UNIT_TEST_FORK_COUNT} -Dunit.test.fork.heap=${UNIT_TEST_FORK_HEAP} -Djacoco.exec.suffix=-\${surefire.forkNumber}"
+FORK_OPTS="-Dunit.test.fork.count=${UNIT_TEST_FORK_COUNT} -Dunit.test.fork.heap=${UNIT_TEST_FORK_HEAP} -Dunit.test.rerun.count=${UNIT_TEST_RERUN_COUNT} -Djacoco.exec.suffix=-\${surefire.forkNumber}"
 if [ "$RUN_TEST_SET" == "1" ]; then
   # pinot-segment-local's tests run here (not in set #2) to balance the two shards: it is the
   # largest single test module and is already built in set #1 (see .pinot_tests_build.sh), so

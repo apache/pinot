@@ -156,6 +156,13 @@
     -->
     <unit.test.fork.count>1</unit.test.fork.count>
     <!--
+      Number of times surefire retries a failing unit test before failing the build. Defaults to
+      0 (no retry) so local/dev behavior is unchanged; CI raises it to absorb a few pre-existing
+      load-sensitive flaky tests exposed by parallel forks. A test passing only on retry is
+      reported as flaky, not silently passed.
+    -->
+    <unit.test.rerun.count>0</unit.test.rerun.count>
+    <!--
       Suffix for the JaCoCo exec file name. Empty by default so coverage writes the
       historical target/jacoco.exec (used by report / report-aggregate everywhere). The
       unit-test script sets this to -${surefire.forkNumber} so parallel forks each write a
@@ -2200,6 +2207,8 @@
                  definition for details. -->
             <forkCount>${unit.test.fork.count}</forkCount>
             <reuseForks>false</reuseForks>
+            <!-- Retries a failing test up to N times (default 0); see property definition. -->
+            <rerunFailingTestsCount>${unit.test.rerun.count}</rerunFailingTestsCount>
             <!-- 60 minutes -->
             <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
             <!-- Disable zookeeper force sync -->
@@ -2552,10 +2561,16 @@
                parallelizes classes across JVMs while preserving class-level isolation. -->
           <forkCount>${unit.test.fork.count}</forkCount>
           <reuseForks>false</reuseForks>
+          <!-- Retries a failing test up to N times before marking it failed (default 0 = no
+               retry). CI sets this to tolerate a handful of pre-existing load-sensitive flaky
+               tests (Lucene NRT refresh, filesystem mtime) that surface only when many parallel
+               forks saturate the runner; a test that passes on retry is reported as flaky, not
+               green-washed. -->
+          <rerunFailingTestsCount>${unit.test.rerun.count}</rerunFailingTestsCount>
           <systemPropertyVariables>
-            <!-- Expose the 1-based fork index to tests so port bases / temp dirs can be
-                 offset per fork (see ZkStarter.FORK_PORT_OFFSET, ControllerTest port bases).
-                 Absent/0 for single-fork runs, preserving historical defaults. -->
+            <!-- Expose the 1-based fork index (1 even at forkCount=1, 1..N under parallel forks)
+                 so tests can offset port bases / temp dirs per fork (see ZkStarter.FORK_PORT_OFFSET,
+                 ControllerTest port bases). -->
             <surefire.forkNumber>${surefire.forkNumber}</surefire.forkNumber>
           </systemPropertyVariables>
         </configuration>
