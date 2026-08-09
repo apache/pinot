@@ -1437,6 +1437,25 @@ public final class TableConfigUtils {
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
     String partialUpsertMergerClass = upsertConfig.getPartialUpsertMergerClass();
 
+    // VARIANT columns support only the OVERWRITE partial-upsert strategy. A column that is not listed in
+    // partialUpsertStrategies is merged at runtime with defaultPartialUpsertStrategy, so validating only the listed
+    // entries would let a non-OVERWRITE default (or a custom merger class) silently apply INCREMENT/APPEND/UNION/IGNORE
+    // to a VARIANT byte envelope. Validate the effective strategy for every VARIANT column here.
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (fieldSpec.getDataType() != DataType.VARIANT) {
+        continue;
+      }
+      String column = fieldSpec.getName();
+      Preconditions.checkState(StringUtils.isBlank(partialUpsertMergerClass),
+          "VARIANT column supports only OVERWRITE partial-upsert strategy and cannot be merged by a custom "
+              + "partialUpsertMergerClass: %s", column);
+      UpsertConfig.Strategy effectiveStrategy =
+          partialUpsertStrategies != null && partialUpsertStrategies.containsKey(column)
+              ? partialUpsertStrategies.get(column) : upsertConfig.getDefaultPartialUpsertStrategy();
+      Preconditions.checkState(effectiveStrategy == UpsertConfig.Strategy.OVERWRITE,
+          "VARIANT column supports only OVERWRITE partial-upsert strategy: %s", column);
+    }
+
     // check if partialUpsertMergerClass is provided then partialUpsertStrategies should be empty
     if (StringUtils.isNotBlank(partialUpsertMergerClass)) {
       Preconditions.checkState(MapUtils.isEmpty(partialUpsertStrategies),
@@ -1460,10 +1479,7 @@ public final class TableConfigUtils {
 
         FieldSpec fieldSpec = schema.getFieldSpecFor(column);
         Preconditions.checkState(fieldSpec != null, "Merger cannot be applied to non-existing column: %s", column);
-        if (fieldSpec.getDataType() == DataType.VARIANT) {
-          Preconditions.checkState(columnStrategy == UpsertConfig.Strategy.OVERWRITE,
-              "VARIANT column supports only OVERWRITE partial-upsert strategy: %s", column);
-        }
+        // VARIANT columns are validated up front against their effective strategy (default or explicit).
 
         if (columnStrategy == UpsertConfig.Strategy.INCREMENT) {
           Preconditions.checkState(fieldSpec.getDataType().getStoredType().isNumeric(),
