@@ -28,6 +28,7 @@ import java.util.PriorityQueue;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
@@ -75,9 +76,10 @@ public class SortOperator extends MultiStageOperator {
     // - Input is already sorted
     List<RelFieldCollation> collations = node.getCollations();
     for (RelFieldCollation collation : collations) {
-      Preconditions.checkArgument(
-          _dataSchema.getColumnDataType(collation.getFieldIndex()).supportsOrdering(),
-          "ORDER BY does not support raw VARIANT values; extract a typed path with variantGet first");
+      ColumnDataType dataType = _dataSchema.getColumnDataType(collation.getFieldIndex());
+      Preconditions.checkArgument(dataType.supportsOrdering(), dataType == ColumnDataType.VARIANT
+          ? "ORDER BY does not support raw VARIANT values; extract a typed path with variantGet first"
+          : "ORDER BY does not support " + dataType + " values");
     }
     if (collations.isEmpty() || input instanceof SortedMailboxReceiveOperator) {
       _priorityQueue = null;

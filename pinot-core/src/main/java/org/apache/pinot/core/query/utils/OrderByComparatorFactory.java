@@ -27,6 +27,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
@@ -51,9 +52,11 @@ public class OrderByComparatorFactory {
         throw new BadQueryRequestException("MV expression: " + orderByExpressions.get(i)
             + " should not be included in the ORDER-BY clause");
       }
-      if (!orderByColumnContexts[i].getDataType().supportsOrdering()) {
-        throw new BadQueryRequestException(
-            "ORDER BY does not support raw VARIANT values; extract a typed path with variantGet first");
+      FieldSpec.DataType dataType = orderByColumnContexts[i].getDataType();
+      if (!dataType.supportsOrdering()) {
+        throw new BadQueryRequestException(dataType == FieldSpec.DataType.VARIANT
+            ? "ORDER BY does not support raw VARIANT values; extract a typed path with variantGet first"
+            : "ORDER BY does not support " + dataType + " values");
       }
     }
 
