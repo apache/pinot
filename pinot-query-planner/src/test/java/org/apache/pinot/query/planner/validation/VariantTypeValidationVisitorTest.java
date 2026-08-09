@@ -142,6 +142,16 @@ public class VariantTypeValidationVisitorTest {
   }
 
   @Test
+  public void testRejectsRawVariantGroupByKey() {
+    // COUNT is raw-variant-independent, so the rejection must come from the VARIANT GROUP BY key itself.
+    AggregateNode node = aggregateGroupBy("COUNT", VARIANT_SCHEMA, List.of(0));
+    QueryException exception =
+        Assert.expectThrows(QueryException.class, () -> node.visit(VariantTypeValidationVisitor.INSTANCE, null));
+    Assert.assertTrue(exception.getMessage().contains("GROUP BY"));
+    Assert.assertTrue(exception.getMessage().contains("raw VARIANT"));
+  }
+
+  @Test
   public void testUsesLogicalTypeInsteadOfVariantStorageType() {
     DataSchema bytesSchema =
         new DataSchema(new String[]{"bytes"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BYTES});
@@ -223,6 +233,15 @@ public class VariantTypeValidationVisitorTest {
         new DataSchema(new String[]{"result"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG});
     return new AggregateNode(0, resultSchema, PlanNode.NodeHint.EMPTY, List.of(input), List.of(aggCall), List.of(-1),
         List.of(), AggregateNode.AggType.DIRECT, false, List.of(), 0);
+  }
+
+  private static AggregateNode aggregateGroupBy(String functionName, DataSchema inputSchema, List<Integer> groupKeys) {
+    ValueNode input = new ValueNode(0, inputSchema, PlanNode.NodeHint.EMPTY, List.of(), List.of());
+    RexExpression.FunctionCall aggCall = functionCall(functionName, false, new RexExpression.InputRef(0));
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"result"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG});
+    return new AggregateNode(0, resultSchema, PlanNode.NodeHint.EMPTY, List.of(input), List.of(aggCall), List.of(-1),
+        groupKeys, AggregateNode.AggType.DIRECT, false, List.of(), 0);
   }
 
   private static WindowNode window(String functionName) {

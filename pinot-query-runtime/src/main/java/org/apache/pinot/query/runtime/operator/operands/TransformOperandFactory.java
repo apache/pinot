@@ -62,7 +62,8 @@ public class TransformOperandFactory {
       Preconditions.checkState(numOperands == 2, "%s takes 2 arguments, got: %s", functionCall.getFunctionName(),
           numOperands);
       for (RexExpression operand : operands) {
-        Preconditions.checkArgument(getResultType(operand, dataSchema).supportsEquality(),
+        // Reject raw VARIANT operands only; preserve existing distinct-from behavior for all other types.
+        Preconditions.checkArgument(getResultType(operand, dataSchema) != DataSchema.ColumnDataType.VARIANT,
             "Raw VARIANT values do not support comparison; extract a typed path with variantGet first");
       }
       return new FunctionOperand(functionCall, dataSchema);

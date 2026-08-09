@@ -61,6 +61,12 @@ public final class VariantTypeValidationVisitor extends PlanNodeVisitor.DepthFir
   /// <p>This method is also invoked by the runtime as a defensive check for plans that did not pass through the
   /// current broker planner.
   public static void validateAggregateInputs(AggregateNode node, DataSchema inputSchema) {
+    for (int key : node.getGroupKeys()) {
+      DataSchema.ColumnDataType dataType = inputSchema.getColumnDataType(key);
+      if (!dataType.supportsEquality() || !dataType.supportsHashing()) {
+        throw unsupported("GROUP BY", dataType);
+      }
+    }
     validateAggregateInputs(node.getAggCalls(), inputSchema);
   }
 
@@ -71,8 +77,9 @@ public final class VariantTypeValidationVisitor extends PlanNodeVisitor.DepthFir
         continue;
       }
       for (RexExpression operand : aggCall.getFunctionOperands()) {
-        if (!getLogicalType(operand, inputSchema).supportsDirectAggregation()) {
-          throw unsupported("Aggregate function " + aggCall.getFunctionName());
+        DataSchema.ColumnDataType dataType = getLogicalType(operand, inputSchema);
+        if (!dataType.supportsDirectAggregation()) {
+          throw unsupported("Aggregate function " + aggCall.getFunctionName(), dataType);
         }
       }
     }
@@ -93,8 +100,9 @@ public final class VariantTypeValidationVisitor extends PlanNodeVisitor.DepthFir
     DataSchema dataSchema = node.getDataSchema();
     for (RelFieldCollation collation : node.getCollations()) {
       int fieldIndex = collation.getFieldIndex();
-      if (!dataSchema.getColumnDataType(fieldIndex).supportsOrdering()) {
-        throw unsupported("ORDER BY");
+      DataSchema.ColumnDataType dataType = dataSchema.getColumnDataType(fieldIndex);
+      if (!dataType.supportsOrdering()) {
+        throw unsupported("ORDER BY", dataType);
       }
     }
     return super.visitSort(node, context);
@@ -105,7 +113,7 @@ public final class VariantTypeValidationVisitor extends PlanNodeVisitor.DepthFir
     if (!(node.getSetOpType() == SetOpNode.SetOpType.UNION && node.isAll())) {
       for (DataSchema.ColumnDataType dataType : node.getDataSchema().getColumnDataTypes()) {
         if (!dataType.supportsEquality() || !dataType.supportsHashing()) {
-          throw unsupported(node.explain().replace('_', ' '));
+          throw unsupported(node.explain().replace('_', ' '), dataType);
         }
       }
     }
@@ -150,12 +158,13 @@ public final class VariantTypeValidationVisitor extends PlanNodeVisitor.DepthFir
     for (int key : node.getKeys()) {
       DataSchema.ColumnDataType dataType = inputSchema.getColumnDataType(key);
       if (!dataType.supportsEquality() || !dataType.supportsHashing()) {
-        throw unsupported("Window PARTITION BY");
+        throw unsupported("Window PARTITION BY", dataType);
       }
     }
     for (RelFieldCollation collation : node.getCollations()) {
-      if (!inputSchema.getColumnDataType(collation.getFieldIndex()).supportsOrdering()) {
-        throw unsupported("Window ORDER BY");
+      DataSchema.ColumnDataType dataType = inputSchema.getColumnDataType(collation.getFieldIndex());
+      if (!dataType.supportsOrdering()) {
+        throw unsupported("Window ORDER BY", dataType);
       }
     }
     validateAggregateInputs(node.getAggCalls(), inputSchema);
@@ -178,8 +187,12 @@ public final class VariantTypeValidationVisitor extends PlanNodeVisitor.DepthFir
     throw new IllegalStateException("Unsupported aggregate operand: " + expression.getClass().getName());
   }
 
-  private static QueryException unsupported(String operation) {
-    return new QueryException(QueryErrorCode.QUERY_PLANNING,
-        operation + " does not support raw VARIANT values; extract a typed path with variantGet first");
+  private static QueryException unsupported(String operation, DataSchema.ColumnDataType dataType) {
+    // Name the actual unsupported type so the error is accurate for non-VARIANT opaque types (OBJECT, arrays, MAP),
+    // while preserving the raw-VARIANT wording and remediation guidance for the VARIANT case.
+    String message = dataType == DataSchema.ColumnDataType.VARIANT
+        ? operation + " does not support raw VARIANT values; extract a typed path with variantGet first"
+        : operation + " does not support " + dataType + " values";
+    return new QueryException(QueryErrorCode.QUERY_PLANNING, message);
   }
 }

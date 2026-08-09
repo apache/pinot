@@ -227,6 +227,63 @@ public class VariantTableConfigValidationTest {
   }
 
   @Test
+  public void testNonOverwriteDefaultPartialUpsertStrategyIsRejectedForUnlistedVariant() {
+    // The VARIANT column is not listed in partialUpsertStrategies, so at merge time it uses
+    // defaultPartialUpsertStrategy. A non-OVERWRITE default must still be rejected.
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setComparisonColumn(ID_COLUMN);
+    upsertConfig.setPartialUpsertStrategies(Map.of(ID_COLUMN, UpsertConfig.Strategy.OVERWRITE));
+    upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.UNION);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+        .setNullHandlingEnabled(true)
+        .setUpsertConfig(upsertConfig)
+        .build();
+    try {
+      TableConfigUtils.validatePartialUpsertStrategies(tableConfig, UPSERT_SCHEMA);
+      fail("Expected non-OVERWRITE default VARIANT partial-upsert strategy validation to fail");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage() != null
+              && e.getMessage().contains("VARIANT column supports only OVERWRITE partial-upsert strategy"),
+          "Unexpected validation error: " + e.getMessage());
+    }
+  }
+
+  @Test
+  public void testDefaultOverwritePartialUpsertStrategyIsValidForUnlistedVariant() {
+    // The VARIANT column is unlisted and defaultPartialUpsertStrategy defaults to OVERWRITE, which is valid.
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setComparisonColumn(ID_COLUMN);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+        .setNullHandlingEnabled(true)
+        .setUpsertConfig(upsertConfig)
+        .build();
+    TableConfigUtils.validatePartialUpsertStrategies(tableConfig, UPSERT_SCHEMA);
+  }
+
+  @Test
+  public void testCustomPartialUpsertMergerIsRejectedForVariant() {
+    // A custom merger class cannot be validated against the OVERWRITE-only VARIANT contract, so it must be rejected.
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setComparisonColumn(ID_COLUMN);
+    upsertConfig.setPartialUpsertMergerClass("com.example.CustomMerger");
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+        .setNullHandlingEnabled(true)
+        .setUpsertConfig(upsertConfig)
+        .build();
+    try {
+      TableConfigUtils.validatePartialUpsertStrategies(tableConfig, UPSERT_SCHEMA);
+      fail("Expected custom partialUpsertMergerClass with a VARIANT column to fail");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage() != null && e.getMessage().contains("custom")
+              && e.getMessage().contains("VARIANT column supports only OVERWRITE partial-upsert strategy"),
+          "Unexpected validation error: " + e.getMessage());
+    }
+  }
+
+  @Test
   public void testMetricsAggregationAndDefaultStarTreeAreRejected() {
     TableConfig aggregateMetricsTable = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(TABLE_NAME)

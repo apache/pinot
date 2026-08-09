@@ -116,7 +116,8 @@ public abstract class FilterOperand implements TransformOperand {
       _childOperands = new ArrayList<>(children.size());
       for (RexExpression child : children) {
         TransformOperand operand = TransformOperandFactory.getTransformOperand(child, dataSchema);
-        Preconditions.checkArgument(operand.getResultType().supportsEquality(),
+        // Reject raw VARIANT operands only; preserve existing IN behavior for all other types.
+        Preconditions.checkArgument(operand.getResultType() != ColumnDataType.VARIANT,
             "Raw VARIANT values do not support IN; extract a typed path with variantGet first");
         _childOperands.add(operand);
       }
@@ -196,8 +197,10 @@ public abstract class FilterOperand implements TransformOperand {
 
       ColumnDataType lhsType = _lhs.getResultType();
       ColumnDataType rhsType = _rhs.getResultType();
-      Preconditions.checkArgument((lhsType == ColumnDataType.UNKNOWN || lhsType.supportsOrdering())
-              && (rhsType == ColumnDataType.UNKNOWN || rhsType.supportsOrdering()),
+      // Reject raw VARIANT operands only; other non-orderable types (OBJECT, arrays, MAP) keep their existing
+      // best-effort comparison behavior. VARIANT is opaque because its PVAR byte encoding is not a canonical
+      // semantic ordering, so a comparison must extract a typed scalar first.
+      Preconditions.checkArgument(lhsType != ColumnDataType.VARIANT && rhsType != ColumnDataType.VARIANT,
           "Raw VARIANT values do not support comparison; extract a typed path with variantGet first");
       if (lhsType == ColumnDataType.UNKNOWN || rhsType == ColumnDataType.UNKNOWN || lhsType == rhsType) {
         _requireCasting = false;

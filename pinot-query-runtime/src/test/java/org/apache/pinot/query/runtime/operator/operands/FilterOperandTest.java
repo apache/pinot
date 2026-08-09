@@ -31,6 +31,8 @@ public class FilterOperandTest {
       new DataSchema(new String[]{"value"}, new ColumnDataType[]{ColumnDataType.INT});
   private static final DataSchema VARIANT_SCHEMA =
       new DataSchema(new String[]{"payload"}, new ColumnDataType[]{ColumnDataType.VARIANT});
+  private static final DataSchema OBJECT_SCHEMA =
+      new DataSchema(new String[]{"payload"}, new ColumnDataType[]{ColumnDataType.OBJECT});
   private static final RexExpression NULL_LITERAL = new RexExpression.Literal(ColumnDataType.UNKNOWN, null);
   private static final List<RexExpression> VARIANT_OPERANDS =
       List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(0));
@@ -68,6 +70,19 @@ public class FilterOperandTest {
         Assert.expectThrows(IllegalArgumentException.class,
             () -> new FilterOperand.In(VARIANT_OPERANDS, VARIANT_SCHEMA, true));
     Assert.assertTrue(exception.getMessage().contains("Raw VARIANT values do not support IN"));
+  }
+
+  @Test
+  public void testNonVariantOpaqueTypesAreNotRejectedAsVariant() {
+    // OBJECT (and other non-orderable types) must keep their existing best-effort comparison/IN behavior rather
+    // than being rejected with the VARIANT-specific guard. Constructing the operands must not throw.
+    new FilterOperand.Predicate(VARIANT_OPERANDS, OBJECT_SCHEMA, value -> value == 0);
+    new FilterOperand.In(VARIANT_OPERANDS, OBJECT_SCHEMA, false);
+    for (String functionName : List.of("IS_DISTINCT_FROM", "isNotDistinctFrom")) {
+      RexExpression.FunctionCall functionCall =
+          new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, functionName, VARIANT_OPERANDS);
+      TransformOperandFactory.getTransformOperand(functionCall, OBJECT_SCHEMA);
+    }
   }
 
   @Test
