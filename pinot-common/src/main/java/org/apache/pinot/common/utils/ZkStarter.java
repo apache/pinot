@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -41,6 +42,22 @@ public class ZkStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZkStarter.class);
   public static final int DEFAULT_ZK_TEST_PORT = 2191;
   private static final int DEFAULT_ZK_CLIENT_RETRIES = 10;
+
+  /// Per-fork offset applied to the default test port so that concurrent surefire forks
+  /// (forkCount > 1, reuseForks=false) do not scan from the same base port and collide.
+  /// surefire injects `surefire.forkNumber` (1-based) into each fork; it is absent (0) for
+  /// single-fork/local runs, preserving the historical default of {@link #DEFAULT_ZK_TEST_PORT}.
+  /// The stride (1000) is large enough that a fork exhausting ports below the next boundary
+  /// (findOpenPort scans upward) does not spill into the neighboring fork's band.
+  private static final int FORK_PORT_OFFSET = forkNumber() * 1000;
+
+  private static int forkNumber() {
+    try {
+      return Integer.parseInt(System.getProperty("surefire.forkNumber", "0"));
+    } catch (NumberFormatException e) {
+      return 0;
+    }
+  }
 
   public static class ZookeeperInstance {
     private PublicZooKeeperServerMain _serverMain;
@@ -135,9 +152,10 @@ public class ZkStarter {
     }
   }
 
-  /// Starts an empty local Zk instance on the default port
+  /// Starts an empty local Zk instance on the default port (offset per surefire fork so that
+  /// concurrent forks bind disjoint port ranges).
   public static ZookeeperInstance startLocalZkServer() {
-    return startLocalZkServer(NetUtils.findOpenPort(DEFAULT_ZK_TEST_PORT));
+    return startLocalZkServer(NetUtils.findOpenPort(DEFAULT_ZK_TEST_PORT + FORK_PORT_OFFSET));
   }
 
   public static String getDefaultZkStr() {
@@ -147,8 +165,10 @@ public class ZkStarter {
   /// Starts a local Zk instance with a generated empty data directory
   /// @param port The port to listen on
   public static ZookeeperInstance startLocalZkServer(final int port) {
+    // Use a random UUID rather than a timestamp so that concurrent forks/threads never share a
+    // ZK data directory (System.currentTimeMillis() collides when two instances start in the same ms).
     return startLocalZkServer(port,
-        org.apache.commons.io.FileUtils.getTempDirectoryPath() + File.separator + "test-" + System.currentTimeMillis());
+        org.apache.commons.io.FileUtils.getTempDirectoryPath() + File.separator + "test-" + UUID.randomUUID());
   }
 
   /// Starts a local Zk instance

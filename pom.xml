@@ -139,9 +139,22 @@
     <!-- Only unit tests are run by default. -->
     <skip.integration.tests>true</skip.integration.tests>
     <skip.unit.tests>false</skip.unit.tests>
+    <!--
+      Per-fork heap for unit tests. Defaults to 4g to preserve historical behavior. When
+      running multiple parallel forks (unit.test.fork.count > 1) CI lowers this so that
+      N forks * heap + the Maven JVM stay within the runner's memory.
+    -->
+    <unit.test.fork.heap>4g</unit.test.fork.heap>
     <!-- Sets the VM argument line used when unit tests are run. -->
-    <argLine>-Xms4g -Xmx4g</argLine>
+    <argLine>-Xms${unit.test.fork.heap} -Xmx${unit.test.fork.heap}</argLine>
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
+    <!--
+      Number of parallel JVM forks used by surefire for unit tests. Defaults to 1 to
+      preserve the historical single-fork behavior for local/dev builds. CI overrides
+      this (e.g. -Dunit.test.fork.count=2) to run test classes in parallel forks and
+      shorten the unit-test phase. Must be a positive integer.
+    -->
+    <unit.test.fork.count>1</unit.test.fork.count>
 
     <!-- Checkstyle violation prop.-->
     <checkstyle.violation.severity>warning</checkstyle.violation.severity>
@@ -557,7 +570,9 @@
         <activeByDefault>false</activeByDefault>
       </activation>
       <properties>
-        <argLine>-Xms4g -Xmx4g -Dlog4j2.configurationFile=log4j2.xml</argLine>
+        <!-- Inherits unit.test.fork.heap from the global properties (overridable via
+             -Dunit.test.fork.heap); adds the log4j2 config used under github-actions. -->
+        <argLine>-Xms${unit.test.fork.heap} -Xmx${unit.test.fork.heap} -Dlog4j2.configurationFile=log4j2.xml</argLine>
       </properties>
     </profile>
     <profile>
@@ -578,6 +593,12 @@
                   <includes>
                     <include>org/apache/pinot/**/*</include>
                   </includes>
+                  <!-- Fork-scope the exec file so concurrent forks (forkCount > 1,
+                       reuseForks=false) never append to the same jacoco.exec and corrupt
+                       coverage. surefire.forkNumber is empty for single-fork runs, yielding
+                       the historical target/jacoco.exec. report-aggregate is invoked with a
+                       matching dataFileIncludes glob (see .pinot_tests_unit.sh). -->
+                  <destFile>${project.build.directory}/jacoco-${surefire.forkNumber}.exec</destFile>
                 </configuration>
               </execution>
             </executions>
@@ -2167,13 +2188,18 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
           <configuration>
-            <forkCount>1</forkCount>
+            <!-- Overridable via -Dunit.test.fork.count (defaults to 1); see the property
+                 definition for details. -->
+            <forkCount>${unit.test.fork.count}</forkCount>
             <reuseForks>false</reuseForks>
             <!-- 60 minutes -->
             <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
             <!-- Disable zookeeper force sync -->
             <systemPropertyVariables>
               <zookeeper.forceSync>no</zookeeper.forceSync>
+              <!-- Expose the 1-based fork index so tests can offset port bases / temp dirs per
+                   fork when forkCount > 1 (absent/0 for single-fork runs). -->
+              <surefire.forkNumber>${surefire.forkNumber}</surefire.forkNumber>
             </systemPropertyVariables>
             <trimStackTrace>false</trimStackTrace>
             <reportFormat>plain</reportFormat>
@@ -2513,8 +2539,17 @@
           <excludes>
             <exclude>**/*IT.java</exclude>
           </excludes>
-          <forkCount>1</forkCount>
+          <!-- forkCount is overridable via -Dunit.test.fork.count (defaults to 1). Each
+               fork runs a distinct test class (reuseForks=false), so raising the count
+               parallelizes classes across JVMs while preserving class-level isolation. -->
+          <forkCount>${unit.test.fork.count}</forkCount>
           <reuseForks>false</reuseForks>
+          <systemPropertyVariables>
+            <!-- Expose the 1-based fork index to tests so port bases / temp dirs can be
+                 offset per fork (see ZkStarter.FORK_PORT_OFFSET, ControllerTest port bases).
+                 Absent/0 for single-fork runs, preserving historical defaults. -->
+            <surefire.forkNumber>${surefire.forkNumber}</surefire.forkNumber>
+          </systemPropertyVariables>
         </configuration>
         <executions>
           <execution>
