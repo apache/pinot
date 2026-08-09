@@ -19,8 +19,8 @@
 package org.apache.pinot.integration.tests.realtime.utils;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -40,7 +40,7 @@ public class FailureInjectingPinotLLCRealtimeSegmentManager extends PinotLLCReal
   public FailureInjectingPinotLLCRealtimeSegmentManager(PinotHelixResourceManager helixResourceManager,
       ControllerConf controllerConf, ControllerMetrics controllerMetrics) {
     super(helixResourceManager, controllerConf, controllerMetrics);
-    _failureConfig = new HashMap<>();
+    _failureConfig = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -63,12 +63,16 @@ public class FailureInjectingPinotLLCRealtimeSegmentManager extends PinotLLCReal
 
   @VisibleForTesting
   public void enableTestFault(String faultType) {
-    _failureConfig.put(faultType, "true");
+    if (faultType != null) {
+      _failureConfig.put(faultType, "true");
+    }
   }
 
   @VisibleForTesting
   public void disableTestFault(String faultType) {
-    _failureConfig.remove(faultType);
+    if (faultType != null) {
+      _failureConfig.remove(faultType);
+    }
   }
 
   @Override
