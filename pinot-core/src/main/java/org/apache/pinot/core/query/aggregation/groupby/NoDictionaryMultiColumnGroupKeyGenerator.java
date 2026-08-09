@@ -36,7 +36,6 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.FixedIntArray;
-import org.apache.pinot.spi.utils.UuidKey;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -52,11 +51,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
 
   private final ExpressionContext[] _groupByExpressions;
   private final int _numGroupByExpressions;
-  /// Per-column group-key dispatch type: stored type of each column, except UUID is preserved as
-  /// [DataType#UUID] so the on-the-fly dictionary keys on [org.apache.pinot.spi.utils.UuidKey]
-  /// instead of [org.apache.pinot.spi.utils.ByteArray]. For every other logical type this equals
-  /// `logicalType.getStoredType()`.
-  private final DataType[] _dataTypes;
+  private final DataType[] _storedTypes;
   private final Dictionary[] _dictionaries;
   private final ValueToIdMap[] _onTheFlyDictionaries;
   private final Object2IntOpenHashMap<FixedIntArray> _groupKeyMap;
@@ -70,7 +65,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates) {
     _groupByExpressions = groupByExpressions;
     _numGroupByExpressions = groupByExpressions.length;
-    _dataTypes = new DataType[_numGroupByExpressions];
+    _storedTypes = new DataType[_numGroupByExpressions];
     _dictionaries = new Dictionary[_numGroupByExpressions];
     _onTheFlyDictionaries = new ValueToIdMap[_numGroupByExpressions];
     _isSingleValueExpressions = new boolean[_numGroupByExpressions];
@@ -80,9 +75,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
     for (int i = 0; i < _numGroupByExpressions; i++) {
       ExpressionContext groupByExpression = groupByExpressions[i];
       ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
-      DataType logicalType = columnContext.getDataType();
-      // Normalize to stored type, but preserve UUID so it uses UuidKey instead of ByteArray.
-      _dataTypes[i] = logicalType == DataType.UUID ? DataType.UUID : logicalType.getStoredType();
+      _storedTypes[i] = columnContext.getDataType().getStoredType();
       // Take the dict-id path only when the forward index is dict-encoded. A column with EncodingType.RAW +
       // dictionaryIndex exposes a Dictionary but BlockValSet#getDictionaryIdsSV throws on its RAW forward
       // index — fall back to an on-the-fly dictionary on raw values for that case.
@@ -91,7 +84,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       if (dictionary != null) {
         _dictionaries[i] = dictionary;
       } else {
-        _onTheFlyDictionaries[i] = ValueToIdMapFactory.get(_dataTypes[i]);
+        _onTheFlyDictionaries[i] = ValueToIdMapFactory.get(_storedTypes[i]);
       }
       if (canOptimizeGroupByUpperBound) {
         Integer size = groupByExpressionSizesFromPredicates.get(groupByExpression);
@@ -128,7 +121,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       if (_dictionaries[i] != null) {
         values[i] = blockValSet.getDictionaryIdsSV();
       } else {
-        switch (_dataTypes[i]) {
+        switch (_storedTypes[i]) {
           case INT:
             values[i] = blockValSet.getIntValuesSV();
             break;
@@ -148,11 +141,10 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
             values[i] = blockValSet.getStringValuesSV();
             break;
           case BYTES:
-          case UUID:
             values[i] = blockValSet.getBytesValuesSV();
             break;
           default:
-            throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _dataTypes[i]);
+            throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _storedTypes[i]);
         }
       }
     }
@@ -184,7 +176,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
               } else if (columnValues instanceof double[]) {
                 keyValue = onTheFlyDictionary.put(((double[]) columnValues)[row]);
               } else if (columnValues instanceof byte[][]) {
-                keyValue = putBytesValue(onTheFlyDictionary, (byte[][]) columnValues, row, _dataTypes[col]);
+                keyValue = onTheFlyDictionary.put(new ByteArray(((byte[][]) columnValues)[row]));
               } else {
                 keyValue = onTheFlyDictionary.put(((Object[]) columnValues)[row]);
               }
@@ -208,7 +200,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
               } else if (columnValues instanceof double[]) {
                 keyValue = onTheFlyDictionary.getId(((double[]) columnValues)[row]);
               } else if (columnValues instanceof byte[][]) {
-                keyValue = getBytesValueId(onTheFlyDictionary, (byte[][]) columnValues, row, _dataTypes[col]);
+                keyValue = onTheFlyDictionary.getId(new ByteArray(((byte[][]) columnValues)[row]));
               } else {
                 keyValue = onTheFlyDictionary.getId(((Object[]) columnValues)[row]);
               }
@@ -250,7 +242,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
             } else if (columnValues instanceof double[]) {
               keyValue = onTheFlyDictionary.put(((double[]) columnValues)[row]);
             } else if (columnValues instanceof byte[][]) {
-              keyValue = putBytesValue(onTheFlyDictionary, (byte[][]) columnValues, row, _dataTypes[col]);
+              keyValue = onTheFlyDictionary.put(new ByteArray(((byte[][]) columnValues)[row]));
             } else {
               keyValue = onTheFlyDictionary.put(((Object[]) columnValues)[row]);
             }
@@ -271,7 +263,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
             } else if (columnValues instanceof double[]) {
               keyValue = onTheFlyDictionary.getId(((double[]) columnValues)[row]);
             } else if (columnValues instanceof byte[][]) {
-              keyValue = getBytesValueId(onTheFlyDictionary, (byte[][]) columnValues, row, _dataTypes[col]);
+              keyValue = onTheFlyDictionary.getId(new ByteArray(((byte[][]) columnValues)[row]));
             } else {
               keyValue = onTheFlyDictionary.getId(((Object[]) columnValues)[row]);
             }
@@ -318,7 +310,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       } else {
         ValueToIdMap onTheFlyDictionary = _onTheFlyDictionaries[i];
         if (_isSingleValueExpressions[i]) {
-          switch (_dataTypes[i]) {
+          switch (_storedTypes[i]) {
             case INT:
               int[] intValues = blockValSet.getIntValuesSV();
               for (int j = 0; j < numDocs; j++) {
@@ -349,12 +341,6 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
                 keys[j][i] = new int[]{onTheFlyDictionary.put(stringValues[j])};
               }
               break;
-            case UUID:
-              byte[][] uuidValues = blockValSet.getBytesValuesSV();
-              for (int j = 0; j < numDocs; j++) {
-                keys[j][i] = new int[]{onTheFlyDictionary.put(UuidKey.fromBytes(uuidValues[j]))};
-              }
-              break;
             case BYTES:
               byte[][] bytesValues = blockValSet.getBytesValuesSV();
               for (int j = 0; j < numDocs; j++) {
@@ -363,10 +349,10 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
               break;
             default:
               throw new IllegalArgumentException(
-                  "Illegal data type for no-dictionary key generator: " + _dataTypes[i]);
+                  "Illegal data type for no-dictionary key generator: " + _storedTypes[i]);
           }
         } else {
-          switch (_dataTypes[i]) {
+          switch (_storedTypes[i]) {
             case INT:
               int[][] intValues = blockValSet.getIntValuesMV();
               for (int j = 0; j < numDocs; j++) {
@@ -422,20 +408,9 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
                 keys[j][i] = mvKeys;
               }
               break;
-            case UUID:
-              byte[][][] uuidValues = blockValSet.getBytesValuesMV();
-              for (int j = 0; j < numDocs; j++) {
-                int mvSize = uuidValues[j].length;
-                int[] mvKeys = new int[mvSize];
-                for (int k = 0; k < mvSize; k++) {
-                  mvKeys[k] = onTheFlyDictionary.put(UuidKey.fromBytes(uuidValues[j][k]));
-                }
-                keys[j][i] = mvKeys;
-              }
-              break;
             default:
               throw new IllegalArgumentException(
-                  "Illegal data type for no-dictionary key generator: " + _dataTypes[i]);
+                  "Illegal data type for no-dictionary key generator: " + _storedTypes[i]);
           }
         }
       }
@@ -540,20 +515,5 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       }
     }
     return keys;
-  }
-
-  private static int putBytesValue(ValueToIdMap onTheFlyDictionary, byte[][] columnValues, int row, DataType dataType) {
-    if (dataType == DataType.UUID) {
-      return onTheFlyDictionary.put(UuidKey.fromBytes(columnValues[row]));
-    }
-    return onTheFlyDictionary.put(new ByteArray(columnValues[row]));
-  }
-
-  private static int getBytesValueId(ValueToIdMap onTheFlyDictionary, byte[][] columnValues, int row,
-      DataType dataType) {
-    if (dataType == DataType.UUID) {
-      return onTheFlyDictionary.getId(UuidKey.fromBytes(columnValues[row]));
-    }
-    return onTheFlyDictionary.getId(new ByteArray(columnValues[row]));
   }
 }
