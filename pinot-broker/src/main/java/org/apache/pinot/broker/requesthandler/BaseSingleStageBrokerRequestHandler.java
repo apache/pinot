@@ -108,6 +108,7 @@ import org.apache.pinot.materializedview.rewrite.MaterializedViewRewritePlan;
 import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -148,6 +149,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
+  /// Canonical name (see [RequestUtils#canonicalizeFunctionName]) of the `lookup()` transform function, which reads a
+  /// dimension table named by a string literal argument instead of by the FROM clause.
+  private static final String LOOKUP_FUNCTION = "lookup";
   private static final int MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION = 10;
 
   protected final QueryOptimizer _queryOptimizer = new QueryOptimizer();
@@ -398,15 +402,18 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     final Schema _schema;
     final String _tableName;
     final String _rawTableName;
+    /// Dimension tables read by `lookup()` calls, which are not part of the data source
+    final Set<String> _lookupTableNames;
     final BrokerResponse _errorOrLiteralOnlyBrokerResponse;
 
     public CompileResult(PinotQuery pinotQuery, PinotQuery serverPinotQuery, Schema schema, String tableName,
-        String rawTableName) {
+        String rawTableName, Set<String> lookupTableNames) {
       _pinotQuery = pinotQuery;
       _serverPinotQuery = serverPinotQuery;
       _schema = schema;
       _tableName = tableName;
       _rawTableName = rawTableName;
+      _lookupTableNames = lookupTableNames;
       _errorOrLiteralOnlyBrokerResponse = null;
     }
 
@@ -416,6 +423,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _schema = null;
       _tableName = null;
       _rawTableName = null;
+      _lookupTableNames = Set.of();
       _errorOrLiteralOnlyBrokerResponse = errorOrLiteralOnlyBrokerResponse;
     }
   }
@@ -480,6 +488,30 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     BrokerRequest brokerRequest = CalciteSqlCompiler.convertToBrokerRequest(pinotQuery);
     BrokerRequest serverBrokerRequest =
         serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
+
+    // A `lookup()` dimension table is not part of the data source, so neither the logical-table check nor the
+    // BrokerRequest based check below covers it. Authorize it here, for both branches.
+    Set<String> lookupTableNames = compileResult._lookupTableNames;
+    if (!lookupTableNames.isEmpty()) {
+      AuthorizationResult lookupAuthorizationResult =
+          hasTableAccess(requesterIdentity, lookupTableNames, requestContext, httpHeaders);
+      if (!lookupAuthorizationResult.hasAccess()) {
+        throwAccessDeniedError(requestId, query, requestContext, tableName, lookupAuthorizationResult);
+      }
+      if (_enableRowColumnLevelAuth) {
+        // `lookup()` resolves a row by primary key against the dimension table's in-memory data and never evaluates a
+        // filter against that table, so an RLS filter on it cannot be applied. Reject the query instead of returning
+        // rows the principal is not allowed to see.
+        for (String lookupTableName : lookupTableNames) {
+          List<String> rowFilters =
+              accessControl.getRowColFilters(requesterIdentity, lookupTableName).getRLSFilters().orElse(null);
+          if (rowFilters != null && !rowFilters.isEmpty()) {
+            throwAccessDeniedError(requestId, query, requestContext, tableName,
+                new TableAuthorizationResult(Set.of(lookupTableName)));
+          }
+        }
+      }
+    }
 
     TableRouteProvider routeProvider;
 
@@ -1171,6 +1203,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
     }
 
+    // A `lookup()` dimension table is named by a literal argument rather than by the FROM clause, so it is absent from
+    // the data source. Collect it here so that `doHandleRequest` can authorize it alongside the queried table.
+    Set<String> lookupTableNames = extractLookupTableNames(serverPinotQuery);
+    if (serverPinotQuery != pinotQuery) {
+      // For a gapfill query the two differ, and only the stripped one was walked above
+      lookupTableNames.addAll(extractLookupTableNames(pinotQuery));
+    }
+
     try {
       Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
       if (columnNameMap != null) {
@@ -1205,7 +1245,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     Schema schema = _tableCache.getSchema(rawTableName);
     _queryOptimizer.optimize(serverPinotQuery, schema);
 
-    return new CompileResult(pinotQuery, serverPinotQuery, schema, tableName, rawTableName);
+    return new CompileResult(pinotQuery, serverPinotQuery, schema, tableName, rawTableName, lookupTableNames);
   }
 
   /// Mutable holder returned from [#applyMaterializedViewRewriteAtCompile] — Java has no out
@@ -2152,6 +2192,50 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     pinotQuery.setSelectList(newSelections);
   }
 
+  /// Returns the dimension tables read by the `lookup()` calls in the given query.
+  ///
+  /// `lookup()` names its dimension table with a string literal argument instead of the FROM clause, so the table is
+  /// absent from the query's data source and has to be collected explicitly for the table-level access checks to see
+  /// it. The names are returned exactly as written, which is how `LookupTransformFunction` resolves them on the
+  /// server, so the authorized table is always the one actually read.
+  @VisibleForTesting
+  static Set<String> extractLookupTableNames(PinotQuery pinotQuery) {
+    Set<String> lookupTableNames = new HashSet<>();
+    for (Expression expression : pinotQuery.getSelectList()) {
+      collectLookupTableNames(expression, lookupTableNames);
+    }
+    collectLookupTableNames(pinotQuery.getFilterExpression(), lookupTableNames);
+    collectLookupTableNames(pinotQuery.getHavingExpression(), lookupTableNames);
+    collectLookupTableNames(pinotQuery.getGroupByList(), lookupTableNames);
+    collectLookupTableNames(pinotQuery.getOrderByList(), lookupTableNames);
+    return lookupTableNames;
+  }
+
+  private static void collectLookupTableNames(@Nullable List<Expression> expressions, Set<String> lookupTableNames) {
+    if (expressions != null) {
+      for (Expression expression : expressions) {
+        collectLookupTableNames(expression, lookupTableNames);
+      }
+    }
+  }
+
+  private static void collectLookupTableNames(@Nullable Expression expression, Set<String> lookupTableNames) {
+    if (expression == null || expression.getType() != ExpressionType.FUNCTION) {
+      return;
+    }
+    Function functionCall = expression.getFunctionCall();
+    List<Expression> operands = functionCall.getOperands();
+    if (LOOKUP_FUNCTION.equals(functionCall.getOperator()) && !operands.isEmpty()) {
+      Literal tableName = operands.get(0).getLiteral();
+      // A non-literal table name is rejected by LookupTransformFunction on the server
+      if (tableName != null && tableName.isSetStringValue()) {
+        lookupTableNames.add(tableName.getStringValue());
+      }
+    }
+    // Recurse regardless, so that a lookup() nested inside another lookup()'s join value is collected too
+    collectLookupTableNames(operands, lookupTableNames);
+  }
+
   /// Fixes the column names to the actual column names in the given expression.
   private static void fixColumnName(String rawTableName, Expression expression, Map<String, String> columnNameMap,
       boolean ignoreCase) {
@@ -2165,7 +2249,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         case "as":
           fixColumnName(rawTableName, functionCall.getOperands().get(0), columnNameMap, ignoreCase);
           break;
-        case "lookup":
+        case LOOKUP_FUNCTION:
           // LOOKUP function looks up another table's schema, skip the check for now.
           break;
         default:
