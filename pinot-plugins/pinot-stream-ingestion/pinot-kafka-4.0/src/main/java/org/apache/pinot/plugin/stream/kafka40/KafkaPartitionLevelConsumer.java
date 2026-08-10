@@ -189,9 +189,8 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       return _consumer.beginningOffsets(List.of(_topicPartition), Duration.ofMillis(timeoutMs))
           .getOrDefault(_topicPartition, Long.MIN_VALUE);
     } catch (Exception e) {
-      if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("Failed to read log start offset for {}", _topicPartition, e);
-      }
+      LOGGER.warn("Failed to read log start offset for {}; treating the offset gap as no data loss "
+          + "(this can mask genuine data loss if it persists)", _topicPartition, e);
       return Long.MIN_VALUE;
     }
   }
