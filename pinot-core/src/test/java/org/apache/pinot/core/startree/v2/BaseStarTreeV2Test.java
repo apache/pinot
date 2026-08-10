@@ -43,6 +43,7 @@ import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
@@ -85,15 +86,15 @@ abstract class BaseStarTreeV2Test<R, A> {
   private static final Random RANDOM = new Random();
 
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "BaseStarTreeV2Test");
-  private static final String TABLE_NAME = "testTable";
+  protected static final String TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
 
   private static final int NUM_SEGMENT_RECORDS = 100_000;
   private static final int MAX_LEAF_RECORDS = RANDOM.nextInt(100) + 1;
   // Using column names with '__' to make sure regular table columns with '__' in the name aren't wrongly interpreted
   // as AggregationFunctionColumnPair
-  private static final String DIMENSION1 = "d1__COLUMN_NAME";
-  private static final String DIMENSION2 = "DISTINCTCOUNTRAWHLL__d2";
+  protected static final String DIMENSION1 = "d1__COLUMN_NAME";
+  protected static final String DIMENSION2 = "DISTINCTCOUNTRAWHLL__d2";
   private static final int DIMENSION_CARDINALITY = 100;
   private static final String AGG_COL = "m";
 
@@ -152,7 +153,7 @@ abstract class BaseStarTreeV2Test<R, A> {
               dimensionFieldSpec -> dimensionFieldSpec.setSingleValueField(isAggColSingleValueField()));
     }
     Schema schema = schemaBuilder.build();
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    TableConfig tableConfig = createTableConfig();
 
     List<GenericRow> segmentRecords = new ArrayList<>(NUM_SEGMENT_RECORDS);
     for (int i = 0; i < NUM_SEGMENT_RECORDS; i++) {
@@ -311,9 +312,12 @@ abstract class BaseStarTreeV2Test<R, A> {
         nonStarTreeAggregationColumnDictionaries.add(dataSource.getDictionary());
       }
     }
-    List<ForwardIndexReader> nonStarTreeGroupByColumnReaders = new ArrayList<>(numGroupByColumns);
+    // Use PinotSegmentColumnReader so a RAW forward-index group-by column with a separated dictionary resolves
+    // its dict ids via the dictionary — mirroring the same lookup the star-tree builder performs at build time
+    // (see BaseSingleTreeBuilder). Behavior is identical for dictionary-encoded columns.
+    List<PinotSegmentColumnReader> nonStarTreeGroupByColumnReaders = new ArrayList<>(numGroupByColumns);
     for (String groupByColumn : groupByColumns) {
-      nonStarTreeGroupByColumnReaders.add(_indexSegment.getDataSource(groupByColumn).getForwardIndex());
+      nonStarTreeGroupByColumnReaders.add(new PinotSegmentColumnReader(_indexSegment, groupByColumn));
     }
     Map<List<Integer>, List<Object>> nonStarTreeResult =
         computeNonStarTreeResult(nonStarTreeFilterPlanNode, nonStarTreeAggregationColumnReaders,
@@ -401,14 +405,13 @@ abstract class BaseStarTreeV2Test<R, A> {
 
   private Map<List<Integer>, List<Object>> computeNonStarTreeResult(FilterPlanNode nonStarTreeFilterPlanNode,
       List<ForwardIndexReader> aggregationColumnReaders, List<Dictionary> aggregationColumnDictionaries,
-      List<ForwardIndexReader> groupByColumnReaders)
+      List<PinotSegmentColumnReader> groupByColumnReaders)
       throws IOException {
     Map<List<Integer>, List<Object>> result = new HashMap<>();
     int numAggregations = aggregationColumnReaders.size();
     int numGroupByColumns = groupByColumnReaders.size();
 
     List<ForwardIndexReaderContext> aggregationColumnReaderContexts = new ArrayList<>(numAggregations);
-    List<ForwardIndexReaderContext> groupByColumnReaderContexts = new ArrayList<>(numGroupByColumns);
     try {
       for (ForwardIndexReader aggregationColumnReader : aggregationColumnReaders) {
         if (aggregationColumnReader != null) {
@@ -417,9 +420,6 @@ abstract class BaseStarTreeV2Test<R, A> {
           aggregationColumnReaderContexts.add(null);
         }
       }
-      for (ForwardIndexReader groupByColumnReader : groupByColumnReaders) {
-        groupByColumnReaderContexts.add(groupByColumnReader.createContext());
-      }
 
       BlockDocIdIterator docIdIterator = nonStarTreeFilterPlanNode.run().nextBlock().getBlockDocIdSet().iterator();
       int docId;
@@ -427,7 +427,7 @@ abstract class BaseStarTreeV2Test<R, A> {
         // Array of dictionary ids (zero-length array for non-group-by queries)
         List<Integer> group = new ArrayList<>(numGroupByColumns);
         for (int i = 0; i < numGroupByColumns; i++) {
-          group.add(groupByColumnReaders.get(i).getDictId(docId, groupByColumnReaderContexts.get(i)));
+          group.add(groupByColumnReaders.get(i).getDictId(docId));
         }
         List<Object> values = result.computeIfAbsent(group, k -> new ArrayList<>(numAggregations));
         if (values.isEmpty()) {
@@ -465,10 +465,8 @@ abstract class BaseStarTreeV2Test<R, A> {
           readerContext.close();
         }
       }
-      for (ForwardIndexReaderContext readerContext : groupByColumnReaderContexts) {
-        if (readerContext != null) {
-          readerContext.close();
-        }
+      for (PinotSegmentColumnReader groupByColumnReader : groupByColumnReaders) {
+        groupByColumnReader.close();
       }
     }
   }
@@ -505,6 +503,12 @@ abstract class BaseStarTreeV2Test<R, A> {
 
   protected boolean isAggColSingleValueField() {
     return true;
+  }
+
+  /// Can be overridden to customize the table config (e.g. to attach `FieldConfig`s that force a specific
+  /// forward-index encoding or dictionary configuration for the dimension columns).
+  protected TableConfig createTableConfig() {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
   }
 
   abstract ValueAggregator<R, A> getValueAggregator();
