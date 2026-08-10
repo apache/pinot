@@ -24,7 +24,9 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.JsonNodeType;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -33,6 +35,7 @@ public class ConfigUtils {
   }
 
   private static final Map<String, String> ENVIRONMENT_VARIABLES = System.getenv();
+  private static final String CONFIG_PROVIDERS = "config.providers";
 
   /// Apply system properties and environment variables to any given BaseJsonConfig.
   /// Environment variables take precedence over system properties.
@@ -72,12 +75,19 @@ public class ConfigUtils {
 
   private static JsonNode applyConfigWithEnvVariablesAndSystemProperties(Map<String, String> configValues,
       JsonNode jsonNode) {
+    return applyConfigWithEnvVariablesAndSystemProperties(configValues, jsonNode, Set.of());
+  }
+
+  private static JsonNode applyConfigWithEnvVariablesAndSystemProperties(Map<String, String> configValues,
+      JsonNode jsonNode, Set<String> inheritedConfigProviders) {
     final JsonNodeType nodeType = jsonNode.getNodeType();
     switch (nodeType) {
       case OBJECT:
         if (!jsonNode.isEmpty()) {
+          Set<String> configProviders = getConfigProviders(jsonNode, inheritedConfigProviders);
           for (Map.Entry<String, JsonNode> next : jsonNode.properties()) {
-            next.setValue(applyConfigWithEnvVariablesAndSystemProperties(configValues, next.getValue()));
+            next.setValue(
+                applyConfigWithEnvVariablesAndSystemProperties(configValues, next.getValue(), configProviders));
           }
         }
         break;
@@ -86,13 +96,17 @@ public class ConfigUtils {
           ArrayNode arrayNode = (ArrayNode) jsonNode;
           for (int i = 0; i < arrayNode.size(); i++) {
             JsonNode arrayElement = arrayNode.get(i);
-            arrayNode.set(i, applyConfigWithEnvVariablesAndSystemProperties(configValues, arrayElement));
+            arrayNode.set(i,
+                applyConfigWithEnvVariablesAndSystemProperties(configValues, arrayElement, inheritedConfigProviders));
           }
         }
         break;
       case STRING:
         final String field = jsonNode.asText();
-        if (field.startsWith("${") && field.endsWith("}")) {
+        // Kafka ConfigProvider references share Pinot's ${name:value} syntax. Keep references for providers declared
+        // in the containing config object so Kafka can resolve them when constructing the client.
+        if (field.startsWith("${") && field.endsWith("}")
+            && !isConfigProviderReference(field, inheritedConfigProviders)) {
           String[] envVarSplits = field.substring(2, field.length() - 1).split(":", 2);
           String envVarKey = envVarSplits[0];
           String value = configValues.get(envVarKey);
@@ -108,5 +122,30 @@ public class ConfigUtils {
         break;
     }
     return jsonNode;
+  }
+
+  private static Set<String> getConfigProviders(JsonNode jsonNode, Set<String> inheritedConfigProviders) {
+    JsonNode configProvidersNode = jsonNode.get(CONFIG_PROVIDERS);
+    if (configProvidersNode == null || !configProvidersNode.isTextual()) {
+      return inheritedConfigProviders;
+    }
+
+    Set<String> configProviders = new HashSet<>(inheritedConfigProviders);
+    for (String configProvider : configProvidersNode.asText().split(",")) {
+      String trimmedConfigProvider = configProvider.trim();
+      if (!trimmedConfigProvider.isEmpty()) {
+        configProviders.add(trimmedConfigProvider);
+      }
+    }
+    return configProviders;
+  }
+
+  private static boolean isConfigProviderReference(String field, Set<String> configProviders) {
+    for (String configProvider : configProviders) {
+      if (field.startsWith("${" + configProvider + ":")) {
+        return true;
+      }
+    }
+    return false;
   }
 }

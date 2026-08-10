@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -54,6 +56,46 @@ public class ConfigUtilsTest {
     System.clearProperty("LOAD_MODE");
     System.clearProperty("AWS_ACCESS_KEY");
     System.clearProperty("AWS_SECRET_KEY");
+  }
+
+  @Test
+  public void testKafkaConfigProviderReferencesArePreserved() {
+    IndexingConfig indexingConfig = new IndexingConfig();
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("config.providers", "file");
+    streamConfigMap.put("ssl.keystore.password", "${file:/vault/secrets/kafka.properties:keystore.password}");
+    streamConfigMap.put("ssl.truststore.password", "${PINOT_KAFKA_TRUSTSTORE_PASSWORD:fallback}");
+    indexingConfig.setStreamConfigs(streamConfigMap);
+
+    IndexingConfig resolvedConfig =
+        ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(Map.of(), indexingConfig);
+
+    assertEquals(resolvedConfig.getStreamConfigs().get("ssl.keystore.password"),
+        "${file:/vault/secrets/kafka.properties:keystore.password}");
+    assertEquals(resolvedConfig.getStreamConfigs().get("ssl.truststore.password"), "fallback");
+  }
+
+  @Test
+  public void testConfigProviderReferencesAreScopedToDeclaringObject() {
+    Map<String, String> providerConfig = new HashMap<>();
+    providerConfig.put("config.providers", "file, vault");
+    providerConfig.put("ssl.keystore.password", "${file:/vault/secrets/kafka.properties:keystore.password}");
+    providerConfig.put("sasl.jaas.config", "${vault:secret/kafka:jaas}");
+    Map<String, String> regularConfig = Map.of("value", "${file:fallback}");
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(
+        new StreamIngestionConfig(List.of(providerConfig, regularConfig)));
+
+    IngestionConfig resolvedConfig =
+        ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(Map.of(), ingestionConfig);
+    List<Map<String, String>> resolvedStreamConfigs =
+        resolvedConfig.getStreamIngestionConfig().getStreamConfigMaps();
+
+    assertEquals(resolvedStreamConfigs.get(0).get("ssl.keystore.password"),
+        "${file:/vault/secrets/kafka.properties:keystore.password}");
+    assertEquals(resolvedStreamConfigs.get(0).get("sasl.jaas.config"), "${vault:secret/kafka:jaas}");
+    assertEquals(resolvedStreamConfigs.get(1).get("value"), "fallback");
   }
 
   private void testIndexingWithConfig(Map<String, String> configOverride) {

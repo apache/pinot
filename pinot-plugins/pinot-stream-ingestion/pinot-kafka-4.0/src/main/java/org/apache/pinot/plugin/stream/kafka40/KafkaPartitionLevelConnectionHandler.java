@@ -169,7 +169,8 @@ public abstract class KafkaPartitionLevelConnectionHandler {
       synchronized (this) {
         ref = _sharedAdminClientRef;
         if (ref == null) {
-          ref = KafkaAdminClientManager.getInstance().getOrCreateAdminClient(_consumerProp);
+          ref = KafkaAdminClientManager.getInstance()
+              .getOrCreateAdminClient(filterKafkaProperties(_consumerProp, ADMIN_CLIENT_CONFIG_NAMES));
           _sharedAdminClientRef = ref;
         }
       }
