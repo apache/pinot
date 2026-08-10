@@ -987,4 +987,19 @@ public class ReplicaGroupSelectorTest {
             STRICT_RG1_SERVER_C, STRICT_RG1_SERVER_D));
     assertEquals(rankedCandidatesCaptor.getValue().size(), 4);
   }
+
+  @Test
+  public void testStrictReplicaGroupAdaptiveHandlesMinimumRequestId() {
+    HybridSelector hybridSelector = mock(HybridSelector.class);
+    StrictReplicaGroupInstanceSelector instanceSelector = buildStrictReplicaGroupArSelector(hybridSelector);
+    when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(List.of());
+
+    InstanceSelector.InstanceMapping result = instanceSelector.select(STRICT_SEGMENTS, Integer.MIN_VALUE,
+        buildStrictReplicaGroupSegmentStates(), null);
+
+    assertEquals(result.segmentToInstanceMap(), Map.of(
+        STRICT_SEGMENT0, STRICT_RG0_SERVER_A,
+        STRICT_SEGMENT1, STRICT_RG0_SERVER_A,
+        STRICT_SEGMENT2, STRICT_RG0_SERVER_B));
+  }
 }
