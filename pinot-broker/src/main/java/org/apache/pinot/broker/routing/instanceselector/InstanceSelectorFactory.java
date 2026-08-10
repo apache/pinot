@@ -74,6 +74,7 @@ public class InstanceSelectorFactory {
       ExternalView externalView, Set<String> onlineSegments) {
     String tableNameWithType = tableConfig.getTableName();
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
+    AdaptiveServerSelector effectiveAdaptiveServerSelector = adaptiveServerSelector;
     boolean useFixedReplica = brokerConfig.getProperty(CommonConstants.Broker.CONFIG_OF_USE_FIXED_REPLICA,
         CommonConstants.Broker.DEFAULT_USE_FIXED_REPLICA);
     if (routingConfig != null && routingConfig.getUseFixedReplica() != null) {
@@ -107,12 +108,12 @@ public class InstanceSelectorFactory {
           case RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE: {
             LOGGER.info("Using StrictReplicaGroupInstanceSelector for table: {}", tableNameWithType);
             boolean enableStrictReplicaGroupAdaptiveRouting = brokerConfig.getProperty(
-                CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STRICT_REPLICA_GROUP,
-                CommonConstants.Broker.AdaptiveServerSelector.DEFAULT_ENABLE_STRICT_REPLICA_GROUP);
-            if (!enableStrictReplicaGroupAdaptiveRouting && adaptiveServerSelector != null) {
+                CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STRICT_REPLICA_GROUP_ENABLED,
+                CommonConstants.Broker.AdaptiveServerSelector.DEFAULT_STRICT_REPLICA_GROUP_ENABLED);
+            if (!enableStrictReplicaGroupAdaptiveRouting && effectiveAdaptiveServerSelector != null) {
               LOGGER.info("Adaptive routing disabled for StrictReplicaGroupInstanceSelector table: {}",
                   tableNameWithType);
-              adaptiveServerSelector = null;
+              effectiveAdaptiveServerSelector = null;
             }
             instanceSelector = new StrictReplicaGroupInstanceSelector();
             break;
@@ -144,8 +145,15 @@ public class InstanceSelectorFactory {
     if (instanceSelector == null) {
       instanceSelector = new BalancedInstanceSelector();
     }
+    if (instanceSelector.getClass() == ReplicaGroupInstanceSelector.class
+        && (tableConfig.isUpsertEnabled() || tableConfig.isDedupEnabled())
+        && effectiveAdaptiveServerSelector != null) {
+      LOGGER.warn("Disabling adaptive routing for legacy upsert/dedup table {} using ReplicaGroupInstanceSelector",
+          tableNameWithType);
+      effectiveAdaptiveServerSelector = null;
+    }
 
-    instanceSelector.init(tableConfig, propertyStore, brokerMetrics, adaptiveServerSelector, clock,
+    instanceSelector.init(tableConfig, propertyStore, brokerMetrics, effectiveAdaptiveServerSelector, clock,
         config, enabledInstances, enabledServerMap, idealState, externalView, onlineSegments);
     return instanceSelector;
   }

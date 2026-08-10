@@ -445,7 +445,7 @@ public class ReplicaGroupSelectorTest {
     HybridSelector hybridSelector = mock(HybridSelector.class);
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
     PinotConfiguration brokerConfig = new PinotConfiguration(Map.of(
-        CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STRICT_REPLICA_GROUP, "false"));
+        CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STRICT_REPLICA_GROUP_ENABLED, "false"));
     StrictReplicaGroupInstanceSelector instanceSelector =
         buildStrictReplicaGroupArSelector(hybridSelector, brokerMetrics, brokerConfig);
 
