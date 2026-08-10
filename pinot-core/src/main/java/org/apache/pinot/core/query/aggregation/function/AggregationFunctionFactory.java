@@ -458,9 +458,9 @@ public class AggregationFunctionFactory {
           case HISTOGRAM:
             return new HistogramAggregationFunction(arguments);
           case COVARPOP:
-            return new CovarianceAggregationFunction(arguments, false);
+            return new CovarianceAggregationFunction(arguments, false, nullHandlingEnabled);
           case COVARSAMP:
-            return new CovarianceAggregationFunction(arguments, true);
+            return new CovarianceAggregationFunction(arguments, true, nullHandlingEnabled);
           case BOOLAND:
             return new BooleanAndAggregationFunction(arguments, nullHandlingEnabled);
           case BOOLOR:
