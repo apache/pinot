@@ -111,12 +111,8 @@ public class AggregationDataTableReducer implements DataTableReducer {
           intermediateResultToMerge =
               AggregationFunctionUtils.getIntermediateResult(aggregationFunction, dataTable, columnDataType, 0, i);
         }
-        Object mergedIntermediateResult = intermediateResults[i];
-        if (mergedIntermediateResult == null) {
-          intermediateResults[i] = intermediateResultToMerge;
-        } else {
-          intermediateResults[i] = aggregationFunction.merge(mergedIntermediateResult, intermediateResultToMerge);
-        }
+        intermediateResults[i] =
+            AggregationFunctionUtils.merge(aggregationFunction, intermediateResults[i], intermediateResultToMerge);
       }
     }
     return intermediateResults;
@@ -197,12 +193,8 @@ public class AggregationDataTableReducer implements DataTableReducer {
         } else {
           finalResultToMerge = AggregationFunctionUtils.getFinalResult(dataTable, columnDataType, 0, i);
         }
-        Comparable mergedFinalResult = finalResults[i];
-        if (mergedFinalResult == null) {
-          finalResults[i] = finalResultToMerge;
-        } else {
-          finalResults[i] = _aggregationFunctions[i].mergeFinalResult(mergedFinalResult, finalResultToMerge);
-        }
+        finalResults[i] =
+            AggregationFunctionUtils.mergeFinalResult(_aggregationFunctions[i], finalResults[i], finalResultToMerge);
       }
     }
     Object[] convertedFinalResults = new Object[numAggregationFunctions];

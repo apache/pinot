@@ -109,7 +109,7 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
   }
 
   @Override
-  public Geometry merge(@Nullable Geometry intermediateResult1, @Nullable Geometry intermediateResult2) {
+  public Geometry merge(Geometry intermediateResult1, Geometry intermediateResult2) {
     return union(intermediateResult1, intermediateResult2);
   }
 
@@ -134,9 +134,11 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
     return DataSchema.ColumnDataType.BYTES;
   }
 
+  @Nullable
   @Override
-  public ByteArray extractFinalResult(Geometry geometry) {
-    return new ByteArray(GeometrySerializer.serialize(geometry));
+  public ByteArray extractFinalResult(@Nullable Geometry geometry) {
+    // A null intermediate result means nothing was aggregated; the union of no geometries is NULL, matching ST_Union
+    return geometry != null ? new ByteArray(GeometrySerializer.serialize(geometry)) : null;
   }
 
   /// Returns the union of the supplied geometries.

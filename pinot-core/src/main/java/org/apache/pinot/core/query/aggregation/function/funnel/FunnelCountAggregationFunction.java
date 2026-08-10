@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -146,12 +147,6 @@ public class FunnelCountAggregationFunction<A, I> implements AggregationFunction
 
   @Override
   public I merge(I a, I b) {
-    if (a == null) {
-      return b;
-    }
-    if (b == null) {
-      return a;
-    }
     return _mergeStrategy.merge(a, b);
   }
 
@@ -179,7 +174,7 @@ public class FunnelCountAggregationFunction<A, I> implements AggregationFunction
   }
 
   @Override
-  public LongArrayList extractFinalResult(I intermediateResult) {
+  public LongArrayList extractFinalResult(@Nullable I intermediateResult) {
     if (intermediateResult == null) {
       return LongArrayList.wrap(new long[_numSteps]);
     }
