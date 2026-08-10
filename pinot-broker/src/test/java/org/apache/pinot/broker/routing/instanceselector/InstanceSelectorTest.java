@@ -39,6 +39,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.broker.routing.adaptiveserverselector.HybridSelector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -71,6 +72,7 @@ import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -236,6 +238,25 @@ public class InstanceSelectorTest {
         InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics, new PinotConfiguration(),
             Set.of(), Map.of(), new IdealState("testTable_OFFLINE"), new ExternalView("testTable_OFFLINE"),
             Set.of()) instanceof ReplicaGroupInstanceSelector);
+  }
+
+  @Test
+  public void testFactoryDisablesAdaptiveRoutingForLegacyUpsertReplicaGroupSelector() {
+    TableConfig tableConfig = mock(TableConfig.class);
+    RoutingConfig routingConfig = mock(RoutingConfig.class);
+    HybridSelector hybridSelector = mock(HybridSelector.class);
+    when(tableConfig.getTableName()).thenReturn("legacyUpsert_REALTIME");
+    when(tableConfig.getRoutingConfig()).thenReturn(routingConfig);
+    when(tableConfig.isUpsertEnabled()).thenReturn(true);
+    when(routingConfig.getInstanceSelectorType()).thenReturn(REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
+
+    ReplicaGroupInstanceSelector instanceSelector =
+        (ReplicaGroupInstanceSelector) InstanceSelectorFactory.getInstanceSelector(tableConfig, _propertyStore,
+            _brokerMetrics, hybridSelector, new PinotConfiguration(), Set.of(), Map.of(),
+            new IdealState("legacyUpsert_REALTIME"), new ExternalView("legacyUpsert_REALTIME"), Set.of());
+
+    assertNull(instanceSelector._adaptiveServerSelector);
+    assertNull(instanceSelector._priorityPoolInstanceSelector);
   }
 
   @Test
