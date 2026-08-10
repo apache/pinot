@@ -66,6 +66,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /**
@@ -647,6 +648,36 @@ public class ReplicaGroupSelectorTest {
         STRICT_SEGMENT0, STRICT_RG1_SERVER_C,
         STRICT_SEGMENT1, STRICT_RG1_SERVER_C,
         STRICT_SEGMENT2, STRICT_RG1_SERVER_D));
+  }
+
+  @Test
+  public void testStrictReplicaGroupAdaptiveRejectsFixedReplicaQueryOption() {
+    HybridSelector hybridSelector = mock(HybridSelector.class);
+    StrictReplicaGroupInstanceSelector instanceSelector = buildStrictReplicaGroupArSelector(hybridSelector);
+
+    Map<String, String> queryOptions = Map.of(
+        CommonConstants.Broker.Request.QueryOptionKey.USE_FIXED_REPLICA, "true");
+    IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
+        () -> instanceSelector.select(STRICT_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), queryOptions));
+    assertTrue(exception.getMessage().contains("useFixedReplica cannot be used"));
+    verify(hybridSelector, never()).fetchServerRankingsWithScores(any());
+  }
+
+  @Test
+  public void testStrictReplicaGroupAdaptivePreservesNumReplicaGroupsToQuery() {
+    HybridSelector hybridSelector = mock(HybridSelector.class);
+    StrictReplicaGroupInstanceSelector instanceSelector = buildStrictReplicaGroupArSelector(hybridSelector);
+
+    Map<String, String> queryOptions = Map.of(
+        CommonConstants.Broker.Request.QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY, "2");
+    InstanceSelector.InstanceMapping result =
+        instanceSelector.select(STRICT_SEGMENTS, 0, buildStrictReplicaGroupSegmentStates(), queryOptions);
+
+    verify(hybridSelector, never()).fetchServerRankingsWithScores(any());
+    assertEquals(result.segmentToInstanceMap(), Map.of(
+        STRICT_SEGMENT0, STRICT_RG0_SERVER_A,
+        STRICT_SEGMENT1, STRICT_RG1_SERVER_C,
+        STRICT_SEGMENT2, STRICT_RG0_SERVER_B));
   }
 
   @Test
