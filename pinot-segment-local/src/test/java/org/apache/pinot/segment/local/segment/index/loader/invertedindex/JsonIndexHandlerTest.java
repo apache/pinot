@@ -302,7 +302,7 @@ public class JsonIndexHandlerTest {
       throws Exception {
     File metadataFile = new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
     PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(metadataFile);
-    String key = V1Constants.MetadataKeys.Column.getKeyFor(columnName, "jsonIndexConfig");
+    String key = V1Constants.MetadataKeys.Column.getKeyFor(columnName, JsonIndexHandler.JSON_INDEX_CONFIG_KEY);
     String serialized = JsonUtils.objectToString(config);
     String escaped = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(serialized);
     properties.setProperty(key, escaped);

@@ -23,7 +23,6 @@ import java.io.File;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
@@ -47,8 +46,6 @@ import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.CommonsConfigurationUtils;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +54,8 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class JsonIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonIndexHandler.class);
+  /// Metadata key suffix used to persist/restore [JsonIndexConfig] in {@code metadata.properties}.
+  static final String JSON_INDEX_CONFIG_KEY = "jsonIndexConfig";
 
   private final Map<String, JsonIndexConfig> _jsonIndexConfigs;
 
@@ -85,7 +84,8 @@ public class JsonIndexHandler extends BaseIndexHandler {
       // absent (e.g. forwardIndexDisabled=true with no dictionary/inverted pair), preserve the existing JSON
       // index untouched — createForwardIndexIfNeeded() would fail with no dictionary/inverted index available.
       JsonIndexConfig currentConfig = _jsonIndexConfigs.get(column);
-      JsonIndexConfig storedConfig = readStoredJsonIndexConfig(column, properties);
+      JsonIndexConfig storedConfig =
+          readStoredIndexConfig(column, JSON_INDEX_CONFIG_KEY, JsonIndexConfig.class, properties);
       if (properties != null) {
         // configChanged: stored config exists and differs from current — rebuild regardless of forward
         // index presence (same pre-existing behaviour; createForwardIndexIfNeeded will fail if the
@@ -142,7 +142,8 @@ public class JsonIndexHandler extends BaseIndexHandler {
         // absent (e.g. forwardIndexDisabled=true with no dictionary/inverted pair), preserve the existing JSON
         // index untouched — createForwardIndexIfNeeded() would fail with no dictionary/inverted index available.
         JsonIndexConfig currentConfig = _jsonIndexConfigs.get(column);
-        JsonIndexConfig storedConfig = readStoredJsonIndexConfig(column, properties);
+        JsonIndexConfig storedConfig =
+            readStoredIndexConfig(column, JSON_INDEX_CONFIG_KEY, JsonIndexConfig.class, properties);
         if (properties != null) {
           // configChanged: stored config exists and differs — rebuild (see needUpdateIndices for rationale).
           boolean configChanged = storedConfig != null && !storedConfig.equals(currentConfig);
@@ -166,7 +167,7 @@ public class JsonIndexHandler extends BaseIndexHandler {
       if (shouldCreateJsonIndex(columnMetadata)) {
         createJsonIndexForColumn(segmentWriter, columnMetadata);
         if (properties != null) {
-          setStoredJsonIndexConfig(column, _jsonIndexConfigs.get(column), properties);
+          setStoredIndexConfig(column, JSON_INDEX_CONFIG_KEY, _jsonIndexConfigs.get(column), properties);
           metadataModified = true;
         }
       }
@@ -174,59 +175,6 @@ public class JsonIndexHandler extends BaseIndexHandler {
     if (metadataModified && properties != null) {
       SegmentMetadataUtils.savePropertiesConfiguration(properties,
           _segmentDirectory.getSegmentMetadata().getIndexDir());
-    }
-  }
-
-  /// Loads the segment {@code metadata.properties} file, or returns {@code null} if unavailable (in-memory segments).
-  @Nullable
-  private PropertiesConfiguration loadMetadataProperties() {
-    try {
-      return SegmentMetadataUtils.getPropertiesConfiguration(_segmentDirectory.getSegmentMetadata());
-    } catch (Exception e) {
-      LOGGER.warn("Cannot load segment metadata properties for segment: {}, config-change detection disabled",
-          _segmentDirectory.getSegmentMetadata().getName(), e);
-      return null;
-    }
-  }
-
-  /// Reads the stored {@link JsonIndexConfig} from the given {@code properties}, or returns {@code null} if not
-  /// present (e.g., index was built before config persistence was added).
-  @Nullable
-  private static JsonIndexConfig readStoredJsonIndexConfig(String columnName,
-      @Nullable PropertiesConfiguration properties) {
-    if (properties == null) {
-      return null;
-    }
-    try {
-      String key = V1Constants.MetadataKeys.Column.getKeyFor(columnName, "jsonIndexConfig");
-      String escaped = properties.getString(key, null);
-      if (escaped == null) {
-        return null;
-      }
-      String serialized = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(escaped);
-      return JsonUtils.stringToObject(serialized, JsonIndexConfig.class);
-    } catch (Exception e) {
-      LOGGER.warn("Failed to read stored json index config for column: {}, treating as legacy (no stored config)",
-          columnName, e);
-      return null;
-    }
-  }
-
-  /// Writes the {@link JsonIndexConfig} for {@code columnName} into {@code properties} (without saving to disk).
-  private static void setStoredJsonIndexConfig(String columnName, JsonIndexConfig config,
-      PropertiesConfiguration properties) {
-    try {
-      String serialized = JsonUtils.objectToString(config);
-      String escaped = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(serialized);
-      if (escaped == null) {
-        LOGGER.warn("Cannot persist json index config for column: {} due to unsupported characters", columnName);
-        return;
-      }
-      String key = V1Constants.MetadataKeys.Column.getKeyFor(columnName, "jsonIndexConfig");
-      properties.setProperty(key, escaped);
-    } catch (Exception e) {
-      LOGGER.warn("Failed to serialize json index config for column: {}, config changes will not trigger rebuild",
-          columnName, e);
     }
   }
 
