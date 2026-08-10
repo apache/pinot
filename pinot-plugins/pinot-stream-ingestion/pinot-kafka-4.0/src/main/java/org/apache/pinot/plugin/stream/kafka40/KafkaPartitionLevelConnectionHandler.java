@@ -35,6 +35,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.serialization.BytesDeserializer;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.plugin.stream.kafka.KafkaAdminClientManager;
@@ -98,16 +99,18 @@ public abstract class KafkaPartitionLevelConnectionHandler {
     return consumerProp;
   }
 
-  /// Filter properties to only include the specified Kafka configurations.
-  /// This prevents "was supplied but isn't a known config" warnings from Kafka clients.
+  /// Filter properties to include the specified Kafka configurations and the dynamic config-provider namespace.
+  /// This prevents "was supplied but isn't a known config" warnings without dropping config-provider settings.
   ///
   /// @param props The properties to filter
   /// @param validConfigNames The set of valid configuration names for the target Kafka client
   /// @return A new Properties object containing only the valid configurations
-  private Properties filterKafkaProperties(Properties props, Set<String> validConfigNames) {
+  @VisibleForTesting
+  static Properties filterKafkaProperties(Properties props, Set<String> validConfigNames) {
     Properties filteredProps = new Properties();
     for (String key : props.stringPropertyNames()) {
-      if (validConfigNames.contains(key)) {
+      if (validConfigNames.contains(key) || key.equals(AbstractConfig.CONFIG_PROVIDERS_CONFIG)
+          || key.startsWith(AbstractConfig.CONFIG_PROVIDERS_CONFIG + ".")) {
         filteredProps.put(key, props.get(key));
       }
     }

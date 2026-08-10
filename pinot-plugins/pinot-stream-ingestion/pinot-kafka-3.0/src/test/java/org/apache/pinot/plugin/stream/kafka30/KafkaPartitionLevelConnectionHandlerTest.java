@@ -18,11 +18,22 @@
  */
 package org.apache.pinot.plugin.stream.kafka30;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.config.AbstractConfig;
+import org.apache.kafka.common.config.SslConfigs;
+import org.apache.kafka.common.config.provider.FileConfigProvider;
+import org.apache.kafka.common.serialization.BytesDeserializer;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -42,6 +53,43 @@ public class KafkaPartitionLevelConnectionHandlerTest {
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     return new StreamConfig("testTable_REALTIME", streamConfigMap);
+  }
+
+  @Test
+  public void testFilterKafkaPropertiesPreservesConfigProviders()
+      throws Exception {
+    Path providerFile = Files.createTempFile("kafka-config-provider", ".properties");
+    try {
+      Files.writeString(providerFile, "keystore.password=test-password\n");
+
+      Properties properties = new Properties();
+      properties.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+      properties.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, BytesDeserializer.class.getName());
+      properties.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, BytesDeserializer.class.getName());
+      properties.setProperty(AbstractConfig.CONFIG_PROVIDERS_CONFIG, "file");
+      properties.setProperty("config.providers.file.class", FileConfigProvider.class.getName());
+      properties.setProperty(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG,
+          "${file:" + providerFile + ":keystore.password}");
+      properties.setProperty("streamType", "kafka");
+
+      Properties consumerProperties =
+          KafkaPartitionLevelConnectionHandler.filterKafkaProperties(properties, ConsumerConfig.configNames());
+      assertEquals(consumerProperties.getProperty(AbstractConfig.CONFIG_PROVIDERS_CONFIG), "file");
+      assertEquals(consumerProperties.getProperty("config.providers.file.class"), FileConfigProvider.class.getName());
+      assertFalse(consumerProperties.containsKey("streamType"));
+      assertEquals(new ConsumerConfig(consumerProperties).getPassword(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG).value(),
+          "test-password");
+
+      Properties adminProperties =
+          KafkaPartitionLevelConnectionHandler.filterKafkaProperties(properties, AdminClientConfig.configNames());
+      assertEquals(adminProperties.getProperty(AbstractConfig.CONFIG_PROVIDERS_CONFIG), "file");
+      assertEquals(adminProperties.getProperty("config.providers.file.class"), FileConfigProvider.class.getName());
+      assertFalse(adminProperties.containsKey("streamType"));
+      assertEquals(new AdminClientConfig(adminProperties).getPassword(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG).value(),
+          "test-password");
+    } finally {
+      Files.deleteIfExists(providerFile);
+    }
   }
 
   @Test
