@@ -55,6 +55,7 @@ import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
@@ -267,7 +268,14 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   /// Registers a mock DimensionTableDataManager for lookup join testing.
-  /// The mock stores all rows in a HashMap keyed by primary key, supporting lookupValues() and containsKey().
+  /// The mock stores all rows in a HashMap keyed by primary key, supporting lookupValues(), containsKey() and
+  /// getPrimaryKeyColumns().
+  ///
+  /// A real dimension table reads its values from a segment, so every value has the stored type of its column. The
+  /// rows here come straight from the test case JSON, where the parser cannot know the column types, so this method
+  /// converts every value to the stored type of its column. Without the conversion the map holds an Integer where the
+  /// query supplies a Long, and [PrimaryKey] compares values with equals, so the lookup misses for reasons that have
+  /// nothing to do with the code under test.
   private void registerMockDimensionTable(String offlineTableName, Schema schema, QueryTestCase.Table table,
       List<GenericRow> rows) {
     List<String> primaryKeyColumns = table._primaryKeyColumns;
@@ -280,12 +288,14 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     for (GenericRow row : rows) {
       Object[] pkValues = new Object[primaryKeyColumns.size()];
       for (int i = 0; i < primaryKeyColumns.size(); i++) {
-        pkValues[i] = row.getValue(primaryKeyColumns.get(i));
+        String primaryKeyColumn = primaryKeyColumns.get(i);
+        pkValues[i] = toStoredValue(row.getValue(primaryKeyColumn), schema, primaryKeyColumn);
       }
       lookupMap.put(new PrimaryKey(pkValues), row);
     }
     // Create and register a mock DimensionTableDataManager
     DimensionTableDataManager mockDimManager = Mockito.mock(DimensionTableDataManager.class);
+    Mockito.when(mockDimManager.getPrimaryKeyColumns()).thenReturn(primaryKeyColumns);
     Mockito.when(mockDimManager.containsKey(ArgumentMatchers.any(PrimaryKey.class)))
         .thenAnswer(invocation -> {
           PrimaryKey pk = invocation.getArgument(0);
@@ -301,11 +311,37 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           }
           Object[] values = new Object[columns.length];
           for (int i = 0; i < columns.length; i++) {
-            values[i] = row.getValue(columns[i]);
+            values[i] = toStoredValue(row.getValue(columns[i]), schema, columns[i]);
           }
           return values;
         });
     DimensionTableDataManager.registerDimensionTable(offlineTableName, mockDimManager);
+  }
+
+  /// Converts a raw JSON value to the stored representation of its column, the same way a segment stores it.
+  @Nullable
+  private static Object toStoredValue(@Nullable Object value, Schema schema, String column) {
+    if (value == null) {
+      return null;
+    }
+    FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+    if (fieldSpec == null) {
+      return value;
+    }
+    switch (fieldSpec.getDataType().getStoredType()) {
+      case INT:
+        return ((Number) value).intValue();
+      case LONG:
+        return ((Number) value).longValue();
+      case FLOAT:
+        return ((Number) value).floatValue();
+      case DOUBLE:
+        return ((Number) value).doubleValue();
+      case STRING:
+        return value.toString();
+      default:
+        return value;
+    }
   }
 
   @AfterClass
