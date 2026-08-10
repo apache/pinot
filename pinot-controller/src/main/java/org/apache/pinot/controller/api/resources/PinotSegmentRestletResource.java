@@ -379,6 +379,7 @@ public class PinotSegmentRestletResource {
           String.format("Segment CRC does not match for segment: %s in table: %s", segmentName, tableNameWithType),
           Status.PRECONDITION_FAILED);
     }
+    segmentZKMetadata.setRefreshTime(System.currentTimeMillis());
     segmentZKMetadata.setCustomMap(customMapModifier.modifyMap(segmentZKMetadata.getCustomMap()));
     if (!_pinotHelixResourceManager.updateZkMetadata(tableNameWithType, segmentZKMetadata,
         segmentMetadataRecord.getVersion())) {

@@ -197,6 +197,7 @@ public class PinotSegmentRestletResourceTest {
         TEST_INSTANCE.getHelixResourceManager().getSegmentZKMetadata(offlineTableName, segmentName);
     assertNotNull(originalMetadata);
     long originalCrc = originalMetadata.getCrc();
+    long originalRefreshTime = originalMetadata.getRefreshTime();
     String endpoint = TEST_INSTANCE.getControllerBaseApiUrl() + "/segments/" + offlineTableName + "/" + segmentName
         + "/metadata";
     String modifier = new SegmentZKMetadataCustomMapModifier(
@@ -209,6 +210,7 @@ public class PinotSegmentRestletResourceTest {
     SegmentZKMetadata updatedMetadata =
         TEST_INSTANCE.getHelixResourceManager().getSegmentZKMetadata(offlineTableName, segmentName);
     assertNotNull(updatedMetadata);
+    assertTrue(updatedMetadata.getRefreshTime() > originalRefreshTime);
     assertEquals(updatedMetadata.getCustomMap(), Map.of("task.lastProcessedTime", "1234"));
     assertEquals(updatedMetadata.getCrc(), originalCrc);
     assertEquals(updatedMetadata.getDownloadUrl(), "downloadUrl");
