@@ -627,6 +627,53 @@ public class ReplicaGroupSelectorTest {
   }
 
   @Test
+  public void testStrictReplicaGroupAdaptiveRoutesAroundDegradedPreferredPool() {
+    HybridSelector hybridSelector = mock(HybridSelector.class);
+    StrictReplicaGroupInstanceSelector instanceSelector = buildStrictReplicaGroupArSelector(hybridSelector);
+
+    when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(Arrays.asList(
+        new ImmutablePair<>(STRICT_RG1_SERVER_C, 1.0),
+        new ImmutablePair<>(STRICT_RG1_SERVER_D, 2.0),
+        new ImmutablePair<>(STRICT_RG0_SERVER_A, 90.0),
+        new ImmutablePair<>(STRICT_RG0_SERVER_B, 100.0)
+    ));
+
+    Map<String, String> queryOptions = Map.of(
+        CommonConstants.Broker.Request.QueryOptionKey.ORDERED_PREFERRED_POOLS, "0");
+    InstanceSelector.InstanceMapping result = instanceSelector.select(STRICT_SEGMENTS, 0,
+        buildStrictReplicaGroupSegmentStates(0, 1), queryOptions);
+
+    // Pool 0 is preferred, but adaptive health is the primary selection criterion.
+    assertEquals(result.segmentToInstanceMap(), Map.of(
+        STRICT_SEGMENT0, STRICT_RG1_SERVER_C,
+        STRICT_SEGMENT1, STRICT_RG1_SERVER_C,
+        STRICT_SEGMENT2, STRICT_RG1_SERVER_D));
+  }
+
+  @Test
+  public void testStrictReplicaGroupAdaptiveUsesPreferredPoolToBreakScoreTie() {
+    HybridSelector hybridSelector = mock(HybridSelector.class);
+    StrictReplicaGroupInstanceSelector instanceSelector = buildStrictReplicaGroupArSelector(hybridSelector);
+
+    when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(Arrays.asList(
+        new ImmutablePair<>(STRICT_RG0_SERVER_A, 1.0),
+        new ImmutablePair<>(STRICT_RG0_SERVER_B, 2.0),
+        new ImmutablePair<>(STRICT_RG1_SERVER_C, 1.0),
+        new ImmutablePair<>(STRICT_RG1_SERVER_D, 2.0)
+    ));
+
+    Map<String, String> queryOptions = Map.of(
+        CommonConstants.Broker.Request.QueryOptionKey.ORDERED_PREFERRED_POOLS, "0");
+    InstanceSelector.InstanceMapping result = instanceSelector.select(STRICT_SEGMENTS, 1,
+        buildStrictReplicaGroupSegmentStates(0, 1), queryOptions);
+
+    assertEquals(result.segmentToInstanceMap(), Map.of(
+        STRICT_SEGMENT0, STRICT_RG0_SERVER_A,
+        STRICT_SEGMENT1, STRICT_RG0_SERVER_A,
+        STRICT_SEGMENT2, STRICT_RG0_SERVER_B));
+  }
+
+  @Test
   public void testStrictReplicaGroupAdaptiveEmptyRankingsFallBackToRoundRobin() {
     // When adaptive ranking returns no servers, fall back to round-robin by replica-group index.
     HybridSelector hybridSelector = mock(HybridSelector.class);
