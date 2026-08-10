@@ -33,6 +33,7 @@ import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionCon
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 /// Instance selector for strict replica-group routing strategy.
@@ -79,9 +80,18 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
   @Override
   public InstanceMapping select(List<String> segments, int requestId,
       SegmentStates segmentStates, Map<String, String> queryOptions) {
+    ServerSelectionContext ctx = new ServerSelectionContext(queryOptions, _config);
 
     if (_adaptiveServerSelector == null || _priorityPoolInstanceSelector == null) {
-      ServerSelectionContext ctx = new ServerSelectionContext(queryOptions, _config);
+      return selectServers(segments, requestId, segmentStates, null, ctx);
+    }
+    if (ctx.isUseFixedReplica()) {
+      throw new IllegalArgumentException(
+          "useFixedReplica cannot be used when adaptive routing is enabled for StrictReplicaGroupInstanceSelector");
+    }
+    if (QueryOptionsUtils.getNumReplicaGroupsToQuery(ctx.getQueryOptions()) != null) {
+      // The existing option intentionally fans segments across multiple replica groups. Preserve that behavior and do
+      // not apply adaptive single-replica-group selection to this query.
       return selectServers(segments, requestId, segmentStates, null, ctx);
     }
 
