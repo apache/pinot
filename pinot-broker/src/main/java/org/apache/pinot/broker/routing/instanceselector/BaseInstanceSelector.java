@@ -23,6 +23,7 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -526,13 +527,13 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     if (unavailableSegments.isEmpty() && mappingUnavailable.isEmpty()) {
       return new SelectionResult(mapping, List.of(), 0);
     } else {
-      List<String> unavailableSegmentsForRequest = new ArrayList<>(mappingUnavailable);
+      Set<String> unavailableSegmentsForRequest = new LinkedHashSet<>(mappingUnavailable);
       for (String segment : segments) {
         if (unavailableSegments.contains(segment)) {
           unavailableSegmentsForRequest.add(segment);
         }
       }
-      return new SelectionResult(mapping, unavailableSegmentsForRequest, 0);
+      return new SelectionResult(mapping, new ArrayList<>(unavailableSegmentsForRequest), 0);
     }
   }
 

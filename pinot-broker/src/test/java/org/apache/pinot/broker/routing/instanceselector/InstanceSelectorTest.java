@@ -1000,6 +1000,29 @@ public class InstanceSelectorTest {
   }
 
   @Test
+  public void testUnavailableSegmentsAreDeduplicated() {
+    String segment = "unavailableSegment";
+    BaseInstanceSelector instanceSelector = new BaseInstanceSelector() {
+      @Override
+      void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
+          Map<String, Long> newSegmentCreationTimeMap) {
+      }
+
+      @Override
+      protected InstanceSelector.InstanceMapping select(List<String> segments, int requestId,
+          SegmentStates segmentStates,
+          Map<String, String> queryOptions) {
+        return new InstanceSelector.InstanceMapping(Map.of(), Map.of(), List.of(segment));
+      }
+    };
+    instanceSelector._segmentStates = new SegmentStates(Map.of(), Set.of(), Set.of(segment));
+
+    InstanceSelector.SelectionResult result = instanceSelector.select(_brokerRequest, List.of(segment), 0);
+
+    assertEquals(result.getUnavailableSegments(), List.of(segment));
+  }
+
+  @Test
   public void testUnavailableSegments() {
     String offlineTableName = "testTable_OFFLINE";
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
