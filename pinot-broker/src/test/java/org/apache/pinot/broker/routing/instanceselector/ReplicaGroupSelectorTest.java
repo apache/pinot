@@ -20,7 +20,6 @@ package org.apache.pinot.broker.routing.instanceselector;
 
 import java.time.Clock;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -81,7 +80,7 @@ public class ReplicaGroupSelectorTest {
   private TableConfig _tableConfig;
 
   private static final String TABLE_NAME = "testTable_OFFLINE";
-  private static final Map<String, ServerInstance> EMPTY_SERVER_MAP = Collections.EMPTY_MAP;
+  private static final Map<String, ServerInstance> EMPTY_SERVER_MAP = Map.of();
   private static final InstanceSelectorConfig INSTANCE_SELECTOR_CONFIG = new InstanceSelectorConfig(false, 300, false);
   private static final List<String> SEGMENTS =
       Arrays.asList("segment0", "segment1", "segment2", "segment3", "segment4", "segment5", "segment6", "segment7",
