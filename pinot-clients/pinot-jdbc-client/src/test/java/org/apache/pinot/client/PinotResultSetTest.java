@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -69,12 +70,14 @@ public class PinotResultSetTest {
       throws Exception {
     PinotResultSet resultSet = PinotResultSet.fromJson("{\"resultTable\":{"
         + "\"dataSchema\":{\"columnNames\":[\"booleans\",\"ints\",\"longs\",\"floats\",\"doubles\","
-        + "\"decimals\",\"timestamps\",\"strings\",\"bytes\"],"
+        + "\"decimals\",\"timestamps\",\"strings\",\"bytes\",\"uuids\"],"
         + "\"columnDataTypes\":[\"BOOLEAN_ARRAY\",\"INT_ARRAY\",\"LONG_ARRAY\",\"FLOAT_ARRAY\","
-        + "\"DOUBLE_ARRAY\",\"BIG_DECIMAL_ARRAY\",\"TIMESTAMP_ARRAY\",\"STRING_ARRAY\",\"BYTES_ARRAY\"]},"
+        + "\"DOUBLE_ARRAY\",\"BIG_DECIMAL_ARRAY\",\"TIMESTAMP_ARRAY\",\"STRING_ARRAY\",\"BYTES_ARRAY\","
+        + "\"UUID_ARRAY\"]},"
         + "\"rows\":[[[true,false],[1,null,2],[2147483648,3],[1.25,2.5],[1.5,2.75],"
         + "[\"1.20\",\"3.4\"],[\"2020-01-01 12:00:00\",\"2021-02-03 04:05:06\"],"
-        + "[\"first\",\"second\"],[\"00ff\",\"1020\"]]]}}");
+        + "[\"first\",\"second\"],[\"00ff\",\"1020\"],"
+        + "[\"00000000-0000-0000-0000-000000000001\",\"00000000-0000-0000-0000-000000000002\"]]]}}");
 
     Assert.assertTrue(resultSet.next());
     Assert.assertEquals(resultSet.getObject(1), List.of(true, false));
@@ -89,6 +92,9 @@ public class PinotResultSetTest {
     List<?> bytes = (List<?>) resultSet.getObject(9);
     Assert.assertEquals(bytes.get(0), new byte[]{0, (byte) 0xff});
     Assert.assertEquals(bytes.get(1), new byte[]{0x10, 0x20});
+    Assert.assertEquals(resultSet.getObject(10), List.of(
+        UUID.fromString("00000000-0000-0000-0000-000000000001"),
+        UUID.fromString("00000000-0000-0000-0000-000000000002")));
 
     ResultSetMetaData metadata = resultSet.getMetaData();
     for (int columnIndex = 1; columnIndex <= metadata.getColumnCount(); columnIndex++) {
