@@ -45,7 +45,6 @@ public class DistinctCountOffHeapAggregationFunction
     extends NullableSingleInputAggregationFunction<BaseOffHeapSet, Integer> {
   // Use empty OffHeap32BitSet as a placeholder for empty result
   // NOTE: It is okay to close it (multiple times) since we are never adding values into it
-  private static final OffHeap32BitSet EMPTY_PLACEHOLDER = new OffHeap32BitSet(0);
 
   private final int _initialCapacity;
   private final int _hashBits;
@@ -282,11 +281,12 @@ public class DistinctCountOffHeapAggregationFunction
     throw new UnsupportedOperationException();
   }
 
+  @Nullable
   @Override
   public BaseOffHeapSet extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     Object result = aggregationResultHolder.getResult();
     if (result == null) {
-      return EMPTY_PLACEHOLDER;
+      return null;
     }
     if (result instanceof DictIdsWrapper) {
       return extractAggregationResult((DictIdsWrapper) result);

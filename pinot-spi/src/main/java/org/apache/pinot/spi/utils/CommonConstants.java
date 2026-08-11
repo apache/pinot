@@ -2254,7 +2254,36 @@ public class CommonConstants {
       public static final String HOSTNAME = "$hostName";
       public static final String SEGMENTNAME = "$segmentName";
       public static final String PARTITIONID = "$partitionId";
-      public static final Set<String> BUILT_IN_VIRTUAL_COLUMNS = Set.of(DOCID, HOSTNAME, SEGMENTNAME, PARTITIONID);
+
+      // Segment metadata virtual columns. Each of them is a constant single-value column within a segment, exposing a
+      // piece of the segment metadata to queries. When the underlying metadata is not available (e.g. on a CONSUMING
+      // segment, which has no time range and no CRC yet), the column reads as NULL.
+      //
+      // The three time columns are TIMESTAMP rather than LONG, so the unit is carried by the type instead of by the
+      // column name, and query results render them as readable timestamps.
+
+      /// Segment creation time (TIMESTAMP). This is the index creation time recorded in the segment's creation
+      /// metadata; for a CONSUMING segment it is the time the consuming segment was created.
+      public static final String CREATIONTIME = "$creationTime";
+      /// Start of the segment time range (TIMESTAMP), normalized from the time column's own unit.
+      /// NULL for segments without a time range, such as CONSUMING segments and tables without a time column.
+      public static final String STARTTIME = "$startTime";
+      /// End of the segment time range (TIMESTAMP), normalized from the time column's own unit.
+      /// NULL for segments without a time range, such as CONSUMING segments and tables without a time column.
+      public static final String ENDTIME = "$endTime";
+      /// Number of documents in the segment (INT). On a CONSUMING segment this is the number of documents indexed so
+      /// far. NOTE: This counts all the documents physically stored in the segment, so for an upsert table it also
+      /// includes the documents that have been replaced and are no longer returned by queries.
+      public static final String TOTALDOCS = "$totalDocs";
+      /// Segment CRC (LONG). NULL on CONSUMING segments, which have no CRC until they are committed.
+      /// NOTE: Do not confuse this constant with the enclosing [Segment#CRC], which is the `segment.crc` metadata key.
+      public static final String CRC = "$crc";
+
+      /// NOTE: Kept in sync with `BuiltInVirtualColumnDefinitions#DEFINITIONS`, which additionally carries the data
+      /// type and single-value/multi-value shape of each column. `BuiltInVirtualColumnDefinitionsTest` asserts the two
+      /// agree.
+      public static final Set<String> BUILT_IN_VIRTUAL_COLUMNS =
+          Set.of(DOCID, HOSTNAME, SEGMENTNAME, PARTITIONID, CREATIONTIME, STARTTIME, ENDTIME, TOTALDOCS, CRC);
     }
   }
 
