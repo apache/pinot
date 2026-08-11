@@ -26,6 +26,7 @@ import java.util.Set;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -48,6 +49,7 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
   private static final String INT_COL = "int_col";
   private static final String STRING_COL = "string_col";
   private static final String JSON_COL = "json_col";
+  private static final String METRIC_COL = "metric_col";
   private static final StreamMessageMetadata METADATA = mock(StreamMessageMetadata.class);
 
   private MutableSegmentImpl _mutableSegment;
@@ -174,5 +176,110 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
 
     verify(_serverMetrics, atLeastOnce()).addMeteredTableValue(eq(TABLE_NAME + "_REALTIME"),
         eq(ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED), eq(1L));
+  }
+
+  @Test
+  public void testDictionaryFailureIndexesDefaultValue()
+      throws IOException {
+    // A String in an INT column makes MutableDictionary.index() throw. The catch must index the field default instead
+    // of leaving the Integer.MIN_VALUE sentinel, so the dict id matches the value that is actually stored and the
+    // column min/max stay in sync with the dictionary (#16316).
+    GenericRow badRow = new GenericRow();
+    badRow.putValue(INT_COL, "not-an-int");
+    badRow.putValue(STRING_COL, "a");
+    badRow.putValue(JSON_COL, "{\"valid\": \"json\"}");
+    _mutableSegment.index(badRow, METADATA);
+
+    assertEquals(_mutableSegment.getNumDocsIndexed(), 1);
+    GenericRow result = _mutableSegment.getRecord(0, new GenericRow());
+    assertEquals(result.getValue(INT_COL), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
+    assertTrue(_mutableSegment.getDataSource(INT_COL).getNullValueVector().isNull(0));
+    // min/max are only refreshed from the dictionary after a successful index, so the sentinel path left them unset.
+    DataSourceMetadata metadata = _mutableSegment.getDataSource(INT_COL).getDataSourceMetadata();
+    assertEquals(metadata.getMinValue(), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
+    assertEquals(metadata.getMaxValue(), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
+    verify(_serverMetrics, times(1)).addMeteredTableValue(matches("DICTIONARY-indexingError$"),
+        eq(ServerMeter.INDEXING_FAILURES), eq(1L));
+    verify(_serverMetrics, times(1)).addMeteredTableValue(eq(TABLE_NAME + "_REALTIME"),
+        eq(ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED), eq(1L));
+  }
+
+  @Test
+  public void testDictionaryFailureKeepsAggregationKeyConsistent()
+      throws IOException {
+    // Metrics aggregation keys each row on the dimension dict ids (getOrCreateDocId). Integer.MIN_VALUE is not a real
+    // dict id, so a failed row was keyed on something that could never match the default value stored for it, and a
+    // later row legitimately carrying that default landed on a second docId with identical dimension content. Failed
+    // rows deliberately share the default-value key instead (#16316).
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(INT_COL, FieldSpec.DataType.INT)
+        .addMetric(METRIC_COL, FieldSpec.DataType.LONG)
+        .setSchemaName(TABLE_NAME)
+        .build();
+    MutableSegmentImpl segment =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(METRIC_COL), Set.of(), Set.of(INT_COL),
+            true);
+    try {
+      segment.index(badDimensionRow("not-an-int"), METADATA);
+      segment.index(badDimensionRow("also-not-an-int"), METADATA);
+      // Two failed rows carrying different values now share the default-value key by design.
+      assertEquals(segment.getNumDocsIndexed(), 1);
+
+      GenericRow defaultRow = new GenericRow();
+      defaultRow.putValue(INT_COL, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
+      defaultRow.putValue(METRIC_COL, 4L);
+      segment.index(defaultRow, METADATA);
+      // The failed rows are keyed on what is stored for them, so the legitimate default row rolls up into the same
+      // docId instead of creating a duplicate group.
+      assertEquals(segment.getNumDocsIndexed(), 1);
+
+      GenericRow result = segment.getRecord(0, new GenericRow());
+      assertEquals(result.getValue(INT_COL), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
+      assertEquals(result.getValue(METRIC_COL), 7L);
+    } finally {
+      segment.destroy();
+    }
+  }
+
+  private static GenericRow badDimensionRow(String badValue) {
+    GenericRow row = new GenericRow();
+    row.putValue(INT_COL, badValue);
+    row.putValue(METRIC_COL, 1L);
+    return row;
+  }
+
+  @Test
+  public void testNullValueSubstitutionMetersIncompleteRowOnce()
+      throws IOException {
+    // STRING_COL has no dictionary here, so a null value first shows up in addPhysicalColumn. The substituted default
+    // must mark the row incomplete exactly once even though the JSON index fails on the same row (#16316).
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(INT_COL, FieldSpec.DataType.INT)
+        .addSingleValueDimension(STRING_COL, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(JSON_COL, FieldSpec.DataType.JSON)
+        .setSchemaName(TABLE_NAME)
+        .build();
+    ServerMetrics serverMetrics = mock(ServerMetrics.class);
+    MutableSegmentImpl segment =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(STRING_COL), Set.of(), Set.of(INT_COL),
+            Map.of(JSON_COL, new JsonIndexConfig()), serverMetrics);
+    try {
+      GenericRow row = new GenericRow();
+      row.putValue(INT_COL, 1);
+      row.putValue(STRING_COL, null);
+      row.addNullValueField(STRING_COL);
+      row.putValue(JSON_COL, "{\"truncatedJson...");
+      segment.index(row, METADATA);
+
+      assertEquals(segment.getNumDocsIndexed(), 1);
+      GenericRow result = segment.getRecord(0, new GenericRow());
+      assertEquals(result.getValue(STRING_COL), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
+      assertTrue(segment.getDataSource(STRING_COL).getNullValueVector().isNull(0));
+      verify(serverMetrics, times(1)).addMeteredTableValue(matches("NULL_VALUE-indexingError$"),
+          eq(ServerMeter.INDEXING_FAILURES), eq(1L));
+      // Exactly once for the row, even though the null substitution and the JSON index failure both hit it.
+      verify(serverMetrics, times(1)).addMeteredTableValue(eq(TABLE_NAME + "_REALTIME"),
+          eq(ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED), eq(1L));
+    } finally {
+      segment.destroy();
+    }
   }
 }

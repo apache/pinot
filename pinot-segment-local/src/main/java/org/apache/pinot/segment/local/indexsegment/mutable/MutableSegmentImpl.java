@@ -874,8 +874,30 @@ public class MutableSegmentImpl implements MutableSegment {
         // defaults for this column if dict ids are unset (Integer.MIN_VALUE / null).
         hadError = true;
         recordIndexingError("DICTIONARY", e);
+        // Error sentinels, kept only if even the default cannot be indexed below. For MV columns the sentinel is a
+        // null array, which is distinct from an empty array (a row that legitimately carries no values).
         indexContainer._dictId = Integer.MIN_VALUE;
         indexContainer._dictIds = null;
+        try {
+          // Index the field default instead of leaving the sentinel: with metrics aggregation the rollup key is built
+          // straight from the dict ids (see getOrCreateDocId), and Integer.MIN_VALUE is not a real dict id, so the
+          // sentinel key never matches the default value that addNewRow actually stores for this column. Two failed
+          // rows now deliberately share the default-value key, which is better than colliding on a raw sentinel
+          // shared with any other failing column combination.
+          Object defaultValue = getDefaultNullValueForIndexing(indexContainer._fieldSpec);
+          if (indexContainer._fieldSpec.isSingleValueField()) {
+            indexContainer._dictId = dictionary.index(defaultValue);
+          } else {
+            indexContainer._dictIds = dictionary.index((Object[]) defaultValue);
+          }
+          // Keep the row consistent with the dict id: addNewRow writes this default to the forward and secondary
+          // indexes and marks the value null for null-aware queries.
+          row.putDefaultNullValue(column, defaultValue);
+          indexContainer._minValue = dictionary.getMinVal();
+          indexContainer._maxValue = dictionary.getMaxVal();
+        } catch (Exception fallbackError) {
+          _logger.error("Failed to index default null value into dictionary for column: {}", column, fallbackError);
+        }
       }
       updateIndexCapacityThresholdBreached(dictionary, column);
     }
@@ -974,17 +996,21 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  /// Returns {@code true} when the physical column was written without error.
+  /// Returns {@code true} when the physical column was written from the row value without error and without falling
+  /// back to the field default.
   private boolean addPhysicalColumn(int docId, GenericRow row, String column, IndexContainer indexContainer) {
     FieldSpec fieldSpec = indexContainer._fieldSpec;
     DataType dataType = fieldSpec.getDataType();
     boolean isNull = row.isNullValue(column);
     Object value = row.getValue(column);
+    // Folded into every return path so addNewRow meters the row incomplete once, even when several columns fall back.
+    boolean defaultSubstituted = false;
     if (value == null) {
       // Should not happen after NullValueTransformer, but complete the row with defaults rather than leaving a hole.
       recordIndexingError("NULL_VALUE");
       value = getDefaultNullValueForIndexing(fieldSpec);
       isNull = true;
+      defaultSubstituted = true;
     }
     if (indexContainer._nullValueVector != null && isNull) {
       indexContainer._nullValueVector.setNull(docId);
@@ -1005,7 +1031,7 @@ public class MutableSegmentImpl implements MutableSegment {
           }
         }
         indexContainer._valuesInfo.updateSVNumValues();
-        return true;
+        return !defaultSubstituted;
       }
 
       int dictId = indexContainer._dictId;
@@ -1095,7 +1121,7 @@ public class MutableSegmentImpl implements MutableSegment {
           _multiColumnValues.set(pos, value);
         }
       }
-      return !hadError;
+      return !hadError && !defaultSubstituted;
     } else {
       // Multi-value column
       Object[] values = value instanceof Object[] ? (Object[]) value
@@ -1165,7 +1191,7 @@ public class MutableSegmentImpl implements MutableSegment {
           _multiColumnValues.set(pos, values);
         }
       }
-      return !hadError;
+      return !hadError && !defaultSubstituted;
     }
   }
 
