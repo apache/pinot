@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function.array;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -112,11 +113,13 @@ public class SumArrayDoubleAggregationFunction
     }
   }
 
+  @Nullable
   @Override
   public DoubleArrayList extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public DoubleArrayList extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
@@ -160,8 +163,9 @@ public class SumArrayDoubleAggregationFunction
     return DataSchema.ColumnDataType.DOUBLE_ARRAY;
   }
 
+  @Nullable
   @Override
-  public DoubleArrayList extractFinalResult(DoubleArrayList result) {
+  public DoubleArrayList extractFinalResult(@Nullable DoubleArrayList result) {
     return result;
   }
 }

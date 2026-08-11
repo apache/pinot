@@ -340,15 +340,8 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     }
   }
 
-  @Nullable
   @Override
-  public UltraLogLog merge(@Nullable UltraLogLog intermediateResult1, @Nullable UltraLogLog intermediateResult2) {
-    if (intermediateResult1 == null) {
-      return intermediateResult2;
-    }
-    if (intermediateResult2 == null) {
-      return intermediateResult1;
-    }
+  public UltraLogLog merge(UltraLogLog intermediateResult1, UltraLogLog intermediateResult2) {
     // UltraLogLog object doesn't support merging a smaller p object into a larger p object.
     if (intermediateResult1.getP() > intermediateResult2.getP()) {
       return intermediateResult2.add(intermediateResult1);
@@ -377,7 +370,6 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     return ColumnDataType.LONG;
   }
 
-  @Nullable
   @Override
   public Comparable extractFinalResult(@Nullable UltraLogLog intermediateResult) {
     return intermediateResult == null ? 0L : Math.round(intermediateResult.getDistinctCountEstimate());
