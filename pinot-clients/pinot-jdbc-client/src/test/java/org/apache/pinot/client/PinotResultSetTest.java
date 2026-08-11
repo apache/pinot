@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -118,6 +119,23 @@ public class PinotResultSetTest {
     ResultSetMetaData metadata = resultSet.getMetaData();
     Assert.assertEquals(metadata.getColumnType(1), Types.OTHER);
     Assert.assertEquals(metadata.getColumnClassName(1), UUID.class.getTypeName());
+  }
+
+  @Test
+  public void testGetMapWithMixedNumericTypes()
+      throws Exception {
+    PinotResultSet resultSet = PinotResultSet.fromJson("{\"resultTable\":{"
+        + "\"dataSchema\":{\"columnNames\":[\"map\"],\"columnDataTypes\":[\"MAP\"]},"
+        + "\"rows\":[[{\"small\":1,\"large\":2147483648,\"float\":1.25,\"decimal\":2.5,"
+        + "\"nested\":{\"values\":[2,3.5]}}]]}}");
+
+    Assert.assertTrue(resultSet.next());
+    Assert.assertEquals(resultSet.getObject(1), Map.of(
+        "small", 1,
+        "large", 2147483648L,
+        "float", 1.25d,
+        "decimal", 2.5d,
+        "nested", Map.of("values", List.of(2, 3.5d))));
   }
 
   @Test
