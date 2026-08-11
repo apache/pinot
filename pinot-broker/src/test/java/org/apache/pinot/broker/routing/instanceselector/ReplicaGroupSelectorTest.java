@@ -70,10 +70,8 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/**
- * Tests for {@link ReplicaGroupInstanceSelector} and {@link StrictReplicaGroupInstanceSelector},
- * including adaptive server selection for strict replica groups.
- */
+/// Tests for [ReplicaGroupInstanceSelector] and [StrictReplicaGroupInstanceSelector], including adaptive server
+/// selection for strict replica groups.
 @SuppressWarnings("unchecked")
 public class ReplicaGroupSelectorTest {
   private AutoCloseable _mocks;
