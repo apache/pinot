@@ -18,28 +18,12 @@
  */
 package org.apache.pinot.plugin.stream.kafka30;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
-import org.apache.kafka.clients.admin.AdminClientConfig;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.common.config.AbstractConfig;
-import org.apache.kafka.common.config.SslConfigs;
-import org.apache.kafka.common.config.provider.FileConfigProvider;
-import org.apache.kafka.common.serialization.BytesDeserializer;
-import org.apache.kafka.common.utils.Bytes;
-import org.apache.pinot.plugin.stream.kafka.KafkaAdminClientManager;
-import org.apache.pinot.spi.config.ConfigUtils;
-import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.plugin.stream.kafka.KafkaConfigProviderTestUtils;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -64,58 +48,7 @@ public class KafkaPartitionLevelConnectionHandlerTest {
   @Test
   public void testConfigProviderReferencesReachKafkaClients()
       throws Exception {
-    Path providerFile = Files.createTempFile("kafka-config-provider", ".properties");
-    try {
-      Files.writeString(providerFile, "keystore.password=test-password\n");
-
-      String passwordReference = "${file:" + providerFile + ":keystore.password}";
-      Map<String, String> streamConfigs = new HashMap<>();
-      streamConfigs.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-      streamConfigs.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, BytesDeserializer.class.getName());
-      streamConfigs.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, BytesDeserializer.class.getName());
-      streamConfigs.put(AbstractConfig.CONFIG_PROVIDERS_CONFIG, "file");
-      streamConfigs.put("config.providers.file.class", FileConfigProvider.class.getName());
-      streamConfigs.put("config.providers.file.param.allowed.paths", providerFile.getParent().toString());
-      streamConfigs.put(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG, passwordReference);
-      streamConfigs.put("streamType", "kafka");
-
-      IndexingConfig indexingConfig = new IndexingConfig();
-      indexingConfig.setStreamConfigs(streamConfigs);
-      IndexingConfig resolvedIndexingConfig =
-          ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(Map.of(), indexingConfig);
-      Properties properties = new Properties();
-      properties.putAll(resolvedIndexingConfig.getStreamConfigs());
-      assertEquals(properties.getProperty(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG), passwordReference);
-
-      Properties consumerProperties =
-          KafkaPartitionLevelConnectionHandler.filterKafkaProperties(properties, ConsumerConfig.configNames());
-      assertEquals(consumerProperties.getProperty(AbstractConfig.CONFIG_PROVIDERS_CONFIG), "file");
-      assertEquals(consumerProperties.getProperty("config.providers.file.class"), FileConfigProvider.class.getName());
-      assertEquals(consumerProperties.getProperty("config.providers.file.param.allowed.paths"),
-          providerFile.getParent().toString());
-      assertFalse(consumerProperties.containsKey("streamType"));
-      assertEquals(new ConsumerConfig(consumerProperties).getPassword(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG).value(),
-          "test-password");
-      try (KafkaConsumer<Bytes, Bytes> consumer = new KafkaConsumer<>(consumerProperties)) {
-        assertNotNull(consumer);
-      }
-
-      Properties adminProperties =
-          KafkaPartitionLevelConnectionHandler.filterKafkaProperties(properties, AdminClientConfig.configNames());
-      assertEquals(adminProperties.getProperty(AbstractConfig.CONFIG_PROVIDERS_CONFIG), "file");
-      assertEquals(adminProperties.getProperty("config.providers.file.class"), FileConfigProvider.class.getName());
-      assertEquals(adminProperties.getProperty("config.providers.file.param.allowed.paths"),
-          providerFile.getParent().toString());
-      assertFalse(adminProperties.containsKey("streamType"));
-      assertEquals(new AdminClientConfig(adminProperties).getPassword(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG).value(),
-          "test-password");
-      try (KafkaAdminClientManager.AdminClientReference adminClientReference =
-          KafkaAdminClientManager.getInstance().getOrCreateAdminClient(adminProperties)) {
-        assertNotNull(adminClientReference.getAdminClient());
-      }
-    } finally {
-      Files.deleteIfExists(providerFile);
-    }
+    KafkaConfigProviderTestUtils.assertConfigProviderReferencesReachKafkaClients();
   }
 
   @Test

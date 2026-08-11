@@ -35,10 +35,10 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.serialization.BytesDeserializer;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.plugin.stream.kafka.KafkaAdminClientManager;
+import org.apache.pinot.plugin.stream.kafka.KafkaConfigUtils;
 import org.apache.pinot.plugin.stream.kafka.KafkaPartitionLevelStreamConfig;
 import org.apache.pinot.plugin.stream.kafka.KafkaSSLUtils;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -99,30 +99,13 @@ public abstract class KafkaPartitionLevelConnectionHandler {
     return consumerProp;
   }
 
-  /// Filter properties to include the specified Kafka configurations and the dynamic config-provider namespace.
-  /// This prevents "was supplied but isn't a known config" warnings without dropping config-provider settings.
-  ///
-  /// @param props The properties to filter
-  /// @param validConfigNames The set of valid configuration names for the target Kafka client
-  /// @return A new Properties object containing only the valid configurations
-  @VisibleForTesting
-  static Properties filterKafkaProperties(Properties props, Set<String> validConfigNames) {
-    Properties filteredProps = new Properties();
-    for (String key : props.stringPropertyNames()) {
-      if (validConfigNames.contains(key) || key.equals(AbstractConfig.CONFIG_PROVIDERS_CONFIG)
-          || key.startsWith(AbstractConfig.CONFIG_PROVIDERS_CONFIG + ".")) {
-        filteredProps.put(key, props.get(key));
-      }
-    }
-    return filteredProps;
-  }
-
   private Consumer<Bytes, Bytes> createConsumer(Properties consumerProp, RetryPolicy retryPolicy) {
     AtomicReference<Consumer<Bytes, Bytes>> consumer = new AtomicReference<>();
     try {
       retryPolicy.attempt(() -> {
         try {
-          consumer.set(new KafkaConsumer<>(filterKafkaProperties(consumerProp, CONSUMER_CONFIG_NAMES)));
+          consumer.set(new KafkaConsumer<>(KafkaConfigUtils.filterAndValidateKafkaProperties(consumerProp,
+              CONSUMER_CONFIG_NAMES)));
           return true;
         } catch (Exception e) {
           LOGGER.warn("Caught exception while creating Kafka consumer, retrying.", e);
@@ -138,11 +121,13 @@ public abstract class KafkaPartitionLevelConnectionHandler {
 
   @VisibleForTesting
   protected Consumer<Bytes, Bytes> createConsumer(Properties consumerProp) {
-    return retry(() -> new KafkaConsumer<>(filterKafkaProperties(consumerProp, CONSUMER_CONFIG_NAMES)), 5);
+    return retry(() -> new KafkaConsumer<>(KafkaConfigUtils.filterAndValidateKafkaProperties(consumerProp,
+        CONSUMER_CONFIG_NAMES)), 5);
   }
 
   protected AdminClient createAdminClient() {
-    return retry(() -> AdminClient.create(filterKafkaProperties(_consumerProp, ADMIN_CLIENT_CONFIG_NAMES)), 5);
+    return retry(() -> AdminClient.create(KafkaConfigUtils.filterAndValidateKafkaProperties(_consumerProp,
+        ADMIN_CLIENT_CONFIG_NAMES)), 5);
   }
 
   /// Gets or creates a reusable admin client instance. The admin client is lazily initialized
@@ -170,7 +155,8 @@ public abstract class KafkaPartitionLevelConnectionHandler {
         ref = _sharedAdminClientRef;
         if (ref == null) {
           ref = KafkaAdminClientManager.getInstance()
-              .getOrCreateAdminClient(filterKafkaProperties(_consumerProp, ADMIN_CLIENT_CONFIG_NAMES));
+              .getOrCreateAdminClient(KafkaConfigUtils.filterAndValidateKafkaProperties(_consumerProp,
+                  ADMIN_CLIENT_CONFIG_NAMES));
           _sharedAdminClientRef = ref;
         }
       }
