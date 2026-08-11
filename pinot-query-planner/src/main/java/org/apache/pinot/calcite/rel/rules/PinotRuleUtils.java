@@ -38,14 +38,18 @@ import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexVisitorImpl;
 import org.apache.calcite.rex.RexWindowBound;
 import org.apache.calcite.rex.RexWindowBounds;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
+import org.apache.calcite.util.Util;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
+import org.apache.pinot.common.function.sql.PinotSqlFunction;
 
 
 public class PinotRuleUtils {
@@ -130,6 +134,39 @@ public class PinotRuleUtils {
   public static String extractFunctionName(RexCall function) {
     SqlKind funcSqlKind = function.getOperator().getKind();
     return funcSqlKind == SqlKind.OTHER_FUNCTION ? function.getOperator().getName() : funcSqlKind.name();
+  }
+
+  /// Returns whether `node` evaluates to the same result no matter where in the plan it is placed, and can therefore
+  /// be relocated across a stage boundary (e.g. pushed below a join).
+  ///
+  /// Pinot tracks two independent axes of variability, and an expression must be clear of both:
+  ///
+  /// - [SqlOperator#isDeterministic()] -- `false` for `rand()`, `UUID_V4`, `UUID_V7` and Calcite's own `RAND` /
+  ///   `RAND_INTEGER`. This is what `RexUtil#isDeterministic` checks.
+  /// - [PinotSqlFunction#isVolatile()] -- `true` for `FunctionVolatility.VOLATILE` functions such as `now()`, `ago()`
+  ///   and `stageId()`. These stay `isDeterministic() == true` so that [PinotEvaluateLiteralRule] can still fold them
+  ///   once at plan time, so `RexUtil#isDeterministic` alone does not catch them.
+  ///
+  /// Relocating an expression that fails this check changes how many times, and in what context, it is evaluated --
+  /// which changes query results.
+  public static boolean isStageInvariant(RexNode node) {
+    try {
+      node.accept(new RexVisitorImpl<Void>(true) {
+        @Override
+        public Void visitCall(RexCall call) {
+          SqlOperator operator = call.getOperator();
+          if (!operator.isDeterministic()
+              || (operator instanceof PinotSqlFunction && ((PinotSqlFunction) operator).isVolatile())) {
+            throw Util.FoundOne.NULL;
+          }
+          return super.visitCall(call);
+        }
+      });
+      return true;
+    } catch (Util.FoundOne e) {
+      Util.swallow(e, null);
+      return false;
+    }
   }
 
   public static class WindowUtils {

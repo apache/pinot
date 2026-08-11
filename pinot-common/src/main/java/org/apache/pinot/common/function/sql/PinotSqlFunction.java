@@ -28,12 +28,20 @@ import org.apache.calcite.sql.type.SqlReturnTypeInference;
 /// Pinot custom SqlFunction to be registered into SqlOperatorTable.
 public class PinotSqlFunction extends SqlFunction {
   private final boolean _deterministic;
+  private final boolean _volatile;
 
   public PinotSqlFunction(String name, SqlReturnTypeInference returnTypeInference,
-      SqlOperandTypeChecker operandTypeChecker, boolean deterministic) {
+      SqlOperandTypeChecker operandTypeChecker, boolean deterministic, boolean isVolatile) {
     super(name.toUpperCase(), SqlKind.OTHER_FUNCTION, returnTypeInference, null, operandTypeChecker,
         SqlFunctionCategory.USER_DEFINED_FUNCTION);
     _deterministic = deterministic;
+    _volatile = isVolatile;
+  }
+
+  /// A non-deterministic function is always volatile, mirroring `FunctionInfo#fromMethod`.
+  public PinotSqlFunction(String name, SqlReturnTypeInference returnTypeInference,
+      SqlOperandTypeChecker operandTypeChecker, boolean deterministic) {
+    this(name, returnTypeInference, operandTypeChecker, deterministic, !deterministic);
   }
 
   public PinotSqlFunction(String name, SqlReturnTypeInference returnTypeInference,
@@ -44,5 +52,16 @@ public class PinotSqlFunction extends SqlFunction {
   @Override
   public boolean isDeterministic() {
     return _deterministic;
+  }
+
+  /// Whether the function is `FunctionVolatility.VOLATILE`, i.e. its result can change on every invocation or it has
+  /// side effects.
+  ///
+  /// This is independent of [#isDeterministic()], which is Pinot's compile-time-evaluation hint: `now()` is
+  /// deterministic (so it can be constant-folded once at plan time) but volatile (so it must not be re-evaluated at a
+  /// different point in the plan). `FunctionVolatility.STABLE` is not reported here, since a stable function is
+  /// constant within a single query and is therefore safe to relocate.
+  public boolean isVolatile() {
+    return _volatile;
   }
 }

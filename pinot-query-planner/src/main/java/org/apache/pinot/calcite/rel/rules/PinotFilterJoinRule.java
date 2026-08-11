@@ -49,8 +49,10 @@ public abstract class PinotFilterJoinRule<C extends FilterJoinRule.Config> exten
 
   // Following code are copy-pasted from Calcite, and modified to not push down filter into right side of lookup join.
   // SYNCED WITH Calcite 1.42.0 FilterJoinRule#perform -- re-diff this method body against upstream on every
-  // calcite.version bump; the only intended deviation is the canPushRight lookup-join restriction below. Known
-  // outstanding drift: upstream's RexUtil.containsCorrelation partitioning of aboveFilters and the variablesSet
+  // calcite.version bump. The intended deviations are the canPushRight lookup-join restriction and the volatility half
+  // of the isStageInvariant guard, both marked PINOT MODIFICATION below.
+  //
+  // Known outstanding drift: upstream's RexUtil.containsCorrelation partitioning of aboveFilters and the variablesSet
   // argument on the final RelBuilder#filter (CALCITE-7319) are not ported. Pinot decorrelates in
   // QueryEnvironment#toRelation before these rules run, and the LogicalCorrelate shapes that do survive it
   // (UNNEST / CROSS JOIN UNNEST) have an Uncollect right input, so a Filter carrying $cor never sits directly above a
@@ -58,18 +60,20 @@ public abstract class PinotFilterJoinRule<C extends FilterJoinRule.Config> exten
   //@formatter:off
   @Override
   protected void perform(RelOptRuleCall call, @Nullable Filter filter, Join join) {
-    // Upstream parity (CALCITE-7373): a non-deterministic conjunct such as rand() < 0.1 has an empty input bitmap, so
+    // From CALCITE-7373: a non-deterministic conjunct such as rand() < 0.1 has an empty input bitmap, so
     // classifyFilters would treat it as pushable and relocate it below the join, evaluating it per input row instead
     // of per join-output row. Like upstream, this bails on the whole condition rather than per conjunct, so a
     // deterministic conjunct sharing the WHERE clause also stays above the join.
-    // NOTE: this only covers @ScalarFunction(isDeterministic = false). Pinot's separate FunctionVolatility.VOLATILE
-    // axis (now(), ago(), stageId(), ...) is not consulted here, so such filters are still pushed below the join.
-    // Skip non-deterministic filter condition
-    if (filter != null && !RexUtil.isDeterministic(filter.getCondition())) {
+    // PINOT MODIFICATION to also skip volatile conditions. Upstream uses RexUtil.isDeterministic, which only covers
+    // @ScalarFunction(isDeterministic = false). Pinot's separate FunctionVolatility.VOLATILE axis (now(), ago(),
+    // stageId(), ...) keeps isDeterministic() == true so PinotEvaluateLiteralRule can still fold it once at plan time,
+    // so it needs the wider PinotRuleUtils.isStageInvariant check here.
+    // Skip non-deterministic or volatile filter condition
+    if (filter != null && !PinotRuleUtils.isStageInvariant(filter.getCondition())) {
       return;
     }
-    // Skip non-deterministic join condition
-    if (!RexUtil.isDeterministic(join.getCondition())) {
+    // Skip non-deterministic or volatile join condition
+    if (!PinotRuleUtils.isStageInvariant(join.getCondition())) {
       return;
     }
 

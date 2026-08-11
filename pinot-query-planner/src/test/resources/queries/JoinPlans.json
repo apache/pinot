@@ -803,6 +803,23 @@
         ]
       },
       {
+        "description": "Volatile WHERE filter is not pushed below the join, nor duplicated onto both inputs",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE stageId(a.col1) >= 0",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalFilter(condition=[>=(STAGEID($0), 0)])",
+          "\n    LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0], col2=[$1])",
+          "\n          PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
         "description": "Deterministic WHERE filter is still pushed below the join",
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col3 > 5",
         "output": [

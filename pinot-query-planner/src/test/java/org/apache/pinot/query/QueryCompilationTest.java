@@ -434,6 +434,34 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
+  /// [org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule] refuses to push a volatile filter below a join. `now()`
+  /// is volatile, but [org.apache.pinot.calcite.rel.rules.PinotEvaluateLiteralRule] folds it to a literal first, so
+  /// the common time-filter-over-a-join pattern must still reach the leaf scan.
+  ///
+  /// Asserted here rather than in JoinPlans.json because the folded epoch literal differs on every run.
+  @Test
+  public void testVolatileNowFilterIsStillPushedBelowJoin() {
+    String query =
+        "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.ts > now() - 86400000";
+
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    // now() folds to the current epoch millis, so mask the literal before comparing.
+    String normalized = explain.replaceAll("(?<=\\$7, )\\d+", "<EPOCH>");
+    //@formatter:off
+    assertEquals(normalized,
+        "Execution Plan\n"
+        + "LogicalProject(col1=[$0], col2=[$2])\n"
+        + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
+        + "    PinotLogicalExchange(distribution=[hash[0]])\n"
+        + "      LogicalProject(col1=[$0])\n"
+        + "        LogicalFilter(condition=[>($7, <EPOCH>)])\n"
+        + "          PinotLogicalTableScan(table=[[default, a]])\n"
+        + "    PinotLogicalExchange(distribution=[hash[0]])\n"
+        + "      LogicalProject(col1=[$0], col2=[$1])\n"
+        + "        PinotLogicalTableScan(table=[[default, b]])\n");
+    //@formatter:on
+  }
+
   @Test
   public void testAggregateCaseToFilter() {
     // Tests that queries like "SELECT SUM(CASE WHEN col1 = 'a' THEN 1 ELSE 0 END) FROM a" are rewritten to
