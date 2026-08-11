@@ -830,7 +830,9 @@ public class PinotSegmentUploadDownloadRestletResource {
   // request if a multipart object is not sent. This endpoint does not move the segment to its final location;
   // it keeps it at the downloadURI header that is set. We will not support this endpoint going forward.
   public void uploadSegmentAsJson(String segmentJsonStr,
-      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
+      @ApiParam(value = "Name of the table to upload into. Overrides segment.table.name in segment metadata when set "
+          + "(allows promoting a segment built for another table). Falls back to metadata when omitted.")
+      @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
       String tableName,
       @ApiParam(value = "Type of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_TYPE)
       @DefaultValue("OFFLINE") String tableType,
@@ -869,7 +871,9 @@ public class PinotSegmentUploadDownloadRestletResource {
   @TrackedByGauge(gauge = ControllerGauge.SEGMENT_UPLOADS_IN_PROGRESS)
   // For the multipart endpoint, we will always move segment to final location regardless of the segment endpoint.
   public void uploadSegmentAsMultiPart(FormDataMultiPart multiPart,
-      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
+      @ApiParam(value = "Name of the table to upload into. Overrides segment.table.name in segment metadata when set "
+          + "(allows promoting a segment built for another table). Falls back to metadata when omitted.")
+      @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
       String tableName,
       @ApiParam(value = "Type of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_TYPE)
       @DefaultValue("OFFLINE") String tableType,
@@ -971,7 +975,8 @@ public class PinotSegmentUploadDownloadRestletResource {
   // request if a multipart object is not sent. This endpoint is recommended for use. It differs from the first
   // endpoint in how it moves the segment to a Pinot-determined final directory.
   public void uploadSegmentAsJsonV2(String segmentJsonStr,
-      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
+      @ApiParam(value = "Name of the table to upload into. Overrides segment.table.name in segment metadata when set.")
+      @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
       String tableName,
       @ApiParam(value = "Type of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_TYPE)
       @DefaultValue("OFFLINE") String tableType,
@@ -1011,7 +1016,8 @@ public class PinotSegmentUploadDownloadRestletResource {
   @TrackedByGauge(gauge = ControllerGauge.SEGMENT_UPLOADS_IN_PROGRESS)
   // This behavior does not differ from v1 of the same endpoint.
   public void uploadSegmentAsMultiPartV2(FormDataMultiPart multiPart,
-      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
+      @ApiParam(value = "Name of the table to upload into. Overrides segment.table.name in segment metadata when set.")
+      @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
       String tableName,
       @ApiParam(value = "Type of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_TYPE)
       @DefaultValue("OFFLINE") String tableType,
