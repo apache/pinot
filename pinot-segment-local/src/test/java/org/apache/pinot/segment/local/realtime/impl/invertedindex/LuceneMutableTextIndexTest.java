@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -49,7 +50,8 @@ import static org.testng.Assert.assertEquals;
 
 public class LuceneMutableTextIndexTest {
   private static final AtomicInteger SEGMENT_NAME_SUFFIX_COUNTER = new AtomicInteger(0);
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "LuceneMutableIndexTest");
+  private static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectory(), "LuceneMutableIndexTest-" + UUID.randomUUID());
   private static final String TEXT_COLUMN_NAME = "testColumnName";
   private static final String CUSTOM_ANALYZER_FQCN = CustomAnalyzer.class.getName();
   private static final String CUSTOM_QUERY_PARSER_FQCN = CustomQueryParser.class.getName();
@@ -65,14 +67,21 @@ public class LuceneMutableTextIndexTest {
 
   @BeforeMethod
   public void setUpMethod() {
+    // Give each test a fresh refresh queue and worker. Closing and immediately replacing indexes in the
+    // same queue can race the worker's empty-list exit and leave the replacement without a refresher.
+    RealtimeLuceneIndexRefreshManager.getInstance().reset();
     _queryThreadContext = QueryThreadContext.openForSseTest();
   }
 
-  @AfterMethod
+  @AfterMethod(alwaysRun = true)
   public void tearDownMethod() {
-    if (_queryThreadContext != null) {
-      _queryThreadContext.close();
-      _queryThreadContext = null;
+    try {
+      closeCurrentIndex();
+    } finally {
+      if (_queryThreadContext != null) {
+        _queryThreadContext.close();
+        _queryThreadContext = null;
+      }
     }
   }
 
@@ -180,6 +189,7 @@ public class LuceneMutableTextIndexTest {
 
   private void configureIndex(String analyzerClass, String analyzerClassArgs, String analyzerClassArgTypes,
                               String queryParserClass) {
+    closeCurrentIndex();
     TextIndexConfigBuilder builder = new TextIndexConfigBuilder();
     if (null != analyzerClass) {
       builder.withLuceneAnalyzerClass(analyzerClass);
@@ -254,7 +264,18 @@ public class LuceneMutableTextIndexTest {
 
   @AfterClass
   public void tearDown() {
-    _realtimeLuceneTextIndex.close();
+    try {
+      closeCurrentIndex();
+    } finally {
+      FileUtils.deleteQuietly(INDEX_DIR);
+    }
+  }
+
+  private void closeCurrentIndex() {
+    if (_realtimeLuceneTextIndex != null) {
+      _realtimeLuceneTextIndex.close();
+      _realtimeLuceneTextIndex = null;
+    }
   }
 
   @Test
@@ -271,8 +292,8 @@ public class LuceneMutableTextIndexTest {
       index.add(new String[]{"foo bar"});
       index.add(new String[]{"baz qux"});
 
-      // Force a searcher refresh — triggers the refresh listener which records the current doc count
-      index.getSearcherManager().maybeRefresh();
+      // Block until the refresh attempt completes so the listener has recorded the current doc count
+      index.getSearcherManager().maybeRefreshBlocking();
 
       assertEquals(index.getSearchableDocCount(), 3);
     } finally {
@@ -282,6 +303,7 @@ public class LuceneMutableTextIndexTest {
 
   @Test
   public void testQueries() {
+    configureIndex(null, null, null, null);
     TestUtils.waitForCondition(aVoid -> {
       try {
         return _realtimeLuceneTextIndex.getSearcherManager().isSearcherCurrent();
@@ -299,6 +321,7 @@ public class LuceneMutableTextIndexTest {
       expectedExceptionsMessageRegExp = ".*TEXT_MATCH query interrupted while querying the consuming segment.*")
   public void testQueryCancellationIsSuccessful()
       throws InterruptedException, ExecutionException {
+    configureIndex(null, null, null, null);
     // Avoid early finalization by not using Executors.newSingleThreadExecutor (java <= 20, JDK-8145304)
     ExecutorService baseExecutor = Executors.newFixedThreadPool(1);
     // Wrap with contextAwareExecutorService to propagate QueryThreadContext to child threads

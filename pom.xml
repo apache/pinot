@@ -2215,8 +2215,8 @@
             <systemPropertyVariables>
               <zookeeper.forceSync>no</zookeeper.forceSync>
               <!-- Expose the 1-based fork index so tests can offset port bases / temp dirs per
-                   fork when forkCount > 1 (absent/0 for single-fork runs). -->
-              <surefire.forkNumber>${surefire.forkNumber}</surefire.forkNumber>
+                   fork (1 even at forkCount=1, 1..N under parallel forks). -->
+              <surefire.forkNumber>$${surefire.forkNumber}</surefire.forkNumber>
             </systemPropertyVariables>
             <trimStackTrace>false</trimStackTrace>
             <reportFormat>plain</reportFormat>
@@ -2567,11 +2567,20 @@
                forks saturate the runner; a test that passes on retry is reported as flaky, not
                green-washed. -->
           <rerunFailingTestsCount>${unit.test.rerun.count}</rerunFailingTestsCount>
+          <properties>
+            <!-- Surefire is the default report writer; modules can explicitly opt into an isolated
+                 reporter. TestNG's native HTML/XML reporters write shared files and assets, which
+                 race when multiple forks use one module. -->
+            <property>
+              <name>usedefaultlisteners</name>
+              <value>false</value>
+            </property>
+          </properties>
           <systemPropertyVariables>
             <!-- Expose the 1-based fork index (1 even at forkCount=1, 1..N under parallel forks)
                  so tests can offset port bases / temp dirs per fork (see ZkStarter.FORK_PORT_OFFSET,
                  ControllerTest port bases). -->
-            <surefire.forkNumber>${surefire.forkNumber}</surefire.forkNumber>
+            <surefire.forkNumber>$${surefire.forkNumber}</surefire.forkNumber>
           </systemPropertyVariables>
         </configuration>
         <executions>

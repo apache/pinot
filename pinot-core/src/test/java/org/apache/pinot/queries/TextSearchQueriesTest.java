@@ -30,6 +30,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.analysis.Analyzer;
@@ -85,7 +89,8 @@ import static org.testng.Assert.*;
 /// The test table has a SKILLS column and QUERY_LOG column. Text index is created
 /// on each of these columns.
 public class TextSearchQueriesTest extends BaseQueriesTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TextSearchQueriesTest");
+  private static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectory(), "TextSearchQueriesTest-" + UUID.randomUUID());
   protected static final String TABLE_NAME = "MyTable";
   private static final String SEGMENT_NAME = "testSegment";
 
@@ -1591,31 +1596,29 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   public void testMultiThreadedLuceneRealtime()
       throws Exception {
     File indexFile = new File(INDEX_DIR.getPath() + "/realtime-test3.index");
-    Directory indexDirectory = FSDirectory.open(indexFile.toPath());
-    Analyzer analyzer = new CaseAwareStandardAnalyzer();
-    // create and open a writer
-    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(analyzer);
-    indexWriterConfig.setRAMBufferSizeMB(500);
-    IndexWriter indexWriter = new IndexWriter(indexDirectory, indexWriterConfig);
+    try (Directory indexDirectory = FSDirectory.open(indexFile.toPath());
+        Analyzer analyzer = new CaseAwareStandardAnalyzer()) {
+      // create and open a writer
+      IndexWriterConfig indexWriterConfig = new IndexWriterConfig(analyzer);
+      indexWriterConfig.setRAMBufferSizeMB(500);
+      try (IndexWriter indexWriter = new IndexWriter(indexDirectory, indexWriterConfig);
+          SearcherManager searcherManager = new SearcherManager(indexWriter, false, false, null);
+          ControlledRealTimeReopenThread<IndexSearcher> controlledRealTimeReopenThread =
+              new ControlledRealTimeReopenThread<>(indexWriter, searcherManager, 0.01, 0.01)) {
+        controlledRealTimeReopenThread.start();
 
-    // create an NRT index reader
-    SearcherManager searcherManager = new SearcherManager(indexWriter, false, false, null);
-
-    // background thread to refresh NRT reader
-    ControlledRealTimeReopenThread controlledRealTimeReopenThread =
-        new ControlledRealTimeReopenThread(indexWriter, searcherManager, 0.01, 0.01);
-    controlledRealTimeReopenThread.start();
-
-    // start writer and reader
-    Thread writer = new Thread(new RealtimeWriter(indexWriter));
-    Thread realtimeReader = new Thread(new RealtimeReader(searcherManager, analyzer));
-
-    writer.start();
-    realtimeReader.start();
-
-    writer.join();
-    realtimeReader.join();
-    controlledRealTimeReopenThread.join();
+        // Start the writer and reader, and propagate worker failures back to the test thread.
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        try {
+          Future<?> writer = executorService.submit(new RealtimeWriter(indexWriter));
+          Future<?> realtimeReader = executorService.submit(new RealtimeReader(searcherManager, analyzer));
+          writer.get();
+          realtimeReader.get();
+        } finally {
+          executorService.shutdownNow();
+        }
+      }
+    }
   }
 
   private static class RealtimeWriter implements Runnable {
@@ -1662,9 +1665,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
       } finally {
         try {
           _indexWriter.commit();
-          _indexWriter.close();
         } catch (Exception e) {
-          throw new RuntimeException("Failed to commit/close the index writer");
+          throw new RuntimeException("Failed to commit the index writer");
         }
       }
     }
@@ -1689,16 +1691,19 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         // in the index
         while (count < 1000) {
           IndexSearcher indexSearcher = _searcherManager.acquire();
-          int hits = indexSearcher.search(query, Integer.MAX_VALUE).scoreDocs.length;
-          // TODO: see how we can make this more deterministic
-          if (count > 200) {
-            // we should see an increasing number of hits
-            assertTrue(hits > 0);
-            assertTrue(hits >= prevHits);
+          try {
+            int hits = indexSearcher.search(query, Integer.MAX_VALUE).scoreDocs.length;
+            // TODO: see how we can make this more deterministic
+            if (count > 200) {
+              // we should see an increasing number of hits
+              assertTrue(hits > 0);
+              assertTrue(hits >= prevHits);
+            }
+            count++;
+            prevHits = hits;
+          } finally {
+            _searcherManager.release(indexSearcher);
           }
-          count++;
-          prevHits = hits;
-          _searcherManager.release(indexSearcher);
           Thread.sleep(1);
         }
       } catch (Exception e) {

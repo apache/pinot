@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -85,7 +86,8 @@ import static org.testng.Assert.assertNull;
 abstract class BaseStarTreeV2Test<R, A> {
   private static final Random RANDOM = new Random();
 
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "BaseStarTreeV2Test");
+  private static final File TEMP_DIR =
+      new File(FileUtils.getTempDirectory(), "BaseStarTreeV2Test-" + UUID.randomUUID());
   protected static final String TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
 
