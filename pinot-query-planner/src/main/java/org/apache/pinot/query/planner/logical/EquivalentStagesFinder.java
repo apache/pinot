@@ -184,6 +184,9 @@ public class EquivalentStagesFinder {
         return areBaseNodesEquivalent(node1, node2) && Objects.equals(node1.getAggCalls(), that.getAggCalls())
             && Objects.equals(node1.getFilterArgs(), that.getFilterArgs())
             && Objects.equals(node1.getGroupKeys(), that.getGroupKeys())
+            // Group keys only hold the union of the grouping columns, so two different sets of grouping sets over the
+            // same columns are indistinguishable without this check (and produce the same data schema).
+            && Objects.equals(node1.getGroupingSets(), that.getGroupingSets())
             && node1.getAggType() == that.getAggType()
             && node1.isLeafReturnFinalResult() == that.isLeafReturnFinalResult()
             && Objects.equals(node1.getCollations(), that.getCollations())
@@ -245,6 +248,9 @@ public class EquivalentStagesFinder {
             && Objects.equals(node1.getLeftKeys(), that.getLeftKeys())
             && Objects.equals(node1.getRightKeys(), that.getRightKeys())
             && Objects.equals(node1.getNonEquiConditions(), that.getNonEquiConditions())
+            // ASOF joins keep their whole comparison here rather than in the non-equi conditions, so without this
+            // check two ASOF joins differing only on the match condition look equivalent.
+            && Objects.equals(node1.getMatchCondition(), that.getMatchCondition())
             && node1.getJoinStrategy() == that.getJoinStrategy();
       }
 
@@ -318,6 +324,9 @@ public class EquivalentStagesFinder {
             && Objects.equals(node1.getKeys(), that.getKeys())
             && Objects.equals(node1.getCollations(), that.getCollations())
             && node1.getWindowFrameType() == that.getWindowFrameType()
+            // The frame exclusion changes which rows feed the window function, so two windows that only differ on it
+            // compute different values and must not be spooled together.
+            && node1.getExclude() == that.getExclude()
             && Objects.equals(node1.getConstants(), that.getConstants());
       }
 
