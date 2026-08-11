@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
 public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskExecutor.class);
 
-  /** Bounded retries for Check C bitmap fetch to ride out server reload races without re-downloading the segment. */
+  /// Bounded retries for Check C bitmap fetch to ride out server reload races without re-downloading the segment.
   @VisibleForTesting
   static final int DEFAULT_VALID_DOC_IDS_FETCH_MAX_ATTEMPTS = 3;
 
@@ -144,10 +144,8 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     return result;
   }
 
-  /**
-   * Check B: task-generation (ZK) segment CRC must match the downloaded deepstore/on-disk copy, with the same
-   * data-CRC fallback used by server matching ({@link MinionTaskUtils#crcMatches}).
-   */
+  /// Check B: task-generation (ZK) segment CRC must match the downloaded deepstore/on-disk copy, with the same
+  /// data-CRC fallback used by server matching ([MinionTaskUtils#crcMatches]).
   @VisibleForTesting
   void validateDeepStoreCrc(String tableNameWithType, String segmentName, String expectedSegmentCrc,
       String deepstoreSegmentCrc, String deepstoreDataCrc, boolean ignoreCrcMismatch) {
@@ -167,10 +165,8 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     throw new IllegalStateException(message);
   }
 
-  /**
-   * Check C with a short bounded retry so transient server reload races (segment uploaded while a replica is still
-   * rebuilding upsert metadata) do not fail the task on the first attempt. Does not re-download the segment.
-   */
+  /// Check C with a short bounded retry so transient server reload races (segment uploaded while a replica is still
+  /// rebuilding upsert metadata) do not fail the task on the first attempt. Does not re-download the segment.
   @VisibleForTesting
   RoaringBitmap fetchValidDocIdsWithRetry(PinotTaskConfig pinotTaskConfig, String tableNameWithType, String segmentName,
       String validDocIdsTypeStr, String expectedSegmentCrc, String expectedDataCrc, String consensusMode)
@@ -233,9 +229,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     return MinionMeter.VALID_DOC_IDS_UNAVAILABLE;
   }
 
-  /**
-   * ZK data CRC for Check B data-CRC fallback. Returns -1 when metadata is missing or data CRC is not reported.
-   */
+  /// ZK data CRC for Check B data-CRC fallback. Returns -1 when metadata is missing or data CRC is not reported.
   @VisibleForTesting
   long getZkDataCrc(String tableNameWithType, String segmentName) {
     SegmentZKMetadata segmentZKMetadata =

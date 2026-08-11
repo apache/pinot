@@ -19,10 +19,12 @@
 package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
 import java.io.File;
+import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
@@ -73,6 +75,8 @@ public class UpsertCompactionTaskExecutorTest {
   private static final String DATA_CRC = "5000";
 
   private MinionMetrics _minionMetrics;
+  private AtomicReference<MinionMetrics> _minionMetricsInstance;
+  private MinionMetrics _previousMinionMetrics;
   private MinionEventObserver _eventObserver;
   private File _tempDir;
 
@@ -82,22 +86,33 @@ public class UpsertCompactionTaskExecutorTest {
     _minionMetrics = mock(MinionMetrics.class);
     // Force the process-global singleton so BaseTaskExecutor picks up the mock.
     // register() only wins when current is NOOP; tests may run after other classes registered.
-    java.lang.reflect.Field field = MinionMetrics.class.getDeclaredField("MINION_METRICS_INSTANCE");
-    field.setAccessible(true);
-    @SuppressWarnings("unchecked")
-    java.util.concurrent.atomic.AtomicReference<MinionMetrics> ref =
-        (java.util.concurrent.atomic.AtomicReference<MinionMetrics>) field.get(null);
-    ref.set(_minionMetrics);
+    _minionMetricsInstance = minionMetricsInstance();
+    _previousMinionMetrics = _minionMetricsInstance.get();
+    _minionMetricsInstance.set(_minionMetrics);
 
     _eventObserver = MinionTaskTestUtils.getMinionProgressObserver();
     _tempDir = new File(FileUtils.getTempDirectory(), "UpsertCompactionTaskExecutorTest-" + System.nanoTime());
     Assert.assertTrue(_tempDir.mkdirs());
   }
 
-  @AfterMethod
-  public void tearDown()
+  @AfterMethod(alwaysRun = true)
+  public void tearDown() {
+    // Put back whatever was registered before this class ran. register() only swaps away from NOOP, so a
+    // leaked mock would stick for every later test sharing the JVM.
+    if (_minionMetricsInstance != null) {
+      _minionMetricsInstance.set(_previousMinionMetrics);
+    }
+    FileUtils.deleteQuietly(_tempDir);
+  }
+
+  /// The only place that reflects on the private `MinionMetrics.MINION_METRICS_INSTANCE` holder, so a future
+  /// JDK encapsulation change breaks here and nowhere else.
+  @SuppressWarnings("unchecked")
+  private static AtomicReference<MinionMetrics> minionMetricsInstance()
       throws Exception {
-    FileUtils.deleteDirectory(_tempDir);
+    Field field = MinionMetrics.class.getDeclaredField("MINION_METRICS_INSTANCE");
+    field.setAccessible(true);
+    return (AtomicReference<MinionMetrics>) field.get(null);
   }
 
   @Test
@@ -174,8 +189,7 @@ public class UpsertCompactionTaskExecutorTest {
     TestableExecutor executor = newExecutor();
     executor._validDocIdsFetchMaxAttempts = 3;
     executor._validDocIdsFetchRetryDelayMs = 0L;
-    RoaringBitmap bitmap = new RoaringBitmap();
-    bitmap.add(0, 1, 2);
+    RoaringBitmap bitmap = RoaringBitmap.bitmapOf(0, 1, 2);
 
     AtomicInteger calls = new AtomicInteger();
     try (MockedStatic<MinionTaskUtils> mocked = Mockito.mockStatic(MinionTaskUtils.class, Mockito.CALLS_REAL_METHODS)) {
@@ -389,9 +403,7 @@ public class UpsertCompactionTaskExecutorTest {
         .setTaskConfig(new TableTaskConfig(taskTypeConfigs)).build();
   }
 
-  /**
-   * Test double that stubs ZK / table-config lookups so convert() can run without Helix property store.
-   */
+  /// Test double that stubs ZK / table-config lookups so convert() can run without Helix property store.
   private static class TestableExecutor extends UpsertCompactionTaskExecutor {
     long _zkDataCrc = -1;
 
