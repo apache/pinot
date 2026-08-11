@@ -1669,4 +1669,41 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     Assert.assertEquals(serverTableName, baseOfflineTable,
         "EXPLAIN must route to the base table, not the MV; SPLIT must not have swapped routing");
   }
+
+  @Test
+  public void testExtractLookupTableNames() {
+    // No lookup at all
+    Assert.assertEquals(extractLookupTableNames("SELECT col FROM tbl WHERE col > 1"), Set.of());
+
+    // Select list, filter, group-by, order-by and having
+    Assert.assertEquals(extractLookupTableNames("SELECT lookup('dimA', 'c', 'pk', col) FROM tbl"), Set.of("dimA"));
+    Assert.assertEquals(extractLookupTableNames("SELECT col FROM tbl WHERE lookup('dimA', 'c', 'pk', col) = 'x'"),
+        Set.of("dimA"));
+    Assert.assertEquals(
+        extractLookupTableNames("SELECT COUNT(*) FROM tbl GROUP BY lookup('dimA', 'c', 'pk', col)"), Set.of("dimA"));
+    Assert.assertEquals(extractLookupTableNames("SELECT col FROM tbl ORDER BY lookup('dimA', 'c', 'pk', col)"),
+        Set.of("dimA"));
+    Assert.assertEquals(
+        extractLookupTableNames("SELECT COUNT(*) FROM tbl GROUP BY col HAVING COUNT(*) > 1 AND MAX(col) > 0"),
+        Set.of());
+
+    // Wrapped in another function, aliased, and nested inside another lookup's join value
+    Assert.assertEquals(extractLookupTableNames("SELECT UPPER(lookup('dimA', 'c', 'pk', col)) AS a FROM tbl"),
+        Set.of("dimA"));
+    Assert.assertEquals(
+        extractLookupTableNames("SELECT lookup('dimA', 'c', 'pk', lookup('dimB', 'c', 'pk', col)) FROM tbl"),
+        Set.of("dimA", "dimB"));
+
+    // The function name is canonicalized, so casing in the query must not hide the table
+    Assert.assertEquals(extractLookupTableNames("SELECT LOOKUP('dimA', 'c', 'pk', col) FROM tbl"), Set.of("dimA"));
+
+    // Multiple distinct dimension tables
+    Assert.assertEquals(extractLookupTableNames(
+            "SELECT lookup('dimA', 'c', 'pk', col) FROM tbl WHERE lookup('dimB', 'c', 'pk', col) = 'x'"),
+        Set.of("dimA", "dimB"));
+  }
+
+  private static Set<String> extractLookupTableNames(String sql) {
+    return BaseSingleStageBrokerRequestHandler.extractLookupTableNames(CalciteSqlParser.compileToPinotQuery(sql));
+  }
 }
