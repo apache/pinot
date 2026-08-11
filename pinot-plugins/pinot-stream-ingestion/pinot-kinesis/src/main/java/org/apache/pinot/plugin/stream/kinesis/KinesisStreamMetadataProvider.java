@@ -52,10 +52,8 @@ import software.amazon.awssdk.services.kinesis.model.Shard;
  */
 public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   public static final String SHARD_ID_PREFIX = "shardId-";
-  /**
-   * Max empty non-EOP GetRecords probes when checking whether a closed shard is fully consumed.
-   * AWS may return several empty batches with a non-null iterator before the iterator goes null.
-   */
+  /// Max empty non-EOP GetRecords probes when checking whether a closed shard is fully consumed.
+  /// AWS may return several empty batches with a non-null iterator before the iterator goes null.
   static final int MAX_END_OF_SHARD_EMPTY_PROBES = 5;
   private final KinesisConnectionHandler _kinesisConnectionHandler;
   private final StreamConsumerFactory _kinesisStreamConsumerFactory;
@@ -231,21 +229,17 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     return shardIdNum.isEmpty() ? 0 : Integer.parseInt(shardIdNum);
   }
 
-  /**
-   * Returns true when a closed Kinesis shard has been fully consumed at/after {@code startCheckpoint}.
-   * Only invoked when the shard's {@code endingSequenceNumber} is non-null (shard closed by split/merge).
-   *
-   * <p>Order of checks:
-   * <ol>
-   *   <li>Sequence short-circuit: checkpoint SN &gt;= ending SN (BigInteger) ⇒ fully consumed, no GetRecords.</li>
-   *   <li>Poll GetRecords until EOP, messages found, empty-probe budget exhausted, or time budget exhausted.</li>
-   * </ol>
-   *
-   * <p>On a closed shard, empty-only probes (no messages ever seen) mean no backlog after the checkpoint, so we
-   * assume ended (fail-open for EOL). Returning false here re-opens the parent forever and blocks child shards.
-   * Transient empties from rate-limit/timeout are soft-failed: they do not burn the hard empty-probe budget the
-   * same way; a wall-clock time budget still bounds the loop.
-   */
+  /// Returns true when a closed Kinesis shard has been fully consumed at/after `startCheckpoint`.
+  /// Only invoked when the shard's `endingSequenceNumber` is non-null (shard closed by split/merge).
+  ///
+  /// Order of checks:
+  /// 1. Sequence short-circuit: checkpoint SN >= ending SN (BigInteger) means fully consumed, no GetRecords.
+  /// 2. Poll GetRecords until EOP, messages found, empty-probe budget exhausted, or time budget exhausted.
+  ///
+  /// On a closed shard, empty-only probes (no messages ever seen) mean no backlog after the checkpoint, so we
+  /// assume ended (fail-open for EOL). Returning false here re-opens the parent forever and blocks child shards.
+  /// Transient empties from rate-limit/timeout are soft-failed: they do not burn the hard empty-probe budget the
+  /// same way; a wall-clock time budget still bounds the loop.
   private boolean consumedEndOfShard(StreamPartitionMsgOffset startCheckpoint,
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus, String endingSequenceNumber)
       throws IOException, TimeoutException {
@@ -298,7 +292,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
         // or the consumer returned a rate-limit/timeout empty batch (no iterator advance).
         // Soft-fail throttles/timeouts: a fetch that burned most of its timeout is treated as transient and does
         // not increment the hard empty-probe counter. Hard empties (quick empty responses) do.
-        boolean likelyTransientEmpty = fetchElapsedMs >= (fetchTimeoutMs * 3L / 4L);
+        boolean likelyTransientEmpty = fetchElapsedMs >= Math.max(1L, fetchTimeoutMs * 3L / 4L);
         if (!likelyTransientEmpty) {
           emptyProbes++;
         }
@@ -326,11 +320,9 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     }
   }
 
-  /**
-   * True when the checkpoint sequence number is at or past the shard ending sequence number.
-   * The Kinesis consumer starts AFTER the checkpoint sequence number, so checkpoint == ending means the ending
-   * record was already consumed (nothing remains after it).
-   */
+  /// True when the checkpoint sequence number is at or past the shard ending sequence number.
+  /// The Kinesis consumer starts AFTER the checkpoint sequence number, so checkpoint == ending means the ending
+  /// record was already consumed (nothing remains after it).
   static boolean hasConsumedThroughEndingSequence(StreamPartitionMsgOffset checkpoint, String endingSequenceNumber) {
     if (!(checkpoint instanceof KinesisPartitionGroupOffset) || StringUtils.isEmpty(endingSequenceNumber)) {
       return false;
@@ -348,9 +340,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     }
   }
 
-  /**
-   * Visible for tests that need to control wall-clock behavior of the end-of-shard probe loop.
-   */
+  /// Visible for tests that need to control wall-clock behavior of the end-of-shard probe loop.
   long currentTimeMillis() {
     return System.currentTimeMillis();
   }
