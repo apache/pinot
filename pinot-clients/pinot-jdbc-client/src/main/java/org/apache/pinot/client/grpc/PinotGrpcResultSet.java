@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.client.PinotResultMetadata;
@@ -388,6 +389,8 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
           return new ArrayList<>(Arrays.asList((String[]) value));
         case BYTES_ARRAY:
           return toBytesList((String[]) value);
+        case UUID_ARRAY:
+          return toUuidList((String[]) value);
         default:
           throw new SQLDataException("Data type is not an array: " + dataType);
       }
@@ -473,6 +476,19 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
       return list;
     } catch (DecoderException e) {
       throw new SQLDataException("Error parsing bytes array", e);
+    }
+  }
+
+  private static List<UUID> toUuidList(String[] values)
+      throws SQLException {
+    List<UUID> list = new ArrayList<>(values.length);
+    try {
+      for (String value : values) {
+        list.add(value == null ? null : UUID.fromString(value));
+      }
+      return list;
+    } catch (IllegalArgumentException e) {
+      throw new SQLDataException("Error parsing UUID array", e);
     }
   }
 

@@ -26,6 +26,7 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.pinot.common.proto.Broker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.encoder.JsonResponseEncoder;
@@ -36,21 +37,21 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests collection-valued results returned by the gRPC JDBC result set.
- */
+/// Tests collection-valued results returned by the gRPC JDBC result set.
 public class PinotGrpcResultSetTest {
 
   @Test
   public void testGetMapAndArrays()
       throws Exception {
     String[] columnNames = {
-        "map", "booleans", "ints", "longs", "floats", "doubles", "decimals", "timestamps", "strings", "bytes"
+        "map", "booleans", "ints", "longs", "floats", "doubles", "decimals", "timestamps", "strings", "bytes",
+        "uuids"
     };
     ColumnDataType[] columnTypes = {
         ColumnDataType.MAP, ColumnDataType.BOOLEAN_ARRAY, ColumnDataType.INT_ARRAY, ColumnDataType.LONG_ARRAY,
         ColumnDataType.FLOAT_ARRAY, ColumnDataType.DOUBLE_ARRAY, ColumnDataType.BIG_DECIMAL_ARRAY,
-        ColumnDataType.TIMESTAMP_ARRAY, ColumnDataType.STRING_ARRAY, ColumnDataType.BYTES_ARRAY
+        ColumnDataType.TIMESTAMP_ARRAY, ColumnDataType.STRING_ARRAY, ColumnDataType.BYTES_ARRAY,
+        ColumnDataType.UUID_ARRAY
     };
     Object[] row = {
         Map.of("name", "pinot", "count", 2),
@@ -62,7 +63,9 @@ public class PinotGrpcResultSetTest {
         new BigDecimal[]{new BigDecimal("1.20"), new BigDecimal("3.4")},
         new Timestamp[]{Timestamp.valueOf("2020-01-01 12:00:00"), Timestamp.valueOf("2021-02-03 04:05:06")},
         new String[]{"first", "second"},
-        new byte[][]{new byte[]{0, (byte) 0xff}, new byte[]{0x10, 0x20}}
+        new byte[][]{new byte[]{0, (byte) 0xff}, new byte[]{0x10, 0x20}},
+        new UUID[]{UUID.fromString("00000000-0000-0000-0000-000000000001"),
+            UUID.fromString("00000000-0000-0000-0000-000000000002")}
     };
 
     PinotGrpcResultSet resultSet = createResultSet(columnNames, columnTypes, row);
@@ -81,6 +84,9 @@ public class PinotGrpcResultSetTest {
     List<?> bytes = (List<?>) resultSet.getObject(10);
     Assert.assertEquals(bytes.get(0), new byte[]{0, (byte) 0xff});
     Assert.assertEquals(bytes.get(1), new byte[]{0x10, 0x20});
+    Assert.assertEquals(resultSet.getObject(11), List.of(
+        UUID.fromString("00000000-0000-0000-0000-000000000001"),
+        UUID.fromString("00000000-0000-0000-0000-000000000002")));
 
     ResultSetMetaData metadata = resultSet.getMetaData();
     Assert.assertEquals(metadata.getColumnType(1), Types.JAVA_OBJECT);
