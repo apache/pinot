@@ -254,25 +254,16 @@ public class PercentileSmartTDigestAggregationFunction extends NullableSingleInp
 
   @Override
   public Object extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    Object result = aggregationResultHolder.getResult();
-    return result != null ? result : new DoubleArrayList();
+    return aggregationResultHolder.getResult();
   }
 
   @Override
   public Object extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    Object result = groupByResultHolder.getResult(groupKey);
-    return result != null ? result : new DoubleArrayList();
+    return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
-  @Nullable
-  public Object merge(@Nullable Object intermediateResult1, @Nullable Object intermediateResult2) {
-    if (intermediateResult1 == null) {
-      return intermediateResult2;
-    }
-    if (intermediateResult2 == null) {
-      return intermediateResult1;
-    }
+  public Object merge(Object intermediateResult1, Object intermediateResult2) {
     if (intermediateResult1 instanceof PercentileTDigestAccumulator) {
       return mergeIntoAccumulator((PercentileTDigestAccumulator) intermediateResult1, intermediateResult2);
     }
@@ -330,10 +321,23 @@ public class PercentileSmartTDigestAggregationFunction extends NullableSingleInp
     return ColumnDataType.DOUBLE;
   }
 
+  @Nullable
   @Override
-  public Double extractFinalResult(Object intermediateResult) {
+  public Double extractFinalResult(@Nullable Object intermediateResult) {
+    // A null intermediate result means nothing was aggregated, and so do an empty digest and an empty value list,
+    // which is what a deserialized peer can still carry. With null handling enabled the percentile of nothing is
+    // NULL; with it disabled it is the sentinel this function has always rendered for an untouched accumulator.
+    if (intermediateResult == null) {
+      return _nullHandlingEnabled ? null : DEFAULT_FINAL_RESULT;
+    }
     if (intermediateResult instanceof TDigest) {
-      return ((TDigest) intermediateResult).quantile(_percentile / 100.0);
+      TDigest tDigest = (TDigest) intermediateResult;
+      // An empty digest holds the same state as the empty value list below, so the two branches must answer alike:
+      // which one a query lands in depends only on whether the accumulator crossed the conversion threshold.
+      if (_nullHandlingEnabled && tDigest.size() == 0L) {
+        return null;
+      }
+      return tDigest.quantile(_percentile / 100.0);
     } else {
       DoubleArrayList valueList = (DoubleArrayList) intermediateResult;
       int size = valueList.size();

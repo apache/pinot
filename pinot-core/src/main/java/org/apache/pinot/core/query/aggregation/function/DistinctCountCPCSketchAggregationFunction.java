@@ -392,10 +392,10 @@ public class DistinctCountCPCSketchAggregationFunction
   @Override
   public CpcSketchAccumulator merge(CpcSketchAccumulator intermediateResult1,
       CpcSketchAccumulator intermediateResult2) {
-    if (intermediateResult1 == null || intermediateResult1.isEmpty()) {
+    if (intermediateResult1.isEmpty()) {
       return intermediateResult2;
     }
-    if (intermediateResult2 == null || intermediateResult2.isEmpty()) {
+    if (intermediateResult2.isEmpty()) {
       return intermediateResult1;
     }
     intermediateResult1.setLgNominalEntries(_lgNominalEntries);
@@ -425,7 +425,6 @@ public class DistinctCountCPCSketchAggregationFunction
     return DataSchema.ColumnDataType.LONG;
   }
 
-  @Nullable
   @Override
   public Comparable extractFinalResult(@Nullable CpcSketchAccumulator intermediateResult) {
     if (intermediateResult == null) {

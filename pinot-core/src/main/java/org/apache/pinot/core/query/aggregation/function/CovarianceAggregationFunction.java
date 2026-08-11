@@ -22,6 +22,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -161,6 +162,7 @@ public class CovarianceAggregationFunction implements AggregationFunction<Covari
     }
   }
 
+  @Nullable
   @Override
   public CovarianceTuple extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
@@ -193,8 +195,16 @@ public class CovarianceAggregationFunction implements AggregationFunction<Covari
     return ColumnDataType.DOUBLE;
   }
 
+  @Nullable
   @Override
-  public Double extractFinalResult(CovarianceTuple covarianceTuple) {
+  public Double extractFinalResult(@Nullable CovarianceTuple covarianceTuple) {
+    // A null intermediate result means nothing was aggregated, and the covariance of nothing is NULL. A zero-count
+    // tuple means the same thing and ought to answer alike, but this function never receives the query's null
+    // handling option and so cannot tell the two modes apart; it keeps its historical sentinel below. See the first
+    // known deviation on the null contract.
+    if (covarianceTuple == null) {
+      return null;
+    }
     long count = covarianceTuple.getCount();
     if (count == 0L) {
       return DEFAULT_FINAL_RESULT;

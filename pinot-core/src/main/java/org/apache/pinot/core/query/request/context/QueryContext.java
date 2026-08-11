@@ -257,10 +257,14 @@ public class QueryContext {
     return numGroupByExpressions + getNumExtraGroupByKeyColumns();
   }
 
-  /// Returns whether group-by key columns must be serialized/deserialized through the null-aware path (null
-  /// bitmaps). True when the user enabled null handling, or for grouping-set queries, which produce NULL keys
+  /// Returns whether group-by key columns must be compared and filtered null-aware, i.e. whether ORDER BY
+  /// comparators and HAVING predicates over group keys have to treat `null` as a distinct value rather than as the
+  /// type's default. True when the user enabled null handling, or for grouping-set queries, which produce NULL keys
   /// for rolled-up columns regardless of the user's null-handling option.
-  public boolean requiresNullAwareKeySerialization() {
+  ///
+  /// NOTE: This does not gate serialization -- [org.apache.pinot.core.common.datatable.DataTableBuilder] always
+  /// supports nulls, so a null key or intermediate result round-trips through a DataTable in either mode.
+  public boolean requiresNullAwareKeyEvaluation() {
     return isNullHandlingEnabled() || isGroupingSets();
   }
 

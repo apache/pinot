@@ -1049,6 +1049,13 @@ public final class TableConfigUtils {
           segmentPartitionConfig != null && MapUtils.isNotEmpty(segmentPartitionConfig.getColumnPartitionMap()),
           "Offline upsert table must have segment partition config to ensure correct partition-based "
               + "segment assignment. Configure segmentPartitionConfig in the indexingConfig.");
+      // A comparison column is required, same as realtime upsert. It resolves to the configured comparison columns, or
+      // the table's time column when comparison columns are not set. Unlike realtime, offline tables do not require a
+      // time column, so reject the case where neither is configured (no implicit segment creation time fallback).
+      Preconditions.checkState(
+          CollectionUtils.isNotEmpty(upsertConfig.getComparisonColumns())
+              || tableConfig.getValidationConfig().getTimeColumnName() != null,
+          "Offline upsert table must have a comparison column or a time column configured");
     }
 
     if (upsertEnabled) {
@@ -1467,6 +1474,7 @@ public final class TableConfigUtils {
     List<String> violations = new ArrayList<>();
     validateUpsertConfigUpdate(newConfig, existingConfig, violations);
     validateDedupConfigUpdate(newConfig, existingConfig, violations);
+    validatePartitionConfigUpdate(newConfig, existingConfig, violations);
     validateMaterializedViewConfigUpdate(newConfig, existingConfig, violations);
 
     return violations;
@@ -1619,6 +1627,38 @@ public final class TableConfigUtils {
           "MaterializedViewTask is configured but definedSQL is missing or empty for table: %s",
           tableConfig.getTableName()));
     }
+  }
+
+  /// On upsert/dedup tables, rejects `numPartitions` changes on already-partitioned columns — the one
+  /// segmentPartitionConfig change that silently breaks broker query pruning against existing segments.
+  /// Adding, removing, and `functionName` / `functionConfig` changes are all allowed. Bypassable with force update.
+  private static void validatePartitionConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
+      List<String> violations) {
+    if (!(existingConfig.isUpsertEnabled() || existingConfig.isDedupEnabled())
+        || !(newConfig.isUpsertEnabled() || newConfig.isDedupEnabled())) {
+      return;
+    }
+    Map<String, ColumnPartitionConfig> existingMap = getColumnPartitionMap(existingConfig);
+    Map<String, ColumnPartitionConfig> newMap = getColumnPartitionMap(newConfig);
+    for (Map.Entry<String, ColumnPartitionConfig> entry : existingMap.entrySet()) {
+      ColumnPartitionConfig newCol = newMap.get(entry.getKey());
+      if (newCol != null && entry.getValue().getNumPartitions() != newCol.getNumPartitions()) {
+        violations.add(String.format(
+            "segmentPartitionConfig numPartitions cannot change for upsert/dedup column '%s' (%d -> %d)",
+            entry.getKey(), entry.getValue().getNumPartitions(), newCol.getNumPartitions()));
+      }
+    }
+  }
+
+  private static Map<String, ColumnPartitionConfig> getColumnPartitionMap(TableConfig tableConfig) {
+    if (tableConfig.getIndexingConfig() == null) {
+      return Map.of();
+    }
+    SegmentPartitionConfig partitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+    if (partitionConfig == null || partitionConfig.getColumnPartitionMap() == null) {
+      return Map.of();
+    }
+    return partitionConfig.getColumnPartitionMap();
   }
 
   private static void validateMaterializedViewConfigUpdate(TableConfig newConfig, TableConfig existingConfig,

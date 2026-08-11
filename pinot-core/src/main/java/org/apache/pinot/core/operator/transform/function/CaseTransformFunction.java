@@ -207,10 +207,12 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
       case JSON:
         break;
       case BYTES:
+      case UUID:
         try {
-          BytesUtils.toBytes(literal);
+          byte[] bytes = BytesUtils.toBytes(literal);
+          Preconditions.checkArgument(dataType != DataType.UUID || bytes.length == dataType.size());
         } catch (Exception e) {
-          throw new IllegalArgumentException("Invalid literal: " + literal + " for BYTES");
+          throw new IllegalArgumentException("Invalid literal: " + literal + " for " + dataType);
         }
         break;
       default:
@@ -827,15 +829,16 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     final RoaringBitmap bitmap = new RoaringBitmap();
     int[] selected = getSelectedArray(valueBlock, true);
     int numDocs = valueBlock.getNumDocs();
-    initStringValuesSV(numDocs);
+    initBytesValuesSV(numDocs);
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
     Map<Integer, Pair<byte[][], RoaringBitmap>> thenStatementsIndexToValues = new HashMap<>();
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, ImmutablePair.of(_thenStatements.get(i).transformToBytesValuesSV(valueBlock),
-            _thenStatements.get(i).getNullBitmap(valueBlock)));
+        thenStatementsIndexToValues.put(i,
+            ImmutablePair.of(_thenStatements.get(i).transformToBytesValuesSV(valueBlock),
+                _thenStatements.get(i).getNullBitmap(valueBlock)));
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
@@ -871,6 +874,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     }
     return _bytesValuesSV;
   }
+
 
   @Override
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
