@@ -221,7 +221,9 @@ public class BinaryWorkloadScheduler extends QueryScheduler {
         LOGGER.error("Failed to fail pending query: {} on shutdown", queryContext.getQueryRequest().getRequestId(), t);
         // Last resort, so one bad query does not leave the remaining ones without a response.
         // No-op if the handler already completed the future.
-        queryContext.getResultFuture().setException(t);
+        if (queryContext.getResultFuture() != null) {
+          queryContext.getResultFuture().setException(t);
+        }
       }
     }
   }

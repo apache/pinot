@@ -131,7 +131,9 @@ public class SecondaryWorkloadQueue {
         } catch (Throwable t) {
           LOGGER.error("Failed to complete expired query: {}", queryContext.getQueryRequest().getRequestId(), t);
           // Last resort, so the request always gets a response. No-op if the handler already completed the future.
-          queryContext.getResultFuture().setException(t);
+          if (queryContext.getResultFuture() != null) {
+            queryContext.getResultFuture().setException(t);
+          }
         }
       }
       if (schedulerQueryContext != null) {
