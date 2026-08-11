@@ -27,12 +27,17 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.message.BasicHeader;
+import org.apache.pinot.common.auth.vault.VaultTokenAuthProvider;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// Utility class to wrap inference of optimal auth provider from component configs.
 public final class AuthProviderUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AuthProviderUtils.class);
+
   private AuthProviderUtils() {
     // left blank
   }
@@ -49,9 +54,10 @@ public final class AuthProviderUtils {
     return new AuthConfig(pinotConfig.subset(namespace).toMap());
   }
 
-  /// Create an AuthProvider after extracting a config from a pinot configuration subset namespace
-  /// @see AuthProviderUtils#extractAuthConfig(PinotConfiguration, String)
+  /// Create an AuthProvider after extracting a config from a pinot configuration subset namespace.
+  /// Uses only the service-specific token configuration (e.g., pinot.controller.segment.fetcher.auth.token).
   ///
+  /// @see AuthProviderUtils#extractAuthConfig(PinotConfiguration, String)
   /// @param pinotConfig pinot configuration
   /// @param namespace subset namespace
   /// @return auth provider
@@ -59,7 +65,19 @@ public final class AuthProviderUtils {
     if (pinotConfig == null) {
       return new NullAuthProvider();
     }
-    return makeAuthProvider(extractAuthConfig(pinotConfig, namespace));
+
+    // Check if Vault has been initialized by AuthProviderFactory
+    // If Vault is initialized, reuse the VaultTokenAuthProvider
+    if (AuthProviderFactory.isVaultInitialized()) {
+      LOGGER.info("Vault initialized, using VaultTokenAuthProvider for namespace: {}", namespace);
+      return new VaultTokenAuthProvider();
+    }
+
+    // Extract auth config from namespace subset
+    // Only use service-specific configuration, no fallback to global auth.token
+    AuthConfig authConfig = extractAuthConfig(pinotConfig, namespace);
+
+    return makeAuthProvider(authConfig);
   }
 
   /// Create auth provider based on the availability of a static token only, if any. This typically applies to task
