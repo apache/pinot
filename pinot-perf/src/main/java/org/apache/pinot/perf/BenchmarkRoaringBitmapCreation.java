@@ -48,9 +48,7 @@ import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * Benchmark created to test the impact of removing the SoftReference array cache for ImmutableRoaringBitmap
- */
+/// Benchmark created to test the impact of removing the SoftReference array cache for ImmutableRoaringBitmap
 @State(Scope.Benchmark)
 @Fork(1)
 public class BenchmarkRoaringBitmapCreation {
@@ -137,9 +135,7 @@ public class BenchmarkRoaringBitmapCreation {
     return immutableRoaringBitmap.isEmpty();
   }
 
-  /**
-   * Code as of before this commit, using an array of SoftReference for the ImmutableRoaringBitmap
-   */
+  /// Code as of before this commit, using an array of SoftReference for the ImmutableRoaringBitmap
   private ImmutableRoaringBitmap getRoaringBitmapFromCache(int dictId) {
     SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference =
         (_bitmapsArrayReference != null) ? _bitmapsArrayReference.get() : null;

@@ -25,11 +25,9 @@ import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 
 
-/**
- * Utility for training k-means centroids used by IVF_PQ.
- *
- * <p>This class is stateless and thread-safe.</p>
- */
+/// Utility for training k-means centroids used by IVF_PQ.
+///
+/// This class is stateless and thread-safe.
 public final class KMeansTrainer {
   private static final int MAX_KMEANS_ITERATIONS = 50;
   private static final float CONVERGENCE_THRESHOLD = 1e-5f;

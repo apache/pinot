@@ -26,9 +26,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 
-/**
- * Dictionary of a single bytes ({@code byte[]}) value.
- */
+/// Dictionary of a single bytes (`byte[]`) value.
 public class ConstantValueBytesDictionary extends BaseConstantValueDictionary {
   private final byte[] _value;
 

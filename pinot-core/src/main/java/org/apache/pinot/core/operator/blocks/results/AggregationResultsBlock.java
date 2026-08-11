@@ -38,12 +38,9 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Results block for aggregation queries.
- */
+/// Results block for aggregation queries.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class AggregationResultsBlock extends BaseResultsBlock {
   private final AggregationFunction[] _aggregationFunctions;
@@ -126,73 +123,32 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       return dataTableBuilder.build();
     }
 
-    boolean returnFinalResult = _queryContext.isServerReturnFinalResult();
-    if (_queryContext.isNullHandlingEnabled()) {
-      RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
+    // NOTE: Nulls are serialized through the builder's null-aware path regardless of the query's null-handling
+    // option. Aggregation functions whose accumulator has no identity element (MINSTRING, MAXSTRING, ANYVALUE)
+    // return a null intermediate result in both modes, and their result column type is not OBJECT.
+    dataTableBuilder.startRow();
+    if (_queryContext.isServerReturnFinalResult()) {
       for (int i = 0; i < numColumns; i++) {
-        nullBitmaps[i] = new RoaringBitmap();
-      }
-      dataTableBuilder.startRow();
-      if (returnFinalResult) {
-        for (int i = 0; i < numColumns; i++) {
-          Object result = _aggregationFunctions[i].extractFinalResult(_results.get(i));
-          if (result == null) {
-            result = columnDataTypes[i].getNullPlaceholder();
-            nullBitmaps[i].add(0);
-          }
-          assert result != null;
+        Object result = _aggregationFunctions[i].extractFinalResult(_results.get(i));
+        if (result == null) {
+          dataTableBuilder.setNull(i);
+        } else {
           setFinalResult(dataTableBuilder, columnDataTypes, i, result);
         }
-      } else {
-        for (int i = 0; i < numColumns; i++) {
-          Object result = _results.get(i);
-          if (columnDataTypes[i] == ColumnDataType.OBJECT) {
-            if (result == null) {
-              dataTableBuilder.setNull(i);
-            } else {
-              dataTableBuilder.setColumn(i, _aggregationFunctions[i].serializeIntermediateResult(result));
-            }
-          } else {
-            if (result == null) {
-              result = columnDataTypes[i].getNullPlaceholder();
-              nullBitmaps[i].add(0);
-            }
-            assert result != null;
-            AggregationFunctionUtils.setIntermediateResult(dataTableBuilder, columnDataTypes[i], i, result);
-          }
-        }
-      }
-      dataTableBuilder.finishRow();
-      for (RoaringBitmap nullBitmap : nullBitmaps) {
-        dataTableBuilder.setNullRowIds(nullBitmap);
       }
     } else {
-      dataTableBuilder.startRow();
-      if (returnFinalResult) {
-        for (int i = 0; i < numColumns; i++) {
-          Object result = _aggregationFunctions[i].extractFinalResult(_results.get(i));
-          if (result == null) {
-            dataTableBuilder.setNull(i);
-          } else {
-            setFinalResult(dataTableBuilder, columnDataTypes, i, result);
-          }
-        }
-      } else {
-        for (int i = 0; i < numColumns; i++) {
-          Object result = _results.get(i);
-          if (result == null) {
-            dataTableBuilder.setNull(i);
-          } else {
-            if (columnDataTypes[i] == ColumnDataType.OBJECT) {
-              dataTableBuilder.setColumn(i, _aggregationFunctions[i].serializeIntermediateResult(result));
-            } else {
-              AggregationFunctionUtils.setIntermediateResult(dataTableBuilder, columnDataTypes[i], i, result);
-            }
-          }
+      for (int i = 0; i < numColumns; i++) {
+        Object result = _results.get(i);
+        if (result == null) {
+          dataTableBuilder.setNull(i);
+        } else if (columnDataTypes[i] == ColumnDataType.OBJECT) {
+          dataTableBuilder.setColumn(i, _aggregationFunctions[i].serializeIntermediateResult(result));
+        } else {
+          AggregationFunctionUtils.setIntermediateResult(dataTableBuilder, columnDataTypes[i], i, result);
         }
       }
-      dataTableBuilder.finishRow();
     }
+    dataTableBuilder.finishRow();
     return dataTableBuilder.build();
   }
 

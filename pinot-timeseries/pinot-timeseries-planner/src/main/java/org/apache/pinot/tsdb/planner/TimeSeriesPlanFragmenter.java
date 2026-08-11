@@ -26,66 +26,65 @@ import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 
 
-/**
- * Fragments the plan into executable units. Since we only support Broker-Reduce for Time Series Queries at present,
- * we will have 1 fragment for the broker, and 1 fragment for each {@link LeafTimeSeriesPlanNode}.
- * <p>
- * As an example, say we have the following plan:
- *   <pre>
- *                            +------------+
- *                            | Node-1     |
- *                            +------------+
- *                          /              \
- *                   +------------+     +------------+
- *                   | Node-2     |     | Leaf-2     |
- *                   +------------+     +------------+
- *                     /
- *            +------------+
- *            | Leaf-1     |
- *            +------------+
- *   </pre>
- *   The plan fragmenter will convert this to:
- *   <pre>
- *     This is fragment-1, aka the Broker's plan fragment:
- *
- *                            +------------+
- *                            | Node-1     |
- *                            +------------+
- *                          /              \
- *                   +------------+     +------------+
- *                   | Node-2     |     | Exchange   |
- *                   +------------+     +------------+
- *                     /
- *            +------------+
- *            | Exchange   |
- *            +------------+
- *   </pre>
- *   <pre>
- *     This is fragment-2:
- *            +------------+
- *            | Leaf-1     |
- *            +------------+
- *   </pre>
- *   <pre>
- *     This is fragment-3:
- *            +------------+
- *            | Leaf-2     |
- *            +------------+
- *   </pre>
- * </p>
- */
+/// Fragments the plan into executable units. Since we only support Broker-Reduce for Time Series Queries at present,
+/// we will have 1 fragment for the broker, and 1 fragment for each [LeafTimeSeriesPlanNode].
+///
+/// As an example, say we have the following plan:
+///
+/// ```
+///                 +------------+
+///                 | Node-1     |
+///                 +------------+
+///               /              \
+///        +------------+     +------------+
+///        | Node-2     |     | Leaf-2     |
+///        +------------+     +------------+
+///          /
+/// +------------+
+/// | Leaf-1     |
+/// +------------+
+/// ```
+///
+///   The plan fragmenter will convert this to:
+///
+/// ```
+/// This is fragment-1, aka the Broker's plan fragment:
+///
+///                        +------------+
+///                        | Node-1     |
+///                        +------------+
+///                      /              \
+///               +------------+     +------------+
+///               | Node-2     |     | Exchange   |
+///               +------------+     +------------+
+///                 /
+///        +------------+
+///        | Exchange   |
+///        +------------+
+/// ```
+///
+/// ```
+/// This is fragment-2:
+///        +------------+
+///        | Leaf-1     |
+///        +------------+
+/// ```
+///
+/// ```
+/// This is fragment-3:
+///        +------------+
+///        | Leaf-2     |
+///        +------------+
+/// ```
 public class TimeSeriesPlanFragmenter {
   private TimeSeriesPlanFragmenter() {
   }
 
-  /**
-   * Fragments the plan as described in {@link TimeSeriesPlanFragmenter}. The first element of the list is the broker
-   * fragment, and the other elements are the server fragments. For single-node queries, this pushes down the entire
-   * plan to the servers.
-   * <p>
-   *   <b>Note:</b> This method may return cloned plan nodes, so you should use them as the plan subsequently.
-   * </p>
-   */
+  /// Fragments the plan as described in [TimeSeriesPlanFragmenter]. The first element of the list is the broker
+  /// fragment, and the other elements are the server fragments. For single-node queries, this pushes down the entire
+  /// plan to the servers.
+  ///
+  ///   **Note:** This method may return cloned plan nodes, so you should use them as the plan subsequently.
   public static List<BaseTimeSeriesPlanNode> getFragments(BaseTimeSeriesPlanNode rootNode,
       boolean isSingleServerQuery) {
     List<BaseTimeSeriesPlanNode> result = new ArrayList<>();

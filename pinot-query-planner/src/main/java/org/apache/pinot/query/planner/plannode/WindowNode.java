@@ -124,25 +124,21 @@ public class WindowNode extends BasePlanNode {
         _exclude, _constants);
   }
 
-  /**
-   * Enum to denote the type of window frame
-   * ROWS - ROWS type window frame
-   * RANGE - RANGE type window frame
-   */
+  /// Enum to denote the type of window frame
+  /// ROWS - ROWS type window frame
+  /// RANGE - RANGE type window frame
   public enum WindowFrameType {
     ROWS, RANGE
   }
 
-  /**
-   * Enum to denote the frame exclusion option (SQL standard {@code EXCLUDE} clause).
-   * {@link #NO_OTHERS} is the default and means no rows are excluded.
-   * {@link #CURRENT_ROW} excludes only the current row from the frame.
-   * {@link #GROUP} excludes the current row and all its ordering peers.
-   * {@link #TIES} excludes the ordering peers of the current row but keeps the current row.
-   *
-   * <p>The constant names are part of the wire protocol via {@code Plan.WindowExclusion} and must remain stable across
-   * mixed-version brokers and servers.
-   */
+  /// Enum to denote the frame exclusion option (SQL standard `EXCLUDE` clause).
+  /// [#NO_OTHERS] is the default and means no rows are excluded.
+  /// [#CURRENT_ROW] excludes only the current row from the frame.
+  /// [#GROUP] excludes the current row and all its ordering peers.
+  /// [#TIES] excludes the ordering peers of the current row but keeps the current row.
+  ///
+  /// The constant names are part of the wire protocol via `Plan.WindowExclusion` and must remain stable across
+  /// mixed-version brokers and servers.
   public enum WindowExclusion {
     NO_OTHERS, CURRENT_ROW, GROUP, TIES
   }

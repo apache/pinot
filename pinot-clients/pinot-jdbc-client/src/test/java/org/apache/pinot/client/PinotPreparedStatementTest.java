@@ -21,13 +21,16 @@ package org.apache.pinot.client;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.client.utils.DateTimeUtils;
 import org.apache.pinot.client.utils.DriverUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -158,5 +161,66 @@ public class PinotPreparedStatementTest {
     String expectedSql =
         DriverUtils.createSetQueryOptionString(QueryOptionKey.ENABLE_NULL_HANDLING, true) + BASIC_TEST_QUERY;
     Assert.assertEquals(_dummyPinotClientTransport.getLastQuery().substring(0, expectedSql.length()), expectedSql);
+  }
+
+  @Test
+  public void testExecuteReturnsResultSetForEmptyResults()
+      throws Exception {
+    PreparedStatement preparedStatement = createPreparedStatement("{\"resultTable\":{"
+        + "\"dataSchema\":{\"columnNames\":[\"value\"],\"columnDataTypes\":[\"INT\"]},\"rows\":[]}}");
+
+    Assert.assertTrue(preparedStatement.execute());
+    ResultSet resultSet = preparedStatement.getResultSet();
+    Assert.assertNotNull(resultSet);
+    Assert.assertFalse(resultSet.next());
+  }
+
+  @Test
+  public void testExecuteDoesNotAdvanceResultSet()
+      throws Exception {
+    PreparedStatement preparedStatement = createPreparedStatement("{\"resultTable\":{"
+        + "\"dataSchema\":{\"columnNames\":[\"value\"],\"columnDataTypes\":[\"INT\"]},\"rows\":[[42]]}}");
+
+    Assert.assertTrue(preparedStatement.execute());
+    ResultSet resultSet = preparedStatement.getResultSet();
+    Assert.assertNotNull(resultSet);
+    Assert.assertTrue(resultSet.isBeforeFirst());
+    Assert.assertTrue(resultSet.next());
+    Assert.assertEquals(resultSet.getInt(1), 42);
+  }
+
+  private static PreparedStatement createPreparedStatement(String responseJson)
+      throws Exception {
+    Properties props = new Properties();
+    props.put(PinotConnection.BROKER_LIST, "dummy");
+    PinotConnection connection = new PinotConnection(props, "dummy", new ResponsePinotClientTransport(responseJson),
+        "dummy", DummyPinotControllerTransport.create());
+    return connection.prepareStatement(BASIC_TEST_QUERY);
+  }
+
+  private static class ResponsePinotClientTransport implements PinotClientTransport {
+    private final BrokerResponse _response;
+
+    ResponsePinotClientTransport(String responseJson)
+        throws Exception {
+      _response = BrokerResponse.fromJson(JsonUtils.stringToJsonNode(responseJson));
+    }
+
+    @Override
+    public BrokerResponse executeQuery(String brokerAddress, String query)
+        throws PinotClientException {
+      return _response;
+    }
+
+    @Override
+    public CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
+        throws PinotClientException {
+      return CompletableFuture.completedFuture(_response);
+    }
+
+    @Override
+    public void close()
+        throws PinotClientException {
+    }
   }
 }

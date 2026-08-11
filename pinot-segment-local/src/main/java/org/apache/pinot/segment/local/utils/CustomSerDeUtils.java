@@ -22,7 +22,6 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.google.common.primitives.Longs;
-import com.tdunning.math.stats.MergingDigest;
 import com.tdunning.math.stats.TDigest;
 import java.io.IOException;
 import java.lang.foreign.MemorySegment;
@@ -45,26 +44,18 @@ public class CustomSerDeUtils {
   private CustomSerDeUtils() {
   }
 
-  /**
-   * Serializer/De-serializer for a specific type of object.
-   *
-   * @param <T> Type of the object
-   */
+  /// Serializer/De-serializer for a specific type of object.
+  ///
+  /// @param <T> Type of the object
   public interface ObjectSerDe<T> {
 
-    /**
-     * Serializes a value into a byte array.
-     */
+    /// Serializes a value into a byte array.
     byte[] serialize(T value);
 
-    /**
-     * De-serializes a value from a byte array.
-     */
+    /// De-serializes a value from a byte array.
     T deserialize(byte[] bytes);
 
-    /**
-     * De-serializes a value from a byte buffer.
-     */
+    /// De-serializes a value from a byte buffer.
     T deserialize(ByteBuffer byteBuffer);
   }
 
@@ -224,19 +215,17 @@ public class CustomSerDeUtils {
 
     @Override
     public byte[] serialize(TDigest tDigest) {
-      byte[] bytes = new byte[tDigest.byteSize()];
-      tDigest.asBytes(ByteBuffer.wrap(bytes));
-      return bytes;
+      return TDigestUtils.serialize(tDigest);
     }
 
     @Override
     public TDigest deserialize(byte[] bytes) {
-      return MergingDigest.fromBytes(ByteBuffer.wrap(bytes));
+      return TDigestUtils.deserialize(bytes);
     }
 
     @Override
     public TDigest deserialize(ByteBuffer byteBuffer) {
-      return MergingDigest.fromBytes(byteBuffer);
+      return TDigestUtils.deserialize(byteBuffer);
     }
   };
 

@@ -28,35 +28,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Singleton class to manage the configuration for force commit on consuming segments
- * for upsert tables with inconsistent state configurations (partial upsert or dropOutOfOrderRecord=true or
- * outOfOrderColumn). By default, the force commit and reload is disabled
- * This configuration is dynamically updatable via ZK cluster config without requiring a server restart.
- */
+/// Singleton class to manage the configuration for force commit on consuming segments
+/// for upsert tables with inconsistent state configurations (partial upsert or dropOutOfOrderRecord=true or
+/// outOfOrderColumn). By default, the force commit and reload is disabled
+/// This configuration is dynamically updatable via ZK cluster config without requiring a server restart.
 public class ConsumingSegmentConsistencyModeListener implements PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(ConsumingSegmentConsistencyModeListener.class);
   private static final ConsumingSegmentConsistencyModeListener INSTANCE = new ConsumingSegmentConsistencyModeListener();
 
   public enum Mode {
-    /**
-     * Force commit is disabled for tables with inconsistent state configurations.
-     * Safe option that prevents potential data inconsistency issues.
-     */
+    /// Force commit is disabled for tables with inconsistent state configurations.
+    /// Safe option that prevents potential data inconsistency issues.
     RESTRICTED(false),
 
-    /**
-     * Force commit is enabled but tables with partial upsert or dropOutOfOrderRecord=true (with replication > 1)
-     * will have their upsert metadata reverted when inconsistencies are detected.
-     */
+    /// Force commit is enabled but tables with partial upsert or dropOutOfOrderRecord=true (with replication > 1)
+    /// will have their upsert metadata reverted when inconsistencies are detected.
     PROTECTED(true),
 
-    /**
-     * Force commit is enabled for all tables regardless of their configuration.
-     * Use with caution as this may cause data inconsistency for partial-upsert tables
-     * or upsert tables with dropOutOfOrderRecord/outOfOrderRecordColumn enabled when replication > 1.
-     * Inconsistency checks and metadata revert are skipped.
-     */
+    /// Force commit is enabled for all tables regardless of their configuration.
+    /// Use with caution as this may cause data inconsistency for partial-upsert tables
+    /// or upsert tables with dropOutOfOrderRecord/outOfOrderRecordColumn enabled when replication > 1.
+    /// Inconsistency checks and metadata revert are skipped.
     UNSAFE(true);
 
     public static final Mode DEFAULT_CONSUMING_SEGMENT_CONSISTENCY_MODE = RESTRICTED;

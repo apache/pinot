@@ -24,9 +24,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 
-/**
- * Utility class to convert between human readable data size (e.g. '10.5G', '40B') and data size in bytes.
- */
+/// Utility class to convert between human readable data size (e.g. '10.5G', '40B') and data size in bytes.
 public class DataSizeUtils {
   private DataSizeUtils() {
   }
@@ -41,9 +39,7 @@ public class DataSizeUtils {
   private static final double TB_IN_BYTES = GB_IN_BYTES * 1024;
   private static final double PB_IN_BYTES = TB_IN_BYTES * 1024;
 
-  /**
-   * Converts human readable data size (e.g. '10.5G', '40B') to data size in bytes.
-   */
+  /// Converts human readable data size (e.g. '10.5G', '40B') to data size in bytes.
   public static long toBytes(String dataSizeString) {
     Matcher matcher = DATA_SIZE_PATTERN.matcher(dataSizeString);
     Preconditions.checkArgument(matcher.matches(), "Illegal data size: %s", dataSizeString);
@@ -70,9 +66,7 @@ public class DataSizeUtils {
     }
   }
 
-  /**
-   * Converts data size in bytes to human readable data size (e.g. '5B', '1.24M', '3T').
-   */
+  /// Converts data size in bytes to human readable data size (e.g. '5B', '1.24M', '3T').
   public static String fromBytes(long dataSizeInBytes) {
     if (dataSizeInBytes < KB_IN_BYTES) {
       return dataSizeInBytes + "B";

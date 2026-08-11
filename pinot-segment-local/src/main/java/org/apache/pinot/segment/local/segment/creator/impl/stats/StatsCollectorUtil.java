@@ -27,21 +27,17 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Utility class for creating column statistics collectors.
- */
+/// Utility class for creating column statistics collectors.
 public final class StatsCollectorUtil {
   private StatsCollectorUtil() {
   }
 
-  /**
-   * Create a statistics collector for the given column based on its data type.
-   *
-   * @param columnName Name of the column
-   * @param fieldSpec Field specification for the column
-   * @param statsCollectorConfig Stats collector configuration
-   * @return AbstractColumnStatisticsCollector for the column
-   */
+  /// Create a statistics collector for the given column based on its data type.
+  ///
+  /// @param columnName Name of the column
+  /// @param fieldSpec Field specification for the column
+  /// @param statsCollectorConfig Stats collector configuration
+  /// @return AbstractColumnStatisticsCollector for the column
   public static AbstractColumnStatisticsCollector createStatsCollector(String columnName, FieldSpec fieldSpec,
       FieldIndexConfigs indexConfig, StatsCollectorConfig statsCollectorConfig) {
     boolean dictionaryEnabled = indexConfig.getConfig(StandardIndexes.dictionary()).isEnabled();

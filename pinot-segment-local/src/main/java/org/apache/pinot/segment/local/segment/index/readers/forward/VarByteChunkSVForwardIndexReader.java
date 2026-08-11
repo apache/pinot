@@ -32,11 +32,10 @@ import org.apache.pinot.spi.utils.MapUtils;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * Chunk-based single-value raw (non-dictionary-encoded) forward index reader for values of variable length data type
- * (BIG_DECIMAL, STRING, BYTES).
- * <p>For data layout, please refer to the documentation for {@link VarByteChunkForwardIndexWriter}
- */
+/// Chunk-based single-value raw (non-dictionary-encoded) forward index reader for values of variable length data type
+/// (BIG_DECIMAL, STRING, BYTES).
+///
+/// For data layout, please refer to the documentation for [VarByteChunkForwardIndexWriter]
 public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardIndexReader {
   private static final int ROW_OFFSET_SIZE = VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
 
@@ -74,9 +73,7 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
     }
   }
 
-  /**
-   * Helper method to read STRING value from the compressed index.
-   */
+  /// Helper method to read STRING value from the compressed index.
   private String getStringCompressed(int docId, ChunkReaderContext context) {
     int chunkRowId = docId % _numDocsPerChunk;
     ByteBuffer chunkBuffer = getChunkBuffer(docId, context);
@@ -92,9 +89,7 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
     return new String(bytes, 0, length, UTF_8);
   }
 
-  /**
-   * Helper method to read STRING value from the uncompressed index.
-   */
+  /// Helper method to read STRING value from the uncompressed index.
   private String getStringUncompressed(int docId) {
     int chunkId = docId / _numDocsPerChunk;
     int chunkRowId = docId % _numDocsPerChunk;
@@ -135,9 +130,7 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
     return MapUtils.deserializeMap(getBytes(docId, context));
   }
 
-  /**
-   * Helper method to read BYTES value from the compressed index.
-   */
+  /// Helper method to read BYTES value from the compressed index.
   private byte[] getBytesCompressed(int docId, ChunkReaderContext context) {
     int chunkRowId = docId % _numDocsPerChunk;
     ByteBuffer chunkBuffer = getChunkBuffer(docId, context);
@@ -152,9 +145,7 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
     return bytes;
   }
 
-  /**
-   * Helper method to read BYTES value from the uncompressed index.
-   */
+  /// Helper method to read BYTES value from the uncompressed index.
   private byte[] getBytesUncompressed(int docId) {
     int chunkId = docId / _numDocsPerChunk;
     int chunkRowId = docId % _numDocsPerChunk;
@@ -170,9 +161,7 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
     return bytes;
   }
 
-  /**
-   * Helper method to compute the end offset of the value in the chunk buffer.
-   */
+  /// Helper method to compute the end offset of the value in the chunk buffer.
   private int getValueEndOffset(int rowId, ByteBuffer chunkBuffer) {
     if (rowId == _numDocsPerChunk - 1) {
       // Last row in the chunk
@@ -188,9 +177,7 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
     }
   }
 
-  /**
-   * Helper method to compute the end offset of the value in the data buffer.
-   */
+  /// Helper method to compute the end offset of the value in the data buffer.
   private long getValueEndOffset(int chunkId, int chunkRowId, long chunkStartOffset) {
     if (chunkId == _numChunks - 1) {
       // Last chunk

@@ -26,19 +26,15 @@ import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
-/**
- * Centralizes validations for the optimized PRelNode tree.
- */
+/// Centralizes validations for the optimized PRelNode tree.
 public class PRelNodeTreeValidator {
   private static final BrokerMetrics BROKER_METRICS = BrokerMetrics.get();
 
   private PRelNodeTreeValidator() {
   }
 
-  /**
-   * Validate the tree rooted at the given PRelNode. Ideally all issues with the plan should be caught even with an
-   * EXPLAIN, hence this method should be called as part of query compilation itself.
-   */
+  /// Validate the tree rooted at the given PRelNode. Ideally all issues with the plan should be caught even with an
+  /// EXPLAIN, hence this method should be called as part of query compilation itself.
   public static void validate(PRelNode rootNode, PhysicalPlannerContext context) {
     if (context == null) {
       return;
@@ -46,9 +42,7 @@ public class PRelNodeTreeValidator {
     validateLiteModeJoins(rootNode, context);
   }
 
-  /**
-   * Disables joins in lite mode based on broker-initialized config carried in context.
-   */
+  /// Disables joins in lite mode based on broker-initialized config carried in context.
   private static void validateLiteModeJoins(PRelNode rootNode, PhysicalPlannerContext context) {
     if (!context.isUseLiteMode() || context.isLiteModeJoinsEnabled()) {
       return;
@@ -71,10 +65,8 @@ public class PRelNodeTreeValidator {
     return false;
   }
 
-  /**
-   * Emit metrics about the given plan tree. This should be avoided for Explain statements since metrics are not really
-   * helpful there and can be misleading.
-   */
+  /// Emit metrics about the given plan tree. This should be avoided for Explain statements since metrics are not really
+  /// helpful there and can be misleading.
   public static void emitMetrics(PRelNode pRelNode) {
     Context context = new Context();
     walk(pRelNode, context);

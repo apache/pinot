@@ -39,9 +39,7 @@ import static org.mockito.Mockito.*;
 import static org.mockito.MockitoAnnotations.initMocks;
 
 
-/**
- * Unit test for {@link AzureEnvironmentProviderTest}
- */
+/// Unit test for [AzureEnvironmentProviderTest]
 public class AzureEnvironmentProviderTest {
   private final static String IMDS_RESPONSE_FILE = "mock-imds-response.json";
   private final static String IMDS_RESPONSE_WITHOUT_COMPUTE_INFO = "mock-imds-response-without-computenode.json";

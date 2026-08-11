@@ -26,9 +26,7 @@ import java.io.Serializable;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * Base implementation for the JSON based configurations.
- */
+/// Base implementation for the JSON based configurations.
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public abstract class BaseJsonConfig implements Serializable {

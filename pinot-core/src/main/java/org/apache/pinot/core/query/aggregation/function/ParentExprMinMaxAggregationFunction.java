@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -266,6 +267,7 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
     }
   }
 
+  @Nullable
   @Override
   public ExprMinMaxObject extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
@@ -292,8 +294,9 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
     return ObjectSerDeUtils.ARG_MIN_MAX_OBJECT_SER_DE.deserialize(customObject.getBuffer());
   }
 
+  @Nullable
   @Override
-  public ExprMinMaxObject extractFinalResult(ExprMinMaxObject exprMinMaxObject) {
+  public ExprMinMaxObject extractFinalResult(@Nullable ExprMinMaxObject exprMinMaxObject) {
     return exprMinMaxObject;
   }
 }

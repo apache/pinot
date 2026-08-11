@@ -31,7 +31,7 @@ public interface BloomFilterCreator extends IndexCreator {
 
   @Override
   default void add(Object value, int dictId) {
-    if (getDataType() == FieldSpec.DataType.BYTES) {
+    if (getDataType().getStoredType() == FieldSpec.DataType.BYTES) {
       add(BytesUtils.toHexString((byte[]) value));
     } else {
       add(value.toString());
@@ -40,7 +40,7 @@ public interface BloomFilterCreator extends IndexCreator {
 
   @Override
   default void add(Object[] values, @Nullable int[] dictIds) {
-    if (getDataType() == FieldSpec.DataType.BYTES) {
+    if (getDataType().getStoredType() == FieldSpec.DataType.BYTES) {
       for (Object value : values) {
         add(BytesUtils.toHexString((byte[]) value));
       }
@@ -50,14 +50,11 @@ public interface BloomFilterCreator extends IndexCreator {
       }
     }
   }
-  /**
-   * Adds a value to the bloom filter.
-   */
+
+  /// Adds a value to the bloom filter.
   void add(String value);
 
-  /**
-   * Seals the index and flushes it to disk.
-   */
+  /// Seals the index and flushes it to disk.
   void seal()
       throws IOException;
 }

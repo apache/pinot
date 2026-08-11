@@ -250,12 +250,10 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     assertEquals(DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_INT_ARRAY_MAP.get().size(), 0);
   }
 
-  /**
-   * Helper method to compare the values inside the single value group key buffer.
-   *
-   * All odd number index values should be the same, all even number index values should be the same.
-   * Odd number index values should be different from even number index values.
-   */
+  /// Helper method to compare the values inside the single value group key buffer.
+  ///
+  /// All odd number index values should be the same, all even number index values should be the same.
+  /// Odd number index values should be different from even number index values.
   private void compareSingleValueBuffer() {
     assertTrue(SV_GROUP_KEY_BUFFER[0] != SV_GROUP_KEY_BUFFER[1], _errorMessage);
     for (int i = 2; i < NUM_GROUPS; i += 2) {
@@ -408,12 +406,10 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     return expressions;
   }
 
-  /**
-   * Helper method to compare the values inside the multi value group key buffer.
-   *
-   * All odd number index values should be the same, all even number index values should be the same.
-   * Odd number index values should be different from even number index values.
-   */
+  /// Helper method to compare the values inside the multi value group key buffer.
+  ///
+  /// All odd number index values should be the same, all even number index values should be the same.
+  /// Odd number index values should be different from even number index values.
   private void compareMultiValueBuffer() {
     assertFalse(Arrays.equals(MV_GROUP_KEY_BUFFER[0], MV_GROUP_KEY_BUFFER[1]), _errorMessage);
     for (int i = 2; i < NUM_GROUPS; i += 2) {
@@ -422,12 +418,10 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     }
   }
 
-  /**
-   * Helper method to test the group key iterator returned by getGroupKeys().
-   *
-   * @param groupKeyIterator group key iterator.
-   * @param numUniqueKeys number of unique keys.
-   */
+  /// Helper method to test the group key iterator returned by getGroupKeys().
+  ///
+  /// @param groupKeyIterator group key iterator.
+  /// @param numUniqueKeys number of unique keys.
   private void testGetGroupKeys(Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator, int numUniqueKeys) {
     int count = 0;
     Set<Integer> idSet = new HashSet<>();

@@ -31,37 +31,29 @@ public class QueryContextUtils {
   private QueryContextUtils() {
   }
 
-  /**
-   * Returns {@code true} if the given query is a selection query, {@code false} otherwise.
-   */
+  /// Returns `true` if the given query is a selection query, `false` otherwise.
   public static boolean isSelectionQuery(QueryContext query) {
     return !query.isDistinct() && query.getAggregationFunctions() == null;
   }
 
-  /**
-   * Returns {@code true} if the given query is a simple selection-only query, {@code false} otherwise.
-   *
-   * Selection-only query at this moment means selection query without order-by.
-   */
+  /// Returns `true` if the given query is a simple selection-only query, `false` otherwise.
+  ///
+  /// Selection-only query at this moment means selection query without order-by.
   public static boolean isSelectionOnlyQuery(QueryContext query) {
     return isSelectionQuery(query) && query.getOrderByExpressions() == null;
   }
 
-  /**
-   * Returns {@code true} if the given query is an aggregation query, {@code false} otherwise.
-   */
+  /// Returns `true` if the given query is an aggregation query, `false` otherwise.
   public static boolean isAggregationQuery(QueryContext query) {
     return query.getAggregationFunctions() != null;
   }
 
-  /**
-   * Returns {@code true} if the given query is a distinct query, {@code false} otherwise.
-   */
+  /// Returns `true` if the given query is a distinct query, `false` otherwise.
   public static boolean isDistinctQuery(QueryContext query) {
     return query.isDistinct();
   }
 
-  /** Collect aggregation functions (except for the ones in filter). */
+  /// Collect aggregation functions (except for the ones in filter).
   public static void collectPostAggregations(QueryContext queryContext, Set<String> postAggregations) {
 
     // select
@@ -89,7 +81,7 @@ public class QueryContextUtils {
     }
   }
 
-  /** Collect aggregation functions from an ExpressionContext. */
+  /// Collect aggregation functions from an ExpressionContext.
   public static void collectPostAggregations(ExpressionContext expression, Set<String> postAggregations) {
     FunctionContext function = expression.getFunction();
     if (function != null) {
@@ -123,7 +115,7 @@ public class QueryContextUtils {
     return false;
   }
 
-  /** Collect aggregation functions from a FilterContext. */
+  /// Collect aggregation functions from a FilterContext.
   public static void collectPostAggregations(FilterContext filter, Set<String> postAggregations) {
     List<FilterContext> children = filter.getChildren();
     if (children != null) {

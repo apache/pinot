@@ -102,9 +102,7 @@ public abstract class ErrorCodesIntegrationTest extends BaseClusterIntegrationTe
 
   public abstract boolean useMultiStageQueryEngine();
 
-  /**
-   * If true, tests will query the controller instead of the broker.
-   */
+  /// If true, tests will query the controller instead of the broker.
   public abstract boolean queryController();
 
   @Override

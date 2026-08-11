@@ -27,13 +27,11 @@ import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 
 
-/**
- * Utility class to perform accumulation over a collection of rows. It provides utils for the following:
- * (1) method to deal with aggregation key and
- * (2) method to merge a row into an existing accumulator
- *
- * <p>Accumulation is used by {@code WindowAggregateOperator} and {@code AggregateOperator}.
- */
+/// Utility class to perform accumulation over a collection of rows. It provides utils for the following:
+/// (1) method to deal with aggregation key and
+/// (2) method to merge a row into an existing accumulator
+///
+/// Accumulation is used by `WindowAggregateOperator` and `AggregateOperator`.
 public class AggregationUtils {
   private AggregationUtils() {
   }
@@ -47,9 +45,7 @@ public class AggregationUtils {
     return new Key(values);
   }
 
-  /**
-   * Accumulator class which accumulates the aggregated results into the group sets if any
-   */
+  /// Accumulator class which accumulates the aggregated results into the group sets if any
   public static class Accumulator {
 
     protected final int _inputRef;

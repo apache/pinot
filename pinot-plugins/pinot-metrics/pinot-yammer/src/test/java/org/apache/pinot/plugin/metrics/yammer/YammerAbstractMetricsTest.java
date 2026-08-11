@@ -24,10 +24,8 @@ import org.apache.pinot.common.metrics.MetricsInspector;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
-/**
- * Runs the shared {@link AbstractMetricsTest} against the real {@link YammerMetricsRegistry}, verifying that the
- * yammer plugin respects the generic {@code AbstractMetrics} contract.
- */
+/// Runs the shared [AbstractMetricsTest] against the real [YammerMetricsRegistry], verifying that the
+/// yammer plugin respects the generic `AbstractMetrics` contract.
 public class YammerAbstractMetricsTest extends AbstractMetricsTest {
 
   @Override

@@ -40,9 +40,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 
-/**
- * Tests for {@link VectorSimilarityFilterOperator} with multi-backend support.
- */
+/// Tests for [VectorSimilarityFilterOperator] with multi-backend support.
 public class VectorSimilarityFilterOperatorTest {
 
   @Test
@@ -573,9 +571,7 @@ public class VectorSimilarityFilterOperatorTest {
     Assert.assertTrue(explain.contains("effectiveHnswUseBoundedQueue:false"), explain);
   }
 
-  /**
-   * Interface combining VectorIndexReader and NprobeAware for mocking IVF_FLAT readers.
-   */
+  /// Interface combining VectorIndexReader and NprobeAware for mocking IVF_FLAT readers.
   interface NprobeAwareVectorReader extends VectorIndexReader, NprobeAware {
   }
 

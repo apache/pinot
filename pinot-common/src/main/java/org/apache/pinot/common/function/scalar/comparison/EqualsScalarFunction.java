@@ -27,9 +27,7 @@ import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
-/**
- * Polymorphic equals (=) scalar function implementation
- */
+/// Polymorphic equals (=) scalar function implementation
 @ScalarFunction
 public class EqualsScalarFunction extends PolymorphicComparisonScalarFunction {
 

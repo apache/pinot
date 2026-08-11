@@ -48,13 +48,11 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * Test optimal settings for transforming bitmap via mapping.
- *  Depends on following files:
- *  - docMapping.buffer (json flattened doc ids -> doc ids mapping)
- *  - test.bitmap (serialized mutable roaring bitmap)
- *  that have to be generated (copied from pinot instance) before benchmark run.
- *  */
+/// Test optimal settings for transforming bitmap via mapping.
+///  Depends on following files:
+///  - docMapping.buffer (json flattened doc ids -> doc ids mapping)
+///  - test.bitmap (serialized mutable roaring bitmap)
+///  that have to be generated (copied from pinot instance) before benchmark run.
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Fork(1)

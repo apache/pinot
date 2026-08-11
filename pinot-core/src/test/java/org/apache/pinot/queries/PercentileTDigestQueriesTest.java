@@ -70,21 +70,13 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for PERCENTILE_TDIGEST aggregation function.
- *
- * <ul>
- *   <li>
- *     Generates a segment with a double column, a TDigest column, a custom compression TDigest column and a group-by
- *     column
- *   </li>
- *   <li>Runs aggregation and group-by queries on the generated segment</li>
- *   <li>
- *     Compares the results for PERCENTILE_TDIGEST on double column and TDigest column with results for PERCENTILE on
- *     double column
- *   </li>
- * </ul>
- */
+/// Tests for PERCENTILE_TDIGEST aggregation function.
+///
+/// - Generates a segment with a double column, a TDigest column, a custom compression TDigest column and a group-by
+///   column
+/// - Runs aggregation and group-by queries on the generated segment
+/// - Compares the results for PERCENTILE_TDIGEST on double column and TDigest column with results for PERCENTILE on
+///   double column
 public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   protected static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "PercentileTDigestQueriesTest");
   protected static final String TABLE_NAME = "testTable";

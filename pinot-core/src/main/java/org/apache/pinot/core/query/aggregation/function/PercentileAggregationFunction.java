@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.util.Arrays;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -186,22 +187,12 @@ public class PercentileAggregationFunction extends NullableSingleInputAggregatio
 
   @Override
   public DoubleArrayList extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    DoubleArrayList doubleArrayList = aggregationResultHolder.getResult();
-    if (doubleArrayList == null) {
-      return new DoubleArrayList();
-    } else {
-      return doubleArrayList;
-    }
+    return aggregationResultHolder.getResult();
   }
 
   @Override
   public DoubleArrayList extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    DoubleArrayList doubleArrayList = groupByResultHolder.getResult(groupKey);
-    if (doubleArrayList == null) {
-      return new DoubleArrayList();
-    } else {
-      return doubleArrayList;
-    }
+    return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
@@ -231,32 +222,28 @@ public class PercentileAggregationFunction extends NullableSingleInputAggregatio
     return ColumnDataType.DOUBLE;
   }
 
+  @Nullable
   @Override
-  public Double extractFinalResult(DoubleArrayList intermediateResult) {
-    int size = intermediateResult.size();
-    if (size == 0) {
-      if (_nullHandlingEnabled) {
-        return null;
-      } else {
-        return DEFAULT_FINAL_RESULT;
-      }
-    } else {
-      double[] values = intermediateResult.elements();
-      Arrays.sort(values, 0, size);
-      if (_percentile == 100) {
-        return values[size - 1];
-      } else {
-        return values[(int) ((long) size * _percentile / 100)];
-      }
+  public Double extractFinalResult(@Nullable DoubleArrayList intermediateResult) {
+    // A null intermediate result means nothing was aggregated, and so does an empty list, which is what a
+    // deserialized peer can still carry. With null handling enabled the percentile of nothing is NULL; with it
+    // disabled it is the sentinel this function has always rendered for an untouched accumulator.
+    if (intermediateResult == null || intermediateResult.isEmpty()) {
+      return _nullHandlingEnabled ? null : DEFAULT_FINAL_RESULT;
     }
+    int size = intermediateResult.size();
+    double[] values = intermediateResult.elements();
+    Arrays.sort(values, 0, size);
+    if (_percentile == 100) {
+      return values[size - 1];
+    }
+    return values[(int) ((long) size * _percentile / 100)];
   }
 
-  /**
-   * Returns the value list from the result holder or creates a new one if it does not exist.
-   *
-   * @param aggregationResultHolder Result holder
-   * @return Value list from the result holder
-   */
+  /// Returns the value list from the result holder or creates a new one if it does not exist.
+  ///
+  /// @param aggregationResultHolder Result holder
+  /// @return Value list from the result holder
   protected static DoubleArrayList getValueList(AggregationResultHolder aggregationResultHolder) {
     DoubleArrayList valueList = aggregationResultHolder.getResult();
     if (valueList == null) {
@@ -266,13 +253,11 @@ public class PercentileAggregationFunction extends NullableSingleInputAggregatio
     return valueList;
   }
 
-  /**
-   * Returns the value list for the given group key. If one does not exist, creates a new one and returns that.
-   *
-   * @param groupByResultHolder Result holder
-   * @param groupKey Group key for which to return the value list
-   * @return Value list for the group key
-   */
+  /// Returns the value list for the given group key. If one does not exist, creates a new one and returns that.
+  ///
+  /// @param groupByResultHolder Result holder
+  /// @param groupKey Group key for which to return the value list
+  /// @return Value list for the group key
   protected static DoubleArrayList getValueList(GroupByResultHolder groupByResultHolder, int groupKey) {
     DoubleArrayList valueList = groupByResultHolder.getResult(groupKey);
     if (valueList == null) {

@@ -59,10 +59,8 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     _segmentName = tableName + SEPARATOR + partitionGroupId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
   }
 
-  /**
-   * Returns the {@link LLCSegmentName} for the given segment name, or {@code null} if the given segment name does not
-   * represent an LLC segment.
-   */
+  /// Returns the [LLCSegmentName] for the given segment name, or `null` if the given segment name does not
+  /// represent an LLC segment.
   @Nullable
   public static LLCSegmentName of(String segmentName) {
     try {
@@ -72,9 +70,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     }
   }
 
-  /**
-   * Returns whether the given segment name represents an LLC segment.
-   */
+  /// Returns whether the given segment name represents an LLC segment.
   public static boolean isLLCSegment(String segmentName) {
     int numSeparators = 0;
     int index = 0;
@@ -85,14 +81,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     return numSeparators == 3;
   }
 
-  @Deprecated
-  public static boolean isLowLevelConsumerSegmentName(String segmentName) {
-    return isLLCSegment(segmentName);
-  }
-
-  /**
-   * Returns the sequence number of the given segment name.
-   */
+  /// Returns the sequence number of the given segment name.
   public static int getSequenceNumber(String segmentName) {
     return Integer.parseInt(StringUtils.splitByWholeSeparator(segmentName, SEPARATOR)[2]);
   }

@@ -21,24 +21,22 @@ package org.apache.pinot.spi.stream;
 import javax.annotation.Nullable;
 
 
-/**
- * Represents a Stream message which includes the following components:
- * 1. record key (optional)
- * 2. record value (required)
- * 3. length of the record value (required)
- * 4. StreamMessageMetadata (required) - encapsulates record headers and metadata associated with a stream message
- *  (such as a message identifier, publish timestamp, user-provided headers etc)
- *
- * Similar to value decoder, each implementing stream plugin can have a key decoder and header extractor.
- * If the key and header extractions are enabled for the table, the schema will automatically contain these fields as:
- * "__header$HEADER_KEY" or "__metadata$RECORD_TIMESTAMP"
- *
- * These columns can be treated similar to any other Pinot table column.
- *
- * Usability note: In order to achieve this, table configuration should enable "populate metadata" option.
- * Additionally, the pinot table schema should refer these fields. Otherwise, even though the fields are extracted,
- * they will not materialize in the pinot table.
- */
+/// Represents a Stream message which includes the following components:
+/// 1. record key (optional)
+/// 2. record value (required)
+/// 3. length of the record value (required)
+/// 4. StreamMessageMetadata (required) - encapsulates record headers and metadata associated with a stream message
+///  (such as a message identifier, publish timestamp, user-provided headers etc)
+///
+/// Similar to value decoder, each implementing stream plugin can have a key decoder and header extractor.
+/// If the key and header extractions are enabled for the table, the schema will automatically contain these fields as:
+/// "\_\_header$HEADER_KEY" or "\_\_metadata$RECORD_TIMESTAMP"
+///
+/// These columns can be treated similar to any other Pinot table column.
+///
+/// Usability note: In order to achieve this, table configuration should enable "populate metadata" option.
+/// Additionally, the pinot table schema should refer these fields. Otherwise, even though the fields are extracted,
+/// they will not materialize in the pinot table.
 // TODO: Revisit if we need to support value type other than byte[]
 public class StreamMessage<T> {
   protected final byte[] _key;
@@ -54,31 +52,23 @@ public class StreamMessage<T> {
     _metadata = metadata;
   }
 
-  /**
-   * Returns the key of the message.
-   */
+  /// Returns the key of the message.
   @Nullable
   public byte[] getKey() {
     return _key;
   }
 
-  /**
-   * Returns the content of the message.
-   */
+  /// Returns the content of the message.
   public T getValue() {
     return _value;
   }
 
-  /**
-   * Returns the length of the message content.
-   */
+  /// Returns the length of the message content.
   public int getLength() {
     return _length;
   }
 
-  /**
-   * Returns the metadata of the message.
-   */
+  /// Returns the metadata of the message.
   public StreamMessageMetadata getMetadata() {
     return _metadata;
   }

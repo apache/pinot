@@ -47,14 +47,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A Flink 2.x {@link Sink} that converts stream records into Pinot segments and uploads them to Pinot.
- *
- * <p>The sink is stateless and provides at-least-once semantics by draining in-flight uploads whenever Flink asks the
- * writer to flush.
- *
- * @param <T> type of record supported by the sink
- */
+/// A Flink 2.x [Sink] that converts stream records into Pinot segments and uploads them to Pinot.
+///
+/// The sink is stateless and provides at-least-once semantics by draining in-flight uploads whenever Flink asks the
+/// writer to flush.
+///
+/// @param <T> type of record supported by the sink
 @SuppressWarnings("NullAway")
 public class PinotSink<T> implements Sink<T> {
   public static final long DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS = 500000;
@@ -77,10 +75,8 @@ public class PinotSink<T> implements Sink<T> {
     this(recordConverter, tableConfig, schema, DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, DEFAULT_EXECUTOR_POOL_SIZE);
   }
 
-  /**
-   * Creates a sink using a table config fetched from the controller and injects the upload settings required by the
-   * Flink connector.
-   */
+  /// Creates a sink using a table config fetched from the controller and injects the upload settings required by the
+  /// Flink connector.
   public PinotSink(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
       String controllerBaseUrl) {
     this(recordConverter, prepareTableConfigForSink(tableConfig, controllerBaseUrl), schema,
@@ -104,9 +100,7 @@ public class PinotSink<T> implements Sink<T> {
     _segmentUploadTimeMs = segmentUploadTimeMs;
   }
 
-  /**
-   * Applies the connector-specific batch-ingestion defaults needed for segment generation and upload.
-   */
+  /// Applies the connector-specific batch-ingestion defaults needed for segment generation and upload.
   static TableConfig prepareTableConfigForSink(TableConfig tableConfig, String controllerBaseUrl) {
     Map<String, String> requiredBatchConfig = new HashMap<>();
     requiredBatchConfig.put(BatchConfigProperties.PUSH_CONTROLLER_URI, controllerBaseUrl);
@@ -149,12 +143,10 @@ public class PinotSink<T> implements Sink<T> {
     return new PinotSinkWriter(context);
   }
 
-  /**
-   * Writer implementation used by the Flink runtime inside each sink subtask.
-   *
-   * <p>This writer is not thread-safe; Flink invokes it from a single task thread while uploads are dispatched to a
-   * bounded background pool.
-   */
+  /// Writer implementation used by the Flink runtime inside each sink subtask.
+  ///
+  /// This writer is not thread-safe; Flink invokes it from a single task thread while uploads are dispatched to a
+  /// bounded background pool.
   private final class PinotSinkWriter implements SinkWriter<T> {
     private final SegmentWriter _segmentWriter;
     private final SegmentUploader _segmentUploader;

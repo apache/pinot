@@ -49,9 +49,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
-/**
- * Tests for time range reload behavior in {@link PinotTableReloadService}. Not thread-safe.
- */
+/// Tests for time range reload behavior in [PinotTableReloadService]. Not thread-safe.
 public class PinotTableReloadServiceTest {
   @Test
   public void testReloadSegmentsInTimeRangeFiltersSegmentsAndDispatches() throws Exception {

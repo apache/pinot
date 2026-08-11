@@ -84,9 +84,7 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
     return CustomSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytes);
   }
 
-  /**
-   * Processes a raw value (either multi-value array or single number) and returns an AvgPair with the sum and count.
-   */
+  /// Processes a raw value (either multi-value array or single number) and returns an AvgPair with the sum and count.
   protected AvgPair processRawValue(Object rawValue) {
     if (rawValue instanceof byte[]) {
       return deserializeAggregatedValue((byte[]) rawValue);

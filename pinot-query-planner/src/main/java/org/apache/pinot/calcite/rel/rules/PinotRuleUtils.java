@@ -92,18 +92,15 @@ public class PinotRuleUtils {
     return unboxRel(rel) instanceof Aggregate;
   }
 
-  /**
-   * utility logic to determine if a JOIN can be pushed down to the leaf-stage execution and leverage the
-   * segment-local info (indexing and others) to speed up the execution.
-   *
-   * <p>The logic here is that the "row-representation" of the relation must not have changed. E.g. </p>
-   * <ul>
-   *   <li>`RelNode` that are single-in, single-out are possible (Project/Filter/)</li>
-   *   <li>`Join` can be stacked on top if we only consider SEMI-JOIN</li>
-   *   <li>`Window` should be allowed but we don't have impl for Window on leaf, so not yet included.</li>
-   *   <li>`Sort` should be allowed but we need to reorder Sort and Join first, so not yet included.</li>
-   * </ul>
-   */
+  /// utility logic to determine if a JOIN can be pushed down to the leaf-stage execution and leverage the
+  /// segment-local info (indexing and others) to speed up the execution.
+  ///
+  /// The logic here is that the "row-representation" of the relation must not have changed. E.g.
+  ///
+  /// - `RelNode` that are single-in, single-out are possible (Project/Filter/)
+  /// - `Join` can be stacked on top if we only consider SEMI-JOIN
+  /// - `Window` should be allowed but we don't have impl for Window on leaf, so not yet included.
+  /// - `Sort` should be allowed but we need to reorder Sort and Join first, so not yet included.
   public static boolean canPushDynamicBroadcastToLeaf(RelNode relNode) {
     // TODO 1: optimize this part out as it is not efficient to scan the entire subtree for exchanges;
     //    we should cache the stats in the node (potentially using Trait, e.g. marking LeafTrait & IntermediateTrait)
@@ -157,11 +154,9 @@ public class PinotRuleUtils {
       validateWindowFrames(windowGroup);
     }
 
-    /**
-     * Replaces the reference to literal arguments in the window group with the actual literal values.
-     * NOTE: {@link Window} has a field called "constants" which contains the literal values. If the input reference is
-     * beyond the window input size, it is a reference to the constants.
-     */
+    /// Replaces the reference to literal arguments in the window group with the actual literal values.
+    /// NOTE: [Window] has a field called "constants" which contains the literal values. If the input reference is
+    /// beyond the window input size, it is a reference to the constants.
     public static Window.Group updateLiteralArgumentsInWindowGroup(Window window) {
       Window.Group oldWindowGroup = window.groups.get(0);
       RelNode input = unboxRel(window.getInput());

@@ -78,18 +78,16 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
     return selfNode(type, context, index, childrenArr, true);
   }
 
-  /**
-   * Builds the JSON node for the current operator including its statistics and children.
-   *
-   * @param type The type of the operator.
-   * @param context The context containing parallelism information.
-   * @param index The index of the operator in the stage stats.
-   * @param childrenArr The array of child JSON nodes.
-   * @param adjustWithChildren Whether cumulative stats like execution time and memory allocation should be adjusted
-   *                           by subtracting the children's stats. This is usually true, except in cases like pipeline
-   *                           breakers
-   * @return The constructed JSON node representing the operator and its statistics, including children.
-   */
+  /// Builds the JSON node for the current operator including its statistics and children.
+  ///
+  /// @param type The type of the operator.
+  /// @param context The context containing parallelism information.
+  /// @param index The index of the operator in the stage stats.
+  /// @param childrenArr The array of child JSON nodes.
+  /// @param adjustWithChildren Whether cumulative stats like execution time and memory allocation should be adjusted
+  ///                           by subtracting the children's stats. This is usually true, except in cases like pipeline
+  ///                           breakers
+  /// @return The constructed JSON node representing the operator and its statistics, including children.
   private ObjectNode selfNode(
       OperatorTypeDescriptor type,
       Context context,
@@ -286,6 +284,7 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
     }
   }
 
+  @Deprecated(forRemoval = true, since = "1.6.0")
   @Override
   public ObjectNode visitEnrichedJoin(EnrichedJoinNode node, Context context) {
     return visitJoin(node, context);

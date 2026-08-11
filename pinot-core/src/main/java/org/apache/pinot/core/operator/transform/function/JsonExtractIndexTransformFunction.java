@@ -38,12 +38,10 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The <code>JsonExtractIndexTransformFunction</code> provides the same behavior as JsonExtractScalar, with the
- * implementation changed to read values from the JSON index. For large JSON blobs this can be faster than parsing
- * GBs of JSON at query time. For small JSON blobs/highly filtered input this is generally slower than the *scalar
- * implementation. The inflection point is highly dependent on the number of docs remaining post filter.
- */
+/// The `JsonExtractIndexTransformFunction` provides the same behavior as JsonExtractScalar, with the
+/// implementation changed to read values from the JSON index. For large JSON blobs this can be faster than parsing
+/// GBs of JSON at query time. For small JSON blobs/highly filtered input this is generally slower than the \*scalar
+/// implementation. The inflection point is highly dependent on the number of docs remaining post filter.
 public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "jsonExtractIndex";
 
@@ -423,9 +421,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     return _stringValuesMV;
   }
 
-  /**
-   * Lazily initialize _valueToMatchingDocsMap, so that map generation is skipped when filtering excludes all values
-   */
+  /// Lazily initialize \_valueToMatchingDocsMap, so that map generation is skipped when filtering excludes all values
   private Map<String, RoaringBitmap> getValueToMatchingDocsMap() {
     if (_valueToMatchingDocsMap == null) {
       _valueToMatchingDocsMap = _jsonIndexReader.getMatchingFlattenedDocsMap(_jsonPathString, _filterJsonExpression);

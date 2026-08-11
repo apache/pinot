@@ -21,10 +21,8 @@ package org.apache.pinot.spi.ingestion.batch.spec;
 import java.io.Serializable;
 
 
-/**
- * TLS key and trust-store specification for ingestion jobs
- * (Enables access to TLS-protected controller APIs, etc.)
- */
+/// TLS key and trust-store specification for ingestion jobs
+/// (Enables access to TLS-protected controller APIs, etc.)
 public class TlsSpec implements Serializable {
   private String _keyStorePath;
   private String _keyStorePassword;

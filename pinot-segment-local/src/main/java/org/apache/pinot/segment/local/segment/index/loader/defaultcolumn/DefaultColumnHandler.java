@@ -20,19 +20,16 @@ package org.apache.pinot.segment.local.segment.index.loader.defaultcolumn;
 
 public interface DefaultColumnHandler {
 
-  /**
-   * Update the auto-generated default columns.
-   * <p>Supported default column actions include: <code>ADD/UPDATE/REMOVE DIMENSION/METRIC</code>
-   *
-   * @throws Exception
-   */
+  /// Update the auto-generated default columns.
+  ///
+  /// Supported default column actions include: `ADD/UPDATE/REMOVE DIMENSION/METRIC`
+  ///
+  /// @throws Exception
   void updateDefaultColumns()
       throws Exception;
 
-  /**
-   * Check if there is a need to add/remove/update the auto-generated default columns
-   * for the segment, according to the current table schema.
-   * @return true if there is a need to update.
-   */
+  /// Check if there is a need to add/remove/update the auto-generated default columns
+  /// for the segment, according to the current table schema.
+  /// @return true if there is a need to update.
   boolean needUpdateDefaultColumns();
 }

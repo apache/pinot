@@ -28,27 +28,24 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
-/**
- * The {@code FunnelCountSortedAggregationFunction} calculates the number of conversions for a given correlation column
- * and a list of steps as boolean expressions.
- * It leverages a more efficient counting strategy for segments sorted by correlate_by column, falls back to a regular
- * counting strategy for unsorted segments (e.g. uncommitted segments).
- *
- * <p>For multi-key correlate-by, the sorted/partitioned optimization applies to the first (primary) column only.
- *
- * Example:
- *   SELECT
- *    dateTrunc('day', timestamp) AS ts,
- *    FUNNEL_COUNT(
- *      STEPS(url = '/addToCart', url = '/checkout', url = '/orderConfirmation'),
- *      CORRELATE_BY(user_id),
- *      SETTINGS('partitioned','sorted')
- *    ) as step_counts
- *    FROM user_log
- *    WHERE url in ('/addToCart', '/checkout', '/orderConfirmation')
- *    GROUP BY 1
- *
- */
+/// The `FunnelCountSortedAggregationFunction` calculates the number of conversions for a given correlation column
+/// and a list of steps as boolean expressions.
+/// It leverages a more efficient counting strategy for segments sorted by correlate_by column, falls back to a regular
+/// counting strategy for unsorted segments (e.g. uncommitted segments).
+///
+/// For multi-key correlate-by, the sorted/partitioned optimization applies to the first (primary) column only.
+///
+/// Example:
+///   SELECT
+///    dateTrunc('day', timestamp) AS ts,
+///    FUNNEL_COUNT(
+///      STEPS(url = '/addToCart', url = '/checkout', url = '/orderConfirmation'),
+///      CORRELATE_BY(user_id),
+///      SETTINGS('partitioned','sorted')
+///    ) as step_counts
+///    FROM user_log
+///    WHERE url in ('/addToCart', '/checkout', '/orderConfirmation')
+///    GROUP BY 1
 public class FunnelCountSortedAggregationFunction<A> extends FunnelCountAggregationFunction<A, List<Long>> {
   private final ExpressionContext _primaryCorrelationCol;
   private final AggregationStrategy<SortedAggregationResult> _sortedAggregationStrategy;

@@ -93,9 +93,7 @@ import software.amazon.awssdk.services.sts.auth.StsAssumeRoleCredentialsProvider
 import software.amazon.awssdk.services.sts.model.AssumeRoleRequest;
 
 
-/**
- * Implementation of PinotFS for AWS S3 file system
- */
+/// Implementation of PinotFS for AWS S3 file system
 public class S3PinotFS extends BasePinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(S3PinotFS.class);
 
@@ -221,13 +219,11 @@ public class S3PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Masks a sensitive key, showing only the first and last 3 characters, with the middle characters replaced by '*'.
-   * If the key is null or shorter than or equal to 6 characters, returns "***".
-   *
-   * @param key the sensitive key string to mask
-   * @return the masked key string
-   */
+  /// Masks a sensitive key, showing only the first and last 3 characters, with the middle characters replaced by '\*'.
+  /// If the key is null or shorter than or equal to 6 characters, returns "\*\*\*".
+  ///
+  /// @param key the sensitive key string to mask
+  /// @return the masked key string
   private static String maskKey(String key) {
     if (key == null || key.length() <= 6) {
       return "***";
@@ -252,12 +248,10 @@ public class S3PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Retrieves the AWS credentials from the current S3 client's credentials provider.
-   *
-   * @return the resolved {@link AwsCredentials}
-   * @throws IllegalStateException if the S3 client credentials provider is not an {@link AwsCredentialsProvider}
-   */
+  /// Retrieves the AWS credentials from the current S3 client's credentials provider.
+  ///
+  /// @return the resolved [AwsCredentials]
+  /// @throws IllegalStateException if the S3 client credentials provider is not an [AwsCredentialsProvider]
   public AwsCredentials getAwsCredentials() {
     Object provider = _s3Client.serviceClientConfiguration().credentialsProvider();
     if (provider instanceof AwsCredentialsProvider) {
@@ -268,14 +262,12 @@ public class S3PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Executes the given S3 operation, retrying once after refreshing AWS credentials if an {@link S3Exception} occurs.
-   *
-   * @param action the S3 operation to execute
-   * @param <T> the type of the result returned by the operation
-   * @return the result of the S3 operation
-   * @throws IOException if the operation fails after credential refresh
-   */
+  /// Executes the given S3 operation, retrying once after refreshing AWS credentials if an [S3Exception] occurs.
+  ///
+  /// @param action the S3 operation to execute
+  /// @param <T> the type of the result returned by the operation
+  /// @return the result of the S3 operation
+  /// @throws IOException if the operation fails after credential refresh
   private <T> T retryWithS3CredentialRefresh(Supplier<T> action) throws IOException {
     try {
       return action.get();
@@ -298,22 +290,19 @@ public class S3PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Initialized the _s3Client directly with provided client.
-   * This initialization method will not initialize the server side encryption
-   * @param s3Client s3Client to initialize with
-   */
+  /// Initialized the \_s3Client directly with provided client.
+  /// This initialization method will not initialize the server side encryption
+  /// @param s3Client s3Client to initialize with
   public void init(S3Client s3Client) {
     _s3Client = s3Client;
     setMultiPartUploadConfigs(-1, -1);
   }
 
-  /**
-   * Initialize the _s3Client directly with provided client, along with additional server side encryption related props
-   * @param s3Client s3Client to initialize with
-   * @param serverSideEncryption the server side encryption string e.g. AWS_KMS is the only supported on as of now
-   * @param serverSideEncryptionConfig properties specific to provided server side encryption type
-   */
+  /// Initialize the \_s3Client directly with provided client, along with additional server side encryption related
+  /// props
+  /// @param s3Client s3Client to initialize with
+  /// @param serverSideEncryption the server side encryption string e.g. AWS_KMS is the only supported on as of now
+  /// @param serverSideEncryptionConfig properties specific to provided server side encryption type
   public void init(S3Client s3Client, String serverSideEncryption, PinotConfiguration serverSideEncryptionConfig) {
     _s3Client = s3Client;
     _s3Config = new S3Config(serverSideEncryptionConfig);
@@ -412,12 +401,10 @@ public class S3PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Determines if the file exists at the given path
-   * @param uri file path
-   * @return {@code true} if the file exists in the path
-   *         {@code false} otherwise
-   */
+  /// Determines if the file exists at the given path
+  /// @param uri file path
+  /// @return `true` if the file exists in the path
+  ///         `false` otherwise
   private boolean existsFile(URI uri)
       throws IOException {
     try {
@@ -434,12 +421,10 @@ public class S3PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Determines if a path is a directory that is not empty
-   * @param uri The path under the S3 bucket
-   * @return {@code true} if the path is a non-empty directory,
-   *         {@code false} otherwise
-   */
+  /// Determines if a path is a directory that is not empty
+  /// @param uri The path under the S3 bucket
+  /// @return `true` if the path is a non-empty directory,
+  ///         `false` otherwise
   private boolean isEmptyDirectory(URI uri)
       throws IOException {
     if (!isDirectory(uri)) {
@@ -468,13 +453,11 @@ public class S3PinotFS extends BasePinotFS {
     return isEmpty;
   }
 
-  /**
-   * Method to copy file from source to destination.
-   * @param srcUri source path
-   * @param dstUri destination path
-   * @return {@code true} if the copy operation succeeds, i.e., response code is 200
-   *         {@code false} otherwise
-   */
+  /// Method to copy file from source to destination.
+  /// @param srcUri source path
+  /// @param dstUri destination path
+  /// @return `true` if the copy operation succeeds, i.e., response code is 200
+  ///         `false` otherwise
   private boolean copyFile(URI srcUri, URI dstUri)
       throws IOException {
     try {

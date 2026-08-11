@@ -21,15 +21,11 @@ package org.apache.pinot.segment.local.segment.readers.sort;
 import java.util.List;
 
 
-/**
- * Interface for segment sorters
- */
+/// Interface for segment sorters
 public interface SegmentSorter {
 
-  /**
-   * Compute the sorted docIds given a list of sort order column names
-   * @param sortOrder a list of column names that represent the sorting order
-   * @return an array of sorted docIds
-   */
+  /// Compute the sorted docIds given a list of sort order column names
+  /// @param sortOrder a list of column names that represent the sorting order
+  /// @return an array of sorted docIds
   int[] getSortedDocIds(final List<String> sortOrder);
 }

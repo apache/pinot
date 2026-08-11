@@ -66,10 +66,8 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Helper class to reduce data tables and set group by results into the BrokerResponseNative
- * Used for key-less aggregations, e.g. select max(id), sum(quantity) from orders .
- */
+/// Helper class to reduce data tables and set group by results into the BrokerResponseNative
+/// Used for key-less aggregations, e.g. select max(id), sum(quantity) from orders .
 @SuppressWarnings("rawtypes")
 public class GroupByDataTableReducer implements DataTableReducer {
   private static final int MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE = 2; // TBD, find a better value.
@@ -93,9 +91,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     _numColumns = _numAggregationFunctions + _numKeyColumns;
   }
 
-  /**
-   * Reduces and sets group by results into ResultTable.
-   */
+  /// Reduces and sets group by results into ResultTable.
   @Override
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
       Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponse,
@@ -210,7 +206,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     if (havingFilter != null) {
       rows = new ArrayList<>();
       HavingFilterHandler havingFilterHandler = new HavingFilterHandler(havingFilter, postAggregationHandler,
-          _queryContext.requiresNullAwareKeySerialization());
+          _queryContext.requiresNullAwareKeyEvaluation());
       int processedRows = 0;
       while (rows.size() < limit && sortedIterator.hasNext()) {
         QueryThreadContext.checkTerminationAndSampleUsagePeriodically(processedRows++, "GroupByDataTableReducer");
@@ -249,9 +245,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     brokerResponseNative.setResultTable(new ResultTable(rewriterResult.getDataSchema(), rewriterResult.getRows()));
   }
 
-  /**
-   * Constructs the DataSchema for the rows before the post-aggregation (SQL mode).
-   */
+  /// Constructs the DataSchema for the rows before the post-aggregation (SQL mode).
   private DataSchema getPrePostAggregationDataSchema(DataSchema dataSchema) {
     String[] columnNames = dataSchema.getColumnNames();
     ColumnDataType[] columnDataTypes = new ColumnDataType[_numColumns];
@@ -299,15 +293,15 @@ public class GroupByDataTableReducer implements DataTableReducer {
         public void runJob() {
           try {
             for (DataTable dataTable : reduceGroup) {
-              /// Grouping-set queries serialize NULL group keys via null bitmaps regardless of the user's
-              /// null-handling option, so their key nulls must be restored here as well.
-              boolean restoreNulls = _queryContext.requiresNullAwareKeySerialization();
-              RoaringBitmap[] nullBitmaps = null;
-              if (restoreNulls) {
-                nullBitmaps = new RoaringBitmap[_numColumns];
-                for (int i = 0; i < _numColumns; i++) {
-                  nullBitmaps[i] = dataTable.getNullRowIds(i);
-                }
+              // Nulls are restored regardless of the query's null-handling option: a DataTable carries a null bitmap
+              // whenever the producer wrote a null, which happens in both modes. Tables without nulls have no bitmap
+              // section at all, so getNullRowIds() returns null for every column and the per-row restore is skipped.
+              RoaringBitmap[] nullBitmaps = new RoaringBitmap[_numColumns];
+              boolean restoreNulls = false;
+              for (int i = 0; i < _numColumns; i++) {
+                RoaringBitmap nullBitmap = dataTable.getNullRowIds(i);
+                nullBitmaps[i] = nullBitmap;
+                restoreNulls |= nullBitmap != null;
               }
 
               int numRows = dataTable.getNumberOfRows();
@@ -423,18 +417,15 @@ public class GroupByDataTableReducer implements DataTableReducer {
     return indexedTable;
   }
 
-  /**
-   * Computes the number of reduce threads to use per query.
-   * <ul>
-   *   <li> Use single thread if number of data tables to reduce is less than
-   *   {@value #MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE}.</li>
-   *   <li> Else, use min of max allowed reduce threads per query, and number of data tables.</li>
-   * </ul>
-   *
-   * @param numDataTables Number of data tables to reduce
-   * @param maxReduceThreadsPerQuery Max allowed reduce threads per query
-   * @return Number of reduce threads to use for the query
-   */
+  /// Computes the number of reduce threads to use per query.
+  ///
+  /// - Use single thread if number of data tables to reduce is less than
+  ///   {@value #MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE}.
+  /// - Else, use min of max allowed reduce threads per query, and number of data tables.
+  ///
+  /// @param numDataTables Number of data tables to reduce
+  /// @param maxReduceThreadsPerQuery Max allowed reduce threads per query
+  /// @return Number of reduce threads to use for the query
   private int getNumReduceThreadsToUse(int numDataTables, int maxReduceThreadsPerQuery) {
     // Use single thread if number of data tables < MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE.
     if (numDataTables < MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE) {
@@ -463,7 +454,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     if (havingFilter != null) {
       rows = new ArrayList<>();
       HavingFilterHandler havingFilterHandler = new HavingFilterHandler(havingFilter, postAggregationHandler,
-          _queryContext.requiresNullAwareKeySerialization());
+          _queryContext.requiresNullAwareKeyEvaluation());
       for (int i = 0; i < numRows; i++) {
         Object[] row = getConvertedRowWithFinalResult(dataTable, i);
         if (havingFilterHandler.isMatch(row)) {
@@ -545,74 +536,35 @@ public class GroupByDataTableReducer implements DataTableReducer {
     }
   }
 
-  /**
-   * Serializes the merged {@link IndexedTable} back into an intermediate {@link DataTable}, mirroring
-   * {@code GroupByResultsBlock#getDataTable()} so the output is byte-shape identical to a single
-   * server's intermediate group-by response. Group-key columns are written by stored type; OBJECT
-   * aggregate columns via {@link AggregationFunction#serializeIntermediateResult}. No limit / HAVING /
-   * post-aggregation / formatting is applied.
-   */
+  /// Serializes the merged [IndexedTable] back into an intermediate [DataTable], mirroring
+  /// `GroupByResultsBlock#getDataTable()` so the output is byte-shape identical to a single
+  /// server's intermediate group-by response. Group-key columns are written by stored type; OBJECT
+  /// aggregate columns via [AggregationFunction#serializeIntermediateResult]. No limit / HAVING /
+  /// post-aggregation / formatting is applied.
   private DataTable buildIntermediateDataTable(DataSchema dataSchema, IndexedTable indexedTable)
       throws IOException {
     DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     Iterator<Record> iterator = indexedTable.iterator();
-    /// Grouping-set queries carry NULL group keys that must be serialized via the null-aware path even when
-    /// the user did not enable null handling.
-    if (_queryContext.requiresNullAwareKeySerialization()) {
-      RoaringBitmap[] nullBitmaps = new RoaringBitmap[_numColumns];
-      Object[] nullPlaceholders = new Object[_numColumns];
-      for (int colId = 0; colId < _numColumns; colId++) {
-        nullBitmaps[colId] = new RoaringBitmap();
-        nullPlaceholders[colId] = storedColumnDataTypes[colId].getNullPlaceholder();
-      }
-      int rowId = 0;
-      while (iterator.hasNext()) {
-        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId, "GroupByDataTableReducer#merge");
-        dataTableBuilder.startRow();
-        Object[] values = iterator.next().getValues();
-        for (int i = 0; i < _numColumns; i++) {
-          Object value = values[i];
-          if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
-            if (value == null) {
-              dataTableBuilder.setNull(i);
-            } else {
-              dataTableBuilder.setColumn(i,
-                  _aggregationFunctions[i - _numKeyColumns].serializeIntermediateResult(value));
-            }
-          } else {
-            if (value == null) {
-              value = nullPlaceholders[i];
-              nullBitmaps[i].add(rowId);
-            }
-            DataTableBuilderUtils.setColumn(dataTableBuilder, storedColumnDataTypes[i], i, value);
-          }
+    // NOTE: Nulls are serialized through the builder's null-aware path regardless of the query's null-handling
+    // option -- grouping sets carry NULL group keys, and aggregation functions whose accumulator has no identity
+    // element produce null intermediate results, in both modes.
+    int rowId = 0;
+    while (iterator.hasNext()) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId++, "GroupByDataTableReducer#merge");
+      dataTableBuilder.startRow();
+      Object[] values = iterator.next().getValues();
+      for (int i = 0; i < _numColumns; i++) {
+        Object value = values[i];
+        if (value == null) {
+          dataTableBuilder.setNull(i);
+        } else if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
+          dataTableBuilder.setColumn(i, _aggregationFunctions[i - _numKeyColumns].serializeIntermediateResult(value));
+        } else {
+          DataTableBuilderUtils.setColumn(dataTableBuilder, storedColumnDataTypes[i], i, value);
         }
-        dataTableBuilder.finishRow();
-        rowId++;
       }
-      for (RoaringBitmap nullBitmap : nullBitmaps) {
-        dataTableBuilder.setNullRowIds(nullBitmap);
-      }
-    } else {
-      int rowId = 0;
-      while (iterator.hasNext()) {
-        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId++, "GroupByDataTableReducer#merge");
-        dataTableBuilder.startRow();
-        Object[] values = iterator.next().getValues();
-        for (int i = 0; i < _numColumns; i++) {
-          Object value = values[i];
-          if (value == null) {
-            dataTableBuilder.setNull(i);
-          } else if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
-            dataTableBuilder.setColumn(i,
-                _aggregationFunctions[i - _numKeyColumns].serializeIntermediateResult(value));
-          } else {
-            DataTableBuilderUtils.setColumn(dataTableBuilder, storedColumnDataTypes[i], i, value);
-          }
-        }
-        dataTableBuilder.finishRow();
-      }
+      dataTableBuilder.finishRow();
     }
     return dataTableBuilder.build();
   }

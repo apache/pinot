@@ -23,14 +23,12 @@ import java.util.List;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 
 
-/**
- * Represents a composite predicate.
- *
- * A composite predicate evaluator represents a single predicate evaluator or multiple predicate evaluators conjoined
- * with OR. Each predicate evaluator is associated with a boolean value indicating whether the predicate is negated.
- * Consider the given predicate: (d1 > 10 OR NOT d1 > 50). A composite predicate will represent two predicates:
- * (d1 > 10) and NOT(d1 > 50) and represent that they are related by the operator OR.
- */
+/// Represents a composite predicate.
+///
+/// A composite predicate evaluator represents a single predicate evaluator or multiple predicate evaluators conjoined
+/// with OR. Each predicate evaluator is associated with a boolean value indicating whether the predicate is negated.
+/// Consider the given predicate: (d1 > 10 OR NOT d1 > 50). A composite predicate will represent two predicates:
+/// (d1 > 10) and NOT(d1 > 50) and represent that they are related by the operator OR.
 public class CompositePredicateEvaluator {
   private final List<ObjectBooleanPair<PredicateEvaluator>> _predicateEvaluators;
 
@@ -43,10 +41,8 @@ public class CompositePredicateEvaluator {
     return _predicateEvaluators;
   }
 
-  /**
-   * Applies a dictionary id to the composite predicate evaluator. Returns {@code true} if the dictionary id matches any
-   * predicate evaluator, {@code false} otherwise.
-   */
+  /// Applies a dictionary id to the composite predicate evaluator. Returns `true` if the dictionary id
+  /// matches any predicate evaluator, `false` otherwise.
   public boolean apply(int dictId) {
     for (ObjectBooleanPair<PredicateEvaluator> predicateEvaluator : _predicateEvaluators) {
       if (predicateEvaluator.left().applySV(dictId) != predicateEvaluator.rightBoolean()) {

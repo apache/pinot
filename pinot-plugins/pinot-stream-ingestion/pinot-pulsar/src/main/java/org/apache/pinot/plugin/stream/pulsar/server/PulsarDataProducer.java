@@ -32,12 +32,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Pulsar data producer class
- *
- * TODO: Improve the current implementation that creates the producer object for each `produce()` call.
- *
- */
+/// Pulsar data producer class
+///
+/// TODO: Improve the current implementation that creates the producer object for each `produce()` call.
 public class PulsarDataProducer implements StreamDataProducer {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarDataProducer.class);

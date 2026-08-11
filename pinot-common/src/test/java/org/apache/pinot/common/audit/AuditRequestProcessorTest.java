@@ -42,9 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 
-/**
- * Unit tests for {@link AuditRequestProcessor}.
- */
+/// Unit tests for [AuditRequestProcessor].
 public class AuditRequestProcessorTest {
 
   @Mock

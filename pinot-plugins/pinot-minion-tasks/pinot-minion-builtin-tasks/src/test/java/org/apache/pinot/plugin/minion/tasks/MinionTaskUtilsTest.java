@@ -404,9 +404,7 @@ public class MinionTaskUtilsTest {
     return b;
   }
 
-  /**
-   * Builds a ValidDocIdsBitmapResponse for testing: same segmentCrc and GOOD status.
-   */
+  /// Builds a ValidDocIdsBitmapResponse for testing: same segmentCrc and GOOD status.
   private static ValidDocIdsBitmapResponse makeResponse(String segmentName, String crc, String instanceId,
       RoaringBitmap bitmap) {
     return new ValidDocIdsBitmapResponse(segmentName, crc, null, ValidDocIdsType.SNAPSHOT,
@@ -419,9 +417,7 @@ public class MinionTaskUtilsTest {
         RoaringBitmapUtils.serialize(bitmap), instanceId, ServiceStatus.Status.GOOD);
   }
 
-  /**
-   * Creates an InstanceConfig so that InstanceUtils.getServerAdminEndpoint() returns a valid URL.
-   */
+  /// Creates an InstanceConfig so that InstanceUtils.getServerAdminEndpoint() returns a valid URL.
   private static InstanceConfig makeInstanceConfig(String instanceId) {
     InstanceConfig config = new InstanceConfig(instanceId);
     config.setHostName("localhost");
@@ -429,9 +425,7 @@ public class MinionTaskUtilsTest {
     return config;
   }
 
-  /**
-   * Sets up MinionContext with mock Helix so getServers() returns the given server list.
-   */
+  /// Sets up MinionContext with mock Helix so getServers() returns the given server list.
   private void setupMinionContextWithServers(String tableNameWithType, String segmentName, String[] servers) {
     ExternalView externalView = new ExternalView(tableNameWithType);
     Map<String, String> assignment = new HashMap<>();
@@ -453,11 +447,9 @@ public class MinionTaskUtilsTest {
     MinionContext.getInstance().setHelixManager(helixManager);
   }
 
-  /**
-   * Calls getValidDocIdFromServerMatchingCrc with ServerSegmentMetadataReader mocked. Each invocation of
-   * getValidDocIdsBitmapFromServer returns the next element of responseOrThrowByCallOrder; if it is an Exception,
-   * that exception is thrown (simulating fetch failure).
-   */
+  /// Calls getValidDocIdFromServerMatchingCrc with ServerSegmentMetadataReader mocked. Each invocation of
+  /// getValidDocIdsBitmapFromServer returns the next element of responseOrThrowByCallOrder; if it is an Exception,
+  /// that exception is thrown (simulating fetch failure).
   private static RoaringBitmap getValidDocIdFromServerMatchingCrcWithMockedReader(String tableName,
       String segmentName, String expectedCrc, String consensusMode, List<Object> responseOrThrowByCallOrder,
       String[] servers, MinionTaskUtilsTest testInstance) {

@@ -33,7 +33,6 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import org.apache.pinot.segment.local.io.util.VarLengthValueWriter;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter;
-import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.roaringbitmap.RoaringBitmap;
@@ -44,16 +43,16 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * Implementation of {@link JsonIndexCreator} that uses off-heap memory.
- * <p>The posting lists (map from value to doc ids) are initially stored in a TreeMap, then flushed into a file for
- * every 100,000 documents (unflattened records) added. After all the documents are added, we read all the posting lists
- * from the file and merge them using a priority queue to calculate the final posting lists. Then we generate the string
- * dictionary and inverted index from the final posting lists and create the json index on top of them.
- * <p>Off-heap creator uses less heap memory, but is more expensive on computation and needs flush data to disk which
- * can slow down the creation because of the IO latency. Use off-heap creator in the environment where there is limited
- * heap memory or garbage collection can cause performance issue (e.g. index creation at loading time on Pinot Server).
- */
+/// Implementation of [org.apache.pinot.segment.spi.index.creator.JsonIndexCreator] that uses off-heap memory.
+///
+/// The posting lists (map from value to doc ids) are initially stored in a TreeMap, then flushed into a file for
+/// every 100,000 documents (unflattened records) added. After all the documents are added, we read all the posting
+/// lists from the file and merge them using a priority queue to calculate the final posting lists. Then we generate
+/// the string dictionary and inverted index from the final posting lists and create the json index on top of them.
+///
+/// Off-heap creator uses less heap memory, but is more expensive on computation and needs flush data to disk which
+/// can slow down the creation because of the IO latency. Use off-heap creator in the environment where there is limited
+/// heap memory or garbage collection can cause performance issue (e.g. index creation at loading time on Pinot Server).
 public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
   private static final int FLUSH_THRESHOLD = 100_000;
 
@@ -88,9 +87,7 @@ public class OffHeapJsonIndexCreator extends BaseJsonIndexCreator {
     }
   }
 
-  /**
-   * Flushes the current posting list map into the file.
-   */
+  /// Flushes the current posting list map into the file.
   private void flush()
       throws IOException {
     long length = 0;

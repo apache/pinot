@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -45,21 +44,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Disk-backed reader for IVF_FLAT index files using positional buffer reads.
- *
- * <p>Unlike {@link IvfFlatVectorIndexReader} which loads all data into heap, this reader
- * keeps the backing {@link PinotDataBuffer} open and performs positional reads on demand.
- * Centroids are always loaded into heap for fast probe selection; inverted list data
- * (doc IDs and vectors) is read on demand from the buffer.</p>
- *
- * <p>This reader can read standard IVF_FLAT index files (magic 0x49564646). The on-disk
- * format is identical — only the runtime access pattern differs.</p>
- *
- * <h3>Thread safety</h3>
- * <p>Thread-safe for concurrent reads. Query-scoped nprobe overrides use ThreadLocal.
- * Positional buffer reads are thread-safe; each read specifies an absolute offset.</p>
- */
+/// Disk-backed reader for IVF_FLAT index files using positional buffer reads.
+///
+/// Unlike [IvfFlatVectorIndexReader] which loads all data into heap, this reader
+/// keeps the backing [PinotDataBuffer] open and performs positional reads on demand.
+/// Centroids are always loaded into heap for fast probe selection; inverted list data
+/// (doc IDs and vectors) is read on demand from the buffer.
+///
+/// This reader can read standard IVF_FLAT index files (magic 0x49564646). The on-disk
+/// format is identical — only the runtime access pattern differs.
+///
+/// ## Thread safety
+///
+/// Thread-safe for concurrent reads. Query-scoped nprobe overrides use ThreadLocal.
+/// Positional buffer reads are thread-safe; each read specifies an absolute offset.
 public class IvfOnDiskVectorIndexReader
     implements FilterAwareVectorIndexReader, ApproximateRadiusVectorIndexReader, NprobeAware {
   private static final Logger LOGGER = LoggerFactory.getLogger(IvfOnDiskVectorIndexReader.class);
@@ -100,28 +98,24 @@ public class IvfOnDiskVectorIndexReader
 
   private final ThreadLocal<Integer> _nprobeOverride = new ThreadLocal<>();
 
-  /**
-   * Opens an IVF_FLAT index from the given buffer for on-demand positional reads. The reader
-   * takes ownership of the buffer and closes it in {@link #close()}; use the four-arg overload
-   * to pass a borrowed buffer (e.g. one owned by the segment directory).
-   */
+  /// Opens an IVF_FLAT index from the given buffer for on-demand positional reads. The reader
+  /// takes ownership of the buffer and closes it in [#close()]; use the four-arg overload
+  /// to pass a borrowed buffer (e.g. one owned by the segment directory).
   public IvfOnDiskVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config) {
     this(column, buffer, config, /* ownsBuffer */ true);
   }
 
-  /**
-   * Opens an IVF_FLAT index from the given buffer for on-demand positional reads.
-   *
-   * <p>The buffer must be mapped {@link ByteOrder#BIG_ENDIAN} (the IVF_FLAT on-disk byte order)
-   * and must remain valid for the lifetime of the reader (positional reads at query time).</p>
-   *
-   * @param column      the column name
-   * @param buffer      the IVF_FLAT index buffer (BIG_ENDIAN)
-   * @param config      the vector index configuration
-   * @param ownsBuffer  when {@code true}, the reader closes the buffer in {@link #close()} (or
-   *                    on constructor failure). Pass {@code false} when the buffer is owned by
-   *                    the segment directory.
-   */
+  /// Opens an IVF_FLAT index from the given buffer for on-demand positional reads.
+  ///
+  /// The buffer must be mapped [java.nio.ByteOrder#BIG_ENDIAN] (the IVF_FLAT on-disk byte order)
+  /// and must remain valid for the lifetime of the reader (positional reads at query time).
+  ///
+  /// @param column      the column name
+  /// @param buffer      the IVF_FLAT index buffer (BIG_ENDIAN)
+  /// @param config      the vector index configuration
+  /// @param ownsBuffer  when `true`, the reader closes the buffer in [#close()] (or
+  ///                    on constructor failure). Pass `false` when the buffer is owned by
+  ///                    the segment directory.
   public IvfOnDiskVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config,
       boolean ownsBuffer) {
     _column = column;
@@ -296,18 +290,16 @@ public class IvfOnDiskVectorIndexReader
     return result;
   }
 
-  /**
-   * Reads and scans an inverted list from the backing buffer.
-   *
-   * <p>Uses a ThreadLocal ByteBuffer to avoid per-call heap allocation for the list data,
-   * and reuses a single float[] for reading each document vector.</p>
-   *
-   * @param centroidIdx index of the centroid
-   * @param query query vector
-   * @param topK max results to keep
-   * @param maxHeap priority queue for top-K tracking
-   * @param preFilterBitmap optional filter bitmap; if non-null, only matching docs are scored
-   */
+  /// Reads and scans an inverted list from the backing buffer.
+  ///
+  /// Uses a ThreadLocal ByteBuffer to avoid per-call heap allocation for the list data,
+  /// and reuses a single float\[\] for reading each document vector.
+  ///
+  /// @param centroidIdx index of the centroid
+  /// @param query query vector
+  /// @param topK max results to keep
+  /// @param maxHeap priority queue for top-K tracking
+  /// @param preFilterBitmap optional filter bitmap; if non-null, only matching docs are scored
   private void scanInvertedList(int centroidIdx, float[] query, int topK,
       PriorityQueue<ScoredDoc> maxHeap, ImmutableRoaringBitmap preFilterBitmap) {
     int listSize = _listSizes[centroidIdx];
@@ -393,11 +385,9 @@ public class IvfOnDiskVectorIndexReader
   private static final int MAX_THREAD_LOCAL_BUFFER_SIZE = 4 * 1024 * 1024; // 4 MB
   private static final ThreadLocal<ByteBuffer> SCAN_BUFFER = new ThreadLocal<>();
 
-  /**
-   * Returns a ByteBuffer of at least the given capacity, cleared and ready for use.
-   * Uses a thread-local buffer when the required capacity is within the size cap.
-   * Allocates a fresh buffer for oversized requests to avoid pinning large allocations.
-   */
+  /// Returns a ByteBuffer of at least the given capacity, cleared and ready for use.
+  /// Uses a thread-local buffer when the required capacity is within the size cap.
+  /// Allocates a fresh buffer for oversized requests to avoid pinning large allocations.
   private static ByteBuffer getOrResizeThreadLocalBuffer(int requiredCapacity) {
     if (requiredCapacity > MAX_THREAD_LOCAL_BUFFER_SIZE) {
       // Allocate a fresh buffer for oversized requests — do not cache in ThreadLocal

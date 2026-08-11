@@ -28,9 +28,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests the array scalar functions
- */
+/// Tests the array scalar functions
 public class ArrayFunctionsTest {
 
   private void testFunction(String functionExpression, List<String> expectedArguments, GenericRow row,

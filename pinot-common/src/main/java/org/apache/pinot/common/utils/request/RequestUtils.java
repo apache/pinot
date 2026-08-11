@@ -36,6 +36,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlKind;
@@ -58,6 +59,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
@@ -94,9 +96,7 @@ public class RequestUtils {
     return sqlNodeAndOptions;
   }
 
-  /**
-   * Sets extra options for the given query.
-   */
+  /// Sets extra options for the given query.
   @VisibleForTesting
   public static void setOptions(SqlNodeAndOptions sqlNodeAndOptions, JsonNode jsonRequest) {
     Map<String, String> queryOptions = new HashMap<>();
@@ -209,6 +209,9 @@ public class RequestUtils {
     }
     if (object instanceof byte[]) {
       return getLiteral((byte[]) object);
+    }
+    if (object instanceof UUID) {
+      return getLiteral(UuidUtils.toBytes((UUID) object));
     }
     if (object instanceof int[]) {
       return getLiteral((int[]) object);
@@ -334,9 +337,7 @@ public class RequestUtils {
     return getLiteralExpression(getLiteral(object));
   }
 
-  /**
-   * Returns the value of the given literal.
-   */
+  /// Returns the value of the given literal.
   @Nullable
   public static Object getLiteralValue(Literal literal) {
     Literal._Fields type = literal.getSetField();
@@ -454,9 +455,7 @@ public class RequestUtils {
     }
   }
 
-  /**
-   * Returns the string representation of the given literal.
-   */
+  /// Returns the string representation of the given literal.
   public static String getLiteralString(Literal literal) {
     Literal._Fields type = literal.getSetField();
     switch (type) {
@@ -530,18 +529,7 @@ public class RequestUtils {
     return getFunctionExpression(getFunction(canonicalName, operands));
   }
 
-  @Deprecated
-  public static Expression getFunctionExpression(String canonicalName) {
-    assert canonicalName.equalsIgnoreCase(canonicalizeFunctionNamePreservingSpecialKey(canonicalName));
-    Expression expression = new Expression(ExpressionType.FUNCTION);
-    Function function = new Function(canonicalName);
-    expression.setFunctionCall(function);
-    return expression;
-  }
-
-  /**
-   * Converts the function name into its canonical form.
-   */
+  /// Converts the function name into its canonical form.
   public static String canonicalizeFunctionName(String functionName) {
     return StringUtils.remove(functionName, '_').toLowerCase();
   }
@@ -550,22 +538,20 @@ public class RequestUtils {
       Map.copyOf(Arrays.stream(FilterKind.values())
           .collect(Collectors.toMap(f -> canonicalizeFunctionName(f.name()), Enum::name)));
 
-  /**
-   * Converts the function name into its canonical form, but preserving the special keys.
-   * - Keep FilterKind.name() as is because we need to read the FilterKind via FilterKind.valueOf().
-   */
+  /// Converts the function name into its canonical form, but preserving the special keys.
+  /// - Keep FilterKind.name() as is because we need to read the FilterKind via FilterKind.valueOf().
   public static String canonicalizeFunctionNamePreservingSpecialKey(String functionName) {
     String canonicalName = canonicalizeFunctionName(functionName);
     return CANONICAL_NAME_TO_SPECIAL_KEY_MAP.getOrDefault(canonicalName, canonicalName);
   }
 
-  /// Returns true iff {@code expression} is an {@code AS}-wrapped function call
-  /// (i.e. shaped like {@code expr AS alias} after Calcite parsing).
+  /// Returns true iff `expression` is an `AS`-wrapped function call
+  /// (i.e. shaped like `expr AS alias` after Calcite parsing).
   ///
   /// Centralises the shape check that was previously open-coded in several places
   /// (alias appliers, MV analyzer, query-context converters).  Callers that need the
-  /// alias name or the underlying expression should use {@link #unwrapAlias(Expression)}
-  /// or {@link #extractAliasOrIdentifierName(Expression)} rather than re-implementing
+  /// alias name or the underlying expression should use [#unwrapAlias(Expression)]
+  /// or [#extractAliasOrIdentifierName(Expression)] rather than re-implementing
   /// this check inline.
   public static boolean isAliased(@Nullable Expression expression) {
     if (expression == null) {
@@ -575,13 +561,13 @@ public class RequestUtils {
     return function != null && SqlKind.AS.lowerName.equals(function.getOperator());
   }
 
-  /// Strips the {@code AS alias} wrapper from a SELECT-list expression and returns the
-  /// underlying source expression.  When {@code expression} is not aliased the original
+  /// Strips the `AS alias` wrapper from a SELECT-list expression and returns the
+  /// underlying source expression.  When `expression` is not aliased the original
   /// expression is returned unchanged, so this method is safe to call unconditionally
   /// while iterating SELECT items.
   ///
   /// Mirrors the local helper that previously lived in
-  /// {@code MaterializedViewAnalyzer#extractSourceExpression}; callers that walk a
+  /// `MaterializedViewAnalyzer#extractSourceExpression`; callers that walk a
   /// SELECT list to inspect the aggregate / transform under each alias should use this
   /// method instead of re-implementing the same operand-zero indirection.
   public static Expression unwrapAlias(Expression expression) {
@@ -590,10 +576,10 @@ public class RequestUtils {
 
   /// Extracts the user-facing column name a SELECT-list expression resolves to:
   ///
-  ///   - {@code expr AS alias} ⇒ {@code alias}
-  ///   - bare identifier ({@code col}) ⇒ {@code col}
+  ///   - `expr AS alias` ⇒ `alias`
+  ///   - bare identifier (`col`) ⇒ `col`
   ///   - any other shape (function/literal without an alias) ⇒
-  ///     {@link IllegalStateException}
+  ///     [IllegalStateException]
   ///
   /// Used by callers that need to map SELECT items to schema columns (e.g. MV schema
   /// coverage checks, MV column inference).  The error message lists the offending
@@ -692,11 +678,6 @@ public class RequestUtils {
 
   public static Set<String> getTableNames(PinotQuery pinotQuery) {
     return getTableNames(pinotQuery.getDataSource());
-  }
-
-  @Deprecated
-  public static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
-    return getOptionsFromString(request.get(optionsKey).asText());
   }
 
   public static Map<String, String> getOptionsFromString(String optionStr) {

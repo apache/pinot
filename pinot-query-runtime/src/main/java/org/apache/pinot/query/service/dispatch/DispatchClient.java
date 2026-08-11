@@ -40,25 +40,19 @@ import org.apache.pinot.query.service.dispatch.streaming.StreamingDispatchObserv
 import org.apache.pinot.query.service.dispatch.streaming.StreamingQuerySession;
 
 
-/**
- * Dispatches a query plan to given a {@link QueryServerInstance}. Each {@link DispatchClient} has its own gRPC Channel
- * and Client Stub.
- * TODO: It might be neater to implement pooling at the client level. Two options: (1) Pass a channel provider and
- *       let that take care of pooling. (2) Create a DispatchClient interface and implement pooled/non-pooled versions.
- */
+/// Dispatches a query plan to given a [QueryServerInstance]. Each [DispatchClient] has its own gRPC Channel
+/// and Client Stub.
+/// TODO: It might be neater to implement pooling at the client level. Two options: (1) Pass a channel provider and
+///       let that take care of pooling. (2) Create a DispatchClient interface and implement pooled/non-pooled versions.
 class DispatchClient {
   private static final StreamObserver<Worker.CancelResponse> NO_OP_CANCEL_STREAM_OBSERVER = new CancelObserver();
-  /**
-   * Shared buffer allocator configured to prefer direct (off-heap) buffers for better performance.
-   * Using a static allocator allows for better memory pooling across all DispatchClient instances.
-   */
+  /// Shared buffer allocator configured to prefer direct (off-heap) buffers for better performance.
+  /// Using a static allocator allows for better memory pooling across all DispatchClient instances.
   private static final PooledByteBufAllocator BUF_ALLOCATOR = new PooledByteBufAllocator(true);
-  /**
-   * Max size of an inbound message on the broker's dispatch channel. The default gRPC limit is 4 MB, but a single
-   * {@code SubmitWithStream} {@code OpChainComplete} can carry a large {@link Worker.MultiStageStatsTree} (wide/deep
-   * plans, large STRING stats), and exceeding the limit fails the whole query with {@code RESOURCE_EXHAUSTED} even
-   * though the query results are already in hand. Matches the server's inbound limit ({@code QueryServer}).
-   */
+  /// Max size of an inbound message on the broker's dispatch channel. The default gRPC limit is 4 MB, but a single
+  /// `SubmitWithStream` `OpChainComplete` can carry a large [Worker.MultiStageStatsTree] (wide/deep
+  /// plans, large STRING stats), and exceeding the limit fails the whole query with `RESOURCE_EXHAUSTED` even
+  /// though the query results are already in hand. Matches the server's inbound limit (`QueryServer`).
   private static final int MAX_INBOUND_MESSAGE_SIZE = 64 * 1024 * 1024;
 
   private final ManagedChannel _channel;
@@ -141,26 +135,24 @@ class DispatchClient {
     _dispatchStub.withDeadline(deadline).submit(request, new LastValueDispatchObserver<>(virtualServer, callback));
   }
 
-  /**
-   * Opens a {@code SubmitWithStream} bidi RPC for one server, sends the initial {@code submit}, and registers the
-   * resulting {@link StreamingDispatchObserver} with {@code session} for cancel fan-out and {@code OpChainComplete}
-   * accumulation.
-   *
-   * <p>The submit-ack callback is invoked exactly once: with the {@link Worker.QueryResponse} on the first
-   * {@code submit_ack} from the server, or with a non-null {@link Throwable} if the stream errors before the ack
-   * arrives.
-   *
-   * @param request               the plan submission
-   * @param virtualServer         server identity (used in callbacks for routing decisions on failure)
-   * @param deadline              gRPC deadline for the call
-   * @param session               broker-side streaming session — the returned observer registers itself here
-   * @param expectedOpChainsForThisServer  number of opchains this server is expected to report; used to drain the
-   *                              session latch correctly when the stream errors before all opchains have responded
-   * @param ackCallback           receives the submit-ack response or a failure throwable
-   * @return the observer, also exposed as
-   *         {@link org.apache.pinot.query.service.dispatch.streaming.StreamingServerHandle} on the session for
-   *         cancel fan-out
-   */
+  /// Opens a `SubmitWithStream` bidi RPC for one server, sends the initial `submit`, and registers the
+  /// resulting [StreamingDispatchObserver] with `session` for cancel fan-out and `OpChainComplete`
+  /// accumulation.
+  ///
+  /// The submit-ack callback is invoked exactly once: with the [Worker.QueryResponse] on the first
+  /// `submit_ack` from the server, or with a non-null [Throwable] if the stream errors before the ack
+  /// arrives.
+  ///
+  /// @param request               the plan submission
+  /// @param virtualServer         server identity (used in callbacks for routing decisions on failure)
+  /// @param deadline              gRPC deadline for the call
+  /// @param session               broker-side streaming session — the returned observer registers itself here
+  /// @param expectedOpChainsForThisServer  number of opchains this server is expected to report; used to drain the
+  ///                              session latch correctly when the stream errors before all opchains have responded
+  /// @param ackCallback           receives the submit-ack response or a failure throwable
+  /// @return the observer, also exposed as
+  ///         [org.apache.pinot.query.service.dispatch.streaming.StreamingServerHandle] on the session for
+  ///         cancel fan-out
   public StreamingDispatchObserver submitWithStream(Worker.QueryRequest request, QueryServerInstance virtualServer,
       Deadline deadline, StreamingQuerySession session, int expectedOpChainsForThisServer,
       BiConsumer<Worker.QueryResponse, Throwable> ackCallback) {

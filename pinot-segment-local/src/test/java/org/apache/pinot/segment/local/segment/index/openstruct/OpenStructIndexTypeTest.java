@@ -61,7 +61,7 @@ public class OpenStructIndexTypeTest {
     JsonNode indexes = JsonUtils.stringToJsonNode("{\"h3\": {}}");
     FieldConfig keyConfig = new FieldConfig.Builder("loc").withIndexes(indexes).build();
     // First constructor arg is `disabled` — pass false so the config is enabled and validation runs.
-    OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(keyConfig));
+    OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(keyConfig), null);
     FieldIndexConfigs fieldIndexConfigs =
         new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), config).build();
     FieldSpec openStructSpec = new ComplexFieldSpec("payload", FieldSpec.DataType.OPEN_STRUCT, true, Map.of());
@@ -75,7 +75,7 @@ public class OpenStructIndexTypeTest {
       throws Exception {
     JsonNode indexes = JsonUtils.stringToJsonNode("{\"range\": {}, \"bloom\": {}, \"inverted\": {}}");
     FieldConfig keyConfig = new FieldConfig.Builder("clicks").withIndexes(indexes).build();
-    OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(keyConfig));
+    OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(keyConfig), null);
     FieldIndexConfigs fieldIndexConfigs =
         new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), config).build();
     FieldSpec openStructSpec = new ComplexFieldSpec("payload", FieldSpec.DataType.OPEN_STRUCT, true, Map.of());

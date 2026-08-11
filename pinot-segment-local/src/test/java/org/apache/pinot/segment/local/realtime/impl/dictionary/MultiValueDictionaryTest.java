@@ -20,11 +20,14 @@ package org.apache.pinot.segment.local.realtime.impl.dictionary;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Random;
+import java.util.UUID;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
+import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -86,6 +89,31 @@ public class MultiValueDictionaryTest implements PinotBuffersAfterClassCheckRule
     } catch (Throwable t) {
       fail("Failed with random seed: " + seed, t);
     }
+  }
+
+  @Test
+  public void testMultiValueBytesIndexingWithDictionary()
+      throws Exception {
+    try (MutableDictionary dictionary = new BytesOnHeapMutableDictionary()) {
+      assertMultiValueBytesIndexingWithDictionary(dictionary);
+    }
+    try (MutableDictionary dictionary =
+        new BytesOffHeapMutableDictionary(4, 10, _memoryManager, "bytesDictionary", 4)) {
+      assertMultiValueBytesIndexingWithDictionary(dictionary);
+    }
+  }
+
+  private static void assertMultiValueBytesIndexingWithDictionary(MutableDictionary dictionary) {
+    byte[] first = new byte[]{1, 2};
+    byte[] second = new byte[]{3, 4, 5};
+    byte[] third = new byte[]{6};
+
+    assertEquals(dictionary.index(new Object[]{first, second, first}), new int[]{0, 1, 0});
+    assertEquals(dictionary.index(new Object[]{third, second}), new int[]{2, 1});
+    assertEquals(dictionary.length(), 3);
+    assertEquals(dictionary.getBytesValue(0), first);
+    assertEquals(dictionary.getBytesValue(1), second);
+    assertEquals(dictionary.getBytesValue(2), third);
   }
 
   @Test
@@ -284,6 +312,31 @@ public class MultiValueDictionaryTest implements PinotBuffersAfterClassCheckRule
       }
     } catch (Throwable t) {
       fail("Failed with random seed: " + seed, t);
+    }
+  }
+
+  @Test
+  public void testMultiValueIndexingWithRawUuidBytes()
+      throws Exception {
+    try (DirectMemoryManager memManager = new DirectMemoryManager("test");
+        FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
+            NROWS / 3, UuidUtils.UUID_NUM_BYTES, memManager, "indexer", false, FieldSpec.DataType.BYTES,
+            FieldSpec.DataType.UUID)) {
+      byte[][] values = new byte[][]{
+          UuidUtils.toBytes(new UUID(1L, 2L)),
+          UuidUtils.toBytes(new UUID(3L, 4L))
+      };
+      indexer.setBytesMV(0, values);
+
+      byte[][] buffer = new byte[values.length][];
+      assertEquals(indexer.getBytesMV(0, buffer), values.length);
+      for (int i = 0; i < values.length; i++) {
+        assertEquals(buffer[i], values[i]);
+      }
+      byte[][] actualValues = indexer.getBytesMV(0);
+      for (int i = 0; i < values.length; i++) {
+        assertEquals(actualValues[i], values[i]);
+      }
     }
   }
 }

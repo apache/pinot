@@ -106,10 +106,8 @@ public class SegmentGenerationJobRunnerTest {
     // FUTURE - validate contents of file?
   }
 
-  /**
-   * Enabling consistent data push should generate segment names with timestamps in order to differentiate between
-   * the non-unique raw segment names.
-   */
+  /// Enabling consistent data push should generate segment names with timestamps in order to differentiate between
+  /// the non-unique raw segment names.
   @Test
   public void testSegmentGenerationWithConsistentPush()
       throws Exception {

@@ -23,11 +23,9 @@ import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-/**
- * Polymorphic bit mask scalar function.
- *
- * <p>This implementation is stateless and thread-safe.
- */
+/// Polymorphic bit mask scalar function.
+///
+/// This implementation is stateless and thread-safe.
 @ScalarFunction
 public class BitMaskScalarFunction extends BaseUnaryIntegralScalarFunction {
   private static final FunctionInfo INT_FUNCTION_INFO;

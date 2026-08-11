@@ -25,30 +25,24 @@ import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * Factory for REGEXP_LIKE predicate evaluators when FST index is enabled.
- */
+/// Factory for REGEXP_LIKE predicate evaluators when FST index is enabled.
 public class FSTBasedRegexpPredicateEvaluatorFactory {
   private FSTBasedRegexpPredicateEvaluatorFactory() {
   }
 
-  /**
-   * Creates a predicate evaluator which matches the regexp query pattern using FST Index available.
-   *
-   * @param regexpLikePredicate REGEXP_LIKE predicate to evaluate
-   * @param fstIndexReader FST Index reader
-   * @param dictionary Dictionary for the column
-   * @return Predicate evaluator
-   */
+  /// Creates a predicate evaluator which matches the regexp query pattern using FST Index available.
+  ///
+  /// @param regexpLikePredicate REGEXP_LIKE predicate to evaluate
+  /// @param fstIndexReader FST Index reader
+  /// @param dictionary Dictionary for the column
+  /// @return Predicate evaluator
   public static BaseDictionaryBasedPredicateEvaluator newFSTBasedEvaluator(RegexpLikePredicate regexpLikePredicate,
       TextIndexReader fstIndexReader, Dictionary dictionary) {
     return new FSTBasedRegexpPredicateEvaluatorFactory.FSTBasedRegexpPredicateEvaluator(regexpLikePredicate,
         fstIndexReader, dictionary);
   }
 
-  /**
-   * Matches regexp query using FSTIndexReader.
-   */
+  /// Matches regexp query using FSTIndexReader.
   private static class FSTBasedRegexpPredicateEvaluator extends BaseDictIdBasedRegexpLikePredicateEvaluator {
     final ImmutableRoaringBitmap _matchingDictIdBitmap;
 

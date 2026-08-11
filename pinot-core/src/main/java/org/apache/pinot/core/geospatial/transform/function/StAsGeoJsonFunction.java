@@ -33,9 +33,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
 
 
-/**
- * Returns the GEOJson representation of the geometry object .
- */
+/// Returns the GEOJson representation of the geometry object .
 public class StAsGeoJsonFunction extends BaseTransformFunction {
 
   public static final String FUNCTION_NAME = "ST_AsGeoJSON";

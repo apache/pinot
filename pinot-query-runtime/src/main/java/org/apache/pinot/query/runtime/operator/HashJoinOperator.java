@@ -41,9 +41,7 @@ import org.apache.pinot.query.runtime.operator.join.ObjectLookupTable;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
-/**
- * This {@code HashJoinOperator} join algorithm with join keys. Right table is materialized into a hash table.
- */
+/// This `HashJoinOperator` join algorithm with join keys. Right table is materialized into a hash table.
 // TODO: Support memory size based resource limit.
 @SuppressWarnings("unchecked")
 public class HashJoinOperator extends BaseJoinOperator {
@@ -134,9 +132,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     }
   }
 
-  /**
-   * Check if a join key contains null values. In SQL standard, null keys should not match in equi-joins.
-   **/
+  /// Check if a join key contains null values. In SQL standard, null keys should not match in equi-joins.
   private boolean isNullKey(Object key) {
     if (key == null) {
       return true;

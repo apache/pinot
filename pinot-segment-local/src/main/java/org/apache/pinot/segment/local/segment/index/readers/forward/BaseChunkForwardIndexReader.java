@@ -37,9 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base implementation for chunk-based raw (non-dictionary-encoded) forward index reader.
- */
+/// Base implementation for chunk-based raw (non-dictionary-encoded) forward index reader.
 public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<ChunkReaderContext> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseChunkForwardIndexReader.class);
 
@@ -110,16 +108,14 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     _isSingleValue = isSingleValue;
   }
 
-  /**
-   * Helper method to return the chunk buffer that contains the value at the given document id.
-   * <ul>
-   *   <li> If the chunk already exists in the reader context, returns the same. </li>
-   *   <li> Otherwise, loads the chunk for the row, and sets it in the reader context. </li>
-   * </ul>
-   * @param docId Document id
-   * @param context Reader context
-   * @return Chunk for the row
-   */
+  /// Helper method to return the chunk buffer that contains the value at the given document id.
+  ///
+  /// - If the chunk already exists in the reader context, returns the same.
+  /// - Otherwise, loads the chunk for the row, and sets it in the reader context.
+  ///
+  /// @param docId Document id
+  /// @param context Reader context
+  /// @return Chunk for the row
   protected ByteBuffer getChunkBuffer(int docId, ChunkReaderContext context) {
     int chunkId = getChunkId(docId);
     if (context.getChunkId() == chunkId) {
@@ -234,11 +230,9 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     return decompressedBuffer;
   }
 
-  /**
-   * Helper method to get the offset of the chunk in the data.
-   * @param chunkId Id of the chunk for which to return the position.
-   * @return Position (offset) of the chunk in the data.
-   */
+  /// Helper method to get the offset of the chunk in the data.
+  /// @param chunkId Id of the chunk for which to return the position.
+  /// @return Position (offset) of the chunk in the data.
   protected long getChunkPosition(int chunkId) {
     if (_headerEntryChunkOffsetSize == Integer.BYTES) {
       return _dataHeader.getInt(chunkId * _headerEntryChunkOffsetSize);

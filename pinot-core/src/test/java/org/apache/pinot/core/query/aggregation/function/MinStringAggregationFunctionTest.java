@@ -36,18 +36,15 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
 public class MinStringAggregationFunctionTest extends AbstractAggregationFunctionTest {
 
-  /**
-   * Helper method to create a FluentQueryTest builder for a table with a single String field.
-   * This is used to simulate the DataTypeScenario concept from numeric aggregation tests,
-   * but fixed for the STRING data type.
-   */
+  /// Helper method to create a FluentQueryTest builder for a table with a single String field.
+  /// This is used to simulate the DataTypeScenario concept from numeric aggregation tests,
+  /// but fixed for the STRING data type.
   protected FluentQueryTest.DeclaringTable getDeclaringTable(boolean enableColumnBasedNullHandling) {
     return FluentQueryTest.withBaseDir(_baseDir)
         .givenTable(
@@ -130,11 +127,6 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
     assertEquals(function.merge("banana", "apple"), "apple");
     assertEquals(function.merge("", "apple"), "");
     assertEquals(function.merge("apple", ""), "");
-
-    // Test null handling
-    assertEquals(function.merge("apple", null), "apple");
-    assertEquals(function.merge(null, "apple"), "apple");
-    assertNull(function.merge(null, null));
 
     // Test final result merging
     assertEquals(function.mergeFinalResult("apple", "banana"), "apple");

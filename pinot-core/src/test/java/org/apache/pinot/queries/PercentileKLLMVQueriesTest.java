@@ -35,9 +35,7 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 
 
-/**
- * Variation of the PercentileKLLQueriesTest suite which tests PERCENTILE_KLL_MV
- */
+/// Variation of the PercentileKLLQueriesTest suite which tests PERCENTILE_KLL_MV
 public class PercentileKLLMVQueriesTest extends PercentileKLLQueriesTest {
   private static final int MAX_NUM_MULTI_VALUES = 10;
 

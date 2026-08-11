@@ -45,6 +45,13 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
   protected final boolean _isSortedColumn;
   protected final MutableForwardIndex _forwardIndex;
 
+  // Lazily computed because it may require a full scan of the forward index, and it is queried multiple times per
+  // column during segment creation. Left unsynchronized: an instance describes a single column and is reached only
+  // through the per-column stats map, so it is confined to whichever thread creates that column. Even if that ever
+  // changes, the segment no longer accepts documents by the time stats are collected, so a race can only recompute
+  // the same value.
+  private Boolean _sorted;
+
   public MutableNoDictColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn) {
     _dataSourceMetadata = dataSource.getDataSourceMetadata();
     _fieldSpec = _dataSourceMetadata.getFieldSpec();
@@ -105,6 +112,13 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
 
   @Override
   public boolean isSorted() {
+    if (_sorted == null) {
+      _sorted = computeSorted();
+    }
+    return _sorted;
+  }
+
+  private boolean computeSorted() {
     // Sorted column is guaranteed to be sorted by construction — no scan needed
     if (_isSortedColumn) {
       return true;
@@ -115,9 +129,18 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
       return false;
     }
 
+    // A single distinct value is always sorted — no scan needed. Min and max are tracked per raw value during
+    // ingestion, but are left null when aggregated metrics are enabled, so fall back to the scan when unavailable.
+    Comparable<?> minValue = getMinValue();
+    if (minValue != null && minValue.equals(getMaxValue())) {
+      return true;
+    }
+
     int numDocs = _dataSourceMetadata.getNumDocs();
 
-    // Verify that values are non-decreasing when iterated in the given order
+    // Verify that values are non-decreasing when iterated in the given order. The BYTES path uses
+    // ByteArray.compare (unsigned byte-wise lexicographic), which is identical to UuidUtils.compare's unsigned
+    // 64-bit-word ordering on canonical 16-byte big-endian UUIDs, so a single comparator handles both.
     DataType storedType = getStoredType();
     if (_sortedDocIds != null) {
       switch (storedType) {

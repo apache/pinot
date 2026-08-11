@@ -51,10 +51,8 @@ import static org.apache.pinot.core.common.MinionConstants.UpsertCompactMergeTas
 import static org.testng.Assert.*;
 
 
-/**
- * Integration test for the UpsertCompactMergeTask minion task.
- * This test validates the complete flow of compacting and merging segments in an upsert table.
- */
+/// Integration test for the UpsertCompactMergeTask minion task.
+/// This test validates the complete flow of compacting and merging segments in an upsert table.
 public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegrationTest {
   protected static final String DEFAULT_TABLE_NAME = "mytable";
   protected static final String DEFAULT_SCHEMA_NAME = "mytable";
@@ -135,9 +133,7 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     FileUtils.deleteDirectory(_tempDir);
   }
 
-  /**
-   * Tests the basic flow of UpsertCompactMergeTask execution.
-   */
+  /// Tests the basic flow of UpsertCompactMergeTask execution.
   @Test(priority = 1)
   public void testBasicUpsertCompactMergeTaskExecution()
       throws Exception {
@@ -181,9 +177,7 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     assertTrue(hasTaskMetadata, "Should have task metadata indicating segments were processed");
   }
 
-  /**
-   * Tests error scenarios in task execution.
-   */
+  /// Tests error scenarios in task execution.
   @Test(priority = 3)
   public void testErrorScenarios()
       throws Exception {
@@ -439,10 +433,8 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     verifyLatestRecordsRetained();
   }
 
-  /**
-   * Verifies that for each primary key, the record with the highest timestamp is retained after merge.
-   * This is crucial for upsert behavior - the latest record should win.
-   */
+  /// Verifies that for each primary key, the record with the highest timestamp is retained after merge.
+  /// This is crucial for upsert behavior - the latest record should win.
   private void verifyLatestRecordsRetained()
       throws Exception {
     // Based on the gameScores_csv.tar.gz data, expected latest records are:
@@ -481,10 +473,8 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     System.out.println("✓ Verified that latest records are retained for each primary key after upsert merge");
   }
 
-  /**
-   * Captures the initial data state before running the merge task.
-   * This allows us to verify that the data remains consistent after the merge.
-   */
+  /// Captures the initial data state before running the merge task.
+  /// This allows us to verify that the data remains consistent after the merge.
   private void captureInitialDataState()
       throws Exception {
     // Capture initial count
@@ -564,10 +554,8 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     }
   }
 
-  /**
-   * Verifies that segments have been processed by the UpsertCompactMerge task.
-   * This checks for task completion metadata in segment custom maps.
-   */
+  /// Verifies that segments have been processed by the UpsertCompactMerge task.
+  /// This checks for task completion metadata in segment custom maps.
   private void verifyTaskProcessedSegments(List<SegmentZKMetadata> segments) {
     List<SegmentZKMetadata> processedSegments = segments.stream()
         .filter(s -> {
@@ -597,9 +585,7 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     }
   }
 
-  /**
-   * Verifies merged segments created by the task.
-   */
+  /// Verifies merged segments created by the task.
   private void verifyMergedSegments(List<SegmentZKMetadata> segments) {
     List<SegmentZKMetadata> mergedSegments = segments.stream()
         .filter(s -> s.getSegmentName().contains(MERGED_SEGMENT_NAME_PREFIX))
@@ -637,11 +623,9 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     }
   }
 
-  /**
-   * Verifies that the original segments that were merged have been properly invalidated.
-   * In an upsert table, when segments are merged, the original segments should be marked
-   * as having invalid documents or should be removed.
-   */
+  /// Verifies that the original segments that were merged have been properly invalidated.
+  /// In an upsert table, when segments are merged, the original segments should be marked
+  /// as having invalid documents or should be removed.
   private void verifyOriginalSegmentsInvalidated(String mergedSegmentsList) {
     String[] originalSegmentNames = mergedSegmentsList.split(",");
     List<SegmentZKMetadata> allSegments = _pinotHelixResourceManager.getSegmentsZKMetadata(REALTIME_TABLE_NAME);
@@ -671,10 +655,8 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     }
   }
 
-  /**
-   * Verifies that segments are properly uploaded to the controller.
-   * For successful task completion, merged segments should be uploaded.
-   */
+  /// Verifies that segments are properly uploaded to the controller.
+  /// For successful task completion, merged segments should be uploaded.
   private void verifySegmentUploadToController()
       throws Exception {
     List<SegmentZKMetadata> segments = _pinotHelixResourceManager.getSegmentsZKMetadata(REALTIME_TABLE_NAME);

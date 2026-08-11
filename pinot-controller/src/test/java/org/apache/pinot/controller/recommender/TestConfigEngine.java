@@ -282,7 +282,7 @@ public class TestConfigEngine {
     assertEquals(output.getIndexConfig().getRangeIndexColumns().toString(), "[t, j]");
   }
 
-  /** Verifiy rule that recommends JsonIndex and NoDictionary on JSON columns. */
+  /// Verifiy rule that recommends JsonIndex and NoDictionary on JSON columns.
   @Test
   void testJsonIndexRule()
       throws InvalidInputException, IOException {

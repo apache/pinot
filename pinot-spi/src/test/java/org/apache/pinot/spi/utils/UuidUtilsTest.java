@@ -29,9 +29,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for {@link UuidUtils}.
- */
+/// Tests for [UuidUtils].
 public class UuidUtilsTest {
   private static final String UUID_VALUE = "550e8400-e29b-41d4-a716-446655440000";
 

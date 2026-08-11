@@ -102,13 +102,11 @@ public abstract class BaseSparkSegmentTarPushJobRunner implements IngestionJobRu
     }
   }
 
-  /**
-   * Parallelizes the tar push job using Spark to distribute the work across multiple nodes.
-   *
-   * @param pinotFSSpecs the list of Pinot file system specifications to be registered
-   * @param segmentUris the list of segment URIs to be pushed
-   * @param pushParallelism the level of parallelism for the push job
-   */
+  /// Parallelizes the tar push job using Spark to distribute the work across multiple nodes.
+  ///
+  /// @param pinotFSSpecs the list of Pinot file system specifications to be registered
+  /// @param segmentUris the list of segment URIs to be pushed
+  /// @param pushParallelism the level of parallelism for the push job
   public abstract void parallelizeTarPushJob(List<PinotFSSpec> pinotFSSpecs,
       List<String> segmentUris, int pushParallelism, URI outputDirURI);
 }

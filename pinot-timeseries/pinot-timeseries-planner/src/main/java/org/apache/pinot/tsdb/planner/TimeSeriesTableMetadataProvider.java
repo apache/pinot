@@ -25,9 +25,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.tsdb.spi.TimeSeriesMetadata;
 
 
-/**
- * Implementation of TimeSeriesTableMetadata that uses TableCache to provide table metadata.
- */
+/// Implementation of TimeSeriesTableMetadata that uses TableCache to provide table metadata.
 public class TimeSeriesTableMetadataProvider implements TimeSeriesMetadata {
   private final TableCache _tableCache;
 

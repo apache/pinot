@@ -42,36 +42,34 @@ import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 
 
 public final class DataBlockUtils {
-  /**
-   * This map is used to associate a {@link DataBlockSerde.Version} with a specific {@link DataBlockSerde}.
-   *
-   * Although Pinot 1.2.0 only supports a single version of the serialization format, it is possible to support
-   * multiple versions in the future.
-   *
-   * We can imagine future version of Pinot that uses Apache Arrow to represent the data blocks.
-   * In this case, in order to communicate this future version with a node running Pinot 1.2.0 we would need to
-   * implement a new {@link DataBlockSerde} that can serialize and deserialize the Arrow data blocks into the
-   * serialization format used by Pinot 1.2.0.
-   *
-   * Although this DataBlockSerde could be used to communicate two Arrow based Pinot nodes,
-   * it would probably not be very efficient because in order to apply the conversion it would probably need to
-   * allocate a linear amount of memory.
-   * Therefore it would be recommended to have another {@link DataBlockSerde.Version} that can only be used by nodes
-   * running the new version of Pinot and a new DataBlockSerde that can serialize and deserialize the Arrow data blocks
-   * directly.
-   *
-   * Therefore that future Pinot version would have two elements in its map:
-   * - One for the version used to communicate with Pinot 1.2.0
-   * - Another for the version used to communicate with other nodes running the same version.
-   *
-   * The system right now is pretty naive and although it supports different versions at deserialization time, it
-   * always uses the same to serialize the data blocks. In the future, we could add a way to specify the version
-   * to use when serializing the data blocks, which could be negotiated between the two nodes or (given that the
-   * clusters are not expected to run with different versions for a long time) hardcoded in the configuration.
-   *
-   * Anyway, having this map is very useful to profile, test and in general support different {@link DataBlockSerde},
-   * even for the same format.
-   */
+  /// This map is used to associate a [DataBlockSerde.Version] with a specific [DataBlockSerde].
+  ///
+  /// Although Pinot 1.2.0 only supports a single version of the serialization format, it is possible to support
+  /// multiple versions in the future.
+  ///
+  /// We can imagine future version of Pinot that uses Apache Arrow to represent the data blocks.
+  /// In this case, in order to communicate this future version with a node running Pinot 1.2.0 we would need to
+  /// implement a new [DataBlockSerde] that can serialize and deserialize the Arrow data blocks into the
+  /// serialization format used by Pinot 1.2.0.
+  ///
+  /// Although this DataBlockSerde could be used to communicate two Arrow based Pinot nodes,
+  /// it would probably not be very efficient because in order to apply the conversion it would probably need to
+  /// allocate a linear amount of memory.
+  /// Therefore it would be recommended to have another [DataBlockSerde.Version] that can only be used by nodes
+  /// running the new version of Pinot and a new DataBlockSerde that can serialize and deserialize the Arrow data blocks
+  /// directly.
+  ///
+  /// Therefore that future Pinot version would have two elements in its map:
+  /// - One for the version used to communicate with Pinot 1.2.0
+  /// - Another for the version used to communicate with other nodes running the same version.
+  ///
+  /// The system right now is pretty naive and although it supports different versions at deserialization time, it
+  /// always uses the same to serialize the data blocks. In the future, we could add a way to specify the version
+  /// to use when serializing the data blocks, which could be negotiated between the two nodes or (given that the
+  /// clusters are not expected to run with different versions for a long time) hardcoded in the configuration.
+  ///
+  /// Anyway, having this map is very useful to profile, test and in general support different [DataBlockSerde],
+  /// even for the same format.
   private static final EnumMap<DataBlockSerde.Version, DataBlockSerde> SERDES;
   private static final Pattern CAUSE_CAPTION_REGEXP = Pattern.compile("^([\\t]*)Caused by: ");
   private static final Pattern SUPPRESSED_CAPTION_REGEXP = Pattern.compile("^([\\t]*)Suppressed: ");
@@ -103,16 +101,14 @@ public final class DataBlockUtils {
     return t.getMessage() + "\n" + getTruncatedStackTrace(t);
   }
 
-  /**
-   * Truncate the stack trace of the given {@link Throwable} to a maximum of 5 lines per frame.
-   * <p>
-   * This method is deprecated because it is not used in the codebase and it is not clear what is the purpose of
-   * truncating the stack trace.
-   * <p>
-   * The method is kept here for reference and in case it is needed in the future.
-   *
-   * @deprecated We still need to think whether and how to send stack traces downstream
-   */
+  /// Truncate the stack trace of the given [Throwable] to a maximum of 5 lines per frame.
+  ///
+  /// This method is deprecated because it is not used in the codebase and it is not clear what is the purpose of
+  /// truncating the stack trace.
+  ///
+  /// The method is kept here for reference and in case it is needed in the future.
+  ///
+  /// @deprecated We still need to think whether and how to send stack traces downstream
   @Deprecated
   private static String getTruncatedStackTrace(Throwable t) {
     StringWriter stringWriter = new StringWriter();
@@ -140,13 +136,11 @@ public final class DataBlockUtils {
     return sb.toString();
   }
 
-  /**
-   * Reads an integer from the given byte buffer.
-   * <p>
-   * The returned integer contains both the version and the type of the data block.
-   * {@link #getVersion(int)} and {@link #getType(int)} can be used to extract the version and the type.
-   * @param byteBuffer byte buffer to read from. A single int will be read
-   */
+  /// Reads an integer from the given byte buffer.
+  ///
+  /// The returned integer contains both the version and the type of the data block.
+  /// [#getVersion(int)] and [#getType(int)] can be used to extract the version and the type.
+  /// @param byteBuffer byte buffer to read from. A single int will be read
   public static int readVersionType(ByteBuffer byteBuffer) {
     return byteBuffer.getInt();
   }
@@ -207,11 +201,9 @@ public final class DataBlockUtils {
     return byteString;
   }
 
-  /**
-   * Reads a data block from the given byte buffer.
-   * @param buffer the buffer to read from. The data will be read at the buffer's current position. This position will
-   *               be updated to point to the end of the data block.
-   */
+  /// Reads a data block from the given byte buffer.
+  /// @param buffer the buffer to read from. The data will be read at the buffer's current position. This position will
+  ///               be updated to point to the end of the data block.
   public static DataBlock readFrom(ByteBuffer buffer)
       throws IOException {
     return deserialize(PinotByteBuffer.wrap(buffer), buffer.position(), newOffset -> {
@@ -222,10 +214,8 @@ public final class DataBlockUtils {
     });
   }
 
-  /**
-   * Deserialize a list of byte buffers into a data block.
-   * Contrary to {@link #readFrom(ByteBuffer)}, the given buffers will not be modified.
-   */
+  /// Deserialize a list of byte buffers into a data block.
+  /// Contrary to [#readFrom(ByteBuffer)], the given buffers will not be modified.
   public static DataBlock deserialize(List<ByteBuffer> buffers)
       throws IOException {
     DataBuffer dataBuffer = buffers.size() == 1 ? PinotByteBuffer.wrap(buffers.get(0))
@@ -233,10 +223,8 @@ public final class DataBlockUtils {
     return deserialize(dataBuffer);
   }
 
-  /**
-   * Deserialize a list of byte buffers into a data block.
-   * Contrary to {@link #readFrom(ByteBuffer)}, the given buffers will not be modified.
-   */
+  /// Deserialize a list of byte buffers into a data block.
+  /// Contrary to [#readFrom(ByteBuffer)], the given buffers will not be modified.
   public static DataBlock deserialize(ByteBuffer[] buffers)
       throws IOException {
     DataBuffer dataBuffer = buffers.length == 1 ? PinotByteBuffer.wrap(buffers[0])
@@ -244,24 +232,20 @@ public final class DataBlockUtils {
     return deserialize(dataBuffer);
   }
 
-  /**
-   * Deserialize a list of byte buffers into a data block.
-   * <p>
-   * Data will be read from the first byte of the buffer. Use {@link #deserialize(DataBuffer, long, LongConsumer)}
-   * in case it is needed to read from a different position.
-   */
+  /// Deserialize a list of byte buffers into a data block.
+  ///
+  /// Data will be read from the first byte of the buffer. Use [#deserialize(DataBuffer, long, LongConsumer)]
+  /// in case it is needed to read from a different position.
   public static DataBlock deserialize(DataBuffer buffer)
       throws IOException {
     return deserialize(buffer, 0, null);
   }
 
-  /**
-   * Deserialize a list of byte buffers into a data block.
-   * @param buffer the buffer to read from.
-   * @param offset the offset in the buffer where the data starts.
-   * @param finalOffsetConsumer An optional consumer that will be called after the data block is deserialized.
-   *                            The consumer will receive the offset where the data block ends.
-   */
+  /// Deserialize a list of byte buffers into a data block.
+  /// @param buffer the buffer to read from.
+  /// @param offset the offset in the buffer where the data starts.
+  /// @param finalOffsetConsumer An optional consumer that will be called after the data block is deserialized.
+  ///                            The consumer will receive the offset where the data block ends.
   public static DataBlock deserialize(DataBuffer buffer, long offset, @Nullable LongConsumer finalOffsetConsumer)
       throws IOException {
     int versionAndSubVersion = buffer.getInt(offset);
@@ -287,14 +271,12 @@ public final class DataBlockUtils {
     }
   }
 
-  /**
-   * Given a {@link DataSchema}, compute each column's offset and fill them into the passed in array, then return the
-   * row size in bytes.
-   *
-   * @param dataSchema data schema.
-   * @param columnOffsets array of column offsets.
-   * @return row size in bytes.
-   */
+  /// Given a [DataSchema], compute each column's offset and fill them into the passed in array, then return the
+  /// row size in bytes.
+  ///
+  /// @param dataSchema data schema.
+  /// @param columnOffsets array of column offsets.
+  /// @return row size in bytes.
   public static int computeColumnOffsets(DataSchema dataSchema, int[] columnOffsets) {
     int numColumns = columnOffsets.length;
     assert numColumns == dataSchema.size();
@@ -329,13 +311,11 @@ public final class DataBlockUtils {
     return rowSizeInBytes;
   }
 
-  /**
-   * Given a {@link DataSchema}, compute each column's size and fill them into the passed in array.
-   *
-   * @param dataSchema data schema.
-   * @param columnSizes array of column size.
-   * @return row size in bytes.
-   */
+  /// Given a [DataSchema], compute each column's size and fill them into the passed in array.
+  ///
+  /// @param dataSchema data schema.
+  /// @param columnSizes array of column size.
+  /// @return row size in bytes.
   public static void computeColumnSizeInBytes(DataSchema dataSchema, int[] columnSizes) {
     int numColumns = columnSizes.length;
     assert numColumns == dataSchema.size();

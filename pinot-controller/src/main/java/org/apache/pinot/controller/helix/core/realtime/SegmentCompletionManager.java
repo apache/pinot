@@ -43,14 +43,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This is a singleton class in the controller that drives the state machines for segments that are in the
- * committing stage.
- *
- * SegmentCompletionManager has a sub-class that represents the FSM that the segment goes through while
- * executing the segment completion protocol between pinot servers and pinot controller. The protocol is
- * described in SegmentCompletionProtocol.
- */
+/// This is a singleton class in the controller that drives the state machines for segments that are in the
+/// committing stage.
+///
+/// SegmentCompletionManager has a sub-class that represents the FSM that the segment goes through while
+/// executing the segment completion protocol between pinot servers and pinot controller. The protocol is
+/// described in SegmentCompletionProtocol.
 public class SegmentCompletionManager {
   // TODO Can we log using the segment name in the log message?
   public static final Logger LOGGER = LoggerFactory.getLogger(SegmentCompletionManager.class);
@@ -148,11 +146,9 @@ public class SegmentCompletionManager {
     return fsm;
   }
 
-  /**
-   * This method is to be called when a server calls in with the segmentConsumed() API, reporting an offset in the
-   * stream
-   * that it currently has (i.e. next offset that it will consume, if it continues to consume).
-   */
+  /// This method is to be called when a server calls in with the segmentConsumed() API, reporting an offset in the
+  /// stream
+  /// that it currently has (i.e. next offset that it will consume, if it continues to consume).
   public SegmentCompletionProtocol.Response segmentConsumed(SegmentCompletionProtocol.Request.Params reqParams) {
     final String segmentNameStr = reqParams.getSegmentName();
     final LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
@@ -180,17 +176,15 @@ public class SegmentCompletionManager {
     return response;
   }
 
-  /**
-   * This method is to be called when a server calls in with the segmentCommit() API. The server sends in the segment
-   * along with the API, but it is the caller's responsibility to save the segment after this call (and before the
-   * segmentCommitEnd() call).
-   *
-   * If successful, this method will return Response.COMMIT_CONTINUE, in which case, the caller should save the incoming
-   * segment and then call segmentCommitEnd().
-   *
-   * Otherwise, this method will return a protocol response to be returned to the client right away (without saving the
-   * incoming segment).
-   */
+  /// This method is to be called when a server calls in with the segmentCommit() API. The server sends in the segment
+  /// along with the API, but it is the caller's responsibility to save the segment after this call (and before the
+  /// segmentCommitEnd() call).
+  ///
+  /// If successful, this method will return Response.COMMIT_CONTINUE, in which case, the caller should save the
+  /// incoming segment and then call segmentCommitEnd().
+  ///
+  /// Otherwise, this method will return a protocol response to be returned to the client right away (without saving the
+  /// incoming segment).
   public SegmentCompletionProtocol.Response segmentCommitStart(
       final SegmentCompletionProtocol.Request.Params reqParams) {
     final String segmentNameStr = reqParams.getSegmentName();
@@ -257,11 +251,9 @@ public class SegmentCompletionManager {
     return SegmentCompletionProtocol.RESP_PROCESSED;
   }
 
-  /**
-   * This method is to be called when a server reports that it has stopped consuming a real-time segment.
-   *
-   * @return
-   */
+  /// This method is to be called when a server reports that it has stopped consuming a real-time segment.
+  ///
+  /// @return
   public SegmentCompletionProtocol.Response segmentStoppedConsuming(
       SegmentCompletionProtocol.Request.Params reqParams) {
     final String segmentNameStr = reqParams.getSegmentName();
@@ -289,14 +281,12 @@ public class SegmentCompletionManager {
     return response;
   }
 
-  /**
-   * This method is to be called when the segment sent in by the server has been saved locally in the correct path that
-   * is downloadable by the servers.
-   *
-   * It returns a response code to be sent back to the client.
-   *
-   * If the response code is not COMMIT_SUCCESS, then the caller may remove the segment that has been saved.
-   */
+  /// This method is to be called when the segment sent in by the server has been saved locally in the correct path that
+  /// is downloadable by the servers.
+  ///
+  /// It returns a response code to be sent back to the client.
+  ///
+  /// If the response code is not COMMIT_SUCCESS, then the caller may remove the segment that has been saved.
   public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams,
       CommittingSegmentDescriptor committingSegmentDescriptor) {
     final String segmentNameStr = reqParams.getSegmentName();

@@ -24,11 +24,9 @@ import org.apache.pinot.tsdb.spi.series.BaseTimeSeriesBuilder;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
 
 
-/**
- * MinSeriesBuilder is a series builder that computes the minimum value in each time bucket.
- * <b>Context:</b>We provide some ready to use implementations for some of the most common use-cases in the SPI. This
- * reduces redundancy and also serves as a reference implementation for language developers.
- */
+/// MinSeriesBuilder is a series builder that computes the minimum value in each time bucket.
+/// **Context:** We provide some ready to use implementations for some of the most common use-cases in the SPI. This
+/// reduces redundancy and also serves as a reference implementation for language developers.
 public class MinTimeSeriesBuilder extends BaseTimeSeriesBuilder {
   private final Double[] _values;
 

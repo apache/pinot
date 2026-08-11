@@ -59,14 +59,16 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Verifies the core merge-only contract: reducing the raw per-server DataTable map produces the same
- * final result as reducing a single re-injected merged intermediate DataTable, i.e.
- * <pre>reduceOnDataTable(rawMap) == reduceOnDataTable({ syntheticKey -> mergeOnDataTable(rawMap) })</pre>
- * for the supported reducers (Aggregation, Group-by, Distinct), including the OBJECT-column
- * (DISTINCTCOUNT) round-trip. Also checks that the merged DataTable carries the intermediate schema and
- * that unsupported reducers (Selection) throw.
- */
+/// Verifies the core merge-only contract: reducing the raw per-server DataTable map produces the same
+/// final result as reducing a single re-injected merged intermediate DataTable, i.e.
+///
+/// ```
+/// reduceOnDataTable(rawMap) == reduceOnDataTable({ syntheticKey -> mergeOnDataTable(rawMap) })
+/// ```
+///
+/// for the supported reducers (Aggregation, Group-by, Distinct), including the OBJECT-column
+/// (DISTINCTCOUNT) round-trip. Also checks that the merged DataTable carries the intermediate schema and
+/// that unsupported reducers (Selection) throw.
 public class MergeDataTablesOnlyTest {
   private static final long TIMEOUT_MS = 60_000L;
   private BrokerReduceService _reduceService;
@@ -267,6 +269,33 @@ public class MergeDataTablesOnlyTest {
     assertRoundTrip(brokerRequest, serverTables);
   }
 
+  /// A null intermediate result reaches the merge-only path with null handling disabled too, so the merged
+  /// DataTable has to carry it.
+  ///
+  /// The aggregate has to be `MAXSTRING`: its accumulator has no identity element, so a server that aggregated no
+  /// rows contributes null in either mode, and its `merge` is null-safe. `MIN` / `SUM` cannot reach this state --
+  /// their accumulators are primitive and always hold an identity value -- so a nulled DOUBLE fixture would be an
+  /// input no server produces, and `MinAggregationFunction#merge` would NPE on it since it only null-guards when
+  /// null handling is enabled.
+  @Test
+  public void testNullAggregationRoundTripWithNullHandlingDisabled()
+      throws IOException {
+    String query = "SELECT MAXSTRING(s) FROM testTable";
+    DataSchema schema = new DataSchema(new String[]{"maxstring(s)"}, new ColumnDataType[]{ColumnDataType.STRING});
+    // One server aggregated rows, the other matched none.
+    assertRoundTrip(query, List.of(buildNullableString(schema, "alpha"), buildNullableString(schema, null)));
+  }
+
+  /// When every server contributes null, the merged intermediate DataTable itself holds a null, so the null has to
+  /// survive `buildIntermediateDataTable`'s write as well as the restore on the way back in.
+  @Test
+  public void testAllNullAggregationRoundTripWithNullHandlingDisabled()
+      throws IOException {
+    String query = "SELECT MAXSTRING(s) FROM testTable";
+    DataSchema schema = new DataSchema(new String[]{"maxstring(s)"}, new ColumnDataType[]{ColumnDataType.STRING});
+    assertRoundTrip(query, List.of(buildNullableString(schema, null), buildNullableString(schema, null)));
+  }
+
   @Test
   public void testConflictingSchemaSurfacedAsIncompleteMerge() {
     // When one server's column types conflict with the first non-empty table's, filterDataTablesAndPickSchema
@@ -465,9 +494,7 @@ public class MergeDataTablesOnlyTest {
 
   // ---- helpers ----
 
-  /**
-   * Asserts the round-trip equivalence for the given query and per-server intermediate DataTables.
-   */
+  /// Asserts the round-trip equivalence for the given query and per-server intermediate DataTables.
   private void assertRoundTrip(String query, List<DataTable> serverTables) {
     assertRoundTrip(CalciteSqlCompiler.compileToBrokerRequest(query), serverTables);
   }
@@ -529,13 +556,11 @@ public class MergeDataTablesOnlyTest {
     }
   }
 
-  /**
-   * Builds a GROUP BY DataTable with one INT key column followed by one OBJECT aggregate column whose
-   * value is the intermediate {@code Set} (or other aggregate state) the server would have emitted.
-   * Mirrors what {@code GroupByResultsBlock.getDataTable()} produces on the server side for the
-   * non-null-handling path: scalar key written directly, OBJECT column written via
-   * {@code serializeIntermediateResult}.
-   */
+  /// Builds a GROUP BY DataTable with one INT key column followed by one OBJECT aggregate column whose
+  /// value is the intermediate `Set` (or other aggregate state) the server would have emitted.
+  /// Mirrors what `GroupByResultsBlock.getDataTable()` produces on the server side for the
+  /// non-null-handling path: scalar key written directly, OBJECT column written via
+  /// `serializeIntermediateResult`.
   private static DataTable buildGroupByWithObject(DataSchema schema, AggregationFunction aggFunction,
       Object[]... rows)
       throws IOException {
@@ -559,7 +584,7 @@ public class MergeDataTablesOnlyTest {
     return builder.build();
   }
 
-  /** Builds a single-row, single-DOUBLE-column intermediate DataTable with null-handling encoding. */
+  /// Builds a single-row, single-DOUBLE-column intermediate DataTable with null-handling encoding.
   private static DataTable buildNullableDouble(DataSchema schema, Double value)
       throws IOException {
     DataTableBuilder builder = DataTableBuilderFactory.getDataTableBuilder(schema);
@@ -573,6 +598,19 @@ public class MergeDataTablesOnlyTest {
     }
     builder.finishRow();
     builder.setNullRowIds(nullBitmap);
+    return builder.build();
+  }
+
+  private static DataTable buildNullableString(DataSchema schema, String value)
+      throws IOException {
+    DataTableBuilder builder = DataTableBuilderFactory.getDataTableBuilder(schema);
+    builder.startRow();
+    if (value == null) {
+      builder.setNull(0);
+    } else {
+      builder.setColumn(0, value);
+    }
+    builder.finishRow();
     return builder.build();
   }
 
@@ -615,10 +653,8 @@ public class MergeDataTablesOnlyTest {
     return map;
   }
 
-  /**
-   * Asserts the two result tables have the same schema and the same set of rows (order-independent, so
-   * the comparison is robust for unordered group-by / distinct results).
-   */
+  /// Asserts the two result tables have the same schema and the same set of rows (order-independent, so
+  /// the comparison is robust for unordered group-by / distinct results).
   private static void assertResultTablesEquivalent(ResultTable expected, ResultTable actual) {
     assertNotNull(expected);
     assertNotNull(actual);

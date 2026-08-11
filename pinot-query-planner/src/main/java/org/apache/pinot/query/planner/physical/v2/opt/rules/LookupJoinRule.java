@@ -33,26 +33,23 @@ import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalExchange;
 import org.apache.pinot.query.planner.physical.v2.opt.PRelNodeTransformer;
 
 
-/**
- * Post-pass rule that isolates every lookup join in its own plan fragment.
- *
- * <p>Runs after {@link WorkerExchangeAssignmentRule}, which assigns workers and exchanges generically (with zero
- * lookup join awareness). This rule then post-processes lookup joins to ensure:</p>
- * <ol>
- *   <li><b>Right side</b>: Exchange converted to {@link ExchangeStrategy#LOOKUP_LOCAL_EXCHANGE} — a pseudo-exchange
- *       that does not split fragments. Later, during plan fragment assignment,
- *       {@code PlanFragmentAndMailboxAssignment.processLookupLocalExchange} registers the dim table with fake
- *       segments so the fragment is classified as a leaf stage for {@code DimensionTableDataManager} access.</li>
- *   <li><b>Left side</b>: Exchange exists (inserts {@link ExchangeStrategy#IDENTITY_EXCHANGE} if missing, e.g. when
- *       the left input is an intermediate node like a hash join with the same workers).</li>
- *   <li><b>Above</b>: Lookup join wrapped in {@link ExchangeStrategy#IDENTITY_EXCHANGE} so downstream nodes
- *       (other joins, sorts) are not absorbed into the lookup join's leaf fragment.</li>
- * </ol>
- *
- * <p>This achieves the same outcome as V1, where {@code WorkerManager.assignWorkersToNonRootFragment} detects
- * lookup joins and assigns the same workers as the fact table while registering fake empty segments for the
- * dim table.</p>
- */
+/// Post-pass rule that isolates every lookup join in its own plan fragment.
+///
+/// Runs after [WorkerExchangeAssignmentRule], which assigns workers and exchanges generically (with zero
+/// lookup join awareness). This rule then post-processes lookup joins to ensure:
+///
+/// 1. **Right side**: Exchange converted to [ExchangeStrategy#LOOKUP_LOCAL_EXCHANGE] — a pseudo-exchange
+///       that does not split fragments. Later, during plan fragment assignment,
+///       `PlanFragmentAndMailboxAssignment.processLookupLocalExchange` registers the dim table with fake
+///       segments so the fragment is classified as a leaf stage for `DimensionTableDataManager` access.
+/// 2. **Left side**: Exchange exists (inserts [ExchangeStrategy#IDENTITY_EXCHANGE] if missing, e.g. when
+///       the left input is an intermediate node like a hash join with the same workers).
+/// 3. **Above**: Lookup join wrapped in [ExchangeStrategy#IDENTITY_EXCHANGE] so downstream nodes
+///       (other joins, sorts) are not absorbed into the lookup join's leaf fragment.
+///
+/// This achieves the same outcome as V1, where `WorkerManager.assignWorkersToNonRootFragment` detects
+/// lookup joins and assigns the same workers as the fact table while registering fake empty segments for the
+/// dim table.
 public class LookupJoinRule implements PRelNodeTransformer {
   private final PhysicalPlannerContext _context;
 
@@ -102,11 +99,9 @@ public class LookupJoinRule implements PRelNodeTransformer {
     return node;
   }
 
-  /**
-   * Converts the right-side exchange to LOOKUP_LOCAL_EXCHANGE. The right side should already have an exchange
-   * from {@link WorkerExchangeAssignmentRule} (IDENTITY at leaf boundary, or RANDOM/BROADCAST if workers differ).
-   * If no exchange exists (shouldn't happen), inserts LOOKUP_LOCAL_EXCHANGE directly.
-   */
+  /// Converts the right-side exchange to LOOKUP_LOCAL_EXCHANGE. The right side should already have an exchange
+  /// from [WorkerExchangeAssignmentRule] (IDENTITY at leaf boundary, or RANDOM/BROADCAST if workers differ).
+  /// If no exchange exists (shouldn't happen), inserts LOOKUP_LOCAL_EXCHANGE directly.
   private PRelNode convertRightExchange(PRelNode joinNode) {
     if (joinNode.getPRelInputs().size() < 2) {
       return joinNode;
@@ -132,10 +127,8 @@ public class LookupJoinRule implements PRelNodeTransformer {
         createLookupLocalExchange(existing.getPRelInput(0), joinNode)));
   }
 
-  /**
-   * Ensures the left input has an exchange. If the left input is already a PhysicalExchange (e.g. IDENTITY from
-   * leaf boundary), do nothing. Otherwise insert IDENTITY_EXCHANGE to create a fragment boundary.
-   */
+  /// Ensures the left input has an exchange. If the left input is already a PhysicalExchange (e.g. IDENTITY from
+  /// leaf boundary), do nothing. Otherwise insert IDENTITY_EXCHANGE to create a fragment boundary.
   private PRelNode ensureLeftExchange(PRelNode joinNode) {
     if (joinNode.getPRelInputs().isEmpty()) {
       return joinNode;
@@ -150,18 +143,14 @@ public class LookupJoinRule implements PRelNodeTransformer {
     return joinNode.with(replaceInput(joinNode, 0, identity));
   }
 
-  /**
-   * Wraps the lookup join node in an IDENTITY_EXCHANGE, creating a fragment boundary above it.
-   */
+  /// Wraps the lookup join node in an IDENTITY_EXCHANGE, creating a fragment boundary above it.
   private PhysicalExchange wrapWithIdentityExchange(PRelNode joinNode) {
     return new PhysicalExchange(nodeId(), joinNode, joinNode.getPinotDataDistributionOrThrow(), List.of(),
         ExchangeStrategy.IDENTITY_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy(),
         _context.getDefaultHashFunction());
   }
 
-  /**
-   * Creates a LOOKUP_LOCAL_EXCHANGE wrapping the given child node, using the join's worker distribution.
-   */
+  /// Creates a LOOKUP_LOCAL_EXCHANGE wrapping the given child node, using the join's worker distribution.
   private PhysicalExchange createLookupLocalExchange(PRelNode child, PRelNode joinNode) {
     PinotDataDistribution joinDist = joinNode.getPinotDataDistributionOrThrow();
     RelDistribution.Type distType = joinDist.getWorkers().size() == 1

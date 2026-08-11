@@ -27,9 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Union operator for UNION ALL queries. Each child operator is fully drained sequentially and all rows are returned.
- */
+/// Union operator for UNION ALL queries. Each child operator is fully drained sequentially and all rows are returned.
 public class UnionAllOperator extends SetOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UnionAllOperator.class);
   private static final String EXPLAIN_NAME = "UNION_ALL";

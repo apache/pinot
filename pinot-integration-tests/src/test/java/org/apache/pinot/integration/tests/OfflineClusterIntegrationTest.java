@@ -66,7 +66,6 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
@@ -108,9 +107,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOpt
 import static org.testng.Assert.*;
 
 
-/**
- * Integration test that converts Avro data for 12 segments and runs queries against it.
- */
+/// Integration test that converts Avro data for 12 segments and runs queries against it.
 public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
@@ -641,11 +638,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     addRangeIndex(true);
   }
 
-  /**
-   * SELECT DISTINCT on an inverted-indexed column. InvertedIndexDistinctOperator is used when
-   * opted in via query option. Verifies correctness with and without filter.
-   * Origin already has an inverted index by default (see DEFAULT_INVERTED_INDEX_COLUMNS).
-   */
+  /// SELECT DISTINCT on an inverted-indexed column. InvertedIndexDistinctOperator is used when
+  /// opted in via query option. Verifies correctness with and without filter.
+  /// Origin already has an inverted index by default (see DEFAULT_INVERTED_INDEX_COLUMNS).
   @Test(dataProvider = "useBothQueryEngines")
   public void testDistinctWithInvertedIndex(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -1622,9 +1617,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble(), expectedForwardIndexSize);
   }
 
-  /**
-   * Check if server returns error response quickly without timing out Broker.
-   */
+  /// Check if server returns error response quickly without timing out Broker.
   @Test(dataProvider = "useBothQueryEngines")
   public void testServerErrorWithBrokerTimeout(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -1831,38 +1824,35 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(queryResponse.get("numDocsScanned").asInt(), expectedDocsScanned);
   }
 
-  /**
-   * We will add extra new columns to the schema to test adding new columns with default value/transform function to the
-   * offline segments.
-   * <p>New columns are: (name, field type, data type, single/multi value, default null value)
-   * <ul>
-   *   <li>"NewAddedIntMetric", METRIC, INT, single-value, 1</li>
-   *   <li>"NewAddedLongMetric", METRIC, LONG, single-value, 1</li>
-   *   <li>"NewAddedFloatMetric", METRIC, FLOAT, single-value, default (0.0)</li>
-   *   <li>"NewAddedDoubleMetric", METRIC, DOUBLE, single-value, default (0.0)</li>
-   *   <li>"NewAddedBigDecimalMetric", METRIC, BIG_DECIMAL, single-value, default (0)</li>
-   *   <li>"NewAddedBytesMetric", METRIC, BYTES, single-value, default (byte[0])</li>
-   *   <li>"NewAddedMVIntDimension", DIMENSION, INT, multi-value, default (Integer.MIN_VALUE)</li>
-   *   <li>"NewAddedMVLongDimension", DIMENSION, LONG, multi-value, default (Long.MIN_VALUE)</li>
-   *   <li>"NewAddedMVFloatDimension", DIMENSION, FLOAT, multi-value, default (Float.NEGATIVE_INFINITY)</li>
-   *   <li>"NewAddedMVDoubleDimension", DIMENSION, DOUBLE, multi-value, default (Double.NEGATIVE_INFINITY)</li>
-   *   <li>"NewAddedMVBooleanDimension", DIMENSION, BOOLEAN, multi-value, default (false)</li>
-   *   <li>"NewAddedMVTimestampDimension", DIMENSION, TIMESTAMP, multi-value, default (EPOCH)</li>
-   *   <li>"NewAddedMVStringDimension", DIMENSION, STRING, multi-value, default ("null")</li>
-   *   <li>"NewAddedSVJSONDimension", DIMENSION, JSON, single-value, default ("null")</li>
-   *   <li>"NewAddedSVBytesDimension", DIMENSION, BYTES, single-value, default (byte[0])</li>
-   *   <li>"NewAddedDerivedHoursSinceEpoch", DATE_TIME, INT, single-value, DaysSinceEpoch * 24</li>
-   *   <li>"NewAddedDerivedTimestamp", DATE_TIME, TIMESTAMP, single-value, DaysSinceEpoch * 24 * 3600 * 1000</li>
-   *   <li>"NewAddedDerivedSVBooleanDimension", DIMENSION, BOOLEAN, single-value, ActualElapsedTime > 0</li>
-   *   <li>"NewAddedDerivedMVStringDimension", DIMENSION, STRING, multi-value, split(DestCityName, ', ')</li>
-   *   <li>"NewAddedDerivedDivAirportSeqIDs", DIMENSION, INT, multi-value, DivAirportSeqIDs</li>
-   *   <li>"NewAddedDerivedDivAirportSeqIDsString", DIMENSION, STRING, multi-value, DivAirportSeqIDs</li>
-   *   <li>"NewAddedRawDerivedStringDimension", DIMENSION, STRING, single-value, reverse(DestCityName)</li>
-   *   <li>"NewAddedRawDerivedMVIntDimension", DIMENSION, INT, multi-value, array(ActualElapsedTime)</li>
-   *   <li>"NewAddedDerivedMVDoubleDimension", DIMENSION, DOUBLE, multi-value, array(ArrDelayMinutes)</li>
-   *   <li>"NewAddedDerivedNullString", DIMENSION, STRING, single-value, caseWhen(true, null, null)</li>
-   * </ul>
-   */
+  /// We will add extra new columns to the schema to test adding new columns with default value/transform function to
+  /// the offline segments.
+  ///
+  /// New columns are: (name, field type, data type, single/multi value, default null value)
+  ///   - "NewAddedIntMetric", METRIC, INT, single-value, 1
+  ///   - "NewAddedLongMetric", METRIC, LONG, single-value, 1
+  ///   - "NewAddedFloatMetric", METRIC, FLOAT, single-value, default (0.0)
+  ///   - "NewAddedDoubleMetric", METRIC, DOUBLE, single-value, default (0.0)
+  ///   - "NewAddedBigDecimalMetric", METRIC, BIG_DECIMAL, single-value, default (0)
+  ///   - "NewAddedBytesMetric", METRIC, BYTES, single-value, default (byte\[0\])
+  ///   - "NewAddedMVIntDimension", DIMENSION, INT, multi-value, default (Integer.MIN_VALUE)
+  ///   - "NewAddedMVLongDimension", DIMENSION, LONG, multi-value, default (Long.MIN_VALUE)
+  ///   - "NewAddedMVFloatDimension", DIMENSION, FLOAT, multi-value, default (Float.NEGATIVE_INFINITY)
+  ///   - "NewAddedMVDoubleDimension", DIMENSION, DOUBLE, multi-value, default (Double.NEGATIVE_INFINITY)
+  ///   - "NewAddedMVBooleanDimension", DIMENSION, BOOLEAN, multi-value, default (false)
+  ///   - "NewAddedMVTimestampDimension", DIMENSION, TIMESTAMP, multi-value, default (EPOCH)
+  ///   - "NewAddedMVStringDimension", DIMENSION, STRING, multi-value, default ("null")
+  ///   - "NewAddedSVJSONDimension", DIMENSION, JSON, single-value, default ("null")
+  ///   - "NewAddedSVBytesDimension", DIMENSION, BYTES, single-value, default (byte\[0\])
+  ///   - "NewAddedDerivedHoursSinceEpoch", DATE_TIME, INT, single-value, DaysSinceEpoch \* 24
+  ///   - "NewAddedDerivedTimestamp", DATE_TIME, TIMESTAMP, single-value, DaysSinceEpoch \* 24 \* 3600 \* 1000
+  ///   - "NewAddedDerivedSVBooleanDimension", DIMENSION, BOOLEAN, single-value, ActualElapsedTime > 0
+  ///   - "NewAddedDerivedMVStringDimension", DIMENSION, STRING, multi-value, split(DestCityName, ', ')
+  ///   - "NewAddedDerivedDivAirportSeqIDs", DIMENSION, INT, multi-value, DivAirportSeqIDs
+  ///   - "NewAddedDerivedDivAirportSeqIDsString", DIMENSION, STRING, multi-value, DivAirportSeqIDs
+  ///   - "NewAddedRawDerivedStringDimension", DIMENSION, STRING, single-value, reverse(DestCityName)
+  ///   - "NewAddedRawDerivedMVIntDimension", DIMENSION, INT, multi-value, array(ActualElapsedTime)
+  ///   - "NewAddedDerivedMVDoubleDimension", DIMENSION, DOUBLE, multi-value, array(ArrDelayMinutes)
+  ///   - "NewAddedDerivedNullString", DIMENSION, STRING, single-value, caseWhen(true, null, null)
   @Test(dataProvider = "useBothQueryEngines")
   public void testDefaultColumns(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -2457,6 +2447,78 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         segmentNames.subList(0, numSegmentsToQuery)) + "')";
     response = postQuery(query);
     assertEquals(response.get("numSegmentsMatched").asInt(), numSegmentsToQuery);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testSegmentMetadataVirtualColumns(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = "SELECT $creationTime, $startTime, $endTime, $totalDocs, $crc FROM mytable LIMIT 10";
+    JsonNode response = postQuery(query);
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnNames").toString(),
+        "[\"$creationTime\",\"$startTime\",\"$endTime\",\"$totalDocs\",\"$crc\"]");
+    // The three time columns are TIMESTAMP, so they render as formatted timestamps rather than raw millis
+    assertEquals(dataSchema.get("columnDataTypes").toString(),
+        "[\"TIMESTAMP\",\"TIMESTAMP\",\"TIMESTAMP\",\"INT\",\"LONG\"]");
+    JsonNode rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      JsonNode row = rows.get(i);
+      long creationTime = Timestamp.valueOf(row.get(0).asText()).getTime();
+      assertTrue(creationTime > 0, "Unexpected segment creation time: " + row.get(0).asText());
+      long startTime = Timestamp.valueOf(row.get(1).asText()).getTime();
+      long endTime = Timestamp.valueOf(row.get(2).asText()).getTime();
+      assertTrue(startTime > 0, "Unexpected segment start time: " + row.get(1).asText());
+      assertTrue(startTime <= endTime, "Segment start time: " + startTime + " is after end time: " + endTime);
+      assertTrue(row.get(3).asInt() > 0, "Unexpected total docs: " + row.get(3).asInt());
+      // A real CRC, not the placeholder the column falls back to when the metadata is unavailable
+      long crc = row.get(4).asLong();
+      assertNotEquals(crc, (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG, "Segment CRC should be a real CRC");
+    }
+
+    // $totalDocs is constant within a segment, so the per-segment values must add up to the total number of rows
+    query = "SELECT $segmentName, MAX($totalDocs) FROM mytable GROUP BY $segmentName LIMIT 10000";
+    rows = postQuery(query).get("resultTable").get("rows");
+    long totalDocs = 0;
+    for (JsonNode row : rows) {
+      totalDocs += row.get(1).asLong();
+    }
+    assertEquals(totalDocs, getCountStarResult());
+
+    // $startTime/$endTime are normalized from the time column's own unit. mytable's time column is DaysSinceEpoch in
+    // DAYS, so each segment's values must be its own day boundaries expressed as timestamps - this is what
+    // distinguishes a correct implementation from one leaking the raw DAYS value.
+    query = "SELECT $segmentName, $startTime, $endTime, MIN(DaysSinceEpoch), MAX(DaysSinceEpoch) FROM mytable "
+        + "GROUP BY $segmentName, $startTime, $endTime LIMIT 10000";
+    rows = postQuery(query).get("resultTable").get("rows");
+    assertFalse(rows.isEmpty());
+    long daysToMillis = TimeUnit.DAYS.toMillis(1);
+    for (JsonNode row : rows) {
+      assertEquals(Timestamp.valueOf(row.get(1).asText()).getTime(), row.get(3).asLong() * daysToMillis,
+          "Unexpected $startTime for segment: " + row.get(0).asText());
+      assertEquals(Timestamp.valueOf(row.get(2).asText()).getTime(), row.get(4).asLong() * daysToMillis,
+          "Unexpected $endTime for segment: " + row.get(0).asText());
+    }
+
+    // Filtering on a single segment's CRC must return exactly the documents grouped under that CRC
+    query = "SELECT $crc, COUNT(*) FROM mytable GROUP BY $crc LIMIT 10000";
+    JsonNode crcRow = postQuery(query).get("resultTable").get("rows").get(0);
+    long segmentCrc = crcRow.get(0).asLong();
+    long docsForCrc = crcRow.get(1).asLong();
+    assertEquals(postQuery("SELECT COUNT(*) FROM mytable WHERE $crc = " + segmentCrc).get("resultTable")
+        .get("rows").get(0).get(0).asLong(), docsForCrc);
+
+    // With null handling on, the engine must consult the null value vector. Every segment of this table has a time
+    // range, a CRC and a creation time, so none of these columns may report a null.
+    for (String column : List.of("$creationTime", "$startTime", "$endTime", "$totalDocs", "$crc")) {
+      assertEquals(postQuery("SET enableNullHandling=true; SELECT COUNT(*) FROM mytable WHERE " + column
+          + " IS NOT NULL").get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult(), column);
+      assertEquals(postQuery("SET enableNullHandling=true; SELECT COUNT(*) FROM mytable WHERE " + column
+          + " IS NULL").get("resultTable").get("rows").get(0).get(0).asLong(), 0, column);
+    }
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -3591,7 +3653,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "    LogicalProject(count=[$1], name=[$0])\n"
         + "      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])\n"
         + "        PinotLogicalExchange(distribution=[hash[0]])\n"
-        + "          PinotLogicalAggregate(group=[{18}], agg#0=[COUNT()], aggType=[LEAF])\n"
+        + "          PinotLogicalAggregate(group=[{23}], agg#0=[COUNT()], aggType=[LEAF])\n"
         + "            PinotLogicalTableScan(table=[[default, mytable]])\n");
     assertEquals(response1Json.get("rows").get(0).get(2).asText(), "Rule Execution Times\n"
         + "Rule: SortRemove -> Time:*\n"
@@ -3631,7 +3693,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
             + "Rule: EvaluateFilterLiteral -> Time: *\n");
   }
 
-  /** Test to make sure we are properly handling string comparisons in predicates. */
+  /// Test to make sure we are properly handling string comparisons in predicates.
   @Test(dataProvider = "useBothQueryEngines")
   public void testStringComparisonInFilter(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -3652,9 +3714,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(getLongCellValue(jsonNode, 0, 0), 19755);
   }
 
-  /**
-   * Test queries that can be solved with {@link NonScanBasedAggregationOperator}.
-   */
+  /// Test queries that can be solved with [org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator].
   @Test(dataProvider = "useBothQueryEngines")
   public void testNonScanAggregationQueries(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -3882,22 +3942,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode starColumnResponse = JsonUtils.objectToJsonNode(
         getOrCreateAdminClient().getTableClient().getAggregateMetadata(
             TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "*"));
-    validateMetadataResponse(starColumnResponse, 83, 10);
+    validateMetadataResponse(starColumnResponse, 88, 10);
 
     JsonNode starEncodedColumnResponse = JsonUtils.objectToJsonNode(
         getOrCreateAdminClient().getTableClient().getAggregateMetadata(
             TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "*"));
-    validateMetadataResponse(starEncodedColumnResponse, 83, 10);
+    validateMetadataResponse(starEncodedColumnResponse, 88, 10);
 
     JsonNode starWithExtraColumnResponse = JsonUtils.objectToJsonNode(
         getOrCreateAdminClient().getTableClient().getAggregateMetadata(
             TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "CRSElapsedTime,*,OriginStateName"));
-    validateMetadataResponse(starWithExtraColumnResponse, 83, 10);
+    validateMetadataResponse(starWithExtraColumnResponse, 88, 10);
 
     JsonNode starWithExtraEncodedColumnResponse = JsonUtils.objectToJsonNode(
         getOrCreateAdminClient().getTableClient().getAggregateMetadata(
             TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), "CRSElapsedTime,*,OriginStateName"));
-    validateMetadataResponse(starWithExtraEncodedColumnResponse, 83, 10);
+    validateMetadataResponse(starWithExtraEncodedColumnResponse, 88, 10);
   }
 
   private void validateMetadataResponse(JsonNode response, int numTotalColumn, int numMVColumn) {
@@ -4360,15 +4420,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  /**
-   * Test SQL string literal escaping behavior.
-   *
-   * In SQL, single quotes within string literals are escaped by doubling them:
-   * - 'It''s' represents the string "It's" (2 quotes = 1 quote in result)
-   *
-   * The Calcite parser handles this escaping correctly. This test disables the legacy SSE behavior of double escaping
-   * quotes. With the legacy behavior disabled, both SSE and MSE have the same standard behavior.
-   */
+  /// Test SQL string literal escaping behavior.
+  ///
+  /// In SQL, single quotes within string literals are escaped by doubling them:
+  /// - 'It''s' represents the string "It's" (2 quotes = 1 quote in result)
+  ///
+  /// The Calcite parser handles this escaping correctly. This test disables the legacy SSE behavior of double escaping
+  /// quotes. With the legacy behavior disabled, both SSE and MSE have the same standard behavior.
   @Test(dataProvider = "useBothQueryEngines")
   public void testStringLiteralEscaping(boolean useMultiStageQueryEngine)
       throws Exception {

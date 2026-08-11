@@ -49,7 +49,6 @@ import org.slf4j.LoggerFactory;
 ///   - HAVING compatibility
 ///   - Build the rewritten query and cost
 ///
-///
 /// Concrete subclasses customize individual steps by overriding the
 /// `protected abstract` hook methods. This design allows adding new
 /// matching strategies (scan subsumption, aggregation subsumption, etc.)
@@ -92,14 +91,17 @@ public abstract class AbstractSubsumptionStrategy implements MaterializedViewMat
       return null;
     }
 
+    /// The projection map cached on the entry is needed from Step 2 onward: a GROUP BY key is only
+    /// usable if the MV actually materialized a column for it.
+    Map<Expression, String> viewProjectionMap = candidateEntry.getViewProjectionMap();
+
     /// Step 2: GROUP BY
-    if (!groupByMatches(userQuery, viewQuery)) {
+    if (!groupByMatches(userQuery, viewQuery, viewProjectionMap)) {
       LOGGER.debug("MV match [{}] strategy={}: rejected at GROUP_BY", materializedViewName, strategyName);
       return null;
     }
 
-    /// Step 3: projection subsumption — use the projection map cached on the entry.
-    Map<Expression, String> viewProjectionMap = candidateEntry.getViewProjectionMap();
+    /// Step 3: projection subsumption
     if (!projectionSubsumes(userQuery.getSelectList(), viewProjectionMap)) {
       LOGGER.debug("MV match [{}] strategy={}: rejected at PROJECTION", materializedViewName, strategyName);
       return null;
@@ -172,7 +174,14 @@ public abstract class AbstractSubsumptionStrategy implements MaterializedViewMat
 
   /// Returns `true` if the user query's GROUP BY clause is compatible
   /// with the MV's GROUP BY clause.
-  protected abstract boolean groupByMatches(PinotQuery userQuery, PinotQuery viewQuery);
+  ///
+  /// @param userQuery         the user's compiled query
+  /// @param viewQuery         the MV's compiled query
+  /// @param viewProjectionMap alias-stripped expression &rarr; MV column name.  Strategies that
+  ///                          rewrite the user's GROUP BY to MV columns must use this to reject
+  ///                          keys the MV groups by but does not materialize a column for.
+  protected abstract boolean groupByMatches(PinotQuery userQuery, PinotQuery viewQuery,
+      Map<Expression, String> viewProjectionMap);
 
   /// Returns `true` if the MV's projection (SELECT list) covers all
   /// expressions required by the user query.

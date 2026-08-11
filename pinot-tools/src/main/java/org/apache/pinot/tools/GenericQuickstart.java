@@ -25,18 +25,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Sets up a demo Pinot cluster with 1 zookeeper, 1 controller, 1 broker and 1 server
- * Sets up a demo Kafka cluster for real-time ingestion
- * It takes a directory as input
- * <code>
- *  rawData
- *    - 1.csv
- *  table_config.json
- *  schema.json
- *  ingestion_job_spec.json
- *  </code>
- */
+/// Sets up a demo Pinot cluster with 1 zookeeper, 1 controller, 1 broker and 1 server
+/// Sets up a demo Kafka cluster for real-time ingestion
+/// It takes a directory as input
+///
+/// ```
+/// rawData
+///   - 1.csv
+/// table_config.json
+/// schema.json
+/// ingestion_job_spec.json
+/// ```
 public class GenericQuickstart extends Quickstart {
   private static final Logger LOGGER = LoggerFactory.getLogger(GenericQuickstart.class);
 

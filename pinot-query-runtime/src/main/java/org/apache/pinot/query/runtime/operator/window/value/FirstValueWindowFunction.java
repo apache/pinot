@@ -61,11 +61,9 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
     }
   }
 
-  /**
-   * FIRST_VALUE for a non-default EXCLUDE clause. Computes the first non-excluded index for each row in O(1) using
-   * the precomputed peer-group boundaries; if {@code IGNORE NULLS} is set, advances past null values respecting the
-   * exclude rules.
-   */
+  /// FIRST_VALUE for a non-default EXCLUDE clause. Computes the first non-excluded index for each row in O(1) using
+  /// the precomputed peer-group boundaries; if `IGNORE NULLS` is set, advances past null values respecting the
+  /// exclude rules.
   private List<Object> processWithExclude(List<Object[]> rows) {
     int numRows = rows.size();
     WindowNode.WindowExclusion exclude = _windowFrame.getExclude();
@@ -318,10 +316,8 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
     }
   }
 
-  /**
-   * Both lowerBound and upperBound should be valid values for the given row set. The returned value is -1 if there is
-   * no non-null value in the window.
-   */
+  /// Both lowerBound and upperBound should be valid values for the given row set. The returned value is -1 if there is
+  /// no non-null value in the window.
   private int indexOfFirstNonNullValueInWindow(List<Object[]> rows, int lowerBound, int upperBound) {
     for (int i = lowerBound; i <= upperBound; i++) {
       Object value = extractValueFromRow(rows.get(i));

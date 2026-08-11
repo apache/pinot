@@ -149,12 +149,10 @@ public class DispatchablePlanContext {
     _leafStagesEmpty++;
   }
 
-  /**
-   * Returns true when at least one non-replicated leaf stage was processed during worker
-   * assignment, and every such leaf stage ended up with zero workers (e.g. all segments
-   * pruned by broker, or the table has no segments). Replicated leaves (dim tables) are
-   * excluded because they return early in WorkerManager before reaching the tracking code.
-   */
+  /// Returns true when at least one non-replicated leaf stage was processed during worker
+  /// assignment, and every such leaf stage ended up with zero workers (e.g. all segments
+  /// pruned by broker, or the table has no segments). Replicated leaves (dim tables) are
+  /// excluded because they return early in WorkerManager before reaching the tracking code.
   public boolean isAllNonReplicatedLeafStagesEmpty() {
     return _leafStagesAssigned > 0 && _leafStagesAssigned == _leafStagesEmpty;
   }

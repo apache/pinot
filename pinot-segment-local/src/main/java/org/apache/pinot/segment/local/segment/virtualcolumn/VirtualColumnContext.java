@@ -23,10 +23,8 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Miscellaneous context information about the column.
- * It will be used to build various components (dictionary, reader, etc) in the virtual column provider.
- */
+/// Miscellaneous context information about the column.
+/// It will be used to build various components (dictionary, reader, etc) in the virtual column provider.
 public class VirtualColumnContext {
   private final FieldSpec _fieldSpec;
   private final int _totalDocCount;

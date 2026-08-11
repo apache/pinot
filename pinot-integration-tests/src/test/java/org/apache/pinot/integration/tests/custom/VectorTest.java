@@ -211,10 +211,8 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
-  /**
-   * Tests filtered ANN: VECTOR_SIMILARITY combined with a metadata filter.
-   * All returned rows must match the filter predicate and be ordered by distance.
-   */
+  /// Tests filtered ANN: VECTOR_SIMILARITY combined with a metadata filter.
+  /// All returned rows must match the filter predicate and be ordered by distance.
   @Test(dataProvider = "useBothQueryEngines")
   public void testFilteredAnn(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -244,9 +242,7 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
-  /**
-   * Tests that filtered ANN returns fewer or equal results compared to unfiltered ANN.
-   */
+  /// Tests that filtered ANN returns fewer or equal results compared to unfiltered ANN.
   @Test(dataProvider = "useBothQueryEngines")
   public void testFilteredAnnReducesResults(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -269,9 +265,7 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
     assertTrue(filteredCount > 0, "Filtered ANN should return at least 1 result");
   }
 
-  /**
-   * Tests that EXPLAIN output includes execution mode for vector queries.
-   */
+  /// Tests that EXPLAIN output includes execution mode for vector queries.
   @Test(dataProvider = "useBothQueryEngines")
   public void testExplainShowsExecutionMode(boolean useMultiStageQueryEngine)
       throws Exception {

@@ -90,9 +90,7 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
     return value;
   }
 
-  /**
-   * Offers a raw value (single value or multi-value array) to the HyperLogLog.
-   */
+  /// Offers a raw value (single value or multi-value array) to the HyperLogLog.
   protected void offerValue(HyperLogLog hll, Object rawValue) {
     if (rawValue instanceof Object[]) {
       Object[] values = (Object[]) rawValue;

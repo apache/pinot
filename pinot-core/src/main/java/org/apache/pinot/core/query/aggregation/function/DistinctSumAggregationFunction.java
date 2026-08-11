@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
@@ -29,13 +30,16 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * Aggregation function to compute the sum of distinct values for an SV column.
- */
+/// Aggregation function to compute the sum of distinct values for an SV column.
 public class DistinctSumAggregationFunction extends BaseDistinctAggregateAggregationFunction<Double> {
 
   public DistinctSumAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
-    super(verifySingleArgument(arguments, "DISTINCT_SUM"), AggregationFunctionType.DISTINCTSUM, nullHandlingEnabled);
+    this(verifySingleArgument(arguments, "DISTINCT_SUM"), AggregationFunctionType.DISTINCTSUM, nullHandlingEnabled);
+  }
+
+  protected DistinctSumAggregationFunction(ExpressionContext expression,
+      AggregationFunctionType aggregationFunctionType, boolean nullHandlingEnabled) {
+    super(expression, aggregationFunctionType, nullHandlingEnabled);
   }
 
   @Override
@@ -79,10 +83,14 @@ public class DistinctSumAggregationFunction extends BaseDistinctAggregateAggrega
     return DataSchema.ColumnDataType.DOUBLE;
   }
 
+  @Nullable
   @Override
-  public Double extractFinalResult(Set intermediateResult) {
-    if (_nullHandlingEnabled && intermediateResult.isEmpty()) {
-      return null;
+  public Double extractFinalResult(@Nullable Set intermediateResult) {
+    // A null intermediate result means nothing was aggregated, and so does an empty set, which is what a
+    // deserialized peer can still carry. With null handling enabled the distinct sum of nothing is NULL; with it
+    // disabled it is the sum of no values, which is the zero below.
+    if (intermediateResult == null || intermediateResult.isEmpty()) {
+      return _nullHandlingEnabled ? null : 0.0;
     }
 
     Double distinctSum = 0.0;

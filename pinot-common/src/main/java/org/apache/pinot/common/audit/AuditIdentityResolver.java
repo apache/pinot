@@ -36,21 +36,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Resolves user identity for audit logging purposes from HTTP request contexts.
- * <p>
- * This resolver supports multiple identity resolution strategies in order of priority:
- * <ol>
- *   <li>Custom identity header - as configured in the audit configuration</li>
- *   <li>Custom token resolver (via SPI) - for proprietary token formats</li>
- *   <li>JWT token in Authorization header - extracting principal from JWT claims</li>
- * </ol>
- * <p>
- * The resolver is designed to be used in a JAX-RS environment where HTTP request
- * context is available through {@link ContainerRequestContext}.
- *
- * @since 1.0
- */
+/// Resolves user identity for audit logging purposes from HTTP request contexts.
+///
+/// This resolver supports multiple identity resolution strategies in order of priority:
+///
+/// 1. Custom identity header - as configured in the audit configuration
+/// 2. Custom token resolver (via SPI) - for proprietary token formats
+/// 3. JWT token in Authorization header - extracting principal from JWT claims
+///
+/// The resolver is designed to be used in a JAX-RS environment where HTTP request
+/// context is available through [ContainerRequestContext].
+///
+/// @since 1.0
 @Singleton
 public class AuditIdentityResolver {
 
@@ -71,23 +68,20 @@ public class AuditIdentityResolver {
     _resolverHolder.set(new ResolverHolder(tokenResolver));
   }
 
-  /**
-   * Resolves user identity from the given HTTP request context.
-   * <p>
-   * The resolution follows a priority order:
-   * <ol>
-   *   <li>Check for a custom identity header as specified in the audit configuration</li>
-   *   <li>Use custom token resolver (if configured) to resolve from Authorization header</li>
-   *   <li>Extract principal from JWT token in the Authorization header</li>
-   * </ol>
-   * <p>
-   * If no identity can be resolved from any of the above methods, this method returns {@code null}
-   * rather than creating an anonymous identity.
-   *
-   * @param requestContext the HTTP request context containing headers and other request information
-   * @return a {@link AuditEvent.UserIdentity} containing the resolved principal, or {@code null} if no identity
-   * could be resolved
-   */
+  /// Resolves user identity from the given HTTP request context.
+  ///
+  /// The resolution follows a priority order:
+  ///
+  /// 1. Check for a custom identity header as specified in the audit configuration
+  /// 2. Use custom token resolver (if configured) to resolve from Authorization header
+  /// 3. Extract principal from JWT token in the Authorization header
+  ///
+  /// If no identity can be resolved from any of the above methods, this method returns `null`
+  /// rather than creating an anonymous identity.
+  ///
+  /// @param requestContext the HTTP request context containing headers and other request information
+  /// @return a [AuditEvent.UserIdentity] containing the resolved principal, or `null` if no identity
+  /// could be resolved
   @Nullable
   public AuditEvent.UserIdentity resolveIdentity(ContainerRequestContext requestContext) {
     AuditConfig config = _configManager.getCurrentConfig();
@@ -185,9 +179,7 @@ public class AuditIdentityResolver {
     }
   }
 
-  /**
-   * Immutable holder for resolver and its class name to enable atomic updates.
-   */
+  /// Immutable holder for resolver and its class name to enable atomic updates.
   private static final class ResolverHolder {
     @Nullable
     private final AuditTokenResolver _resolver;

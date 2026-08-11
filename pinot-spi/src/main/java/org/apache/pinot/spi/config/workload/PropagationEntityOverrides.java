@@ -23,13 +23,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
-/**
- * Represents custom entity overrides for propagation schemes.
- *
- * It defines custom entity overrides where finer grained resource allocations is needed.
- * For example, in a TablePropagationScheme, for realtime tables. The entity could be "CONSUMING" or "COMPLETED"
- * to allow for two different resource allocations splits. Each having its own CPU and memory costs.
- */
+/// Represents custom entity overrides for propagation schemes.
+///
+/// It defines custom entity overrides where finer grained resource allocations is needed.
+/// For example, in a TablePropagationScheme, for realtime tables. The entity could be "CONSUMING" or "COMPLETED"
+/// to allow for two different resource allocations splits. Each having its own CPU and memory costs.
 public class PropagationEntityOverrides extends BaseJsonConfig {
 
   @JsonPropertyDescription("The unique identifier for the propagation entity override")
