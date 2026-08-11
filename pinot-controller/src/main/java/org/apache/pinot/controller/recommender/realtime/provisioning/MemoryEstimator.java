@@ -446,10 +446,8 @@ public class MemoryEstimator {
     return _numSegmentsQueriedPerHost;
   }
 
-  /**
-   * Max usable host memory (bytes) supplied when this estimator was constructed.
-   * Estimates may exceed this value; callers should surface warnings rather than hiding them.
-   */
+  /// Max usable host memory (bytes) supplied when this estimator was constructed.
+  /// Estimates may exceed this value; callers should surface warnings rather than hiding them.
   public long getMaxUsableHostMemory() {
     return _maxUsableHostMemory;
   }

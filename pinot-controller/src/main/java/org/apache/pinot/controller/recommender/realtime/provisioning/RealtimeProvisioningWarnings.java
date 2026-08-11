@@ -24,61 +24,51 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 
 
-/**
- * Builds human-readable sanity-check warnings for realtime provisioning estimates.
- * <p>
- * These are advisory only: recommendation matrices are left unchanged. Thresholds are
- * named constants so they can be tuned in review without hunting through string literals.
- * See <a href="https://github.com/apache/pinot/issues/8339">#8339</a>.
- * <p>
- * Warnings are based on the maximum value across the estimate grid (not a single selected
- * host/hour pick). When {@code numHours}/{@code numHosts} axes are supplied, messages name
- * the worst cell so operators can map the warning back to the printed matrix.
- */
+/// Builds human-readable sanity-check warnings for realtime provisioning estimates.
+///
+/// These are advisory only: recommendation matrices are left unchanged. Thresholds are
+/// named constants so they can be tuned in review without hunting through string literals.
+/// See [#8339](https://github.com/apache/pinot/issues/8339).
+///
+/// Warnings are based on the maximum value across the estimate grid (not a single selected
+/// host/hour pick). When `numHours`/`numHosts` axes are supplied, messages name
+/// the worst cell so operators can map the warning back to the printed matrix.
 public final class RealtimeProvisioningWarnings {
 
-  /**
-   * Segment sizes above this often risk long consumption pauses, heap pressure during
-   * segment build, and controller upload timeouts. Not a hard limit — large total data
-   * volumes can still justify bigger segments after reviewing the tradeoff.
-   */
+  /// Segment sizes above this often risk long consumption pauses, heap pressure during
+  /// segment build, and controller upload timeouts. Not a hard limit - large total data
+  /// volumes can still justify bigger segments after reviewing the tradeoff.
   public static final long LARGE_SEGMENT_SIZE_BYTES = 500L * 1024 * 1024;
 
-  /**
-   * Many segments per host increase metadata overhead and query fan-out. Flag combinations
-   * that query more than this many segments on a single host.
-   */
+  /// Many segments per host increase metadata overhead and query fan-out. Flag combinations
+  /// that query more than this many segments on a single host.
   public static final int HIGH_SEGMENTS_PER_HOST_THRESHOLD = 5_000;
 
-  /** Canonical docs path (current site IA). Legacy {@code operators/operating-pinot/...} redirects here. */
+  /// Canonical docs path (current site IA). Legacy `operators/operating-pinot/...` redirects here.
   public static final String REALTIME_TUNING_DOCS_URL =
       "https://docs.pinot.apache.org/operate-pinot/tuning/realtime";
 
   private RealtimeProvisioningWarnings() {
   }
 
-  /**
-   * Generate warnings from provisioning matrices produced by {@link MemoryEstimator}.
-   * Equivalent to {@link #generate(String[][], String[][], String[][], long, int[], int[])}
-   * with no axis labels.
-   */
+  /// Generate warnings from provisioning matrices produced by {@link MemoryEstimator}.
+  /// Equivalent to {@link #generate(String[][], String[][], String[][], long, int[], int[])}
+  /// with no axis labels.
   public static List<String> generate(String[][] optimalSegmentSize, String[][] activeMemoryPerHost,
       String[][] numSegmentsQueriedPerHost, long maxUsableHostMemoryBytes) {
     return generate(optimalSegmentSize, activeMemoryPerHost, numSegmentsQueriedPerHost, maxUsableHostMemoryBytes,
         null, null);
   }
 
-  /**
-   * Generate warnings from provisioning matrices produced by {@link MemoryEstimator}.
-   *
-   * @param optimalSegmentSize segment size grid (human-readable sizes or {@link MemoryEstimator#NOT_APPLICABLE})
-   * @param activeMemoryPerHost active/mapped memory grid (e.g. {@code 12G/24G}) or NA
-   * @param numSegmentsQueriedPerHost segments-queried grid or NA
-   * @param maxUsableHostMemoryBytes max usable host memory used for the estimate
-   * @param numHours optional hour axis matching matrix rows (for cell labels)
-   * @param numHosts optional host axis matching matrix columns (for cell labels)
-   * @return ordered list of warning messages (may be empty)
-   */
+  /// Generate warnings from provisioning matrices produced by {@link MemoryEstimator}.
+  ///
+  /// @param optimalSegmentSize segment size grid (human-readable sizes or {@link MemoryEstimator#NOT_APPLICABLE})
+  /// @param activeMemoryPerHost active/mapped memory grid (e.g. `12G/24G`) or NA
+  /// @param numSegmentsQueriedPerHost segments-queried grid or NA
+  /// @param maxUsableHostMemoryBytes max usable host memory used for the estimate
+  /// @param numHours optional hour axis matching matrix rows (for cell labels)
+  /// @param numHosts optional host axis matching matrix columns (for cell labels)
+  /// @return ordered list of warning messages (may be empty)
   public static List<String> generate(String[][] optimalSegmentSize, String[][] activeMemoryPerHost,
       String[][] numSegmentsQueriedPerHost, long maxUsableHostMemoryBytes, @Nullable int[] numHours,
       @Nullable int[] numHosts) {
@@ -126,9 +116,7 @@ public final class RealtimeProvisioningWarnings {
     return warnings;
   }
 
-  /**
-   * Format warnings for CLI / log display. Returns empty string when there are no warnings.
-   */
+  /// Format warnings for CLI / log display. Returns empty string when there are no warnings.
   public static String formatForDisplay(List<String> warnings) {
     if (warnings == null || warnings.isEmpty()) {
       return "";
@@ -268,7 +256,7 @@ public final class RealtimeProvisioningWarnings {
     }
   }
 
-  /** Holds a numeric max and its matrix coordinates (row = hours index, col = hosts index). */
+  /// Holds a numeric max and its matrix coordinates (row = hours index, col = hosts index).
   private static final class CellLong {
     final long _value;
     final int _row;

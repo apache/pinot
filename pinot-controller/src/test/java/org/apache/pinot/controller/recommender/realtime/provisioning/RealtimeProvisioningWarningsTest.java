@@ -27,9 +27,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for {@link RealtimeProvisioningWarnings} sanity checks (#8339).
- */
+/// Unit tests for {@link RealtimeProvisioningWarnings} sanity checks (#8339).
 public class RealtimeProvisioningWarningsTest {
 
   private static final long MAX_HOST_MEMORY = DataSizeUtils.toBytes("48G");
@@ -49,7 +47,7 @@ public class RealtimeProvisioningWarningsTest {
 
   @Test
   public void testLargeSegmentSizeWarning() {
-    // 5G segment — the motivating case from #8339
+    // 5G segment, the motivating case from #8339
     String[][] segmentSize = {{"100M", "5G"}, {"200M", "1G"}};
     String[][] activeMemory = {{"10G/12G", "20G/24G"}, {"12G/14G", "22G/26G"}};
     String[][] numSegments = {{"100", "20"}, {"80", "15"}};
