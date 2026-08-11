@@ -22,12 +22,19 @@ public class InstanceSelectorConfig {
   private final boolean _useFixedReplica;
   private final long _newSegmentExpirationTimeInSeconds;
   private final boolean _emitSinglePoolSegmentsMetrics;
+  private final boolean _emitReplicaHealthMetrics;
 
   public InstanceSelectorConfig(boolean useFixedReplica, long newSegmentExpirationTimeInSeconds,
       boolean emitSinglePoolSegmentsMetrics) {
+    this(useFixedReplica, newSegmentExpirationTimeInSeconds, emitSinglePoolSegmentsMetrics, true);
+  }
+
+  public InstanceSelectorConfig(boolean useFixedReplica, long newSegmentExpirationTimeInSeconds,
+      boolean emitSinglePoolSegmentsMetrics, boolean emitReplicaHealthMetrics) {
     _useFixedReplica = useFixedReplica;
     _newSegmentExpirationTimeInSeconds = newSegmentExpirationTimeInSeconds;
     _emitSinglePoolSegmentsMetrics = emitSinglePoolSegmentsMetrics;
+    _emitReplicaHealthMetrics = emitReplicaHealthMetrics;
   }
 
   public boolean isUseFixedReplica() {
@@ -40,5 +47,15 @@ public class InstanceSelectorConfig {
 
   public boolean shouldEmitSinglePoolSegmentsMetrics() {
     return _emitSinglePoolSegmentsMetrics;
+  }
+
+  /// Whether this selector should report the table's replica health gauges.
+  ///
+  /// The replica health gauges are keyed by table name, so only the selector that covers all of the
+  /// table's segments may report them. A selector built for a table sampler sees a sampled subset of
+  /// the segments and must not, or it would overwrite the table's values with numbers measured over
+  /// that sample.
+  public boolean shouldEmitReplicaHealthMetrics() {
+    return _emitReplicaHealthMetrics;
   }
 }

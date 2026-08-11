@@ -64,7 +64,20 @@ public class InstanceSelectorFactory {
       Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap, IdealState idealState,
       ExternalView externalView, Set<String> onlineSegments) {
     return getInstanceSelector(tableConfig, propertyStore, brokerMetrics, adaptiveServerSelector, Clock.systemUTC(),
-        brokerConfig, enabledInstances, enabledServerMap, idealState, externalView, onlineSegments);
+        brokerConfig, enabledInstances, enabledServerMap, idealState, externalView, onlineSegments, false);
+  }
+
+  /// Creates an instance selector covering only a subset of the table's segments, as one built for a table
+  /// sampler does. Such a selector never reports the table's replica health gauges: it shares the table name
+  /// with the selector covering the whole table, so reporting would overwrite the table's values with numbers
+  /// measured over the subset. See [InstanceSelectorConfig#shouldEmitReplicaHealthMetrics()].
+  public static InstanceSelector getInstanceSelectorForPartialSegmentView(TableConfig tableConfig,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics,
+      @Nullable AdaptiveServerSelector adaptiveServerSelector, PinotConfiguration brokerConfig,
+      Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap, IdealState idealState,
+      ExternalView externalView, Set<String> onlineSegments) {
+    return getInstanceSelector(tableConfig, propertyStore, brokerMetrics, adaptiveServerSelector, Clock.systemUTC(),
+        brokerConfig, enabledInstances, enabledServerMap, idealState, externalView, onlineSegments, true);
   }
 
   public static InstanceSelector getInstanceSelector(TableConfig tableConfig,
@@ -72,6 +85,21 @@ public class InstanceSelectorFactory {
       @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock, PinotConfiguration brokerConfig,
       Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap, IdealState idealState,
       ExternalView externalView, Set<String> onlineSegments) {
+    return getInstanceSelector(tableConfig, propertyStore, brokerMetrics, adaptiveServerSelector, clock, brokerConfig,
+        enabledInstances, enabledServerMap, idealState, externalView, onlineSegments, false);
+  }
+
+  /// Creates an instance selector for the given table.
+  ///
+  /// @param partialSegmentView whether `onlineSegments` is only a subset of the table's segments, as it is
+  /// for a table sampler. Such a selector must not report the table's replica health gauges, since it shares
+  /// the table name with the selector covering the whole table. See
+  /// [InstanceSelectorConfig#shouldEmitReplicaHealthMetrics()].
+  private static InstanceSelector getInstanceSelector(TableConfig tableConfig,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics,
+      @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock, PinotConfiguration brokerConfig,
+      Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap, IdealState idealState,
+      ExternalView externalView, Set<String> onlineSegments, boolean partialSegmentView) {
     String tableNameWithType = tableConfig.getTableName();
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
     boolean useFixedReplica = brokerConfig.getProperty(CommonConstants.Broker.CONFIG_OF_USE_FIXED_REPLICA,
@@ -85,8 +113,11 @@ public class InstanceSelectorFactory {
     boolean emitSinglePoolSegmentsMetric = brokerConfig.getProperty(
             CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_SINGLE_POOL_SEGMENTS_METRIC,
             CommonConstants.Broker.DEFAULT_ENABLE_SINGLE_POOL_SEGMENTS_METRIC);
+    // Always on, with one exception: a selector built over a sampled subset of the table's segments would
+    // report that subset under the table's own gauge names and overwrite the real values.
+    boolean emitReplicaHealthMetrics = !partialSegmentView;
     InstanceSelectorConfig config = new InstanceSelectorConfig(useFixedReplica, newSegmentExpirationTimeInSeconds,
-            emitSinglePoolSegmentsMetric);
+            emitSinglePoolSegmentsMetric, emitReplicaHealthMetrics);
 
     InstanceSelector instanceSelector = null;
     if (routingConfig != null) {

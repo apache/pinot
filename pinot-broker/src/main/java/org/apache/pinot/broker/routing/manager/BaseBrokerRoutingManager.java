@@ -58,6 +58,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.broker.helix.ClusterChangeHandler;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelectorFactory;
+import org.apache.pinot.broker.routing.instanceselector.BaseInstanceSelector;
 import org.apache.pinot.broker.routing.instanceselector.InstanceSelector;
 import org.apache.pinot.broker.routing.instanceselector.InstanceSelectorFactory;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetchListener;
@@ -693,6 +694,14 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     _globalLock.readLock().lock();
     try {
       buildRoutingInternal(tableNameWithType);
+    } catch (Exception e) {
+      // Creating the instance selector registers the table's replica health gauges, which happens before the
+      // routing entry is stored. If the build failed in between there is no routing entry to clean them up
+      // later, so they would keep being exported frozen at a value that no longer describes the table
+      if (!_routingEntryMap.containsKey(tableNameWithType)) {
+        BaseInstanceSelector.removeReplicaHealthMetrics(_brokerMetrics, tableNameWithType);
+      }
+      throw e;
     } finally {
       _globalLock.readLock().unlock();
     }
@@ -866,9 +875,11 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
             Set<String> samplerPreSelectedOnlineSegments = sampler.sampleSegments(preSelectedOnlineSegments);
             SegmentSelector samplerSegmentSelector = SegmentSelectorFactory.getSegmentSelector(tableConfig);
             samplerSegmentSelector.init(idealState, externalView, samplerPreSelectedOnlineSegments);
+            // This selector only sees the sampled segments, so it must not report the table's replica
+            // health gauges - those belong to the selector covering the whole table
             InstanceSelector samplerInstanceSelector =
-                InstanceSelectorFactory.getInstanceSelector(tableConfig, _propertyStore, _brokerMetrics,
-                    adaptiveServerSelector, _pinotConfig, _routableServerInstanceMap.keySet(),
+                InstanceSelectorFactory.getInstanceSelectorForPartialSegmentView(tableConfig, _propertyStore,
+                    _brokerMetrics, adaptiveServerSelector, _pinotConfig, _routableServerInstanceMap.keySet(),
                     _enabledServerInstanceMap, idealState, externalView, samplerPreSelectedOnlineSegments);
             configuredSamplerInfos.put(normalizedSamplerName,
                 new SamplerInfo(sampler, samplerSegmentSelector, samplerInstanceSelector));
@@ -970,8 +981,13 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
             TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
       }
 
-      if (_routingEntryMap.remove(tableNameWithType) != null) {
+      RoutingEntry removedRoutingEntry = _routingEntryMap.remove(tableNameWithType);
+      if (removedRoutingEntry != null) {
         LOGGER.info("Removed routing for table: {}", tableNameWithType);
+
+        // Stop reporting the table level gauges owned by the routing, otherwise they keep being exported
+        // for a table this broker no longer serves
+        removedRoutingEntry._instanceSelector.removeMetrics();
 
         // Remove time boundary manager for the offline part routing if the removed routing is the real-time part of a
         // hybrid table

@@ -244,6 +244,14 @@ public class BrokerRoutingManagerTest {
   private static Object createRoutingEntry(String tableNameWithType, TimeBoundaryManager timeBoundaryManager,
       SegmentPartitionMetadataManager partitionMetadataManager, Map<String, ?> samplerInfos)
       throws Exception {
+    return createRoutingEntry(tableNameWithType, timeBoundaryManager, partitionMetadataManager, samplerInfos,
+        mock(InstanceSelector.class));
+  }
+
+  private static Object createRoutingEntry(String tableNameWithType, TimeBoundaryManager timeBoundaryManager,
+      SegmentPartitionMetadataManager partitionMetadataManager, Map<String, ?> samplerInfos,
+      InstanceSelector instanceSelector)
+      throws Exception {
     Class<?> routingEntryClass = Class.forName(BaseBrokerRoutingManager.class.getName() + "$RoutingEntry");
     Constructor<?> constructor = routingEntryClass.getDeclaredConstructor(String.class, String.class, String.class,
         SegmentPreSelector.class, SegmentSelector.class, List.class, InstanceSelector.class, int.class, int.class,
@@ -252,9 +260,21 @@ public class BrokerRoutingManagerTest {
     constructor.setAccessible(true);
     return constructor.newInstance(tableNameWithType, "/IDEALSTATES/" + tableNameWithType,
         "/EXTERNALVIEW/" + tableNameWithType, mock(SegmentPreSelector.class), mock(SegmentSelector.class),
-        Collections.<SegmentPruner>emptyList(), mock(InstanceSelector.class), 1, 1,
+        Collections.<SegmentPruner>emptyList(), instanceSelector, 1, 1,
         mock(SegmentZkMetadataFetcher.class), timeBoundaryManager, partitionMetadataManager, null, samplerInfos,
         false);
+  }
+
+  @Test
+  public void testRemoveRoutingRemovesInstanceSelectorMetrics()
+      throws Exception {
+    // The selector owns the table's replica health gauges, so tearing down the routing has to stop them
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector));
+
+    _routingManager.removeRouting(TEST_TABLE);
+
+    verify(instanceSelector).removeMetrics();
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})

@@ -107,7 +107,27 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   /// signals a leak in the ZK listener / drop path.
   MATERIALIZED_VIEW_CACHE_ENTRY_COUNT("materializedViewCacheEntries", true),
   // Workload config fetch status: 1 = success, 0 = failure
-  WORKLOAD_CONFIG_FETCH_STATUS("status", true);
+  WORKLOAD_CONFIG_FETCH_STATUS("status", true),
+
+  /// Replica availability of a table as observed by this broker's routing: the smallest percentage of
+  /// assigned replicas that are actually routable, across all the table's segments. `100` means every segment can be
+  ///  served from every replica the ideal state assigns to it; `0` means at least one segment cannot be served at all.
+  ///
+  /// Segments still classified new (see
+  /// [org.apache.pinot.spi.utils.CommonConstants.Broker#CONFIG_OF_NEW_SEGMENT_EXPIRATION_SECONDS]) are
+  /// excluded because they are commonly not yet loaded everywhere
+  PERCENT_OF_REPLICAS("percent", false),
+
+  /// Number of the table's segments that this broker currently cannot route to any server. Segments assigned a
+  /// single replica are included
+  UNAVAILABLE_SEGMENTS("segments", false),
+
+  /// Number of the table's segments that are down to their last routable replica, or have none left.
+  /// Segments assigned a single replica are excluded, since they never had redundancy to lose. Recently created
+  /// segments are excluded on the same terms as [#PERCENT_OF_REPLICAS].
+  SEGMENTS_WITHOUT_REDUNDANCY("segments", false);
+
+
 
   private final String _brokerGaugeName;
   private final String _unit;

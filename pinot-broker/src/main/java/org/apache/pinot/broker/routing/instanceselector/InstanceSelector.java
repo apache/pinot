@@ -72,6 +72,11 @@ public interface InstanceSelector {
   /// Returns the enabled server instances currently serving the table.
   Set<String> getServingInstances();
 
+  /// Removes the table level metrics owned by this selector. Called when the table's routing is torn
+  /// down, so that gauges for a table this broker no longer serves stop being reported.
+  default void removeMetrics() {
+  }
+
   class SelectionResult {
     private final Pair<Map<String, String>, Map<String, String>/*optional segments*/> _segmentToInstanceMap;
     private final List<String> _unavailableSegments;
