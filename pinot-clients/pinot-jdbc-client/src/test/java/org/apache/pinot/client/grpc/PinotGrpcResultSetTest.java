@@ -126,6 +126,28 @@ public class PinotGrpcResultSetTest {
     Assert.assertEquals(metadata.getColumnClassName(1), UUID.class.getTypeName());
   }
 
+  @Test
+  public void testGetMapWithMixedNumericTypes()
+      throws Exception {
+    PinotGrpcResultSet resultSet = createResultSet(
+        new String[]{"map"},
+        new ColumnDataType[]{ColumnDataType.MAP},
+        new Object[]{Map.of(
+            "small", (short) 1,
+            "large", 2147483648L,
+            "float", 1.25f,
+            "decimal", new BigDecimal("2.5"),
+            "nested", Map.of("values", new Object[]{(short) 2, 3.5f}))});
+
+    Assert.assertTrue(resultSet.next());
+    Assert.assertEquals(resultSet.getObject(1), Map.of(
+        "small", 1,
+        "large", 2147483648L,
+        "float", 1.25d,
+        "decimal", 2.5d,
+        "nested", Map.of("values", List.of(2, 3.5d))));
+  }
+
   private static PinotGrpcResultSet createResultSet(String[] columnNames, ColumnDataType[] columnTypes, Object[] row)
       throws Exception {
     DataSchema schema = new DataSchema(columnNames, columnTypes);
