@@ -64,16 +64,14 @@ else
   COVERAGE_PROFILE=""
 fi
 if [ "$RUN_TEST_SET" == "1" ]; then
-  # pinot-segment-local's tests run here (not in set #2) to balance the two shards: it is the
-  # largest single test module and is already built in set #1 (see .pinot_tests_build.sh), so
-  # moving its tests off the slower set #2 (which has a ~3x longer build) keeps both shards
-  # near-equal in total wall-clock. No -am on this command, so only the listed modules test.
+  # pinot-segment-local's tests run in set #2 to balance pinot-core's longer test time in this
+  # shard against set #2's longer build. It remains built in set #1 as a pinot-core dependency.
+  # No -am on this command, so only the listed modules test.
   mvn test ${FORK_OPTS} \
       -pl 'pinot-spi' \
       -pl 'pinot-segment-spi' \
       -pl 'pinot-common' \
       -pl ':pinot-yammer' \
-      -pl 'pinot-segment-local' \
       -pl 'pinot-core' \
       -pl 'pinot-query-planner' \
       -pl 'pinot-query-runtime' \
@@ -84,7 +82,6 @@ if [ "$RUN_TEST_SET" == "2" ]; then
     -pl '!pinot-spi' \
     -pl '!pinot-segment-spi' \
     -pl '!pinot-common' \
-    -pl '!pinot-segment-local' \
     -pl '!pinot-core' \
     -pl '!pinot-query-planner' \
     -pl '!pinot-query-runtime' \
