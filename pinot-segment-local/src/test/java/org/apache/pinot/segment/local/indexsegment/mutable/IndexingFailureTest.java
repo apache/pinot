@@ -219,8 +219,8 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
         MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(METRIC_COL), Set.of(), Set.of(INT_COL),
             true);
     try {
-      segment.index(badDimensionRow("not-an-int"), METADATA);
-      segment.index(badDimensionRow("also-not-an-int"), METADATA);
+      segment.index(badDimensionRow("not-an-int", 1L), METADATA);
+      segment.index(badDimensionRow("also-not-an-int", 2L), METADATA);
       // Two failed rows carrying different values now share the default-value key by design.
       assertEquals(segment.getNumDocsIndexed(), 1);
 
@@ -240,10 +240,19 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
     }
   }
 
-  private static GenericRow badDimensionRow(String badValue) {
+  private static GenericRow nullStringRow(String jsonValue) {
+    GenericRow row = new GenericRow();
+    row.putValue(INT_COL, 1);
+    row.putValue(STRING_COL, null);
+    row.addNullValueField(STRING_COL);
+    row.putValue(JSON_COL, jsonValue);
+    return row;
+  }
+
+  private static GenericRow badDimensionRow(String badValue, long metricValue) {
     GenericRow row = new GenericRow();
     row.putValue(INT_COL, badValue);
-    row.putValue(METRIC_COL, 1L);
+    row.putValue(METRIC_COL, metricValue);
     return row;
   }
 
@@ -251,7 +260,7 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
   public void testNullValueSubstitutionMetersIncompleteRowOnce()
       throws IOException {
     // STRING_COL has no dictionary here, so a null value first shows up in addPhysicalColumn. The substituted default
-    // must mark the row incomplete exactly once even though the JSON index fails on the same row (#16316).
+    // must mark the row incomplete on its own, and still only once when another column fails on the same row (#16316).
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(INT_COL, FieldSpec.DataType.INT)
         .addSingleValueDimension(STRING_COL, FieldSpec.DataType.STRING)
         .addSingleValueDimension(JSON_COL, FieldSpec.DataType.JSON)
@@ -262,21 +271,21 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
         MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(STRING_COL), Set.of(), Set.of(INT_COL),
             Map.of(JSON_COL, new JsonIndexConfig()), serverMetrics);
     try {
-      GenericRow row = new GenericRow();
-      row.putValue(INT_COL, 1);
-      row.putValue(STRING_COL, null);
-      row.addNullValueField(STRING_COL);
-      row.putValue(JSON_COL, "{\"truncatedJson...");
-      segment.index(row, METADATA);
+      // Only the null substitution goes wrong on this row.
+      segment.index(nullStringRow("{\"valid\": \"json\"}"), METADATA);
+      // Null substitution plus a JSON index failure on the same row.
+      segment.index(nullStringRow("{\"truncatedJson..."), METADATA);
 
-      assertEquals(segment.getNumDocsIndexed(), 1);
+      assertEquals(segment.getNumDocsIndexed(), 2);
       GenericRow result = segment.getRecord(0, new GenericRow());
       assertEquals(result.getValue(STRING_COL), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
       assertTrue(segment.getDataSource(STRING_COL).getNullValueVector().isNull(0));
-      verify(serverMetrics, times(1)).addMeteredTableValue(matches("NULL_VALUE-indexingError$"),
+      assertTrue(segment.getDataSource(STRING_COL).getNullValueVector().isNull(1));
+      verify(serverMetrics, times(2)).addMeteredTableValue(matches("NULL_VALUE-indexingError$"),
           eq(ServerMeter.INDEXING_FAILURES), eq(1L));
-      // Exactly once for the row, even though the null substitution and the JSON index failure both hit it.
-      verify(serverMetrics, times(1)).addMeteredTableValue(eq(TABLE_NAME + "_REALTIME"),
+      // Once per row: the first row is metered on the substitution alone, the second one only once despite two
+      // failing columns.
+      verify(serverMetrics, times(2)).addMeteredTableValue(eq(TABLE_NAME + "_REALTIME"),
           eq(ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED), eq(1L));
     } finally {
       segment.destroy();
