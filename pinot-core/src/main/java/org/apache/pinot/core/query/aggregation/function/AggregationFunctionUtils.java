@@ -119,6 +119,36 @@ public class AggregationFunctionUtils {
     return expressions;
   }
 
+  /// Merges two intermediate results, either of which may be `null`.
+  ///
+  /// A `null` intermediate result means nothing was aggregated, and is thus the identity of merging, which means the
+  /// same thing for every aggregation. Resolving it here keeps that out of the implementations, so
+  /// [AggregationFunction#merge] only ever sees two real values. See the null contract on [AggregationFunction].
+  @Nullable
+  public static <I> I merge(AggregationFunction<I, ?> aggregationFunction, @Nullable I intermediateResult1,
+      @Nullable I intermediateResult2) {
+    if (intermediateResult1 == null) {
+      return intermediateResult2;
+    }
+    if (intermediateResult2 == null) {
+      return intermediateResult1;
+    }
+    return aggregationFunction.merge(intermediateResult1, intermediateResult2);
+  }
+
+  /// Merges two final results, either of which may be `null`, on the same terms as [#merge].
+  @Nullable
+  public static <F extends Comparable> F mergeFinalResult(AggregationFunction<?, F> aggregationFunction,
+      @Nullable F finalResult1, @Nullable F finalResult2) {
+    if (finalResult1 == null) {
+      return finalResult2;
+    }
+    if (finalResult2 == null) {
+      return finalResult1;
+    }
+    return aggregationFunction.mergeFinalResult(finalResult1, finalResult2);
+  }
+
   /// Creates a map from expression required by the [AggregationFunction] to [BlockValSet] fetched from the
   /// [ValueBlock].
   public static Map<ExpressionContext, BlockValSet> getBlockValSetMap(AggregationFunction aggregationFunction,

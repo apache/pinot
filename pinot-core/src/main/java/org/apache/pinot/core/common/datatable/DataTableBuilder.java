@@ -92,14 +92,23 @@ public interface DataTableBuilder {
   void setColumn(int colId, AggregationFunction.SerializedIntermediateResult value)
       throws IOException;
 
+  /// Writes a `null` for the given column of the current row.
+  ///
+  /// Valid for every column type, independent of the query's null-handling option. Types that can represent `null`
+  /// in-band (`OBJECT`, `UNKNOWN`, `MAP`) keep their own encoding; every other type is written as the column's null
+  /// placeholder and the row is recorded in a per-column null bitmap that `build()` appends to the table. Readers
+  /// restore the `null` via `DataTable.getNullRowIds`.
   void setNull(int colId)
       throws IOException;
 
   void finishRow()
       throws IOException;
 
-  /// NOTE: When setting nullRowIds, we don't pass the colId currently, and this method must be invoked for all columns.
-  /// TODO: Revisit this
+  /// Merges a pre-computed null bitmap into the bitmap the builder maintains for the next column.
+  ///
+  /// NOTE: The colId is positional -- the first call targets column 0, the second column 1, and so on -- so callers
+  /// that use this method must invoke it once for every column, in order. Callers that instead report nulls per cell
+  /// through [#setNull] need not call this at all.
   void setNullRowIds(@Nullable RoaringBitmap nullRowIds)
       throws IOException;
 

@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -139,16 +140,13 @@ public class VarianceAggregationFunction extends NullableSingleInputAggregationF
     });
   }
 
+  @Nullable
   @Override
   public VarianceTuple extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    VarianceTuple varianceTuple = aggregationResultHolder.getResult();
-    if (varianceTuple == null) {
-      return _nullHandlingEnabled ? null : new VarianceTuple(0L, 0.0, 0.0);
-    } else {
-      return varianceTuple;
-    }
+    return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public VarianceTuple extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
@@ -156,13 +154,6 @@ public class VarianceAggregationFunction extends NullableSingleInputAggregationF
 
   @Override
   public VarianceTuple merge(VarianceTuple intermediateResult1, VarianceTuple intermediateResult2) {
-    if (_nullHandlingEnabled) {
-      if (intermediateResult1 == null) {
-        return intermediateResult2;
-      } else if (intermediateResult2 == null) {
-        return intermediateResult1;
-      }
-    }
     intermediateResult1.apply(intermediateResult2);
     return intermediateResult1;
   }
@@ -188,10 +179,14 @@ public class VarianceAggregationFunction extends NullableSingleInputAggregationF
     return DataSchema.ColumnDataType.DOUBLE;
   }
 
+  @Nullable
   @Override
-  public Double extractFinalResult(VarianceTuple varianceTuple) {
+  public Double extractFinalResult(@Nullable VarianceTuple varianceTuple) {
+    // A null intermediate result means nothing was aggregated, and so does a zero count, which is what a
+    // deserialized empty tuple carries. With null handling enabled the variance of nothing is NULL; with it disabled
+    // it is what an untouched tuple renders to, which is the sentinel below.
     if (varianceTuple == null) {
-      return null;
+      return _nullHandlingEnabled ? null : DEFAULT_FINAL_RESULT;
     }
     long count = varianceTuple.getCount();
     if (count == 0L) {

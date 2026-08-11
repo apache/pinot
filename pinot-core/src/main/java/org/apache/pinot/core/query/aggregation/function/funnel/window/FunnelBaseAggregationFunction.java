@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -217,11 +218,13 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
     return stepEvents;
   }
 
+  @Nullable
   @Override
   public PriorityQueue<FunnelStepEvent> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public PriorityQueue<FunnelStepEvent> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
@@ -230,13 +233,6 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
   @Override
   public PriorityQueue<FunnelStepEvent> merge(PriorityQueue<FunnelStepEvent> intermediateResult1,
       PriorityQueue<FunnelStepEvent> intermediateResult2) {
-    if (intermediateResult1 == null) {
-      return intermediateResult2;
-    }
-    if (intermediateResult2 == null) {
-      return intermediateResult1;
-    }
-
     QueryThreadContext.checkTerminationAndSampleUsage(this::getResultColumnName);
 
     intermediateResult1.addAll(intermediateResult2);

@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function.array;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -111,11 +112,13 @@ public class SumArrayLongAggregationFunction extends BaseSingleInputAggregationF
     }
   }
 
+  @Nullable
   @Override
   public LongArrayList extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public LongArrayList extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
@@ -159,8 +162,9 @@ public class SumArrayLongAggregationFunction extends BaseSingleInputAggregationF
     return DataSchema.ColumnDataType.LONG_ARRAY;
   }
 
+  @Nullable
   @Override
-  public LongArrayList extractFinalResult(LongArrayList result) {
+  public LongArrayList extractFinalResult(@Nullable LongArrayList result) {
     return result;
   }
 }

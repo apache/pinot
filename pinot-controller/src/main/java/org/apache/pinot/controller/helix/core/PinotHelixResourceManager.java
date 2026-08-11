@@ -5560,8 +5560,8 @@ public class PinotHelixResourceManager {
     // the per-consuming-segment commit rate.  Without this early bail, even a no-op notify
     // chain (extract name + WARN log + onBaseTableFullInvalidation → fast-path inside) would
     // multiply controller CPU + log volume on every realtime commit.  Verified by
-    // PauselessRealtimeIngestionNewSegmentMetadataCreationFailureTest, which timed out at 100s
-    // when the per-commit WARN log was unconditionally emitted.
+    // PauselessRealtimeIngestionIntegrationTest#testNewSegmentMetadataCreationFailure, which timed out at 100s when
+    // the per-commit WARN log was unconditionally emitted.
     if (mgr.getDependentMaterializedViews(rawTableName).isEmpty()) {
       return;
     }

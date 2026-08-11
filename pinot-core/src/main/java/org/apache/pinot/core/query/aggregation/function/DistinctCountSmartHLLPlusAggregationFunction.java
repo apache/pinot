@@ -240,14 +240,7 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
   }
 
   @Override
-  public Object merge(@Nullable Object intermediateResult1, @Nullable Object intermediateResult2) {
-    if (intermediateResult1 == null) {
-      return intermediateResult2;
-    }
-    if (intermediateResult2 == null) {
-      return intermediateResult1;
-    }
-
+  public Object merge(Object intermediateResult1, Object intermediateResult2) {
     if (intermediateResult1 instanceof HyperLogLogPlus) {
       return mergeIntoHLLPlus((HyperLogLogPlus) intermediateResult1, intermediateResult2);
     }
@@ -338,13 +331,7 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
   }
 
   @Override
-  public Integer mergeFinalResult(@Nullable Integer finalResult1, @Nullable Integer finalResult2) {
-    if (finalResult1 == null) {
-      return finalResult2 == null ? 0 : finalResult2;
-    }
-    if (finalResult2 == null) {
-      return finalResult1;
-    }
+  public Integer mergeFinalResult(Integer finalResult1, Integer finalResult2) {
     return finalResult1 + finalResult2;
   }
 

@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -200,6 +201,7 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
     }
   }
 
+  @Nullable
   @Override
   public DoubleArrayList extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
@@ -232,8 +234,9 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
     return ColumnDataType.DOUBLE_ARRAY;
   }
 
+  @Nullable
   @Override
-  public DoubleArrayList extractFinalResult(DoubleArrayList doubleArrayList) {
+  public DoubleArrayList extractFinalResult(@Nullable DoubleArrayList doubleArrayList) {
     return doubleArrayList;
   }
 

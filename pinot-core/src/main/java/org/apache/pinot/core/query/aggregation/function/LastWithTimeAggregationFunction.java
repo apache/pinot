@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -236,8 +237,10 @@ public abstract class LastWithTimeAggregationFunction<V extends Comparable<V>>
     return ColumnDataType.OBJECT;
   }
 
+  @Nullable
   @Override
-  public V extractFinalResult(ValueLongPair<V> intermediateResult) {
-    return intermediateResult.getValue();
+  public V extractFinalResult(@Nullable ValueLongPair<V> intermediateResult) {
+    // A null intermediate result means nothing was aggregated, and there is no last value
+    return intermediateResult != null ? intermediateResult.getValue() : null;
   }
 }

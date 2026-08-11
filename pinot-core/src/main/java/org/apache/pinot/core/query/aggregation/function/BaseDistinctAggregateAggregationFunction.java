@@ -29,6 +29,7 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.math.BigDecimal;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -80,13 +81,13 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
   }
 
+  @Nullable
   @Override
   public Set extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     Object result = aggregationResultHolder.getResult();
     if (result == null) {
-      return EMPTY_PLACEHOLDER;
+      return null;
     }
-
     if (result instanceof DictIdsWrapper) {
       // For dictionary-encoded expression, convert dictionary ids to values
       return convertToValueSet((DictIdsWrapper) result);
@@ -96,13 +97,13 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     }
   }
 
+  @Nullable
   @Override
   public Set extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     Object result = groupByResultHolder.getResult(groupKey);
     if (result == null) {
-      return EMPTY_PLACEHOLDER;
+      return null;
     }
-
     if (result instanceof DictIdsWrapper) {
       // For dictionary-encoded expression, convert dictionary ids to values
       return convertToValueSet((DictIdsWrapper) result);

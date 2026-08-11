@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
@@ -259,6 +260,7 @@ public class MinLongAggregationFunction extends NullableSingleInputAggregationFu
     }
   }
 
+  @Nullable
   @Override
   public Long extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     if (_nullHandlingEnabled) {
@@ -267,6 +269,7 @@ public class MinLongAggregationFunction extends NullableSingleInputAggregationFu
     return aggregationResultHolder.getLongResult();
   }
 
+  @Nullable
   @Override
   public Long extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     if (_nullHandlingEnabled) {
@@ -277,15 +280,6 @@ public class MinLongAggregationFunction extends NullableSingleInputAggregationFu
 
   @Override
   public Long merge(Long intermediateMinResult1, Long intermediateMinResult2) {
-    if (_nullHandlingEnabled) {
-      if (intermediateMinResult1 == null) {
-        return intermediateMinResult2;
-      }
-      if (intermediateMinResult2 == null) {
-        return intermediateMinResult1;
-      }
-    }
-
     if (intermediateMinResult1 < intermediateMinResult2) {
       return intermediateMinResult1;
     }
@@ -302,8 +296,9 @@ public class MinLongAggregationFunction extends NullableSingleInputAggregationFu
     return DataSchema.ColumnDataType.LONG;
   }
 
+  @Nullable
   @Override
-  public Long extractFinalResult(Long intermediateResult) {
+  public Long extractFinalResult(@Nullable Long intermediateResult) {
     return intermediateResult;
   }
 

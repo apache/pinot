@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -486,8 +487,13 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
     return ColumnDataType.STRING;
   }
 
+  @Nullable
   @Override
-  public String extractFinalResult(IdSet intermediateResult) {
+  public String extractFinalResult(@Nullable IdSet intermediateResult) {
+    // A null intermediate result means nothing was aggregated, and there is no id set to serialize
+    if (intermediateResult == null) {
+      return null;
+    }
     try {
       return intermediateResult.toBase64String();
     } catch (IOException e) {

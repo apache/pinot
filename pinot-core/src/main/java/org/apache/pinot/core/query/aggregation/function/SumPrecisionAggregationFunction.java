@@ -24,6 +24,7 @@ import java.math.MathContext;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -314,6 +315,7 @@ public class SumPrecisionAggregationFunction extends NullableSingleInputAggregat
     }
   }
 
+  @Nullable
   @Override
   public BigDecimal extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     BigDecimal result = aggregationResultHolder.getResult();
@@ -323,6 +325,7 @@ public class SumPrecisionAggregationFunction extends NullableSingleInputAggregat
     return result;
   }
 
+  @Nullable
   @Override
   public BigDecimal extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     BigDecimal result = groupByResultHolder.getResult(groupKey);
@@ -334,14 +337,6 @@ public class SumPrecisionAggregationFunction extends NullableSingleInputAggregat
 
   @Override
   public BigDecimal merge(BigDecimal intermediateResult1, BigDecimal intermediateResult2) {
-    if (_nullHandlingEnabled) {
-      if (intermediateResult1 == null) {
-        return intermediateResult2;
-      }
-      if (intermediateResult2 == null) {
-        return intermediateResult1;
-      }
-    }
     return intermediateResult1.add(intermediateResult2);
   }
 
@@ -368,8 +363,9 @@ public class SumPrecisionAggregationFunction extends NullableSingleInputAggregat
     return ColumnDataType.STRING;
   }
 
+  @Nullable
   @Override
-  public BigDecimal extractFinalResult(BigDecimal intermediateResult) {
+  public BigDecimal extractFinalResult(@Nullable BigDecimal intermediateResult) {
     if (intermediateResult == null) {
       return null;
     }

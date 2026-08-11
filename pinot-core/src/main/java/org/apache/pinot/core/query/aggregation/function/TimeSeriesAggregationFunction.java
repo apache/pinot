@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -184,11 +185,13 @@ public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTi
     throw new UnsupportedOperationException("MV not supported yet");
   }
 
+  @Nullable
   @Override
   public BaseTimeSeriesBuilder extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public BaseTimeSeriesBuilder extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
@@ -210,8 +213,13 @@ public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTi
     return DataSchema.ColumnDataType.OBJECT;
   }
 
+  @Nullable
   @Override
-  public DoubleArrayList extractFinalResult(BaseTimeSeriesBuilder seriesBuilder) {
+  public DoubleArrayList extractFinalResult(@Nullable BaseTimeSeriesBuilder seriesBuilder) {
+    // A null intermediate result means nothing was aggregated, and there is no series to build
+    if (seriesBuilder == null) {
+      return null;
+    }
     Double[] doubleValues = seriesBuilder.build().getDoubleValues();
     return new DoubleArrayList(Arrays.asList(doubleValues));
   }
