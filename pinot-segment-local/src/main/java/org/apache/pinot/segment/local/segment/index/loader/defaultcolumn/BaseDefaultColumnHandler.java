@@ -124,7 +124,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     UPDATE_COMPLEX_DEFAULT_VALUE,
     UPDATE_COMPLEX_TRANSFORM_FUNCTION,
     // Metadata-only action: record the configured transform function for an auto-generated column created before the
-    // transform function was tracked in the segment metadata. No values are regenerated.
+    // transform function was tracked in the segment metadata. No values are regenerated, and it is handled entirely
+    // within updateDefaultColumns(), i.e. it is never dispatched to updateDefaultColumn().
     BACKFILL_TRANSFORM_FUNCTION;
 
     boolean isAddAction() {
@@ -340,6 +341,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         // Segments created before the transform function was tracked in the metadata report null for it. Their values
         // cannot be told apart from up-to-date ones, so instead of regenerating them, record the configured transform
         // function in the metadata (values untouched) so that the NEXT transform function change is detected.
+        // Tradeoff: a transform function change that lands in the very same reload as this backfill is not applied to
+        // the existing values (which matches the behavior before the transform function was tracked at all); operators
+        // who need those values regenerated can force it with one more change to the expression.
         if (!defaultColumnActionMap.containsKey(column) && columnMetadata.getTransformFunction() == null
             && getTransformFunctionForColumn(column) != null) {
           defaultColumnActionMap.put(column, DefaultColumnAction.BACKFILL_TRANSFORM_FUNCTION);
