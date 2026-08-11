@@ -618,7 +618,6 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     return ColumnDataType.LONG;
   }
 
-  @Nullable
   @Override
   public Long extractFinalResult(@Nullable HyperLogLog intermediateResult) {
     return intermediateResult == null ? 0L : intermediateResult.cardinality();

@@ -504,8 +504,15 @@ public class ModeAggregationFunction
     return ColumnDataType.DOUBLE;
   }
 
+  @Nullable
   @Override
-  public Double extractFinalResult(Map<? extends Number, Long> intermediateResult) {
+  public Double extractFinalResult(@Nullable Map<? extends Number, Long> intermediateResult) {
+    // A null intermediate result means nothing was aggregated, and the mode of nothing is NULL. An empty map is a
+    // different thing: it is what an untouched single-stage result holder produces, and it keeps its historical
+    // sentinel below so that path is not silently changed.
+    if (intermediateResult == null) {
+      return null;
+    }
     if (intermediateResult.isEmpty()) {
       if (_nullHandlingEnabled) {
         return null;

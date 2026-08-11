@@ -128,6 +128,11 @@ public class ControllerTest {
   public static final String BROKER_INSTANCE_ID_PREFIX = "Broker_localhost_";
   public static final String SERVER_INSTANCE_ID_PREFIX = "Server_localhost_";
   public static final String MINION_INSTANCE_ID_PREFIX = "Minion_localhost_";
+  public static final String TEST_PORT_BASE_PROPERTY = "pinot.test.port.base";
+  public static final String TEST_ZK_PORT_BASE_PROPERTY = "pinot.test.zk.port.base";
+
+  private static final AtomicInteger NEXT_CONFIGURED_ZK_PORT =
+      new AtomicInteger(Integer.getInteger(TEST_ZK_PORT_BASE_PROPERTY, 0));
 
   // Default ControllerTest instance settings
   public static final int DEFAULT_MIN_NUM_REPLICAS = 2;
@@ -145,9 +150,10 @@ public class ControllerTest {
   protected final String _clusterName = getClass().getSimpleName();
   protected final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
 
-  protected int _nextControllerPort = 20000;
+  protected int _nextControllerPort = Integer.getInteger(TEST_PORT_BASE_PROPERTY, 20000);
   protected int _nextBrokerPort = _nextControllerPort + 1000;
   protected int _nextBrokerGrpcPort = _nextBrokerPort + 500;
+  protected int _nextBrokerQueryRunnerPort = _nextBrokerGrpcPort + 250;
   protected int _nextServerPort = _nextBrokerPort + 1000;
   protected int _nextMinionPort = _nextServerPort + 1000;
 
@@ -227,8 +233,20 @@ public class ControllerTest {
 
   public void startZk() {
     if (_zookeeperInstance == null) {
-      runWithHelixMock(() -> _zookeeperInstance = ZkStarter.startLocalZkServer());
+      int zkPort = getNextConfiguredZkPort();
+      runWithHelixMock(() -> _zookeeperInstance = zkPort > 0 ? ZkStarter.startLocalZkServer(zkPort)
+          : ZkStarter.startLocalZkServer());
     }
+  }
+
+  private static synchronized int getNextConfiguredZkPort() {
+    int candidatePort = NEXT_CONFIGURED_ZK_PORT.get();
+    if (candidatePort <= 0) {
+      return 0;
+    }
+    int zkPort = NetUtils.findOpenPort(candidatePort);
+    NEXT_CONFIGURED_ZK_PORT.set(zkPort + 1);
+    return zkPort;
   }
 
   public void startZk(int port) {

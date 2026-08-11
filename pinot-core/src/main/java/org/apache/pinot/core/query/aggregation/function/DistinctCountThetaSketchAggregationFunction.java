@@ -1071,7 +1071,6 @@ public class DistinctCountThetaSketchAggregationFunction
     return ColumnDataType.LONG;
   }
 
-  @Nullable
   @Override
   public Comparable extractFinalResult(@Nullable List<ThetaSketchAccumulator> accumulators) {
     if (accumulators == null) {

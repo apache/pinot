@@ -130,6 +130,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
       BloomFilterConfig bloomFilterConfig, SegmentDirectory.Writer segmentWriter)
       throws Exception {
     int numDocs = columnMetadata.getTotalDocs();
+    DataType storedType = columnMetadata.getDataType().getStoredType();
     IndexCreationContext context = new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata).build();
     IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
     try (BloomFilterCreator bloomFilterCreator = StandardIndexes.bloomFilter()
@@ -139,7 +140,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
       if (columnMetadata.isSingleValue()) {
         // SV
-        switch (columnMetadata.getDataType()) {
+        switch (storedType) {
           case INT:
             for (int i = 0; i < numDocs; i++) {
               bloomFilterCreator.add(Integer.toString(forwardIndexReader.getInt(i, readerContext)));
@@ -177,7 +178,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
         bloomFilterCreator.seal();
       } else {
         // MV
-        switch (columnMetadata.getDataType()) {
+        switch (storedType) {
           case INT:
             for (int i = 0; i < numDocs; i++) {
               int[] buffer = new int[columnMetadata.getMaxNumberOfMultiValues()];
@@ -286,9 +287,9 @@ public class BloomFilterHandler extends BaseIndexHandler {
 
   private Dictionary getDictionaryReader(ColumnMetadata columnMetadata, SegmentDirectory.Writer segmentWriter)
       throws IOException {
-    DataType dataType = columnMetadata.getDataType();
+    DataType storedType = columnMetadata.getDataType().getStoredType();
 
-    switch (dataType) {
+    switch (storedType) {
       case INT:
       case LONG:
       case FLOAT:
@@ -299,7 +300,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
         return DictionaryIndexType.read(buf, columnMetadata, DictionaryIndexConfig.DEFAULT);
       default:
         throw new IllegalStateException(
-            "Unsupported data type: " + dataType + " for column: " + columnMetadata.getColumnName());
+            "Unsupported data type: " + storedType + " for column: " + columnMetadata.getColumnName());
     }
   }
 }

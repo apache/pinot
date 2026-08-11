@@ -2594,6 +2594,7 @@ public class TableConfigUtilsTest {
   @Test
   public void testValidateUpsertConfig() {
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setComparisonColumn("myCol");
     SegmentPartitionConfig segmentPartitionConfig =
         new SegmentPartitionConfig(Map.of("myCol", new ColumnPartitionConfig("murmur", 4)));
     TableConfig validTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -2620,6 +2621,30 @@ public class TableConfigUtilsTest {
           "Offline upsert table must have segment partition config to ensure correct partition-based "
               + "segment assignment. Configure segmentPartitionConfig in the indexingConfig.");
     }
+
+    // OFFLINE table with neither a comparison column nor a time column should fail, same as realtime upsert
+    // (no implicit segment creation time fallback).
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, validSchema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(),
+          "Offline upsert table must have a comparison column or a time column configured");
+    }
+
+    // OFFLINE table relying on the time column (no explicit comparison column) should be allowed, same as realtime.
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setTimeColumnName("myCol")
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setRoutingConfig(STRICT_REPLICA_ROUTING_CONFIG)
+        .build();
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, validSchema);
 
     // OFFLINE table with partial upsert should fail
     UpsertConfig partialUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
@@ -4501,6 +4526,56 @@ public class TableConfigUtilsTest {
 
     List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
     assertTrue(violations.isEmpty(), "Expected no violations for non-upsert tables, but got: " + violations);
+  }
+
+  private static TableConfig upsertTable(@Nullable SegmentPartitionConfig partition) {
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).setSegmentPartitionConfig(partition).build();
+  }
+
+  private static SegmentPartitionConfig partition(String col, String fn, int n) {
+    return new SegmentPartitionConfig(Map.of(col, new ColumnPartitionConfig(fn, n)));
+  }
+
+  @Test
+  public void testNumPartitionsChangeRejected() {
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(
+        upsertTable(partition("myCol", "Murmur", 8)), upsertTable(partition("myCol", "Murmur", 4)));
+    assertEquals(violations.size(), 1);
+    assertTrue(violations.get(0).contains("numPartitions"));
+  }
+
+  @Test
+  public void testDedupNumPartitionsChangeRejected() {
+    TableConfig existing = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setDedupConfig(new DedupConfig())
+        .setSegmentPartitionConfig(partition("myCol", "Murmur", 4)).build();
+    TableConfig updated = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setDedupConfig(new DedupConfig())
+        .setSegmentPartitionConfig(partition("myCol", "Murmur", 8)).build();
+    assertEquals(TableConfigUtils.validateBackwardCompatibility(updated, existing).size(), 1);
+  }
+
+  @Test
+  public void testAddAndRemovePartitionAllowed() {
+    assertTrue(TableConfigUtils.validateBackwardCompatibility(
+        upsertTable(partition("myCol", "Murmur", 4)), upsertTable(null)).isEmpty());
+    assertTrue(TableConfigUtils.validateBackwardCompatibility(
+        upsertTable(null), upsertTable(partition("myCol", "Murmur", 4))).isEmpty());
+  }
+
+  @Test
+  public void testFunctionNameChangeAllowed() {
+    assertTrue(TableConfigUtils.validateBackwardCompatibility(
+        upsertTable(partition("myCol", "Modulo", 4)), upsertTable(partition("myCol", "Murmur", 4))).isEmpty());
+  }
+
+  @Test
+  public void testNonUpsertUnchecked() {
+    TableConfig plain = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setSegmentPartitionConfig(partition("myCol", "Murmur", 8)).build();
+    assertTrue(TableConfigUtils.validateBackwardCompatibility(plain, upsertTable(partition("myCol", "Murmur", 4)))
+        .isEmpty());
   }
 
   @Test
