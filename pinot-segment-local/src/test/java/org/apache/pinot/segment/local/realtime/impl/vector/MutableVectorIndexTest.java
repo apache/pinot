@@ -29,6 +29,7 @@ import org.testng.annotations.Test;
 
 public class MutableVectorIndexTest {
   private static final String COLUMN_NAME = "embedding";
+  private static final String OTHER_COLUMN_NAME = "otherEmbedding";
 
   @BeforeClass
   public void setUpSearcherPool() {
@@ -85,9 +86,26 @@ public class MutableVectorIndexTest {
     }
   }
 
+  @Test
+  public void testCloseOnlyRemovesIndexOfClosedColumn() {
+    String segmentName = "mutableVectorIndexTest_" + System.nanoTime();
+    MutableVectorIndex index = createIndex(segmentName, COLUMN_NAME);
+    MutableVectorIndex otherIndex = createIndex(segmentName, OTHER_COLUMN_NAME);
+    try {
+      index.close();
+      int[] matches = otherIndex.getDocIds(new float[]{5.0F, 42.0F, 54.33333F, 42.24F, 3413.4F}, 3).toArray();
+      Assert.assertEquals(matches.length, 3);
+    } finally {
+      otherIndex.close();
+    }
+  }
+
   private static MutableVectorIndex createIndex() {
-    MutableVectorIndex index =
-        new MutableVectorIndex("mutableVectorIndexTest_" + System.nanoTime(), COLUMN_NAME, createConfig());
+    return createIndex("mutableVectorIndexTest_" + System.nanoTime(), COLUMN_NAME);
+  }
+
+  private static MutableVectorIndex createIndex(String segmentName, String column) {
+    MutableVectorIndex index = new MutableVectorIndex(segmentName, column, createConfig());
     addVector(index, new float[]{5.0F, 42.0F, 54.33333F, 42.24F, 1001.045F}, 0);
     addVector(index, new float[]{42.0F, 23423.0F, 42431.32532F, 6785676.3242F, 42.3F}, 1);
     addVector(index, new float[]{1.0F, 2.0F, 3.0F, 4.0F, 5.0F}, 2);

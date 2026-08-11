@@ -65,7 +65,8 @@ import static org.testng.Assert.assertTrue;
 public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PeerDownloadLLCRealtimeClusterIntegrationTest.class);
 
-  private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
+  private static final String CONSUMER_DIRECTORY =
+      new File(FileUtils.getTempDirectory(), "consumer-test").getAbsolutePath();
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
   private static final int NUM_SERVERS = 2;

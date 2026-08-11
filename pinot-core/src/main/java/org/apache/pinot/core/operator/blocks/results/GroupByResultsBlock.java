@@ -38,7 +38,6 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
-import org.roaringbitmap.RoaringBitmap;
 
 
 /// Results block for group-by queries.
@@ -201,66 +200,26 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     int numKeyColumns = _queryContext.getNumGroupByKeyColumns();
     Iterator<Record> iterator = _table.iterator();
     int numRowsAdded = 0;
-    /// Grouping sets produce NULL group keys (rolled-up columns) regardless of the user's null-handling
-    /// option, so they must be serialized through the null-aware path (null bitmaps) to survive the DataTable
-    /// round-trip -- the non-null path's setNull() writes to the variable buffer that the reducer does not
-    /// read back for fixed-width key columns.
-    if (_queryContext.requiresNullAwareKeySerialization()) {
-      RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
-      Object[] nullPlaceholders = new Object[numColumns];
-      for (int colId = 0; colId < numColumns; colId++) {
-        nullBitmaps[colId] = new RoaringBitmap();
-        // Resolved on the logical type, not the stored type: UUID overrides getNullPlaceholder() to return the nil
-        // UUID, whereas its stored type BYTES would yield a zero-length placeholder that is not a valid UUID.
-        nullPlaceholders[colId] = _dataSchema.getColumnDataType(colId).getNullPlaceholder();
-      }
-      int rowId = 0;
-      while (iterator.hasNext()) {
-        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numRowsAdded, "GroupByResultsBlock#getDataTable");
-        dataTableBuilder.startRow();
-        Object[] values = iterator.next().getValues();
-        for (int i = 0; i < numColumns; i++) {
-          Object value = values[i];
-          if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
-            if (value == null) {
-              dataTableBuilder.setNull(i);
-            } else {
-              dataTableBuilder.setColumn(i, aggregationFunctions[i - numKeyColumns].serializeIntermediateResult(value));
-            }
-          } else {
-            if (value == null) {
-              value = nullPlaceholders[i];
-              nullBitmaps[i].add(rowId);
-            }
-            assert value != null;
-            DataTableBuilderUtils.setColumn(dataTableBuilder, storedColumnDataTypes[i], i, value);
-          }
+    // NOTE: Nulls are serialized through the builder's null-aware path regardless of the query's null-handling
+    // option. Grouping sets produce NULL group keys for rolled-up columns, and aggregation functions whose
+    // accumulator has no identity element (MINSTRING, MAXSTRING, ANYVALUE) produce null intermediate results, in
+    // both modes.
+    while (iterator.hasNext()) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numRowsAdded, "GroupByResultsBlock#getDataTable");
+      dataTableBuilder.startRow();
+      Object[] values = iterator.next().getValues();
+      for (int i = 0; i < numColumns; i++) {
+        Object value = values[i];
+        if (value == null) {
+          dataTableBuilder.setNull(i);
+        } else if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
+          dataTableBuilder.setColumn(i, aggregationFunctions[i - numKeyColumns].serializeIntermediateResult(value));
+        } else {
+          DataTableBuilderUtils.setColumn(dataTableBuilder, storedColumnDataTypes[i], i, value);
         }
-        dataTableBuilder.finishRow();
-        numRowsAdded++;
-        rowId++;
       }
-      for (RoaringBitmap nullBitmap : nullBitmaps) {
-        dataTableBuilder.setNullRowIds(nullBitmap);
-      }
-    } else {
-      while (iterator.hasNext()) {
-        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numRowsAdded, "GroupByResultsBlock#getDataTable");
-        dataTableBuilder.startRow();
-        Object[] values = iterator.next().getValues();
-        for (int i = 0; i < numColumns; i++) {
-          Object value = values[i];
-          if (value == null) {
-            dataTableBuilder.setNull(i);
-          } else if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
-            dataTableBuilder.setColumn(i, aggregationFunctions[i - numKeyColumns].serializeIntermediateResult(value));
-          } else {
-            DataTableBuilderUtils.setColumn(dataTableBuilder, storedColumnDataTypes[i], i, value);
-          }
-        }
-        dataTableBuilder.finishRow();
-        numRowsAdded++;
-      }
+      dataTableBuilder.finishRow();
+      numRowsAdded++;
     }
     return dataTableBuilder.build();
   }

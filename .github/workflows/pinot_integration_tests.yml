@@ -93,7 +93,7 @@ jobs:
         timeout-minutes: 120
         run: |
           .github/workflows/scripts/pr-tests/.pinot_tests_build.sh
-      - name: Integration Test
+      - name: Concurrent Integration Test Lanes
         env:
           RUN_INTEGRATION_TESTS: true
           RUN_TEST_SET: ${{ matrix.testset }}
@@ -110,59 +110,51 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
         timeout-minutes: 120
         run: |
-          .github/workflows/scripts/pr-tests/.pinot_tests_integration.sh
-      - name: Upload coverage to Codecov
+          .github/workflows/scripts/pr-tests/.pinot_tests_two_lane_integration.sh
+      - name: Upload lane A coverage to Codecov
         uses: codecov/codecov-action@v7
         continue-on-error: true
         timeout-minutes: 5
         with:
-          flags: integration,integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
-          name: codecov-integration-tests
+          flags: integration,integration${{ matrix.testset }},lane-a,${{matrix.distribution}},java-${{matrix.java}}
+          name: codecov-integration-tests-lane-a
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
+          files: pinot-integration-tests/target-lane-a/site/jacoco/jacoco.xml
+          disable_search: true
           verbose: true
-      - name: Custom Integration Test
-        if : ${{ matrix.testset == 1 }}
-        env:
-          RUN_INTEGRATION_TESTS: true
-          RUN_TEST_SET: ${{ matrix.testset }}
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
-          MAVEN_OPTS: >
-            -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
-            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
-            -B -ntp
-            -XX:+IgnoreUnrecognizedVMOptions
-            --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
-            --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
-            --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
-            --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
-            --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
-        timeout-minutes: 120
-        run: |
-          .github/workflows/scripts/pr-tests/.pinot_tests_custom_integration.sh
-      - name: Upload coverage to Codecov
-        if : ${{ matrix.testset == 1 }}
+      - name: Upload lane B coverage to Codecov
         uses: codecov/codecov-action@v7
         continue-on-error: true
         timeout-minutes: 5
         with:
-          flags: integration,custom-integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
-          name: codecov-custom-integration-tests
+          flags: integration,integration${{ matrix.testset }},lane-b,${{matrix.distribution}},java-${{matrix.java}}
+          name: codecov-integration-tests-lane-b
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
+          files: pinot-integration-tests/target-lane-b/site/jacoco/jacoco.xml
+          disable_search: true
           verbose: true
       - name: Generate Surefire Report
         if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
         continue-on-error: true
         timeout-minutes: 120
         run: |
-          mvn surefire-report:report-only -P github-actions,codecoverage
+          mvn -f pinot-integration-tests/pom.xml surefire-report:report-only \
+            -Dpinot.integration.test.build.directory="${GITHUB_WORKSPACE}/pinot-integration-tests/target-lane-a" \
+            -P github-actions,codecoverage
+          mvn -f pinot-integration-tests/pom.xml surefire-report:report-only \
+            -Dpinot.integration.test.build.directory="${GITHUB_WORKSPACE}/pinot-integration-tests/target-lane-b" \
+            -P github-actions,codecoverage
       - name: Upload Surefire Reports
         if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
         uses: actions/upload-artifact@v7
         with:
           name: surefire-reports-integration-test-${{ matrix.testset }}-${{matrix.distribution}}-${{matrix.java}}
           path: |
-            **/target/surefire-reports/
-            **/target/site/surefire-report.html
+            **/target-lane-a/surefire-reports/
+            **/target-lane-b/surefire-reports/
+            **/target-lane-a/site/surefire-report.html
+            **/target-lane-b/site/surefire-report.html
+            **/target-concurrent-logs/
           retention-days: 30
