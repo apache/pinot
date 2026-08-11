@@ -427,12 +427,23 @@ public class AggregationFunctionUtils {
     /// aggregations that do not read one at all when `starTreeFunctionColumnPairs` is `null`.
     public AggregationInfo(AggregationFunction[] functions, BaseProjectOperator<?> projectOperator,
         @Nullable AggregationFunctionColumnPair[] starTreeFunctionColumnPairs) {
+      this(functions, projectOperator, starTreeFunctionColumnPairs, functions);
+    }
+
+    private AggregationInfo(AggregationFunction[] functions, BaseProjectOperator<?> projectOperator,
+        @Nullable AggregationFunctionColumnPair[] starTreeFunctionColumnPairs,
+        AggregationFunction[] projectionFunctions) {
       _functions = functions;
       _projectOperator = projectOperator;
       _starTreeFunctionColumnPairs = starTreeFunctionColumnPairs;
       if (starTreeFunctionColumnPairs == null) {
-        validateRawVariantAggregationInputs(functions, projectOperator);
+        validateRawVariantAggregationInputs(projectionFunctions, projectOperator);
       }
+    }
+
+    private static AggregationInfo forPartialProjection(AggregationFunction[] allFunctions,
+        BaseProjectOperator<?> projectOperator, AggregationFunction[] projectionFunctions) {
+      return new AggregationInfo(allFunctions, projectOperator, null, projectionFunctions);
     }
 
     public AggregationFunction[] getFunctions() {
@@ -506,12 +517,14 @@ public class AggregationFunctionUtils {
   public static AggregationInfo buildAggregationInfoWithoutStarTree(SegmentContext segmentContext,
       QueryContext queryContext, AggregationFunction[] allFunctions, AggregationFunction[] projectionFunctions,
       BaseFilterOperator filterOperator) {
+    // This builder is public, so do not rely on its current caller having performed the star-tree validation first.
+    validateRawVariantIdentifierInputs(allFunctions, segmentContext, queryContext);
     Set<ExpressionContext> expressionsToTransform =
         collectExpressionsToTransform(projectionFunctions, queryContext.getGroupByExpressions());
     BaseProjectOperator<?> projectOperator =
         new ProjectPlanNode(segmentContext, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
             filterOperator).run();
-    return new AggregationInfo(allFunctions, projectOperator);
+    return AggregationInfo.forPartialProjection(allFunctions, projectOperator, projectionFunctions);
   }
 
 
