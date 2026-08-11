@@ -19,16 +19,18 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.testng.annotations.DataProvider;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -42,75 +44,114 @@ import static org.testng.Assert.expectThrows;
 /// from.
 ///
 /// The dimension table is a hash map keyed by the primary key values, so a key is only usable when it holds one value
-/// per primary key column, in the order the dimension table schema declares them, and with the stored type of each
-/// column. These tests cover the cases that a query alone cannot reach, such as a null literal and a literal of the
-/// wrong numeric width. End-to-end coverage is in `LookupJoin.json`.
+/// per primary key column, in the order the dimension table schema declares them, and with the type of each column.
+/// These tests cover the cases that a query alone cannot reach, such as a null constant and a constant of the wrong
+/// type. End-to-end coverage is in `LookupJoin.json`.
 public class LookupJoinOperatorTest {
   private static final String TABLE_NAME = "dim_tbl_OFFLINE";
 
+  /// Fact table columns. The dimension table columns of the joined row start after these.
+  private static final int FACT_CURRENCY = 0;
+  private static final int FACT_RATE_START_DATE = 1;
+  private static final int LEFT_COLUMN_SIZE = 2;
+
   /// Dimension table columns, in the order that the leaf stage reports them. The order is not the primary key order,
   /// which is what makes the key positions worth testing.
-  private static final String[] RIGHT_COLUMNS = {"currency", "rate", "rate_start_date"};
-  private static final DataSchema RIGHT_SCHEMA = new DataSchema(RIGHT_COLUMNS,
-      new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.LONG});
+  private static final int DIM_CURRENCY = 0;
+  private static final int DIM_RATE = 1;
+  private static final int DIM_RATE_START_DATE = 2;
+  private static final DataSchema DIM_SCHEMA =
+      new DataSchema(new String[]{"currency", "rate", "rate_start_date"}, new ColumnDataType[]{
+          ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.LONG
+      });
   private static final List<String> PRIMARY_KEY_COLUMNS = List.of("currency", "rate_start_date");
 
-  /// The fact table has two columns, so the dimension table columns start at index 2 of the joined row.
-  private static final int LEFT_COLUMN_SIZE = 2;
+  /// Key positions follow the primary key, not the order of the join condition.
+  private static final int KEY_CURRENCY = 0;
+  private static final int KEY_RATE_START_DATE = 1;
 
   @Test
   public void testKeyPositionsFollowPrimaryKeyOrderNotConditionOrder() {
-    // ON dim.rate_start_date = fact.col1 AND dim.currency = fact.col0
-    // The conditions are in reverse primary key order, so the key values must still land in primary key order.
-    LookupJoinOperator.KeyPlan keyPlan =
-        compileKeyPlan(List.of(1, 0), List.of(2, 0), List.of());
+    // ON dim.rate_start_date = fact.rate_start_date AND dim.currency = fact.currency
+    LookupJoinOperator.KeyPlan keyPlan = compileKeyPlan(
+        List.of(joinKey(FACT_RATE_START_DATE, DIM_RATE_START_DATE), joinKey(FACT_CURRENCY, DIM_CURRENCY)), List.of());
 
-    assertEquals(keyPlan._sources, new int[]{0, 1});
+    assertEquals(keyPlan._sources[KEY_CURRENCY], FACT_CURRENCY);
+    assertEquals(keyPlan._sources[KEY_RATE_START_DATE], FACT_RATE_START_DATE);
     assertFalse(keyPlan._neverMatches);
   }
 
   @Test
-  public void testLiteralBindsPrimaryKeyColumn() {
-    // ON dim.currency = 'gbp' AND dim.rate_start_date = fact.col1
+  public void testConstantBindsPrimaryKeyColumn() {
+    // ON dim.currency = 'gbp' AND dim.rate_start_date = fact.rate_start_date
     LookupJoinOperator.KeyPlan keyPlan =
-        compileKeyPlan(List.of(1), List.of(2), List.of(eq(rightColumnRef(0), literal(ColumnDataType.STRING,
-            "gbp"))));
+        compileKeyPlan(List.of(joinKey(FACT_RATE_START_DATE, DIM_RATE_START_DATE)),
+            List.of(dimEqualsConstant(DIM_CURRENCY, ColumnDataType.STRING, "gbp")));
 
-    assertEquals(keyPlan._sources[1], 1);
-    assertEquals(keyPlan._constants[0], "gbp");
+    assertEquals(keyPlan._sources[KEY_RATE_START_DATE], FACT_RATE_START_DATE);
+    assertEquals(keyPlan._constants[KEY_CURRENCY], "gbp");
     assertFalse(keyPlan._neverMatches);
   }
 
   @Test
-  public void testLiteralDoesNotReplaceEquiJoinKey() {
-    // ON dim.currency = fact.col0 AND dim.rate_start_date = fact.col1 AND dim.currency = 'gbp'
-    // The equi-join key is not kept anywhere else, so replacing it would silently widen the join. The literal stays a
+  public void testConstantDoesNotReplaceJoinKey() {
+    // ON dim.currency = fact.currency AND dim.rate_start_date = fact.rate_start_date AND dim.currency = 'gbp'
+    // The join key is not kept anywhere else, so replacing it would silently widen the join. The constant stays a
     // filter that runs after the lookup.
-    LookupJoinOperator.KeyPlan keyPlan =
-        compileKeyPlan(List.of(0, 1), List.of(0, 2), List.of(eq(rightColumnRef(0), literal(ColumnDataType.STRING,
-            "gbp"))));
+    LookupJoinOperator.KeyPlan keyPlan = compileKeyPlan(
+        List.of(joinKey(FACT_CURRENCY, DIM_CURRENCY), joinKey(FACT_RATE_START_DATE, DIM_RATE_START_DATE)),
+        List.of(dimEqualsConstant(DIM_CURRENCY, ColumnDataType.STRING, "gbp")));
 
-    assertEquals(keyPlan._sources, new int[]{0, 1});
-    assertNull(keyPlan._constants[0]);
+    assertEquals(keyPlan._sources[KEY_CURRENCY], FACT_CURRENCY);
+    assertEquals(keyPlan._sources[KEY_RATE_START_DATE], FACT_RATE_START_DATE);
+    assertNull(keyPlan._constants[KEY_CURRENCY]);
   }
 
   @Test
-  public void testLiteralIsConvertedToStoredTypeOfColumn() {
-    // ON dim.currency = fact.col0 AND dim.rate_start_date = 1
-    // The primary key column is LONG. A key that holds an Integer misses every row, because PrimaryKey compares
-    // values with equals.
-    LookupJoinOperator.KeyPlan keyPlan =
-        compileKeyPlan(List.of(0), List.of(0), List.of(eq(rightColumnRef(2), literal(ColumnDataType.INT, 1))));
+  public void testConstantOfTheColumnTypeIsAccepted() {
+    // ON dim.currency = fact.currency AND dim.rate_start_date = 1
+    // The planner coerces the operands of a comparison, so the constant already carries the type of the column.
+    LookupJoinOperator.KeyPlan keyPlan = compileKeyPlan(List.of(joinKey(FACT_CURRENCY, DIM_CURRENCY)),
+        List.of(dimEqualsConstant(DIM_RATE_START_DATE, ColumnDataType.LONG, 1L)));
 
-    assertEquals(keyPlan._constants[1], 1L);
+    assertEquals(keyPlan._constants[KEY_RATE_START_DATE], 1L);
+  }
+
+  @Test
+  public void testConstantOfAnotherTypeIsRejected() {
+    // PrimaryKey compares values with equals, where an Integer never equals a Long, so a constant of the wrong type
+    // misses every row. The planner is expected to have coerced it already.
+    IllegalStateException exception = expectThrows(IllegalStateException.class,
+        () -> compileKeyPlan(List.of(joinKey(FACT_CURRENCY, DIM_CURRENCY)),
+            List.of(dimEqualsConstant(DIM_RATE_START_DATE, ColumnDataType.INT, 1))));
+    assertTrue(exception.getMessage().contains("got a constant of stored type: INT"), exception.getMessage());
+  }
+
+  @Test
+  public void testBigDecimalConstantIsAccepted() {
+    // BigDecimal#equals compares the scale, so 1.5 does not match a stored 1.50. A hash join carries the same hazard,
+    // so the lookup join accepts the constant rather than singling out one arm of it.
+    LookupJoinOperator.KeyPlan keyPlan = compileKeyPlan(DECIMAL_DIM_SCHEMA, List.of("amount"), List.of(),
+        List.of(dimEqualsConstant(0, ColumnDataType.BIG_DECIMAL, new BigDecimal("1.5"))));
+
+    assertEquals(keyPlan._constants[0], new BigDecimal("1.5"));
+  }
+
+  @Test
+  public void testBytesConstantIsRejected() {
+    // A dimension table keys on a raw byte[], whose equals and hashCode are identity, so no constant can match it.
+    IllegalStateException exception = expectThrows(IllegalStateException.class,
+        () -> compileKeyPlan(BYTES_DIM_SCHEMA, List.of("id"), List.of(),
+            List.of(dimEqualsConstant(0, ColumnDataType.BYTES, new ByteArray(new byte[]{1, 2})))));
+    assertTrue(exception.getMessage().contains("of type BYTES"), exception.getMessage());
   }
 
   @Test
   public void testNullConstantMakesEveryLookupMiss() {
     // A null never matches a primary key value, so the operator must not run the lookup at all.
     LookupJoinOperator.KeyPlan keyPlan =
-        compileKeyPlan(List.of(1), List.of(2), List.of(eq(rightColumnRef(0), literal(ColumnDataType.STRING,
-            null))));
+        compileKeyPlan(List.of(joinKey(FACT_RATE_START_DATE, DIM_RATE_START_DATE)),
+            List.of(dimEqualsConstant(DIM_CURRENCY, ColumnDataType.STRING, null)));
 
     assertTrue(keyPlan._neverMatches);
   }
@@ -120,41 +161,41 @@ public class LookupJoinOperatorTest {
     // dim.currency IN ('gbp', 'usd') reaches the operator as a disjunction. A hash lookup cannot read a set of keys,
     // so the primary key column stays open and the join is rejected.
     RexExpression inList = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.OR.name(),
-        List.of(eq(rightColumnRef(0), literal(ColumnDataType.STRING, "gbp")),
-            eq(rightColumnRef(0), literal(ColumnDataType.STRING, "usd"))));
+        List.of(dimEqualsConstant(DIM_CURRENCY, ColumnDataType.STRING, "gbp"),
+            dimEqualsConstant(DIM_CURRENCY, ColumnDataType.STRING, "usd")));
 
-    IllegalStateException exception =
-        expectThrows(IllegalStateException.class, () -> compileKeyPlan(List.of(1), List.of(2), List.of(inList)));
+    IllegalStateException exception = expectThrows(IllegalStateException.class,
+        () -> compileKeyPlan(List.of(joinKey(FACT_RATE_START_DATE, DIM_RATE_START_DATE)), List.of(inList)));
     assertTrue(exception.getMessage().contains("cannot determine primary key columns: [currency]"),
         exception.getMessage());
   }
 
   @Test
   public void testOpenPrimaryKeyColumnIsRejected() {
-    // ON dim.rate_start_date = fact.col1 only. Nothing gives a value for currency.
-    IllegalStateException exception =
-        expectThrows(IllegalStateException.class, () -> compileKeyPlan(List.of(1), List.of(2), List.of()));
+    // ON dim.rate_start_date = fact.rate_start_date only. Nothing gives a value for currency.
+    IllegalStateException exception = expectThrows(IllegalStateException.class,
+        () -> compileKeyPlan(List.of(joinKey(FACT_RATE_START_DATE, DIM_RATE_START_DATE)), List.of()));
     assertTrue(exception.getMessage().contains("cannot determine primary key columns: [currency]"),
         exception.getMessage());
   }
 
   @Test
   public void testJoinKeyOnNonPrimaryKeyColumnIsRejected() {
-    // ON dim.currency = fact.col0 AND dim.rate_start_date = fact.col1 AND dim.rate = fact.col1
-    // The condition on "rate" is an equi-join key, so it is not in the non-equi conditions and no filter applies it.
+    // The condition on "rate" is a join key, so it is not in the non-equi conditions and no filter applies it.
     // Dropping it would return rows that do not match the join condition.
     IllegalStateException exception = expectThrows(IllegalStateException.class,
-        () -> compileKeyPlan(List.of(0, 1, 1), List.of(0, 2, 1), List.of()));
+        () -> compileKeyPlan(List.of(joinKey(FACT_CURRENCY, DIM_CURRENCY),
+            joinKey(FACT_RATE_START_DATE, DIM_RATE_START_DATE), joinKey(FACT_RATE_START_DATE, DIM_RATE)), List.of()));
     assertTrue(exception.getMessage().contains("join key on column: rate, which is not a primary key column"),
         exception.getMessage());
   }
 
   @Test
   public void testDuplicateJoinKeysOnSamePrimaryKeyColumnAreRejected() {
-    // ON dim.currency = fact.col0 AND dim.currency = fact.col1 AND dim.rate_start_date = fact.col1
     // Only one of the two conditions on currency can build the key, and the other one has nowhere to run.
     IllegalStateException exception = expectThrows(IllegalStateException.class,
-        () -> compileKeyPlan(List.of(0, 1, 1), List.of(0, 0, 2), List.of()));
+        () -> compileKeyPlan(List.of(joinKey(FACT_CURRENCY, DIM_CURRENCY), joinKey(FACT_RATE_START_DATE, DIM_CURRENCY),
+            joinKey(FACT_RATE_START_DATE, DIM_RATE_START_DATE)), List.of()));
     assertTrue(exception.getMessage().contains("multiple join keys on primary key column: currency"),
         exception.getMessage());
   }
@@ -162,76 +203,45 @@ public class LookupJoinOperatorTest {
   @Test
   public void testMissingPrimaryKeyColumnsAreRejected() {
     IllegalStateException exception = expectThrows(IllegalStateException.class,
-        () -> LookupJoinOperator.compileKeyPlan(joinNode(List.of(1), List.of(2), List.of()), TABLE_NAME, List.of(),
-            RIGHT_SCHEMA, LEFT_COLUMN_SIZE));
+        () -> compileKeyPlan(DIM_SCHEMA, List.of(), List.of(joinKey(FACT_RATE_START_DATE, DIM_RATE_START_DATE)),
+            List.of()));
     assertTrue(exception.getMessage().contains("Failed to find primary key columns"), exception.getMessage());
   }
 
-  @DataProvider
-  public Object[][] storedTypes() {
-    return new Object[][]{
-        // A literal of any numeric width converts to the width that the column stores.
-        {ColumnDataType.INT, 1L, 1},
-        {ColumnDataType.LONG, 1, 1L},
-        {ColumnDataType.FLOAT, 1.5d, 1.5f},
-        {ColumnDataType.DOUBLE, 1.5f, 1.5d},
-        {ColumnDataType.STRING, "gbp", "gbp"},
-        // BOOLEAN stores an int and TIMESTAMP stores a long, which is what a literal already holds.
-        {ColumnDataType.BOOLEAN, 1, 1},
-        {ColumnDataType.TIMESTAMP, 1000L, 1000L}
-    };
+  private static final DataSchema DECIMAL_DIM_SCHEMA =
+      new DataSchema(new String[]{"amount"}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL});
+  private static final DataSchema BYTES_DIM_SCHEMA =
+      new DataSchema(new String[]{"id"}, new ColumnDataType[]{ColumnDataType.BYTES});
+
+  /// A join key, as the pair of column ids that Calcite splits a `fact_column = dim_column` condition into.
+  private static Pair<Integer, Integer> joinKey(int factColumnId, int dimColumnId) {
+    return Pair.of(factColumnId, dimColumnId);
   }
 
-  @Test(dataProvider = "storedTypes")
-  public void testConstantConvertsToStoredType(ColumnDataType columnDataType, Object literal, Object expected) {
-    Object stored = LookupJoinOperator.toStoredValue(literal, columnDataType, TABLE_NAME, "col");
-
-    assertEquals(stored, expected);
-    assertEquals(stored.getClass(), expected.getClass());
+  private static LookupJoinOperator.KeyPlan compileKeyPlan(List<Pair<Integer, Integer>> joinKeys,
+      List<RexExpression> nonEquiConditions) {
+    return compileKeyPlan(DIM_SCHEMA, PRIMARY_KEY_COLUMNS, joinKeys, nonEquiConditions);
   }
 
-  @Test
-  public void testConstantOnUnsupportedStoredTypeIsRejected() {
-    // BigDecimal compares its scale, and a BYTES literal is a ByteArray while the dimension table stores byte[]. A
-    // constant of either type misses every row, so the operator rejects it.
-    for (ColumnDataType columnDataType : List.of(ColumnDataType.BIG_DECIMAL, ColumnDataType.BYTES)) {
-      IllegalStateException exception = expectThrows(IllegalStateException.class,
-          () -> LookupJoinOperator.toStoredValue(BigDecimal.ONE, columnDataType, TABLE_NAME, "col"));
-      assertTrue(exception.getMessage().contains("does not support a constant on primary key column: col"),
-          exception.getMessage());
+  private static LookupJoinOperator.KeyPlan compileKeyPlan(DataSchema dimSchema, List<String> primaryKeyColumns,
+      List<Pair<Integer, Integer>> joinKeys, List<RexExpression> nonEquiConditions) {
+    List<Integer> leftKeys = new ArrayList<>(joinKeys.size());
+    List<Integer> rightKeys = new ArrayList<>(joinKeys.size());
+    for (Pair<Integer, Integer> joinKey : joinKeys) {
+      leftKeys.add(joinKey.getLeft());
+      rightKeys.add(joinKey.getRight());
     }
+    JoinNode node =
+        new JoinNode(0, dimSchema, PlanNode.NodeHint.EMPTY, List.of(), JoinRelType.INNER, leftKeys, rightKeys,
+            nonEquiConditions, JoinNode.JoinStrategy.LOOKUP);
+    return LookupJoinOperator.compileKeyPlan(node, TABLE_NAME, primaryKeyColumns, dimSchema, LEFT_COLUMN_SIZE);
   }
 
-  @Test
-  public void testNonNumericConstantOnNumericColumnIsRejected() {
-    IllegalStateException exception = expectThrows(IllegalStateException.class,
-        () -> LookupJoinOperator.toStoredValue("gbp", ColumnDataType.LONG, TABLE_NAME, "col"));
-    assertTrue(exception.getMessage().contains("cannot use the constant: gbp"), exception.getMessage());
-  }
-
-  private static LookupJoinOperator.KeyPlan compileKeyPlan(List<Integer> leftKeys, List<Integer> rightKeys,
-      List<RexExpression> nonEquiConditions) {
-    return LookupJoinOperator.compileKeyPlan(joinNode(leftKeys, rightKeys, nonEquiConditions), TABLE_NAME,
-        PRIMARY_KEY_COLUMNS, RIGHT_SCHEMA, LEFT_COLUMN_SIZE);
-  }
-
-  private static JoinNode joinNode(List<Integer> leftKeys, List<Integer> rightKeys,
-      List<RexExpression> nonEquiConditions) {
-    return new JoinNode(0, RIGHT_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(), JoinRelType.INNER, leftKeys, rightKeys,
-        nonEquiConditions, JoinNode.JoinStrategy.LOOKUP);
-  }
-
-  /// Builds a reference to a dimension table column. Non-equi conditions index the joined row, so the dimension table
+  /// Builds a `dim_column = constant` condition. Non-equi conditions index the joined row, so the dimension table
   /// columns start at [#LEFT_COLUMN_SIZE].
-  private static RexExpression rightColumnRef(int rightColumnId) {
-    return new RexExpression.InputRef(LEFT_COLUMN_SIZE + rightColumnId);
-  }
-
-  private static RexExpression literal(ColumnDataType dataType, @Nullable Object value) {
-    return new RexExpression.Literal(dataType, value);
-  }
-
-  private static RexExpression eq(RexExpression left, RexExpression right) {
-    return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.EQUALS.name(), List.of(left, right));
+  private static RexExpression dimEqualsConstant(int dimColumnId, ColumnDataType dataType, @Nullable Object value) {
+    return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.EQUALS.name(),
+        List.of(new RexExpression.InputRef(LEFT_COLUMN_SIZE + dimColumnId),
+            new RexExpression.Literal(dataType, value)));
   }
 }

@@ -195,10 +195,14 @@ public class LookupJoinOperator extends MultiStageOperator {
         continue;
       }
       sources[keyPosition] = KEY_SOURCE_CONSTANT;
-      Object value = getConstantValue(nonEquiCondition);
-      constants[keyPosition] =
-          toStoredValue(value, rightSchema.getColumnDataType(rightColumnId), tableName, rightColumns[rightColumnId]);
-      neverMatches |= constants[keyPosition] == null;
+      RexExpression.Literal literal = getConstantLiteral(nonEquiCondition);
+      Object value = literal.getValue();
+      if (value != null) {
+        checkConstantType(literal, rightSchema.getColumnDataType(rightColumnId), tableName,
+            rightColumns[rightColumnId]);
+      }
+      constants[keyPosition] = value;
+      neverMatches |= value == null;
     }
 
     List<String> unboundColumns = new ArrayList<>();
@@ -242,57 +246,38 @@ public class LookupJoinOperator extends MultiStageOperator {
     return columnId >= 0 && columnId < numRightColumns ? columnId : -1;
   }
 
-  /// Returns the literal value of a condition that [#getConstantEqualityColumnId] accepted.
-  @Nullable
-  private static Object getConstantValue(RexExpression condition) {
+  /// Returns the literal of a condition that [#getConstantEqualityColumnId] accepted.
+  private static RexExpression.Literal getConstantLiteral(RexExpression condition) {
     List<RexExpression> operands = ((RexExpression.FunctionCall) condition).getFunctionOperands();
-    RexExpression literal = operands.get(0) instanceof RexExpression.Literal ? operands.get(0) : operands.get(1);
-    return ((RexExpression.Literal) literal).getValue();
+    return (RexExpression.Literal) (operands.get(0) instanceof RexExpression.Literal ? operands.get(0)
+        : operands.get(1));
   }
 
-  /// Converts a literal value to the representation that the dimension table stores.
+  /// Makes sure that a constant can serve as a lookup key value for the given dimension table column.
   ///
-  /// A literal already holds Pinot's internal value, but its numeric width follows the type that the planner gave the
-  /// literal, which can be narrower or wider than the dimension column. [PrimaryKey] compares values with `equals`,
-  /// where an `Integer` never equals a `Long`, so a literal of the wrong width silently misses every row.
+  /// The operator does not convert the constant. The planner coerces the operands of a comparison, so a literal
+  /// compared against a dimension column already carries the type of that column. This check states that assumption,
+  /// and fails with the table and column named if the planner ever stops holding it up. A constant of another type
+  /// would miss every row, because [PrimaryKey] compares values with `equals` and an `Integer` never equals a `Long`.
   ///
-  /// The switch rejects every type it cannot convert, rather than passing the value through. A value that does not
-  /// match the stored representation misses every row, and this operator reports no rows the same way whether the key
-  /// is genuinely absent or malformed. The single-stage `lookup` transform function rejects the same way.
+  /// BYTES is rejected outright. A dimension table reads its key values with
+  /// [org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader], which returns a raw `byte[]` whose
+  /// `equals` and `hashCode` are identity. No constant of any representation can match such a key, so an error is
+  /// better than an empty result. Fixing that belongs in `DimensionTableDataManager`, which would fix the single-stage
+  /// `lookup` transform function at the same time.
   ///
-  /// BIG_DECIMAL is rejected because `BigDecimal#equals` compares the scale, so a literal of `1.5` never matches a
-  /// stored `1.50`. BYTES is rejected because the literal is a [org.apache.pinot.spi.utils.ByteArray] while the
-  /// dimension table stores `byte[]`, whose `equals` is identity.
-  @VisibleForTesting
-  @Nullable
-  static Object toStoredValue(@Nullable Object value, ColumnDataType columnDataType, String tableName, String column) {
-    if (value == null) {
-      return null;
-    }
+  /// BIG_DECIMAL is allowed. `BigDecimal#equals` compares the scale, so a constant of `1.5` does not match a stored
+  /// `1.50`, but a hash join carries the same hazard through [org.apache.pinot.query.runtime.operator.join.LookupTable]
+  /// and this operator does not single out one arm of it.
+  private static void checkConstantType(RexExpression.Literal literal, ColumnDataType columnDataType, String tableName,
+      String column) {
     ColumnDataType storedType = columnDataType.getStoredType();
-    switch (storedType) {
-      case STRING:
-        return value.toString();
-      case INT:
-        return toNumber(value, tableName, column, storedType).intValue();
-      case LONG:
-        return toNumber(value, tableName, column, storedType).longValue();
-      case FLOAT:
-        return toNumber(value, tableName, column, storedType).floatValue();
-      case DOUBLE:
-        return toNumber(value, tableName, column, storedType).doubleValue();
-      default:
-        throw new IllegalStateException(String.format(
-            "Lookup join on dimension table: %s does not support a constant on primary key column: %s with stored "
-                + "type: %s. Remove the lookup join hint to use a hash join instead.", tableName, column, storedType));
-    }
-  }
-
-  private static Number toNumber(Object value, String tableName, String column, ColumnDataType storedType) {
-    Preconditions.checkState(value instanceof Number,
-        "Lookup join on dimension table: %s cannot use the constant: %s on primary key column: %s with stored type: %s",
-        tableName, value, column, storedType);
-    return (Number) value;
+    Preconditions.checkState(storedType != ColumnDataType.BYTES,
+        "Lookup join on dimension table: %s does not support a constant on primary key column: %s of type BYTES. "
+            + "Remove the lookup join hint to use a hash join instead.", tableName, column);
+    Preconditions.checkState(literal.getDataType().getStoredType() == storedType,
+        "Lookup join on dimension table: %s got a constant of stored type: %s on primary key column: %s of stored "
+            + "type: %s", tableName, literal.getDataType().getStoredType(), column, storedType);
   }
 
   /// Value sources of the lookup key, one entry per dimension table primary key column.
