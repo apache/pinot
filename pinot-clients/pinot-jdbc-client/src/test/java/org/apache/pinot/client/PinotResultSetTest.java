@@ -104,6 +104,23 @@ public class PinotResultSetTest {
   }
 
   @Test
+  public void testGetUuid()
+      throws Exception {
+    UUID uuid = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    PinotResultSet resultSet = PinotResultSet.fromJson("{\"resultTable\":{"
+        + "\"dataSchema\":{\"columnNames\":[\"uuid\"],\"columnDataTypes\":[\"UUID\"]},"
+        + "\"rows\":[[\"" + uuid + "\"]]}}");
+
+    Assert.assertTrue(resultSet.next());
+    Assert.assertEquals(resultSet.getObject(1), uuid);
+    Assert.assertEquals(resultSet.getObject("uuid", UUID.class), uuid);
+
+    ResultSetMetaData metadata = resultSet.getMetaData();
+    Assert.assertEquals(metadata.getColumnType(1), Types.OTHER);
+    Assert.assertEquals(metadata.getColumnClassName(1), UUID.class.getTypeName());
+  }
+
+  @Test
   public void testNullAndEmptyArrays()
       throws Exception {
     PinotResultSet resultSet = PinotResultSet.fromJson("{\"resultTable\":{"

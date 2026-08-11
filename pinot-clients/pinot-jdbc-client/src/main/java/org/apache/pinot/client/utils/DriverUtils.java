@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.regex.Pattern;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration2.MapConfiguration;
@@ -188,6 +189,9 @@ public class DriverUtils {
       case "TIMESTAMP":
         columnsSQLDataType = Types.TIMESTAMP;
         break;
+      case "UUID":
+        columnsSQLDataType = Types.OTHER;
+        break;
       default:
         columnsSQLDataType = Types.NULL;
         break;
@@ -233,6 +237,9 @@ public class DriverUtils {
         break;
       case "TIMESTAMP":
         columnsJavaClassName = Timestamp.class.getTypeName();
+        break;
+      case "UUID":
+        columnsJavaClassName = UUID.class.getTypeName();
         break;
       default:
         columnsJavaClassName = String.class.getTypeName();

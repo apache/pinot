@@ -316,6 +316,8 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
         return getBoolean(columnIndex);
       case BYTES:
         return getBytes(columnIndex);
+      case UUID:
+        return getUuid(columnIndex);
       case MAP:
         return getMap(columnIndex);
       default:
@@ -361,6 +363,19 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
       throw new SQLDataException("Expected map value, found: " + value.getClass());
     }
     return new HashMap<>((Map<?, ?>) value);
+  }
+
+  private UUID getUuid(int columnIndex)
+      throws SQLException {
+    String value = getString(columnIndex);
+    if (value == null) {
+      return null;
+    }
+    try {
+      return UUID.fromString(value);
+    } catch (IllegalArgumentException e) {
+      throw new SQLDataException("Error parsing UUID", e);
+    }
   }
 
   private List<?> getList(int columnIndex, ColumnDataType dataType)
