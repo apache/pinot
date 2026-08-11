@@ -707,7 +707,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
   }
 
-  private static void addTransformFunction(PropertiesConfiguration properties, String column,
+  /// Records the transform function used to generate the given column in the segment metadata properties.
+  public static void addTransformFunction(PropertiesConfiguration properties, String column,
       @Nullable String transformFunction) {
     if (transformFunction != null) {
       String validTransformFunction =

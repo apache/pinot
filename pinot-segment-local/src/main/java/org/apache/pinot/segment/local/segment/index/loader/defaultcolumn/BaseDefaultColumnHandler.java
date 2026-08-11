@@ -30,7 +30,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
@@ -123,14 +122,17 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     UPDATE_DATE_TIME_TRANSFORM_FUNCTION,
     UPDATE_COMPLEX_DATA_TYPE,
     UPDATE_COMPLEX_DEFAULT_VALUE,
-    UPDATE_COMPLEX_TRANSFORM_FUNCTION;
+    UPDATE_COMPLEX_TRANSFORM_FUNCTION,
+    // Metadata-only action: record the configured transform function for an auto-generated column created before the
+    // transform function was tracked in the segment metadata. No values are regenerated.
+    BACKFILL_TRANSFORM_FUNCTION;
 
     boolean isAddAction() {
       return this == ADD_DIMENSION || this == ADD_METRIC || this == ADD_DATE_TIME || this == ADD_COMPLEX;
     }
 
     boolean isUpdateAction() {
-      return !(isAddAction() || isRemoveAction());
+      return !(isAddAction() || isRemoveAction() || this == BACKFILL_TRANSFORM_FUNCTION);
     }
 
     boolean isRemoveAction() {
@@ -188,8 +190,16 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     Iterator<Map.Entry<String, DefaultColumnAction>> entryIterator = defaultColumnActionMap.entrySet().iterator();
     while (entryIterator.hasNext()) {
       Map.Entry<String, DefaultColumnAction> entry = entryIterator.next();
+      String column = entry.getKey();
+      if (entry.getValue() == DefaultColumnAction.BACKFILL_TRANSFORM_FUNCTION) {
+        // Metadata-only: record the configured transform function without touching the column values.
+        LOGGER.info("Backfilling transform function for auto-generated column: {} in segment: {}", column,
+            _segmentMetadata.getName());
+        BaseSegmentCreator.addTransformFunction(_segmentProperties, column, getTransformFunctionForColumn(column));
+        continue;
+      }
       // This method updates the metadata properties, need to save it later. Remove the entry if the update failed.
-      if (!updateDefaultColumn(entry.getKey(), entry.getValue())) {
+      if (!updateDefaultColumn(column, entry.getValue())) {
         entryIterator.remove();
       }
     }
@@ -326,6 +336,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_COMPLEX_TRANSFORM_FUNCTION);
           }
         }
+
+        // Segments created before the transform function was tracked in the metadata report null for it. Their values
+        // cannot be told apart from up-to-date ones, so instead of regenerating them, record the configured transform
+        // function in the metadata (values untouched) so that the NEXT transform function change is detected.
+        if (!defaultColumnActionMap.containsKey(column) && columnMetadata.getTransformFunction() == null
+            && getTransformFunctionForColumn(column) != null) {
+          defaultColumnActionMap.put(column, DefaultColumnAction.BACKFILL_TRANSFORM_FUNCTION);
+        }
       } else {
         // Column does not exist in the segment, add default value for it.
 
@@ -370,9 +388,15 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     return defaultColumnActionMap;
   }
 
+  /// Returns `true` when the segment metadata records a transform function that no longer matches the configured one
+  /// (including the case where the transform function has been removed from the config, in which case the column is
+  /// regenerated with default values).
+  /// A missing (null) transform function in the metadata is NOT treated as a change: see the backfill handling in
+  /// [#computeDefaultColumnActionMap()].
   private boolean isTransformFunctionChanged(String column, ColumnMetadata columnMetadata) {
     String transformFunctionInMetadata = columnMetadata.getTransformFunction();
-    return !Objects.equals(transformFunctionInMetadata, getTransformFunctionForColumn(column));
+    return transformFunctionInMetadata != null && !transformFunctionInMetadata.equals(
+        getTransformFunctionForColumn(column));
   }
 
   /// Helper method to update default column indices, returns `true` if the update succeeds, `false`
@@ -453,6 +477,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     return true;
   }
 
+  @Nullable
   @SuppressWarnings("deprecation")
   private String getTransformFunctionForColumn(String column) {
     IngestionConfig ingestionConfig = _tableConfig.getIngestionConfig();
