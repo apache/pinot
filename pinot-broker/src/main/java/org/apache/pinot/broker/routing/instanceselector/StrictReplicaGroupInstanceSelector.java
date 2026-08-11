@@ -29,16 +29,16 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 
 /// Instance selector for strict replica-group routing strategy.
 ///
-/// The strict replica-group routing strategy always routes same-partition segments to the same instance. During routing
-/// state construction, [#updateSegmentMapsForUpsertTable(IdealState, ExternalView, Set, Map)] removes from every segment
-/// in a partition any replica that is unavailable for any old segment in that partition. Consequently, all
-/// same-partition segments have identical, ordered candidate identities.
+/// The strict replica-group routing strategy always routes same-partition segments to the same instance. During
+/// routing state construction, [#updateSegmentMapsForUpsertTable(IdealState, ExternalView, Set, Map)] removes from
+/// every segment in a partition any replica that is unavailable for any old segment in that partition. Consequently,
+/// all same-partition segments have identical, ordered candidate identities.
 ///
-/// Adaptive routing preserves that guarantee without explicit partition or mirror-set metadata. The inherited selector
-/// takes one ranking snapshot for the query and deterministically chooses the best candidate from each segment's ordered
-/// list. Identical filtered candidate lists, the same ranking snapshot, and deterministic list-order tie-breaking
-/// therefore produce identical selections for every segment in a partition. Different partitions may independently
-/// choose different replicas.
+/// Adaptive routing preserves that guarantee without explicit partition or mirror-set metadata. The inherited
+/// selector takes one ranking snapshot for the query and deterministically chooses the best candidate from each
+/// segment's ordered list. Identical filtered candidate lists, the same ranking snapshot, and deterministic list-order
+/// tie-breaking therefore produce identical selections for every segment in a partition. Different partitions may
+/// independently choose different replicas.
 ///
 /// New segments do not exclude a candidate when that segment is unavailable; they remain optional so that the broker or
 /// server can skip them if necessary.
