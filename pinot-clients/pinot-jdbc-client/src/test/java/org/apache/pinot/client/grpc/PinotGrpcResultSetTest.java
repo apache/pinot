@@ -110,6 +110,22 @@ public class PinotGrpcResultSetTest {
     Assert.assertEquals(resultSet.getObject(2), List.of());
   }
 
+  @Test
+  public void testGetUuid()
+      throws Exception {
+    UUID uuid = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    PinotGrpcResultSet resultSet = createResultSet(
+        new String[]{"uuid"}, new ColumnDataType[]{ColumnDataType.UUID}, new Object[]{uuid});
+
+    Assert.assertTrue(resultSet.next());
+    Assert.assertEquals(resultSet.getObject(1), uuid);
+    Assert.assertEquals(resultSet.getObject("uuid", UUID.class), uuid);
+
+    ResultSetMetaData metadata = resultSet.getMetaData();
+    Assert.assertEquals(metadata.getColumnType(1), Types.OTHER);
+    Assert.assertEquals(metadata.getColumnClassName(1), UUID.class.getTypeName());
+  }
+
   private static PinotGrpcResultSet createResultSet(String[] columnNames, ColumnDataType[] columnTypes, Object[] row)
       throws Exception {
     DataSchema schema = new DataSchema(columnNames, columnTypes);
