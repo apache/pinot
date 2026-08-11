@@ -550,30 +550,27 @@ public class JsonFunctions {
     return null;
   }
 
-  /**
-   * Extract a scalar (or scalar-array) value from a JSON document and coerce it to {@code resultsType}.
-   * <p>Scalar-function counterpart of the {@code jsonExtractScalar} transform (see
-   * {@link org.apache.pinot.core.operator.transform.function.JsonExtractScalarTransformFunction}), so that
-   * {@code json_extract_scalar(...)} resolves in the multi-stage engine and in ad-hoc scalar contexts.
-   * {@code resultsType} is a Pinot {@link DataType} name, optionally suffixed with {@code _ARRAY} for a
-   * multi-value result. Supported types are
-   * {@code INT/LONG/FLOAT/DOUBLE/BIG_DECIMAL/BOOLEAN/TIMESTAMP/STRING/JSON/BYTES} and the
-   * {@code INT/LONG/FLOAT/DOUBLE/BIG_DECIMAL/STRING} array variants.
-   * <p>Coercion mirrors the transform exactly: {@code BOOLEAN} is returned as its stored {@code INT} (0/1),
-   * {@code TIMESTAMP} as epoch millis (numeric values as-is, strings via ISO-8601), {@code BIG_DECIMAL} /
-   * {@code STRING} / {@code JSON} use a BigDecimal-preserving parser. Without a default value an unresolved
-   * single-value path throws; a multi-value path yields an empty array, but a {@code null} element inside a
-   * resolved array still throws. A malformed JSON document is treated as unresolved.
-   */
+  /// Extract a scalar (or scalar-array) value from a JSON document and coerce it to `resultsType`.
+  ///
+  /// Scalar-function counterpart of the `jsonExtractScalar` transform (`JsonExtractScalarTransformFunction` in
+  /// pinot-core), so that `json_extract_scalar(...)` resolves in the multi-stage engine and in ad-hoc scalar
+  /// contexts. `resultsType` is a Pinot [DataType] name, optionally suffixed with `_ARRAY` for a multi-value
+  /// result. Supported types are `INT/LONG/FLOAT/DOUBLE/BIG_DECIMAL/BOOLEAN/TIMESTAMP/STRING/JSON/BYTES` and
+  /// the `INT/LONG/FLOAT/DOUBLE/BIG_DECIMAL/STRING` array variants.
+  ///
+  /// The document may be a `String`, a UTF-8 encoded `byte[]` (BYTES columns) or an already-parsed container.
+  /// Coercion mirrors the transform exactly: `BOOLEAN` is returned as its stored `INT` (0/1), `TIMESTAMP` as
+  /// epoch millis (numeric values as-is, strings via ISO-8601), `BIG_DECIMAL` / `STRING` / `JSON` use a
+  /// BigDecimal-preserving parser. Without a default value an unresolved single-value path throws; a
+  /// multi-value path yields an empty array, but a `null` element inside a resolved array still throws.
+  /// A malformed JSON document is treated as unresolved.
   @ScalarFunction
   public static Object jsonExtractScalar(Object jsonInput, String jsonPath, String resultsType) {
     return jsonExtractScalar(jsonInput, jsonPath, resultsType, null);
   }
 
-  /**
-   * See {@link #jsonExtractScalar(Object, String, String)}. {@code defaultValue} is returned (coerced to
-   * {@code resultsType}) when the path resolves to {@code null} or the document is malformed.
-   */
+  /// See [#jsonExtractScalar(Object, String, String)]. `defaultValue` is returned (coerced to `resultsType`)
+  /// when the path resolves to `null` or the document is malformed.
   @ScalarFunction(nullableParameters = true)
   public static Object jsonExtractScalar(@Nullable Object jsonInput, String jsonPath, String resultsType,
       @Nullable Object defaultValue) {
@@ -612,6 +609,11 @@ public class JsonFunctions {
       if (jsonInput instanceof String) {
         return parseContext.parse((String) jsonInput).read(jsonPath, NO_PREDICATES);
       }
+      if (jsonInput instanceof byte[]) {
+        // BYTES columns carry the raw UTF-8 document; parse(Object) would treat the array as an already-parsed
+        // document, so decode it explicitly like JsonExtractScalarTransformFunction does.
+        return parseContext.parseUtf8((byte[]) jsonInput).read(jsonPath, NO_PREDICATES);
+      }
       return parseContext.parse(jsonInput).read(jsonPath, NO_PREDICATES);
     } catch (Exception e) {
       // Malformed JSON (e.g. a plain-text row) is treated as unresolved, mirroring the transform which swallows
@@ -627,8 +629,14 @@ public class JsonFunctions {
     }
     try {
       ParseContext parseContext = useBigDecimal ? PARSE_CONTEXT_WITH_BIG_DECIMAL : PARSE_CONTEXT;
-      Object read = jsonInput instanceof String ? parseContext.parse((String) jsonInput).read(jsonPath, NO_PREDICATES)
-          : parseContext.parse(jsonInput).read(jsonPath, NO_PREDICATES);
+      Object read;
+      if (jsonInput instanceof String) {
+        read = parseContext.parse((String) jsonInput).read(jsonPath, NO_PREDICATES);
+      } else if (jsonInput instanceof byte[]) {
+        read = parseContext.parseUtf8((byte[]) jsonInput).read(jsonPath, NO_PREDICATES);
+      } else {
+        read = parseContext.parse(jsonInput).read(jsonPath, NO_PREDICATES);
+      }
       return convertObjectToArray(read);
     } catch (Exception e) {
       return null;
@@ -680,10 +688,8 @@ public class JsonFunctions {
     }
   }
 
-  /**
-   * Resolve a single array element: pass through a non-null element, substitute the default when the element is
-   * {@code null}, or throw when a null element has no default - matching the transform's MV semantics.
-   */
+  /// Resolve a single array element: pass through a non-null element, substitute the default when the element
+  /// is `null`, or throw when a null element has no default - matching the transform's MV semantics.
   private static Object resolveArrayElement(@Nullable Object element, @Nullable Object defaultValue) {
     if (element != null) {
       return element;

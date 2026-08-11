@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.jayway.jsonpath.InvalidJsonException;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -989,5 +990,59 @@ public class JsonFunctionsTest {
     IllegalArgumentException iae = expectThrows(IllegalArgumentException.class,
         () -> JsonFunctions.jsonExtractScalar("{\"x\":\"nope\"}", "$.x", "TIMESTAMP"));
     assertTrue(iae.getMessage().startsWith("Invalid timestamp: 'nope'"));
+  }
+
+  @DataProvider(name = "bytesInputParity")
+  public Object[][] bytesInputParity() {
+    return new Object[][]{
+        {"$.i", "INT"}, {"$.l", "LONG"}, {"$.f", "FLOAT"}, {"$.d", "DOUBLE"}, {"$.s", "STRING"},
+        {"$.obj", "STRING"}, {"$.obj", "JSON"}, {"$.hp", "BIG_DECIMAL"}, {"$.b", "BOOLEAN"},
+        {"$.tnum", "TIMESTAMP"}, {"$.tiso", "TIMESTAMP"}, {"$.arr", "INT_ARRAY"}, {"$.arr", "LONG_ARRAY"},
+        {"$.arr", "DOUBLE_ARRAY"}, {"$.arr", "BIG_DECIMAL_ARRAY"}, {"$.arr", "STRING_ARRAY"}
+    };
+  }
+
+  /// A BYTES JSON column arrives as a UTF-8 `byte[]`, which must be decoded instead of being handed to Jayway as
+  /// an already-parsed document. Every result type has to match the `String` input exactly, including the
+  /// BigDecimal-preserving types which go through the second parse context.
+  @Test(dataProvider = "bytesInputParity")
+  public void testJsonExtractScalarBytesInputParity(String jsonPath, String resultsType) {
+    String json = scalarSampleJson();
+    assertEquals(JsonFunctions.jsonExtractScalar(json.getBytes(StandardCharsets.UTF_8), jsonPath, resultsType),
+        JsonFunctions.jsonExtractScalar(json, jsonPath, resultsType));
+  }
+
+  @Test
+  public void testJsonExtractScalarBytesInputDefaultValue() {
+    byte[] json = scalarSampleJson().getBytes(StandardCharsets.UTF_8);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.missing", "INT", -1), -1);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.missing", "STRING", "def"), "def");
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.missing", "BIG_DECIMAL", BigDecimal.ONE), BigDecimal.ONE);
+    IllegalArgumentException e = expectThrows(IllegalArgumentException.class,
+        () -> JsonFunctions.jsonExtractScalar(json, "$.missing", "INT"));
+    assertEquals(e.getMessage(), "Cannot resolve JSON path on some records. Consider setting a default value.");
+  }
+
+  @DataProvider(name = "unparseableBytes")
+  public Object[][] unparseableBytes() {
+    return new Object[][]{
+        {"plain text".getBytes(StandardCharsets.UTF_8)},
+        {"{\"i\":42".getBytes(StandardCharsets.UTF_8)},
+        {new byte[0]},
+        // 0xC3 starts a two-byte sequence that 0x28 cannot continue.
+        {new byte[]{(byte) 0xC3, (byte) 0x28}}
+    };
+  }
+
+  /// Unparseable bytes must behave exactly like an unresolved path: the default when one is supplied, otherwise the
+  /// function's own [IllegalArgumentException] - never an NPE and never a Jayway internal exception type.
+  @Test(dataProvider = "unparseableBytes")
+  public void testJsonExtractScalarUnparseableBytes(byte[] jsonInput) {
+    assertEquals(JsonFunctions.jsonExtractScalar(jsonInput, "$.i", "INT", -1), -1);
+    assertEquals(JsonFunctions.jsonExtractScalar(jsonInput, "$.i", "STRING", "def"), "def");
+    assertEquals((int[]) JsonFunctions.jsonExtractScalar(jsonInput, "$.arr", "INT_ARRAY"), new int[0]);
+    IllegalArgumentException e = expectThrows(IllegalArgumentException.class,
+        () -> JsonFunctions.jsonExtractScalar(jsonInput, "$.i", "INT"));
+    assertEquals(e.getMessage(), "Cannot resolve JSON path on some records. Consider setting a default value.");
   }
 }
