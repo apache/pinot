@@ -50,7 +50,7 @@ public abstract class PinotFilterJoinRule<C extends FilterJoinRule.Config> exten
   // Following code are copy-pasted from Calcite, and modified to not push down filter into right side of lookup join.
   // SYNCED WITH Calcite 1.42.0 FilterJoinRule#perform -- re-diff this method body against upstream on every
   // calcite.version bump. The intended deviations are the canPushRight lookup-join restriction and the volatility half
-  // of the isStageInvariant guard, both marked PINOT MODIFICATION below.
+  // of the isRelocatable guard, both marked PINOT MODIFICATION below.
   //
   // Known outstanding drift: upstream's RexUtil.containsCorrelation partitioning of aboveFilters and the variablesSet
   // argument on the final RelBuilder#filter (CALCITE-7319) are not ported. Pinot decorrelates in
@@ -67,13 +67,17 @@ public abstract class PinotFilterJoinRule<C extends FilterJoinRule.Config> exten
     // PINOT MODIFICATION to also skip volatile conditions. Upstream uses RexUtil.isDeterministic, which only covers
     // @ScalarFunction(isDeterministic = false). Pinot's separate FunctionVolatility.VOLATILE axis (now(), ago(),
     // stageId(), ...) keeps isDeterministic() == true so PinotEvaluateLiteralRule can still fold it once at plan time,
-    // so it needs the wider PinotRuleUtils.isStageInvariant check here.
+    // so it needs the wider PinotRuleUtils.isRelocatable check here.
     // Skip non-deterministic or volatile filter condition
-    if (filter != null && !PinotRuleUtils.isStageInvariant(filter.getCondition())) {
+    if (filter != null && !PinotRuleUtils.isRelocatable(filter.getCondition())) {
       return;
     }
-    // Skip non-deterministic or volatile join condition
-    if (!PinotRuleUtils.isStageInvariant(join.getCondition())) {
+    // Skip non-deterministic or volatile join condition.
+    // NOTE: for an INNER join this guard is largely moot for anything referencing a single side, because
+    // RelOptUtil.pushDownJoinConditions already hoisted such a call into that input's Project during sql-to-rel,
+    // before any rule ran; the condition seen here is then a bare RexInputRef. It is still load-bearing for outer
+    // joins, where the ON clause is preserved. See JoinPlans.json for both shapes.
+    if (!PinotRuleUtils.isRelocatable(join.getCondition())) {
       return;
     }
 

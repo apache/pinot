@@ -38,7 +38,12 @@ public class PinotSqlFunction extends SqlFunction {
     _volatile = isVolatile;
   }
 
-  /// A non-deterministic function is always volatile, mirroring `FunctionInfo#fromMethod`.
+  /// Derives volatility from determinism: a non-deterministic function is always volatile, and a deterministic one is
+  /// assumed not to be.
+  ///
+  /// Only the second half is an assumption -- a deterministic function can still be
+  /// `FunctionVolatility.VOLATILE` (that is exactly what `now()` is). Use the constructor above to say so explicitly;
+  /// this overload is for operators that are plain immutable functions of their arguments.
   public PinotSqlFunction(String name, SqlReturnTypeInference returnTypeInference,
       SqlOperandTypeChecker operandTypeChecker, boolean deterministic) {
     this(name, returnTypeInference, operandTypeChecker, deterministic, !deterministic);

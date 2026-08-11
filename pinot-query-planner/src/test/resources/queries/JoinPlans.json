@@ -820,6 +820,39 @@
         ]
       },
       {
+        "description": "Volatile ON condition is kept in the join condition for an outer join",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a LEFT JOIN b ON a.col1 = b.col1 AND stageId(b.col3) >= 0",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[AND(=($0, $1), >=(STAGEID($3), 0))], joinType=[left])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], EXPR$0=[CAST($2):VARCHAR CHARACTER SET \"UTF-8\" NOT NULL])",
+          "\n        PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "KNOWN GAP: a volatile ON conjunct referencing one side of an INNER join is hoisted into that input by RelOptUtil.pushDownJoinConditions during sql-to-rel, before any rule runs, so the join-condition guard never sees it",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 AND stageId(a.col3) >= 0",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        LogicalFilter(condition=[>=(STAGEID(CAST($2):VARCHAR CHARACTER SET \"UTF-8\" NOT NULL), 0)])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0], col2=[$1])",
+          "\n        PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
         "description": "Deterministic WHERE filter is still pushed below the join",
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col3 > 5",
         "output": [
