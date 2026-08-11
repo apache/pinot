@@ -139,9 +139,36 @@
     <!-- Only unit tests are run by default. -->
     <skip.integration.tests>true</skip.integration.tests>
     <skip.unit.tests>false</skip.unit.tests>
+    <!--
+      Per-fork heap for unit tests. Defaults to 4g to preserve historical behavior. When
+      running multiple parallel forks (unit.test.fork.count > 1) CI lowers this so that
+      N forks * heap + the Maven JVM stay within the runner's memory.
+    -->
+    <unit.test.fork.heap>4g</unit.test.fork.heap>
     <!-- Sets the VM argument line used when unit tests are run. -->
-    <argLine>-Xms4g -Xmx4g</argLine>
+    <argLine>-Xms${unit.test.fork.heap} -Xmx${unit.test.fork.heap}</argLine>
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
+    <!--
+      Number of parallel JVM forks used by surefire for unit tests. Defaults to 1 to
+      preserve the historical single-fork behavior for local/dev builds. CI overrides
+      this (e.g. -Dunit.test.fork.count=3) to run test classes in parallel forks and
+      shorten the unit-test phase. Must be a positive integer.
+    -->
+    <unit.test.fork.count>1</unit.test.fork.count>
+    <!--
+      Number of times surefire retries a failing unit test before failing the build. Defaults to
+      0 (no retry) so local/dev behavior is unchanged; CI raises it to absorb a few pre-existing
+      load-sensitive flaky tests exposed by parallel forks. A test passing only on retry is
+      reported as flaky, not silently passed.
+    -->
+    <unit.test.rerun.count>0</unit.test.rerun.count>
+    <!--
+      Suffix for the JaCoCo exec file name. Empty by default so coverage writes the
+      historical target/jacoco.exec (used by report / report-aggregate everywhere). The
+      unit-test script sets this to -${surefire.forkNumber} so parallel forks each write a
+      distinct jacoco-<n>.exec instead of appending to one shared file.
+    -->
+    <jacoco.exec.suffix></jacoco.exec.suffix>
 
     <!-- Checkstyle violation prop.-->
     <checkstyle.violation.severity>warning</checkstyle.violation.severity>
@@ -557,7 +584,9 @@
         <activeByDefault>false</activeByDefault>
       </activation>
       <properties>
-        <argLine>-Xms4g -Xmx4g -Dlog4j2.configurationFile=log4j2.xml</argLine>
+        <!-- Inherits unit.test.fork.heap from the global properties (overridable via
+             -Dunit.test.fork.heap); adds the log4j2 config used under github-actions. -->
+        <argLine>-Xms${unit.test.fork.heap} -Xmx${unit.test.fork.heap} -Dlog4j2.configurationFile=log4j2.xml</argLine>
       </properties>
     </profile>
     <profile>
@@ -578,6 +607,13 @@
                   <includes>
                     <include>org/apache/pinot/**/*</include>
                   </includes>
+                  <!-- Exec file suffix defaults to empty, keeping the historical
+                       target/jacoco.exec used by report / report-aggregate everywhere (incl.
+                       the integration lanes). The unit-test script sets jacoco.exec.suffix to
+                       -${surefire.forkNumber} so parallel forks (forkCount > 1) each write a
+                       distinct jacoco-<n>.exec instead of appending to one shared file; it
+                       then aggregates with a matching jacoco-*.exec glob. -->
+                  <destFile>${project.build.directory}/jacoco${jacoco.exec.suffix}.exec</destFile>
                 </configuration>
               </execution>
             </executions>
@@ -2167,13 +2203,20 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
           <configuration>
-            <forkCount>1</forkCount>
+            <!-- Overridable via -Dunit.test.fork.count (defaults to 1); see the property
+                 definition for details. -->
+            <forkCount>${unit.test.fork.count}</forkCount>
             <reuseForks>false</reuseForks>
+            <!-- Retries a failing test up to N times (default 0); see property definition. -->
+            <rerunFailingTestsCount>${unit.test.rerun.count}</rerunFailingTestsCount>
             <!-- 60 minutes -->
             <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
             <!-- Disable zookeeper force sync -->
             <systemPropertyVariables>
               <zookeeper.forceSync>no</zookeeper.forceSync>
+              <!-- Expose the 1-based fork index so tests can offset port bases / temp dirs per
+                   fork (1 even at forkCount=1, 1..N under parallel forks). -->
+              <surefire.forkNumber>$${surefire.forkNumber}</surefire.forkNumber>
             </systemPropertyVariables>
             <trimStackTrace>false</trimStackTrace>
             <reportFormat>plain</reportFormat>
@@ -2513,8 +2556,32 @@
           <excludes>
             <exclude>**/*IT.java</exclude>
           </excludes>
-          <forkCount>1</forkCount>
+          <!-- forkCount is overridable via -Dunit.test.fork.count (defaults to 1). Each
+               fork runs a distinct test class (reuseForks=false), so raising the count
+               parallelizes classes across JVMs while preserving class-level isolation. -->
+          <forkCount>${unit.test.fork.count}</forkCount>
           <reuseForks>false</reuseForks>
+          <!-- Retries a failing test up to N times before marking it failed (default 0 = no
+               retry). CI sets this to tolerate a handful of pre-existing load-sensitive flaky
+               tests (Lucene NRT refresh, filesystem mtime) that surface only when many parallel
+               forks saturate the runner; a test that passes on retry is reported as flaky, not
+               green-washed. -->
+          <rerunFailingTestsCount>${unit.test.rerun.count}</rerunFailingTestsCount>
+          <properties>
+            <!-- Surefire is the default report writer; modules can explicitly opt into an isolated
+                 reporter. TestNG's native HTML/XML reporters write shared files and assets, which
+                 race when multiple forks use one module. -->
+            <property>
+              <name>usedefaultlisteners</name>
+              <value>false</value>
+            </property>
+          </properties>
+          <systemPropertyVariables>
+            <!-- Expose the 1-based fork index (1 even at forkCount=1, 1..N under parallel forks)
+                 so tests can offset port bases / temp dirs per fork (see ZkStarter.FORK_PORT_OFFSET,
+                 ControllerTest port bases). -->
+            <surefire.forkNumber>$${surefire.forkNumber}</surefire.forkNumber>
+          </systemPropertyVariables>
         </configuration>
         <executions>
           <execution>

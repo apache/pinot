@@ -20,10 +20,12 @@ package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
@@ -48,7 +50,8 @@ import static org.testng.Assert.assertEquals;
 
 public class LuceneMutableTextIndexTest {
   private static final AtomicInteger SEGMENT_NAME_SUFFIX_COUNTER = new AtomicInteger(0);
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "LuceneMutableIndexTest");
+  private static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectory(), "LuceneMutableIndexTest-" + UUID.randomUUID());
   private static final String TEXT_COLUMN_NAME = "testColumnName";
   private static final String CUSTOM_ANALYZER_FQCN = CustomAnalyzer.class.getName();
   private static final String CUSTOM_QUERY_PARSER_FQCN = CustomQueryParser.class.getName();
@@ -64,14 +67,21 @@ public class LuceneMutableTextIndexTest {
 
   @BeforeMethod
   public void setUpMethod() {
+    // Give each test a fresh refresh queue and worker. Closing and immediately replacing indexes in the
+    // same queue can race the worker's empty-list exit and leave the replacement without a refresher.
+    RealtimeLuceneIndexRefreshManager.getInstance().reset();
     _queryThreadContext = QueryThreadContext.openForSseTest();
   }
 
-  @AfterMethod
+  @AfterMethod(alwaysRun = true)
   public void tearDownMethod() {
-    if (_queryThreadContext != null) {
-      _queryThreadContext.close();
-      _queryThreadContext = null;
+    try {
+      closeCurrentIndex();
+    } finally {
+      if (_queryThreadContext != null) {
+        _queryThreadContext.close();
+        _queryThreadContext = null;
+      }
     }
   }
 
@@ -179,6 +189,7 @@ public class LuceneMutableTextIndexTest {
 
   private void configureIndex(String analyzerClass, String analyzerClassArgs, String analyzerClassArgTypes,
                               String queryParserClass) {
+    closeCurrentIndex();
     TextIndexConfigBuilder builder = new TextIndexConfigBuilder();
     if (null != analyzerClass) {
       builder.withLuceneAnalyzerClass(analyzerClass);
@@ -214,11 +225,34 @@ public class LuceneMutableTextIndexTest {
     // ensure searches work after .commit() is called
     _realtimeLuceneTextIndex.commit();
 
-    // sleep for index refresh
-    try {
-      Thread.sleep(100);
-    } catch (Exception e) {
-      // no-op
+    // Wait for the async NRT index refresh to make the committed documents searchable. A fixed
+    // sleep is flaky under CPU load (the refresh thread may not run in time), so poll until a
+    // sentinel query is visible, up to a generous timeout.
+    //
+    // The sentinel is the regex /.*house.*/ -> doc 1 ("...data warehouses"), which every test in
+    // this class also asserts and which matches under both the default StandardAnalyzer and the
+    // custom KeywordTokenizer (regex matches the single keyword-tokenized term). A term sentinel
+    // like "stream" would never match the keyword-tokenized custom-analyzer cases, making the
+    // barrier spin the full timeout for those tests.
+    awaitIndexRefreshed("/.*house.*/", ImmutableRoaringBitmap.bitmapOf(1));
+  }
+
+  private void awaitIndexRefreshed(String sentinelQuery, ImmutableRoaringBitmap expected) {
+    long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+    while (true) {
+      if (expected.equals(_realtimeLuceneTextIndex.getDocIds(sentinelQuery))) {
+        return;
+      }
+      if (System.nanoTime() >= deadlineNanos) {
+        // Fall through and let the caller's assertions report the actual mismatch.
+        return;
+      }
+      try {
+        Thread.sleep(10);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return;
+      }
     }
   }
 
@@ -230,7 +264,18 @@ public class LuceneMutableTextIndexTest {
 
   @AfterClass
   public void tearDown() {
-    _realtimeLuceneTextIndex.close();
+    try {
+      closeCurrentIndex();
+    } finally {
+      FileUtils.deleteQuietly(INDEX_DIR);
+    }
+  }
+
+  private void closeCurrentIndex() {
+    if (_realtimeLuceneTextIndex != null) {
+      _realtimeLuceneTextIndex.close();
+      _realtimeLuceneTextIndex = null;
+    }
   }
 
   @Test
@@ -247,8 +292,8 @@ public class LuceneMutableTextIndexTest {
       index.add(new String[]{"foo bar"});
       index.add(new String[]{"baz qux"});
 
-      // Force a searcher refresh — triggers the refresh listener which records the current doc count
-      index.getSearcherManager().maybeRefresh();
+      // Block until the refresh attempt completes so the listener has recorded the current doc count
+      index.getSearcherManager().maybeRefreshBlocking();
 
       assertEquals(index.getSearchableDocCount(), 3);
     } finally {
@@ -258,6 +303,7 @@ public class LuceneMutableTextIndexTest {
 
   @Test
   public void testQueries() {
+    configureIndex(null, null, null, null);
     TestUtils.waitForCondition(aVoid -> {
       try {
         return _realtimeLuceneTextIndex.getSearcherManager().isSearcherCurrent();
@@ -275,6 +321,7 @@ public class LuceneMutableTextIndexTest {
       expectedExceptionsMessageRegExp = ".*TEXT_MATCH query interrupted while querying the consuming segment.*")
   public void testQueryCancellationIsSuccessful()
       throws InterruptedException, ExecutionException {
+    configureIndex(null, null, null, null);
     // Avoid early finalization by not using Executors.newSingleThreadExecutor (java <= 20, JDK-8145304)
     ExecutorService baseExecutor = Executors.newFixedThreadPool(1);
     // Wrap with contextAwareExecutorService to propagate QueryThreadContext to child threads

@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.FixedBitMVForwardIndexWriter;
@@ -39,7 +40,8 @@ import static org.testng.Assert.assertEquals;
 
 
 public class FixedBitMVForwardIndexTest implements PinotBuffersAfterMethodCheckRule {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "FixedBitMVForwardIndexTest");
+  private static final File TEMP_DIR =
+      new File(FileUtils.getTempDirectory(), "FixedBitMVForwardIndexTest-" + UUID.randomUUID());
   private static final File INDEX_FILE =
       new File(TEMP_DIR, "testColumn" + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
   private static final int NUM_DOCS = 100;

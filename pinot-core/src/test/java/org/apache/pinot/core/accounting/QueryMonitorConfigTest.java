@@ -135,12 +135,13 @@ public class QueryMonitorConfigTest {
         new PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test", InstanceType.SERVER);
 
     assertEquals(accountant.getQueryMonitorConfig().getPanicLevel(),
-        Accounting.DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO * accountant.getQueryMonitorConfig().getMaxHeapSize());
+        (long) ((double) Accounting.DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO
+            * accountant.getQueryMonitorConfig().getMaxHeapSize()));
     accountant.getWatcherTask()
         .onChange(Set.of(Accounting.COMMON_PREFIX + "." + Accounting.Keys.PANIC_LEVEL_HEAP_USAGE_RATIO),
             CLUSTER_CONFIGS);
     assertEquals(accountant.getQueryMonitorConfig().getPanicLevel(),
-        EXPECTED_PANIC_LEVEL * accountant.getQueryMonitorConfig().getMaxHeapSize());
+        (long) (EXPECTED_PANIC_LEVEL * accountant.getQueryMonitorConfig().getMaxHeapSize()));
   }
 
   @Test
@@ -149,12 +150,13 @@ public class QueryMonitorConfigTest {
         new PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test", InstanceType.SERVER);
 
     assertEquals(accountant.getQueryMonitorConfig().getCriticalLevel(),
-        Accounting.DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO * accountant.getQueryMonitorConfig().getMaxHeapSize());
+        (long) ((double) Accounting.DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO
+            * accountant.getQueryMonitorConfig().getMaxHeapSize()));
     accountant.getWatcherTask()
         .onChange(Set.of(Accounting.COMMON_PREFIX + "." + Accounting.Keys.CRITICAL_LEVEL_HEAP_USAGE_RATIO),
             CLUSTER_CONFIGS);
     assertEquals(accountant.getQueryMonitorConfig().getCriticalLevel(),
-        EXPECTED_CRITICAL_LEVEL * accountant.getQueryMonitorConfig().getMaxHeapSize());
+        (long) (EXPECTED_CRITICAL_LEVEL * accountant.getQueryMonitorConfig().getMaxHeapSize()));
   }
 
   @Test
@@ -163,12 +165,13 @@ public class QueryMonitorConfigTest {
         new PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test", InstanceType.SERVER);
 
     assertEquals(accountant.getQueryMonitorConfig().getAlarmingLevel(),
-        Accounting.DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO * accountant.getQueryMonitorConfig().getMaxHeapSize());
+        (long) ((double) Accounting.DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO
+            * accountant.getQueryMonitorConfig().getMaxHeapSize()));
     accountant.getWatcherTask()
         .onChange(Set.of(Accounting.COMMON_PREFIX + "." + Accounting.Keys.ALARMING_LEVEL_HEAP_USAGE_RATIO),
             CLUSTER_CONFIGS);
     assertEquals(accountant.getQueryMonitorConfig().getAlarmingLevel(),
-        EXPECTED_ALARMING_LEVEL * accountant.getQueryMonitorConfig().getMaxHeapSize());
+        (long) (EXPECTED_ALARMING_LEVEL * accountant.getQueryMonitorConfig().getMaxHeapSize()));
   }
 
   @Test
