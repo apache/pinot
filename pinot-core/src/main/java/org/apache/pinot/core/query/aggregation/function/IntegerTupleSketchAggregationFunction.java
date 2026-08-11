@@ -96,15 +96,16 @@ import org.apache.pinot.spi.utils.CommonConstants;
 ///     )
 @SuppressWarnings({"rawtypes"})
 public class IntegerTupleSketchAggregationFunction
-    extends BaseSingleInputAggregationFunction<TupleIntSketchAccumulator, Comparable> {
+    extends NullableSingleInputAggregationFunction<TupleIntSketchAccumulator, Comparable> {
   private static final int DEFAULT_ACCUMULATOR_THRESHOLD = 2;
   final ExpressionContext _expressionContext;
   final IntegerSummarySetOperations _setOps;
   protected int _accumulatorThreshold = DEFAULT_ACCUMULATOR_THRESHOLD;
   protected int _nominalEntries;
 
-  public IntegerTupleSketchAggregationFunction(List<ExpressionContext> arguments, IntegerSummary.Mode mode) {
-    super(arguments.get(0));
+  public IntegerTupleSketchAggregationFunction(List<ExpressionContext> arguments, IntegerSummary.Mode mode,
+      boolean nullHandlingEnabled) {
+    super(arguments.get(0), nullHandlingEnabled);
 
     Preconditions.checkArgument(arguments.size() <= 2,
         "Tuple Sketch Aggregation Function expects at most 2 arguments, got: %s", arguments.size());
@@ -156,11 +157,19 @@ public class IntegerTupleSketchAggregationFunction
     if (storedType == FieldSpec.DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
-        TupleIntSketchAccumulator tupleIntSketchAccumulator = getAccumulator(aggregationResultHolder);
-        TupleSketch<IntegerSummary>[] sketches = deserializeSketches(bytesValues, length);
-        for (TupleSketch<IntegerSummary> sketch : sketches) {
-          tupleIntSketchAccumulator.apply(sketch);
-        }
+        // The accumulator is created inside the range, so an all-null block leaves the holder untouched and
+        // extractFinalResult sees the null that means nothing was aggregated
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          // An empty range still reaches here, for a zero-length block. Creating the accumulator for it would mark
+          // the holder as aggregated and lose the signal this whole arrangement exists to carry.
+          if (to == from) {
+            return;
+          }
+          TupleIntSketchAccumulator tupleIntSketchAccumulator = getAccumulator(aggregationResultHolder);
+          for (int i = from; i < to; i++) {
+            tupleIntSketchAccumulator.apply(deserializeSketch(bytesValues[i]));
+          }
+        });
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while aggregating Tuple Sketches", e);
       }
@@ -181,12 +190,11 @@ public class IntegerTupleSketchAggregationFunction
     if (storedType == FieldSpec.DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
-        TupleSketch<IntegerSummary>[] sketches = deserializeSketches(bytesValues, length);
-        for (int i = 0; i < length; i++) {
-          TupleIntSketchAccumulator tupleIntSketchAccumulator = getAccumulator(groupByResultHolder, groupKeyArray[i]);
-          TupleSketch<IntegerSummary> sketch = sketches[i];
-          tupleIntSketchAccumulator.apply(sketch);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            getAccumulator(groupByResultHolder, groupKeyArray[i]).apply(deserializeSketch(bytesValues[i]));
+          }
+        });
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while aggregating Tuple Sketches", e);
       }
@@ -208,12 +216,15 @@ public class IntegerTupleSketchAggregationFunction
     if (singleValue && storedType == FieldSpec.DataType.BYTES) {
       byte[][] bytesValues = blockValSetMap.get(_expression).getBytesValuesSV();
       try {
-        TupleSketch<IntegerSummary>[] sketches = deserializeSketches(bytesValues, length);
-        for (int i = 0; i < length; i++) {
-          for (int groupKey : groupKeysArray[i]) {
-            getAccumulator(groupByResultHolder, groupKey).apply(sketches[i]);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            // Deserialized once per row, not once per group key the row belongs to
+            TupleSketch<IntegerSummary> sketch = deserializeSketch(bytesValues[i]);
+            for (int groupKey : groupKeysArray[i]) {
+              getAccumulator(groupByResultHolder, groupKey).apply(sketch);
+            }
           }
-        }
+        });
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while aggregating Tuple Sketches", e);
       }
@@ -224,12 +235,15 @@ public class IntegerTupleSketchAggregationFunction
   }
 
   @Override
+  @Nullable
   public TupleIntSketchAccumulator extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    TupleIntSketchAccumulator result = aggregationResultHolder.getResult();
-    if (result == null) {
-      return new TupleIntSketchAccumulator(_setOps, _nominalEntries, _accumulatorThreshold);
-    }
-    return result;
+    return aggregationResultHolder.getResult();
+  }
+
+  /// The accumulator an untouched holder stands for, built where the disabled-mode answer is rendered rather than
+  /// substituted during extraction.
+  TupleIntSketchAccumulator emptyAccumulator() {
+    return new TupleIntSketchAccumulator(_setOps, _nominalEntries, _accumulatorThreshold);
   }
 
   @Nullable
@@ -278,8 +292,13 @@ public class IntegerTupleSketchAggregationFunction
   @Nullable
   @Override
   public Comparable extractFinalResult(@Nullable TupleIntSketchAccumulator accumulator) {
+    // A null intermediate result means nothing was aggregated. With null handling enabled that is NULL; with it
+    // disabled the answer stays what it has always been, the serialized empty sketch.
     if (accumulator == null) {
-      return null;
+      if (_nullHandlingEnabled) {
+        return null;
+      }
+      accumulator = emptyAccumulator();
     }
     accumulator.setNominalEntries(_nominalEntries);
     accumulator.setSetOperations(_setOps);
@@ -327,15 +346,9 @@ public class IntegerTupleSketchAggregationFunction
     return accumulator;
   }
 
-  /// Deserializes the sketches from the bytes.
-  @SuppressWarnings({"unchecked"})
-  private TupleSketch<IntegerSummary>[] deserializeSketches(byte[][] serializedSketches, int length) {
-    TupleSketch<IntegerSummary>[] sketches = new TupleSketch[length];
-    for (int i = 0; i < length; i++) {
-      sketches[i] =
-          TupleSketch.heapifySketch(MemorySegment.ofArray(serializedSketches[i]), new IntegerSummaryDeserializer());
-    }
-    return sketches;
+  /// Deserializes a single serialized sketch, so a row that is skipped as null is never heapified.
+  private TupleSketch<IntegerSummary> deserializeSketch(byte[] serializedSketch) {
+    return TupleSketch.heapifySketch(MemorySegment.ofArray(serializedSketch), new IntegerSummaryDeserializer());
   }
 
   /// Helper class to wrap the tuple-sketch parameters.  The initial values for the parameters are set to the

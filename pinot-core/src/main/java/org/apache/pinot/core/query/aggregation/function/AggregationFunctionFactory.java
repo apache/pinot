@@ -481,13 +481,16 @@ public class AggregationFunctionFactory {
             return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.MOMENT);
           case DISTINCTCOUNTTUPLESKETCH:
             // mode actually doesn't matter here because we only care about keys, not values
-            return new DistinctCountIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+            return new DistinctCountIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum,
+                nullHandlingEnabled);
           case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
-            return new IntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+            return new IntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum, nullHandlingEnabled);
           case SUMVALUESINTEGERSUMTUPLESKETCH:
-            return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+            return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum,
+                nullHandlingEnabled);
           case AVGVALUEINTEGERSUMTUPLESKETCH:
-            return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+            return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum,
+                nullHandlingEnabled);
           case PINOTPARENTAGGEXPRMAX:
             return new ParentExprMinMaxAggregationFunction(arguments, true);
           case PINOTPARENTAGGEXPRMIN:
