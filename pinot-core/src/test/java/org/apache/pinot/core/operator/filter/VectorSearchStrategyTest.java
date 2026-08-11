@@ -25,9 +25,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for {@link VectorSearchStrategy} adaptive planner.
- */
+/// Tests for [VectorSearchStrategy] adaptive planner.
 public class VectorSearchStrategyTest {
 
   @Test

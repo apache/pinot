@@ -43,34 +43,28 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * Factory for NOT_IN predicate evaluators.
- */
+/// Factory for NOT_IN predicate evaluators.
 public class NotInPredicateEvaluatorFactory {
   private NotInPredicateEvaluatorFactory() {
   }
 
-  /**
-   * Create a new instance of dictionary based NOT_IN predicate evaluator.
-   *
-   * @param notInPredicate NOT_IN predicate to evaluate
-   * @param dictionary     Dictionary for the column
-   * @param dataType       Data type for the column
-   * @param queryContext   Query context
-   * @return Dictionary based NOT_IN predicate evaluator
-   */
+  /// Create a new instance of dictionary based NOT_IN predicate evaluator.
+  ///
+  /// @param notInPredicate NOT_IN predicate to evaluate
+  /// @param dictionary     Dictionary for the column
+  /// @param dataType       Data type for the column
+  /// @param queryContext   Query context
+  /// @return Dictionary based NOT_IN predicate evaluator
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(NotInPredicate notInPredicate,
       Dictionary dictionary, DataType dataType, @Nullable QueryContext queryContext) {
     return new DictionaryBasedNotInPredicateEvaluator(notInPredicate, dictionary, dataType, queryContext);
   }
 
-  /**
-   * Create a new instance of raw value based NOT_IN predicate evaluator.
-   *
-   * @param notInPredicate NOT_IN predicate to evaluate
-   * @param dataType Data type for the column
-   * @return Raw value based NOT_IN predicate evaluator
-   */
+  /// Create a new instance of raw value based NOT_IN predicate evaluator.
+  ///
+  /// @param notInPredicate NOT_IN predicate to evaluate
+  /// @param dataType Data type for the column
+  /// @return Raw value based NOT_IN predicate evaluator
   public static NotInRawPredicateEvaluator newRawValueBasedEvaluator(NotInPredicate notInPredicate, DataType dataType) {
     switch (dataType) {
       case INT: {
@@ -145,6 +139,19 @@ public class NotInPredicateEvaluatorFactory {
         // NOTE: Add value-by-value to avoid overhead
         //noinspection ManualArrayToCollectionCopy
         for (ByteArray value : bytesValues) {
+          //noinspection UseBulkOperation
+          nonMatchingValues.add(value);
+        }
+        return new BytesRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
+      }
+      // UUID is a logical type stored as 16 raw bytes, so -- like TIMESTAMP over LONG above -- convert the
+      // literals to their stored form and reuse the stored-type evaluator.
+      case UUID: {
+        ByteArray[] uuidValues = notInPredicate.getUuidValues();
+        Set<ByteArray> nonMatchingValues = new ObjectOpenHashSet<>(HashUtil.getMinHashSetSize(uuidValues.length));
+        // NOTE: Add value-by-value to avoid overhead
+        //noinspection ManualArrayToCollectionCopy
+        for (ByteArray value : uuidValues) {
           //noinspection UseBulkOperation
           nonMatchingValues.add(value);
         }

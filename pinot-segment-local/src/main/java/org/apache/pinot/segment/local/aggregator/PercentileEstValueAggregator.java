@@ -70,9 +70,7 @@ public class PercentileEstValueAggregator implements ValueAggregator<Object, Qua
     return value;
   }
 
-  /**
-   * Adds a raw value (single value or multi-value array) to the QuantileDigest.
-   */
+  /// Adds a raw value (single value or multi-value array) to the QuantileDigest.
   protected void addToDigest(QuantileDigest digest, Object rawValue) {
     if (rawValue instanceof Object[]) {
       Object[] values = (Object[]) rawValue;

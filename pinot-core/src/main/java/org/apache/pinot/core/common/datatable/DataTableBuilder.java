@@ -30,20 +30,19 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * DataTable holds data in a matrix form. The purpose of this interface is to provide a way to construct a data table
- * and ability to serialize and deserialize.
- *
- * <p>Why can't we use existing serialization/deserialization mechanism:
- * <p>Most existing techniques (protocol buffer, thrift, avro) are optimized for transporting a single record but Pinot
- * transfers quite a lot of data from server to broker during the scatter/gather operation. The cost of serialization
- * and deserialization directly impacts the performance. Most ser/deser requires us to convert the primitive data types
- * into objects like Integer etc. This will waste cpu resource and increase the payload size. We optimize the data
- * format for Pinot use case. We can also support lazy construction of objects. In fact we retain the bytes as it is and
- * will be able to look up a field directly within a byte buffer.
- *
- * TODO: Consider skipping seeking for the column offsets and directly write to the byte buffer
- */
+/// DataTable holds data in a matrix form. The purpose of this interface is to provide a way to construct a data table
+/// and ability to serialize and deserialize.
+///
+/// Why can't we use existing serialization/deserialization mechanism:
+///
+/// Most existing techniques (protocol buffer, thrift, avro) are optimized for transporting a single record but Pinot
+/// transfers quite a lot of data from server to broker during the scatter/gather operation. The cost of serialization
+/// and deserialization directly impacts the performance. Most ser/deser requires us to convert the primitive data
+/// types into objects like Integer etc. This will waste cpu resource and increase the payload size. We optimize the
+/// data format for Pinot use case. We can also support lazy construction of objects. In fact we retain the bytes as
+/// it is and will be able to look up a field directly within a byte buffer.
+///
+/// TODO: Consider skipping seeking for the column offsets and directly write to the byte buffer
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public interface DataTableBuilder {
@@ -93,16 +92,23 @@ public interface DataTableBuilder {
   void setColumn(int colId, AggregationFunction.SerializedIntermediateResult value)
       throws IOException;
 
+  /// Writes a `null` for the given column of the current row.
+  ///
+  /// Valid for every column type, independent of the query's null-handling option. Types that can represent `null`
+  /// in-band (`OBJECT`, `UNKNOWN`, `MAP`) keep their own encoding; every other type is written as the column's null
+  /// placeholder and the row is recorded in a per-column null bitmap that `build()` appends to the table. Readers
+  /// restore the `null` via `DataTable.getNullRowIds`.
   void setNull(int colId)
       throws IOException;
 
   void finishRow()
       throws IOException;
 
-  /**
-   * NOTE: When setting nullRowIds, we don't pass the colId currently, and this method must be invoked for all columns.
-   * TODO: Revisit this
-   */
+  /// Merges a pre-computed null bitmap into the bitmap the builder maintains for the next column.
+  ///
+  /// NOTE: The colId is positional -- the first call targets column 0, the second column 1, and so on -- so callers
+  /// that use this method must invoke it once for every column, in order. Callers that instead report nulls per cell
+  /// through [#setNull] need not call this at all.
   void setNullRowIds(@Nullable RoaringBitmap nullRowIds)
       throws IOException;
 

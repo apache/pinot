@@ -21,9 +21,7 @@ package org.apache.pinot.common.tier;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 
 
-/**
- * Interface for the segment selection strategy of a tier
- */
+/// Interface for the segment selection strategy of a tier
 public interface TierSegmentSelector {
 
   /// Returns the type of the segment selector (e.g. TIME).

@@ -24,15 +24,13 @@ import org.apache.datasketches.theta.ThetaSketch;
 import org.apache.datasketches.theta.ThetaUnion;
 
 
-/**
- * Intermediate state used by {@code DistinctCountThetaSketchAggregationFunction} which gives
- * the end user more control over how sketches are merged for performance.
- * In particular, the Theta Sketch Union "early-stop" optimisation can be used - ordered sketches require no further
- * processing beyond the minimum Theta value.
- * The union operation initialises an empty "gadget" bookkeeping sketch that is updated with hashed entries
- * that fall below the minimum Theta value for all input sketches ("Broder Rule").  When the initial Theta value is
- * set to the minimum immediately, further gains can be realised.
- */
+/// Intermediate state used by `DistinctCountThetaSketchAggregationFunction` which gives
+/// the end user more control over how sketches are merged for performance.
+/// In particular, the Theta Sketch Union "early-stop" optimisation can be used - ordered sketches require no further
+/// processing beyond the minimum Theta value.
+/// The union operation initialises an empty "gadget" bookkeeping sketch that is updated with hashed entries
+/// that fall below the minimum Theta value for all input sketches ("Broder Rule").  When the initial Theta value is
+/// set to the minimum immediately, further gains can be realised.
 public class ThetaSketchAccumulator extends CustomObjectAccumulator<ThetaSketch> {
   private ThetaSetOperationBuilder _setOperationBuilder = new ThetaSetOperationBuilder();
   private ThetaUnion _union;

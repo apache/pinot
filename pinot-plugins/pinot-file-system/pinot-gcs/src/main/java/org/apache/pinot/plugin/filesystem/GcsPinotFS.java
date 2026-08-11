@@ -416,13 +416,11 @@ public class GcsPinotFS extends BasePinotFS {
     return gcsUri.getPath().endsWith(GcsUri.DELIMITER);
   }
 
-  /**
-   * Returns true if this is an existing directory
-   *
-   * @param gcsUri
-   * @return true if the directory exists
-   * @throws IOException
-   */
+  /// Returns true if this is an existing directory
+  ///
+  /// @param gcsUri
+  /// @return true if the directory exists
+  /// @throws IOException
   private boolean existsDirectoryOrBucket(GcsUri gcsUri)
       throws IOException {
     String prefix = gcsUri.getPrefix();
@@ -575,14 +573,12 @@ public class GcsPinotFS extends BasePinotFS {
     if (srcUri.hasSubpath(dstUri) || dstUri.hasSubpath(srcUri)) {
       throw new IOException("Cannot copy from or to a subdirectory: '" + srcUri + "' -> '" + dstUri + "'");
     }
-    /**
-     * If an non-empty blob exists and does not end with "/"
-     * gcs will create a 0 length blob ending with "/".
-     * So you can have something like a file with a subdirectory.
-     * This is due to gcs behavior:
-     *
-     * @see https://cloud.google.com/storage/docs/gsutil/addlhelp/HowSubdirectoriesWork
-     */
+    /// If an non-empty blob exists and does not end with "/"
+    /// gcs will create a 0 length blob ending with "/".
+    /// So you can have something like a file with a subdirectory.
+    /// This is due to gcs behavior:
+    ///
+    /// @see https://cloud.google.com/storage/docs/gsutil/addlhelp/HowSubdirectoriesWork
     if (!existsDirectoryOrBucket(dstUri)) {
       mkdir(dstUri.getUri());
     }

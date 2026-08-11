@@ -109,7 +109,7 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
   }
 
   @Override
-  public Geometry merge(@Nullable Geometry intermediateResult1, @Nullable Geometry intermediateResult2) {
+  public Geometry merge(Geometry intermediateResult1, Geometry intermediateResult2) {
     return union(intermediateResult1, intermediateResult2);
   }
 
@@ -134,19 +134,19 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
     return DataSchema.ColumnDataType.BYTES;
   }
 
+  @Nullable
   @Override
-  public ByteArray extractFinalResult(Geometry geometry) {
-    return new ByteArray(GeometrySerializer.serialize(geometry));
+  public ByteArray extractFinalResult(@Nullable Geometry geometry) {
+    // A null intermediate result means nothing was aggregated; the union of no geometries is NULL, matching ST_Union
+    return geometry != null ? new ByteArray(GeometrySerializer.serialize(geometry)) : null;
   }
 
-  /**
-   * Returns the union of the supplied geometries.
-   *
-   * <p>When either operand is a {@code GeometryCollection}, {@link Geometry#union(Geometry)} can produce invalid
-   * topologies or drop components because it expects homogeneous inputs.  The {@link UnaryUnionOp} implementation is
-   * purpose-built for arbitrary collections, so we first combine the components and delegate to it to ensure a valid
-   * and deterministic result.</p>
-   */
+  /// Returns the union of the supplied geometries.
+  ///
+  /// When either operand is a `GeometryCollection`, [Geometry#union(Geometry)] can produce invalid
+  /// topologies or drop components because it expects homogeneous inputs.  The [UnaryUnionOp] implementation is
+  /// purpose-built for arbitrary collections, so we first combine the components and delegate to it to ensure a valid
+  /// and deterministic result.
   @Nullable
   private static Geometry union(@Nullable Geometry left, @Nullable Geometry right) {
     if (left == null) {

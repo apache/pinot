@@ -135,11 +135,9 @@ public class PostAggregationFunctionTest {
     assertNull(function.invoke(new Object[]{null, 1}));
   }
 
-  /**
-   * Regression test for the single-stage post-aggregation path: arithmetic on whole-number operands - for example
-   * {@code COUNT(DISTINCT ...) * 60}, which reaches here as {@code times(INT, INT)} because DISTINCTCOUNT is typed
-   * INT and a small integer literal is typed INT - must return LONG rather than silently widening to DOUBLE.
-   */
+  /// Regression test for the single-stage post-aggregation path: arithmetic on whole-number operands - for example
+  /// `COUNT(DISTINCT ...) * 60`, which reaches here as `times(INT, INT)` because DISTINCTCOUNT is typed
+  /// INT and a small integer literal is typed INT - must return LONG rather than silently widening to DOUBLE.
   @Test
   public void testWholeNumberArithmeticReturnsLong() {
     for (String functionName : new String[]{"plus", "minus", "times"}) {

@@ -23,17 +23,13 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GapfillUtils;
 
 
-/**
- * Factory class to construct the right ScalableGapfillProcessor based on the query context.
- */
+/// Factory class to construct the right ScalableGapfillProcessor based on the query context.
 @SuppressWarnings("rawtypes")
 public final class GapfillProcessorFactory {
   private GapfillProcessorFactory() {
   }
 
-  /**
-   * Constructs the right result reducer based on the given query context.
-   */
+  /// Constructs the right result reducer based on the given query context.
   public static BaseGapfillProcessor getGapfillProcessor(
       QueryContext queryContext, GapfillUtils.GapfillType gapfillType) {
     if (gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {

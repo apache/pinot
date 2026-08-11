@@ -36,9 +36,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
 
-/**
- * Tests Groovy functions for transforming schema columns
- */
+/// Tests Groovy functions for transforming schema columns
 public class GroovyFunctionEvaluatorTest {
   @Test
   public void testLegalGroovyScripts()

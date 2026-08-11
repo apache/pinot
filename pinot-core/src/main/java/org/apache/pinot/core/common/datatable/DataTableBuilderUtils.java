@@ -30,19 +30,16 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * Helpers for writing values into a {@link DataTableBuilder}.
- */
+/// Helpers for writing values into a [DataTableBuilder].
 public class DataTableBuilderUtils {
   private DataTableBuilderUtils() {
   }
 
-  /**
-   * Writes a non-null value of the given stored column data type into the {@link DataTableBuilder} at
-   * the given column. Supports all scalar and array stored types. OBJECT columns are NOT handled here
-   * (callers serialize them via the owning aggregation function). Used by the group-by result
-   * serialization on both the server ({@code GroupByResultsBlock}) and the merge-only reduce path.
-   */
+  /// Writes a non-null value of the given stored column data type into the [DataTableBuilder] at the given column.
+  ///
+  /// Supports all scalar and array stored types. `OBJECT`, `UNKNOWN` and `MAP` are NOT handled here -- they are
+  /// written through the builder's own type-specific methods, since their values are either serialized by an owning
+  /// aggregation function or already carry an in-band null encoding.
   public static void setColumn(DataTableBuilder dataTableBuilder, ColumnDataType storedColumnDataType,
       int columnIndex, Object value)
       throws IOException {

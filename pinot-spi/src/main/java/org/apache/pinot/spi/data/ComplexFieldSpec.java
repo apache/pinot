@@ -28,29 +28,27 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 
 
-/**
- * FieldSpec for complex fields. The {@link org.apache.pinot.spi.data.FieldSpec.FieldType}
- * is COMPLEX and the inner data type represents the root data type of the field.
- * It could be STRUCT, MAP, LIST or OPEN_STRUCT. A complex field is composable with a single root
- * type and a number of child types. Although we have multi-value primitive columns, LIST
- * is for representing lists of both complex and primitives inside a complex field.
- *
- * Consider a person json where the root type is STRUCT and composes of inner members:
- *  STRUCT(
- *          name: STRING
- *          age: INT
- *          salary: INT
- *          addresses: LIST (STRUCT
- *                              apt: INT
- *                              street: STRING
- *                              city: STRING
- *                              zip: INT
- *                          )
- *        )
- *
- * The fieldspec would be COMPLEX with type as STRUCT and 4 inner members
- * to model the hierarchy
- */
+/// FieldSpec for complex fields. The [org.apache.pinot.spi.data.FieldSpec.FieldType]
+/// is COMPLEX and the inner data type represents the root data type of the field.
+/// It could be STRUCT, MAP, LIST or OPEN_STRUCT. A complex field is composable with a single root
+/// type and a number of child types. Although we have multi-value primitive columns, LIST
+/// is for representing lists of both complex and primitives inside a complex field.
+///
+/// Consider a person json where the root type is STRUCT and composes of inner members:
+///  STRUCT(
+///          name: STRING
+///          age: INT
+///          salary: INT
+///          addresses: LIST (STRUCT
+///                              apt: INT
+///                              street: STRING
+///                              city: STRING
+///                              zip: INT
+///                          )
+///        )
+///
+/// The fieldspec would be COMPLEX with type as STRUCT and 4 inner members
+/// to model the hierarchy
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class ComplexFieldSpec extends FieldSpec {
   public static final String KEY_FIELD = "key";
@@ -135,11 +133,9 @@ public final class ComplexFieldSpec extends FieldSpec {
         Map.of(KEY_FIELD, mapFieldSpec.getKeyFieldSpec(), VALUE_FIELD, mapFieldSpec.getValueFieldSpec()));
   }
 
-  /**
-   * Returns the full child name for the given columns for complex data type.
-   * E.g. map$$key, map$$value, list$$element, etc.
-   * This is used in persisting column metadata for complex data types.
-   */
+  /// Returns the full child name for the given columns for complex data type.
+  /// E.g. map$$key, map$$value, list$$element, etc.
+  /// This is used in persisting column metadata for complex data types.
   public static String getFullChildName(String... columns) {
     return StringUtil.join("$$", columns);
   }

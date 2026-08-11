@@ -35,12 +35,10 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for the filter-aware (FILTER_THEN_ANN) functionality of {@link IvfFlatVectorIndexReader}.
- *
- * <p>Verifies that pre-filter ANN search correctly restricts results to the filtered document set
- * and returns correct top-K results across various filter selectivities.</p>
- */
+/// Tests for the filter-aware (FILTER_THEN_ANN) functionality of [IvfFlatVectorIndexReader].
+///
+/// Verifies that pre-filter ANN search correctly restricts results to the filtered document set
+/// and returns correct top-K results across various filter selectivities.
 public class IvfFlatFilterAwareTest {
   private static final String COLUMN_NAME = "vectorCol";
   private static final long TEST_SEED = 42L;

@@ -35,25 +35,21 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Constructor-failure path validation for the IVF buffer-based readers.
- *
- * <p>The reader constructors take ownership of the passed-in {@link PinotDataBuffer} and are
- * responsible for closing it if construction throws (otherwise the caller never receives a reader
- * to {@code close()}, and the mmap would leak). This test exercises that contract end-to-end:</p>
- *
- * <ol>
- *   <li>Build a valid IVF combined via the unchanged creator.</li>
- *   <li>Produce a copy whose magic bytes are zeroed out — guaranteed to fail the magic check.</li>
- *   <li>Snapshot {@link PinotDataBuffer#getMmapBufferCount()} before mapping the corrupted file.</li>
- *   <li>Map the corrupted file (count goes up by 1) and try to construct the reader (throws).</li>
- *   <li>Assert the mmap count returns to the snapshot — i.e. the constructor's catch block closed
- *       the buffer.</li>
- * </ol>
- *
- * <p>One method per IVF variant (FLAT, ON_DISK, PQ). Each also asserts the successful-construction
- * case is balanced: build → open → construct → close → mmap count back to baseline.</p>
- */
+/// Constructor-failure path validation for the IVF buffer-based readers.
+///
+/// The reader constructors take ownership of the passed-in [PinotDataBuffer] and are
+/// responsible for closing it if construction throws (otherwise the caller never receives a reader
+/// to `close()`, and the mmap would leak). This test exercises that contract end-to-end:
+///
+/// 1. Build a valid IVF combined via the unchanged creator.
+/// 2. Produce a copy whose magic bytes are zeroed out — guaranteed to fail the magic check.
+/// 3. Snapshot [PinotDataBuffer#getMmapBufferCount()] before mapping the corrupted file.
+/// 4. Map the corrupted file (count goes up by 1) and try to construct the reader (throws).
+/// 5. Assert the mmap count returns to the snapshot — i.e. the constructor's catch block closed
+///       the buffer.
+///
+/// One method per IVF variant (FLAT, ON_DISK, PQ). Each also asserts the successful-construction
+/// case is balanced: build → open → construct → close → mmap count back to baseline.
 public class IvfReaderFailurePathTest {
 
   private static final String COLUMN = "v";
@@ -224,11 +220,9 @@ public class IvfReaderFailurePathTest {
   // Borrowed-buffer path (ownsBuffer=false) — used when the buffer comes from columns.psf
   // ---------------------------------------------------------------------------
 
-  /**
-   * When {@code ownsBuffer=false}, the reader must NOT close the buffer in {@link
-   * org.apache.pinot.segment.local.segment.index.readers.vector.IvfFlatVectorIndexReader#close()}.
-   * The segment directory owns the lifetime in the consolidated path.
-   */
+  /// When `ownsBuffer=false` , the reader must NOT close the buffer in
+  /// [org.apache.pinot.segment.local.segment.index.readers.vector.IvfFlatVectorIndexReader#close()] .
+  /// The segment directory owns the lifetime in the consolidated path.
   @Test
   public void testIvfFlatBorrowedBufferNotClosedByReader()
       throws Exception {
@@ -303,10 +297,8 @@ public class IvfReaderFailurePathTest {
     }
   }
 
-  /**
-   * Constructor failure on a borrowed buffer must NOT close it either — the segment directory
-   * still owns the lifetime even if a particular reader fails to initialise.
-   */
+  /// Constructor failure on a borrowed buffer must NOT close it either — the segment directory
+  /// still owns the lifetime even if a particular reader fails to initialise.
   @Test
   public void testIvfFlatBorrowedBufferNotClosedOnConstructorFailure()
       throws Exception {
@@ -358,11 +350,9 @@ public class IvfReaderFailurePathTest {
     }
   }
 
-  /**
-   * Returns a copy of {@code source} with the first 4 bytes overwritten with zeros, guaranteed
-   * to fail the magic check in any IVF reader. The corrupted file lives next to the source so
-   * the temp directory clean-up still removes it.
-   */
+  /// Returns a copy of `source` with the first 4 bytes overwritten with zeros, guaranteed
+  /// to fail the magic check in any IVF reader. The corrupted file lives next to the source so
+  /// the temp directory clean-up still removes it.
   private static File corruptMagic(File source)
       throws Exception {
     File corrupted = new File(source.getParentFile(), source.getName() + ".corrupted");

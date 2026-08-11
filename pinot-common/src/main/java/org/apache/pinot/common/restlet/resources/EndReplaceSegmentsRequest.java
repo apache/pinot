@@ -24,15 +24,13 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 
-/**
- * Request object for endReplaceSegments API.
- *
- * 1. segmentsTo: The new segments that actually get created. Sometimes not all segments that are passed into
- * startReplaceSegments can get created. If only a subset of the original list eventually gets created,
- * we need to be able to supply that list to the replacement protocol, so that the remaining
- * segments that did not get created can be ignored.
- * 2. customMap : custom map.
- */
+/// Request object for endReplaceSegments API.
+///
+/// 1. segmentsTo: The new segments that actually get created. Sometimes not all segments that are passed into
+/// startReplaceSegments can get created. If only a subset of the original list eventually gets created,
+/// we need to be able to supply that list to the replacement protocol, so that the remaining
+/// segments that did not get created can be ignored.
+/// 2. customMap : custom map.
 public class EndReplaceSegmentsRequest {
   private final List<String> _segmentsTo;
   private final Map<String, String> _customMap;

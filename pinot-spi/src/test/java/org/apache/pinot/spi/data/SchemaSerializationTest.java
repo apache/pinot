@@ -34,17 +34,13 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for Schema serialization with @JsonValue annotation.
- * These tests verify that Jackson serialization uses the toJsonObject() method
- * which produces a minimal, canonical JSON format.
- */
+/// Unit tests for Schema serialization with @JsonValue annotation.
+/// These tests verify that Jackson serialization uses the toJsonObject() method
+/// which produces a minimal, canonical JSON format.
 public class SchemaSerializationTest {
 
-  /**
-   * Tests that Jackson serialization uses toJsonObject() format via @JsonValue annotation.
-   * This ensures that defaultNullValueString is never included in serialized output.
-   */
+  /// Tests that Jackson serialization uses toJsonObject() format via @JsonValue annotation.
+  /// This ensures that defaultNullValueString is never included in serialized output.
   @Test
   public void testJsonValueSerializationOmitsDefaultNullValueString()
       throws Exception {
@@ -68,9 +64,7 @@ public class SchemaSerializationTest {
     assertNotNull(deserializedSchema.getMetricSpec("metric1"));
   }
 
-  /**
-   * Tests that Jackson serialization omits default values for fields.
-   */
+  /// Tests that Jackson serialization omits default values for fields.
   @Test
   public void testJsonValueSerializationOmitsDefaultValues()
       throws Exception {
@@ -106,9 +100,7 @@ public class SchemaSerializationTest {
         "defaultNullValue should not be present for DOUBLE metric with default value");
   }
 
-  /**
-   * Tests that Jackson serialization includes non-default values.
-   */
+  /// Tests that Jackson serialization includes non-default values.
   @Test
   public void testJsonValueSerializationIncludesNonDefaultValues()
       throws Exception {
@@ -155,9 +147,7 @@ public class SchemaSerializationTest {
     assertEquals(metric1.get("defaultNullValue").asDouble(), 99.9);
   }
 
-  /**
-   * Tests that empty field spec arrays are omitted from serialization.
-   */
+  /// Tests that empty field spec arrays are omitted from serialization.
   @Test
   public void testJsonValueSerializationOmitsEmptyArrays()
       throws Exception {
@@ -185,9 +175,7 @@ public class SchemaSerializationTest {
         "Empty primaryKeyColumns should be omitted");
   }
 
-  /**
-   * Tests that enableColumnBasedNullHandling is always included in serialization.
-   */
+  /// Tests that enableColumnBasedNullHandling is always included in serialization.
   @Test
   public void testJsonValueSerializationAlwaysIncludesEnableColumnBasedNullHandling()
       throws Exception {
@@ -218,9 +206,7 @@ public class SchemaSerializationTest {
     assertTrue(jsonNodeEnabled.get("enableColumnBasedNullHandling").asBoolean());
   }
 
-  /**
-   * Tests that ComplexFieldSpec with MAP type serializes correctly.
-   */
+  /// Tests that ComplexFieldSpec with MAP type serializes correctly.
   @Test
   public void testJsonValueSerializationWithComplexFieldSpecMap()
       throws Exception {
@@ -254,9 +240,7 @@ public class SchemaSerializationTest {
     assertEquals(deserializedSchema.getFieldSpecFor("mapField").getDataType(), DataType.MAP);
   }
 
-  /**
-   * Tests that ComplexFieldSpec with LIST type serializes correctly.
-   */
+  /// Tests that ComplexFieldSpec with LIST type serializes correctly.
   @Test
   public void testJsonValueSerializationWithComplexFieldSpecList()
       throws Exception {
@@ -285,9 +269,7 @@ public class SchemaSerializationTest {
     assertEquals(deserializedSchema.getFieldSpecFor("listField").getDataType(), DataType.LIST);
   }
 
-  /**
-   * Tests that DateTimeFieldSpec serializes correctly with format and granularity.
-   */
+  /// Tests that DateTimeFieldSpec serializes correctly with format and granularity.
   @Test
   public void testJsonValueSerializationWithDateTimeFieldSpec()
       throws Exception {
@@ -314,9 +296,7 @@ public class SchemaSerializationTest {
         "Default null value should not be serialized for DATE_TIME LONG");
   }
 
-  /**
-   * Tests that Jackson serialization output matches toJsonObject() output.
-   */
+  /// Tests that Jackson serialization output matches toJsonObject() output.
   @Test
   public void testJacksonSerializationMatchesToJsonObject()
       throws Exception {
@@ -343,9 +323,7 @@ public class SchemaSerializationTest {
         "Jackson serialization should match toJsonObject() output");
   }
 
-  /**
-   * Tests round-trip serialization/deserialization with a complex schema.
-   */
+  /// Tests round-trip serialization/deserialization with a complex schema.
   @Test
   public void testRoundTripSerializationWithComplexSchema()
       throws Exception {
@@ -389,10 +367,8 @@ public class SchemaSerializationTest {
     assertEquals(deserializedSchema.getPrimaryKeyColumns(), Lists.newArrayList("stringDim", "eventTime"));
   }
 
-  /**
-   * Tests that a fresh ObjectMapper produces the same serialization as JsonUtils.
-   * This verifies that @JsonValue annotation works with any ObjectMapper, not just JsonUtils.
-   */
+  /// Tests that a fresh ObjectMapper produces the same serialization as JsonUtils.
+  /// This verifies that @JsonValue annotation works with any ObjectMapper, not just JsonUtils.
   @Test
   public void testJsonValueWorksWithFreshObjectMapper()
       throws Exception {

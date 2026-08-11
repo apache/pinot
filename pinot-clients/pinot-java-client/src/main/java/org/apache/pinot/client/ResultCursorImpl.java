@@ -23,17 +23,15 @@ import java.util.function.IntSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Implementation of ResultCursor that manages cursor-based pagination.
- *
- * This class encapsulates the cursor state and navigation logic,
- * keeping the Connection and CursorResultSetGroup classes focused
- * on their primary responsibilities. The cursor starts with the first
- * page already loaded.
- *
- * Thread Safety: All navigation methods are synchronized to ensure
- * safe concurrent access to cursor state.
- */
+/// Implementation of ResultCursor that manages cursor-based pagination.
+///
+/// This class encapsulates the cursor state and navigation logic,
+/// keeping the Connection and CursorResultSetGroup classes focused
+/// on their primary responsibilities. The cursor starts with the first
+/// page already loaded.
+///
+/// Thread Safety: All navigation methods are synchronized to ensure
+/// safe concurrent access to cursor state.
 public class ResultCursorImpl implements ResultCursor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ResultCursorImpl.class);
 
@@ -50,14 +48,12 @@ public class ResultCursorImpl implements ResultCursor {
   private volatile int _currentPageNumber;
   private volatile boolean _closed;
 
-  /**
-   * Creates a new cursor with the initial page of results already loaded.
-   *
-   * @param transport the transport to use for navigation
-   * @param brokerHostPort the broker host and port
-   * @param initialResponse the initial cursor-aware response (first page)
-   * @param failOnExceptions whether to fail on query exceptions
-   */
+  /// Creates a new cursor with the initial page of results already loaded.
+  ///
+  /// @param transport the transport to use for navigation
+  /// @param brokerHostPort the broker host and port
+  /// @param initialResponse the initial cursor-aware response (first page)
+  /// @param failOnExceptions whether to fail on query exceptions
   public ResultCursorImpl(PinotClientTransport<?> transport, String brokerHostPort,
                          CursorAwareBrokerResponse initialResponse, boolean failOnExceptions) {
     _transport = transport;
@@ -273,10 +269,8 @@ public class ResultCursorImpl implements ResultCursor {
         String cursorId, int offset);
   }
 
-  /**
-   * Common method to update cursor state and return result for both sync and async operations.
-   * This eliminates code duplication between navigation methods.
-   */
+  /// Common method to update cursor state and return result for both sync and async operations.
+  /// This eliminates code duplication between navigation methods.
   private CursorResultSetGroup updateStateAndReturn(CursorAwareBrokerResponse response, Runnable stateUpdater) {
     if (response.hasExceptions() && _failOnExceptions) {
       throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());

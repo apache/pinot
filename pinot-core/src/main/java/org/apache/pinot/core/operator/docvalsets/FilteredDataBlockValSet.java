@@ -30,13 +30,11 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * In the multistage engine, the leaf stage servers process the data in columnar fashion. By the time the
- * intermediate stage receives the projected column, they are converted to a row based format. This class provides
- * the capability to convert the row based representation into columnar blocks so that they can be used to process
- * aggregations using v1 aggregation functions.
- * TODO: Support MV
- */
+/// In the multistage engine, the leaf stage servers process the data in columnar fashion. By the time the
+/// intermediate stage receives the projected column, they are converted to a row based format. This class provides
+/// the capability to convert the row based representation into columnar blocks so that they can be used to process
+/// aggregations using v1 aggregation functions.
+/// TODO: Support MV
 public class FilteredDataBlockValSet implements BlockValSet {
   private final DataType _dataType;
   private final DataType _storedType;
@@ -71,9 +69,7 @@ public class FilteredDataBlockValSet implements BlockValSet {
     }
   }
 
-  /**
-   * Returns a bitmap of indices where null values are found.
-   */
+  /// Returns a bitmap of indices where null values are found.
   @Nullable
   @Override
   public RoaringBitmap getNullBitmap() {

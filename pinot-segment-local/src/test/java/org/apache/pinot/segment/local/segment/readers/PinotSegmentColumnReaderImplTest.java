@@ -56,25 +56,19 @@ import static org.testng.Assert.fail;
 /// - Dictionary-encoded, raw forward index, and nullable columns
 public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTestBase {
 
-  /**
-   * Enum representing different segment index configurations for testing.
-   */
+  /// Enum representing different segment index configurations for testing.
   enum IndexType {
     DICT_ENCODED, RAW_INDEX, NULLABLE
   }
 
-  /**
-   * Functional interface for single-value getters that can throw IOException.
-   */
+  /// Functional interface for single-value getters that can throw IOException.
   @FunctionalInterface
   interface SingleValueGetter {
     Object get(PinotSegmentColumnReaderImpl reader, int docId)
         throws IOException;
   }
 
-  /**
-   * Functional interface for multi-value getters that can throw IOException.
-   */
+  /// Functional interface for multi-value getters that can throw IOException.
   @FunctionalInterface
   interface MultiValueGetter {
     Object get(PinotSegmentColumnReaderImpl reader, int docId)
@@ -136,9 +130,7 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
     reader.close();
   }
 
-  /**
-   * Helper method to get the appropriate segment and schema based on IndexType.
-   */
+  /// Helper method to get the appropriate segment and schema based on IndexType.
   private ImmutableSegment getSegment(IndexType indexType) {
     switch (indexType) {
       case DICT_ENCODED:
@@ -152,9 +144,7 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
     }
   }
 
-  /**
-   * Helper method to get the appropriate schema based on IndexType.
-   */
+  /// Helper method to get the appropriate schema based on IndexType.
   private Schema getSchema(IndexType indexType) {
     switch (indexType) {
       case DICT_ENCODED:

@@ -39,9 +39,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests filtering of records during segment generation
- */
+/// Tests filtering of records during segment generation
 public class SegmentGenerationWithMinMaxTest implements PinotBuffersAfterMethodCheckRule {
   private static final String STRING_COLUMN = "col1";
 

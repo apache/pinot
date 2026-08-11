@@ -28,10 +28,8 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for parsing VECTOR_SIMILARITY_RADIUS SQL and ensuring backward compatibility
- * of the existing VECTOR_SIMILARITY function.
- */
+/// Tests for parsing VECTOR_SIMILARITY_RADIUS SQL and ensuring backward compatibility
+/// of the existing VECTOR_SIMILARITY function.
 public class CalciteSqlParserVectorRadiusTest {
 
   @Test

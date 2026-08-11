@@ -22,24 +22,25 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * The {@code PercentileRawTDigestMVAggregationFunction} returns the serialized {@code TDigest} data structure of the
- * {@code PercentileTDigestMVAggregationFunction}.
- */
 public class PercentileRawTDigestMVAggregationFunction extends PercentileRawTDigestAggregationFunction {
 
-  public PercentileRawTDigestMVAggregationFunction(ExpressionContext expressionContext, int percentile) {
-    super(expressionContext, new PercentileTDigestMVAggregationFunction(expressionContext, percentile));
-  }
-
-  public PercentileRawTDigestMVAggregationFunction(ExpressionContext expressionContext, double percentile) {
-    super(expressionContext, new PercentileTDigestMVAggregationFunction(expressionContext, percentile));
+  public PercentileRawTDigestMVAggregationFunction(ExpressionContext expressionContext, int percentile,
+      boolean nullHandlingEnabled) {
+    super(expressionContext,
+        new PercentileTDigestMVAggregationFunction(expressionContext, percentile, nullHandlingEnabled));
   }
 
   public PercentileRawTDigestMVAggregationFunction(ExpressionContext expressionContext, double percentile,
-      int compressionFactor) {
+      boolean nullHandlingEnabled) {
     super(expressionContext,
-        new PercentileTDigestMVAggregationFunction(expressionContext, percentile, compressionFactor));
+        new PercentileTDigestMVAggregationFunction(expressionContext, percentile, nullHandlingEnabled));
+  }
+
+  public PercentileRawTDigestMVAggregationFunction(ExpressionContext expressionContext, double percentile,
+      int compressionFactor, boolean nullHandlingEnabled) {
+    super(expressionContext,
+        new PercentileTDigestMVAggregationFunction(expressionContext, percentile, compressionFactor,
+            nullHandlingEnabled));
   }
 
   @Override

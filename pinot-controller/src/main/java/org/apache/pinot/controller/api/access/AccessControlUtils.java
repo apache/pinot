@@ -30,9 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Utility class to simplify access control validation. This class is simple wrapper around AccessControl class.
- */
+/// Utility class to simplify access control validation. This class is simple wrapper around AccessControl class.
 public final class AccessControlUtils {
   private AccessControlUtils() {
     // left blank
@@ -40,15 +38,13 @@ public final class AccessControlUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AccessControlUtils.class);
 
-  /**
-   * Validate permission for the given access type against the given table
-   *
-   * @param tableName name of the table to be accessed (post database name translation)
-   * @param accessType type of the access
-   * @param httpHeaders HTTP headers containing requester identity required by access control object
-   * @param endpointUrl the request url for which this access control is called
-   * @param accessControl AccessControl object which does the actual validation
-   */
+  /// Validate permission for the given access type against the given table
+  ///
+  /// @param tableName name of the table to be accessed (post database name translation)
+  /// @param accessType type of the access
+  /// @param httpHeaders HTTP headers containing requester identity required by access control object
+  /// @param endpointUrl the request url for which this access control is called
+  /// @param accessControl AccessControl object which does the actual validation
   public static void validatePermission(@Nullable String tableName, AccessType accessType,
       @Nullable HttpHeaders httpHeaders, String endpointUrl, AccessControl accessControl) {
     String userMessage = getUserMessage(tableName, accessType, endpointUrl);

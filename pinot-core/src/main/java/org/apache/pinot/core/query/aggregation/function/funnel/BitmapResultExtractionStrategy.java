@@ -26,13 +26,11 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Extracts intermediate bitmap results for cross-segment merging.
- *
- * <p>The bitmap strategy stores entities as 32-bit hash codes in a {@link RoaringBitmap}. For single-key INT
- * columns, the actual int values are stored directly (exact). For other single-key types and all multi-key
- * composites, hash codes are used (approximate — hash collisions can cause under-counting).
- */
+/// Extracts intermediate bitmap results for cross-segment merging.
+///
+/// The bitmap strategy stores entities as 32-bit hash codes in a [RoaringBitmap]. For single-key INT
+/// columns, the actual int values are stored directly (exact). For other single-key types and all multi-key
+/// composites, hash codes are used (approximate — hash collisions can cause under-counting).
 class BitmapResultExtractionStrategy implements ResultExtractionStrategy<DictIdsWrapper, List<RoaringBitmap>> {
   protected final int _numSteps;
 
@@ -65,7 +63,7 @@ class BitmapResultExtractionStrategy implements ResultExtractionStrategy<DictIds
 
   /// Converts segment-local composite dictionary IDs to hash-coded value bitmaps for cross-segment merging.
   /// Combines per-column value hashes directly — no string allocation. Same approximation as the
-  /// single-key non-INT path in {@link #convertToValueBitmap}: hash collisions may cause under-counting.
+  /// single-key non-INT path in [#convertToValueBitmap]: hash collisions may cause under-counting.
   private RoaringBitmap convertCompositeToValueBitmap(DictIdsWrapper wrapper, RoaringBitmap compositeIdBitmap) {
     RoaringBitmap valueBitmap = new RoaringBitmap();
     PeekableIntIterator iterator = compositeIdBitmap.getIntIterator();
@@ -102,10 +100,8 @@ class BitmapResultExtractionStrategy implements ResultExtractionStrategy<DictIds
     }
   }
 
-  /**
-   * Helper method to read dictionary and convert dictionary ids to hash code of the values for dictionary-encoded
-   * expression.
-   */
+  /// Helper method to read dictionary and convert dictionary ids to hash code of the values for dictionary-encoded
+  /// expression.
   private RoaringBitmap convertToValueBitmap(Dictionary dictionary, RoaringBitmap dictIdBitmap) {
     RoaringBitmap valueBitmap = new RoaringBitmap();
     PeekableIntIterator iterator = dictIdBitmap.getIntIterator();

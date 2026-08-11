@@ -567,12 +567,10 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  /**
-   * Decide whether a given column should be dictionary encoded or not
-   * @param fieldSpec field spec of column
-   * @param column column name
-   * @return true if column is no-dictionary, false if dictionary encoded
-   */
+  /// Decide whether a given column should be dictionary encoded or not
+  /// @param fieldSpec field spec of column
+  /// @param column column name
+  /// @return true if column is no-dictionary, false if dictionary encoded
   private boolean isNoDictionaryColumn(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, String column) {
     DataType dataType = fieldSpec.getDataType();
     if (dataType == DataType.MAP || dataType == DataType.OPEN_STRUCT) {
@@ -739,10 +737,8 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  /**
-   * Updates ingestion timestamp metadata. This is a public function to allow
-   * external components to update the ingestion timestamp metadata without indexing a row.
-   */
+  /// Updates ingestion timestamp metadata. This is a public function to allow
+  /// external components to update the ingestion timestamp metadata without indexing a row.
   public void updateIngestionTimestamp(long recordIngestionTimeMs) {
     long now = System.currentTimeMillis();
     _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, recordIngestionTimeMs);
@@ -803,11 +799,9 @@ public class MutableSegmentImpl implements MutableSegment {
     return new ComparisonColumns(comparisonValues, comparableIndex);
   }
 
-  /**
-   * @param row
-   * @throws UnsupportedOperationException if the length of an MV column would exceed the
-   * capacity of a chunk in the ForwardIndex
-   */
+  /// @param row
+  /// @throws UnsupportedOperationException if the length of an MV column would exceed the
+  /// capacity of a chunk in the ForwardIndex
   private void validateLengthOfMVColumns(GenericRow row)
       throws UnsupportedOperationException {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
@@ -1588,11 +1582,9 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  /**
-   * Calls commit() on all mutable indexes. This is used in preparation for realtime segment conversion.
-   * .commit() can be implemented per index to perform any required actions before using mutable segment
-   * artifacts to optimize immutable segment build.
-   */
+  /// Calls commit() on all mutable indexes. This is used in preparation for realtime segment conversion.
+  /// .commit() can be implemented per index to perform any required actions before using mutable segment
+  /// artifacts to optimize immutable segment build.
   public void commit() {
     for (IndexContainer indexContainer : _indexContainerMap.values()) {
       for (MutableIndex mutableIndex : indexContainer._mutableIndexes.values()) {
@@ -1605,10 +1597,8 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  /**
-   * Returns the per-column mutable OPEN_STRUCT index, or {@code null} if the column is not OPEN_STRUCT
-   * or the index has not been initialized.
-   */
+  /// Returns the per-column mutable OPEN_STRUCT index, or `null` if the column is not OPEN_STRUCT
+  /// or the index has not been initialized.
   @Nullable
   public MutableOpenStructIndex getOpenStructIndex(String column) {
     IndexContainer container = _indexContainerMap.get(column);
@@ -1800,15 +1790,10 @@ public class MutableSegmentImpl implements MutableSegment {
     return docIds;
   }
 
-  /**
-   * Helper function that returns docId, depends on the following scenarios.
-   * <ul>
-   *   <li> If metrics aggregation is enabled and if the dimension values were already seen, return existing docIds
-   *   </li>
-   *   <li> Else, this function will create and return a new docId. </li>
-   * </ul>
-   *
-   * */
+  /// Helper function that returns docId, depends on the following scenarios.
+  ///
+  /// - If metrics aggregation is enabled and if the dimension values were already seen, return existing docIds
+  /// - Else, this function will create and return a new docId.
   private int getOrCreateDocId() {
     if (!isAggregateMetricsEnabled()) {
       return _numDocsIndexed;
@@ -1930,12 +1915,10 @@ public class MutableSegmentImpl implements MutableSegment {
       _maxNumValuesPerMVEntry = Math.max(_maxNumValuesPerMVEntry, numValuesInMVEntry);
     }
 
-    /**
-     * When an MV VarByte column is created with noDict, the realtime segment is still created with a dictionary.
-     * When the realtime segment is converted to offline segment, the offline segment creates a noDict column.
-     * MultiValueVarByteRawIndexCreator requires the maxRowLengthInBytes. Refer to OSS issue
-     * https://github.com/apache/pinot/issues/10127 for more details.
-     */
+    /// When an MV VarByte column is created with noDict, the realtime segment is still created with a dictionary.
+    /// When the realtime segment is converted to offline segment, the offline segment creates a noDict column.
+    /// MultiValueVarByteRawIndexCreator requires the maxRowLengthInBytes. Refer to OSS issue
+    /// https://github.com/apache/pinot/issues/10127 for more details.
     void updateVarByteMVMaxRowLengthInBytes(Object entry, DataType dataType) {
       // MV support for BigDecimal is not available.
       if (dataType != STRING && dataType != BYTES) {
@@ -1982,15 +1965,11 @@ public class MutableSegmentImpl implements MutableSegment {
     volatile Comparable _minValue;
     volatile Comparable _maxValue;
 
-    /**
-     * The dictionary id for the latest single-value record.
-     * It is set on {@link #updateDictionary(GenericRow)} and read in {@link #addNewRow(int, GenericRow)}
-     */
+    /// The dictionary id for the latest single-value record.
+    /// It is set on [#updateDictionary(GenericRow)] and read in [#addNewRow(int, GenericRow)]
     int _dictId = Integer.MIN_VALUE;
-    /**
-     * The dictionary ids for the latest multi-value record.
-     * It is set on {@link #updateDictionary(GenericRow)} and read in {@link #addNewRow(int, GenericRow)}
-     */
+    /// The dictionary ids for the latest multi-value record.
+    /// It is set on [#updateDictionary(GenericRow)] and read in [#addNewRow(int, GenericRow)]
     int[] _dictIds;
 
     IndexContainer(FieldSpec fieldSpec, @Nullable PartitionFunction partitionFunction,

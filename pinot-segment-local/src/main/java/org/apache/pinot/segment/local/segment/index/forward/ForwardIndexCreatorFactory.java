@@ -112,10 +112,8 @@ public class ForwardIndexCreatorFactory {
     }
   }
 
-  /**
-   * Helper method to build the raw index creator for the column.
-   * Assumes that column to be indexed is single valued.
-   */
+  /// Helper method to build the raw index creator for the column.
+  /// Assumes that column to be indexed is single valued.
   public static ForwardIndexCreator getRawIndexCreatorForSVColumn(File indexDir, ChunkCompressionType compressionType,
       String column, DataType storedType, int numTotalDocs, int lengthOfLongestEntry, boolean deriveNumDocsPerChunk,
       int writerVersion, int targetMaxChunkSize, int targetDocsPerChunk)
@@ -138,10 +136,8 @@ public class ForwardIndexCreatorFactory {
     }
   }
 
-  /**
-   * Helper method to build the raw index creator for the column.
-   * Assumes that column to be indexed is multi-valued.
-   */
+  /// Helper method to build the raw index creator for the column.
+  /// Assumes that column to be indexed is multi-valued.
   public static ForwardIndexCreator getRawIndexCreatorForMVColumn(File indexDir, ChunkCompressionType compressionType,
       String column, DataType storedType, int numTotalDocs, int maxNumberOfMultiValueElements,
       boolean deriveNumDocsPerChunk, int writerVersion, int maxRowLengthInBytes, int targetMaxChunkSize,

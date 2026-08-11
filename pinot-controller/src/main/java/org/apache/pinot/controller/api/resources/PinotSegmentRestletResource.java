@@ -101,72 +101,35 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-/**
- * Segment admin rest APIs:
- * <ul>
- *   <li>
- *     GET requests:
- *     <ul>
- *       <li>"/segments/{tableName}": get the name of all segments</li>
- *       <li>"/segments/{tableName}/servers": get a map from server to segments hosted by the server</li>
- *       <li>"/segments/{tableName}/crc": get a map from segment to CRC of the segment (OFFLINE table only)</li>
- *       <li>"/segments/{tableName}/{segmentName}/metadata: get the metadata for a segment</li>
- *       <li>"/segments/{tableName}/metadata: get the metadata for all segments from the server</li>
- *       <li>"/segments/{tableName}/zkmetadata: get the zk metadata for all segments of a table</li>
- *       <li>"/segments/{tableName}/{segmentName}/tiers": get storage tier for the segment in the table</li>
- *       <li>"/segments/{tableName}/tiers": get storage tier for all segments in the table</li>
- *     </ul>
- *   </li>
- *   <li>
- *     POST requests:
- *     <ul>
- *       <li>"/segments/{tableNameWithType}/{segmentName}/reset": reset a segment</li>
- *       <li>"/segments/{tableNameWithType}/reset": reset all segments</li>
- *       <li>"/segments/{tableName}/delete": delete the segments in the payload</li>
- *     </ul>
- *   </li>
- *   <li>
- *     DELETE requests:
- *     <ul>
- *       <li>"/segments/{tableName}/{segmentName}": delete a segment</li>
- *       <li>"/segments/{tableName}: delete all segments</li>
- *     </ul>
- *   </li>
- *   <li>
- *     The following requests can take a query parameter "type" (OFFLINE or REALTIME) for table type. The request will
- *     be performed to tables that match the table name and type.
- *     E.g. "foobar_OFFLINE" matches:
- *     ("foobar_OFFLINE", null), ("foobar_OFFLINE", OFFLINE), ("foobar", null), ("foobar", OFFLINE);
- *     "foobar_OFFLINE" does not match:
- *     ("foo", null), ("foobar_REALTIME", null), ("foobar_REALTIME", OFFLINE), ("foobar_OFFLINE", REALTIME).
- *     <ul>
- *       <li>
- *         Requests with optional "type":
- *         <ul>
- *           <li>"GET /segments/{tableName}"</li>
- *           <li>"GET /segments/{tableName}/servers"</li>
- *         </ul>
- *       </li>
- *       <li>
- *         Requests with mandatory "type":
- *         <ul>
- *           <li>"DELETE /segments/{tableName}"</li>
- *         </ul>
- *       </li>
- *     </ul>
- *   </li>
- *   <li>
- *     Deprecated APIs:
- *     <ul>
- *       <li>"GET /tables/{tableName}/segments"</li>
- *       <li>"GET /tables/{tableName}/segments/metadata"</li>
- *       <li>"GET /tables/{tableName}/segments/crc"</li>
- *       <li>"GET /tables/{tableName}/segments/{segmentName}"</li>
- *       <li>"GET /tables/{tableName}/segments/{segmentName}/metadata"</li>
- *     </ul>
- *   </li>
- * </ul>
- */
+/// Segment admin rest APIs:
+///
+/// - GET requests:
+///   - "/segments/{tableName}": get the name of all segments
+///   - "/segments/{tableName}/servers": get a map from server to segments hosted by the server
+///   - "/segments/{tableName}/crc": get a map from segment to CRC of the segment (OFFLINE table only)
+///   - "/segments/{tableName}/{segmentName}/metadata: get the metadata for a segment
+///   - "/segments/{tableName}/metadata: get the metadata for all segments from the server
+///   - "/segments/{tableName}/zkmetadata: get the zk metadata for all segments of a table
+///   - "/segments/{tableName}/{segmentName}/tiers": get storage tier for the segment in the table
+///   - "/segments/{tableName}/tiers": get storage tier for all segments in the table
+/// - POST requests:
+///   - "/segments/{tableNameWithType}/{segmentName}/reset": reset a segment
+///   - "/segments/{tableNameWithType}/reset": reset all segments
+///   - "/segments/{tableName}/delete": delete the segments in the payload
+/// - DELETE requests:
+///   - "/segments/{tableName}/{segmentName}": delete a segment
+///   - "/segments/{tableName}: delete all segments
+/// - The following requests can take a query parameter "type" (OFFLINE or REALTIME) for table type. The request will
+///   be performed to tables that match the table name and type.
+///   E.g. "foobar_OFFLINE" matches:
+///   ("foobar_OFFLINE", null), ("foobar_OFFLINE", OFFLINE), ("foobar", null), ("foobar", OFFLINE);
+///   "foobar_OFFLINE" does not match:
+///   ("foo", null), ("foobar_REALTIME", null), ("foobar_REALTIME", OFFLINE), ("foobar_OFFLINE", REALTIME).
+///   - Requests with optional "type":
+///     - "GET /segments/{tableName}"
+///     - "GET /segments/{tableName}/servers"
+///   - Requests with mandatory "type":
+///     - "DELETE /segments/{tableName}"
 @Api(tags = Constants.SEGMENT_TAG, authorizations = {
     @Authorization(value = SWAGGER_AUTHORIZATION_KEY),
     @Authorization(value = DATABASE)
@@ -376,10 +339,8 @@ public class PinotSegmentRestletResource {
     return segmentZKMetadata != null ? segmentZKMetadata.toMap() : null;
   }
 
-  /**
-   * Helper method to find the existing table based on the given table name (with or without type suffix) and segment
-   * name.
-   */
+  /// Helper method to find the existing table based on the given table name (with or without type suffix) and segment
+  /// name.
   private String getExistingTable(String tableName, String segmentName) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType == null) {
@@ -391,12 +352,10 @@ public class PinotSegmentRestletResource {
     return ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
   }
 
-  /**
-   * Resets the segment of the table, by disabling and then enabling it.
-   * This API will take segments to OFFLINE state, wait for External View to stabilize, and then back to
-   * ONLINE/CONSUMING state,
-   * thus effective in resetting segments or consumers in error states.
-   */
+  /// Resets the segment of the table, by disabling and then enabling it.
+  /// This API will take segments to OFFLINE state, wait for External View to stabilize, and then back to
+  /// ONLINE/CONSUMING state,
+  /// thus effective in resetting segments or consumers in error states.
   @POST
   @Path("segments/{tableNameWithType}/{segmentName}/reset")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.RESET_SEGMENT)
@@ -430,12 +389,10 @@ public class PinotSegmentRestletResource {
     }
   }
 
-  /**
-   * Resets all segments or segments with Error state of the given table
-   * This API will take segments to OFFLINE state, wait for External View to stabilize, and then back to
-   * ONLINE/CONSUMING state,
-   * thus effective in resetting segments or consumers in error states.
-   */
+  /// Resets all segments or segments with Error state of the given table
+  /// This API will take segments to OFFLINE state, wait for External View to stabilize, and then back to
+  /// ONLINE/CONSUMING state,
+  /// thus effective in resetting segments or consumers in error states.
   @POST
   @Path("segments/{tableNameWithType}/reset")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.RESET_SEGMENT)
@@ -953,13 +910,11 @@ public class PinotSegmentRestletResource {
     return resultList;
   }
 
-  /**
-   * This is a helper method to get the metadata for all segments for a given table name.
-   * @param tableNameWithType name of the table along with its type
-   * @param columns name of the columns
-   * @param segments name of the segments to include in metadata
-   * @return Map<String, String>  metadata of the table segments -> map of segment name to its metadata
-   */
+  /// This is a helper method to get the metadata for all segments for a given table name.
+  /// @param tableNameWithType name of the table along with its type
+  /// @param columns name of the columns
+  /// @param segments name of the segments to include in metadata
+  /// @return Map<String, String>  metadata of the table segments -> map of segment name to its metadata
   private JsonNode getSegmentsMetadataFromServer(String tableNameWithType, List<String> columns, List<String> segments)
       throws InvalidConfigException, IOException {
     TableMetadataReader tableMetadataReader =
@@ -1091,25 +1046,23 @@ public class PinotSegmentRestletResource {
     return JsonUtils.objectToString(response);
   }
 
-  /**
-   * Identifies segments that need to be deleted based on partition and sequence ID information.
-   *
-   * For each partition in the provided partitionToOldestSegment map, this method identifies
-   * all segments with sequence IDs greater than or equal to the oldest segment's sequence ID.
-   * It also tracks the latest segment (highest sequence ID) for each partition, which is useful
-   * for logging purposes.
-   *
-   * @param partitionToOldestSegment Map of partition IDs to their corresponding oldest segment (lowest sequence ID)
-   *                                that serves as the threshold for deletion. All segments with sequence IDs
-   *                                greater than or equal to this will be selected for deletion.
-   * @param idealStateSegmentsSet The segments present in the ideal state for the table
-   * @param partitionIdToLatestSegment A map that will be populated with the latest segment (highest sequence ID)
-   *                                  for each partition. This is passed by reference and modified by this method.
-   *
-   * @return A map from partition IDs to sets of segment names that should be deleted.
-   *         Each set contains all segments with sequence IDs >= the oldest segment's sequence ID
-   *         for that particular partition.
-   */
+  /// Identifies segments that need to be deleted based on partition and sequence ID information.
+  ///
+  /// For each partition in the provided partitionToOldestSegment map, this method identifies
+  /// all segments with sequence IDs greater than or equal to the oldest segment's sequence ID.
+  /// It also tracks the latest segment (highest sequence ID) for each partition, which is useful
+  /// for logging purposes.
+  ///
+  /// @param partitionToOldestSegment Map of partition IDs to their corresponding oldest segment (lowest sequence ID)
+  ///                                that serves as the threshold for deletion. All segments with sequence IDs
+  ///                                greater than or equal to this will be selected for deletion.
+  /// @param idealStateSegmentsSet The segments present in the ideal state for the table
+  /// @param partitionIdToLatestSegment A map that will be populated with the latest segment (highest sequence ID)
+  ///                                  for each partition. This is passed by reference and modified by this method.
+  ///
+  /// @return A map from partition IDs to sets of segment names that should be deleted.
+  ///         Each set contains all segments with sequence IDs >= the oldest segment's sequence ID
+  ///         for that particular partition.
   @VisibleForTesting
   Map<Integer, Set<String>> getPartitionIdToSegmentsToDeleteMap(
       Map<Integer, LLCSegmentName> partitionToOldestSegment,
@@ -1174,11 +1127,9 @@ public class PinotSegmentRestletResource {
     return partitionToOldestSegment;
   }
 
-  /**
-   * Internal method to update schema
-   * @param tableNameWithType  name of the table
-   * @return
-   */
+  /// Internal method to update schema
+  /// @param tableNameWithType  name of the table
+  /// @return
   private SuccessResponse updateZKTimeIntervalInternal(String tableNameWithType) {
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     if (tableConfig == null) {

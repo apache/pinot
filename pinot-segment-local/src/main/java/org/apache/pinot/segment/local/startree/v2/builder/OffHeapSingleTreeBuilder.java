@@ -36,9 +36,7 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
-/**
- * The {@code OffHeapSingleTreeBuilder} class is the single star-tree builder that uses off-heap memory.
- */
+/// The `OffHeapSingleTreeBuilder` class is the single star-tree builder that uses off-heap memory.
 public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   private static final String SEGMENT_RECORD_FILE_NAME = "segment.record";
   private static final String STAR_TREE_RECORD_FILE_NAME = "star-tree.record";
@@ -53,15 +51,13 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   private PinotDataBuffer _starTreeRecordBuffer;
   private int _numReadableStarTreeRecords;
 
-  /**
-   * Constructor for the off-heap single star-tree builder.
-   *
-   * @param builderConfig Builder config
-   * @param outputDir Directory to store the index files
-   * @param segment Index segment
-   * @param metadataProperties Segment metadata properties
-   * @throws FileNotFoundException
-   */
+  /// Constructor for the off-heap single star-tree builder.
+  ///
+  /// @param builderConfig Builder config
+  /// @param outputDir Directory to store the index files
+  /// @param segment Index segment
+  /// @param metadataProperties Segment metadata properties
+  /// @throws FileNotFoundException
   public OffHeapSingleTreeBuilder(StarTreeV2BuilderConfig builderConfig, File outputDir, ImmutableSegment segment,
       Configuration metadataProperties)
       throws FileNotFoundException {

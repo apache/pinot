@@ -43,9 +43,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests filtering of records during segment generation
- */
+/// Tests filtering of records during segment generation
 public class SegmentGenerationWithFilterRecordsTest implements PinotBuffersAfterMethodCheckRule {
   private static final String STRING_COLUMN = "col1";
   private static final String[] STRING_VALUES = {"A", "B", "C", "D", "E"};

@@ -34,13 +34,11 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.sql.parsers.ParserUtils;
 
 
-/**
- * Calcite parser to convert SQL expressions into {@link Expression}.
- *
- * <p>This class is extracted from {@link org.apache.pinot.sql.parsers.CalciteSqlParser}. It contains the logic
- * to parsed {@link org.apache.calcite.rex.RexNode}, in the format of {@link RexExpression} and convert them into
- * Thrift {@link Expression} format.
- */
+/// Calcite parser to convert SQL expressions into [Expression].
+///
+/// This class is extracted from [org.apache.pinot.sql.parsers.CalciteSqlParser]. It contains the logic
+/// to parsed [org.apache.calcite.rex.RexNode], in the format of [RexExpression] and convert them into
+/// Thrift [Expression] format.
 public class CalciteRexExpressionParser {
   private CalciteRexExpressionParser() {
   }
@@ -173,9 +171,7 @@ public class CalciteRexExpressionParser {
     return RequestUtils.getFunctionExpression(canonicalName, operands);
   }
 
-  /**
-   * Helper method to flatten the operands for the AND expression.
-   */
+  /// Helper method to flatten the operands for the AND expression.
   private static Expression compileAndExpression(RexExpression.FunctionCall andNode, List<Expression> selectList) {
     List<Expression> operands = new ArrayList<>();
     for (RexExpression childNode : andNode.getFunctionOperands()) {
@@ -190,9 +186,7 @@ public class CalciteRexExpressionParser {
     return RequestUtils.getFunctionExpression(AND, operands);
   }
 
-  /**
-   * Helper method to flatten the operands for the OR expression.
-   */
+  /// Helper method to flatten the operands for the OR expression.
   private static Expression compileOrExpression(RexExpression.FunctionCall orNode, List<Expression> selectList) {
     List<Expression> operands = new ArrayList<>();
     for (RexExpression childNode : orNode.getFunctionOperands()) {

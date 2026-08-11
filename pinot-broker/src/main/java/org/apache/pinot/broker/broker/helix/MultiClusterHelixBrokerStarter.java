@@ -41,16 +41,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Multi-cluster broker starter that extends the base Helix broker functionality
- * to support federation across multiple Pinot clusters.
- *
- * This class handles:
- * - Connection to remote clusters via separate ZooKeeper instances
- * - Federated routing across primary and remote clusters
- * - Cross-cluster query federation
- * - Cluster change monitoring for remote clusters
- */
+/// Multi-cluster broker starter that extends the base Helix broker functionality
+/// to support federation across multiple Pinot clusters.
+///
+/// This class handles:
+/// - Connection to remote clusters via separate ZooKeeper instances
+/// - Federated routing across primary and remote clusters
+/// - Cross-cluster query federation
+/// - Cluster change monitoring for remote clusters
 @SuppressWarnings("unused")
 public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiClusterHelixBrokerStarter.class);

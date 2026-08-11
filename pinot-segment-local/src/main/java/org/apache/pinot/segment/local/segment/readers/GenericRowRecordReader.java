@@ -27,9 +27,7 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
-/**
- * Record reader for list of {@link GenericRow}.
- */
+/// Record reader for list of [GenericRow].
 public class GenericRowRecordReader implements RecordReader {
   private final List<GenericRow> _rows;
   private final int _numRows;

@@ -108,10 +108,8 @@ public class FsResponseStoreTest {
     overwriteExpiration(requestId, expirationTimeMs, brokerId);
   }
 
-  /**
-   * Overwrites the metadata file to set custom expirationTimeMs and brokerId,
-   * since storeResponse() auto-calculates expiration from current time.
-   */
+  /// Overwrites the metadata file to set custom expirationTimeMs and brokerId,
+  /// since storeResponse() auto-calculates expiration from current time.
   private void overwriteExpiration(String requestId, long expirationTimeMs, String brokerId)
       throws Exception {
     CursorResponse response = _store.readResponse(requestId);

@@ -36,9 +36,7 @@ import javax.ws.rs.core.Response;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.common.utils.WorkloadBudgetUtils;
 
-/**
- * This resource handles workload budget updates sent from the controller via direct HTTP calls,
- */
+/// This resource handles workload budget updates sent from the controller via direct HTTP calls,
 @Api(tags = "Workload")
 @Path("/")
 public class QueryWorkloadConfigResource {
@@ -46,26 +44,24 @@ public class QueryWorkloadConfigResource {
   @Named(BrokerAdminApiApplication.BROKER_INSTANCE_ID)
   private String _instanceId;
 
-  /**
-   * Refreshes query workload configurations on this instance.
-   * <p>
-   * This endpoint adds or updates workload budgets sent from the controller.
-   * It supports batch updates of multiple workloads in a single request.
-   * This method enforces strict error handling - any update failure will cause the entire
-   * operation to fail immediately without continuing to update remaining workloads.
-   * </p>
-   *
-   * <p><b>Request Body Example:</b></p>
-   * <pre>{@code
-    {
-   *     "foo": {"cpuCostNs": 1000000, "memoryCostBytes": 1000000},
-   *     "bar": {"cpuCostNs": 500000, "memoryCostBytes": 500000}
-   *}
-   * }</pre>
-   *
-   * @param requestString JSON request containing workload-to-cost map
-   * @return HTTP 200 (success), 400 (bad request), or 500 (error)
-   */
+  /// Refreshes query workload configurations on this instance.
+  ///
+  /// This endpoint adds or updates workload budgets sent from the controller.
+  /// It supports batch updates of multiple workloads in a single request.
+  /// This method enforces strict error handling - any update failure will cause the entire
+  /// operation to fail immediately without continuing to update remaining workloads.
+  ///
+  /// **Request Body Example:**
+  ///
+  /// ```
+  /// {
+  ///     "foo": {"cpuCostNs": 1000000, "memoryCostBytes": 1000000},
+  ///     "bar": {"cpuCostNs": 500000, "memoryCostBytes": 500000}
+  /// }
+  /// ```
+  ///
+  /// @param requestString JSON request containing workload-to-cost map
+  /// @return HTTP 200 (success), 400 (bad request), or 500 (error)
   @POST
   @Path("/queryWorkloadConfigs")
   @Produces(MediaType.APPLICATION_JSON)
@@ -80,21 +76,17 @@ public class QueryWorkloadConfigResource {
     return WorkloadBudgetUtils.handleRefreshRequest(requestString, _instanceId);
   }
 
-  /**
-   * Gets budget statistics for workloads on this instance.
-   * <p>
-   * If workloadNames query parameter is not provided, returns budget information for all workloads.
-   * If workloadNames is provided as a comma-separated list, returns budget information for those specific workloads.
-   * This method enforces strict error handling - any retrieval failure will cause the entire
-   * operation to fail immediately without returning partial results.
-   * </p>
-   * <p>
-   * Returns a single object if exactly one workload is requested, otherwise returns an array.
-   * </p>
-   *
-   * @param workloadNames Optional comma-separated list of workload names to query
-   * @return JSON string with workload budget statistics (single object or array)
-   */
+  /// Gets budget statistics for workloads on this instance.
+  ///
+  /// If workloadNames query parameter is not provided, returns budget information for all workloads.
+  /// If workloadNames is provided as a comma-separated list, returns budget information for those specific workloads.
+  /// This method enforces strict error handling - any retrieval failure will cause the entire
+  /// operation to fail immediately without returning partial results.
+  ///
+  /// Returns a single object if exactly one workload is requested, otherwise returns an array.
+  ///
+  /// @param workloadNames Optional comma-separated list of workload names to query
+  /// @return JSON string with workload budget statistics (single object or array)
   @GET
   @Path("/queryWorkloadConfigs")
   @Produces(MediaType.APPLICATION_JSON)
@@ -112,23 +104,21 @@ public class QueryWorkloadConfigResource {
     return WorkloadBudgetUtils.getWorkloadBudgetStats(workloadNames, _instanceId);
   }
 
-  /**
-   * Deletes query workload configurations from this instance.
-   * <p>
-   * This endpoint removes workload budgets sent from the controller.
-   * It supports batch deletion of multiple workloads via comma-separated query parameter.
-   * This method enforces strict error handling - any deletion failure will cause the entire
-   * operation to fail immediately without continuing to delete remaining workloads.
-   * </p>
-   *
-   * <p><b>Example:</b></p>
-   * <pre>{@code
-   * DELETE /queryWorkloadConfigs?workloadNames=foo,bar,baz
-   * }</pre>
-   *
-   * @param workloadNamesParam Comma-separated list of workload names to delete
-   * @return HTTP 200 (success), 400 (bad request), or 500 (error)
-   */
+  /// Deletes query workload configurations from this instance.
+  ///
+  /// This endpoint removes workload budgets sent from the controller.
+  /// It supports batch deletion of multiple workloads via comma-separated query parameter.
+  /// This method enforces strict error handling - any deletion failure will cause the entire
+  /// operation to fail immediately without continuing to delete remaining workloads.
+  ///
+  /// **Example:**
+  ///
+  /// ```
+  /// DELETE /queryWorkloadConfigs?workloadNames=foo,bar,baz
+  /// ```
+  ///
+  /// @param workloadNamesParam Comma-separated list of workload names to delete
+  /// @return HTTP 200 (success), 400 (bad request), or 500 (error)
   @DELETE
   @Path("/queryWorkloadConfigs")
   @Produces(MediaType.APPLICATION_JSON)

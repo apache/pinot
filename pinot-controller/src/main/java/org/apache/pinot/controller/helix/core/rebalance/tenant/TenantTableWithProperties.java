@@ -30,12 +30,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Class to hold table properties when listing tables for a tenant during rebalancing.
- * This class contains pre-defined properties of a table that are relevant
- * for making include/exclude decisions during tenant rebalance operations.
- * The properties focus on factors that could impact rebalance performance and stability.
- */
+/// Class to hold table properties when listing tables for a tenant during rebalancing.
+/// This class contains pre-defined properties of a table that are relevant
+/// for making include/exclude decisions during tenant rebalance operations.
+/// The properties focus on factors that could impact rebalance performance and stability.
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class TenantTableWithProperties {
   // Basic table identification

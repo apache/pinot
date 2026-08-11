@@ -38,10 +38,8 @@ import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * Broker response for single-stage engine.
- * This class can be used to serialize/deserialize the broker response.
- */
+/// Broker response for single-stage engine.
+/// This class can be used to serialize/deserialize the broker response.
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
     "numGroupsWarningLimitReached", "maxRowsInDistinctReached", "maxRowsWithoutChangeInDistinctReached",
@@ -150,7 +148,7 @@ public class BrokerResponseNative implements BrokerResponse {
     return brokerResponse;
   }
 
-  /** Generate EXPLAIN PLAN output when queries are evaluated by Broker without going to the Server. */
+  /// Generate EXPLAIN PLAN output when queries are evaluated by Broker without going to the Server.
   private static BrokerResponseNative getBrokerResponseExplainPlanOutput() {
     BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
     List<Object[]> rows = new ArrayList<>();
@@ -159,9 +157,7 @@ public class BrokerResponseNative implements BrokerResponse {
     return brokerResponse;
   }
 
-  /**
-   * Get a new empty {@link BrokerResponseNative}.
-   */
+  /// Get a new empty [BrokerResponseNative].
   public static BrokerResponseNative empty() {
     return new BrokerResponseNative();
   }

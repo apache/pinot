@@ -41,20 +41,18 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The {@code DistinctCountSmartHLLPlusAggregationFunction} calculates the number of distinct values for a given
- * expression (both single-valued and multi-valued are supported).
- *
- * For aggregation-only queries, the distinct values are stored in a Set initially. Once the number of distinct values
- * exceeds a threshold, the Set will be converted into a HyperLogLogPlus, and approximate result will be returned.
- *
- * The function takes an optional second argument for parameters:
- * - threshold: Threshold of the number of distinct values to trigger the conversion, 100_000 by default. Non-positive
- *              value means never convert.
- * - p: Parameter p for the converted HyperLogLogPlus, 14 by default.
- * - sp: Parameter sp for the converted HyperLogLogPlus, 0 by default.
- * Example of second argument: 'threshold=10;p=12;sp=25'
- */
+/// The `DistinctCountSmartHLLPlusAggregationFunction` calculates the number of distinct values for a given
+/// expression (both single-valued and multi-valued are supported).
+///
+/// For aggregation-only queries, the distinct values are stored in a Set initially. Once the number of distinct values
+/// exceeds a threshold, the Set will be converted into a HyperLogLogPlus, and approximate result will be returned.
+///
+/// The function takes an optional second argument for parameters:
+/// - threshold: Threshold of the number of distinct values to trigger the conversion, 100_000 by default. Non-positive
+///              value means never convert.
+/// - p: Parameter p for the converted HyperLogLogPlus, 14 by default.
+/// - sp: Parameter sp for the converted HyperLogLogPlus, 0 by default.
+/// Example of second argument: 'threshold=10;p=12;sp=25'
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCountSmartSketchAggregationFunction {
 
@@ -242,14 +240,7 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
   }
 
   @Override
-  public Object merge(@Nullable Object intermediateResult1, @Nullable Object intermediateResult2) {
-    if (intermediateResult1 == null) {
-      return intermediateResult2;
-    }
-    if (intermediateResult2 == null) {
-      return intermediateResult1;
-    }
-
+  public Object merge(Object intermediateResult1, Object intermediateResult2) {
     if (intermediateResult1 instanceof HyperLogLogPlus) {
       return mergeIntoHLLPlus((HyperLogLogPlus) intermediateResult1, intermediateResult2);
     }
@@ -340,20 +331,12 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
   }
 
   @Override
-  public Integer mergeFinalResult(@Nullable Integer finalResult1, @Nullable Integer finalResult2) {
-    if (finalResult1 == null) {
-      return finalResult2 == null ? 0 : finalResult2;
-    }
-    if (finalResult2 == null) {
-      return finalResult1;
-    }
+  public Integer mergeFinalResult(Integer finalResult1, Integer finalResult2) {
     return finalResult1 + finalResult2;
   }
 
-  /**
-   * Helper method to read dictionary and convert dictionary ids to a HyperLogLogPlus for
-   * dictionary-encoded expression.
-   */
+  /// Helper method to read dictionary and convert dictionary ids to a HyperLogLogPlus for
+  /// dictionary-encoded expression.
   private HyperLogLogPlus convertToHLLPlus(
           BaseDistinctCountSmartSketchAggregationFunction.DictIdsWrapper dictIdsWrapper) {
     HyperLogLogPlus hllPlus = new HyperLogLogPlus(_p, _sp);
@@ -383,9 +366,7 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
             : "_MV"));
   }
 
-  /**
-   * Helper class to wrap the parameters.
-   */
+  /// Helper class to wrap the parameters.
   private static class Parameters {
     static final char PARAMETER_DELIMITER = ';';
     static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';

@@ -19,57 +19,14 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * Aggregation function to compute the count of distinct values for an MV column.
- */
-public class DistinctCountMVAggregationFunction extends BaseDistinctAggregateAggregationFunction<Integer> {
+public class DistinctCountMVAggregationFunction extends DistinctCountAggregationFunction {
 
-  public DistinctCountMVAggregationFunction(List<ExpressionContext> arguments) {
-    super(verifySingleArgument(arguments, "DISTINCT_COUNT_MV"), AggregationFunctionType.DISTINCTCOUNTMV, false);
-  }
-
-  @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    mvAggregate(blockValSetMap.get(_expression), length, aggregationResultHolder);
-  }
-
-  @Override
-  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    mvAggregateGroupBySV(blockValSetMap.get(_expression), length, groupKeyArray, groupByResultHolder);
-  }
-
-  @Override
-  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    mvAggregateGroupByMV(blockValSetMap.get(_expression), length, groupKeysArray, groupByResultHolder);
-  }
-
-  @Override
-  public DataSchema.ColumnDataType getFinalResultColumnType() {
-    return DataSchema.ColumnDataType.INT;
-  }
-
-  @Nullable
-  @Override
-  public Integer extractFinalResult(@Nullable Set intermediateResult) {
-    return intermediateResult == null ? 0 : intermediateResult.size();
-  }
-
-  @Override
-  public Integer mergeFinalResult(Integer finalResult1, Integer finalResult2) {
-    return finalResult1 + finalResult2;
+  public DistinctCountMVAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(verifySingleArgument(arguments, "DISTINCT_COUNT_MV"), AggregationFunctionType.DISTINCTCOUNTMV,
+        nullHandlingEnabled);
   }
 }

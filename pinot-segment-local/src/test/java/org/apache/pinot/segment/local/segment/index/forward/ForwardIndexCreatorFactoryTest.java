@@ -42,10 +42,8 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests {@link ForwardIndexCreatorFactory}'s forward-index encoding branch selection. Each test uses an isolated
- * temporary index directory and does not share mutable state.
- */
+/// Tests [ForwardIndexCreatorFactory]'s forward-index encoding branch selection. Each test uses an isolated
+/// temporary index directory and does not share mutable state.
 public class ForwardIndexCreatorFactoryTest {
   private static final String COLUMN_NAME = "testCol";
 

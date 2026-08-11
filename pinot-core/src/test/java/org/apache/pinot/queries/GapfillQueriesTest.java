@@ -48,9 +48,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Queries test for Gapfill queries.
- */
+/// Queries test for Gapfill queries.
 // TODO: Item 1. table alias for subquery in next PR
 public class GapfillQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "PostAggregationGapfillQueriesTest");

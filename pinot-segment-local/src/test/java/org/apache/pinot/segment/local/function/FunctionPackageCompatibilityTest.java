@@ -27,10 +27,8 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Verifies that the deprecated {@code org.apache.pinot.segment.local.function} shim layer
- * is wired through to the canonical implementations in {@code org.apache.pinot.common.evaluator}.
- */
+/// Verifies that the deprecated `org.apache.pinot.segment.local.function` shim layer
+/// is wired through to the canonical implementations in `org.apache.pinot.common.evaluator`.
 @SuppressWarnings("deprecation")
 public class FunctionPackageCompatibilityTest {
 

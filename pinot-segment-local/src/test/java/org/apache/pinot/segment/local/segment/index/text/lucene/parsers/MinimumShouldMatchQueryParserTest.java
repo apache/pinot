@@ -30,14 +30,12 @@ public class MinimumShouldMatchQueryParserTest {
 
   private static final String FIELD_NAME = "content";
 
-  /**
-   * Helper method to parse query with minimum_should_match option and return the result.
-   *
-   * @param query the query string to parse
-   * @param minimumShouldMatch the minimum_should_match value (can be null)
-   * @return the parsed Query
-   * @throws ParseException if parsing fails
-   */
+  /// Helper method to parse query with minimum_should_match option and return the result.
+  ///
+  /// @param query the query string to parse
+  /// @param minimumShouldMatch the minimum_should_match value (can be null)
+  /// @return the parsed Query
+  /// @throws ParseException if parsing fails
   private Query parseQueryWithMinimumShouldMatch(String query, String minimumShouldMatch)
       throws ParseException {
     MatchQueryParser parser = new MatchQueryParser(FIELD_NAME, new StandardAnalyzer());

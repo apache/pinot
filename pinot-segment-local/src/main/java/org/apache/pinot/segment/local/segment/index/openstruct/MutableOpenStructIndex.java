@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
 
 
 /// Manages per-key mutable columns for an OPEN_STRUCT column during real-time consumption.
-/// Each discovered key gets its own {@link MutableKeyColumn} (dictionary-encoded forward index +
+/// Each discovered key gets its own [MutableKeyColumn] (dictionary-encoded forward index +
 /// presence bitmap). Dense/sparse classification is deferred to seal time.
 ///
 /// Single-writer for [#index]: the consuming thread calls this method. Readers may
@@ -168,12 +168,18 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
     }
   }
 
-  /// Allocates a new MutableKeyColumn for {@code key} with the resolved {@code storedType} and
+  /// Allocates a new MutableKeyColumn for `key` with the resolved `storedType` and
   /// publishes it via volatile copy-on-write.
   private MutableKeyColumn allocateKeyColumn(String key, DataType storedType) {
     String allocationContext = _openStructColumn + "$" + key;
+    // Use the standard dimension default for the resolved stored type, regardless of any child
+    // spec's own default: OpenStructColumnSplitter#writeDenseKeyColumn (the sealed build path)
+    // always derives the absent-doc default from a throwaway DimensionFieldSpec(key, storedType,
+    // true) rather than the real child spec, so mirroring that exactly is what keeps a doc's
+    // resolved value identical before and after seal.
+    Object defaultNullValue = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, storedType, null);
     MutableKeyColumn newCol =
-        new MutableKeyColumn(key, storedType, _memoryManager, _capacity, allocationContext);
+        new MutableKeyColumn(key, storedType, defaultNullValue, _memoryManager, _capacity, allocationContext);
     Map<String, MutableKeyColumn> updated = new HashMap<>(_keyColumns);
     updated.put(key, newCol);
     _keyColumns = updated;
@@ -190,14 +196,14 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
     return _keyColumns;
   }
 
-  /// Returns the {@link MutableKeyColumn} for `key`, or `null` if not seen yet.
+  /// Returns the [MutableKeyColumn] for `key`, or `null` if not seen yet.
   @Nullable
   public MutableKeyColumn getKeyColumn(String key) {
     return _keyColumns.get(key);
   }
 
-  /// Reconstructs the OPEN_STRUCT value for {@code docId} as a {@code Map<String, Object>} from the
-  /// per-key columns, including only keys present at that doc (presence-aware). Returns {@code null}
+  /// Reconstructs the OPEN_STRUCT value for `docId` as a `Map<String, Object>` from the
+  /// per-key columns, including only keys present at that doc (presence-aware). Returns `null`
   /// when no key is present. Used by the realtime seal path to re-feed the OPEN_STRUCT column into
   /// the immutable segment build, where dense/sparse classification is (re)applied.
   @Nullable
@@ -223,7 +229,7 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
       return Map.of();
     }
     return Map.of(
-        StandardIndexes.forward(), col.getForwardIndex(),
+        StandardIndexes.forward(), col.getGuardedForwardIndex(),
         StandardIndexes.dictionary(), col.getDictionary(),
         StandardIndexes.inverted(), col.getInvertedIndex());
   }

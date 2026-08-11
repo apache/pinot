@@ -46,22 +46,16 @@ import static org.apache.pinot.segment.spi.V1Constants.Indexes.BITMAP_RANGE_INDE
 import static org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Range index creator that uses off-heap memory.
- * <p>We use 2 passes to create the range index.
- * <ul>
- *   <li>
- *     In the first pass (adding values phase), when add() method is called, store the raw values into the value buffer
- *     (for multi-valued column we flatten the values). We also store the corresponding docId in docIdBuffer which will
- *     be sorted in the next phase based on the value in valueBuffer.
- *   </li>
- *   <li>
- *     In the second pass (processing values phase), when seal() method is called, we sort the docIdBuffer based on the
- *     value in valueBuffer. We then iterate over the sorted docIdBuffer and create ranges such that each range
- *     comprises of _numDocsPerRange.
- *   </li>
- * </ul>
- */
+/// Range index creator that uses off-heap memory.
+///
+/// We use 2 passes to create the range index.
+///
+/// - In the first pass (adding values phase), when add() method is called, store the raw values into the value buffer
+///   (for multi-valued column we flatten the values). We also store the corresponding docId in docIdBuffer which will
+///   be sorted in the next phase based on the value in valueBuffer.
+/// - In the second pass (processing values phase), when seal() method is called, we sort the docIdBuffer based on the
+///   value in valueBuffer. We then iterate over the sorted docIdBuffer and create ranges such that each range
+///   comprises of \_numDocsPerRange.
 public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(RangeIndexCreator.class);
 
@@ -98,18 +92,15 @@ public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
   private final int _numValuesPerRange;
   private final DataType _valueType;
 
-  /**
-   *
-   * @param indexDir destination of the range index file
-   * @param fieldSpec fieldspec of the column to generate the range index
-   * @param valueType DataType of the column, INT if dictionary encoded, or INT, FLOAT, LONG, DOUBLE for raw encoded
-   * @param numRanges Number of ranges, use DEFAULT_NUM_RANGES if not configured (<= 0)
-   * @param numValuesPerRange Number of values per range, calculate from numRanges if not configured (<= 0)
-   * @param numDocs total number of documents
-   * @param numValues total number of values, used for Multi value columns (for single value columns numDocs==
-   *                  numValues)
-   * @throws IOException
-   */
+  /// @param indexDir destination of the range index file
+  /// @param fieldSpec fieldspec of the column to generate the range index
+  /// @param valueType DataType of the column, INT if dictionary encoded, or INT, FLOAT, LONG, DOUBLE for raw encoded
+  /// @param numRanges Number of ranges, use DEFAULT_NUM_RANGES if not configured (<= 0)
+  /// @param numValuesPerRange Number of values per range, calculate from numRanges if not configured (<= 0)
+  /// @param numDocs total number of documents
+  /// @param numValues total number of values, used for Multi value columns (for single value columns numDocs==
+  ///                  numValues)
+  /// @throws IOException
   public RangeIndexCreator(File indexDir, FieldSpec fieldSpec, DataType valueType, int numRanges, int numValuesPerRange,
       int numDocs, int numValues)
       throws IOException {
@@ -234,22 +225,20 @@ public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
     _nextDocId++;
   }
 
-  /**
-   * Generates the range Index file
-   * Sample output by running RangeIndexCreatorTest with TRACE=true and change log4.xml in core to info
-   * 15:18:47.330 RangeIndexCreator - Before sorting
-   * 15:18:47.333 RangeIndexCreator - DocIdBuffer  [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
-   * 18, 19, ]
-   * 15:18:47.333 RangeIndexCreator - ValueBuffer  [ 3, 0, 0, 0, 3, 1, 3, 0, 2, 4, 4, 2, 4, 3, 2, 1, 0, 2, 0, 3, ]
-   * 15:18:47.371 RangeIndexCreator - After sorting
-   * 15:18:47.371 RangeIndexCreator - DocIdBuffer  [ 16, 3, 1, 2, 7, 18, 15, 5, 14, 8, 17, 11, 0, 4, 6, 13, 19, 10,
-   * 9, 12, ]
-   * 15:18:47.371 RangeIndexCreator - ValueBuffer  [ 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, ]
-   * 15:18:47.372 RangeIndexCreator - rangeOffsets = [ (0,5) ,(6,7) ,(8,11) ,(12,16) ,(17,19) , ]
-   * 15:18:47.372 RangeIndexCreator - rangeValues = [ (0,0) ,(1,1) ,(2,2) ,(3,3) ,(4,4) , ]
-   *
-   * @throws IOException
-   */
+  /// Generates the range Index file
+  /// Sample output by running RangeIndexCreatorTest with TRACE=true and change log4.xml in core to info
+  /// 15:18:47.330 RangeIndexCreator - Before sorting
+  /// 15:18:47.333 RangeIndexCreator - DocIdBuffer  \[ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+  /// 18, 19, \]
+  /// 15:18:47.333 RangeIndexCreator - ValueBuffer  \[ 3, 0, 0, 0, 3, 1, 3, 0, 2, 4, 4, 2, 4, 3, 2, 1, 0, 2, 0, 3, \]
+  /// 15:18:47.371 RangeIndexCreator - After sorting
+  /// 15:18:47.371 RangeIndexCreator - DocIdBuffer  \[ 16, 3, 1, 2, 7, 18, 15, 5, 14, 8, 17, 11, 0, 4, 6, 13, 19, 10,
+  /// 9, 12, \]
+  /// 15:18:47.371 RangeIndexCreator - ValueBuffer  \[ 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, \]
+  /// 15:18:47.372 RangeIndexCreator - rangeOffsets = \[ (0,5) ,(6,7) ,(8,11) ,(12,16) ,(17,19) , \]
+  /// 15:18:47.372 RangeIndexCreator - rangeValues = \[ (0,0) ,(1,1) ,(2,2) ,(3,3) ,(4,4) , \]
+  ///
+  /// @throws IOException
   @Override
   public void seal()
       throws IOException {

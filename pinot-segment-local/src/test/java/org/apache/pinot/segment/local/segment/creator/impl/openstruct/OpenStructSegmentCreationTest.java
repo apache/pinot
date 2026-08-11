@@ -83,7 +83,7 @@ public class OpenStructSegmentCreationTest {
         .build();
 
     OpenStructIndexConfig osConfig =
-        new OpenStructIndexConfig(false, null, 3, Set.of("views", "cpu", "host"), 0.5, List.of());
+        new OpenStructIndexConfig(false, null, 3, Set.of("views", "cpu", "host"), 0.5, List.of(), null);
 
     com.fasterxml.jackson.databind.node.ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("open_struct", JsonUtils.objectToJsonNode(osConfig));

@@ -22,11 +22,9 @@ import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-/**
- * Polymorphic bitwise logical right shift scalar function.
- *
- * <p>This implementation is stateless and thread-safe.
- */
+/// Polymorphic bitwise logical right shift scalar function.
+///
+/// This implementation is stateless and thread-safe.
 @ScalarFunction(names = {"bitShiftRightUnsigned", "bitShiftRightLogical"})
 public class BitShiftRightUnsignedScalarFunction extends BaseShiftScalarFunction {
   private static final FunctionInfo INT_FUNCTION_INFO;

@@ -40,9 +40,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.CONTROLLER_INSTAN
 import static org.testng.Assert.*;
 
 
-/**
- * This class tests env variables when starting controller from configs
- */
+/// This class tests env variables when starting controller from configs
 public class ControllerStarterDynamicEnvTest extends ControllerTest {
   private final Map<String, Object> _configOverride = new HashMap<>();
 

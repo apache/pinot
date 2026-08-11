@@ -56,9 +56,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for histogram queries.
- */
+/// Queries test for histogram queries.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class HistogramQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "HistogramQueriesTest");

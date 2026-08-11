@@ -33,9 +33,7 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Point;
 
 
-/**
- * Function that returns a geometry type point object with the given coordinate values.
- */
+/// Function that returns a geometry type point object with the given coordinate values.
 public class StPointFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "ST_Point";
   private TransformFunction _firstArgument;

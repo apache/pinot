@@ -24,14 +24,12 @@ import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.exception.QueryException;
 
 
-/**
- * This class represents an exception using a message and an error code.
- *
- * This is only used to serialize the error message and error code when a broker sends an error message to the client.
- * In other cases use {@link QueryErrorMessage} instead.
- *
- * Notice even the suffix of this class is <em>Exception</em>, it is not a Java {@link Exception}.
- */
+/// This class represents an exception using a message and an error code.
+///
+/// This is only used to serialize the error message and error code when a broker sends an error message to the client.
+/// In other cases use [QueryErrorMessage] instead.
+///
+/// Notice even the suffix of this class is _Exception_, it is not a Java [Exception].
 public class QueryProcessingException {
   private int _errorCode;
   private String _message;

@@ -33,11 +33,9 @@ import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * A {@link BlockValSet} implementation backed by row major data.
- *
- * TODO: Support MV
- */
+/// A [BlockValSet] implementation backed by row major data.
+///
+/// TODO: Support MV
 public class RowBasedBlockValSet implements BlockValSet {
   private final DataType _dataType;
   private final DataType _storedType;

@@ -32,12 +32,10 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Extracts intermediate set results for cross-segment merging.
- *
- * <p>For single-key, converts dictionary IDs to typed value sets. For multi-key, converts composite IDs
- * to length-prefix-encoded composite strings, producing a {@code Set<String>} per step.
- */
+/// Extracts intermediate set results for cross-segment merging.
+///
+/// For single-key, converts dictionary IDs to typed value sets. For multi-key, converts composite IDs
+/// to length-prefix-encoded composite strings, producing a `Set<String>` per step.
 class SetResultExtractionStrategy implements ResultExtractionStrategy<DictIdsWrapper, List<Set>> {
   protected final int _numSteps;
 

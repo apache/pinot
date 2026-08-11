@@ -45,44 +45,41 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The {@code DistinctCountCPCSketchAggregationFunction} is used for space-efficient cardinality estimation.
- * The Apache Datasketches CPC sketch is a unique-counting sketch that implements the
- * <i>Compressed Probabilistic Counting (CPC, a.k.a FM85)</i> algorithms developed by Kevin Lang in his paper
- * <a href="https://arxiv.org/abs/1708.06839">Back to the Future: an Even More Nearly Optimal Cardinality Estimation
- * Algorithm</a>.
- * <br><br>
- * The stored CPC sketch can consume about 40% less space than an HLL sketch of comparable accuracy. CPC sketches have
- * been intentionally designed to offer different tradeoffs to HLL sketches so that, they complement each
- * other in many ways.  For more information, see the Apache Datasketches documentation.
- * <br><br>
- * The aggregation function supports both pre-aggregated sketches or raw values, but no post-aggregation is supported.
- * Usage examples:
- * <ul>
- *   <li>
- *     Simple union (1 or 2 arguments): main expression to aggregate on, followed by an optional CPC sketch size
- *     argument. The second argument is the sketch lgK – the given log_base2 of k, and defaults to 12.
- *     The "raw" equivalents return serialised sketches in base64-encoded strings.
- *     <p>DISTINCT_COUNT_CPC_SKETCH(col)</p>
- *     <p>DISTINCT_COUNT_CPC_SKETCH(col, 12)</p>
- *     <p>DISTINCT_COUNT_RAW_CPC_SKETCH(col)</p>
- *     <p>DISTINCT_COUNT_RAW_CPC_SKETCH(col, 12)</p>
- *   <li>
- *     Extracting a cardinality estimate from a CPC sketch:
- *     <p>GET_CPC_SKETCH_ESTIMATE(sketch_bytes)</p>
- *     <p>GET_CPC_SKETCH_ESTIMATE(DISTINCT_COUNT_RAW_CPC_SKETCH(col))</p>
- *   </li>
- *   <li>
- *     Union between two sketches:
- *     <p>
- *       CPC_SKETCH_UNION(
- *         DISTINCT_COUNT_RAW_CPC_SKETCH(col1),
- *         DISTINCT_COUNT_RAW_CPC_SKETCH(col2)
- *       )
- *     </p>
- *   </li>
- * </ul>
- */
+/// The `DistinctCountCPCSketchAggregationFunction` is used for space-efficient cardinality estimation.
+/// The Apache Datasketches CPC sketch is a unique-counting sketch that implements the
+/// _Compressed Probabilistic Counting (CPC, a.k.a FM85)_ algorithms developed by Kevin Lang in his paper
+/// [Back to the Future: an Even More Nearly Optimal Cardinality Estimation Algorithm](https://arxiv.org/abs/1708.06839)
+/// .
+///
+/// The stored CPC sketch can consume about 40% less space than an HLL sketch of comparable accuracy. CPC sketches have
+/// been intentionally designed to offer different tradeoffs to HLL sketches so that, they complement each
+/// other in many ways.  For more information, see the Apache Datasketches documentation.
+///
+/// The aggregation function supports both pre-aggregated sketches or raw values, but no post-aggregation is supported.
+/// Usage examples:
+///
+/// - Simple union (1 or 2 arguments): main expression to aggregate on, followed by an optional CPC sketch size
+///   argument. The second argument is the sketch lgK – the given log_base2 of k, and defaults to 12.
+///   The "raw" equivalents return serialised sketches in base64-encoded strings.
+///
+///   DISTINCT_COUNT_CPC_SKETCH(col)
+///
+///   DISTINCT_COUNT_CPC_SKETCH(col, 12)
+///
+///   DISTINCT_COUNT_RAW_CPC_SKETCH(col)
+///
+///   DISTINCT_COUNT_RAW_CPC_SKETCH(col, 12)
+/// - Extracting a cardinality estimate from a CPC sketch:
+///
+///   GET_CPC_SKETCH_ESTIMATE(sketch_bytes)
+///
+///   GET_CPC_SKETCH_ESTIMATE(DISTINCT_COUNT_RAW_CPC_SKETCH(col))
+/// - Union between two sketches:
+///
+///     CPC_SKETCH_UNION(
+///      DISTINCT_COUNT_RAW_CPC_SKETCH(col1),
+///      DISTINCT_COUNT_RAW_CPC_SKETCH(col2)
+///     )
 @SuppressWarnings({"rawtypes"})
 public class DistinctCountCPCSketchAggregationFunction
     extends BaseSingleInputAggregationFunction<CpcSketchAccumulator, Comparable> {
@@ -395,10 +392,10 @@ public class DistinctCountCPCSketchAggregationFunction
   @Override
   public CpcSketchAccumulator merge(CpcSketchAccumulator intermediateResult1,
       CpcSketchAccumulator intermediateResult2) {
-    if (intermediateResult1 == null || intermediateResult1.isEmpty()) {
+    if (intermediateResult1.isEmpty()) {
       return intermediateResult2;
     }
-    if (intermediateResult2 == null || intermediateResult2.isEmpty()) {
+    if (intermediateResult2.isEmpty()) {
       return intermediateResult1;
     }
     intermediateResult1.setLgNominalEntries(_lgNominalEntries);
@@ -428,7 +425,6 @@ public class DistinctCountCPCSketchAggregationFunction
     return DataSchema.ColumnDataType.LONG;
   }
 
-  @Nullable
   @Override
   public Comparable extractFinalResult(@Nullable CpcSketchAccumulator intermediateResult) {
     if (intermediateResult == null) {
@@ -463,9 +459,7 @@ public class DistinctCountCPCSketchAggregationFunction
     return _lgNominalEntries <= starTreeLgK;
   }
 
-  /**
-   * Returns the CpcSketch from the result holder or creates a new one if it does not exist.
-   */
+  /// Returns the CpcSketch from the result holder or creates a new one if it does not exist.
   protected CpcSketch getCpcSketch(AggregationResultHolder aggregationResultHolder) {
     CpcSketch cpcSketch = aggregationResultHolder.getResult();
     if (cpcSketch == null) {
@@ -475,9 +469,7 @@ public class DistinctCountCPCSketchAggregationFunction
     return cpcSketch;
   }
 
-  /**
-   * Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
-   */
+  /// Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
   protected static RoaringBitmap getDictIdBitmap(AggregationResultHolder aggregationResultHolder,
       Dictionary dictionary) {
     DictIdsWrapper dictIdsWrapper = aggregationResultHolder.getResult();
@@ -488,9 +480,7 @@ public class DistinctCountCPCSketchAggregationFunction
     return dictIdsWrapper._dictIdBitmap;
   }
 
-  /**
-   * Returns the dictionary id bitmap for the given group key or creates a new one if it does not exist.
-   */
+  /// Returns the dictionary id bitmap for the given group key or creates a new one if it does not exist.
   protected static RoaringBitmap getDictIdBitmap(GroupByResultHolder groupByResultHolder, int groupKey,
       Dictionary dictionary) {
     DictIdsWrapper dictIdsWrapper = groupByResultHolder.getResult(groupKey);
@@ -501,9 +491,7 @@ public class DistinctCountCPCSketchAggregationFunction
     return dictIdsWrapper._dictIdBitmap;
   }
 
-  /**
-   * Returns the CpcSketch for the given group key or creates a new one if it does not exist.
-   */
+  /// Returns the CpcSketch for the given group key or creates a new one if it does not exist.
   protected CpcSketch getCpcSketch(GroupByResultHolder groupByResultHolder, int groupKey) {
     CpcSketch cpcSketch = groupByResultHolder.getResult(groupKey);
     if (cpcSketch == null) {
@@ -513,9 +501,7 @@ public class DistinctCountCPCSketchAggregationFunction
     return cpcSketch;
   }
 
-  /**
-   * Helper method to set dictionary id for the given group keys into the result holder.
-   */
+  /// Helper method to set dictionary id for the given group keys into the result holder.
   private static void setDictIdForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys,
       Dictionary dictionary, int dictId) {
     for (int groupKey : groupKeys) {
@@ -581,9 +567,7 @@ public class DistinctCountCPCSketchAggregationFunction
     }
   }
 
-  /**
-   * Returns the accumulator from the result holder or creates a new one if it does not exist.
-   */
+  /// Returns the accumulator from the result holder or creates a new one if it does not exist.
   private CpcSketchAccumulator getAccumulator(AggregationResultHolder aggregationResultHolder) {
     CpcSketchAccumulator accumulator = aggregationResultHolder.getResult();
     if (accumulator == null) {
@@ -593,9 +577,7 @@ public class DistinctCountCPCSketchAggregationFunction
     return accumulator;
   }
 
-  /**
-   * Returns the accumulator for the given group key or creates a new one if it does not exist.
-   */
+  /// Returns the accumulator for the given group key or creates a new one if it does not exist.
   private CpcSketchAccumulator getAccumulator(GroupByResultHolder groupByResultHolder, int groupKey) {
     CpcSketchAccumulator accumulator = groupByResultHolder.getResult(groupKey);
     if (accumulator == null) {
@@ -605,10 +587,8 @@ public class DistinctCountCPCSketchAggregationFunction
     return accumulator;
   }
 
-  /**
-   * Deserializes the sketches from the bytes.  Returns null for empty byte arrays which represent
-   * the default null value for BYTES columns in Pinot.  Callers must handle null entries.
-   */
+  /// Deserializes the sketches from the bytes.  Returns null for empty byte arrays which represent
+  /// the default null value for BYTES columns in Pinot.  Callers must handle null entries.
   @SuppressWarnings({"unchecked"})
   private CpcSketch[] deserializeSketches(byte[][] serializedSketches, int length) {
     CpcSketch[] sketches = new CpcSketch[length];
@@ -643,10 +623,8 @@ public class DistinctCountCPCSketchAggregationFunction
     }
   }
 
-  /**
-   * Helper class to wrap the CpcSketch parameters.  The initial values for the parameters are set to the
-   * same defaults in the Apache Datasketches library.
-   */
+  /// Helper class to wrap the CpcSketch parameters.  The initial values for the parameters are set to the
+  /// same defaults in the Apache Datasketches library.
   private static class Parameters {
     private static final char PARAMETER_DELIMITER = ';';
     private static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';

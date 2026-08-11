@@ -39,23 +39,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This scheduler is designed to deal with two types of workloads
- * 1. Primary Workloads -> regular queries from the application
- * 2. Secondary Workloads -> adhoc queries fired from tools, testing, etc
- *
- *
- * Primary Workload Queries
- * Primary workloads queries are executed with priority and submitted to the Runner threads as and when they arrive.
- * The resources used by a primary workload query is not capped.
- *
- * Secondary Workload Queries
- *   - Secondary workload queries are identified using a query option -> "SET isSecondaryWorkload=true"
- *   - Secondary workload queries are contained as follows:
- *       - Restrictions on number of runner threads available to process secondary queries
- *       - Restrictions on total number of worker threads available to process a single secondary query
- *       - Restrictions on total number of worker threads available to process all in-progress secondary queries
- */
+/// This scheduler is designed to deal with two types of workloads
+/// 1. Primary Workloads -> regular queries from the application
+/// 2. Secondary Workloads -> adhoc queries fired from tools, testing, etc
+///
+/// Primary Workload Queries
+/// Primary workloads queries are executed with priority and submitted to the Runner threads as and when they arrive.
+/// The resources used by a primary workload query is not capped.
+///
+/// Secondary Workload Queries
+///   - Secondary workload queries are identified using a query option -> "SET isSecondaryWorkload=true"
+///   - Secondary workload queries are contained as follows:
+///       - Restrictions on number of runner threads available to process secondary queries
+///       - Restrictions on total number of worker threads available to process a single secondary query
+///       - Restrictions on total number of worker threads available to process all in-progress secondary queries
 public class BinaryWorkloadScheduler extends QueryScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BinaryWorkloadScheduler.class);
 

@@ -21,11 +21,9 @@ package org.apache.pinot.core.query.utils;
 import org.apache.pinot.spi.config.table.TableType;
 
 
-/**
- * Utils to generate and manage the unique query id within a cluster.
- * Request id might not be unique across brokers or for request hitting a hybrid table. To generate a unique query id
- * within a cluster, we want to combine the broker id, request id and table type.
- */
+/// Utils to generate and manage the unique query id within a cluster.
+/// Request id might not be unique across brokers or for request hitting a hybrid table. To generate a unique query id
+/// within a cluster, we want to combine the broker id, request id and table type.
 public class QueryIdUtils {
   private QueryIdUtils() {
   }

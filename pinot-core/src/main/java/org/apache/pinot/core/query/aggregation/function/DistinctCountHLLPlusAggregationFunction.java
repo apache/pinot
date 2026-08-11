@@ -621,7 +621,6 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     return ColumnDataType.LONG;
   }
 
-  @Nullable
   @Override
   public Long extractFinalResult(@Nullable HyperLogLogPlus intermediateResult) {
     return intermediateResult == null ? 0L : intermediateResult.cardinality();
@@ -645,9 +644,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     }
   }
 
-  /**
-   * Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
-   */
+  /// Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
   protected static RoaringBitmap getDictIdBitmap(AggregationResultHolder aggregationResultHolder,
       Dictionary dictionary) {
     DictIdsWrapper dictIdsWrapper = aggregationResultHolder.getResult();
@@ -658,9 +655,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     return dictIdsWrapper._dictIdBitmap;
   }
 
-  /**
-   * Returns the HyperLogLogPlus from the result holder or creates a new one if it does not exist.
-   */
+  /// Returns the HyperLogLogPlus from the result holder or creates a new one if it does not exist.
   protected HyperLogLogPlus getHyperLogLogPlus(AggregationResultHolder aggregationResultHolder) {
     HyperLogLogPlus hyperLogLogPlus = aggregationResultHolder.getResult();
     if (hyperLogLogPlus == null) {
@@ -670,9 +665,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     return hyperLogLogPlus;
   }
 
-  /**
-   * Returns the dictionary id bitmap for the given group key or creates a new one if it does not exist.
-   */
+  /// Returns the dictionary id bitmap for the given group key or creates a new one if it does not exist.
   protected static RoaringBitmap getDictIdBitmap(GroupByResultHolder groupByResultHolder, int groupKey,
       Dictionary dictionary) {
     DictIdsWrapper dictIdsWrapper = groupByResultHolder.getResult(groupKey);
@@ -683,9 +676,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     return dictIdsWrapper._dictIdBitmap;
   }
 
-  /**
-   * Returns the HyperLogLogPlus for the given group key or creates a new one if it does not exist.
-   */
+  /// Returns the HyperLogLogPlus for the given group key or creates a new one if it does not exist.
   protected HyperLogLogPlus getHyperLogLogPlus(GroupByResultHolder groupByResultHolder, int groupKey) {
     HyperLogLogPlus hyperLogLogPlus = groupByResultHolder.getResult(groupKey);
     if (hyperLogLogPlus == null) {
@@ -695,9 +686,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     return hyperLogLogPlus;
   }
 
-  /**
-   * Helper method to set dictionary id for the given group keys into the result holder.
-   */
+  /// Helper method to set dictionary id for the given group keys into the result holder.
   private static void setDictIdForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys,
       Dictionary dictionary, int dictId) {
     for (int groupKey : groupKeys) {
@@ -705,18 +694,14 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     }
   }
 
-  /**
-   * Helper method to set value for the given group keys into the result holder.
-   */
+  /// Helper method to set value for the given group keys into the result holder.
   private void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, Object value) {
     for (int groupKey : groupKeys) {
       getHyperLogLogPlus(groupByResultHolder, groupKey).offer(value);
     }
   }
 
-  /**
-   * Helper method to read dictionary and convert dictionary ids to HyperLogLogPlus for dictionary-encoded expression.
-   */
+  /// Helper method to read dictionary and convert dictionary ids to HyperLogLogPlus for dictionary-encoded expression.
   private HyperLogLogPlus convertToHyperLogLogPlus(DictIdsWrapper dictIdsWrapper) {
     HyperLogLogPlus hyperLogLogPlus = new HyperLogLogPlus(_p, _sp);
     Dictionary dictionary = dictIdsWrapper._dictionary;

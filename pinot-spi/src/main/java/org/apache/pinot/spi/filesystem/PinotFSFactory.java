@@ -29,9 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This factory class initializes the PinotFS class. It creates a PinotFS object based on the URI found.
- */
+/// This factory class initializes the PinotFS class. It creates a PinotFS object based on the URI found.
 public class PinotFSFactory {
   private PinotFSFactory() {
   }

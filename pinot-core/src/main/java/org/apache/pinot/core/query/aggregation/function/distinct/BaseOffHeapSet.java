@@ -28,20 +28,18 @@ import org.slf4j.LoggerFactory;
 import sun.misc.Unsafe;
 
 
-/**
- * Base class for set implementations using off-heap memory.
- *
- * This class is used to calculate the count of distinct values, and it doesn't implement Set interface.
- * The following operations are allowed:
- * - Add value to the set (not included in the base implementation)
- * - Merge with another set
- * - Get the size of the set / check if the set is empty
- * - Iterate over the set
- * - Serialize/deserialize the set
- *
- * The values stored in the set might not be the original values for performance reasons (e.g. avoid re-computing hash
- * during set growing). The iterator returns the internal stored values.
- */
+/// Base class for set implementations using off-heap memory.
+///
+/// This class is used to calculate the count of distinct values, and it doesn't implement Set interface.
+/// The following operations are allowed:
+/// - Add value to the set (not included in the base implementation)
+/// - Merge with another set
+/// - Get the size of the set / check if the set is empty
+/// - Iterate over the set
+/// - Serialize/deserialize the set
+///
+/// The values stored in the set might not be the original values for performance reasons (e.g. avoid re-computing hash
+/// during set growing). The iterator returns the internal stored values.
 @NotThreadSafe
 public abstract class BaseOffHeapSet implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseOffHeapSet.class.getName());
@@ -64,44 +62,30 @@ public abstract class BaseOffHeapSet implements AutoCloseable {
     _address = allocateMemory(getMemorySize(_capacity));
   }
 
-  /**
-   * Returns the memory size for the given capacity.
-   */
+  /// Returns the memory size for the given capacity.
   protected abstract long getMemorySize(int capacity);
 
-  /**
-   * Returns the size of the set.
-   */
+  /// Returns the size of the set.
   public int size() {
     return _containsZero ? _sizeWithoutZero + 1 : _sizeWithoutZero;
   }
 
-  /**
-   * Returns whether the set is empty.
-   */
+  /// Returns whether the set is empty.
   public boolean isEmpty() {
     return !_containsZero && _sizeWithoutZero == 0;
   }
 
-  /**
-   * Returns an iterator over the set. The iterator returns the internal stored values which might not be the original
-   * added values.
-   */
+  /// Returns an iterator over the set. The iterator returns the internal stored values which might not be the original
+  /// added values.
   public abstract Iterator<?> iterator();
 
-  /**
-   * Merges a set into this set.
-   */
+  /// Merges a set into this set.
   public abstract void merge(BaseOffHeapSet another);
 
-  /**
-   * Serializes the set into a byte array.
-   */
+  /// Serializes the set into a byte array.
   public abstract byte[] serialize();
 
-  /**
-   * Expands the set (double its capacity).
-   */
+  /// Expands the set (double its capacity).
   protected void expand() {
     _capacity = _capacity << 1;
     Preconditions.checkState(_capacity > 0, "Integer overflow! Invalid capacity: %s", _capacity);
@@ -119,9 +103,7 @@ public abstract class BaseOffHeapSet implements AutoCloseable {
     UNSAFE.freeMemory(oldAddress);
   }
 
-  /**
-   * Rehashes the set into the expanded memory.
-   */
+  /// Rehashes the set into the expanded memory.
   protected abstract void rehash(long newAddress);
 
   @Override
@@ -145,23 +127,17 @@ public abstract class BaseOffHeapSet implements AutoCloseable {
     }
   }
 
-  /**
-   * Returns the size of the array to allocate based on the expected number of values.
-   */
+  /// Returns the size of the array to allocate based on the expected number of values.
   private static int arraySize(int expectedValues) {
     return HashCommon.arraySize(expectedValues, LOAD_FACTOR);
   }
 
-  /**
-   * Returns the maximum fill of the array based on the capacity.
-   */
+  /// Returns the maximum fill of the array based on the capacity.
   private static int maxFill(int capacity) {
     return HashCommon.maxFill(capacity, LOAD_FACTOR);
   }
 
-  /**
-   * Allocates memory of the given size and initializes it to 0.
-   */
+  /// Allocates memory of the given size and initializes it to 0.
   private static long allocateMemory(long size) {
     long address = UNSAFE.allocateMemory(size);
     UNSAFE.setMemory(address, size, (byte) 0);

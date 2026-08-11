@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.data.table;
 
-/**
- * Helper class to store the values to be ordered. It also wraps the Key and Record of the record.
- * - When ordering on an aggregation, stores the final result of the aggregation
- * - When ordering on a column/transform, stores the actual value of the expression
- */
+/// Helper class to store the values to be ordered. It also wraps the Key and Record of the record.
+/// - When ordering on an aggregation, stores the final result of the aggregation
+/// - When ordering on a column/transform, stores the actual value of the expression
 @SuppressWarnings("rawtypes")
 public class IntermediateRecord {
+  private static final Comparable[] NO_ORDER_BY_VALUES = new Comparable[0];
+
   public final Key _key;
   public final Record _record;
   public final Comparable[] _values;
@@ -33,5 +33,13 @@ public class IntermediateRecord {
     _key = key;
     _record = record;
     _values = values;
+  }
+
+  /// Creates an intermediate record that carries only its [Key] and [Record], with no order-by values.
+  /// Used when a self-contained (key, record) pair is needed outside of order-by trimming — e.g. to detach
+  /// a per-segment group-by result from reused thread-local group-key state before it is merged on another
+  /// thread.
+  public static IntermediateRecord withoutOrderByValues(Key key, Record record) {
+    return new IntermediateRecord(key, record, NO_ORDER_BY_VALUES);
   }
 }

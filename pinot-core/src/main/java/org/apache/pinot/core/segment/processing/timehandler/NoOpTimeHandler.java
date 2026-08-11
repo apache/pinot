@@ -21,9 +21,7 @@ package org.apache.pinot.core.segment.processing.timehandler;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/**
- * Time handler that does not modify the time value and always returns the default partition.
- */
+/// Time handler that does not modify the time value and always returns the default partition.
 public class NoOpTimeHandler implements TimeHandler {
 
   public String handleTime(GenericRow row) {

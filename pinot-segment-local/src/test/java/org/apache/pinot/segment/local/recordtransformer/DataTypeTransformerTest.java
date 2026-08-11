@@ -44,9 +44,7 @@ public class DataTypeTransformerTest {
 
   @Test
   public void testStandardize() {
-    /**
-     * Tests for Map
-     */
+    /// Tests for Map
 
     // Empty Map
     Map<String, Object> map = Map.of();
@@ -73,9 +71,7 @@ public class DataTypeTransformerTest {
     }
     assertEqualsNoOrder((Object[]) DataTypeTransformerUtils.standardize(COLUMN, map, false), expectedValues);
 
-    /**
-     * Tests for List
-     */
+    /// Tests for List
 
     // Empty List
     List<Object> list = List.of();
@@ -98,9 +94,7 @@ public class DataTypeTransformerTest {
     }
     assertEquals((Object[]) DataTypeTransformerUtils.standardize(COLUMN, list, false), expectedValues);
 
-    /**
-     * Tests for Object[]
-     */
+    /// Tests for Object\[\]
 
     // Empty Object[]
     Object[] values = new Object[0];
@@ -123,9 +117,7 @@ public class DataTypeTransformerTest {
     }
     assertEquals((Object[]) DataTypeTransformerUtils.standardize(COLUMN, values, false), expectedValues);
 
-    /**
-     * Tests for nested Map/List/Object[]
-     */
+    /// Tests for nested Map/List/Object\[\]
 
     // Map with empty List
     map = Map.of("testKey", List.of());
@@ -210,10 +202,8 @@ public class DataTypeTransformerTest {
     assertEqualsNoOrder((Object[]) DataTypeTransformerUtils.standardize(COLUMN, values, false), expectedValues);
   }
 
-  /**
-   * Verifies that non-canonical (uppercase) UUID strings in upsert/dedup primary key columns are rejected,
-   * while canonical lowercase UUIDs are accepted, and non-primary-key UUID columns are unaffected.
-   */
+  /// Verifies that non-canonical (uppercase) UUID strings in upsert/dedup primary key columns are rejected,
+  /// while canonical lowercase UUIDs are accepted, and non-primary-key UUID columns are unaffected.
   @Test
   public void testUuidUpsertPrimaryKeyCanonicalValidation() {
     String uuidCol = "uuidPk";

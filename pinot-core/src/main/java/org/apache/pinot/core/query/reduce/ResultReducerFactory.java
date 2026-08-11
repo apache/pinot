@@ -22,16 +22,12 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 
 
-/**
- * Factory class to construct the right result reducer based on the query context.
- */
+/// Factory class to construct the right result reducer based on the query context.
 public final class ResultReducerFactory {
   private ResultReducerFactory() {
   }
 
-  /**
-   * Constructs the right result reducer based on the given query context.
-   */
+  /// Constructs the right result reducer based on the given query context.
   public static DataTableReducer getResultReducer(QueryContext queryContext) {
     if (queryContext.isExplain()) {
       return new ExplainPlanDataTableReducer(queryContext);

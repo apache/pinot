@@ -66,9 +66,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for FIRSTWITHTIME queries.
- */
+/// Queries test for FIRSTWITHTIME queries.
 public class FirstWithTimeQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "FirstQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";

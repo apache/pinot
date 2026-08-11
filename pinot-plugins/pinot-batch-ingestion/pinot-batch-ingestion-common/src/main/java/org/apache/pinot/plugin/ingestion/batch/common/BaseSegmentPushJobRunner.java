@@ -48,10 +48,8 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
   protected TableConfig _tableConfig;
   protected boolean _consistentPushEnabled;
 
-  /**
-   * Initialize BaseSegmentPushJobRunner with SegmentGenerationJobSpec
-   * Checks for required parameters in the spec and enablement of consistent data push.
-   */
+  /// Initialize BaseSegmentPushJobRunner with SegmentGenerationJobSpec
+  /// Checks for required parameters in the spec and enablement of consistent data push.
   @Override
   public void init(SegmentGenerationJobSpec spec) {
     _spec = spec;
@@ -72,9 +70,7 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
     }
   }
 
-  /**
-   * Initialize filesystems and obtain the raw input files for upload.
-   */
+  /// Initialize filesystems and obtain the raw input files for upload.
   public void initFileSys() {
     // Init all file systems
     List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
@@ -101,12 +97,10 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
     }
   }
 
-  /**
-   * Returns segment names, which will be supplied to the segment replacement protocol as the new set of segments to
-   * atomically update when consistent data push is enabled.
-   * @param segmentsUriToTarPathMap Map from segment URI to corresponding tar path. Either the URIs (keys), the
-   *                                tarPaths (values), or both may be used depending on upload mode.
-   */
+  /// Returns segment names, which will be supplied to the segment replacement protocol as the new set of segments to
+  /// atomically update when consistent data push is enabled.
+  /// @param segmentsUriToTarPathMap Map from segment URI to corresponding tar path. Either the URIs (keys), the
+  ///                                tarPaths (values), or both may be used depending on upload mode.
   public List<String> getSegmentsToReplace(Map<String, String> segmentsUriToTarPathMap) {
     Collection<String> tarFilePaths = segmentsUriToTarPathMap.values();
     List<String> segmentNames = new ArrayList<>(tarFilePaths.size());
@@ -120,19 +114,15 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
     return segmentNames;
   }
 
-  /**
-   * Upload segments supplied in segmentsUriToTarPathMap.
-   * @param segmentsUriToTarPathMap Map from segment URI to corresponding tar path. Either the URIs (keys), the
-   *                                tarPaths (values), or both may be used depending on upload mode.
-   */
+  /// Upload segments supplied in segmentsUriToTarPathMap.
+  /// @param segmentsUriToTarPathMap Map from segment URI to corresponding tar path. Either the URIs (keys), the
+  ///                                tarPaths (values), or both may be used depending on upload mode.
   public abstract void uploadSegments(Map<String, String> segmentsUriToTarPathMap)
       throws Exception;
 
-  /**
-   * Runs the main logic of the segment push job runner.
-   * First initialize the filesystem, then upload the segments, while optionally configured to be wrapped around by
-   * the consistent data push protocol.
-   */
+  /// Runs the main logic of the segment push job runner.
+  /// First initialize the filesystem, then upload the segments, while optionally configured to be wrapped around by
+  /// the consistent data push protocol.
   @Override
   public void run()
       throws Exception {

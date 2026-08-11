@@ -33,9 +33,7 @@ import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Base class for transform function providing the default implementation for all data types.
- */
+/// Base class for transform function providing the default implementation for all data types.
 public abstract class BaseTransformFunction implements TransformFunction {
   protected static final TransformResultMetadata INT_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.INT, true, false);
@@ -57,6 +55,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.JSON, true, false);
   protected static final TransformResultMetadata BYTES_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.BYTES, true, false);
+  protected static final TransformResultMetadata UUID_SV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.UUID, true, false);
 
   protected static final TransformResultMetadata INT_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.INT, false, false);
@@ -78,6 +78,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.JSON, false, false);
   protected static final TransformResultMetadata BYTES_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.BYTES, false, false);
+  protected static final TransformResultMetadata UUID_MV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.UUID, false, false);
   protected static final TransformResultMetadata UNKNOWN_METADATA =
       new TransformResultMetadata(DataType.UNKNOWN, true, false);
 

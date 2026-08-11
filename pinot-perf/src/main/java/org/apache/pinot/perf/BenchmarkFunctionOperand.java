@@ -46,19 +46,16 @@ import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
-/**
- * Benchmark for {@link FunctionOperand#apply} to measure the impact of skipping
- * {@code convertTypes()} when operand types already match function parameter types.
- *
- * <p>The benchmark has two parts:
- * <ul>
- *   <li><b>End-to-end apply()</b>: Compares FunctionOperand.apply() when types match (convertTypes
- *       skipped) vs when types mismatch (convertTypes called per row).</li>
- *   <li><b>Isolated convertTypes()</b>: Directly measures the per-row cost of
- *       convertTypes() on type-matching arguments — the exact overhead eliminated by the
- *       optimization — against a no-op baseline.</li>
- * </ul>
- */
+/// Benchmark for [FunctionOperand#apply] to measure the impact of skipping
+/// `convertTypes()` when operand types already match function parameter types.
+///
+/// The benchmark has two parts:
+///
+/// - **End-to-end apply()**: Compares FunctionOperand.apply() when types match (convertTypes
+///      skipped) vs when types mismatch (convertTypes called per row).
+/// - **Isolated convertTypes()**: Directly measures the per-row cost of
+///      convertTypes() on type-matching arguments — the exact overhead eliminated by the
+///      optimization — against a no-op baseline.
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @Fork(1)
@@ -151,10 +148,8 @@ public class BenchmarkFunctionOperand {
   // These directly measure the per-block overhead of convertTypes() on already-matching types,
   // which is the exact cost eliminated by the _needsConversion optimization.
 
-  /**
-   * Baseline: invoke the function on each row without calling convertTypes().
-   * This represents the optimized path (types match, convertTypes skipped).
-   */
+  /// Baseline: invoke the function on each row without calling convertTypes().
+  /// This represents the optimized path (types match, convertTypes skipped).
   @Benchmark
   public void invokeWithoutConvertTypes(Blackhole bh) {
     for (Object[] args : _matchingArgs) {
@@ -162,10 +157,8 @@ public class BenchmarkFunctionOperand {
     }
   }
 
-  /**
-   * Old path: call convertTypes() then invoke the function on each row.
-   * This represents the pre-optimization path (convertTypes always called).
-   */
+  /// Old path: call convertTypes() then invoke the function on each row.
+  /// This represents the pre-optimization path (convertTypes always called).
   @Benchmark
   public void invokeWithConvertTypes(Blackhole bh) {
     for (Object[] args : _matchingArgs) {
