@@ -41,6 +41,7 @@ import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.client.base.AbstractBaseResultSet;
@@ -458,6 +459,8 @@ public class PinotResultSet extends AbstractBaseResultSet {
         return parseJson(columnIndex, STRING_LIST_READER, "string array");
       case BYTES_ARRAY:
         return getBytesList(columnIndex);
+      case UUID_ARRAY:
+        return getUuidList(columnIndex);
       default:
         throw new SQLDataException("Data type is not an array: " + dataType);
     }
@@ -495,6 +498,23 @@ public class PinotResultSet extends AbstractBaseResultSet {
       return bytes;
     } catch (DecoderException e) {
       throw new SQLDataException("Error parsing bytes array", e);
+    }
+  }
+
+  private List<UUID> getUuidList(int columnIndex)
+      throws SQLException {
+    List<String> values = parseJson(columnIndex, STRING_LIST_READER, "UUID array");
+    if (values == null) {
+      return null;
+    }
+    List<UUID> uuids = new ArrayList<>(values.size());
+    try {
+      for (String value : values) {
+        uuids.add(value == null ? null : UUID.fromString(value));
+      }
+      return uuids;
+    } catch (IllegalArgumentException e) {
+      throw new SQLDataException("Error parsing UUID array", e);
     }
   }
 
