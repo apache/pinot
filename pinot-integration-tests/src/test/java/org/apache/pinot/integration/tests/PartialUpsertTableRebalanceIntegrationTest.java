@@ -26,7 +26,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.restlet.resources.PinotTableReloadStatusResponse;
@@ -250,6 +252,11 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       String reloadJobId = reloadStatus.get(REALTIME_TABLE_NAME).get("reloadJobId");
       waitForReloadToComplete(reloadJobId, 600_000L);
       waitForAllDocsLoaded(600_000L, 300);
+      // Reload job status only tracks per-segment reload completion, not IdealState settlement.
+      // For partial-upsert reload the CONSUMING segment is force-committed and a new CONSUMING
+      // segment is created; wait until IdealState settles (expected count, no OFFLINE) and
+      // ExternalView catches up, sustained across a few samples.
+      waitForClusterStateSettled(REALTIME_TABLE_NAME, 4, 5, 60_000L);
       verifyIdealState(4, NUM_SERVERS); // 4 because reload triggers commit of consuming segments
     } finally {
       deleteClusterConfig(CommonConstants.ConfigChangeListenerConstants.CONSUMING_SEGMENT_CONSISTENCY_MODE);
@@ -295,18 +302,26 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       Map<String, String> instanceStateMap = entry.getValue();
 
       // Verify that all segments have the correct state
-      assertEquals(instanceStateMap.size(), 1);
+      assertEquals(instanceStateMap.size(), 1,
+          "Segment " + segmentName + " has unexpected replica count. instanceStateMap=" + instanceStateMap
+              + ", assignment=" + segmentAssignment);
       Map.Entry<String, String> instanceIdAndState = instanceStateMap.entrySet().iterator().next();
       String state = instanceIdAndState.getValue();
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
       if (llcSegmentName != null) {
         if (llcSegmentName.getSequenceNumber() < maxSequenceNumber) {
-          assertEquals(state, CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE);
+          assertEquals(state, CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE,
+              "Older segment " + segmentName + " on instance " + instanceIdAndState.getKey()
+                  + " expected ONLINE. maxSeq=" + maxSequenceNumber + ", assignment=" + segmentAssignment);
         } else {
-          assertEquals(state, CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING);
+          assertEquals(state, CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING,
+              "Newest segment " + segmentName + " on instance " + instanceIdAndState.getKey()
+                  + " expected CONSUMING. maxSeq=" + maxSequenceNumber + ", assignment=" + segmentAssignment);
         }
       } else {
-        assertEquals(state, CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE);
+        assertEquals(state, CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE,
+            "Uploaded segment " + segmentName + " on instance " + instanceIdAndState.getKey()
+                + " expected ONLINE. assignment=" + segmentAssignment);
       }
 
       // Verify that all segments of the same partition are mapped to the same server
@@ -323,6 +338,50 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
   protected void verifyIdealState(int numSegmentsExpected, int numInstancesExpected) {
     IdealState idealState = HelixHelper.getTableIdealState(_helixManager, REALTIME_TABLE_NAME);
     verifySegmentAssignment(idealState.getRecord().getMapFields(), numSegmentsExpected, numInstancesExpected);
+  }
+
+  /// Waits until the cluster state has settled after a reload/rebalance:
+  ///
+  /// - IdealState has `expectedSegments` entries.
+  /// - No segment in IdealState has any instance in OFFLINE state.
+  /// - ExternalView equals IdealState (queries route via ExternalView, so this is required
+  ///   before asserting on IdealState).
+  ///
+  /// All conditions must hold for `stableSamples` consecutive polls, because IdealState can
+  /// transiently look correct between two intermediate states during force-commit +
+  /// new-consuming-segment creation.
+  protected void waitForClusterStateSettled(String tableNameWithType, int expectedSegments, int stableSamples,
+      long timeoutMs) {
+    AtomicInteger streak = new AtomicInteger(0);
+    TestUtils.waitForCondition(aVoid -> {
+      IdealState idealState = HelixHelper.getTableIdealState(_helixManager, tableNameWithType);
+      if (idealState == null) {
+        streak.set(0);
+        return false;
+      }
+      Map<String, Map<String, String>> isMap = idealState.getRecord().getMapFields();
+      if (isMap.size() != expectedSegments) {
+        streak.set(0);
+        return false;
+      }
+      boolean anyOffline = isMap.values().stream()
+          .flatMap(m -> m.values().stream())
+          .anyMatch(CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE::equals);
+      if (anyOffline) {
+        streak.set(0);
+        return false;
+      }
+      ExternalView externalView =
+          HelixHelper.getExternalViewForResource(_resourceManager.getHelixAdmin(),
+              _resourceManager.getHelixClusterName(), tableNameWithType);
+      if (externalView == null || !isMap.equals(externalView.getRecord().getMapFields())) {
+        streak.set(0);
+        return false;
+      }
+      return streak.incrementAndGet() >= stableSamples;
+    }, 200L, timeoutMs,
+        "Cluster state never settled to " + expectedSegments
+            + " segments with no OFFLINE and ExternalView == IdealState for table " + tableNameWithType);
   }
 
   protected void populateTables()

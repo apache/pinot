@@ -93,27 +93,23 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-/**
- * <ul>
- *   <li>Sample curl call to create broker tenant</li>
- *   curl -i -X POST -H 'Content-Type: application/json' -d
- *   '{
- *     "role" : "broker",
- *     "numberOfInstances : "5",
- *     "name" : "brokerOne"
- *   }' http://localhost:1234/tenants
- *
- *   <li>Sample curl call to create server tenant</li>
- *   curl -i -X POST -H 'Content-Type: application/json' -d
- *   '{
- *     "role" : "server",
- *     "numberOfInstances : "5",
- *     "name" : "serverOne",
- *     "offlineInstances" : "3",
- *     "realtimeInstances" : "2"
- *   }' http://localhost:1234/tenants
- * </ul>
- */
+/// - Sample curl call to create broker tenant
+///   curl -i -X POST -H 'Content-Type: application/json' -d
+///   '{
+///     "role" : "broker",
+///     "numberOfInstances : "5",
+///     "name" : "brokerOne"
+///   }' http://localhost:1234/tenants
+///
+/// - Sample curl call to create server tenant
+///   curl -i -X POST -H 'Content-Type: application/json' -d
+///   '{
+///     "role" : "server",
+///     "numberOfInstances : "5",
+///     "name" : "serverOne",
+///     "offlineInstances" : "3",
+///     "realtimeInstances" : "2"
+///   }' http://localhost:1234/tenants
 @Api(tags = Constants.TENANT_TAG, authorizations = {
     @Authorization(value = SWAGGER_AUTHORIZATION_KEY),
     @Authorization(value = DATABASE)
@@ -285,13 +281,11 @@ public class PinotTenantRestletResource {
     }
   }
 
-  /**
-   * This method expects a tenant name and will return a list of tables tagged on that tenant. It assumes that the
-   * tagname is for server tenants only.
-   * @param tenantName
-   * @param tenantType
-   * @return
-   */
+  /// This method expects a tenant name and will return a list of tables tagged on that tenant. It assumes that the
+  /// tagname is for server tenants only.
+  /// @param tenantName
+  /// @param tenantType
+  /// @return
   @GET
   @Path("/tenants/{tenantName}/tables")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TENANT)

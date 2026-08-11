@@ -37,14 +37,10 @@ public interface FSTIndexCreator extends IndexCreator {
     // FST indexes should do nothing when called for each row
   }
 
-  /**
-   * Adds the next document.
-   */
+  /// Adds the next document.
   void add(String document)
       throws IOException;
 
-  /**
-   * Adds a set of documents to the index
-   */
+  /// Adds a set of documents to the index
   void add(String[] document, int length);
 }

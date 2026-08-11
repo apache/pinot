@@ -36,40 +36,34 @@ public abstract class PinotDataBitSetV2 implements Closeable {
   protected PinotDataBuffer _dataBuffer;
   protected int _numBitsPerValue;
 
-  /**
-   * Decode integers starting at a given index. This is efficient
-   * because of simplified bitmath.
-   * @param index docId
-   * @return unpacked integer
-   */
+  /// Decode integers starting at a given index. This is efficient
+  /// because of simplified bitmath.
+  /// @param index docId
+  /// @return unpacked integer
   public abstract int readInt(long index);
 
-  /**
-   * Decode integers for a contiguous range of indexes represented by startIndex
-   * and length. This uses vectorization as much as possible for all the aligned
-   * reads and also takes care of the small byte-sized window of unaligned read.
-   * @param startIndex start docId
-   * @param length length
-   * @param out out array to store the unpacked integers
-   */
+  /// Decode integers for a contiguous range of indexes represented by startIndex
+  /// and length. This uses vectorization as much as possible for all the aligned
+  /// reads and also takes care of the small byte-sized window of unaligned read.
+  /// @param startIndex start docId
+  /// @param length length
+  /// @param out out array to store the unpacked integers
   public abstract void readInt(long startIndex, int length, int[] out);
 
-  /**
-   * Decode integers for an array of indexes which is not necessarily
-   * contiguous. So there could be gaps in the array:
-   * e.g: [1, 3, 7, 9, 11, 12]
-   * The actual read is done by the previous API since that is efficient
-   * as it exploits contiguity and uses vectorization. However, since
-   * the out[] array has to be correctly populated with the unpacked integer
-   * for each index, a post-processing step is needed after the bulk contiguous
-   * read to correctly set the unpacked integer into the out array throwing away
-   * the unnecessary values decoded as part of contiguous read
-   * @param docIds index array
-   * @param docIdsStartIndex starting index in the docIds array
-   * @param length length to read (number of docIds to read in the array)
-   * @param out out array to store the decoded integers
-   * @param outpos starting index in the out array
-   */
+  /// Decode integers for an array of indexes which is not necessarily
+  /// contiguous. So there could be gaps in the array:
+  /// e.g: \[1, 3, 7, 9, 11, 12\]
+  /// The actual read is done by the previous API since that is efficient
+  /// as it exploits contiguity and uses vectorization. However, since
+  /// the out\[\] array has to be correctly populated with the unpacked integer
+  /// for each index, a post-processing step is needed after the bulk contiguous
+  /// read to correctly set the unpacked integer into the out array throwing away
+  /// the unnecessary values decoded as part of contiguous read
+  /// @param docIds index array
+  /// @param docIdsStartIndex starting index in the docIds array
+  /// @param length length to read (number of docIds to read in the array)
+  /// @param out out array to store the decoded integers
+  /// @param outpos starting index in the out array
   public void readInt(int[] docIds, int docIdsStartIndex, int length, int[] out, int outpos) {
     int startDocId = docIds[docIdsStartIndex];
     int endDocId = docIds[docIdsStartIndex + length - 1];

@@ -42,28 +42,26 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Reader for IVF_FLAT (Inverted File with flat vectors) index.
- *
- * <p>Loads the entire index into memory at construction time for fast search.
- * The search algorithm:
- * <ol>
- *   <li>Computes distance from the query to all centroids.</li>
- *   <li>Selects the {@code nprobe} closest centroids.</li>
- *   <li>Scans all vectors in those centroids' inverted lists.</li>
- *   <li>Returns the top-K doc IDs as a bitmap.</li>
- * </ol>
- *
- * <h3>Thread safety</h3>
- * <p>This class is thread-safe for concurrent reads. The loaded index data is immutable
- * after construction. Query-scoped {@code nprobe} overrides are stored in a {@link ThreadLocal}
- * so concurrent queries cannot overwrite each other's search parameters.</p>
- */
+/// Reader for IVF_FLAT (Inverted File with flat vectors) index.
+///
+/// Loads the entire index into memory at construction time for fast search.
+/// The search algorithm:
+///
+/// 1. Computes distance from the query to all centroids.
+/// 2. Selects the `nprobe` closest centroids.
+/// 3. Scans all vectors in those centroids' inverted lists.
+/// 4. Returns the top-K doc IDs as a bitmap.
+///
+/// ## Thread safety
+///
+/// This class is thread-safe for concurrent reads. The loaded index data is immutable
+/// after construction. Query-scoped `nprobe` overrides are stored in a [ThreadLocal]
+/// so concurrent queries cannot overwrite each other's search parameters.
 public class IvfFlatVectorIndexReader
     implements FilterAwareVectorIndexReader, ApproximateRadiusVectorIndexReader, NprobeAware {
   private static final Logger LOGGER = LoggerFactory.getLogger(IvfFlatVectorIndexReader.class);
 
-  /** Default nprobe value when not explicitly set. */
+  /// Default nprobe value when not explicitly set.
   static final int DEFAULT_NPROBE = 4;
 
   // Backing buffer. Closed by this reader only when {@code _ownsBuffer} is true. Contents are
@@ -84,33 +82,29 @@ public class IvfFlatVectorIndexReader
   private final String _column;
   private final int _defaultNprobe;
 
-  /** Query-scoped nprobe override. Falls back to {@link #_defaultNprobe} when unset. */
+  /// Query-scoped nprobe override. Falls back to [#_defaultNprobe] when unset.
   private final ThreadLocal<Integer> _nprobeOverride = new ThreadLocal<>();
 
-  /**
-   * Opens and loads an IVF_FLAT index from the given buffer. The reader takes ownership of the
-   * buffer and closes it in {@link #close()}; use the four-arg overload to pass a borrowed
-   * buffer (e.g. one owned by the segment directory).
-   */
+  /// Opens and loads an IVF_FLAT index from the given buffer. The reader takes ownership of the
+  /// buffer and closes it in [#close()]; use the four-arg overload to pass a borrowed
+  /// buffer (e.g. one owned by the segment directory).
   public IvfFlatVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config) {
     this(column, buffer, config, /* ownsBuffer */ true);
   }
 
-  /**
-   * Opens and loads an IVF_FLAT index from the given buffer.
-   *
-   * <p>The buffer holds the full IVF_FLAT file contents. The reader heap-loads centroids and
-   * inverted lists at construction time, so the buffer can be released once the constructor
-   * returns.</p>
-   *
-   * @param column      the column name
-   * @param buffer      the IVF_FLAT index buffer (mapped or in-memory)
-   * @param config      the vector index configuration
-   * @param ownsBuffer  when {@code true}, the reader closes the buffer in {@link #close()} (or
-   *                    on constructor failure). Pass {@code false} when the buffer is owned by
-   *                    the segment directory (typed entry inside {@code columns.psf}).
-   * @throws RuntimeException if the index buffer cannot be read or is corrupt
-   */
+  /// Opens and loads an IVF_FLAT index from the given buffer.
+  ///
+  /// The buffer holds the full IVF_FLAT file contents. The reader heap-loads centroids and
+  /// inverted lists at construction time, so the buffer can be released once the constructor
+  /// returns.
+  ///
+  /// @param column      the column name
+  /// @param buffer      the IVF_FLAT index buffer (mapped or in-memory)
+  /// @param config      the vector index configuration
+  /// @param ownsBuffer  when `true`, the reader closes the buffer in [#close()] (or
+  ///                    on constructor failure). Pass `false` when the buffer is owned by
+  ///                    the segment directory (typed entry inside `columns.psf`).
+  /// @throws RuntimeException if the index buffer cannot be read or is corrupt
   public IvfFlatVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config,
       boolean ownsBuffer) {
     _column = column;
@@ -334,15 +328,13 @@ public class IvfFlatVectorIndexReader
     return result;
   }
 
-  /**
-   * Sets the number of centroids to probe during search.
-   * This allows query-time tuning of the recall/speed tradeoff.
-   *
-   * @param nprobe number of centroids to probe (clamped to [1, nlist])
-   *
-   * <p><b>Thread-safety note:</b> The override is stored in a thread-local so concurrent queries can
-   * tune nprobe independently on the same reader instance.</p>
-   */
+  /// Sets the number of centroids to probe during search.
+  /// This allows query-time tuning of the recall/speed tradeoff.
+  ///
+  /// @param nprobe number of centroids to probe (clamped to \[1, nlist\])
+  ///
+  /// **Thread-safety note:** The override is stored in a thread-local so concurrent queries can
+  /// tune nprobe independently on the same reader instance.
   @Override
   public void setNprobe(int nprobe) {
     if (nprobe < 1) {
@@ -356,9 +348,7 @@ public class IvfFlatVectorIndexReader
     _nprobeOverride.remove();
   }
 
-  /**
-   * Returns the current nprobe setting.
-   */
+  /// Returns the current nprobe setting.
   public int getNprobe() {
     Integer nprobeOverride = _nprobeOverride.get();
     return nprobeOverride != null ? nprobeOverride
@@ -378,10 +368,8 @@ public class IvfFlatVectorIndexReader
   // Internal helpers
   // -----------------------------------------------------------------------
 
-  /**
-   * Computes distance between two vectors using the configured distance function.
-   * Internally uses L2 for EUCLIDEAN/L2, cosine for COSINE, negative dot for INNER_PRODUCT/DOT_PRODUCT.
-   */
+  /// Computes distance between two vectors using the configured distance function.
+  /// Internally uses L2 for EUCLIDEAN/L2, cosine for COSINE, negative dot for INNER_PRODUCT/DOT_PRODUCT.
   private float computeDistance(float[] a, float[] b) {
     return VectorQuantizationUtils.computeDistance(a, b, _distanceFunction);
   }
@@ -390,13 +378,11 @@ public class IvfFlatVectorIndexReader
     return _quantizer.computeDistance(query, _listEncodedVectors[probeIdx][listOffset], _distanceFunction);
   }
 
-  /**
-   * Finds the n closest centroids to the given query vector.
-   *
-   * @param query  the query vector
-   * @param n      number of centroids to return
-   * @return array of centroid indices sorted by increasing distance
-   */
+  /// Finds the n closest centroids to the given query vector.
+  ///
+  /// @param query  the query vector
+  /// @param n      number of centroids to return
+  /// @return array of centroid indices sorted by increasing distance
   private int[] findClosestCentroids(float[] query, int n) {
     int[] bestIndices = new int[n];
     if (n == 0) {
@@ -509,9 +495,7 @@ public class IvfFlatVectorIndexReader
     return _quantizerType;
   }
 
-  /**
-   * A document with its computed distance, used in the max-heap during search.
-   */
+  /// A document with its computed distance, used in the max-heap during search.
   private static final class ScoredDoc {
     final int _docId;
     final float _distance;

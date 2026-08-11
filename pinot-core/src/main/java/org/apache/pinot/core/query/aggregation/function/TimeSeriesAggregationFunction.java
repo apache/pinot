@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -45,35 +46,33 @@ import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactory;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactoryProvider;
 
 
-/**
- * Aggregation function used by the Time Series Engine. This can't be used with SQL because the Object Serde is not yet
- * implemented. Though we don't plan on exposing this function anytime soon.
- * <h2>Converting Time Values to Bucket Indexes</h2>
- * <p>
- *   This aggregation function will map each scanned data point to a time bucket index. This is done using the
- *   formula: {@code ((timeValue + timeOffset) - timeReferencePoint - 1) / bucketSize}. The entire calculation is done
- *   in the Time Unit (seconds, ms, etc.) of the timeValue returned by the time expression chosen by the user.
- *   The method used to add values to the series builders is:
- *   {@link BaseTimeSeriesBuilder#addValueAtIndex(int, Double, long)}.
- * </p>
- * <p>
- *   The formula originates from the fact that we use half-open time intervals, which are open on the left.
- *   The timeReferencePoint is usually the start of the time-range being scanned. Assuming everything is in seconds,
- *   the time buckets can generally thought to look something like the following:
- *   <pre>
- *     (timeReferencePoint, timeReferencePoint + bucketSize]
- *     (timeReferencePoint + bucketSize, timeReferencePoint + 2 * bucketSize]
- *     ...
- *     (timeReferencePoint + (numBuckets - 1) * bucketSize, timeReferencePoint + numBuckets * bucketSize]
- *   </pre>
- * </p>
- * <p>
- *   Also, note that the timeReferencePoint is simply calculated as follows:
- *   <pre>
- *     timeReferencePointInSeconds = firstBucketValue - bucketSizeInSeconds
- *   </pre>
- * </p>
- */
+/// Aggregation function used by the Time Series Engine. This can't be used with SQL because the Object Serde is not yet
+/// implemented. Though we don't plan on exposing this function anytime soon.
+///
+/// # Converting Time Values to Bucket Indexes
+///
+///   This aggregation function will map each scanned data point to a time bucket index. This is done using the
+///   formula: `((timeValue + timeOffset) - timeReferencePoint - 1) / bucketSize`. The entire calculation is done
+///   in the Time Unit (seconds, ms, etc.) of the timeValue returned by the time expression chosen by the user.
+///   The method used to add values to the series builders is:
+///   [BaseTimeSeriesBuilder#addValueAtIndex(int, Double, long)].
+///
+///   The formula originates from the fact that we use half-open time intervals, which are open on the left.
+///   The timeReferencePoint is usually the start of the time-range being scanned. Assuming everything is in seconds,
+///   the time buckets can generally thought to look something like the following:
+///
+/// ```
+/// (timeReferencePoint, timeReferencePoint + bucketSize]
+/// (timeReferencePoint + bucketSize, timeReferencePoint + 2 * bucketSize]
+/// ...
+/// (timeReferencePoint + (numBuckets - 1) * bucketSize, timeReferencePoint + numBuckets * bucketSize]
+/// ```
+///
+///   Also, note that the timeReferencePoint is simply calculated as follows:
+///
+/// ```
+/// timeReferencePointInSeconds = firstBucketValue - bucketSizeInSeconds
+/// ```
 public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTimeSeriesBuilder, DoubleArrayList> {
   private final TimeSeriesBuilderFactory _factory;
   private final AggInfo _aggInfo;
@@ -84,13 +83,12 @@ public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTi
   private final long _timeOffset;
   private final long _timeBucketDivisor;
 
-  /**
-   * Arguments are as shown below:
-   * <pre>
-   *   timeSeriesAggregate("m3ql", "MIN", valueExpr, timeExpr, timeUnit, offsetSeconds, firstBucketValue,
-   *       bucketLenSeconds, numBuckets, "aggParam1=value1")
-   * </pre>
-   */
+  /// Arguments are as shown below:
+  ///
+  /// ```
+  /// timeSeriesAggregate("m3ql", "MIN", valueExpr, timeExpr, timeUnit, offsetSeconds, firstBucketValue,
+  ///     bucketLenSeconds, numBuckets, "aggParam1=value1")
+  /// ```
   public TimeSeriesAggregationFunction(List<ExpressionContext> arguments) {
     // Initialize temporary variables.
     Preconditions.checkArgument(arguments.size() == 10, "Expected 10 arguments for time-series agg");
@@ -187,11 +185,13 @@ public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTi
     throw new UnsupportedOperationException("MV not supported yet");
   }
 
+  @Nullable
   @Override
   public BaseTimeSeriesBuilder extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public BaseTimeSeriesBuilder extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
@@ -213,8 +213,13 @@ public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTi
     return DataSchema.ColumnDataType.OBJECT;
   }
 
+  @Nullable
   @Override
-  public DoubleArrayList extractFinalResult(BaseTimeSeriesBuilder seriesBuilder) {
+  public DoubleArrayList extractFinalResult(@Nullable BaseTimeSeriesBuilder seriesBuilder) {
+    // A null intermediate result means nothing was aggregated, and there is no series to build
+    if (seriesBuilder == null) {
+      return null;
+    }
     Double[] doubleValues = seriesBuilder.build().getDoubleValues();
     return new DoubleArrayList(Arrays.asList(doubleValues));
   }

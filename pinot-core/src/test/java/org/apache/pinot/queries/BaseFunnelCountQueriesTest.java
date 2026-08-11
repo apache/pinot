@@ -53,10 +53,8 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Base queries test for FUNNEL_COUNT queries.
- * Each strategy gets its own test.
- */
+/// Base queries test for FUNNEL_COUNT queries.
+/// Each strategy gets its own test.
 @SuppressWarnings("rawtypes")
 abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
   protected static final File INDEX_DIR =

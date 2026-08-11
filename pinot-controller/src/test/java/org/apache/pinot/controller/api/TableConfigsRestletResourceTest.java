@@ -33,7 +33,10 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TunerConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -52,9 +55,7 @@ import org.testng.collections.Lists;
 import static org.testng.Assert.fail;
 
 
-/**
- * Tests for CRUD APIs of {@link TableConfigs}
- */
+/// Tests for CRUD APIs of [TableConfigs]
 public class TableConfigsRestletResourceTest extends ControllerTest {
   @BeforeClass
   public void setUp()
@@ -314,9 +315,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     adminClient.getTableClient().deleteTableConfigs(tableName3, null);
   }
 
-  /**
-   * Tests for creation of TableConfigs
-   */
+  /// Tests for creation of TableConfigs
   @Test
   public void testCreateConfig()
       throws Exception {
@@ -513,6 +512,106 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
   }
 
   @Test
+  public void testNonDeterministicTransformCreateAndLegacyUpdate()
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
+    String tableName = "legacyNonDeterministicTableConfigs";
+    Schema schema = createDummySchema(tableName);
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("dimA", "now()")));
+    TableConfig legacyOfflineConfig = getBaseTableConfigBuilder(tableName, TableType.OFFLINE)
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, legacyOfflineConfig, null);
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    try {
+      String createError = Assert.expectThrows(Exception.class,
+              () -> adminClient.getTableClient().createTableConfigs(tableConfigs.toPrettyJsonString(), null, null))
+          .getMessage();
+      Assert.assertTrue(createError.contains("Function 'now' has VOLATILE volatility"), createError);
+
+      // Seed the config below the REST validation layer to model a table persisted before this validation existed.
+      DEFAULT_INSTANCE.addSchema(schema);
+      DEFAULT_INSTANCE.getHelixResourceManager().addTable(legacyOfflineConfig);
+
+      TableConfigs update = adminClient.getTableClient().getTableConfigsObject(tableName);
+      update.getOffline().getValidationConfig().setRetentionTimeValue("10");
+      adminClient.getTableClient()
+          .updateTableConfigs(tableName, update.toPrettyJsonString(), null, false, false);
+
+      TableConfigs stored = adminClient.getTableClient().getTableConfigsObject(tableName);
+      Assert.assertEquals(stored.getOffline().getValidationConfig().getRetentionTimeValue(), "10");
+      Assert.assertEquals(stored.getOffline().getIngestionConfig().getTransformConfigs().get(0).getTransformFunction(),
+          "now()");
+
+      IngestionConfig changedIngestionConfig = new IngestionConfig();
+      changedIngestionConfig.setTransformConfigs(List.of(new TransformConfig("dimA", "plus(now(), 1)")));
+      update.getOffline().setIngestionConfig(changedIngestionConfig);
+      String updateError = Assert.expectThrows(Exception.class,
+              () -> adminClient.getTableClient()
+                  .updateTableConfigs(tableName, update.toPrettyJsonString(), null, false, false))
+          .getMessage();
+      Assert.assertTrue(updateError.contains("Function 'now' has VOLATILE volatility"), updateError);
+    } finally {
+      if (DEFAULT_INSTANCE.getHelixResourceManager().hasTable(tableNameWithType)) {
+        adminClient.getTableClient().deleteTableConfigs(tableName, null);
+      } else if (DEFAULT_INSTANCE.getHelixResourceManager().getSchema(tableName) != null) {
+        adminClient.getSchemaClient().deleteSchema(tableName);
+      }
+    }
+  }
+
+  @Test
+  public void testNonDeterministicSchemaTransformCreateAndLegacyUpdate()
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
+    String tableName = "legacyNonDeterministicSchemaTableConfigs";
+    Schema schema = createDummySchema(tableName);
+    schema.getFieldSpecFor("dimA").setTransformFunction("now()");
+    TableConfig legacyOfflineConfig = getBaseTableConfigBuilder(tableName, TableType.OFFLINE).build();
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, legacyOfflineConfig, null);
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    try {
+      String createError = Assert.expectThrows(Exception.class,
+              () -> adminClient.getTableClient().createTableConfigs(tableConfigs.toPrettyJsonString(), null, null))
+          .getMessage();
+      Assert.assertTrue(createError.contains("Function 'now' has VOLATILE volatility"), createError);
+
+      // Seed below the REST validation layer to model a table and schema persisted before this validation existed.
+      DEFAULT_INSTANCE.getHelixResourceManager().addSchema(schema, false, false);
+      DEFAULT_INSTANCE.getHelixResourceManager().addTable(legacyOfflineConfig);
+
+      TableConfigs update = adminClient.getTableClient().getTableConfigsObject(tableName);
+      update.getSchema().addField(new DimensionFieldSpec("newColumn", FieldSpec.DataType.STRING, true));
+      adminClient.getTableClient().validateTableConfigs(update.toPrettyJsonString(), null);
+      adminClient.getTableClient()
+          .updateTableConfigs(tableName, update.toPrettyJsonString(), null, false, false);
+
+      TableConfigs stored = adminClient.getTableClient().getTableConfigsObject(tableName);
+      Assert.assertTrue(stored.getSchema().hasColumn("newColumn"));
+      Assert.assertEquals(stored.getSchema().getFieldSpecFor("dimA").getTransformFunction(), "now()");
+
+      update.getSchema().getFieldSpecFor("dimA").setTransformFunction("plus(now(), 1)");
+      String validationError = Assert.expectThrows(Exception.class,
+              () -> adminClient.getTableClient().validateTableConfigs(update.toPrettyJsonString(), null))
+          .getMessage();
+      Assert.assertTrue(validationError.contains("Function 'now' has VOLATILE volatility"), validationError);
+      String updateError = Assert.expectThrows(Exception.class,
+              () -> adminClient.getTableClient()
+                  .updateTableConfigs(tableName, update.toPrettyJsonString(), null, false, false))
+          .getMessage();
+      Assert.assertTrue(updateError.contains("Function 'now' has VOLATILE volatility"), updateError);
+    } finally {
+      if (DEFAULT_INSTANCE.getHelixResourceManager().hasTable(tableNameWithType)) {
+        adminClient.getTableClient().deleteTableConfigs(tableName, null);
+      } else if (DEFAULT_INSTANCE.getHelixResourceManager().getSchema(tableName) != null) {
+        adminClient.getSchemaClient().deleteSchema(tableName);
+      }
+    }
+  }
+
+  @Test
   public void testForceUpdateTableSchemaAndConfigs()
       throws Exception {
     PinotAdminClient adminClient = getOrCreateAdminClient();
@@ -674,9 +773,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     adminClient.getTableClient().deleteTableConfigs(tableName, null);
   }
 
-  /**
-   * Tests get TableConfigs for backwards compatibility
-   */
+  /// Tests get TableConfigs for backwards compatibility
   @Test
   public void testGetConfigCompatibility()
       throws Exception {

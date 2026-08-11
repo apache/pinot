@@ -436,9 +436,7 @@ public class QueryOptimizerTest {
     }
   }
 
-  /**
-   * Handles different order of children under AND/OR filter.
-   */
+  /// Handles different order of children under AND/OR filter.
   private static void compareFilterExpressionChildren(List<Expression> actual, List<Expression> expected) {
     assertEquals(actual.size(), expected.size());
     List<Expression> unmatchedExpectedChildren = new ArrayList<>(expected);

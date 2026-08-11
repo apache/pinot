@@ -40,15 +40,13 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * End-to-end integration test for IVF_FLAT with {@code storeInSegmentFile=true}.
- *
- * <p>Mirrors the table-config layout in {@link IvfFlatVectorTest} but with the consolidation
- * flag turned on. The first server load absorbs the offline-built combined into {@code
- * columns.psf}; subsequent queries read the typed entry directly from the segment's combined
- * index file. The single test method asserts that a {@code vectorSimilarity} query returns
- * sensible top-K ANN candidates — i.e. the consolidated read path actually executes.</p>
- */
+/// End-to-end integration test for IVF_FLAT with `storeInSegmentFile=true`.
+///
+/// Mirrors the table-config layout in [IvfFlatVectorTest] but with the consolidation
+/// flag turned on. The first server load absorbs the offline-built combined into `columns.psf` ; subsequent queries
+/// read the typed entry directly from the segment's combined
+/// index file. The single test method asserts that a `vectorSimilarity` query returns
+/// sensible top-K ANN candidates — i.e. the consolidated read path actually executes.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class IvfFlatConsolidatedVectorTest extends CustomDataQueryClusterIntegrationTest {
 
@@ -124,13 +122,11 @@ public class IvfFlatConsolidatedVectorTest extends CustomDataQueryClusterIntegra
     }
   }
 
-  /**
-   * End-to-end: writes a segment with {@code storeInSegmentFile=true}, loads it onto a server,
-   * and runs an ANN query. Passes iff (a) the server can load the segment without error (proves
-   * the consolidated reader path resolves and reads the typed entry from {@code columns.psf}),
-   * and (b) the query returns rows ordered by L2 distance ascending (proves the consolidated
-   * IVF payload is interpreted correctly).
-   */
+  /// End-to-end: writes a segment with `storeInSegmentFile=true`, loads it onto a server,
+  /// and runs an ANN query. Passes iff (a) the server can load the segment without error (proves
+  /// the consolidated reader path resolves and reads the typed entry from `columns.psf`),
+  /// and (b) the query returns rows ordered by L2 distance ascending (proves the consolidated
+  /// IVF payload is interpreted correctly).
   @Test(dataProvider = "useBothQueryEngines")
   public void testConsolidatedIvfFlatVectorSimilarity(boolean useMultiStageQueryEngine)
       throws Exception {

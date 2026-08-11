@@ -28,9 +28,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class for command to start Kafka.
- */
+/// Class for command to start Kafka.
 @CommandLine.Command(name = "StartKafka", mixinStandardHelpOptions = true)
 public class StartKafkaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartKafkaCommand.class);

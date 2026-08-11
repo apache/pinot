@@ -33,10 +33,8 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
 
 
-/**
- * Broker response for multi-stage engine.
- * TODO: Currently this class cannot be used to deserialize the JSON response.
- */
+/// Broker response for multi-stage engine.
+/// TODO: Currently this class cannot be used to deserialize the JSON response.
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
     "numGroupsWarningLimitReached", "numGroups", "earlyTerminationReasons", "maxRowsInJoinReached",
@@ -66,24 +64,18 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   private boolean _maxRowsInWindowReached;
   private long _maxRowsInWindow;
   private long _timeUsedMs;
-  /**
-   * Statistics for each stage of the query execution.
-   */
+  /// Statistics for each stage of the query execution.
   private ObjectNode _stageStats;
-  /**
-   * Stream-mode stats coverage, populated only when the query used {@code SubmitWithStream}. An array indexed by stage
-   * id; each element is an object with {@code responded}, {@code mergeFailed}, and {@code missing} counters, or
-   * {@code null} for stages that have no coverage info (e.g. stage 0 which runs broker-local).
-   */
+  /// Stream-mode stats coverage, populated only when the query used `SubmitWithStream`. An array indexed by stage
+  /// id; each element is an object with `responded`, `mergeFailed`, and `missing` counters, or
+  /// `null` for stages that have no coverage info (e.g. stage 0 which runs broker-local).
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private ArrayNode _streamStatsCoverage;
-  /**
-   * The max number of rows seen at runtime.
-   * <p>
-   * In single-stage this doesn't make sense given it is the max number of rows read from the table. But in multi-stage
-   * virtual rows can be generated. For example, in a join query, the number of rows can be more than the number of rows
-   * in the table.
-   */
+  /// The max number of rows seen at runtime.
+  ///
+  /// In single-stage this doesn't make sense given it is the max number of rows read from the table. But in multi-stage
+  /// virtual rows can be generated. For example, in a join query, the number of rows can be more than the number of
+  /// rows in the table.
   private long _maxRowsInOperator;
   private String _requestId;
   private String _clientRequestId;
@@ -245,9 +237,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     _maxRowsInWindow = Math.max(_maxRowsInWindow, maxRowsInWindow);
   }
 
-  /**
-   * Returns the stage statistics.
-   */
+  /// Returns the stage statistics.
   public ObjectNode getStageStats() {
     return _stageStats;
   }
@@ -256,10 +246,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     _stageStats = stageStats;
   }
 
-  /**
-   * Returns the stream-mode stats coverage, or {@code null} when the query ran in legacy mode. Array indexed by stage
-   * id; elements may be {@code null} for stages with no coverage (e.g. stage 0).
-   */
+  /// Returns the stream-mode stats coverage, or `null` when the query ran in legacy mode. Array indexed by stage
+  /// id; elements may be `null` for stages with no coverage (e.g. stage 0).
   @Nullable
   public ArrayNode getStreamStatsCoverage() {
     return _streamStatsCoverage;
@@ -269,9 +257,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     _streamStatsCoverage = streamStatsCoverage;
   }
 
-  /**
-   * Returns the maximum number of rows seen by a single operator in the query processing chain.
-   */
+  /// Returns the maximum number of rows seen by a single operator in the query processing chain.
   public long getMaxRowsInOperator() {
     return _maxRowsInOperator;
   }

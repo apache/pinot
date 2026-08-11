@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -304,12 +305,14 @@ public class FunnelEventsFunctionEvalAggregationFunction
     return stepEvents;
   }
 
+  @Nullable
   @Override
   public PriorityQueue<FunnelStepEventWithExtraFields> extractAggregationResult(
       AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public PriorityQueue<FunnelStepEventWithExtraFields> extractGroupByResult(GroupByResultHolder groupByResultHolder,
       int groupKey) {
@@ -320,12 +323,6 @@ public class FunnelEventsFunctionEvalAggregationFunction
   public PriorityQueue<FunnelStepEventWithExtraFields> merge(
       PriorityQueue<FunnelStepEventWithExtraFields> intermediateResult1,
       PriorityQueue<FunnelStepEventWithExtraFields> intermediateResult2) {
-    if (intermediateResult1 == null) {
-      return intermediateResult2;
-    }
-    if (intermediateResult2 == null) {
-      return intermediateResult1;
-    }
     intermediateResult1.addAll(intermediateResult2);
     return intermediateResult1;
   }
@@ -386,14 +383,12 @@ public class FunnelEventsFunctionEvalAggregationFunction
     throw new IllegalArgumentException("Unsupported serialized intermediate result version: " + customObject.getType());
   }
 
-  /**
-   * Fill the sliding window with the events that fall into the window.
-   * Note that the events from stepEvents are dequeued and added to the sliding window.
-   * This method ensure the first event from the sliding window is the first step event.
-   *
-   * @param stepEvents    The priority queue of step events
-   * @param slidingWindow The sliding window with events that fall into the window
-   */
+  /// Fill the sliding window with the events that fall into the window.
+  /// Note that the events from stepEvents are dequeued and added to the sliding window.
+  /// This method ensure the first event from the sliding window is the first step event.
+  ///
+  /// @param stepEvents    The priority queue of step events
+  /// @param slidingWindow The sliding window with events that fall into the window
   protected void fillWindow(PriorityQueue<FunnelStepEventWithExtraFields> stepEvents,
       ArrayDeque<FunnelStepEventWithExtraFields> slidingWindow) {
     // Ensure for the sliding window, the first event is the first step
@@ -453,7 +448,8 @@ public class FunnelEventsFunctionEvalAggregationFunction
   }
 
   @Override
-  public ObjectArrayList<String> extractFinalResult(PriorityQueue<FunnelStepEventWithExtraFields> stepEvents) {
+  public ObjectArrayList<String> extractFinalResult(
+      @Nullable PriorityQueue<FunnelStepEventWithExtraFields> stepEvents) {
     ObjectArrayList<String> finalResults = new ObjectArrayList<>();
     List<List<Object[]>> matchedFunnelEventsExtraFields = new ArrayList<>(_numExtraFields);
     if (stepEvents == null || stepEvents.isEmpty()) {
@@ -554,12 +550,6 @@ public class FunnelEventsFunctionEvalAggregationFunction
   @Override
   public ObjectArrayList<String> mergeFinalResult(ObjectArrayList<String> finalResult1,
       ObjectArrayList<String> finalResult2) {
-    if (finalResult1 == null) {
-      return finalResult2;
-    }
-    if (finalResult2 == null) {
-      return finalResult1;
-    }
     finalResult1.addAll(finalResult2);
     return finalResult1;
   }

@@ -58,9 +58,7 @@ public class AggregateWindowFunction extends WindowFunction {
     return _windowFrame.isRowType() ? processRowsWindowWithExclude(rows) : processRangeWindowWithExclude(rows);
   }
 
-  /**
-   * Process windows where both ends are unbounded. Both ROWS and RANGE windows can be processed similarly.
-   */
+  /// Process windows where both ends are unbounded. Both ROWS and RANGE windows can be processed similarly.
   private List<Object> processUnboundedPrecedingAndFollowingWindow(List<Object[]> rows) {
     // Process all rows at once
     for (Object[] row : rows) {
@@ -177,10 +175,8 @@ public class AggregateWindowFunction extends WindowFunction {
     }
   }
 
-  /**
-   * ROWS frame with a non-default EXCLUDE clause. Loads the base frame into the aggregator and removes / re-adds the
-   * excluded values per row. Peer-group boundaries are precomputed once per partition.
-   */
+  /// ROWS frame with a non-default EXCLUDE clause. Loads the base frame into the aggregator and removes / re-adds the
+  /// excluded values per row. Peer-group boundaries are precomputed once per partition.
   private List<Object> processRowsWindowWithExclude(List<Object[]> rows) {
     int numRows = rows.size();
     WindowNode.WindowExclusion exclude = _windowFrame.getExclude();
@@ -230,10 +226,8 @@ public class AggregateWindowFunction extends WindowFunction {
     return result;
   }
 
-  /**
-   * RANGE frame with a non-default EXCLUDE clause. The frame for each row is determined by its peer group; we maintain
-   * the aggregator state corresponding to the base frame and apply per-row EXCLUDE corrections.
-   */
+  /// RANGE frame with a non-default EXCLUDE clause. The frame for each row is determined by its peer group; we maintain
+  /// the aggregator state corresponding to the base frame and apply per-row EXCLUDE corrections.
   private List<Object> processRangeWindowWithExclude(List<Object[]> rows) {
     int numRows = rows.size();
     int[] peerStart = new int[numRows];
@@ -324,11 +318,9 @@ public class AggregateWindowFunction extends WindowFunction {
     throw new IllegalStateException("RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
   }
 
-  /**
-   * Removes (when {@code remove} is true) or re-adds (otherwise) the rows in the EXCLUDE set, restricted to the base
-   * frame {@code [frameStart, frameEnd]}. The exclude set is derived from the current row {@code i} and its peer group
-   * {@code [pStart, pEnd]} as defined by SQL's EXCLUDE clause.
-   */
+  /// Removes (when `remove` is true) or re-adds (otherwise) the rows in the EXCLUDE set, restricted to the base
+  /// frame `[frameStart, frameEnd]`. The exclude set is derived from the current row `i` and its peer group
+  /// `[pStart, pEnd]` as defined by SQL's EXCLUDE clause.
   private void applyExclude(List<Object[]> rows, int i, int frameStart, int frameEnd, int pStart, int pEnd,
       WindowNode.WindowExclusion exclude, boolean remove) {
     switch (exclude) {

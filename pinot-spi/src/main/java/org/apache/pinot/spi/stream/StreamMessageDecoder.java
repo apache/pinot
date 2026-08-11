@@ -27,10 +27,8 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
-/**
- * Interface for a decoder of messages fetched from the stream
- * @param <T>
- */
+/// Interface for a decoder of messages fetched from the stream
+/// @param <T>
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface StreamMessageDecoder<T> {
@@ -38,52 +36,44 @@ public interface StreamMessageDecoder<T> {
   String RECORD_EXTRACTOR_CONFIG_KEY = "recordExtractorClass";
   String RECORD_EXTRACTOR_CONFIG_CONFIG_KEY = "recordExtractorConfigClass";
 
-  /**
-   * Initializes the decoder.
-   *
-   * @param props Decoder properties extracted from the {@link StreamConfig}
-   * @param fieldsToRead The fields to read from the source stream. If blank, reads all fields (only for AVRO/JSON
-   *                     currently)
-   * @param topicName Topic name of the stream
-   * @throws Exception If an error occurs
-   */
+  /// Initializes the decoder.
+  ///
+  /// @param props Decoder properties extracted from the [StreamConfig]
+  /// @param fieldsToRead The fields to read from the source stream. If blank, reads all fields (only for AVRO/JSON
+  ///                     currently)
+  /// @param topicName Topic name of the stream
+  /// @throws Exception If an error occurs
   default void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
       throws Exception {
     throw new UnsupportedOperationException("init method not implemented");
   }
 
-  /**
-   * Initializes the decoder.
-   * @param streamConfig Can be derived from tableConfig but is passed explicitly to avoid redundant computation
-   * @param tableConfig Table Config of the table
-   * @param schema Schema of the table
-   * @throws Exception
-   */
+  /// Initializes the decoder.
+  /// @param streamConfig Can be derived from tableConfig but is passed explicitly to avoid redundant computation
+  /// @param tableConfig Table Config of the table
+  /// @param schema Schema of the table
+  /// @throws Exception
   default void init(Set<String> fieldsToRead, StreamConfig streamConfig, TableConfig tableConfig, Schema schema)
       throws Exception {
     init(streamConfig.getDecoderProperties(), fieldsToRead, streamConfig.getTopicName());
   }
 
-  /**
-   * Decodes a row.
-   *
-   * @param payload The buffer from which to read the row.
-   * @return A new row decoded from the buffer. If the returned value is <code>null</code> the row is dropped from the
-   *         segment.
-   */
+  /// Decodes a row.
+  ///
+  /// @param payload The buffer from which to read the row.
+  /// @return A new row decoded from the buffer. If the returned value is `null` the row is dropped from the
+  ///         segment.
   @Nullable
   GenericRow decode(T payload, GenericRow destination);
 
-  /**
-   * Decodes a row.
-   *
-   * @param payload The buffer from which to read the row.
-   * @param offset The offset into the array from which the row contents starts
-   * @param length The length of the row contents in bytes
-   * @param destination The {@link GenericRow} to write the decoded row into
-   * @return A new row decoded from the buffer If the returned value is <code>null</code> the row is dropped from the
-   *         segment.
-   */
+  /// Decodes a row.
+  ///
+  /// @param payload The buffer from which to read the row.
+  /// @param offset The offset into the array from which the row contents starts
+  /// @param length The length of the row contents in bytes
+  /// @param destination The [GenericRow] to write the decoded row into
+  /// @return A new row decoded from the buffer If the returned value is `null` the row is dropped from the
+  ///         segment.
   @Nullable
   GenericRow decode(T payload, int offset, int length, GenericRow destination);
 }

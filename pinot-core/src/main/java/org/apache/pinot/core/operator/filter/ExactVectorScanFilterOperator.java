@@ -42,22 +42,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Fallback operator that performs exact brute-force vector similarity search by scanning the forward index.
- *
- * <p>This operator is used when no ANN vector index exists on a segment for the target column
- * (e.g., the segment was built before the vector index was added, or the index type is not
- * supported). It reads all vectors from the forward index, computes exact distances to the
- * query vector, and returns the top-K closest document IDs.</p>
- *
- * <p>The distance computation uses L2 (Euclidean) squared distance. For COSINE similarity,
- * vectors should be pre-normalized. This matches the behavior of Lucene's HNSW implementation.</p>
- *
- * <p>This operator is intentionally simple and correct rather than fast -- it is a safety net.
- * A warning is logged when this operator is used because it scans all documents in the segment.</p>
- *
- * <p>This class is thread-safe for single-threaded execution per query (same as other filter operators).</p>
- */
+/// Fallback operator that performs exact brute-force vector similarity search by scanning the forward index.
+///
+/// This operator is used when no ANN vector index exists on a segment for the target column
+/// (e.g., the segment was built before the vector index was added, or the index type is not
+/// supported). It reads all vectors from the forward index, computes exact distances to the
+/// query vector, and returns the top-K closest document IDs.
+///
+/// The distance computation uses L2 (Euclidean) squared distance. For COSINE similarity,
+/// vectors should be pre-normalized. This matches the behavior of Lucene's HNSW implementation.
+///
+/// This operator is intentionally simple and correct rather than fast -- it is a safety net.
+/// A warning is logged when this operator is used because it scans all documents in the segment.
+///
+/// This class is thread-safe for single-threaded execution per query (same as other filter operators).
 public class ExactVectorScanFilterOperator extends BaseFilterOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExactVectorScanFilterOperator.class);
   private static final String EXPLAIN_NAME = "VECTOR_SIMILARITY_EXACT_SCAN";
@@ -70,14 +68,12 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
   private final float _distanceThreshold;
   private ImmutableRoaringBitmap _matches;
 
-  /**
-   * Creates an exact scan operator.
-   *
-   * @param forwardIndexReader the forward index reader for the vector column
-   * @param predicate the vector similarity predicate containing query vector and top-K
-   * @param column the column name (for logging and explain)
-   * @param numDocs the total number of documents in the segment
-   */
+  /// Creates an exact scan operator.
+  ///
+  /// @param forwardIndexReader the forward index reader for the vector column
+  /// @param predicate the vector similarity predicate containing query vector and top-K
+  /// @param column the column name (for logging and explain)
+  /// @param numDocs the total number of documents in the segment
   public ExactVectorScanFilterOperator(ForwardIndexReader<?> forwardIndexReader,
       VectorSimilarityPredicate predicate, String column, int numDocs) {
     this(forwardIndexReader, predicate, column, numDocs, null, "vector_index_missing",
@@ -175,11 +171,9 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
     attributeBuilder.putLongIdempotent("topKtoSearch", _predicate.getTopK());
   }
 
-  /**
-   * Performs brute-force exact search over all documents in the segment.
-   * When a distance threshold is set, returns all vectors within the threshold.
-   * Otherwise uses a max-heap to maintain the top-K closest vectors.
-   */
+  /// Performs brute-force exact search over all documents in the segment.
+  /// When a distance threshold is set, returns all vectors within the threshold.
+  /// Otherwise uses a max-heap to maintain the top-K closest vectors.
   @SuppressWarnings("unchecked")
   private ImmutableRoaringBitmap computeExactTopK() {
     LOGGER.warn("Performing exact vector scan fallback on column: {} for segment with {} docs. "
@@ -231,9 +225,7 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
     return result;
   }
 
-  /**
-   * Performs brute-force threshold scan: returns all vectors within the distance threshold.
-   */
+  /// Performs brute-force threshold scan: returns all vectors within the distance threshold.
   @SuppressWarnings("unchecked")
   private ImmutableRoaringBitmap computeExactThreshold(float[] queryVector) {
     MutableRoaringBitmap result = new MutableRoaringBitmap();
@@ -260,11 +252,9 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
     return result.toImmutableRoaringBitmap();
   }
 
-  /**
-   * Computes the squared L2 (Euclidean) distance between two vectors.
-   * Delegates to {@link VectorFunctions#euclideanDistance(float[], float[])} which returns
-   * the sum of squared differences (no sqrt), sufficient for ranking.
-   */
+  /// Computes the squared L2 (Euclidean) distance between two vectors.
+  /// Delegates to [VectorFunctions#euclideanDistance(float[], float[])] which returns
+  /// the sum of squared differences (no sqrt), sufficient for ranking.
   static float computeL2SquaredDistance(float[] a, float[] b) {
     return VectorDistanceUtils.computeDistance(a, b, VectorIndexConfig.VectorDistanceFunction.L2);
   }
@@ -280,9 +270,7 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
     }
   }
 
-  /**
-   * Simple holder for document ID and its distance to the query vector.
-   */
+  /// Simple holder for document ID and its distance to the query vector.
   private static final class DocDistance {
     final int _docId;
     final float _distance;

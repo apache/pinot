@@ -52,9 +52,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-/**
- * Debug endpoint to check memory allocation.
- */
+/// Debug endpoint to check memory allocation.
 @Api(value = "debug", description = "Debug information", tags = "Debug",
     authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
         @Authorization(value = DATABASE)})

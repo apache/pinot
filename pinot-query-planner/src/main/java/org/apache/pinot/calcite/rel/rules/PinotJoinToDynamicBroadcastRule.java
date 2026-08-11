@@ -33,82 +33,69 @@ import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 
 
-/**
- * Special rule for Pinot, this rule transposing an INNER JOIN into dynamic broadcast join for the leaf stage.
- *
- * <p>Consider the following INNER JOIN plan
- *
- *                  ...                                     ...
- *                   |                                       |
- *             [ Transform ]                           [ Transform ]
- *                   |                                       |
- *             [ Inner Join ]                     [ Pass-through xChange ]
- *             /            \                          /
- *        [xChange]      [xChange]              [Inner Join] <----
- *           /                \                      /            \
- *     [ Transform ]     [ Transform ]         [ Transform ]       \
- *          |                  |                    |               \
- *     [Proj/Filter]     [Proj/Filter]         [Proj/Filter]  <------\
- *          |                  |                    |                 \
- *     [Table Scan ]     [Table Scan ]         [Table Scan ]       [xChange]
- *                                                                      \
- *                                                                 [ Transform ]
- *                                                                       |
- *                                                                 [Proj/Filter]
- *                                                                       |
- *                                                                 [Table Scan ]
- *
- * <p> This rule is one part of the overall mechanism and this rule only does the following
- *
- *                 ...                                      ...
- *                  |                                        |
- *            [ Transform ]                             [ Transform ]
- *                  |                                       /
- *            [ Inner Join ]                     [Pass-through xChange]
- *            /            \                            /
- *       [xChange]      [xChange]          |----[Dyn. Broadcast]   <-----
- *          /                \             |           |                 \
- *    [ Transform ]     [ Transform ]      |----> [ Inner Join ]      [xChange]
- *         |                  |            |           |                   \
- *    [Proj/Filter]     [Proj/Filter]      |      [ Transform ]       [ Transform ]
- *         |                  |            |          |                    |
- *    [Table Scan ]     [Table Scan ]      |----> [Proj/Filter]       [Proj/Filter]
- *                                                     |                    |
- *                                                [Table Scan ]       [Table Scan ]
- *
- *
- *
- * <p> The next part to extend the Dynamic broadcast into the Proj/Filter operator happens in the runtime.
- *
- * <p> This rewrite is only useful if we can ensure that:
- * <ul>
- *   <li>new plan can leverage the indexes and fast filtering of the leaf-stage Pinot server processing logic.</li>
- *   <li>
- *     data sending over xChange should be relatively small comparing to data would've been selected out if the dynamic
- *     broadcast is not applied.
- *   </li>
- *   <li>
- *     since leaf-stage operator can only process a typical Pinot V1 engine chain-operator chain. This means the entire
- *     right-table will be ship over and persist in memory before the dynamic broadcast can occur. memory foot print
- *     will be high so this rule should be use carefully until we have cost-based optimization.
- *   </li>
- *   <li>
- *     if the dynamic broadcast stage is broadcasting to a left-table that's pre-partitioned with the join key, then the
- *     right-table will be ship over and persist in memory using hash distribution. memory foot print will be
- *     relatively low comparing to non-partitioned.
- *   </li>
- *   <li>
- *     if the dynamic broadcast stage operating on a table with the same partition scheme as the left-table, then there
- *     is not going to be any network shuffling overhead. both memory and latency overhead will be low.
- *   </li>
- * </ul>
- *
- * TODO #1: Only support SEMI-JOIN, once JOIN operator is supported by leaf-stage we should allow it to match
- *   @see <a href="https://github.com/apache/pinot/pull/10565/>
- * TODO #2: Only convert to dynamic broadcast from right-to-left, allow option to specify dynamic broadcast direction.
- * TODO #3: Only convert to dynamic broadcast if left is leaf stage, allow the option for intermediate stage.
- * TODO #4: currently adding a pass-through after join, support leaf-stage to chain arbitrary operator(s) next.
- */
+/// Special rule for Pinot, this rule transposing an INNER JOIN into dynamic broadcast join for the leaf stage.
+///
+/// Consider the following INNER JOIN plan
+///
+///                  ...                                     ...
+///                   |                                       |
+///             \[ Transform \]                           \[ Transform \]
+///                   |                                       |
+///             \[ Inner Join \]                     \[ Pass-through xChange \]
+///             /            \                          /
+///        \[xChange\]      \[xChange\]              \[Inner Join\] <----
+///           /                \                      /            \
+///     \[ Transform \]     \[ Transform \]         \[ Transform \]       \
+///          |                  |                    |               \
+///     [Proj/Filter]     [Proj/Filter]         [Proj/Filter]  <------\
+///          |                  |                    |                 \
+///     [Table Scan ]     [Table Scan ]         [Table Scan ]       \[xChange\]
+///                                                                      \
+///                                                                 \[ Transform \]
+///                                                                       |
+///                                                                 [Proj/Filter]
+///                                                                       |
+///                                                                 [Table Scan ]
+///
+/// This rule is one part of the overall mechanism and this rule only does the following
+///
+///                 ...                                      ...
+///                  |                                        |
+///            \[ Transform \]                             \[ Transform \]
+///                  |                                       /
+///            [ Inner Join ]                     [Pass-through xChange]
+///            /            \                            /
+///       \[xChange\]      \[xChange\]          |----[Dyn. Broadcast]   <-----
+///          /                \             |           |                 \
+///    \[ Transform \]     \[ Transform \]      |----> \[ Inner Join \]      \[xChange\]
+///         |                  |            |           |                   \
+///    \[Proj/Filter\]     \[Proj/Filter\]      |      \[ Transform \]       \[ Transform \]
+///         |                  |            |          |                    |
+///    \[Table Scan \]     \[Table Scan \]      |----> \[Proj/Filter\]       \[Proj/Filter\]
+///                                                     |                    |
+///                                                \[Table Scan \]       \[Table Scan \]
+///
+/// The next part to extend the Dynamic broadcast into the Proj/Filter operator happens in the runtime.
+///
+/// This rewrite is only useful if we can ensure that:
+///
+/// - new plan can leverage the indexes and fast filtering of the leaf-stage Pinot server processing logic.
+/// - data sending over xChange should be relatively small comparing to data would've been selected out if the dynamic
+///   broadcast is not applied.
+/// - since leaf-stage operator can only process a typical Pinot V1 engine chain-operator chain. This means the entire
+///   right-table will be ship over and persist in memory before the dynamic broadcast can occur. memory foot print
+///   will be high so this rule should be use carefully until we have cost-based optimization.
+/// - if the dynamic broadcast stage is broadcasting to a left-table that's pre-partitioned with the join key, then
+///   the right-table will be ship over and persist in memory using hash distribution. memory foot print will be
+///   relatively low comparing to non-partitioned.
+/// - if the dynamic broadcast stage operating on a table with the same partition scheme as the left-table, then there
+///   is not going to be any network shuffling overhead. both memory and latency overhead will be low.
+///
+/// TODO #1: Only support SEMI-JOIN, once JOIN operator is supported by leaf-stage we should allow it to match
+///   @see <a href="https://github.com/apache/pinot/pull/10565/>
+/// TODO #2: Only convert to dynamic broadcast from right-to-left, allow option to specify dynamic broadcast direction.
+/// TODO #3: Only convert to dynamic broadcast if left is leaf stage, allow the option for intermediate stage.
+/// TODO #4: currently adding a pass-through after join, support leaf-stage to chain arbitrary operator(s) next.
 public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
   public static final PinotJoinToDynamicBroadcastRule INSTANCE =
       new PinotJoinToDynamicBroadcastRule(PinotRuleUtils.PINOT_REL_FACTORY);

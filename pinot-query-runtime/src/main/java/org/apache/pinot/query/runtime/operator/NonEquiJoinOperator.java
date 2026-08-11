@@ -30,10 +30,8 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
-/**
- * The {@code NonEquiJoinOperator} implements the join algorithm without join keys. Right table is materialized into a
- * list.
- */
+/// The `NonEquiJoinOperator` implements the join algorithm without join keys. Right table is materialized into a
+/// list.
 public class NonEquiJoinOperator extends BaseJoinOperator {
   private static final String EXPLAIN_NAME = "NON_EQUI_JOIN";
   private static final String BUILD_JOINED_ROWS_SCOPE = "NonEquiJoinOperator#buildJoinedRows";

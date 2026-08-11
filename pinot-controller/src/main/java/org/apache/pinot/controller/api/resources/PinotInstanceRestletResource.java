@@ -549,16 +549,13 @@ public class PinotInstanceRestletResource {
     }
   }
 
-  /**
-   * Endpoint to validate the safety of instance tag update requests.
-   * This is to ensure that any instance tag update operation that user wants to perform is safe and does not create any
-   * side effect on the cluster and disturb the cluster consistency.
-   * This operation does not perform any changes to the cluster, but surfaces the possible issues which might occur upon
-   * applying the intended changes.
-   * @param requests list if instance tag update requests
-   * @return list of {@link OperationValidationResponse} which denotes the validity of each request along with listing
-   * the issues if any.
-   */
+  /// Endpoint to validate the safety of instance tag update requests. This is to ensure that any instance tag update
+  /// operation that user wants to perform is safe and does not create any side effect on the cluster and disturb the
+  /// cluster consistency. This operation does not perform any changes to the cluster, but surfaces the possible issues
+  /// which might occur upon applying the intended changes.
+  /// @param requests list if instance tag update requests
+  /// @return list of [OperationValidationResponse] which denotes the validity of each request along with listing
+  /// the issues if any.
   @POST
   @Path("/instances/updateTags/validate")
   @Produces(MediaType.APPLICATION_JSON)
@@ -639,17 +636,15 @@ public class PinotInstanceRestletResource {
     }
   }
 
-  /**
-   * Compute the number of deficient instances for each tag.
-   * The utility accepts two maps
-   * - map of tags and count of their intended tagged instances
-   * - map of tags and their minimum number of instance requirements
-   * And then compares these two maps to return a map of tags and the number of their deficient instances.
-   *
-   * @param tagToInstanceCountMap tags and count of their intended tagged instances
-   * @param tagToMinInstanceCountMap tags and their minimum number of instance requirements
-   * @return tags and the number of their deficient instances
-   */
+  /// Compute the number of deficient instances for each tag.
+  /// The utility accepts two maps
+  /// - map of tags and count of their intended tagged instances
+  /// - map of tags and their minimum number of instance requirements
+  /// And then compares these two maps to return a map of tags and the number of their deficient instances.
+  ///
+  /// @param tagToInstanceCountMap tags and count of their intended tagged instances
+  /// @param tagToMinInstanceCountMap tags and their minimum number of instance requirements
+  /// @return tags and the number of their deficient instances
   private Map<String, Integer> computeTagDeficiency(Map<String, Integer> tagToInstanceCountMap,
       Map<String, Integer> tagToMinInstanceCountMap) {
     Map<String, Integer> tagDeficiency = new HashMap<>();
@@ -666,13 +661,11 @@ public class PinotInstanceRestletResource {
     return tagDeficiency;
   }
 
-  /**
-   * Utility to fetch the existing tags and count of their respective tagged instances and then apply the changes based
-   * on the provided list of {@link InstanceTagUpdateRequest} to get the updated map of tags and count of their
-   * respective tagged instances
-   * @param requests list of {@link InstanceTagUpdateRequest}
-   * @return map of tags and updated count of their respective tagged instances
-   */
+  /// Utility to fetch the existing tags and count of their respective tagged instances and then apply the changes based
+  /// on the provided list of [InstanceTagUpdateRequest] to get the updated map of tags and count of their
+  /// respective tagged instances
+  /// @param requests list of [InstanceTagUpdateRequest]
+  /// @return map of tags and updated count of their respective tagged instances
   private Map<String, Integer> getUpdatedTagToInstanceCountMap(List<InstanceTagUpdateRequest> requests) {
     Map<String, Integer> updatedTagInstanceMap = new HashMap<>();
     Set<String> visitedInstances = new HashSet<>();

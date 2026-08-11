@@ -289,7 +289,7 @@ public class MaterializedViewSchemaInfererTest {
   }
 
   /// Builds a [TableCache] backed by Mockito stubs that satisfy the surface that
-  /// {@code PinotCatalog} consults: name canonicalization, no logical tables, schema
+  /// `PinotCatalog` consults: name canonicalization, no logical tables, schema
   /// lookup keyed on the source table name. Mocking only these methods avoids pulling
   /// pinot-core's MockRoutingManagerFactory into pinot-sql-ddl tests.
   private static TableCache buildTableCache(Schema schema) {

@@ -21,9 +21,7 @@ package org.apache.pinot.common.metrics;
 import org.apache.pinot.common.Utils;
 
 
-/**
- * Meters for the controller.
- */
+/// Meters for the controller.
 public enum ControllerMeter implements AbstractMetrics.Meter {
   HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
   HEALTHCHECK_OK_CALLS("healthcheck", true),
@@ -117,11 +115,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
     return _unit;
   }
 
-  /**
-   * Returns true if the metric is global (not attached to a particular resource)
-   *
-   * @return true if the metric is global
-   */
+  /// Returns true if the metric is global (not attached to a particular resource)
+  ///
+  /// @return true if the metric is global
   @Override
   public boolean isGlobal() {
     return _global;

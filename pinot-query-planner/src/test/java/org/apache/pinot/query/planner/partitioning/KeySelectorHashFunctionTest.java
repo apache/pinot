@@ -24,9 +24,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Test for KeySelector implementations with custom hash functions
- */
+/// Test for KeySelector implementations with custom hash functions
 public class KeySelectorHashFunctionTest {
 
   @Test

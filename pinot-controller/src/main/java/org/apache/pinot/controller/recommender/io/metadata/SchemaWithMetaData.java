@@ -24,10 +24,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-/**
- * To accommodate the metadata piggyback on a standard pinot schmea,
- * See "schema" in SortedInvertedIndexInput.json
- */
+/// To accommodate the metadata piggyback on a standard pinot schmea,
+/// See "schema" in SortedInvertedIndexInput.json
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SchemaWithMetaData {
 

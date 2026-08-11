@@ -366,11 +366,9 @@ public class GroupByOptionsTest extends CustomDataQueryClusterIntegrationTest {
     assertFullPageOfGroups(aggregated, 2);
   }
 
-  /**
-   * Asserts the result is a full page of 5 distinct, in-domain (i, j) groups. The rows are not ordered (we query
-   * without ORDER BY for deterministic trimming), so we validate the page size and group validity rather than exact
-   * values. When {@code expectedCount >= 0}, also asserts each group's COUNT(*).
-   */
+  /// Asserts the result is a full page of 5 distinct, in-domain (i, j) groups. The rows are not ordered (we query
+  /// without ORDER BY for deterministic trimming), so we validate the page size and group validity rather than exact
+  /// values. When `expectedCount >= 0`, also asserts each group's COUNT(\*).
   private static void assertFullPageOfGroups(JsonNode mainNode, int expectedCount) {
     JsonNode resultTable = mainNode.get(RESULT_TABLE);
     Assert.assertNotNull(resultTable, toResultStr(mainNode));

@@ -618,7 +618,6 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     return ColumnDataType.LONG;
   }
 
-  @Nullable
   @Override
   public Long extractFinalResult(@Nullable HyperLogLog intermediateResult) {
     return intermediateResult == null ? 0L : intermediateResult.cardinality();
@@ -642,10 +641,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     }
   }
 
-  /**
-   * Returns the {@link RoaringBitmap} for the given group key, creating a new {@link GroupByDictIdsWrapper} if absent.
-   * Uses a sparse bitmap so memory scales with distinct values per group, not dictionary size.
-   */
+  /// Returns the [RoaringBitmap] for the given group key, creating a new [GroupByDictIdsWrapper] if absent.
+  /// Uses a sparse bitmap so memory scales with distinct values per group, not dictionary size.
   protected static RoaringBitmap getDictIdBitmap(GroupByResultHolder groupByResultHolder, int groupKey,
       Dictionary dictionary) {
     GroupByDictIdsWrapper wrapper = groupByResultHolder.getResult(groupKey);
@@ -656,9 +653,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     return wrapper._dictIdBitmap;
   }
 
-  /**
-   * Returns the {@link BitSet} from the result holder, creating a new {@link DictIdsWrapper} if absent.
-   */
+  /// Returns the [BitSet] from the result holder, creating a new [DictIdsWrapper] if absent.
   protected static BitSet getDictIdBitSet(AggregationResultHolder aggregationResultHolder,
       Dictionary dictionary) {
     DictIdsWrapper dictIdsWrapper = aggregationResultHolder.getResult();
@@ -669,9 +664,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     return dictIdsWrapper._bitSet;
   }
 
-  /**
-   * Returns the HyperLogLog from the result holder or creates a new one if it does not exist.
-   */
+  /// Returns the HyperLogLog from the result holder or creates a new one if it does not exist.
   protected HyperLogLog getHyperLogLog(AggregationResultHolder aggregationResultHolder) {
     HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
     if (hyperLogLog == null) {
@@ -681,9 +674,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     return hyperLogLog;
   }
 
-  /**
-   * Returns the HyperLogLog for the given group key or creates a new one if it does not exist.
-   */
+  /// Returns the HyperLogLog for the given group key or creates a new one if it does not exist.
   protected HyperLogLog getHyperLogLog(GroupByResultHolder groupByResultHolder, int groupKey) {
     HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
     if (hyperLogLog == null) {
@@ -693,18 +684,14 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     return hyperLogLog;
   }
 
-  /**
-   * Helper method to set value for the given group keys into the result holder.
-   */
+  /// Helper method to set value for the given group keys into the result holder.
   private void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, Object value) {
     for (int groupKey : groupKeys) {
       getHyperLogLog(groupByResultHolder, groupKey).offer(value);
     }
   }
 
-  /**
-   * Converts a {@link GroupByDictIdsWrapper} to a HyperLogLog by offering each distinct dictionary value exactly once.
-   */
+  /// Converts a [GroupByDictIdsWrapper] to a HyperLogLog by offering each distinct dictionary value exactly once.
   private HyperLogLog convertToHyperLogLog(GroupByDictIdsWrapper wrapper) {
     HyperLogLog hyperLogLog = new HyperLogLog(_log2m);
     Dictionary dictionary = wrapper._dictionary;
@@ -714,9 +701,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     return hyperLogLog;
   }
 
-  /**
-   * Converts a {@link DictIdsWrapper} to a HyperLogLog by offering each distinct dictionary value exactly once.
-   */
+  /// Converts a [DictIdsWrapper] to a HyperLogLog by offering each distinct dictionary value exactly once.
   private HyperLogLog convertToHyperLogLog(DictIdsWrapper dictIdsWrapper) {
     HyperLogLog hyperLogLog = new HyperLogLog(_log2m);
     Dictionary dictionary = dictIdsWrapper._dictionary;
@@ -727,11 +712,9 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     return hyperLogLog;
   }
 
-  /**
-   * Wraps a {@link Dictionary} with a {@link BitSet} to collect and deduplicate dictionary IDs before offering
-   * to HyperLogLog. BitSet gives O(1) insertion with no container-management overhead (unlike RoaringBitmap),
-   * and uses dictSize/8 bytes of memory (e.g. 128 KB for a 1M-entry dictionary).
-   */
+  /// Wraps a [Dictionary] with a [BitSet] to collect and deduplicate dictionary IDs before offering
+  /// to HyperLogLog. BitSet gives O(1) insertion with no container-management overhead (unlike RoaringBitmap),
+  /// and uses dictSize/8 bytes of memory (e.g. 128 KB for a 1M-entry dictionary).
   protected static final class DictIdsWrapper {
     final Dictionary _dictionary;
     final BitSet _bitSet;
@@ -742,13 +725,11 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     }
   }
 
-  /**
-   * Wraps a {@link Dictionary} with a {@link RoaringBitmap} to collect and deduplicate dictionary IDs in the group-by
-   * aggregation path. Unlike {@link DictIdsWrapper} (which uses a pre-allocated {@link BitSet} of dictSize/8 bytes),
-   * this uses a sparse RoaringBitmap whose memory grows only with the number of distinct dict IDs seen per group.
-   * This is critical for group-by: one wrapper per group means memory = numGroups × (distinct values/group × ~2 bytes),
-   * which stays bounded even when there are many groups or a large dictionary.
-   */
+  /// Wraps a [Dictionary] with a [RoaringBitmap] to collect and deduplicate dictionary IDs in the
+  /// group-by aggregation path. Unlike [DictIdsWrapper] (which uses a pre-allocated [BitSet] of
+  /// dictSize/8 bytes), this uses a sparse RoaringBitmap whose memory grows only with the number of distinct dict
+  /// IDs seen per group. This is critical for group-by: one wrapper per group means memory = numGroups ×
+  /// (distinct values/group × ~2 bytes), which stays bounded even when there are many groups or a large dictionary.
   protected static final class GroupByDictIdsWrapper {
     final Dictionary _dictionary;
     final RoaringBitmap _dictIdBitmap;

@@ -21,30 +21,22 @@ package org.apache.pinot.query.planner.partitioning;
 import javax.annotation.Nullable;
 
 
-/**
- * The {@code KeySelector} provides a partitioning function to encode a specific input data type into a key.
- *
- * <p>This key selector is used for computation such as GROUP BY or equality JOINs.
- *
- * <p>Key selector should always produce the same selection hash key when the same input is provided.
- */
+/// The `KeySelector` provides a partitioning function to encode a specific input data type into a key.
+///
+/// This key selector is used for computation such as GROUP BY or equality JOINs.
+///
+/// Key selector should always produce the same selection hash key when the same input is provided.
 public interface KeySelector<T> {
   String DEFAULT_HASH_ALGORITHM = "absHashCode";
 
-  /**
-   * Extracts the key out of the given row.
-   */
+  /// Extracts the key out of the given row.
   @Nullable
   T getKey(Object[] row);
 
-  /**
-   * Computes the hash of the given row.
-   */
+  /// Computes the hash of the given row.
   int computeHash(Object[] input);
 
-  /**
-   * Returns the hash algorithm used to compute the hash.
-   */
+  /// Returns the hash algorithm used to compute the hash.
   default String hashAlgorithm() {
     return DEFAULT_HASH_ALGORITHM;
   }

@@ -39,12 +39,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The base periodic task for pinot controller only. It uses <code>PinotHelixResourceManager</code> to determine
- * which table resources should be managed by this Pinot controller.
- *
- * @param <C> the context type
- */
+/// The base periodic task for pinot controller only. It uses `PinotHelixResourceManager` to determine
+/// which table resources should be managed by this Pinot controller.
+///
+/// @param <C> the context type
 @ThreadSafe
 public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask implements PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerPeriodicTask.class);
@@ -64,20 +62,16 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask impleme
     _controllerMetrics = controllerMetrics;
   }
 
-  /**
-   * Returns the list of table names (with type) to consider for this task. Subclasses may override to add
-   * more names (e.g. logical table partitions). Default: single table from property or all physical tables.
-   */
+  /// Returns the list of table names (with type) to consider for this task. Subclasses may override to add
+  /// more names (e.g. logical table partitions). Default: single table from property or all physical tables.
   protected List<String> getTablesToProcess(Properties periodicTaskProperties) {
     String propTableNameWithType = (String) periodicTaskProperties.get(PeriodicTask.PROPERTY_KEY_TABLE_NAME);
     return propTableNameWithType != null ? List.of(propTableNameWithType)
         : _pinotHelixResourceManager.getAllTables();
   }
 
-  /**
-   * Returns whether the given table should be processed by this controller run. Default: only if this
-   * controller is leader for the table. Subclasses may override (e.g. to always include logical tables).
-   */
+  /// Returns whether the given table should be processed by this controller run. Default: only if this
+  /// controller is leader for the table. Subclasses may override (e.g. to always include logical tables).
   protected boolean shouldProcessTable(String tableNameWithType) {
     return _leadControllerManager.isLeaderForTable(tableNameWithType);
   }
@@ -111,14 +105,12 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask impleme
     return _controllerMetrics;
   }
 
-  /**
-   * Processes the given list of tables lead by the current controller, and returns the number of tables processed.
-   * <p>
-   * Override one of this method, {@link #processTable(String)} or {@link #processTable(String, C)}.
-   * <p/>
-   * Note: This method is called each time the task is executed <b>if and only if</b> the current controller is the
-   * leader of at least one table. A corollary is that it won't be called every time the task is executed.
-   */
+  /// Processes the given list of tables lead by the current controller, and returns the number of tables processed.
+  ///
+  /// Override one of this method, [#processTable(String)] or [#processTable(String, C)].
+  ///
+  /// Note: This method is called each time the task is executed **if and only if** the current controller is the
+  /// leader of at least one table. A corollary is that it won't be called every time the task is executed.
   protected void processTables(List<String> tableNamesWithType, Properties periodicTaskProperties) {
     int numTables = tableNamesWithType.size();
     LOGGER.info("Processing {} tables in task: {}", numTables, _taskName);
@@ -144,51 +136,39 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask impleme
     LOGGER.info("Finish processing {}/{} tables in task: {}", numTablesProcessed, numTables, _taskName);
   }
 
-  /**
-   * Can be overridden to provide context before processing the tables lead by the current controller.
-   */
+  /// Can be overridden to provide context before processing the tables lead by the current controller.
   protected C preprocess(Properties periodicTaskProperties) {
     return null;
   }
 
-  /**
-   * Processes the given table lead by the current controller.
-   * <p>
-   * Override one of this method, {@link #processTable(String)} or {@link #processTables(List, Properties)}.
-   */
+  /// Processes the given table lead by the current controller.
+  ///
+  /// Override one of this method, [#processTable(String)] or [#processTables(List, Properties)].
   protected void processTable(String tableNameWithType, C context) {
     processTable(tableNameWithType);
   }
 
-  /**
-   * Processes the given table lead by the current controller.
-   * <p>
-   * Override one of this method, {@link #processTable(String, C)} or {@link #processTables(List, Properties)}.
-   */
+  /// Processes the given table lead by the current controller.
+  ///
+  /// Override one of this method, [#processTable(String, C)] or [#processTables(List, Properties)].
   protected void processTable(String tableNameWithType) {
   }
 
-  /**
-   * Can be overridden to perform cleanups after processing the tables lead by the current controller.
-   */
+  /// Can be overridden to perform cleanups after processing the tables lead by the current controller.
   protected void postprocess(C context) {
     postprocess();
   }
 
-  /**
-   * Can be overridden to perform cleanups after processing the tables lead by the current controller.
-   */
+  /// Can be overridden to perform cleanups after processing the tables lead by the current controller.
   protected void postprocess() {
   }
 
-  /**
-   * Can be overridden to perform cleanups for tables the current controller lost the leadership.
-   * <p/>
-   * Note: This method is only being called when there is at least one table in the given list. A corollary is that it
-   * won't be called every time the task is executed.
-   *
-   * @param tableNamesWithType the table names that the current controller isn't the leader for
-   */
+  /// Can be overridden to perform cleanups for tables the current controller lost the leadership.
+  ///
+  /// Note: This method is only being called when there is at least one table in the given list. A corollary is that it
+  /// won't be called every time the task is executed.
+  ///
+  /// @param tableNamesWithType the table names that the current controller isn't the leader for
   protected void nonLeaderCleanup(List<String> tableNamesWithType) {
   }
 

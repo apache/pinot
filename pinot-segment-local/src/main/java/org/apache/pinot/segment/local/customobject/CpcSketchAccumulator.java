@@ -22,11 +22,9 @@ import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.cpc.CpcUnion;
 
 
-/**
- * Intermediate state used by {@code DistinctCountCPCSketchAggregationFunction} which gives
- * the end user more control over how sketches are merged for performance.
- * The end user can set parameters that trade-off more memory usage for more pre-aggregation.
- */
+/// Intermediate state used by `DistinctCountCPCSketchAggregationFunction` which gives
+/// the end user more control over how sketches are merged for performance.
+/// The end user can set parameters that trade-off more memory usage for more pre-aggregation.
 public class CpcSketchAccumulator extends CustomObjectAccumulator<CpcSketch> {
   private int _lgNominalEntries = 4;
   private CpcUnion _union;

@@ -22,19 +22,13 @@ import java.util.Set;
 import org.apache.calcite.runtime.PairList;
 
 
-/**
- * Metadata for a subplan. This class won't leave the query planner/broker side.
- */
+/// Metadata for a subplan. This class won't leave the query planner/broker side.
 public class SubPlanMetadata {
 
-  /**
-   * The set of tables that are scanned in this subplan.
-   */
+  /// The set of tables that are scanned in this subplan.
   private final Set<String> _tableNames;
 
-  /**
-   * The list of fields that are surfaced by this subplan. Only valid for SubPlan Id 0.
-   */
+  /// The list of fields that are surfaced by this subplan. Only valid for SubPlan Id 0.
   private PairList<Integer, String> _fields;
 
   public SubPlanMetadata(Set<String> tableNames, PairList<Integer, String> fields) {

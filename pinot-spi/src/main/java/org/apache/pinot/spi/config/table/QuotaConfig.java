@@ -28,9 +28,7 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 
 
-/**
- * Class representing table quota configuration
- */
+/// Class representing table quota configuration
 public class QuotaConfig extends BaseJsonConfig {
   private static final long INVALID_STORAGE_IN_BYTES = -1L;
   private static final double INVALID_MAX_QPS = -1.0;

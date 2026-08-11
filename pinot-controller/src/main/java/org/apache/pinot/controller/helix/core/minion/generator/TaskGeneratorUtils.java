@@ -43,17 +43,13 @@ public class TaskGeneratorUtils {
   private TaskGeneratorUtils() {
   }
 
-  /**
-   * If task is in final state, it will not be running any more. But note that
-   * STOPPED is not a final task state in helix task framework, as a stopped task
-   * is just paused and can be resumed to rerun.
-   */
+  /// If task is in final state, it will not be running any more. But note that
+  /// STOPPED is not a final task state in helix task framework, as a stopped task
+  /// is just paused and can be resumed to rerun.
   public static final EnumSet<TaskState> TASK_FINAL_STATES =
       EnumSet.of(TaskState.COMPLETED, TaskState.FAILED, TaskState.ABORTED, TaskState.TIMED_OUT);
 
-  /**
-   * Returns all the segments that have been scheduled but not finished.
-   */
+  /// Returns all the segments that have been scheduled but not finished.
   public static Set<Segment> getRunningSegments(String taskType, ClusterInfoAccessor clusterInfoAccessor) {
     Set<Segment> runningSegments = new HashSet<>();
     Map<String, TaskState> taskStates = clusterInfoAccessor.getTaskStates(taskType);
@@ -71,9 +67,7 @@ public class TaskGeneratorUtils {
     return runningSegments;
   }
 
-  /**
-   * Gets all the tasks for the provided task type and tableName, which have not reached final task state yet.
-   */
+  /// Gets all the tasks for the provided task type and tableName, which have not reached final task state yet.
   public static Map<String, TaskState> getIncompleteTasks(String taskType, String tableNameWithType,
       ClusterInfoAccessor clusterInfoAccessor) {
     Map<String, TaskState> incompleteTasks = new HashMap<>();
@@ -92,11 +86,9 @@ public class TaskGeneratorUtils {
     return incompleteTasks;
   }
 
-  /**
-   * Get all the tasks for the provided task type and tableName, which have not reached final task state yet.
-   * In general, if the task is not in final state, we can treat it as running, although it may wait to start
-   * or is paused. The caller provides a consumer to process the task configs of those tasks.
-   */
+  /// Get all the tasks for the provided task type and tableName, which have not reached final task state yet.
+  /// In general, if the task is not in final state, we can treat it as running, although it may wait to start
+  /// or is paused. The caller provides a consumer to process the task configs of those tasks.
   public static void forRunningTasks(String tableNameWithType, String taskType, ClusterInfoAccessor clusterInfoAccessor,
       Consumer<Map<String, String>> taskConfigConsumer) {
     Map<String, TaskState> taskStates = clusterInfoAccessor.getTaskStates(taskType);
@@ -115,9 +107,7 @@ public class TaskGeneratorUtils {
     }
   }
 
-  /**
-   * Extract minionInstanceTag from the task config map. Returns "minion_untagged" in case of no config found.
-   */
+  /// Extract minionInstanceTag from the task config map. Returns "minion_untagged" in case of no config found.
   public static String extractMinionInstanceTag(TableConfig tableConfig, String taskType) {
     TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
     if (tableTaskConfig != null) {
@@ -130,22 +120,20 @@ public class TaskGeneratorUtils {
     return CommonConstants.Helix.UNTAGGED_MINION_INSTANCE;
   }
 
-  /**
-   * Generic method to get configuration values from ZK cluster config with fallback hierarchy:
-   * 1. Check minion tenant specific config (if minionTag provided)
-   * 2. Check task type specific config
-   * 3. Return default value
-   *
-   * @param taskType The task type to build config keys
-   * @param configKeySuffix The suffix to append to task type for config key
-   * @param minionTag The minion tag for tenant-specific config (can be null)
-   * @param defaultValue The default value to return if no config is found
-   * @param returnType The class type for parsing the config value. Currently supported: Integer, Long, Double, Float,
-   *                   String
-   * @param clusterInfoAccessor The cluster info accessor to get config values
-   * @param <T> The return type
-   * @return The parsed configuration value or default value
-   */
+  /// Generic method to get configuration values from ZK cluster config with fallback hierarchy:
+  /// 1. Check minion tenant specific config (if minionTag provided)
+  /// 2. Check task type specific config
+  /// 3. Return default value
+  ///
+  /// @param taskType The task type to build config keys
+  /// @param configKeySuffix The suffix to append to task type for config key
+  /// @param minionTag The minion tag for tenant-specific config (can be null)
+  /// @param defaultValue The default value to return if no config is found
+  /// @param returnType The class type for parsing the config value. Currently supported: Integer, Long, Double, Float,
+  ///                   String
+  /// @param clusterInfoAccessor The cluster info accessor to get config values
+  /// @param <T> The return type
+  /// @return The parsed configuration value or default value
   public static <T> T getClusterMinionConfigValue(String taskType, String configKeySuffix, String minionTag,
       T defaultValue, Class<T> returnType, ClusterInfoAccessor clusterInfoAccessor) {
     // Priority 1: Check minion tenant specific cluster config
@@ -176,9 +164,7 @@ public class TaskGeneratorUtils {
     return defaultValue;
   }
 
-  /**
-   * Helper method to parse config values to the appropriate type
-   */
+  /// Helper method to parse config values to the appropriate type
   @SuppressWarnings("unchecked")
   private static <T> T parseConfigValue(String configValue, Class<T> returnType) {
     if (returnType == Integer.class || returnType == int.class) {

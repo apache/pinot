@@ -28,14 +28,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A singleton manager that provides shared Kafka admin clients across multiple consumers/producers
- * connecting to the same Kafka cluster. This reduces connection overhead and improves resource efficiency.
- *
- * <p>Thread Safety: AdminClient instances are thread-safe and can be used concurrently by multiple threads.
- * The manager itself uses thread-safe data structures and reference counting to ensure safe sharing
- * of admin client instances across different connection handlers.
- */
+/// A singleton manager that provides shared Kafka admin clients across multiple consumers/producers
+/// connecting to the same Kafka cluster. This reduces connection overhead and improves resource efficiency.
+///
+/// Thread Safety: AdminClient instances are thread-safe and can be used concurrently by multiple threads.
+/// The manager itself uses thread-safe data structures and reference counting to ensure safe sharing
+/// of admin client instances across different connection handlers.
 public class KafkaAdminClientManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaAdminClientManager.class);
 
@@ -52,14 +50,12 @@ public class KafkaAdminClientManager {
     return INSTANCE;
   }
 
-  /**
-   * Gets or creates a shared admin client for the given configuration.
-   * The admin client is reference-counted and will be automatically cleaned up
-   * when no longer in use.
-   *
-   * @param properties Kafka client properties containing bootstrap servers and other configs
-   * @return AdminClientReference that should be closed when no longer needed
-   */
+  /// Gets or creates a shared admin client for the given configuration.
+  /// The admin client is reference-counted and will be automatically cleaned up
+  /// when no longer in use.
+  ///
+  /// @param properties Kafka client properties containing bootstrap servers and other configs
+  /// @return AdminClientReference that should be closed when no longer needed
   public AdminClientReference getOrCreateAdminClient(Properties properties) {
     String bootstrapServers = properties.getProperty(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG);
     if (bootstrapServers == null || bootstrapServers.trim().isEmpty()) {
@@ -83,10 +79,8 @@ public class KafkaAdminClientManager {
     return wrapper.addReference();
   }
 
-  /**
-   * Creates a cache key from the properties that are relevant for admin client sharing.
-   * Admin clients can be shared if they have the same bootstrap servers and security configuration.
-   */
+  /// Creates a cache key from the properties that are relevant for admin client sharing.
+  /// Admin clients can be shared if they have the same bootstrap servers and security configuration.
   private String createCacheKey(Properties properties) {
     StringBuilder keyBuilder = new StringBuilder();
 
@@ -113,9 +107,7 @@ public class KafkaAdminClientManager {
 
   // No standalone release method; cleanup is handled within AdminClientWrapper.removeReference()
 
-  /**
-   * Wrapper class that holds an admin client and its reference count
-   */
+  /// Wrapper class that holds an admin client and its reference count
   private class AdminClientWrapper {
     private final AdminClient _adminClient;
     private final String _cacheKey;
@@ -152,9 +144,7 @@ public class KafkaAdminClientManager {
     }
   }
 
-  /**
-   * A reference to a shared admin client that automatically releases the reference when closed.
-   */
+  /// A reference to a shared admin client that automatically releases the reference when closed.
   public class AdminClientReference implements AutoCloseable {
     private final AdminClientWrapper _wrapper;
     private volatile boolean _closed = false;

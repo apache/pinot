@@ -45,62 +45,55 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * The {@code IntegerTupleSketchAggregationFunction} is the base class for all integer-based Tuple Sketch aggregations.
- * Apache Datasketches Tuple Sketches are an extension of the Apache Datasketches Theta Sketch. Tuple sketches store an
- * additional summary value with each retained entry which makes the sketch ideal for summarizing attributes
- * such as impressions or clicks.
- *
- * Tuple sketches are interoperable with the Theta Sketch and enable set operations over a stream of data, and can
- * also be used for cardinality estimation.
- *
- * Note: The current implementation of this aggregation function is limited to binary columns that contain sketches
- * built outside of Pinot.
- *
- * Usage examples:
- * <ul>
- *   <li>
- *     Simple union (1 or 2 arguments): main expression to aggregate on, followed by an optional Tuple sketch size
- *     argument. The second argument is the sketch lgK – the given log_base2 of k, and defaults to 16.
- *     The "raw" equivalents return serialised sketches in base64-encoded strings.
- *     <p>DISTINCT_COUNT_TUPLE_SKETCH(col)</p>
- *     <p>DISTINCT_COUNT_TUPLE_SKETCH(col, 12)</p>
- *     <p>DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col)</p>
- *     <p>DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col, 12)</p>
- *   <li>
- *     Extracting a cardinality estimate from a CPC sketch:
- *     <p>GET_INT_TUPLE_SKETCH_ESTIMATE(sketch_bytes)</p>
- *     <p>GET_INT_TUPLE_SKETCH_ESTIMATE(DISTINCT_COUNT_RAW_TUPLE_SKETCH(col))</p>
- *   </li>
- *   <li>
- *     Union between two sketches summaries are merged using addition for hash keys in common:
- *     <p>
- *       INT_SUM_TUPLE_SKETCH_UNION(
- *         DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col1),
- *         DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col2)
- *       )
- *     </p>
- *   </li>
- *   <li>
- *     Union between two sketches summaries are merged using maximum for hash keys in common:
- *     <p>
- *       INT_MAX_TUPLE_SKETCH_UNION(
- *         DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col1),
- *         DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col2)
- *       )
- *     </p>
- *   </li>
- *   <li>
- *     Union between two sketches summaries are merged using minimum for hash keys in common:
- *     <p>
- *       INT_MIN_TUPLE_SKETCH_UNION(
- *         DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col1),
- *         DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col2)
- *       )
- *     </p>
- *  </li>
- * </ul>
- */
+/// The `IntegerTupleSketchAggregationFunction` is the base class for all integer-based Tuple Sketch aggregations.
+/// Apache Datasketches Tuple Sketches are an extension of the Apache Datasketches Theta Sketch. Tuple sketches store an
+/// additional summary value with each retained entry which makes the sketch ideal for summarizing attributes
+/// such as impressions or clicks.
+///
+/// Tuple sketches are interoperable with the Theta Sketch and enable set operations over a stream of data, and can
+/// also be used for cardinality estimation.
+///
+/// Note: The current implementation of this aggregation function is limited to binary columns that contain sketches
+/// built outside of Pinot.
+///
+/// Usage examples:
+///
+/// - Simple union (1 or 2 arguments): main expression to aggregate on, followed by an optional Tuple sketch size
+///   argument. The second argument is the sketch lgK – the given log_base2 of k, and defaults to 16.
+///   The "raw" equivalents return serialised sketches in base64-encoded strings.
+///
+///   DISTINCT_COUNT_TUPLE_SKETCH(col)
+///
+///   DISTINCT_COUNT_TUPLE_SKETCH(col, 12)
+///
+///   DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col)
+///
+///   DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col, 12)
+/// - Extracting a cardinality estimate from a CPC sketch:
+///
+///   GET_INT_TUPLE_SKETCH_ESTIMATE(sketch_bytes)
+///
+///   GET_INT_TUPLE_SKETCH_ESTIMATE(DISTINCT_COUNT_RAW_TUPLE_SKETCH(col))
+/// - Union between two sketches summaries are merged using addition for hash keys in common:
+///
+///     INT_SUM_TUPLE_SKETCH_UNION(
+///      DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col1),
+///      DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col2)
+///     )
+///
+/// - Union between two sketches summaries are merged using maximum for hash keys in common:
+///
+///     INT_MAX_TUPLE_SKETCH_UNION(
+///      DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col1),
+///      DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col2)
+///     )
+///
+/// - Union between two sketches summaries are merged using minimum for hash keys in common:
+///
+///     INT_MIN_TUPLE_SKETCH_UNION(
+///      DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col1),
+///      DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col2)
+///     )
 @SuppressWarnings({"rawtypes"})
 public class IntegerTupleSketchAggregationFunction
     extends BaseSingleInputAggregationFunction<TupleIntSketchAccumulator, Comparable> {
@@ -239,6 +232,7 @@ public class IntegerTupleSketchAggregationFunction
     return result;
   }
 
+  @Nullable
   @Override
   public TupleIntSketchAccumulator extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
@@ -247,10 +241,10 @@ public class IntegerTupleSketchAggregationFunction
   @Override
   public TupleIntSketchAccumulator merge(TupleIntSketchAccumulator intermediateResult1,
       TupleIntSketchAccumulator intermediateResult2) {
-    if (intermediateResult1 == null || intermediateResult1.isEmpty()) {
+    if (intermediateResult1.isEmpty()) {
       return intermediateResult2;
     }
-    if (intermediateResult2 == null || intermediateResult2.isEmpty()) {
+    if (intermediateResult2.isEmpty()) {
       return intermediateResult1;
     }
     intermediateResult1.setThreshold(_accumulatorThreshold);
@@ -313,9 +307,7 @@ public class IntegerTupleSketchAggregationFunction
     return _nominalEntries <= starTreeNominalEntries;
   }
 
-  /**
-   * Returns the accumulator from the result holder or creates a new one if it does not exist.
-   */
+  /// Returns the accumulator from the result holder or creates a new one if it does not exist.
   private TupleIntSketchAccumulator getAccumulator(AggregationResultHolder aggregationResultHolder) {
     TupleIntSketchAccumulator accumulator = aggregationResultHolder.getResult();
     if (accumulator == null) {
@@ -325,9 +317,7 @@ public class IntegerTupleSketchAggregationFunction
     return accumulator;
   }
 
-  /**
-   * Returns the accumulator for the given group key or creates a new one if it does not exist.
-   */
+  /// Returns the accumulator for the given group key or creates a new one if it does not exist.
   private TupleIntSketchAccumulator getAccumulator(GroupByResultHolder groupByResultHolder, int groupKey) {
     TupleIntSketchAccumulator accumulator = groupByResultHolder.getResult(groupKey);
     if (accumulator == null) {
@@ -337,9 +327,7 @@ public class IntegerTupleSketchAggregationFunction
     return accumulator;
   }
 
-  /**
-   * Deserializes the sketches from the bytes.
-   */
+  /// Deserializes the sketches from the bytes.
   @SuppressWarnings({"unchecked"})
   private TupleSketch<IntegerSummary>[] deserializeSketches(byte[][] serializedSketches, int length) {
     TupleSketch<IntegerSummary>[] sketches = new TupleSketch[length];
@@ -350,10 +338,8 @@ public class IntegerTupleSketchAggregationFunction
     return sketches;
   }
 
-  /**
-   * Helper class to wrap the tuple-sketch parameters.  The initial values for the parameters are set to the
-   * same defaults in the Apache Datasketches library.
-   */
+  /// Helper class to wrap the tuple-sketch parameters.  The initial values for the parameters are set to the
+  /// same defaults in the Apache Datasketches library.
   private static class Parameters {
     private static final char PARAMETER_DELIMITER = ';';
     private static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';

@@ -59,31 +59,25 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
 
-/**
- * The {@code DistinctCountThetaSketchAggregationFunction} can be used in 2 modes:
- * <ul>
- *   <li>
- *     Simple union without post-aggregation (1 or 2 arguments): main expression to aggregate on, optional theta-sketch
- *     parameters
- *     <p>E.g. DISTINCT_COUNT_THETA_SKETCH(col)
- *   </li>
- *   <li>
- *     Union with post-aggregation (at least 4 arguments): main expression to aggregate on, theta-sketch parameters,
- *     filter(s), post-aggregation expression
- *     <p>E.g. DISTINCT_COUNT_THETA_SKETCH(col, '', 'dimName=''gender'' AND dimValue=''male''',
- *     'dimName=''course'' AND dimValue=''math''', 'SET_INTERSECT($1,$2)')
- *   </li>
- * </ul>
- * Currently, there are 3 parameters to the function:
- * <ul>
- *   <li>
- *     nominalEntries: The nominal entries used to create the sketch. (Default 4096)
- *     samplingProbability: Sets the upfront uniform sampling probability, p. (Default 1.0)
- *     accumulatorThreshold: How many sketches should be kept in memory before merging. (Default 2)
- *   </li>
- * </ul>
- * <p>E.g. DISTINCT_COUNT_THETA_SKETCH(col, 'nominalEntries=8192')
- */
+/// The `DistinctCountThetaSketchAggregationFunction` can be used in 2 modes:
+///
+/// - Simple union without post-aggregation (1 or 2 arguments): main expression to aggregate on, optional theta-sketch
+///   parameters
+///
+///   E.g. DISTINCT_COUNT_THETA_SKETCH(col)
+/// - Union with post-aggregation (at least 4 arguments): main expression to aggregate on, theta-sketch parameters,
+///   filter(s), post-aggregation expression
+///
+///   E.g. DISTINCT_COUNT_THETA_SKETCH(col, '', 'dimName=''gender'' AND dimValue=''male''',
+///   'dimName=''course'' AND dimValue=''math''', 'SET_INTERSECT($1,$2)')
+///
+/// Currently, there are 3 parameters to the function:
+///
+/// - nominalEntries: The nominal entries used to create the sketch. (Default 4096)
+///   samplingProbability: Sets the upfront uniform sampling probability, p. (Default 1.0)
+///   accumulatorThreshold: How many sketches should be kept in memory before merging. (Default 2)
+///
+/// E.g. DISTINCT_COUNT_THETA_SKETCH(col, 'nominalEntries=8192')
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class DistinctCountThetaSketchAggregationFunction
     extends BaseSingleInputAggregationFunction<List<ThetaSketchAccumulator>, Comparable> {
@@ -1077,7 +1071,6 @@ public class DistinctCountThetaSketchAggregationFunction
     return ColumnDataType.LONG;
   }
 
-  @Nullable
   @Override
   public Comparable extractFinalResult(@Nullable List<ThetaSketchAccumulator> accumulators) {
     if (accumulators == null) {
@@ -1135,9 +1128,7 @@ public class DistinctCountThetaSketchAggregationFunction
     return (ThetaSketchAccumulator) result;
   }
 
-  /**
-   * Helper method to collect expressions in the filter.
-   */
+  /// Helper method to collect expressions in the filter.
   private static void collectExpressions(FilterContext filter, List<ExpressionContext> expressions,
       Map<ExpressionContext, Integer> expressionIndexMap) {
     List<FilterContext> children = filter.getChildren();
@@ -1153,9 +1144,7 @@ public class DistinctCountThetaSketchAggregationFunction
     }
   }
 
-  /**
-   * Creates a FilterEvaluator for the given filter.
-   */
+  /// Creates a FilterEvaluator for the given filter.
   private static FilterEvaluator getFilterEvaluator(FilterContext filter,
       Map<ExpressionContext, Integer> expressionIndexMap) {
     switch (filter.getType()) {
@@ -1185,14 +1174,12 @@ public class DistinctCountThetaSketchAggregationFunction
     }
   }
 
-  /**
-   * Validates the post-aggregation expression:
-   *   - The sketch id ($0, $1, etc.) does not exceed the number of filters
-   *   - Only contains valid set operations (SET_UNION/SET_INTERSECT/SET_DIFF)
-   *   - SET_UNION/SET_INTERSECT contains at least 2 arguments
-   *   - SET_DIFF contains exactly 2 arguments
-   * Returns whether the post-aggregation expression contains the default sketch ($0).
-   */
+  /// Validates the post-aggregation expression:
+  ///   - The sketch id ($0, $1, etc.) does not exceed the number of filters
+  ///   - Only contains valid set operations (SET_UNION/SET_INTERSECT/SET_DIFF)
+  ///   - SET_UNION/SET_INTERSECT contains at least 2 arguments
+  ///   - SET_DIFF contains exactly 2 arguments
+  /// Returns whether the post-aggregation expression contains the default sketch ($0).
   private static boolean validatePostAggregationExpression(ExpressionContext expression, int numFilters) {
     Preconditions.checkArgument(expression.getType() != ExpressionContext.Type.LITERAL,
         "Post-aggregation expression should not contain literal expression: %s", expression.toString());
@@ -1229,9 +1216,7 @@ public class DistinctCountThetaSketchAggregationFunction
     return includeDefaultSketch;
   }
 
-  /**
-   * Extracts the sketch id from the identifier (e.g. $0 -> 0, $1 -> 1).
-   */
+  /// Extracts the sketch id from the identifier (e.g. $0 -> 0, $1 -> 1).
   private static int extractSketchId(String identifier) {
     Preconditions.checkArgument(identifier.charAt(0) == '$', "Invalid identifier: %s, expecting $0, $1, etc.",
         identifier);
@@ -1240,9 +1225,7 @@ public class DistinctCountThetaSketchAggregationFunction
     return sketchId;
   }
 
-  /**
-   * Extracts values from the BlockValSet map.
-   */
+  /// Extracts values from the BlockValSet map.
   private void extractValues(Map<ExpressionContext, BlockValSet> blockValSetMap, boolean[] singleValues,
       DataType[] valueTypes, Object[] valueArrays) {
     int numExpressions = _inputExpressions.size();
@@ -1299,9 +1282,7 @@ public class DistinctCountThetaSketchAggregationFunction
     }
   }
 
-  /**
-   * Returns the UpdatableThetaSketch list from the result holder or creates a new one if it does not exist.
-   */
+  /// Returns the UpdatableThetaSketch list from the result holder or creates a new one if it does not exist.
   private List<UpdatableThetaSketch> getUpdateSketches(AggregationResultHolder aggregationResultHolder) {
     List<UpdatableThetaSketch> updateSketches = aggregationResultHolder.getResult();
     if (updateSketches == null) {
@@ -1311,9 +1292,7 @@ public class DistinctCountThetaSketchAggregationFunction
     return updateSketches;
   }
 
-  /**
-   * Returns the ThetaSketchAccumulator list from the result holder or creates a new one if it does not exist.
-   */
+  /// Returns the ThetaSketchAccumulator list from the result holder or creates a new one if it does not exist.
   private List<ThetaSketchAccumulator> getUnions(AggregationResultHolder aggregationResultHolder) {
     List<ThetaSketchAccumulator> unions = aggregationResultHolder.getResult();
     if (unions == null) {
@@ -1323,9 +1302,7 @@ public class DistinctCountThetaSketchAggregationFunction
     return unions;
   }
 
-  /**
-   * Returns the UpdatableThetaSketch list for the given group key or creates a new one if it does not exist.
-   */
+  /// Returns the UpdatableThetaSketch list for the given group key or creates a new one if it does not exist.
   private List<UpdatableThetaSketch> getUpdateSketches(GroupByResultHolder groupByResultHolder, int groupKey) {
     List<UpdatableThetaSketch> updateSketches = groupByResultHolder.getResult(groupKey);
     if (updateSketches == null) {
@@ -1335,9 +1312,7 @@ public class DistinctCountThetaSketchAggregationFunction
     return updateSketches;
   }
 
-  /**
-   * Returns the ThetaSketchAccumulator list for the given group key or creates a new one if it does not exist.
-   */
+  /// Returns the ThetaSketchAccumulator list for the given group key or creates a new one if it does not exist.
   private List<ThetaSketchAccumulator> getUnions(GroupByResultHolder groupByResultHolder, int groupKey) {
     List<ThetaSketchAccumulator> unions = groupByResultHolder.getResult(groupKey);
     if (unions == null) {
@@ -1347,9 +1322,7 @@ public class DistinctCountThetaSketchAggregationFunction
     return unions;
   }
 
-  /**
-   * Builds the UpdatableThetaSketch list.
-   */
+  /// Builds the UpdatableThetaSketch list.
   private List<UpdatableThetaSketch> buildUpdateSketches() {
     int numSketches = _filterEvaluators.size() + 1;
     List<UpdatableThetaSketch> updateSketches = new ArrayList<>(numSketches);
@@ -1359,9 +1332,7 @@ public class DistinctCountThetaSketchAggregationFunction
     return updateSketches;
   }
 
-  /**
-   * Builds the ThetaSketchAccumulator list.
-   */
+  /// Builds the ThetaSketchAccumulator list.
   private List<ThetaSketchAccumulator> buildUnions() {
     int numUnions = _filterEvaluators.size() + 1;
     List<ThetaSketchAccumulator> unions = new ArrayList<>(numUnions);
@@ -1373,9 +1344,7 @@ public class DistinctCountThetaSketchAggregationFunction
     return unions;
   }
 
-  /**
-   * Deserializes the sketches from the bytes.
-   */
+  /// Deserializes the sketches from the bytes.
   private ThetaSketch[] deserializeSketches(byte[][] serializedSketches, int length) {
     ThetaSketch[] sketches = new ThetaSketch[length];
     for (int i = 0; i < length; i++) {
@@ -1384,16 +1353,12 @@ public class DistinctCountThetaSketchAggregationFunction
     return sketches;
   }
 
-  /**
-   * Evaluates the post-aggregation expression.
-   */
+  /// Evaluates the post-aggregation expression.
   protected ThetaSketch evaluatePostAggregationExpression(List<ThetaSketch> sketches) {
     return evaluatePostAggregationExpression(_postAggregationExpression, sketches);
   }
 
-  /**
-   * Evaluates the post-aggregation expression.
-   */
+  /// Evaluates the post-aggregation expression.
   private ThetaSketch evaluatePostAggregationExpression(ExpressionContext expression, List<ThetaSketch> sketches) {
     if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
       return sketches.get(extractSketchId(expression.getIdentifier()));
@@ -1425,10 +1390,8 @@ public class DistinctCountThetaSketchAggregationFunction
     }
   }
 
-  /**
-   * Helper class to wrap the theta-sketch parameters.  The initial values for the parameters are set to the
-   * same defaults in the Apache Datasketches library.
-   */
+  /// Helper class to wrap the theta-sketch parameters.  The initial values for the parameters are set to the
+  /// same defaults in the Apache Datasketches library.
   private static class Parameters {
     private static final char PARAMETER_DELIMITER = ';';
     private static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';
@@ -1473,15 +1436,11 @@ public class DistinctCountThetaSketchAggregationFunction
     }
   }
 
-  /**
-   * Helper interface to evaluate the filter on the values.
-   */
+  /// Helper interface to evaluate the filter on the values.
   private interface FilterEvaluator {
 
-    /**
-     * Evaluates the given values with the filter, returns {@code true} if the values pass the filter, {@code false}
-     * otherwise.
-     */
+    /// Evaluates the given values with the filter, returns `true` if the values pass the filter, `false`
+    /// otherwise.
     boolean evaluate(boolean[] singleValues, DataType[] valueTypes, Object[] valueArrays, int index);
   }
 

@@ -26,14 +26,12 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 
 
-/**
- * The ArrayLengthTransformFunction class implements arrayLength function for multi-valued columns
- *
- * Sample queries:
- * SELECT COUNT(*) FROM table WHERE arrayLength(mvColumn) > 2
- * SELECT COUNT(*) FROM table GROUP BY arrayLength(mvColumn)
- * SELECT MAX(arrayLength(mvColumn)) FROM table
- */
+/// The ArrayLengthTransformFunction class implements arrayLength function for multi-valued columns
+///
+/// Sample queries:
+/// SELECT COUNT(\*) FROM table WHERE arrayLength(mvColumn) > 2
+/// SELECT COUNT(\*) FROM table GROUP BY arrayLength(mvColumn)
+/// SELECT MAX(arrayLength(mvColumn)) FROM table
 public class ArrayLengthTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "arrayLength";
 

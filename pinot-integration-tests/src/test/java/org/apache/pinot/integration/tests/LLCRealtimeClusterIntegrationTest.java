@@ -38,6 +38,7 @@ import org.apache.hc.core5.http.HttpStatus;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -61,6 +62,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -76,12 +78,12 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test for low-level Kafka consumer.
- * TODO: Add separate module-level tests and remove the randomness of this test
- */
-public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
-  private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
+/// Integration test for low-level Kafka consumer.
+/// TODO: Add separate module-level tests and remove the randomness of this test
+public class LLCRealtimeClusterIntegrationTest extends SharedKafkaRealtimeIntegrationTestSuite {
+  private static final String CONSUMER_DIRECTORY =
+      new File(FileUtils.getTempDirectory(), "consumer-test").getAbsolutePath();
+  private static final String KAFKA_4_SMOKE_TABLE_NAME = "mytableKafka4Smoke";
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
 
@@ -89,6 +91,8 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   private final boolean _isConsumerDirConfigured = RANDOM.nextBoolean();
   private final boolean _enableLeadControllerResource = RANDOM.nextBoolean();
   private final long _startTime = System.currentTimeMillis();
+  private ScenarioLease _canonicalScenario;
+  private ScenarioLease _kafka4Scenario;
 
   @Override
   protected boolean injectTombstones() {
@@ -145,8 +149,12 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   }
 
   private boolean isOffline(int partition, int seqNum) {
+    return isOffline(getTableName(), partition, seqNum);
+  }
+
+  private boolean isOffline(String tableName, int partition, int seqNum) {
     ExternalView ev = _helixAdmin.getResourceExternalView(getHelixClusterName(),
-        TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
+        TableNameBuilder.REALTIME.tableNameWithType(tableName));
 
     boolean isOffline = false;
     for (String segmentNameStr : ev.getPartitionSet()) {
@@ -271,18 +279,136 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
         "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableLeadControllerResource: %s",
         RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableLeadControllerResource));
 
-    // Remove the consumer directory
-    FileUtils.deleteQuietly(new File(CONSUMER_DIRECTORY));
+    _canonicalScenario = newScenario(getTableName(), getKafkaTopic());
+    Throwable primaryFailure = null;
+    try {
+      createScenarioTopic(_canonicalScenario);
+      List<File> avroFiles = unpackScenarioData(_canonicalScenario);
+      Schema schema = addScenarioSchema(_canonicalScenario);
+      TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
+      addScenarioTable(_canonicalScenario, tableConfig);
 
-    super.setUp();
+      pushAvroIntoKafka(avroFiles);
+      createSegmentsAndUpload(avroFiles, schema, tableConfig);
+      setUpH2Connection(avroFiles);
+      setUpQueryGenerator(avroFiles);
+      runValidationJob(600_000L);
+      waitForAllDocsLoaded(getDocsLoadedTimeoutMs());
+    } catch (Throwable t) {
+      primaryFailure = t;
+      if (t instanceof Error) {
+        throw (Error) t;
+      }
+      throw (Exception) t;
+    } finally {
+      if (primaryFailure != null) {
+        closeScenario(_canonicalScenario, primaryFailure, null);
+        _canonicalScenario = null;
+      }
+    }
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   @Override
   public void tearDown()
       throws Exception {
-    FileUtils.deleteDirectory(new File(CONSUMER_DIRECTORY));
-    super.tearDown();
+    Throwable cleanupFailure = scrubClusterStateForHandoff(null);
+    if (_kafka4Scenario != null) {
+      try {
+        closeKafka4Scenario(null);
+      } catch (Throwable t) {
+        cleanupFailure = addCleanupFailure(cleanupFailure, t);
+      }
+    }
+    if (_canonicalScenario != null) {
+      try {
+        closeScenario(_canonicalScenario, null, null);
+      } catch (Throwable t) {
+        cleanupFailure = addCleanupFailure(cleanupFailure, t);
+      } finally {
+        _canonicalScenario = null;
+      }
+    }
+    if (cleanupFailure != null) {
+      if (cleanupFailure instanceof Error) {
+        throw (Error) cleanupFailure;
+      }
+      if (cleanupFailure instanceof Exception) {
+        throw (Exception) cleanupFailure;
+      }
+      throw new RuntimeException(cleanupFailure);
+    }
+  }
+
+  private Throwable scrubClusterStateForHandoff(Throwable cleanupFailure) {
+    try {
+      setUseMultiStageQueryEngine(false);
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+
+    List<String> instances;
+    try {
+      instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
+    } catch (Throwable t) {
+      return addCleanupFailure(cleanupFailure, t);
+    }
+    for (String instance : instances) {
+      if (InstanceTypeUtils.isServer(instance)) {
+        try {
+          getOrCreateAdminClient().getInstanceClient().updateInstanceState(instance, "QUERIES_ENABLE");
+        } catch (Throwable t) {
+          cleanupFailure = addCleanupFailure(cleanupFailure, t);
+        }
+      }
+      try {
+        InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), instance);
+        instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
+        _helixAdmin.setInstanceConfig(getHelixClusterName(), instance, instanceConfig);
+      } catch (Throwable t) {
+        cleanupFailure = addCleanupFailure(cleanupFailure, t);
+      }
+    }
+    return cleanupFailure;
+  }
+
+  @Override
+  protected void prepareSharedSuiteFiles() {
+    FileUtils.deleteQuietly(new File(CONSUMER_DIRECTORY));
+  }
+
+  @Override
+  protected void resetSharedSuiteStatics()
+      throws Exception {
+    Throwable cleanupFailure = null;
+    try {
+      super.resetSharedSuiteStatics();
+    } catch (Throwable t) {
+      cleanupFailure = t;
+    }
+    try {
+      // A table data manager can disappear before its interrupted partition-consumer threads finish. Keep the
+      // table-keyed failure factories intact until the shared-suite owner has stopped every server.
+      resetConsumerFactories();
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+    try {
+      FileUtils.deleteDirectory(new File(CONSUMER_DIRECTORY));
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+    if (cleanupFailure != null) {
+      if (cleanupFailure instanceof Exception) {
+        throw (Exception) cleanupFailure;
+      }
+      throw new RuntimeException(cleanupFailure);
+    }
+  }
+
+  private static void resetConsumerFactories() {
+    ExceptingKafkaConsumerFactory.reset();
+    ExceptingKafka4ConsumerFactory.reset();
   }
 
   @Test
@@ -290,6 +416,77 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     File consumerDirectory = new File(CONSUMER_DIRECTORY, "mytable_REALTIME");
     assertEquals(consumerDirectory.exists(), _isConsumerDirConfigured,
         "The off heap consumer directory does not exist");
+  }
+
+  @Test(priority = -1)
+  public void testKafka4ConsumerFactory()
+      throws Throwable {
+    _kafka4Scenario = newScenario(KAFKA_4_SMOKE_TABLE_NAME, getKafkaTopic());
+    Throwable primaryFailure = null;
+    try {
+      addScenarioSchema(_kafka4Scenario);
+      _kafka4Scenario._tableCreated = true;
+      addTableConfig(createKafka4SmokeTableConfig());
+
+      String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(KAFKA_4_SMOKE_TABLE_NAME);
+      runKafka4ValidationJob(getDocsLoadedTimeoutMs());
+      waitForAllRealtimePartitionsConsuming(tableNameWithType, getRealtimePartitionsReadyTimeoutMs());
+      long timeoutMs = getDocsLoadedTimeoutMs();
+      TestUtils.waitForCondition(
+          () -> getCurrentCountStarResult(KAFKA_4_SMOKE_TABLE_NAME) == DEFAULT_COUNT_STAR_RESULT, 100L, timeoutMs,
+          "Failed to ingest all documents with the Kafka 4 consumer", Duration.ofMillis(timeoutMs / 10));
+      assertEquals(getCurrentCountStarResult(KAFKA_4_SMOKE_TABLE_NAME), DEFAULT_COUNT_STAR_RESULT);
+    } catch (Throwable t) {
+      primaryFailure = t;
+      throw t;
+    } finally {
+      closeKafka4Scenario(primaryFailure);
+    }
+  }
+
+  private TableConfig createKafka4SmokeTableConfig() {
+    Map<String, String> streamConfigMap = super.getStreamConfigMap();
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(
+            streamConfigMap.get(StreamConfigProperties.STREAM_TYPE),
+            StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
+        ExceptingKafka4ConsumerFactory.class.getName());
+    ExceptingKafka4ConsumerFactory.init(getHelixClusterName(), _helixAdmin, KAFKA_4_SMOKE_TABLE_NAME);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(streamConfigMap)));
+    return getTableConfigBuilder(TableType.REALTIME).setTableName(KAFKA_4_SMOKE_TABLE_NAME)
+        .setIngestionConfig(ingestionConfig).build();
+  }
+
+  private void runKafka4ValidationJob(long timeoutMs)
+      throws Exception {
+    int partition = ExceptingKafka4ConsumerFactory.PARTITION_FOR_EXCEPTIONS;
+    int[] seqNumbers = {ExceptingKafka4ConsumerFactory.SEQ_NUM_FOR_CREATE_EXCEPTION,
+        ExceptingKafka4ConsumerFactory.SEQ_NUM_FOR_CONSUME_EXCEPTION};
+    Arrays.sort(seqNumbers);
+    for (int seqNum : seqNumbers) {
+      TestUtils.waitForCondition(() -> isOffline(KAFKA_4_SMOKE_TABLE_NAME, partition, seqNum), 5000L, timeoutMs,
+          "Failed to find Kafka 4 offline segment in partition " + partition + " seqNum " + seqNum,
+          Duration.ofMillis(timeoutMs / 10));
+      getOrCreateAdminClient().getClusterClient().runPeriodicTask("RealtimeSegmentValidationManager");
+    }
+  }
+
+  private void closeKafka4Scenario(Throwable primaryFailure)
+      throws Exception {
+    ScenarioLease scenario = _kafka4Scenario;
+    closeScenario(scenario, primaryFailure, null);
+    if (!scenario._tableCreated && !scenario._schemaCreated && !scenario._topicCreated
+        && scenario._resetAction == null) {
+      _kafka4Scenario = null;
+    }
+  }
+
+  private static Throwable addCleanupFailure(Throwable cleanupFailure, Throwable failure) {
+    if (cleanupFailure == null) {
+      return failure;
+    }
+    cleanupFailure.addSuppressed(failure);
+    return cleanupFailure;
   }
 
   @Test
@@ -505,6 +702,88 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     super.testHardcodedServerPartitionedSqlQueries();
   }
 
+  public static class ExceptingKafka4ConsumerFactory
+      extends org.apache.pinot.plugin.stream.kafka40.KafkaConsumerFactory {
+    public static final int PARTITION_FOR_EXCEPTIONS = 1;
+    public static final int SEQ_NUM_FOR_CREATE_EXCEPTION = 1;
+    public static final int SEQ_NUM_FOR_CONSUME_EXCEPTION = 3;
+
+    private static HelixAdmin _helixAdmin;
+    private static String _helixClusterName;
+    private static String _tableName;
+
+    public static void init(String helixClusterName, HelixAdmin helixAdmin, String tableName) {
+      _helixAdmin = helixAdmin;
+      _helixClusterName = helixClusterName;
+      _tableName = tableName;
+    }
+
+    public static void reset() {
+      _helixAdmin = null;
+      _helixClusterName = null;
+      _tableName = null;
+    }
+
+    @Override
+    public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
+        PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
+      int partition = partitionGroupConsumptionStatus.getPartitionGroupId();
+      boolean exceptionDuringConsume = false;
+      int seqNum = getSegmentSeqNum(partition);
+      if (partition == PARTITION_FOR_EXCEPTIONS) {
+        if (seqNum == SEQ_NUM_FOR_CREATE_EXCEPTION) {
+          throw new RuntimeException("TestException during Kafka 4 consumer creation");
+        } else if (seqNum == SEQ_NUM_FOR_CONSUME_EXCEPTION) {
+          exceptionDuringConsume = true;
+        }
+      }
+      return new ExceptingKafka4Consumer(clientId, _streamConfig, partition, exceptionDuringConsume);
+    }
+
+    @Override
+    public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
+        PartitionGroupConsumptionStatus partitionGroupConsumptionStatus, RetryPolicy retryPolicy) {
+      return createPartitionGroupConsumer(clientId, partitionGroupConsumptionStatus);
+    }
+
+    private int getSegmentSeqNum(int partition) {
+      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName,
+          TableNameBuilder.REALTIME.tableNameWithType(_tableName));
+      AtomicInteger seqNum = new AtomicInteger(-1);
+      idealState.getPartitionSet().forEach(segmentNameStr -> {
+        if (LLCSegmentName.isLLCSegment(segmentNameStr)
+            && idealState.getInstanceStateMap(segmentNameStr).values().contains(
+                CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING)) {
+          LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+          if (segmentName.getPartitionGroupId() == partition) {
+            seqNum.set(segmentName.getSequenceNumber());
+          }
+        }
+      });
+      assertTrue(seqNum.get() >= 0, "No consuming segment found in partition: " + partition);
+      return seqNum.get();
+    }
+
+    public static class ExceptingKafka4Consumer
+        extends org.apache.pinot.plugin.stream.kafka40.KafkaPartitionLevelConsumer {
+      private final boolean _exceptionDuringConsume;
+
+      public ExceptingKafka4Consumer(String clientId, StreamConfig streamConfig, int partition,
+          boolean exceptionDuringConsume) {
+        super(clientId, streamConfig, partition);
+        _exceptionDuringConsume = exceptionDuringConsume;
+      }
+
+      @Override
+      public KafkaMessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs) {
+        if (_exceptionDuringConsume) {
+          throw new RuntimeException("TestException during Kafka 4 consumption");
+        }
+        return super.fetchMessages(startOffset, timeoutMs);
+      }
+    }
+  }
+
   public static class ExceptingKafkaConsumerFactory extends KafkaConsumerFactory {
 
     public static final int PARTITION_FOR_EXCEPTIONS = 1; // Setting this to -1 disables all exceptions thrown.
@@ -522,6 +801,12 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       _helixAdmin = helixAdmin;
       _helixClusterName = helixClusterName;
       _tableName = tableName;
+    }
+
+    public static void reset() {
+      _helixAdmin = null;
+      _helixClusterName = null;
+      _tableName = null;
     }
 
     @Override

@@ -54,10 +54,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests the {@link BaseSingleSegmentConversionExecutor#executeTask} upload-failure handling: a segment-upload failure
- * must propagate so the task is marked failed (and retried) rather than being silently reported as successful.
- */
+/// Tests the [BaseSingleSegmentConversionExecutor#executeTask] upload-failure handling: a segment-upload failure
+/// must propagate so the task is marked failed (and retried) rather than being silently reported as successful.
 public class BaseSingleSegmentConversionExecutorTest {
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), "BaseSingleSegmentConversionExecutorTest");
@@ -175,12 +173,10 @@ public class BaseSingleSegmentConversionExecutorTest {
     return new PinotTaskConfig(TASK_TYPE, configs);
   }
 
-  /**
-   * Verifies that when a METADATA-mode push fails after the converted tar was already staged to the output PinotFS,
-   * the staged tar is deleted before the exception propagates. Without this cleanup the rethrow would make the retry
-   * fail in moveSegmentToOutputPinotFS with "Output file already exists" (overwriteOutput defaults to false), so
-   * transient push failures would never self-heal.
-   */
+  /// Verifies that when a METADATA-mode push fails after the converted tar was already staged to the output PinotFS,
+  /// the staged tar is deleted before the exception propagates. Without this cleanup the rethrow would make the retry
+  /// fail in moveSegmentToOutputPinotFS with "Output file already exists" (overwriteOutput defaults to false), so
+  /// transient push failures would never self-heal.
   @Test
   public void testExecuteTaskCleansUpStagedTarWhenMetadataPushFails()
       throws Exception {
@@ -233,10 +229,8 @@ public class BaseSingleSegmentConversionExecutorTest {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 
-  /**
-   * Minimal concrete executor that stubs out the infrastructure-dependent hooks (download, CRC check, conversion, ZK
-   * metadata modifier) so {@code executeTask} runs to the upload step without a server, controller, or deep store.
-   */
+  /// Minimal concrete executor that stubs out the infrastructure-dependent hooks (download, CRC check, conversion, ZK
+  /// metadata modifier) so `executeTask` runs to the upload step without a server, controller, or deep store.
   private class TestSingleSegmentConversionExecutor extends BaseSingleSegmentConversionExecutor {
     @Override
     protected File downloadSegmentToLocalAndUntar(String tableNameWithType, String segmentName, String deepstoreURL,

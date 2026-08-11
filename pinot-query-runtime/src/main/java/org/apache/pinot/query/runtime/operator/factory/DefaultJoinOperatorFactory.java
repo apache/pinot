@@ -30,9 +30,7 @@ import org.apache.pinot.query.runtime.operator.NonEquiJoinOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
-/**
- * Default implementation that constructs the built-in join operators.
- */
+/// Default implementation that constructs the built-in join operators.
 public class DefaultJoinOperatorFactory implements JoinOperatorFactory {
   @Override
   public MultiStageOperator createJoinOperator(OpChainExecutionContext context, MultiStageOperator leftOperator,
@@ -57,8 +55,8 @@ public class DefaultJoinOperatorFactory implements JoinOperatorFactory {
   }
 
   /// Enriched joins have been removed. This method is retained only for backward compatibility of the
-  /// {@link JoinOperatorFactory} interface and always throws. A current broker never produces an
-  /// {@link EnrichedJoinNode}, so this is only reachable if a plan from an older-version broker is executed.
+  /// [JoinOperatorFactory] interface and always throws. A current broker never produces an
+  /// [EnrichedJoinNode], so this is only reachable if a plan from an older-version broker is executed.
   ///
   /// @deprecated enriched joins are no longer supported; this method always throws.
   @Deprecated(forRemoval = true, since = "1.6.0")

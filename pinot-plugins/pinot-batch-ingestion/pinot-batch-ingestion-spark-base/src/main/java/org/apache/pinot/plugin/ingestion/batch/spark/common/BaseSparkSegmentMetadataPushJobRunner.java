@@ -102,14 +102,12 @@ public abstract class BaseSparkSegmentMetadataPushJobRunner implements Ingestion
     }
   }
 
-  /**
-   * Parallelizes the metadata push job using Spark to distribute the work across multiple nodes.
-   *
-   * @param segmentsToPush the list of segment URIs to be pushed
-   * @param pinotFSSpecs the list of Pinot file system specifications to be registered
-   * @param pushParallelism the level of parallelism for the push job
-   * @param outputDirURI the URI of the output directory containing the segments
-   */
+  /// Parallelizes the metadata push job using Spark to distribute the work across multiple nodes.
+  ///
+  /// @param segmentsToPush the list of segment URIs to be pushed
+  /// @param pinotFSSpecs the list of Pinot file system specifications to be registered
+  /// @param pushParallelism the level of parallelism for the push job
+  /// @param outputDirURI the URI of the output directory containing the segments
   public abstract void parallelizeMetadataPushJob(List<String> segmentsToPush, List<PinotFSSpec> pinotFSSpecs,
       int pushParallelism, URI outputDirURI);
 }

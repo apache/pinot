@@ -31,10 +31,8 @@ public class MinionConf extends PinotConfiguration {
   public static final String MINION_TASK_PROGRESS_MANAGER_CLASS = "pinot.minion.taskProgressManager.class";
   public static final int DEFAULT_END_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS = 10 * 60 * 1000; // 10 mins
 
-  /**
-   * The number of threads to use for downloading segments from the deepstore.
-   * This is a global setting that applies to all tasks of BaseMultipleSegmentsConversionExecutor class.
-   */
+  /// The number of threads to use for downloading segments from the deepstore.
+  /// This is a global setting that applies to all tasks of BaseMultipleSegmentsConversionExecutor class.
   public static final String SEGMENT_DOWNLOAD_PARALLELISM = "pinot.minion.task.segmentDownloadParallelism";
   public static final int DEFAULT_SEGMENT_DOWNLOAD_PARALLELISM = 1;
 

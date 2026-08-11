@@ -25,9 +25,7 @@ import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 
 
-/**
- * Broadcast blocks to all receiving servers.
- */
+/// Broadcast blocks to all receiving servers.
 class BroadcastExchange extends BlockExchange {
 
   protected BroadcastExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter) {

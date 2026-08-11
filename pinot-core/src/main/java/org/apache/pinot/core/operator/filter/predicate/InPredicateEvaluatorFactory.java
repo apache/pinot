@@ -43,34 +43,28 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * Factory for IN predicate evaluators.
- */
+/// Factory for IN predicate evaluators.
 public class InPredicateEvaluatorFactory {
   private InPredicateEvaluatorFactory() {
   }
 
-  /**
-   * Create a new instance of dictionary based IN predicate evaluator.
-   *
-   * @param inPredicate  IN predicate to evaluate
-   * @param dictionary   Dictionary for the column
-   * @param dataType     Data type for the column
-   * @param queryContext Query context
-   * @return Dictionary based IN predicate evaluator
-   */
+  /// Create a new instance of dictionary based IN predicate evaluator.
+  ///
+  /// @param inPredicate  IN predicate to evaluate
+  /// @param dictionary   Dictionary for the column
+  /// @param dataType     Data type for the column
+  /// @param queryContext Query context
+  /// @return Dictionary based IN predicate evaluator
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(InPredicate inPredicate,
       Dictionary dictionary, DataType dataType, @Nullable QueryContext queryContext) {
     return new DictionaryBasedInPredicateEvaluator(inPredicate, dictionary, dataType, queryContext);
   }
 
-  /**
-   * Create a new instance of raw value based IN predicate evaluator.
-   *
-   * @param inPredicate IN predicate to evaluate
-   * @param dataType Data type for the column
-   * @return Raw value based IN predicate evaluator
-   */
+  /// Create a new instance of raw value based IN predicate evaluator.
+  ///
+  /// @param inPredicate IN predicate to evaluate
+  /// @param dataType Data type for the column
+  /// @return Raw value based IN predicate evaluator
   public static InRawPredicateEvaluator newRawValueBasedEvaluator(InPredicate inPredicate, DataType dataType) {
     switch (dataType) {
       case INT: {
@@ -145,6 +139,19 @@ public class InPredicateEvaluatorFactory {
         // NOTE: Add value-by-value to avoid overhead
         //noinspection ManualArrayToCollectionCopy
         for (ByteArray value : bytesValues) {
+          //noinspection UseBulkOperation
+          matchingValues.add(value);
+        }
+        return new BytesRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
+      }
+      // UUID is a logical type stored as 16 raw bytes, so -- like TIMESTAMP over LONG above -- convert the
+      // literals to their stored form and reuse the stored-type evaluator.
+      case UUID: {
+        ByteArray[] uuidValues = inPredicate.getUuidValues();
+        Set<ByteArray> matchingValues = new ObjectOpenHashSet<>(HashUtil.getMinHashSetSize(uuidValues.length));
+        // NOTE: Add value-by-value to avoid overhead
+        //noinspection ManualArrayToCollectionCopy
+        for (ByteArray value : uuidValues) {
           //noinspection UseBulkOperation
           matchingValues.add(value);
         }

@@ -32,8 +32,10 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 public class PredicateUtils {
@@ -44,37 +46,38 @@ public class PredicateUtils {
   // dictionary
   private static final int MAX_INITIAL_DICT_ID_SET_SIZE = 1000;
 
-  /**
-   * Converts the given predicate value to the stored value based on the data type.
-   */
+  /// Converts the given predicate value to the stored value based on the data type.
   public static String getStoredValue(String value, DataType dataType) {
     switch (dataType) {
       case BOOLEAN:
         return getStoredBooleanValue(value);
       case TIMESTAMP:
         return getStoredTimestampValue(value);
+      case UUID:
+        // The hex here is a transport encoding for the String-typed lookup APIs, NOT the storage format -- a UUID
+        // column is stored as its raw 16 bytes, and the bytes round-trip unchanged (encode here, decode in the
+        // dictionary). Range bounds reach the dictionary only through Dictionary#insertionIndexOf(String) and
+        // #getDictIdsInRange(String, ...), and the canonical "550e8400-..." form cannot be passed through as-is
+        // because the dashes are not valid hex. Equality and IN avoid this entirely: they resolve UUIDs
+        // byte-natively via Dictionary#indexOf(ByteArray). Adding a matching insertionIndexOf(ByteArray) overload
+        // would let range bounds do the same.
+        return BytesUtils.toHexString(UuidUtils.toBytes(value));
       default:
         return value;
     }
   }
 
-  /**
-   * Converts the given boolean predicate value to the inner representation (int).
-   */
+  /// Converts the given boolean predicate value to the inner representation (int).
   public static String getStoredBooleanValue(String booleanValue) {
     return Integer.toString(BooleanUtils.toInt(booleanValue));
   }
 
-  /**
-   * Converts the given timestamp predicate value to the inner representation (millis since epoch).
-   */
+  /// Converts the given timestamp predicate value to the inner representation (millis since epoch).
   public static String getStoredTimestampValue(String timestampValue) {
     return Long.toString(TimestampUtils.toMillisSinceEpoch(timestampValue));
   }
 
-  /**
-   * Returns a dictionary id set of the values in the given IN/NOT_IN predicate.
-   */
+  /// Returns a dictionary id set of the values in the given IN/NOT_IN predicate.
   public static IntSet getDictIdSet(BaseInPredicate inPredicate, Dictionary dictionary, DataType dataType,
       @Nullable QueryContext queryContext) {
     List<String> values = inPredicate.getValues();
@@ -179,6 +182,15 @@ public class PredicateUtils {
       case BYTES:
         ByteArray[] bytesValues = inPredicate.getBytesValues();
         for (ByteArray value : bytesValues) {
+          int dictId = dictionary.indexOf(value);
+          if (dictId >= 0) {
+            dictIdSet.add(dictId);
+          }
+        }
+        break;
+      case UUID:
+        ByteArray[] uuidValues = inPredicate.getUuidValues();
+        for (ByteArray value : uuidValues) {
           int dictId = dictionary.indexOf(value);
           if (dictId >= 0) {
             dictIdSet.add(dictId);

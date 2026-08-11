@@ -23,9 +23,7 @@ import java.util.Objects;
 import org.apache.pinot.common.request.context.ExpressionContext;
 
 
-/**
- * Predicate for NOT_IN.
- */
+/// Predicate for NOT_IN.
 public class NotInPredicate extends BaseInPredicate {
 
   public NotInPredicate(ExpressionContext lhs, List<String> values) {

@@ -46,27 +46,25 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-/**
- * Integration test for {@link ProtoBufCodeGenMessageDecoder}.
- *
- * <p>Pushes protobuf-serialized {@code SampleRecord} messages (defined in {@code sample.proto})
- * into Kafka, configures a realtime Pinot table to decode them with {@link ProtoBufCodeGenMessageDecoder},
- * and validates that data is ingested and queryable.
- *
- * <p>Required test resources in {@code pinot-integration-tests/src/test/resources/}:
- * <ul>
- *   <li>{@code sample-samplerecord.jar} — compiled protobuf classes for {@code SampleRecord}.
- *       To regenerate: copy {@code sample.jar} from
- *       {@code pinot-plugins/pinot-input-format/pinot-protobuf/src/test/resources/}.</li>
- *   <li>{@code sample-samplerecord.desc} — binary {@code FileDescriptorSet} for constructing
- *       messages via {@link DynamicMessage} without a generated Java class.
- *       To regenerate: copy {@code sample.desc} from the same source directory.</li>
- * </ul>
- * Both resources are copies of the test resources in {@code pinot-protobuf}, renamed to avoid
- * classpath conflicts with that module's own resources when both are on the test classpath.
- *
- * <p>Thread-safety: inherits the shared-cluster pattern from {@link CustomDataQueryClusterIntegrationTest}.
- */
+/// Integration test for [ProtoBufCodeGenMessageDecoder].
+///
+/// Pushes protobuf-serialized `SampleRecord` messages (defined in `sample.proto`)
+/// into Kafka, configures a realtime Pinot table to decode them with [ProtoBufCodeGenMessageDecoder],
+/// and validates that data is ingested and queryable.
+///
+/// Required test resources in `pinot-integration-tests/src/test/resources/`:
+///
+/// - `sample-samplerecord.jar` — compiled protobuf classes for `SampleRecord`.
+///      To regenerate: copy `sample.jar` from
+///      `pinot-plugins/pinot-input-format/pinot-protobuf/src/test/resources/`.
+/// - `sample-samplerecord.desc` — binary `FileDescriptorSet` for constructing
+///      messages via [DynamicMessage] without a generated Java class.
+///      To regenerate: copy `sample.desc` from the same source directory.
+///
+/// Both resources are copies of the test resources in `pinot-protobuf`, renamed to avoid
+/// classpath conflicts with that module's own resources when both are on the test classpath.
+///
+/// Thread-safety: inherits the shared-cluster pattern from [CustomDataQueryClusterIntegrationTest].
 public class ProtoBufCodeGenMessageDecoderTest extends CustomDataQueryClusterIntegrationTest {
 
   private static final String TABLE_NAME = "ProtoBufCodeGenTest";
@@ -139,10 +137,8 @@ public class ProtoBufCodeGenMessageDecoderTest extends CustomDataQueryClusterInt
         .build();
   }
 
-  /**
-   * Returns a single dummy file. The base class passes {@code avroFiles.get(0)} to
-   * {@link #createRealtimeTableConfig(File)}, so the list must be non-empty. The file is not read.
-   */
+  /// Returns a single dummy file. The base class passes `avroFiles.get(0)` to
+  /// [#createRealtimeTableConfig(File)], so the list must be non-empty. The file is not read.
   @Override
   public List<File> createAvroFiles()
       throws Exception {
@@ -151,20 +147,17 @@ public class ProtoBufCodeGenMessageDecoderTest extends CustomDataQueryClusterInt
     return List.of(dummy);
   }
 
-  /**
-   * Pushes {@link #NUM_RECORDS} protobuf-encoded {@code SampleRecord} messages to Kafka.
-   *
-   * <p>Uses {@link DynamicMessage} with the pre-compiled {@code sample-samplerecord.desc} descriptor
-   * so no generated Java sources are needed at compile time.
-   *
-   * <p>Each record {@code i} has:
-   * <ul>
-   *   <li>{@code id = i} (also the time column, values 0–{@link #NUM_RECORDS})</li>
-   *   <li>{@code name = "name-i"}</li>
-   *   <li>{@code email = "user-i@example.com"}</li>
-   *   <li>{@code friends = ["friend-{i % NUM_DISTINCT_FRIENDS}"]}</li>
-   * </ul>
-   */
+  /// Pushes [#NUM_RECORDS] protobuf-encoded `SampleRecord` messages to Kafka.
+  ///
+  /// Uses [DynamicMessage] with the pre-compiled `sample-samplerecord.desc` descriptor
+  /// so no generated Java sources are needed at compile time.
+  ///
+  /// Each record `i` has:
+  ///
+  /// - `id = i` (also the time column, values 0–[#NUM_RECORDS])
+  /// - `name = "name-i"`
+  /// - `email = "user-i@example.com"`
+  /// - `friends = \["friend-{i % NUM_DISTINCT_FRIENDS}"\]`
   @Override
   protected void pushDataIntoKafka(List<File> dataFiles)
       throws Exception {
@@ -188,9 +181,7 @@ public class ProtoBufCodeGenMessageDecoderTest extends CustomDataQueryClusterInt
     }
   }
 
-  /**
-   * Verifies that all pushed records are ingested: {@code COUNT(*) = NUM_RECORDS}.
-   */
+  /// Verifies that all pushed records are ingested: `COUNT(*) = NUM_RECORDS`.
   @Test
   public void testCountStar()
       throws Exception {
@@ -198,9 +189,7 @@ public class ProtoBufCodeGenMessageDecoderTest extends CustomDataQueryClusterInt
     assertEquals(response.get("resultTable").get("rows").get(0).get(0).asLong(), NUM_RECORDS);
   }
 
-  /**
-   * Verifies scalar field decoding by selecting a specific record by {@code id}.
-   */
+  /// Verifies scalar field decoding by selecting a specific record by `id`.
   @Test
   public void testSelectById()
       throws Exception {
@@ -213,11 +202,9 @@ public class ProtoBufCodeGenMessageDecoderTest extends CustomDataQueryClusterInt
     assertEquals(rows.get(0).get(1).asText(), "user" + targetId + "@example.com");
   }
 
-  /**
-   * Verifies that {@code repeated string friends} is decoded as a multi-value STRING column.
-   * Each record has one friend: {@code "friend-{id % NUM_DISTINCT_FRIENDS}"},
-   * so each distinct friend value should match {@code NUM_RECORDS / NUM_DISTINCT_FRIENDS} rows.
-   */
+  /// Verifies that `repeated string friends` is decoded as a multi-value STRING column.
+  /// Each record has one friend: `"friend-{id % NUM_DISTINCT_FRIENDS}"`,
+  /// so each distinct friend value should match `NUM_RECORDS / NUM_DISTINCT_FRIENDS` rows.
   @Test
   public void testMultiValueFriendsCount()
       throws Exception {
@@ -231,9 +218,7 @@ public class ProtoBufCodeGenMessageDecoderTest extends CustomDataQueryClusterInt
     }
   }
 
-  /**
-   * Verifies there are exactly {@link #NUM_DISTINCT_FRIENDS} distinct values in the {@code friends} column.
-   */
+  /// Verifies there are exactly [#NUM_DISTINCT_FRIENDS] distinct values in the `friends` column.
   @Test
   public void testDistinctFriendCount()
       throws Exception {
@@ -244,9 +229,7 @@ public class ProtoBufCodeGenMessageDecoderTest extends CustomDataQueryClusterInt
         "Expected " + NUM_DISTINCT_FRIENDS + " distinct friend values, got " + count);
   }
 
-  /**
-   * Verifies that the {@code email} field is decoded and non-null for all records.
-   */
+  /// Verifies that the `email` field is decoded and non-null for all records.
   @Test
   public void testEmailFieldNotNull()
       throws Exception {
@@ -258,11 +241,9 @@ public class ProtoBufCodeGenMessageDecoderTest extends CustomDataQueryClusterInt
 
   // ---- Helpers ----
 
-  /**
-   * Loads the {@code SampleRecord} {@link Descriptors.Descriptor} from the binary descriptor file
-   * on the test classpath. Fails with a clear assertion message if the resource or message type
-   * is not found.
-   */
+  /// Loads the `SampleRecord` [Descriptors.Descriptor] from the binary descriptor file
+  /// on the test classpath. Fails with a clear assertion message if the resource or message type
+  /// is not found.
   private static Descriptors.Descriptor loadSampleRecordDescriptor()
       throws Exception {
     try (InputStream is = ProtoBufCodeGenMessageDecoderTest.class.getClassLoader()

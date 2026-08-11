@@ -63,9 +63,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for SEGMENT_PARTITIONED_DISTINCT_COUNT queries.
- */
+/// Queries test for SEGMENT_PARTITIONED_DISTINCT_COUNT queries.
 @SuppressWarnings("rawtypes")
 public class SegmentPartitionedDistinctCountQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR =

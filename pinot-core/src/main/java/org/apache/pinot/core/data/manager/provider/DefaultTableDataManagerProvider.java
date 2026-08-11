@@ -47,9 +47,7 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import static java.util.Objects.requireNonNull;
 
 
-/**
- * Default implementation of {@link TableDataManagerProvider}.
- */
+/// Default implementation of [TableDataManagerProvider].
 public class DefaultTableDataManagerProvider implements TableDataManagerProvider {
   private InstanceDataManagerConfig _instanceDataManagerConfig;
   private HelixManager _helixManager;

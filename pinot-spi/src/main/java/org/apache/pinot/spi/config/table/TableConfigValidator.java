@@ -23,22 +23,18 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.ConfigValidationException;
 
 
-/**
- * SPI interface for validating table config mutations (create and update).
- * Implementations are registered via {@link TableConfigValidatorRegistry}
- * and invoked before table config is persisted. Throw {@link ConfigValidationException} to reject.
- *
- * <p>Implementations must be thread-safe — they may be called concurrently from multiple request threads.</p>
- */
+/// SPI interface for validating table config mutations (create and update).
+/// Implementations are registered via [TableConfigValidatorRegistry]
+/// and invoked before table config is persisted. Throw [ConfigValidationException] to reject.
+///
+/// Implementations must be thread-safe — they may be called concurrently from multiple request threads.
 public interface TableConfigValidator {
 
-  /**
-   * Validates the given table config before persistence.
-   *
-   * @param tableConfig The table config being created or updated
-   * @param schema The table's schema, or null if not available
-   * @throws ConfigValidationException if the table config violates validation rules
-   */
+  /// Validates the given table config before persistence.
+  ///
+  /// @param tableConfig The table config being created or updated
+  /// @param schema The table's schema, or null if not available
+  /// @throws ConfigValidationException if the table config violates validation rules
   void validate(TableConfig tableConfig, @Nullable Schema schema)
       throws ConfigValidationException;
 }

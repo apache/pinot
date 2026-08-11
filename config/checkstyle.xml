@@ -209,7 +209,23 @@
 
     <!-- JAVADOC COMMENTS -->
 
-    <!-- If you have a Javadoc comment, make sure it is properly formed -->
+    <!-- Doc comments must use the /// markdown form (JEP 467), not /** */.
+         The pattern deliberately does not match:
+           - the ASF license header, identified by its text rather than its position, since a
+             handful of files place it below the package/import statements
+           - /*** ... ***/ decorative separators, which are not documentation
+           - /** appearing mid-line, e.g. inside a SQL string literal in a test -->
+    <module name="Regexp">
+      <property name="format"
+                value="(?m)^[ \t]*/\*\*(?!\*)(?![\s\S]{0,60}?Licensed to the Apache Software Foundation)"/>
+      <property name="illegalPattern" value="true"/>
+      <property name="message"
+                value="Use /// markdown doc comments (JEP 467) instead of /** */ Javadoc."/>
+    </module>
+
+    <!-- If you have a Javadoc comment, make sure it is properly formed.
+         NOTE: this only inspects /** */ comments, so it no longer applies to the /// doc
+         comments that the codebase now uses. -->
     <module name="JavadocStyle">
       <property name="checkFirstSentence" value="false"/>
     </module>

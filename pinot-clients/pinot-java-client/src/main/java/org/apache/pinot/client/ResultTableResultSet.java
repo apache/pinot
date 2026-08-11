@@ -23,9 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-/**
- * ResultSet which contains the ResultTable from the broker response of a sql query.
- */
+/// ResultSet which contains the ResultTable from the broker response of a sql query.
 public class ResultTableResultSet extends AbstractResultSet {
   private final JsonNode _rowsArray;
   private final JsonNode _columnNamesArray;

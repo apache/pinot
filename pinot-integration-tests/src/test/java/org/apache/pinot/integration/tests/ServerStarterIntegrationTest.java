@@ -30,6 +30,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.*;
+import static org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT;
+import static org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_INSTANCE_ID;
 import static org.testng.Assert.assertEquals;
 
@@ -57,6 +59,11 @@ public class ServerStarterIntegrationTest extends ControllerTest {
       throws Exception {
     serverConf.setProperty(CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     serverConf.setProperty(CONFIG_OF_ZOOKEEPER_SERVER, getZkUrl());
+    int queryServerPort = NetUtils.findOpenPort(_nextServerPort);
+    int queryRunnerPort = NetUtils.findOpenPort(queryServerPort + 1);
+    serverConf.setProperty(KEY_OF_QUERY_SERVER_PORT, queryServerPort);
+    serverConf.setProperty(KEY_OF_QUERY_RUNNER_PORT, queryRunnerPort);
+    _nextServerPort = queryRunnerPort + 1;
     HelixServerStarter helixServerStarter = new HelixServerStarter();
     helixServerStarter.init(serverConf);
     helixServerStarter.start();

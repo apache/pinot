@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -37,23 +38,22 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * AnyValue aggregation function returns any arbitrary NON-NULL value from the column for each group.
- * <p>
- * This is useful for GROUP BY queries where you want to include a column in SELECT that has a 1:1 mapping with the
- * GROUP BY columns, avoiding the need to add it to GROUP BY clause. The implementation is null-aware and will scan
- * only until it finds the first non-null value in the current batch for each group/key. This makes it O(n) over the
- * input once per group until the first value is set, with early-exit fast paths when there are no nulls.
- * </p>
- * <p><strong>Example:</strong></p>
- * <pre>{@code
- * SELECT CustomerID,
- *        ANY_VALUE(CustomerName),
- *        SUM(OrderValue)
- * FROM Orders
- * GROUP BY CustomerID
- * }</pre>
- */
+/// AnyValue aggregation function returns any arbitrary NON-NULL value from the column for each group.
+///
+/// This is useful for GROUP BY queries where you want to include a column in SELECT that has a 1:1 mapping with the
+/// GROUP BY columns, avoiding the need to add it to GROUP BY clause. The implementation is null-aware and will scan
+/// only until it finds the first non-null value in the current batch for each group/key. This makes it O(n) over the
+/// input once per group until the first value is set, with early-exit fast paths when there are no nulls.
+///
+/// **Example:**
+///
+/// ```
+/// SELECT CustomerID,
+///        ANY_VALUE(CustomerName),
+///        SUM(OrderValue)
+/// FROM Orders
+/// GROUP BY CustomerID
+/// ```
 public class AnyValueAggregationFunction extends NullableSingleInputAggregationFunction<Object, Comparable<?>> {
   private static final FieldSpec.DataType[] DATA_TYPE_VALUES = FieldSpec.DataType.values();
   // Result type is determined at runtime based on input expression type
@@ -91,25 +91,27 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
     return _resultType != null ? _resultType : ColumnDataType.STRING;
   }
 
+  @Nullable
   @Override
   public Object extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public Object extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
-  public Comparable<?> extractFinalResult(Object intermediateResult) {
+  public Comparable<?> extractFinalResult(@Nullable Object intermediateResult) {
     return (Comparable<?>) intermediateResult;
   }
 
   @Override
   public Object merge(Object left, Object right) {
-    // For ANY_VALUE, we just need any non-null value, so merge by returning the first non-null value
-    return left != null ? left : right;
+    // Any of the two values will do, and both are real values here.
+    return left;
   }
 
   @Override
@@ -178,9 +180,7 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
     boolean process(int index, T value); // Returns true to stop processing, false to continue
   }
 
-  /**
-   * Generic helper for processing values with dictionary optimization for all supported data types
-   */
+  /// Generic helper for processing values with dictionary optimization for all supported data types
   private void aggregateHelper(int length, BlockValSet bvs, ValueProcessor<Object> processor) {
     // Use dictionary-based access for efficiency when available
     if (bvs.isDictionaryEncoded()) {
@@ -207,9 +207,7 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
     }
   }
 
-  /**
-   * Get value from dictionary based on data type
-   */
+  /// Get value from dictionary based on data type
   private Object getDictionaryValue(Dictionary dict, int dictId, FieldSpec.DataType storedType) {
     switch (storedType) {
       case INT:
@@ -231,9 +229,7 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
     }
   }
 
-  /**
-   * Get value directly from BlockValSet based on data type
-   */
+  /// Get value directly from BlockValSet based on data type
   private Object getDirectValue(BlockValSet bvs, int index) {
     switch (bvs.getValueType().getStoredType()) {
       case INT:
@@ -255,10 +251,8 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
     }
   }
 
-  /**
-   * Custom serialization for ANY_VALUE that handles all supported data types efficiently
-   * Note: value is never null - null is handled at the serializeIntermediateResult layer
-   */
+  /// Custom serialization for ANY_VALUE that handles all supported data types efficiently
+  /// Note: value is never null - null is handled at the serializeIntermediateResult layer
   private byte[] serializeValue(Object value) {
     if (value instanceof Integer) {
       return serializeFixedValue(FieldSpec.DataType.INT, 4, buffer -> buffer.putInt((Integer) value));
@@ -279,9 +273,7 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
     }
   }
 
-  /**
-   * Helper method for serializing fixed-length values
-   */
+  /// Helper method for serializing fixed-length values
   private byte[] serializeFixedValue(FieldSpec.DataType dataType, int valueSize, Consumer<ByteBuffer> valueWriter) {
     ByteBuffer buffer = ByteBuffer.allocate(4 + valueSize); // 4 bytes for type ordinal + value bytes
     buffer.putInt(dataType.ordinal());
@@ -289,9 +281,7 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
     return buffer.array();
   }
 
-  /**
-   * Helper method for serializing variable-length values
-   */
+  /// Helper method for serializing variable-length values
   private byte[] serializeVariableValue(FieldSpec.DataType dataType, byte[] data) {
     ByteBuffer buffer = ByteBuffer.allocate(8 + data.length); // 4 bytes type ordinal + 4 bytes length + data
     buffer.putInt(dataType.ordinal());
@@ -300,10 +290,8 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
     return buffer.array();
   }
 
-  /**
-   * Custom deserialization for ANY_VALUE that handles all supported data types efficiently
-   * Note: empty buffer (null) is handled at the deserializeIntermediateResult layer
-   */
+  /// Custom deserialization for ANY_VALUE that handles all supported data types efficiently
+  /// Note: empty buffer (null) is handled at the deserializeIntermediateResult layer
   private Object deserializeValue(ByteBuffer buffer) {
     int typeOrdinal = buffer.getInt();
     FieldSpec.DataType dataType = DATA_TYPE_VALUES[typeOrdinal];
@@ -327,9 +315,7 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
     }
   }
 
-  /**
-   * Helper method for deserializing variable-length byte arrays
-   */
+  /// Helper method for deserializing variable-length byte arrays
   private byte[] deserializeVariableBytes(ByteBuffer buffer) {
     int length = buffer.getInt();
     byte[] bytes = new byte[length];

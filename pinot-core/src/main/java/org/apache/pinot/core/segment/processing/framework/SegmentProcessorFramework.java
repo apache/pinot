@@ -48,16 +48,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A framework to process "m" given segments and convert them into "n" segments
- * The phases of the Segment Processor are
- * 1. Map - record transformation, partitioning, partition filtering
- * 2. Reduce - rollup, concat, split etc
- * 3. Segment generation
- *
- * This will typically be used by minion tasks, which want to perform some processing on segments
- * (eg task which merges segments, tasks which aligns segments per time boundaries etc)
- */
+/// A framework to process "m" given segments and convert them into "n" segments
+/// The phases of the Segment Processor are
+/// 1. Map - record transformation, partitioning, partition filtering
+/// 2. Reduce - rollup, concat, split etc
+/// 3. Segment generation
+///
+/// This will typically be used by minion tasks, which want to perform some processing on segments
+/// (eg task which merges segments, tasks which aligns segments per time boundaries etc)
 public class SegmentProcessorFramework {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentProcessorFramework.class);
   public static final String MAP_STAGE = "MAP";
@@ -77,11 +75,9 @@ public class SegmentProcessorFramework {
   private int _skippedRowsFound = 0;
   private int _sanitizedRowsFound = 0;
 
-  /**
-   * Initializes the SegmentProcessorFramework with record readers, config and working directory. We will now rely on
-   * users passing RecordReaderFileConfig, since that also allows us to do lazy initialization of RecordReaders.
-   * Please use the other constructor that uses RecordReaderFileConfig.
-   */
+  /// Initializes the SegmentProcessorFramework with record readers, config and working directory. We will now rely on
+  /// users passing RecordReaderFileConfig, since that also allows us to do lazy initialization of RecordReaders.
+  /// Please use the other constructor that uses RecordReaderFileConfig.
   @Deprecated
   public SegmentProcessorFramework(List<RecordReader> recordReaders, SegmentProcessorConfig segmentProcessorConfig,
       File workingDir)
@@ -140,9 +136,7 @@ public class SegmentProcessorFramework {
     return recordReaderFileConfigs;
   }
 
-  /**
-   * Processes records from record readers per the provided config, returns the directories for the generated segments.
-   */
+  /// Processes records from record readers per the provided config, returns the directories for the generated segments.
   public List<File> process()
       throws Exception {
     try {

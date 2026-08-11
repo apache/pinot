@@ -36,9 +36,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.*;
 
 
-/**
- * The config used for HelixInstanceDataManager.
- */
+/// The config used for HelixInstanceDataManager.
 public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManagerConfig.class);
 

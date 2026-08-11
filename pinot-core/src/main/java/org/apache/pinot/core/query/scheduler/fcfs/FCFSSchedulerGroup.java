@@ -30,13 +30,11 @@ public class FCFSSchedulerGroup extends AbstractSchedulerGroup {
     super(group);
   }
 
-  /**
-   * Group that has pending query with earlier arrival time has higher priority.
-   * @param rhs
-   * @return 1 if this has lower arrival time than rhs
-   *         -1 if this has higher arrival time than lhs
-   *         0 if arrival times are equal
-   */
+  /// Group that has pending query with earlier arrival time has higher priority.
+  /// @param rhs
+  /// @return 1 if this has lower arrival time than rhs
+  ///         -1 if this has higher arrival time than lhs
+  ///         0 if arrival times are equal
   @Override
   public int compareTo(SchedulerGroupAccountant rhs) {
     return compare(this, ((SchedulerGroup) rhs));

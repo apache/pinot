@@ -53,11 +53,9 @@ public class DispatchablePlanFragment {
     this(planFragment, new ArrayList<>(), new HashMap<>(), new HashMap<>());
   }
 
-  /**
-   * Returns a copy of {@code original} with its plan fragment root replaced by {@code newRoot}.
-   * Worker metadata and server-instance mapping are shallow-copied so the new fragment is
-   * independent of the original.
-   */
+  /// Returns a copy of `original` with its plan fragment root replaced by `newRoot`.
+  /// Worker metadata and server-instance mapping are shallow-copied so the new fragment is
+  /// independent of the original.
   public static DispatchablePlanFragment copyWithRoot(DispatchablePlanFragment original, PlanNode newRoot) {
     int fragmentId = original.getPlanFragment().getFragmentId();
     return new DispatchablePlanFragment(

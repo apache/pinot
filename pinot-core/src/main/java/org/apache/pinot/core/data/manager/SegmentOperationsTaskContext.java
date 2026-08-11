@@ -21,9 +21,7 @@ package org.apache.pinot.core.data.manager;
 import java.util.concurrent.Callable;
 import javax.annotation.Nullable;
 
-/**
- * Thread-local task context for segment operations.
- */
+/// Thread-local task context for segment operations.
 public final class SegmentOperationsTaskContext {
   private static final ThreadLocal<Context> CONTEXT = new ThreadLocal<>();
 
@@ -50,9 +48,7 @@ public final class SegmentOperationsTaskContext {
     return context != null ? context._tableNameWithType : null;
   }
 
-  /**
-   * Wraps a runnable task with segment operations context.
-   */
+  /// Wraps a runnable task with segment operations context.
   public static Runnable wrap(Runnable runnable, SegmentOperationsTaskType taskType,
       @Nullable String tableNameWithType) {
     return () -> {
@@ -65,9 +61,7 @@ public final class SegmentOperationsTaskContext {
     };
   }
 
-  /**
-   * Wraps a callable task with segment operations context.
-   */
+  /// Wraps a callable task with segment operations context.
   public static <T> Callable<T> wrap(Callable<T> callable, SegmentOperationsTaskType taskType,
       @Nullable String tableNameWithType) {
     return () -> {

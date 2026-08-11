@@ -28,16 +28,14 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GapfillUtils;
 
 
-/**
- * Helper class to reduce and set gap fill results into the BrokerResponseNative
- *
- * {@link CountGapfillProcessor} is only applying the count aggregation function on the gapfilled result for each time
- * bucket.
- *
- * {@link CountGapfillProcessor} is different from {@link GapfillProcessor} that {@link GapfillProcessor} will create
- * the gapfilled entries, but {@link CountGapfillProcessor} does not generate the gapfilled entries. It just updated
- * the aggregated count as necessary.
- */
+/// Helper class to reduce and set gap fill results into the BrokerResponseNative
+///
+/// [CountGapfillProcessor] is only applying the count aggregation function on the gapfilled result for each time
+/// bucket.
+///
+/// [CountGapfillProcessor] is different from [GapfillProcessor] that [GapfillProcessor] will create
+/// the gapfilled entries, but [CountGapfillProcessor] does not generate the gapfilled entries. It just updated
+/// the aggregated count as necessary.
 class CountGapfillProcessor extends BaseGapfillProcessor {
   protected final Set<Key> _filteredSet;
 

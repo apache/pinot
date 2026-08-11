@@ -842,9 +842,7 @@ public class RetentionManagerTest {
     return segmentZKMetadata;
   }
 
-  /**
-   * Helper method to create a file with content
-   */
+  /// Helper method to create a file with content
   private void createFileWithContent(File file, String content) {
     try {
       Files.write(file.toPath(), content.getBytes());
@@ -853,9 +851,7 @@ public class RetentionManagerTest {
     }
   }
 
-  /**
-   * Helper method to set file modification time
-   */
+  /// Helper method to set file modification time
   private void setFileModificationTime(File file, long timestamp) {
     FileTime fileTime = FileTime.fromMillis(timestamp);
     try {

@@ -27,30 +27,21 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 
 
-/**
- * The {@code SpecialValueTransformer} class will transform special values according to the following rules:
- * <ul>
- *   <li>
- *     For FLOAT and DOUBLE:
- *     <ul>
- *       <li>Negative zero (-0.0) should be converted to 0.0</li>
- *       <li>NaN should be converted to default null</li>
- *     </ul>
- *   </li>
- *   <li>
- *     For BIG_DECIMAL:
- *     <ul>
- *       <li>Strip trailing zeros</li>
- *     </ul>
- *   </li>
- * </ul>
- * <p>This transformation is required to ensure that the value is equal to itself, and the ordering of the values is
- * consistent with equals. This is required for certain data structures (e.g. sorted map) and algorithm (e.g. binary
- * search) to work correctly. Read more about it in {@link Comparable}.
- * <p>NOTE: should put this after the {@link DataTypeTransformer} so that we already have the values complying
- * with the schema before handling special values and before {@link NullValueTransformer} so that it transforms
- * all the null values properly.
- */
+/// The `SpecialValueTransformer` class will transform special values according to the following rules:
+///
+/// - For FLOAT and DOUBLE:
+///   - Negative zero (-0.0) should be converted to 0.0
+///   - NaN should be converted to default null
+/// - For BIG_DECIMAL:
+///   - Strip trailing zeros
+///
+/// This transformation is required to ensure that the value is equal to itself, and the ordering of the values is
+/// consistent with equals. This is required for certain data structures (e.g. sorted map) and algorithm (e.g. binary
+/// search) to work correctly. Read more about it in [Comparable].
+///
+/// NOTE: should put this after the [DataTypeTransformer] so that we already have the values complying
+/// with the schema before handling special values and before [NullValueTransformer] so that it transforms
+/// all the null values properly.
 public class SpecialValueTransformer implements RecordTransformer {
 
   private final Set<String> _columnsToCheck = new HashSet<>();

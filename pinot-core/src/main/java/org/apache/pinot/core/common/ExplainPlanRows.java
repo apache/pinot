@@ -22,9 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Class to hold all the rows for a given Explain Plan
- */
+/// Class to hold all the rows for a given Explain Plan
 public class ExplainPlanRows implements Comparable<ExplainPlanRows> {
   public static final String ALL_SEGMENTS_PRUNED_ON_SERVER = "ALL_SEGMENTS_PRUNED_ON_SERVER";
   public static final String PLAN_START = "PLAN_START(numSegmentsForThisPlan:";

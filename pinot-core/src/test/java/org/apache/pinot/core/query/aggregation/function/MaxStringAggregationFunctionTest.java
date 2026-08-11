@@ -31,25 +31,29 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
 public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctionTest {
 
-  /**
-   * Helper method to create a FluentQueryTest builder for a table with a single String field.
-   * This is used to simulate the DataTypeScenario concept from numeric aggregation tests,
-   * but fixed for the STRING data type.
-   */
+  /// Helper method to create a FluentQueryTest builder for a table with a single String field.
+  /// This is used to simulate the DataTypeScenario concept from numeric aggregation tests,
+  /// but fixed for the STRING data type.
   protected FluentQueryTest.DeclaringTable getDeclaringTable(boolean enableColumnBasedNullHandling) {
+    return getDeclaringTable(enableColumnBasedNullHandling, Map.of());
+  }
+
+  protected FluentQueryTest.DeclaringTable getDeclaringTable(boolean enableColumnBasedNullHandling,
+      Map<String, String> extraQueryOptions) {
     return FluentQueryTest.withBaseDir(_baseDir)
+        .withExtraQueryOptions(extraQueryOptions)
         .givenTable(
             new Schema.SchemaBuilder()
                 .setSchemaName("testTable")
@@ -132,11 +136,6 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
     assertEquals(function.merge("banana", "apple"), "banana");
     assertEquals(function.merge("", "apple"), "apple");
     assertEquals(function.merge("apple", ""), "apple");
-
-    // Test null handling
-    assertEquals(function.merge("apple", null), "apple");
-    assertEquals(function.merge(null, "apple"), "apple");
-    assertNull(function.merge(null, null));
     assertEquals(function.merge("apple", "null"), "null");
 
     // Test final result merging
@@ -308,5 +307,68 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
             "tag2    | cherry", // Values for tag2: "banana", "apple", "cherry". Max is "cherry".
             "tag3    | cherry"  // Values for tag3: "cherry". Max is "cherry".
         );
+  }
+
+  /// MAXSTRING has no identity element, so it yields a null intermediate result when no row is aggregated at all --
+  /// in both null-handling modes. The intermediate result column is STRING, whose 4-byte DataTable slot cannot hold
+  /// the custom-object null encoding, so this only round-trips if the builder writes the null through a bitmap.
+  @Test
+  void aggregationNoMatchingRowsWithNullHandlingDisabled() {
+    getDeclaringTable(false)
+        .onFirstInstance("myField",
+            "alpha"
+        ).andOnSecondInstance("myField",
+            "beta"
+        ).whenQuery("select maxstring(myField) from testTable where myField = 'nomatch'")
+        .thenResultIs("STRING", "null");
+  }
+
+  @Test
+  void aggregationNoMatchingRowsWithNullHandlingEnabled() {
+    getDeclaringTable(true)
+        .onFirstInstance("myField",
+            "alpha"
+        ).andOnSecondInstance("myField",
+            "beta"
+        ).whenQueryWithNullHandlingEnabled("select maxstring(myField) from testTable where myField = 'nomatch'")
+        .thenResultIs("STRING", "null");
+  }
+
+  /// The null intermediate result must survive alongside a neighbouring aggregate: the STRING column occupies a
+  /// 4-byte slot, so an over-wide null encoding would corrupt the column that follows it.
+  @Test
+  void aggregationNoMatchingRowsWithFollowingAggregateColumn() {
+    getDeclaringTable(false)
+        .onFirstInstance("myField",
+            "alpha"
+        ).andOnSecondInstance("myField",
+            "beta"
+        ).whenQuery("select maxstring(myField), count(*) from testTable where myField = 'nomatch'")
+        .thenResultIs("STRING | LONG", "null | 0");
+  }
+
+  /// With `serverReturnFinalResult` the servers finalize before serializing, so the null lands in a column typed by
+  /// `getFinalResultColumnType()` rather than the intermediate type -- STRING here, a 4-byte slot either way. The
+  /// broker sets this option on its own for any single-server query, so this is a routine path, not an edge case.
+  @Test
+  void aggregationNoMatchingRowsReturningFinalResultWithNullHandlingDisabled() {
+    getDeclaringTable(false, Map.of(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true"))
+        .onFirstInstance("myField",
+            "alpha"
+        ).andOnSecondInstance("myField",
+            "beta"
+        ).whenQuery("select maxstring(myField) from testTable where myField = 'nomatch'")
+        .thenResultIs("STRING", "null");
+  }
+
+  @Test
+  void aggregationNoMatchingRowsReturningFinalResultWithNullHandlingEnabled() {
+    getDeclaringTable(true, Map.of(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true"))
+        .onFirstInstance("myField",
+            "alpha"
+        ).andOnSecondInstance("myField",
+            "beta"
+        ).whenQueryWithNullHandlingEnabled("select maxstring(myField) from testTable where myField = 'nomatch'")
+        .thenResultIs("STRING", "null");
   }
 }

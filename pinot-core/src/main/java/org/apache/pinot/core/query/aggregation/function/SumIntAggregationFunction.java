@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
@@ -32,17 +33,15 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * Specialized INT sum aggregation function that avoids type conversion overhead.
- * This function is optimized for INT columns and uses native INT arithmetic.
- *
- * Performance optimizations:
- * - Direct INT arithmetic without DOUBLE conversion
- * - Vectorized operations for better CPU utilization
- * - Minimal object allocations
- * - Optimized for the specific case of INT column aggregation
- * - Proper null handling support using foldNotNull and forEachNotNull
- */
+/// Specialized INT sum aggregation function that avoids type conversion overhead.
+/// This function is optimized for INT columns and uses native INT arithmetic.
+///
+/// Performance optimizations:
+/// - Direct INT arithmetic without DOUBLE conversion
+/// - Vectorized operations for better CPU utilization
+/// - Minimal object allocations
+/// - Optimized for the specific case of INT column aggregation
+/// - Proper null handling support using foldNotNull and forEachNotNull
 public class SumIntAggregationFunction extends NullableSingleInputAggregationFunction<Long, Long> {
   public static final String FUNCTION_NAME = "sumInt";
   private static final long DEFAULT_VALUE = 0L;
@@ -157,6 +156,7 @@ public class SumIntAggregationFunction extends NullableSingleInputAggregationFun
     }
   }
 
+  @Nullable
   @Override
   public Long extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     if (_nullHandlingEnabled) {
@@ -165,6 +165,7 @@ public class SumIntAggregationFunction extends NullableSingleInputAggregationFun
     return aggregationResultHolder.getLongResult();
   }
 
+  @Nullable
   @Override
   public Long extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     if (_nullHandlingEnabled) {
@@ -175,20 +176,7 @@ public class SumIntAggregationFunction extends NullableSingleInputAggregationFun
 
   @Override
   public Long merge(Long intermediateResult1, Long intermediateResult2) {
-    if (_nullHandlingEnabled) {
-      if (intermediateResult1 == null) {
-        return intermediateResult2;
-      }
-      if (intermediateResult2 == null) {
-        return intermediateResult1;
-      }
-      // Both are non-null
-      return intermediateResult1 + intermediateResult2;
-    } else {
-      long val1 = (intermediateResult1 != null) ? intermediateResult1 : 0L;
-      long val2 = (intermediateResult2 != null) ? intermediateResult2 : 0L;
-      return val1 + val2;
-    }
+    return intermediateResult1 + intermediateResult2;
   }
 
   @Override
@@ -201,8 +189,9 @@ public class SumIntAggregationFunction extends NullableSingleInputAggregationFun
     return DataSchema.ColumnDataType.LONG;
   }
 
+  @Nullable
   @Override
-  public Long extractFinalResult(Long intermediateResult) {
+  public Long extractFinalResult(@Nullable Long intermediateResult) {
     return intermediateResult;
   }
 

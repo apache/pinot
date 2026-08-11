@@ -23,7 +23,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.spi.utils.UuidUtils;
 
 
 public interface BloomFilterCreator extends IndexCreator {
@@ -32,10 +31,8 @@ public interface BloomFilterCreator extends IndexCreator {
 
   @Override
   default void add(Object value, int dictId) {
-    if (getDataType() == FieldSpec.DataType.BYTES) {
+    if (getDataType().getStoredType() == FieldSpec.DataType.BYTES) {
       add(BytesUtils.toHexString((byte[]) value));
-    } else if (getDataType() == FieldSpec.DataType.UUID) {
-      add(uuidToCanonicalString(value));
     } else {
       add(value.toString());
     }
@@ -43,13 +40,9 @@ public interface BloomFilterCreator extends IndexCreator {
 
   @Override
   default void add(Object[] values, @Nullable int[] dictIds) {
-    if (getDataType() == FieldSpec.DataType.BYTES) {
+    if (getDataType().getStoredType() == FieldSpec.DataType.BYTES) {
       for (Object value : values) {
         add(BytesUtils.toHexString((byte[]) value));
-      }
-    } else if (getDataType() == FieldSpec.DataType.UUID) {
-      for (Object value : values) {
-        add(uuidToCanonicalString(value));
       }
     } else {
       for (Object value : values) {
@@ -58,22 +51,10 @@ public interface BloomFilterCreator extends IndexCreator {
     }
   }
 
-  /// Renders a UUID value (typically a 16-byte big-endian `byte[]` from segment ingest) as its canonical
-  /// lowercase RFC 4122 string. The `byte[]` fast path just skips the type dispatch of `UuidUtils.toBytes(Object)`;
-  /// neither path copies the buffer (`UuidUtils.toBytes(byte[])` validates the width and returns it as-is).
-  private static String uuidToCanonicalString(Object value) {
-    return value instanceof byte[]
-        ? UuidUtils.toString((byte[]) value)
-        : UuidUtils.toString(UuidUtils.toBytes(value));
-  }
-  /**
-   * Adds a value to the bloom filter.
-   */
+  /// Adds a value to the bloom filter.
   void add(String value);
 
-  /**
-   * Seals the index and flushes it to disk.
-   */
+  /// Seals the index and flushes it to disk.
   void seal()
       throws IOException;
 }

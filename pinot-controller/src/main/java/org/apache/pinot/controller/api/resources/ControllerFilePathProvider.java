@@ -40,10 +40,8 @@ public class ControllerFilePathProvider {
 
   private static ControllerFilePathProvider _instance;
 
-  /**
-   * NOTE: this should be called only once when starting the controller. We don't check whether _instance is null
-   * because we might start multiple controllers in the same JVM for testing.
-   */
+  /// NOTE: this should be called only once when starting the controller. We don't check whether \_instance is null
+  /// because we might start multiple controllers in the same JVM for testing.
   public static void init(ControllerConf controllerConf)
       throws InvalidControllerConfigException {
     _instance = new ControllerFilePathProvider(controllerConf);

@@ -31,18 +31,14 @@ import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 
 
-/**
- * A container for all the indexes for a column.
- */
+/// A container for all the indexes for a column.
 public interface ColumnIndexContainer extends Closeable {
 
-  /**
-   * Returns the index reader of the given type or null if the column doesn't have an index of that type.
-   * @param indexType the type of the index the caller is interested in.
-   * @return The index reader of the given type, or null if the column doesn't have an index of that type.
-   * @param <I> The index reader class
-   * @param <T> The index type
-   */
+  /// Returns the index reader of the given type or null if the column doesn't have an index of that type.
+  /// @param indexType the type of the index the caller is interested in.
+  /// @return The index reader of the given type, or null if the column doesn't have an index of that type.
+  /// @param <I> The index reader class
+  /// @param <T> The index type
   @Nullable
   <I extends IndexReader, T extends IndexType<?, I, ?>> I getIndex(T indexType);
 
@@ -72,11 +68,9 @@ public interface ColumnIndexContainer extends Closeable {
     @Nullable
     private final VectorIndexConfig _vectorIndexConfig;
 
-    /**
-     * @param readersByIndex it is assumed that each index is associated with a compatible reader, but there is no check
-     *                       to verify that. It is recommended to construct instances of this class by using
-     *                       {@link FromMap.Builder}
-     */
+    /// @param readersByIndex it is assumed that each index is associated with a compatible reader, but there is no
+    ///                       check to verify that. It is recommended to construct instances of this class by using
+    ///                       [FromMap.Builder]
     public FromMap(Map<IndexType, ? extends IndexReader> readersByIndex) {
       this(readersByIndex, null, null);
     }

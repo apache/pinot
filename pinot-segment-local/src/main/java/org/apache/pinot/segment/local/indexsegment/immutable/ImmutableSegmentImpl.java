@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -83,6 +84,10 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private final StarTreeIndexContainer _starTreeIndexContainer;
   private final TextIndexReader _multiColumnTextIndex;
   private final Map<String, DataSource> _dataSources;
+  // Guards the post-registration hook so it reaches the directory at most once per segment instance, even when the
+  // same segment is registered more than once (e.g. an upsert replacement with a consistency mode other than NONE
+  // registers the new segment through a DuoSegmentDataManager and then directly).
+  private final AtomicBoolean _segmentAdded = new AtomicBoolean();
 
   // Dedupe
   private PartitionDedupMetadataManager _partitionDedupMetadataManager;
@@ -141,9 +146,12 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
         if (!(fieldSpec instanceof ComplexFieldSpec)) {
           continue;
         }
+        ColumnMetadata parentMetadata = segmentMetadata.getColumnMetadataMap().get(parent);
+        List<String> sparseKeys =
+            parentMetadata instanceof ColumnMetadataImpl impl ? impl.getSparseKeys() : null;
         _dataSources.put(parent, new ImmutableOpenStructDataSource((ComplexFieldSpec) fieldSpec,
             openStructDenseChildren.getOrDefault(parent, Map.of()),
-            openStructSparseChildren.get(parent), segmentMetadata.getTotalDocs()));
+            openStructSparseChildren.get(parent), segmentMetadata.getTotalDocs(), sparseKeys));
       }
     }
 
@@ -162,9 +170,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     _partitionDedupMetadataManager = partitionDedupMetadataManager;
   }
 
-  /**
-   * Enables upsert for this segment. It should be called before the segment getting queried.
-   */
+  /// Enables upsert for this segment. It should be called before the segment getting queried.
   public void enableUpsert(PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       ThreadSafeMutableRoaringBitmap validDocIds, @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds) {
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
@@ -232,9 +238,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     return getSnapshotFile(fileName).exists();
   }
 
-  /**
-   * if re processing or reload is needed on a segment then return true
-   */
+  /// if re processing or reload is needed on a segment then return true
   public boolean isReloadNeeded(IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     return ImmutableSegmentLoader.needPreprocess(_segmentDirectory, indexLoadingConfig);
@@ -324,6 +328,20 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
+  public void onSegmentAdded() {
+    if (!_segmentAdded.compareAndSet(false, true)) {
+      // Already notified for this segment instance; a repeated registration must not notify the directory again.
+      return;
+    }
+    // Best-effort: this fires after the segment is already serving, so a failure cannot roll back the registration.
+    try {
+      _segmentDirectory.onSegmentAdded();
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception in onSegmentAdded for segment: {}. Continuing with error.", getSegmentName(), e);
+    }
+  }
+
+  @Override
   public void offload() {
     if (_partitionUpsertMetadataManager != null) {
       _partitionUpsertMetadataManager.removeSegment(this);
@@ -405,10 +423,8 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     return _hasDeletedDocIds;
   }
 
-  /**
-   * Marks that this segment has externally-supplied deleted docs -- excluded at query time but still counted in
-   * total docs -- so selection LIMIT pruning skips it.
-   */
+  /// Marks that this segment has externally-supplied deleted docs -- excluded at query time but still counted in
+  /// total docs -- so selection LIMIT pruning skips it.
   public void setHasDeletedDocIds(boolean hasDeletedDocIds) {
     _hasDeletedDocIds = hasDeletedDocIds;
   }

@@ -26,17 +26,14 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
-import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 
 
-/**
- * We have implemented a custom serialization/deserialization mechanism for time series plans. This allows users to
- * use Jackson to annotate their plan nodes as shown in {@link LeafTimeSeriesPlanNode}, which is used for
- * plan serde for broker/server communication.
- * TODO: There are limitations to this and we will change this soon. Issues:
- *   1. Pinot TS SPI is compiled in Pinot distribution and Jackson deps get shaded usually.
- *   2. The plugins have to shade the dependency in the exact same way, which is obviously error-prone and not ideal.
- */
+/// We have implemented a custom serialization/deserialization mechanism for time series plans. This allows users to use
+/// Jackson to annotate their plan nodes as shown in [org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode],
+/// which is used for plan serde for broker/server communication.
+/// TODO: There are limitations to this and we will change this soon. Issues:
+///   1. Pinot TS SPI is compiled in Pinot distribution and Jackson deps get shaded usually.
+///   2. The plugins have to shade the dependency in the exact same way, which is obviously error-prone and not ideal.
 @InterfaceStability.Evolving
 public class TimeSeriesPlanSerde {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();

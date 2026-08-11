@@ -266,10 +266,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     factory2.addSegment(offlineTableName, segment);
   }
 
-  /**
-   * Registers a mock DimensionTableDataManager for lookup join testing.
-   * The mock stores all rows in a HashMap keyed by primary key, supporting lookupValues() and containsKey().
-   */
+  /// Registers a mock DimensionTableDataManager for lookup join testing.
+  /// The mock stores all rows in a HashMap keyed by primary key, supporting lookupValues() and containsKey().
   private void registerMockDimensionTable(String offlineTableName, Schema schema, QueryTestCase.Table table,
       List<GenericRow> rows) {
     List<String> primaryKeyColumns = table._primaryKeyColumns;

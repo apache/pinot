@@ -24,11 +24,13 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingControllerStarter;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingPinotLLCRealtimeSegmentManager;
@@ -137,7 +139,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   protected void setupPauselessTable()
       throws Exception {
     Schema schema = createSchema();
-    schema.setSchemaName(DEFAULT_TABLE_NAME);
+    schema.setSchemaName(getTableName());
     addSchema(schema);
 
     TableConfig tableConfig = createRealtimeTableConfig(_avroFiles.get(0));
@@ -211,7 +213,9 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     Thread.sleep(MAX_SEGMENT_COMPLETION_TIME_MILLIS);
     disableFailure();
 
-    _controllerStarter.getRealtimeSegmentValidationManager().run();
+    Properties periodicTaskProperties = new Properties();
+    periodicTaskProperties.setProperty(ControllerPeriodicTask.RUN_SEGMENT_LEVEL_VALIDATION, Boolean.TRUE.toString());
+    _controllerStarter.getRealtimeSegmentValidationManager().run(periodicTaskProperties);
 
     waitForAllDocsLoaded(600_000L);
     waitForAllDocsLoaded(tableNameWithType2, 600_000L);
@@ -230,9 +234,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
         _helixResourceManager.getSegmentsZKMetadata(tableNameWithType2));
   }
 
-  /**
-   * Basic test to verify segment assignment and metadata without any failures
-   */
+  /// Basic test to verify segment assignment and metadata without any failures
   protected void testBasicSegmentAssignment() {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
 

@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.minion.exception;
 
-/**
- * The class <code>TaskCancelledException</code> defines the exception should be thrown when task has been cancelled.
- */
+/// The class `TaskCancelledException` defines the exception should be thrown when task has been cancelled.
 public class TaskCancelledException extends RuntimeException {
 
   public TaskCancelledException(String message) {
