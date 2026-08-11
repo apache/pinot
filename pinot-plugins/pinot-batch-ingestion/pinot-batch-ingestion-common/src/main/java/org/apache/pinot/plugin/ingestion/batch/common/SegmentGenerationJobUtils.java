@@ -37,6 +37,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
@@ -57,10 +58,8 @@ public class SegmentGenerationJobUtils implements Serializable {
   // Field names in the executionFrameworkSpec/extraConfigs section shared across ingestion frameworks
   public static final String DEPENDENCY_JAR_DIR = "dependencyJarDir";
   public static final String STAGING_DIR = "stagingDir";
-  /**
-   * Optional extraConfigs key controlling parallel staging → deep-store copy threads.
-   * Default is {@link #DEFAULT_STAGING_COPY_PARALLELISM}. Cap is {@link #MAX_STAGING_COPY_PARALLELISM}.
-   */
+  /// Optional extraConfigs key controlling the number of parallel staging to deep-store copy threads.
+  /// Default is [#DEFAULT_STAGING_COPY_PARALLELISM]. Cap is [#MAX_STAGING_COPY_PARALLELISM].
   public static final String STAGING_COPY_PARALLELISM = "stagingCopyParallelism";
   public static final int DEFAULT_STAGING_COPY_PARALLELISM = 10;
   public static final int MAX_STAGING_COPY_PARALLELISM = 64;
@@ -131,29 +130,34 @@ public class SegmentGenerationJobUtils implements Serializable {
     moveFiles(fs, sourceDir, destDir, overwrite, DEFAULT_STAGING_COPY_PARALLELISM);
   }
 
-  /**
-   * Move all files from the <sourceDir> to the <destDir> using up to {@code parallelism} threads.
-   * Directories in the source listing are skipped; parent directories on the destination are created by
-   * {@link PinotFS#move}. Relative path layout under {@code sourceDir} is preserved.
-   * <p>
-   * On partial failure, remaining in-flight moves are allowed to finish, then an {@link IOException} is thrown
-   * with any additional failures attached as suppressed exceptions.
-   *
-   * @param fs filesystem used for both source and destination (must be safe for concurrent move of distinct paths)
-   * @param sourceDir source directory URI
-   * @param destDir destination directory URI
-   * @param overwrite whether to overwrite existing destination files
-   * @param parallelism number of concurrent move workers; values &lt;= 1 run serially
-   * @throws IOException on listing or move failure
-   * @throws URISyntaxException on URI construction failure
-   */
+  /// Move all files from the <sourceDir> to the <destDir> using up to `parallelism` threads.
+  /// Directories in the source listing are skipped; parent directories on the destination are created by
+  /// [PinotFS#move]. Relative path layout under `sourceDir` is preserved.
+  ///
+  /// `parallelism` is clamped to at most [#MAX_STAGING_COPY_PARALLELISM] and to the number of files to
+  /// move, so direct callers of this overload cannot exceed the cap that
+  /// [#getStagingCopyParallelism] enforces.
+  ///
+  /// On partial failure, remaining in-flight moves are allowed to finish, then an [IOException] is thrown
+  /// with any additional failures attached as suppressed exceptions. On interruption, all outstanding
+  /// moves are cancelled, the interrupt status is restored, and an [IOException] is thrown.
+  ///
+  /// @param fs filesystem used for both source and destination (must be safe for concurrent move of
+  ///     distinct paths)
+  /// @param sourceDir source directory URI
+  /// @param destDir destination directory URI
+  /// @param overwrite whether to overwrite existing destination files
+  /// @param parallelism number of concurrent move workers; values <= 1 run serially
+  /// @throws IOException on listing or move failure
+  /// @throws URISyntaxException on URI construction failure
   public static void moveFiles(PinotFS fs, URI sourceDir, URI destDir, boolean overwrite, int parallelism)
       throws IOException, URISyntaxException {
     List<URI> sourceFileUris = listSourceFiles(fs, sourceDir);
     if (sourceFileUris.isEmpty()) {
       return;
     }
-    int effectiveParallelism = Math.max(1, Math.min(parallelism, sourceFileUris.size()));
+    int effectiveParallelism =
+        Math.max(1, Math.min(Math.min(parallelism, MAX_STAGING_COPY_PARALLELISM), sourceFileUris.size()));
     LOGGER.info("Moving {} files from [{}] to [{}] with parallelism {}", sourceFileUris.size(), sourceDir, destDir,
         effectiveParallelism);
     if (effectiveParallelism == 1) {
@@ -177,18 +181,21 @@ public class SegmentGenerationJobUtils implements Serializable {
         }));
       }
       IOException firstFailure = null;
-      boolean interrupted = false;
       for (Future<Void> future : futures) {
         try {
           future.get();
         } catch (InterruptedException e) {
-          interrupted = true;
-          future.cancel(true);
+          // Cancel every outstanding move and stop waiting instead of blocking on the remaining futures.
+          futures.forEach(f -> f.cancel(true));
+          Thread.currentThread().interrupt();
+          IOException interruptedFailure =
+              new IOException("Interrupted while moving files from " + sourceDir + " to " + destDir, e);
           if (firstFailure == null) {
-            firstFailure = new IOException("Interrupted while moving files from " + sourceDir + " to " + destDir, e);
+            firstFailure = interruptedFailure;
           } else {
-            firstFailure.addSuppressed(e);
+            firstFailure.addSuppressed(interruptedFailure);
           }
+          break;
         } catch (Exception e) {
           Throwable cause = e.getCause() != null ? e.getCause() : e;
           if (firstFailure == null) {
@@ -199,9 +206,6 @@ public class SegmentGenerationJobUtils implements Serializable {
           }
         }
       }
-      if (interrupted) {
-        Thread.currentThread().interrupt();
-      }
       if (firstFailure != null) {
         throw firstFailure;
       }
@@ -210,11 +214,9 @@ public class SegmentGenerationJobUtils implements Serializable {
     }
   }
 
-  /**
-   * Resolve staging-copy parallelism from job {@code executionFrameworkSpec.extraConfigs}.
-   * Missing/invalid/non-positive values fall back to {@link #DEFAULT_STAGING_COPY_PARALLELISM}.
-   * Values above {@link #MAX_STAGING_COPY_PARALLELISM} are capped.
-   */
+  /// Resolve staging-copy parallelism from job `executionFrameworkSpec.extraConfigs`.
+  /// Missing/invalid/non-positive values fall back to [#DEFAULT_STAGING_COPY_PARALLELISM].
+  /// Values above [#MAX_STAGING_COPY_PARALLELISM] are capped.
   public static int getStagingCopyParallelism(Map<String, String> extraConfigs) {
     if (extraConfigs == null) {
       return DEFAULT_STAGING_COPY_PARALLELISM;
@@ -244,12 +246,23 @@ public class SegmentGenerationJobUtils implements Serializable {
   private static List<URI> listSourceFiles(PinotFS fs, URI sourceDir)
       throws IOException, URISyntaxException {
     List<URI> sourceFileUris = new ArrayList<>();
-    for (String sourcePath : fs.listFiles(sourceDir, true)) {
-      URI sourceFileUri = SegmentGenerationUtils.getFileURI(sourcePath, sourceDir);
-      if (fs.isDirectory(sourceFileUri)) {
-        continue;
+    try {
+      // Recursive listings include directory entries on several implementations, so always filter them out.
+      for (FileMetadata fileMetadata : fs.listFilesWithMetadata(sourceDir, true)) {
+        if (!fileMetadata.isDirectory()) {
+          sourceFileUris.add(SegmentGenerationUtils.getFileURI(fileMetadata.getFilePath(), sourceDir));
+        }
       }
-      sourceFileUris.add(sourceFileUri);
+    } catch (UnsupportedOperationException e) {
+      // The PinotFS SPI default throws this when the implementation has no metadata listing: fall back to
+      // listFiles() plus one isDirectory() stat per entry. IOExceptions are left to propagate.
+      sourceFileUris.clear();
+      for (String sourcePath : fs.listFiles(sourceDir, true)) {
+        URI sourceFileUri = SegmentGenerationUtils.getFileURI(sourcePath, sourceDir);
+        if (!fs.isDirectory(sourceFileUri)) {
+          sourceFileUris.add(sourceFileUri);
+        }
+      }
     }
     return sourceFileUris;
   }
@@ -261,8 +274,13 @@ public class SegmentGenerationJobUtils implements Serializable {
         SegmentGenerationUtils.getRelativeOutputPath(sourceDir, sourceFileUri, destDir).resolve(sourceFilename);
     if (!overwrite && fs.exists(destFileUri)) {
       LOGGER.warn("Can't overwrite existing output segment tar file: {}", destFileUri);
-    } else {
-      fs.move(sourceFileUri, destFileUri, true);
+      return;
+    }
+    // The exists() check above is only a cheap short-circuit; passing the flag down lets PinotFS.move reject a
+    // destination that showed up in between, which parallel moves make more likely.
+    if (!fs.move(sourceFileUri, destFileUri, overwrite)) {
+      LOGGER.warn("Skipped moving {} to {}, move returned false (destination may already exist)", sourceFileUri,
+          destFileUri);
     }
   }
 }
