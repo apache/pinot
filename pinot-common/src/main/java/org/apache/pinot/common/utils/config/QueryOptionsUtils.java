@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -34,6 +35,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// Utils to parse query options.
@@ -41,20 +44,45 @@ public class QueryOptionsUtils {
   private QueryOptionsUtils() {
   }
 
+  /// How SQL-supplied query option keys are validated, see
+  /// [CommonConstants.Broker#CONFIG_OF_BROKER_QUERY_OPTION_VALIDATION_MODE].
+  public enum SqlQueryOptionValidationMode {
+    /// Unknown keys are preserved as-is and nothing is logged. Default, and the only mode that
+    /// leaves the parsed options identical to what Pinot produced before validation existed.
+    NONE,
+    /// Unknown keys are preserved, but logged once per distinct key with a typo suggestion.
+    WARN,
+    /// Unknown keys fail the query with a typo suggestion.
+    REJECT
+  }
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryOptionsUtils.class);
+
   private static final Map<String, String> CONFIG_RESOLVER;
   private static final RuntimeException CLASS_LOAD_ERROR;
 
-  /**
-   * Keys accepted in SQL {@code SET}/{@code OPTION(...)} that are not declared on
-   * {@link QueryOptionKey}. Map is lower-case alias → canonical key as consumed by the broker
-   * ({@link CommonConstants#DATABASE}, {@link CommonConstants.Broker.Request#TRACE}).
-   * <p>
-   * Broker-injected keys such as {@link CommonConstants#RLS_FILTERS}* are intentionally <b>not</b>
-   * allowlisted: they are added after parse and must not be settable via user SQL.
-   */
-  private static final Map<String, String> ADDITIONAL_SQL_OPTION_KEYS = Map.of(
-      CommonConstants.Broker.Request.TRACE.toLowerCase(), CommonConstants.Broker.Request.TRACE,
-      CommonConstants.DATABASE.toLowerCase(), CommonConstants.DATABASE);
+  /// Lower-case keys accepted in SQL `SET`/`OPTION(...)` that are not declared on [QueryOptionKey].
+  private static final Set<String> ADDITIONAL_SQL_OPTION_KEYS =
+      Set.of(CommonConstants.Broker.Request.TRACE.toLowerCase(), CommonConstants.DATABASE.toLowerCase());
+
+  /// Row-level-security options are injected by the broker after parsing and must never be settable
+  /// from user SQL, not even through [#registerSqlQueryOptionKey]. Matched as a lower-case prefix so
+  /// case tricks (`RLSFilters-t`) cannot bypass the guard.
+  private static final String RLS_FILTERS_PREFIX = CommonConstants.RLS_FILTERS.toLowerCase();
+
+  /// Lower-case option keys registered by plugins via [#registerSqlQueryOptionKey].
+  private static final Set<String> REGISTERED_SQL_OPTION_KEYS = ConcurrentHashMap.newKeySet();
+
+  /// Distinct unknown keys already logged in [SqlQueryOptionValidationMode#WARN], so that a
+  /// high-QPS client sending one misspelled option cannot flood the broker log.
+  private static final Set<String> WARNED_SQL_OPTION_KEYS = ConcurrentHashMap.newKeySet();
+  private static final int MAX_WARNED_SQL_OPTION_KEYS = 1000;
+
+  /// Longest key for which a "did you mean" suggestion is computed, to bound the Levenshtein cost.
+  private static final int MAX_SUGGESTION_KEY_LENGTH = 64;
+
+  private static volatile SqlQueryOptionValidationMode _sqlQueryOptionValidationMode =
+      SqlQueryOptionValidationMode.NONE;
 
   static {
     // this is a bit hacky, but lots of the code depends directly on usage of
@@ -87,11 +115,9 @@ public class QueryOptionsUtils {
         : new RuntimeException("Failure to build case insensitive mapping.", classLoadError);
   }
 
-  /**
-   * Resolves known option keys case-insensitively to their canonical names. Unknown keys are
-   * preserved unchanged. Used for REST/JSON {@code queryOptions} and internal option maps where
-   * free-form keys must remain allowed.
-   */
+  /// Resolves known option keys case-insensitively to their canonical names. Unknown keys are
+  /// preserved unchanged, including their key case. Used for every option source: SQL, REST/JSON
+  /// `queryOptions` and broker-injected options, none of which reject unknown keys here.
   public static Map<String, String> resolveCaseInsensitiveOptions(Map<String, String> queryOptions) {
     if (CLASS_LOAD_ERROR != null) {
       throw CLASS_LOAD_ERROR;
@@ -110,42 +136,57 @@ public class QueryOptionsUtils {
     return resolved;
   }
 
-  /**
-   * Resolves known option keys case-insensitively and rejects unsupported keys.
-   * <p>
-   * Intended for SQL-supplied {@code SET} / {@code OPTION(...)} options only. Do not use for
-   * REST/JSON {@code queryOptions} (kept free-form for backward compatibility — unknown keys are
-   * still silently preserved there) or broker-injected options. DML statements that intentionally
-   * carry free-form task properties should continue to use
-   * {@link #resolveCaseInsensitiveOptions(Map)}.
-   * <p>
-   * Additional SQL keys ({@code trace}, {@code database}) are accepted case-insensitively and
-   * stored under their canonical lowercase names so broker lookups succeed.
-   *
-   * @throws IllegalArgumentException if an unsupported option key is present
-   */
-  public static Map<String, String> resolveAndValidateSqlQueryOptions(Map<String, String> queryOptions) {
+  public static SqlQueryOptionValidationMode getSqlQueryOptionValidationMode() {
+    return _sqlQueryOptionValidationMode;
+  }
+
+  /// Sets the validation mode applied to SQL-supplied query option keys. Called once per process at
+  /// broker startup from [CommonConstants.Broker#CONFIG_OF_BROKER_QUERY_OPTION_VALIDATION_MODE], and
+  /// by tests to restore [SqlQueryOptionValidationMode#NONE].
+  public static void setSqlQueryOptionValidationMode(SqlQueryOptionValidationMode mode) {
+    _sqlQueryOptionValidationMode = mode;
+  }
+
+  /// Registers an option key that [#validateSqlQueryOptions] accepts in addition to the keys
+  /// declared on [QueryOptionKey]. Meant for plugins that read custom options off the
+  /// `BrokerRequest`; call it from plugin init. Case-insensitive, thread safe and idempotent.
+  public static void registerSqlQueryOptionKey(String key) {
+    REGISTERED_SQL_OPTION_KEYS.add(key.toLowerCase());
+  }
+
+  /// Validates SQL-supplied `SET` / `OPTION(...)` option keys according to the configured
+  /// [SqlQueryOptionValidationMode]. Only meant for DQL: DML statements carry free-form task and
+  /// filesystem properties, and REST/JSON `queryOptions` are free-form for backward compatibility,
+  /// so neither is validated in any mode. Options the broker injects after parsing are never routed
+  /// here either.
+  ///
+  /// Does not modify or copy the map; in the default `NONE` mode it returns immediately, so the
+  /// parsed options stay exactly what the parser produced.
+  ///
+  /// @throws IllegalArgumentException in `REJECT` mode if an unsupported option key is present
+  public static void validateSqlQueryOptions(Map<String, String> queryOptions) {
+    SqlQueryOptionValidationMode mode = _sqlQueryOptionValidationMode;
+    if (mode == SqlQueryOptionValidationMode.NONE || queryOptions.isEmpty()) {
+      return;
+    }
     if (CLASS_LOAD_ERROR != null) {
       throw CLASS_LOAD_ERROR;
     }
-
-    Map<String, String> resolved = new HashMap<>();
-    for (Map.Entry<String, String> configEntry : queryOptions.entrySet()) {
-      String key = configEntry.getKey();
-      String lower = key.toLowerCase();
-      String canonical = CONFIG_RESOLVER.get(lower);
-      if (canonical != null) {
-        resolved.put(canonical, configEntry.getValue());
+    for (String key : queryOptions.keySet()) {
+      String lowerKey = key.toLowerCase();
+      if (CONFIG_RESOLVER.containsKey(lowerKey) || ADDITIONAL_SQL_OPTION_KEYS.contains(lowerKey)
+          || (REGISTERED_SQL_OPTION_KEYS.contains(lowerKey) && !lowerKey.startsWith(RLS_FILTERS_PREFIX))) {
         continue;
       }
-      String additionalCanonical = ADDITIONAL_SQL_OPTION_KEYS.get(lower);
-      if (additionalCanonical != null) {
-        resolved.put(additionalCanonical, configEntry.getValue());
-        continue;
+      if (mode == SqlQueryOptionValidationMode.REJECT) {
+        throw new IllegalArgumentException(buildUnsupportedOptionMessage(key));
       }
-      throw new IllegalArgumentException(buildUnsupportedOptionMessage(key));
+      // ponytail: bounded set, never evicted, so a key seen once is never logged again. Swap for a
+      // rate limiter if the set of distinct unknown keys ever needs to be unbounded.
+      if (WARNED_SQL_OPTION_KEYS.size() < MAX_WARNED_SQL_OPTION_KEYS && WARNED_SQL_OPTION_KEYS.add(lowerKey)) {
+        LOGGER.warn("{} (logged once per distinct key)", buildUnsupportedOptionMessage(key));
+      }
     }
-    return resolved;
   }
 
   private static String buildUnsupportedOptionMessage(String key) {
@@ -156,22 +197,27 @@ public class QueryOptionsUtils {
     return "Unsupported query option '" + key + "'";
   }
 
+  /// Only called on the unknown-key path, never while parsing a valid query.
   @Nullable
   private static String findClosestCanonicalOption(String key) {
+    if (key.length() > MAX_SUGGESTION_KEY_LENGTH) {
+      return null;
+    }
     String lower = key.toLowerCase();
     String best = null;
     int bestDist = Integer.MAX_VALUE;
-    for (String canonical : CONFIG_RESOLVER.values()) {
-      int dist = levenshteinDistance(lower, canonical.toLowerCase());
+    // CONFIG_RESOLVER is keyed by the lower-case name and valued by the canonical name.
+    for (Map.Entry<String, String> entry : CONFIG_RESOLVER.entrySet()) {
+      int dist = levenshteinDistance(lower, entry.getKey());
       if (dist < bestDist) {
         bestDist = dist;
-        best = canonical;
+        best = entry.getValue();
       }
     }
     if (best == null) {
       return null;
     }
-    // Suggest only when reasonably close (pure case variants are already canonicalized above).
+    // Suggest only when reasonably close (pure case variants are not unknown in the first place).
     int threshold = Math.max(2, best.length() / 4);
     return bestDist <= threshold ? best : null;
   }

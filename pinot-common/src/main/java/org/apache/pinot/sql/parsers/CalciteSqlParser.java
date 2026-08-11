@@ -131,14 +131,15 @@ public class CalciteSqlParser {
       SqlNodeList sqlNodeList = sqlParser.parseSqlStmtList();
       // Extract OPTION statements from sql.
       SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
-      // Legacy OPTION(...) keys: validate for DQL only. DML (e.g. INSERT INTO FILE OPTION(taskName=...))
-      // intentionally carries free-form task/FS properties, same as DML SET.
+      // add legacy OPTIONS keyword-based options
       if (!options.isEmpty()) {
         Map<String, String> optionMap = extractOptionsMap(options);
-        Map<String, String> resolvedLegacyOptions = sqlNodeAndOptions.getSqlType() == PinotSqlType.DQL
-            ? QueryOptionsUtils.resolveAndValidateSqlQueryOptions(optionMap)
-            : QueryOptionsUtils.resolveCaseInsensitiveOptions(optionMap);
-        sqlNodeAndOptions.setExtraOptions(resolvedLegacyOptions);
+        if (sqlNodeAndOptions.getSqlType() == PinotSqlType.DQL) {
+          // No-op unless the broker enables query option validation. DML (e.g.
+          // INSERT INTO FILE OPTION(taskName=...)) carries free-form task/FS properties, like DML SET.
+          QueryOptionsUtils.validateSqlQueryOptions(optionMap);
+        }
+        sqlNodeAndOptions.setExtraOptions(optionMap);
       }
       sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parseStartTimeNs);
       return sqlNodeAndOptions;
@@ -196,12 +197,12 @@ public class CalciteSqlParser {
     if (sqlType == null) {
       throw new SqlCompilationException("SqlNode with executable statement not found!");
     }
-    // Validate unknown SET options for DQL only. DML (e.g. INSERT INTO FILE) intentionally carries
-    // free-form task/FS properties via SET, and REST/JSON queryOptions use a separate non-validating path.
-    Map<String, String> resolvedOptions = sqlType == PinotSqlType.DQL
-        ? QueryOptionsUtils.resolveAndValidateSqlQueryOptions(options)
-        : QueryOptionsUtils.resolveCaseInsensitiveOptions(options);
-    return new SqlNodeAndOptions(statementNode, sqlType, resolvedOptions);
+    if (sqlType == PinotSqlType.DQL) {
+      // No-op unless the broker enables query option validation. DML (e.g. INSERT INTO FILE) carries
+      // free-form task/FS properties via SET, and REST/JSON queryOptions never reach this path.
+      QueryOptionsUtils.validateSqlQueryOptions(options);
+    }
+    return new SqlNodeAndOptions(statementNode, sqlType, QueryOptionsUtils.resolveCaseInsensitiveOptions(options));
   }
 
   public static PinotQuery compileToPinotQuery(String sql)
