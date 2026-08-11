@@ -24,11 +24,15 @@ import java.io.File;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
@@ -48,6 +52,12 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -547,5 +557,106 @@ public class OpenStructColumnSplitterTest {
     String sparseCol = OpenStructNaming.sparseColumnName("metrics");
     File indexFile = new File(_tempDir, sparseCol + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
     assertFalse(indexFile.exists());
+  }
+
+  /// The inferred type of a key is cached on first sighting, so counting inference failures inside
+  /// that caching step would record 1 failure per key no matter how many values actually failed.
+  /// Every value that takes the STRING fallback must be counted.
+  @Test
+  public void testInferenceFailuresCountedPerValueNotPerKey()
+      throws Exception {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
+          config(0.5, -1, null));
+      // 'payload' has no child spec and a Map value, which OpenStructTypeInference cannot map to a DataType.
+      for (int d = 0; d < 4; d++) {
+        s.add(Map.of("payload", Map.of("nested", d)), d);
+      }
+      s.seal();
+
+      verify(metrics).addMeteredTableValue("testTable_OFFLINE", "metrics",
+          ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, 4L);
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  /// A value that cannot be mapped to a DataType but lands on a key whose type is already
+  /// established as something other than STRING is dropped by coercion, not stored as STRING. It
+  /// must be counted once, against the coercion meter only — counting it as an inference failure
+  /// too would record one dropped value against two meters and make the seal-time log claim it
+  /// "fell back to STRING" when it did not.
+  @Test
+  public void testUnmappableValueOnTypedKeyCountsOnlyAsCoercionFailure()
+      throws Exception {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
+          config(0.5, -1, null));
+      // First value fixes the key's type as LONG; the next two cannot be coerced to it.
+      s.add(Map.of("clicks", 1L), 0);
+      s.add(Map.of("clicks", Map.of("a", 1)), 1);
+      s.add(Map.of("clicks", List.of(1, 2)), 2);
+      s.seal();
+
+      verify(metrics).addMeteredTableValue("testTable_OFFLINE", "metrics",
+          ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, 2L);
+      verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+          eq(ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES), anyLong());
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  /// Fill rate is emitted as two raw counts rather than one percentage gauge: integer division
+  /// truncates a dense key present in a handful of docs to 0, which is indistinguishable from no
+  /// data and is exactly the case worth alerting on. Pins both numerator and denominator for a key
+  /// whose fill rate would truncate to 0.
+  @Test
+  public void testGaugesEmitRawDocCountsForTruncatingFillRate()
+      throws Exception {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      // 'rare' is forced dense despite appearing in 3 of 200 docs (1.5%, which truncates to 0%).
+      OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
+          config(0.5, -1, Set.of("rare")));
+      for (int d = 0; d < 200; d++) {
+        s.add(d < 3 ? Map.of("rare", (long) d, "host", "h") : Map.of("host", "h"), d);
+      }
+      s.classify();
+      s.seal();
+
+      verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", "metrics",
+          ServerGauge.OPEN_STRUCT_SEGMENT_DOC_COUNT, 200L);
+      verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE",
+          OpenStructNaming.materializedColumnName("metrics", "rare"),
+          ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT, 3L);
+      verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", "metrics",
+          ServerGauge.OPEN_STRUCT_TOTAL_KEYS_DISCOVERED, 2L);
+      verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", "metrics",
+          ServerGauge.OPEN_STRUCT_DENSE_KEY_COUNT, 2L);
+      verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", "metrics",
+          ServerGauge.OPEN_STRUCT_SPARSE_KEY_COUNT, 0L);
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  /// The key space is user-controlled, so the seal-time INFO summary names at most
+  /// MAX_LOGGED_FAILURE_KEYS keys, highest count first.
+  @Test
+  public void testTopFailuresCapsAndSortsByCount() {
+    Map<String, Long> counts = new LinkedHashMap<>();
+    for (int i = 1; i <= 9; i++) {
+      counts.put("key" + i, (long) i);
+    }
+    List<Map.Entry<String, Long>> top = OpenStructColumnSplitter.topFailures(counts);
+    assertEquals(top.size(), 5);
+    assertEquals(top.stream().map(Map.Entry::getKey).toList(),
+        List.of("key9", "key8", "key7", "key6", "key5"));
   }
 }

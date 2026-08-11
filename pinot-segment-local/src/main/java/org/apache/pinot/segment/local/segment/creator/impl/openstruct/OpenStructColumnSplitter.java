@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.openstruct;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -85,6 +86,10 @@ import org.slf4j.LoggerFactory;
 public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(OpenStructColumnSplitter.class);
+
+  /// Cap on how many offending keys the seal-time failure summaries name at INFO. The key space is
+  /// user-controlled, so a wide struct would otherwise emit an unbounded log line on every seal.
+  private static final int MAX_LOGGED_FAILURE_KEYS = 5;
 
   private final File _indexDir;
   private final String _columnName;
@@ -201,16 +206,21 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
           continue;
         }
         FieldSpec keySpec = _childFieldSpecs.get(key);
-        DataType valueType = keySpec != null
-            ? keySpec.getDataType()
-            : _inferredTypes.computeIfAbsent(key, k -> {
-              DataType inferred = OpenStructTypeInference.inferDataType(rawValue);
-              if (inferred == null) {
-                _inferenceFailuresPerKey.merge(key, 1L, Long::sum);
-                return DataType.STRING;
-              }
-              return inferred;
-            });
+        DataType valueType;
+        if (keySpec != null) {
+          valueType = keySpec.getDataType();
+        } else {
+          // Resolve per value rather than only on first sighting: the key's inferred type is cached,
+          // so folding the counter into a computeIfAbsent would record one failure per key no matter
+          // how many values actually took the STRING fallback.
+          OpenStructTypeInference.Resolution resolution =
+              OpenStructTypeInference.resolve(rawValue, _inferredTypes.get(key));
+          valueType = resolution.getStoredType();
+          _inferredTypes.putIfAbsent(key, valueType);
+          if (resolution.isStringFallback()) {
+            _inferenceFailuresPerKey.merge(key, 1L, Long::sum);
+          }
+        }
         if (!_presenceBitmaps.containsKey(key)) {
           _presenceBitmaps.put(key, new RoaringBitmap());
           _values.put(key, new ArrayList<>());
@@ -254,37 +264,54 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       writeSparseJsonColumn(sparseKeys);
     }
 
-    long totalCoercionFailures = _coercionFailuresPerKey.values().stream().mapToLong(Long::longValue).sum();
+    long totalCoercionFailures = sumValues(_coercionFailuresPerKey);
     if (totalCoercionFailures > 0) {
-      LOGGER.info("OPEN_STRUCT '{}': dropped {} values due to type coercion failures (keys: {})",
-          _columnName, totalCoercionFailures, _coercionFailuresPerKey);
+      LOGGER.info("OPEN_STRUCT '{}': dropped {} values due to type coercion failures across {} keys; top: {}",
+          _columnName, totalCoercionFailures, _coercionFailuresPerKey.size(),
+          topFailures(_coercionFailuresPerKey));
+      LOGGER.debug("OPEN_STRUCT '{}': full coercion failure counts: {}", _columnName, _coercionFailuresPerKey);
     }
-    long totalInferenceFailures = _inferenceFailuresPerKey.values().stream().mapToLong(Long::longValue).sum();
+    long totalInferenceFailures = sumValues(_inferenceFailuresPerKey);
     if (totalInferenceFailures > 0) {
-      LOGGER.info("OPEN_STRUCT '{}': {} type inference failures fell back to STRING (keys: {})",
-          _columnName, totalInferenceFailures, _inferenceFailuresPerKey);
+      LOGGER.info("OPEN_STRUCT '{}': {} values across {} keys fell back to STRING after type inference failed;"
+              + " top: {}",
+          _columnName, totalInferenceFailures, _inferenceFailuresPerKey.size(),
+          topFailures(_inferenceFailuresPerKey));
+      LOGGER.debug("OPEN_STRUCT '{}': full inference failure counts: {}", _columnName, _inferenceFailuresPerKey);
     }
-    emitMetrics(sparseKeys.size());
+    emitMetrics(sparseKeys.size(), totalCoercionFailures, totalInferenceFailures);
 
     emitParentColumnMetadata(sparseKeys);
   }
 
-  private void emitMetrics(int sparseKeyCount) {
+  private static long sumValues(Map<String, Long> counts) {
+    return counts.values().stream().mapToLong(Long::longValue).sum();
+  }
+
+  /// Returns the highest-count entries, capped at [#MAX_LOGGED_FAILURE_KEYS]. The key space is
+  /// user-controlled, so the full map is only logged at DEBUG.
+  @VisibleForTesting
+  static List<Map.Entry<String, Long>> topFailures(Map<String, Long> counts) {
+    return counts.entrySet().stream()
+        .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+        .limit(MAX_LOGGED_FAILURE_KEYS)
+        .toList();
+  }
+
+  private void emitMetrics(int sparseKeyCount, long totalCoercionFailures, long totalInferenceFailures) {
     ServerMetrics serverMetrics = ServerMetrics.get();
     if (serverMetrics == null || _numDocs == 0) {
       return;
     }
     String col = _columnName;
 
-    long totalCoercion = _coercionFailuresPerKey.values().stream().mapToLong(Long::longValue).sum();
-    if (totalCoercion > 0) {
+    if (totalCoercionFailures > 0) {
       serverMetrics.addMeteredTableValue(_tableNameWithType, col,
-          ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, totalCoercion);
+          ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, totalCoercionFailures);
     }
-    long totalInference = _inferenceFailuresPerKey.values().stream().mapToLong(Long::longValue).sum();
-    if (totalInference > 0) {
+    if (totalInferenceFailures > 0) {
       serverMetrics.addMeteredTableValue(_tableNameWithType, col,
-          ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, totalInference);
+          ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, totalInferenceFailures);
     }
 
     serverMetrics.setOrUpdateTableGauge(_tableNameWithType, col,
@@ -293,14 +320,18 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         ServerGauge.OPEN_STRUCT_SPARSE_KEY_COUNT, sparseKeyCount);
     serverMetrics.setOrUpdateTableGauge(_tableNameWithType, col,
         ServerGauge.OPEN_STRUCT_TOTAL_KEYS_DISCOVERED, _presenceBitmaps.size());
+    // Denominator for the per-key fill rate. Emitted as a raw count rather than folding the ratio into a
+    // single percentage gauge: integer division truncates a configured dense key present in a handful of
+    // docs to 0, which is indistinguishable from no data and is exactly the case worth alerting on.
+    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, col,
+        ServerGauge.OPEN_STRUCT_SEGMENT_DOC_COUNT, _numDocs);
 
     for (String key : _resolvedDenseKeys) {
       RoaringBitmap presence = _presenceBitmaps.get(key);
       if (presence != null) {
-        long fillPct = (long) presence.getCardinality() * 100 / _numDocs;
         serverMetrics.setOrUpdateTableGauge(_tableNameWithType,
             OpenStructNaming.materializedColumnName(col, key),
-            ServerGauge.OPEN_STRUCT_KEY_FILL_RATE, fillPct);
+            ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT, presence.getCardinality());
       }
     }
   }

@@ -40,7 +40,6 @@ import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.OpenStructTypeInference;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.slf4j.Logger;
@@ -111,10 +110,7 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
         // build, so no key is dropped during consumption.
         // Resolve stored type and coerce BEFORE allocating a column so a first-row coercion failure
         // does not allocate a column that was never usable.
-        DataType resolvedType = resolveStoredType(key, rawValue);
-        if (resolvedType == null) {
-          continue;
-        }
+        DataType resolvedType = resolveStoredType(key, rawValue, null);
         Object coerced = tryCoerce(key, rawValue, resolvedType);
         if (coerced == null) {
           continue;
@@ -124,7 +120,9 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
         continue;
       }
 
-      DataType storedType = keyCol.getStoredType();
+      // Re-resolve against the established type so a later unmappable value on a STRING key is
+      // metered too; for any other established type this is a no-op returning that type.
+      DataType storedType = resolveStoredType(key, rawValue, keyCol.getStoredType());
       Object coerced = tryCoerce(key, rawValue, storedType);
       if (coerced == null) {
         continue;
@@ -133,35 +131,46 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
     }
   }
 
-  /// Resolves the stored type for a key without allocating any state. Returns null when the type
-  /// cannot be inferred (caller should skip the entry).
-  @Nullable
-  private DataType resolveStoredType(String key, Object rawValue) {
+  /// Resolves the stored type for a key without allocating any state, and meters a value that took
+  /// the STRING fallback. `establishedType` is the key's already-resolved stored type, or `null` on
+  /// first sighting.
+  ///
+  /// Delegates the fallback rule to [OpenStructTypeInference#resolve] so this path and the sealed
+  /// build path ([OpenStructColumnSplitter#addMap]) cannot drift: a value whose type cannot be
+  /// mapped is stored as its serialized string form rather than discarded, so dropping here would
+  /// make a doc resolve differently before and after seal (and make the REALTIME and OFFLINE halves
+  /// of a hybrid table disagree for the same row).
+  private DataType resolveStoredType(String key, Object rawValue, @Nullable DataType establishedType) {
     FieldSpec spec = _childFieldSpecs.get(key);
-    DataType valueType;
     if (spec != null) {
-      valueType = spec.getDataType();
-    } else {
-      valueType = OpenStructTypeInference.inferDataType(rawValue);
-      if (valueType == null) {
+      return spec.getDataType().getStoredType();
+    }
+    OpenStructTypeInference.Resolution resolution = OpenStructTypeInference.resolve(rawValue, establishedType);
+    if (resolution.isStringFallback()) {
+      if (establishedType == null) {
+        // Only on first sighting: this runs on the consuming path, so logging every offending value
+        // of a key would flood the ingestion critical path. Subsequent values are counted by the
+        // meter below, which is what the volume signal is for.
         LOGGER.warn("OPEN_STRUCT '{}': could not infer DataType for key '{}' from value of class '{}'."
-                + " Dropping the entry.",
+                + " Falling back to STRING.",
             _openStructColumn, key, rawValue.getClass().getName());
-        ServerMetrics serverMetrics = ServerMetrics.get();
-        if (serverMetrics != null) {
-          serverMetrics.addMeteredTableValue(_tableNameWithType,
-              OpenStructNaming.materializedColumnName(_openStructColumn, key),
-              ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, 1);
-        }
-        return null;
+      }
+      ServerMetrics serverMetrics = ServerMetrics.get();
+      if (serverMetrics != null) {
+        // Keyed on the column, not the key: this fires on malformed input, so an id-like key would
+        // otherwise mint one meter per id and meters are never removed from the registry.
+        serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
+            ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, 1);
       }
     }
-    return valueType.getStoredType();
+    return resolution.getStoredType().getStoredType();
   }
 
-  /// Coerces rawValue to storedType. Returns null on failure (logged at WARN); the caller drops
-  /// the entry. Note: a successful coerce of a "null"-shaped raw value would also return null —
-  /// but callers gate on rawValue != null before reaching here.
+  /// Coerces rawValue to storedType. Returns null on failure; the caller drops the entry. Failures
+  /// are reported through [ServerMeter#OPEN_STRUCT_TYPE_COERCION_FAILURES] rather than a log line,
+  /// because this runs per value on the consuming path. Note: a successful coerce of a
+  /// "null"-shaped raw value would also return null — but callers gate on rawValue != null before
+  /// reaching here.
   @Nullable
   private Object tryCoerce(String key, Object rawValue, DataType storedType) {
     try {
@@ -171,8 +180,8 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
     } catch (Exception e) {
       ServerMetrics serverMetrics = ServerMetrics.get();
       if (serverMetrics != null) {
-        serverMetrics.addMeteredTableValue(_tableNameWithType,
-            OpenStructNaming.materializedColumnName(_openStructColumn, key),
+        // Column-granular for the same reason as the inference meter above.
+        serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
             ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, 1);
       }
       return null;

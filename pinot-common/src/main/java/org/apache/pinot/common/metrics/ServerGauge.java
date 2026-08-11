@@ -169,11 +169,23 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
       "Current number of tasks in the throttle executor queue"),
   // Workload config fetch status: 1 = success, 0 = failure
   WORKLOAD_CONFIG_FETCH_STATUS("status", true),
-  // OPEN_STRUCT segment build observability
-  OPEN_STRUCT_DENSE_KEY_COUNT("keys", false, "Number of OPEN_STRUCT keys classified as dense"),
-  OPEN_STRUCT_SPARSE_KEY_COUNT("keys", false, "Number of OPEN_STRUCT keys classified as sparse"),
-  OPEN_STRUCT_TOTAL_KEYS_DISCOVERED("keys", false, "Total unique keys discovered in an OPEN_STRUCT column"),
-  OPEN_STRUCT_KEY_FILL_RATE("percent", false, "Fill rate (0-100) of an OPEN_STRUCT key across docs in a segment");
+  // OPEN_STRUCT segment build observability.
+  // Written at segment-seal time and scoped to whichever segment sealed last: each seal on this server
+  // overwrites the previous value for the same (table, column), so these read as "the most recently sealed
+  // segment" rather than as a table-wide total or a sum across segments. Sampling them over time gives the
+  // trend.
+  OPEN_STRUCT_DENSE_KEY_COUNT("keys", false,
+      "Number of OPEN_STRUCT keys classified as dense in the most recently sealed segment"),
+  OPEN_STRUCT_SPARSE_KEY_COUNT("keys", false,
+      "Number of OPEN_STRUCT keys classified as sparse in the most recently sealed segment"),
+  OPEN_STRUCT_TOTAL_KEYS_DISCOVERED("keys", false,
+      "Unique keys discovered in the most recently sealed segment for this OPEN_STRUCT column"),
+  OPEN_STRUCT_SEGMENT_DOC_COUNT("documents", false,
+      "Total docs in the most recently sealed segment for this OPEN_STRUCT column; denominator for "
+          + "openStructKeyDocCount"),
+  OPEN_STRUCT_KEY_DOC_COUNT("documents", false,
+      "Docs in which an OPEN_STRUCT key was present in the most recently sealed segment; divide by "
+          + "openStructSegmentDocCount for the fill rate");
 
   private final String _gaugeName;
   private final String _unit;
