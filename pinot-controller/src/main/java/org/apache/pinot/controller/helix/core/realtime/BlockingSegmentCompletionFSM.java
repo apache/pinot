@@ -38,24 +38,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class implements the FSM on the controller side for each completing segment.
- *
- * An FSM is created when we first hear about a segment (typically through the segmentConsumed message).
- * When an FSM is created, it may have one of two start states (HOLDING, or COMMITTED), depending on the
- * constructor used.
- *
- * We kick off an FSM in the COMMITTED state (rare) when we find that PROPERTYSTORE already has the segment
- * with the Status set to DONE.
- *
- * We kick off an FSM in the HOLDING state (typical) when a sementConsumed() message arrives from the
- * first server we hear from.
- *
- * The FSM does not have a timer. It is clocked by the servers, which, typically, are retransmitting their
- * segmentConsumed() message every so often (SegmentCompletionProtocol.MAX_HOLD_TIME_MS).
- *
- * See https://github.com/linkedin/pinot/wiki/Low-level-kafka-consumers
- */
+/// This class implements the FSM on the controller side for each completing segment.
+///
+/// An FSM is created when we first hear about a segment (typically through the segmentConsumed message).
+/// When an FSM is created, it may have one of two start states (HOLDING, or COMMITTED), depending on the
+/// constructor used.
+///
+/// We kick off an FSM in the COMMITTED state (rare) when we find that PROPERTYSTORE already has the segment
+/// with the Status set to DONE.
+///
+/// We kick off an FSM in the HOLDING state (typical) when a sementConsumed() message arrives from the
+/// first server we hear from.
+///
+/// The FSM does not have a timer. It is clocked by the servers, which, typically, are retransmitting their
+/// segmentConsumed() message every so often (SegmentCompletionProtocol.MAX_HOLD_TIME_MS).
+///
+/// See https://github.com/linkedin/pinot/wiki/Low-level-kafka-consumers
 public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
 
   public enum BlockingSegmentCompletionFSMState {
@@ -182,16 +180,13 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
         BlockingSegmentCompletionFSMState.ABORTED);
   }
 
-  /**
-   * The method is used to decide whether we should reduce segment size and reset when server reports
-   * cannot build segment due to non-recoverable error.
-   * In most of cases, when such request is sent, the error should be deterministic. However, due to possible data lost,
-   * replicas may not hold exact same data and some of them might be able to build the segment.
-   * If the FSM _state indicates that one replica starts to commit, it means immutable segment can be
-   * created successfully, returns true.
-   *
-   * @return boolean
-   */
+  /// The method is used to decide whether we should reduce segment size and reset when server reports cannot build
+  /// segment due to non-recoverable error. In most of cases, when such request is sent, the error should be
+  /// deterministic. However, due to possible data lost, replicas may not hold exact same data and some of them might be
+  /// able to build the segment. If the FSM \_state indicates that one replica starts to commit, it means immutable
+  /// segment can be created successfully, returns true.
+  ///
+  /// @return boolean
   public boolean isImmutableSegmentCreated() {
     return _state.equals(BlockingSegmentCompletionFSMState.COMMITTER_UPLOADING) || _state.equals(
         BlockingSegmentCompletionFSMState.COMMITTING) || _state.equals(BlockingSegmentCompletionFSMState.COMMITTED);
@@ -885,25 +880,23 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     return hold(instanceId, offset);
   }
 
-  /**
-   * Pick a winner if we can, preferring the instance that we are handling right now,
-   *
-   * We accept the first server to report an offset as long as the server stopped consumption
-   * due to row limit. The premise is that other servers will also stop at row limit, and there
-   * is no need to wait for them to report an offset in order to decide on a winner. The state machine takes care
-   * of the cases where other servers may report different offsets (just in case).
-   *
-   * If the above condition is not satisfied (i.e. either this is not the first server, or it did not reach
-   * row limit), then we can pick a winner only if it is too late to pick a winner, or we have heard from all
-   * servers.
-   *
-   * Otherwise, we wait to hear from more servers.
-   *
-   * @param preferredInstance The instance that is reporting in this thread.
-   * @param now current time
-   * @param stopReason reason reported by instance for stopping consumption.
-   * @return true if winner picked, false otherwise.
-   */
+  /// Pick a winner if we can, preferring the instance that we are handling right now,
+  ///
+  /// We accept the first server to report an offset as long as the server stopped consumption
+  /// due to row limit. The premise is that other servers will also stop at row limit, and there
+  /// is no need to wait for them to report an offset in order to decide on a winner. The state machine takes care
+  /// of the cases where other servers may report different offsets (just in case).
+  ///
+  /// If the above condition is not satisfied (i.e. either this is not the first server, or it did not reach
+  /// row limit), then we can pick a winner only if it is too late to pick a winner, or we have heard from all
+  /// servers.
+  ///
+  /// Otherwise, we wait to hear from more servers.
+  ///
+  /// @param preferredInstance The instance that is reporting in this thread.
+  /// @param now current time
+  /// @param stopReason reason reported by instance for stopping consumption.
+  /// @return true if winner picked, false otherwise.
   private boolean isWinnerPicked(String preferredInstance, long now, final String stopReason) {
     if ((SegmentCompletionProtocol.REASON_ROW_LIMIT.equals(stopReason)
         || SegmentCompletionProtocol.REASON_END_OF_PARTITION_GROUP.equals(stopReason))

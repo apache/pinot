@@ -22,52 +22,36 @@ import java.util.Iterator;
 import org.apache.pinot.common.utils.DataSchema;
 
 
-/**
- * A container for {@link Record}s
- */
+/// A container for [Record]s
 public interface Table {
 
-  /**
-   * Updates the table with the given record, returns {@code true} if the table can take more records, {@code false}
-   * otherwise.
-   */
+  /// Updates the table with the given record, returns `true` if the table can take more records, `false`
+  /// otherwise.
   boolean upsert(Record record);
 
-  /**
-   * Updates the table with the given record indexed on the given key, returns {@code true} if the table can take more
-   * records, {@code false} otherwise.
-   */
+  /// Updates the table with the given record indexed on the given key, returns `true` if the table can take more
+  /// records, `false` otherwise.
   boolean upsert(Key key, Record record);
 
-  /**
-   * Merge all records from the given table, returns {@code true} if the table can take more records, {@code false}
-   * otherwise.
-   */
+  /// Merge all records from the given table, returns `true` if the table can take more records, `false`
+  /// otherwise.
   boolean merge(Table table);
 
-  /**
-   * Returns the size of the table
-   */
+  /// Returns the size of the table
   int size();
 
-  /**
-   * An iterator for the {@link Record}s in the table
-   */
+  /// An iterator for the [Record]s in the table
   Iterator<Record> iterator();
 
   default void finish(boolean sort) {
     finish(sort, false);
   }
 
-  /**
-   * Finish any pre exit processing
-   * @param sort sort the final results if true
-   * @param storeFinalResult whether to store final aggregation result
-   */
+  /// Finish any pre exit processing
+  /// @param sort sort the final results if true
+  /// @param storeFinalResult whether to store final aggregation result
   void finish(boolean sort, boolean storeFinalResult);
 
-  /**
-   * Returns the data schema of the table
-   */
+  /// Returns the data schema of the table
   DataSchema getDataSchema();
 }

@@ -22,6 +22,7 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -34,9 +35,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * Use {@link DistinctCountHLLAggregationFunction} on byte[] for serialized HyperLogLog.
- */
+/// Use [DistinctCountHLLAggregationFunction] on byte\[\] for serialized HyperLogLog.
 @Deprecated
 public class FastHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, Long> {
   public static final int DEFAULT_LOG2M = 8;
@@ -187,8 +186,9 @@ public class FastHLLAggregationFunction extends BaseSingleInputAggregationFuncti
   }
 
   @Override
-  public Long extractFinalResult(HyperLogLog intermediateResult) {
-    return intermediateResult.cardinality();
+  public Long extractFinalResult(@Nullable HyperLogLog intermediateResult) {
+    // A null intermediate result means nothing was aggregated, and a distinct count of nothing is 0
+    return intermediateResult != null ? intermediateResult.cardinality() : 0L;
   }
 
   @Override

@@ -27,14 +27,12 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * The ArrayMinTransformFunction class implements arrayMin function for multi-valued columns
- *
- * Sample queries:
- * SELECT COUNT(*) FROM table WHERE arrayMin(mvColumn) > 2
- * SELECT COUNT(*) FROM table GROUP BY arrayMin(mvColumn)
- * SELECT SUM(arrayMin(mvColumn)) FROM table
- */
+/// The ArrayMinTransformFunction class implements arrayMin function for multi-valued columns
+///
+/// Sample queries:
+/// SELECT COUNT(\*) FROM table WHERE arrayMin(mvColumn) > 2
+/// SELECT COUNT(\*) FROM table GROUP BY arrayMin(mvColumn)
+/// SELECT SUM(arrayMin(mvColumn)) FROM table
 public class ArrayMinTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "arrayMin";
 

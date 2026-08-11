@@ -32,9 +32,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests the various options set in the broker request
- */
+/// Tests the various options set in the broker request
 public class BrokerRequestOptionsTest {
 
   @Test

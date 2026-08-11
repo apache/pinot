@@ -56,20 +56,18 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests MergeRollup task executor with PercentileTDigest aggregation on BYTES columns.
- * <p>
- * Data layout across 4 segments with 3 dimension groups:
- *   Segment 0: group1=[1..100], group2=[500..599]
- *   Segment 1: group1=[101..200], group2=[600..699], group3=[1..50]
- *   Segment 2: group1=[201..300], group3=[51..150]
- *   Segment 3: group2=[700..799], group3=[151..200]
- * <p>
- * After rollup:
- *   group1: 300 values [1..300], P50 ~ 150
- *   group2: 300 values [500..799], P50 ~ 649
- *   group3: 200 values [1..200], P50 ~ 100
- */
+/// Tests MergeRollup task executor with PercentileTDigest aggregation on BYTES columns.
+///
+/// Data layout across 4 segments with 3 dimension groups:
+///   Segment 0: group1=\[1..100\], group2=\[500..599\]
+///   Segment 1: group1=\[101..200\], group2=\[600..699\], group3=\[1..50\]
+///   Segment 2: group1=\[201..300\], group3=\[51..150\]
+///   Segment 3: group2=\[700..799\], group3=\[151..200\]
+///
+/// After rollup:
+///   group1: 300 values \[1..300\], P50 ~ 150
+///   group2: 300 values \[500..799\], P50 ~ 649
+///   group3: 200 values \[1..200\], P50 ~ 100
 public class MergeRollupTDigestTaskExecutorTest {
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), "MergeRollupTDigestTaskExecutorTest");
@@ -113,10 +111,8 @@ public class MergeRollupTDigestTaskExecutorTest {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 
-  /**
-   * Verifies that 3 distinct dimension groups across 4 segments are independently merged,
-   * each with correct count and quantile estimates (P0, P50, P99, P100).
-   */
+  /// Verifies that 3 distinct dimension groups across 4 segments are independently merged,
+  /// each with correct count and quantile estimates (P0, P50, P99, P100).
   @Test
   public void testMultipleDimensionGroupsIndependentMerge() throws Exception {
     List<File> segmentDirs = buildSegments(buildStandardSegmentData());
@@ -160,12 +156,10 @@ public class MergeRollupTDigestTaskExecutorTest {
     Assert.assertEquals(digest3.quantile(1.0), 200, 1);         // P100 ~ 200
   }
 
-  /**
-   * Verifies cross-segment merging: the same dimension key appears in multiple segments
-   * and all values are correctly aggregated.
-   *
-   * group1 appears in segments 0, 1, 2; group2 in segments 0, 1, 3; group3 in segments 1, 2, 3.
-   */
+  /// Verifies cross-segment merging: the same dimension key appears in multiple segments
+  /// and all values are correctly aggregated.
+  ///
+  /// group1 appears in segments 0, 1, 2; group2 in segments 0, 1, 3; group3 in segments 1, 2, 3.
   @Test
   public void testCrossSegmentMerging() throws Exception {
     List<File> segmentDirs = buildSegments(buildStandardSegmentData());
@@ -194,10 +188,8 @@ public class MergeRollupTDigestTaskExecutorTest {
     Assert.assertTrue(digest3.quantile(1.0) >= 199.0, "Max should be close to 200");
   }
 
-  /**
-   * Passes a custom compressionFactor via function parameters and verifies merge succeeds
-   * with correct results.
-   */
+  /// Passes a custom compressionFactor via function parameters and verifies merge succeeds
+  /// with correct results.
   @Test
   public void testCustomCompressionFactor() throws Exception {
     List<File> segmentDirs = buildSegments(buildStandardSegmentData());
@@ -229,10 +221,8 @@ public class MergeRollupTDigestTaskExecutorTest {
     Assert.assertEquals(digest3.quantile(0.5), 100, 3);
   }
 
-  /**
-   * Uses realistic latency value ranges (1ms to 10000ms) with varying distributions per group
-   * to verify quantile accuracy on wider data ranges.
-   */
+  /// Uses realistic latency value ranges (1ms to 10000ms) with varying distributions per group
+  /// to verify quantile accuracy on wider data ranges.
   @Test
   public void testLargeValueRange() throws Exception {
     List<List<GenericRow>> segments = new ArrayList<>();
@@ -277,10 +267,8 @@ public class MergeRollupTDigestTaskExecutorTest {
     Assert.assertEquals(digest3.quantile(0.5), 5000, 100);
   }
 
-  /**
-   * Verifies that an empty TDigest (no values added) is handled correctly during merge.
-   * The merged result for that group should reflect only the non-empty input.
-   */
+  /// Verifies that an empty TDigest (no values added) is handled correctly during merge.
+  /// The merged result for that group should reflect only the non-empty input.
   @Test
   public void testEmptyTDigestHandling() throws Exception {
     List<List<GenericRow>> segments = new ArrayList<>();
@@ -311,9 +299,7 @@ public class MergeRollupTDigestTaskExecutorTest {
     Assert.assertEquals(digest1.quantile(0.5), 50, 2);
   }
 
-  /**
-   * Verifies merge works correctly with TDigests that contain exactly 1 value each.
-   */
+  /// Verifies merge works correctly with TDigests that contain exactly 1 value each.
   @Test
   public void testSingleValueTDigest() throws Exception {
     List<List<GenericRow>> segments = new ArrayList<>();
@@ -363,10 +349,8 @@ public class MergeRollupTDigestTaskExecutorTest {
     Assert.assertEquals(digest2.quantile(0.5), 100, 0.1);
   }
 
-  /**
-   * Tests skewed distributions: one group has mostly small values, another mostly large.
-   * Verifies quantiles are correct after merge.
-   */
+  /// Tests skewed distributions: one group has mostly small values, another mostly large.
+  /// Verifies quantiles are correct after merge.
   @Test
   public void testSkewedDistributions() throws Exception {
     List<List<GenericRow>> segments = new ArrayList<>();
@@ -429,9 +413,7 @@ public class MergeRollupTDigestTaskExecutorTest {
     Assert.assertEquals(digest2.quantile(0.0), 1, 1);
   }
 
-  /**
-   * After rollup, the total doc count must equal the number of distinct dimension keys.
-   */
+  /// After rollup, the total doc count must equal the number of distinct dimension keys.
   @Test
   public void testSegmentDocCountEqualsDistinctKeys() throws Exception {
     List<File> segmentDirs = buildSegments(buildStandardSegmentData());

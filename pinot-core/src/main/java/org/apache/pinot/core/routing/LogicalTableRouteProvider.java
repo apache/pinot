@@ -49,10 +49,8 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
     _multiClusterRoutingContext = multiClusterRoutingContext;
   }
 
-  /**
-   * Finds table config from local cache first, then searches federated caches if not found.
-   * Returns null if the table config is not found in any cache.
-   */
+  /// Finds table config from local cache first, then searches federated caches if not found.
+  /// Returns null if the table config is not found in any cache.
   private TableCache findTableCache(String tableName, TableCache localTableCache) {
     // Try local cache first
     TableConfig tableConfig = localTableCache.getTableConfig(tableName);

@@ -30,9 +30,7 @@ import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.auth.server.RequesterIdentity;
 
 
-/**
- * Utility class for Server resources.
- */
+/// Utility class for Server resources.
 public class ServerResourceUtils {
 
   // Disable instantiation.

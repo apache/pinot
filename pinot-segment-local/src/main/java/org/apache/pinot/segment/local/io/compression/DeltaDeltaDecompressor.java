@@ -24,11 +24,9 @@ import net.jpountz.lz4.LZ4Factory;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 
 
-/**
- * A pass-through implementation of {@link ChunkDecompressor}, that simply returns the input data without
- * performing any de-compression. This is useful for cases where cost of de-compression out-weighs the benefits
- * of compression.
- */
+/// A pass-through implementation of [ChunkDecompressor], that simply returns the input data without
+/// performing any de-compression. This is useful for cases where cost of de-compression out-weighs the benefits
+/// of compression.
 class DeltaDeltaDecompressor implements ChunkDecompressor {
 
   static final DeltaDeltaDecompressor INSTANCE = new DeltaDeltaDecompressor();

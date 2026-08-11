@@ -586,10 +586,8 @@ public class LeafOperator extends MultiStageOperator {
     _blockingQueue.clear();
   }
 
-  /**
-   * Composes the {@link MseBlock} from the {@link BaseResultsBlock} returned from single-stage engine. It
-   * converts the data types of the results to conform with the desired data schema asked by the multi-stage engine.
-   */
+  /// Composes the [MseBlock] from the [BaseResultsBlock] returned from single-stage engine. It
+  /// converts the data types of the results to conform with the desired data schema asked by the multi-stage engine.
   private RowHeapDataBlock composeMseBlock(BaseResultsBlock resultsBlock) {
     if (resultsBlock instanceof SelectionResultsBlock) {
       return composeSelectMseBlock((SelectionResultsBlock) resultsBlock);
@@ -598,9 +596,7 @@ public class LeafOperator extends MultiStageOperator {
     }
   }
 
-  /**
-   * For selection, we need to check if the columns are in order. If not, we need to re-arrange the columns.
-   */
+  /// For selection, we need to check if the columns are in order. If not, we need to re-arrange the columns.
   private RowHeapDataBlock composeSelectMseBlock(SelectionResultsBlock resultsBlock) {
     int[] columnIndices = getColumnIndices(resultsBlock);
     if (!inOrder(columnIndices)) {
@@ -766,17 +762,11 @@ public class LeafOperator extends MultiStageOperator {
         return "responseSerializationCpuTimeNs";
       }
     },
-    /**
-     * Allocated memory in bytes for this operator or its children in the same stage.
-     */
+    /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG, null),
-    /**
-     * Time spent on GC while this operator or its children in the same stage were running.
-     */
+    /// Time spent on GC while this operator or its children in the same stage were running.
     GC_TIME_MS(StatMap.Type.LONG, null),
-    /**
-     * Time spent in single-stage execution engine for this leaf stage.
-     */
+    /// Time spent in single-stage execution engine for this leaf stage.
     SSE_EXECUTION_TIME_MS(StatMap.Type.LONG, null),
     EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET);
     // IMPORTANT: When adding new StatKeys, make sure to either create the same key in BrokerResponseNativeV2.StatKey or

@@ -38,16 +38,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class is used to provide the specified consistency mode for upsert table by tracking the segments and
- * synchronizing the accesses to the validDocIds of those tracked segments properly. Two consistency modes are
- * supported currently:
- * - SYNC mode, the upsert threads take the WLock when the upsert involves two segments' bitmaps; and the query
- * threads take the RLock when getting bitmaps for all its selected segments.
- * - SNAPSHOT mode, the query threads don't need to take lock when getting bitmaps for all its selected segments, as
- * the query threads access a copy of bitmaps that are kept updated by upsert thread periodically. But the query
- * thread can specify a freshness threshold query option to refresh the bitmap copies if not fresh enough.
- */
+/// This class is used to provide the specified consistency mode for upsert table by tracking the segments and
+/// synchronizing the accesses to the validDocIds of those tracked segments properly. Two consistency modes are
+/// supported currently:
+/// - SYNC mode, the upsert threads take the WLock when the upsert involves two segments' bitmaps; and the query
+/// threads take the RLock when getting bitmaps for all its selected segments.
+/// - SNAPSHOT mode, the query threads don't need to take lock when getting bitmaps for all its selected segments, as
+/// the query threads access a copy of bitmaps that are kept updated by upsert thread periodically. But the query
+/// thread can specify a freshness threshold query option to refresh the bitmap copies if not fresh enough.
 public class UpsertViewManager {
   public static final long DEFAULT_NEW_SEGMENT_TRACKING_TIME_MS = 10000;
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertViewManager.class);
@@ -164,10 +162,8 @@ public class UpsertViewManager {
     }
   }
 
-  /**
-   * Use the segmentContexts to collect the contexts for selected segments. Reuse the segmentContext object if
-   * present, to avoid overwriting the contexts specified at the others places.
-   */
+  /// Use the segmentContexts to collect the contexts for selected segments. Reuse the segmentContext object if
+  /// present, to avoid overwriting the contexts specified at the others places.
   public void setSegmentContexts(List<SegmentContext> segmentContexts, Map<String, String> queryOptions) {
     boolean skipUpsertDelete = QueryOptionsUtils.isSkipUpsertDelete(queryOptions);
     if (_consistencyMode == UpsertConfig.ConsistencyMode.SYNC) {

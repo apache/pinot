@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -38,27 +39,22 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * The {@code IdSetAggregationFunction} collects the values for the given expression into an IdSet, which can be used in
- * the second query to optimize the query with huge IN clause generated from another query.
- * <p>The generated IdSet can be backed by RoaringBitmap, Roaring64NavigableMap or BloomFilter based on type of the ids
- * and the function parameters.
- * <p>The function takes an optional second argument as the parameters for the function. There are 3 parameters for the
- * function:
- * <ul>
- *   <li>
- *     sizeThresholdInBytes: When the size of the IdSet exceeds this threshold, convert the IdSet to BloomFilterIdSet to
- *     reduce the size of the IdSet. Directly create BloomFilterIdSet if it is smaller or equal to 0. (Default 8MB)
- *   </li>
- *   <li>
- *     expectedInsertions: Number of expected insertions for the BloomFilter, must be positive. (Default 5M)
- *   </li>
- *   <li>
- *     fpp: Desired false positive probability for the BloomFilter, must be positive and less than 1.0. (Default 0.03)
- *   </li>
- * </ul>
- * <p>Example: IDSET(col, 'sizeThresholdInBytes=1000;expectedInsertions=10000;fpp=0.03')
- */
+/// The `IdSetAggregationFunction` collects the values for the given expression into an IdSet, which can be
+/// used in the second query to optimize the query with huge IN clause generated from another query.
+///
+/// The generated IdSet can be backed by RoaringBitmap, Roaring64NavigableMap or BloomFilter based on type of the ids
+/// and the function parameters.
+///
+/// The function takes an optional second argument as the parameters for the function. There are 3 parameters for the
+/// function:
+///
+/// - sizeThresholdInBytes: When the size of the IdSet exceeds this threshold, convert the IdSet to
+///   BloomFilterIdSet to reduce the size of the IdSet. Directly create BloomFilterIdSet if it is smaller or equal
+///   to 0. (Default 8MB)
+/// - expectedInsertions: Number of expected insertions for the BloomFilter, must be positive. (Default 5M)
+/// - fpp: Desired false positive probability for the BloomFilter, must be positive and less than 1.0. (Default 0.03)
+///
+/// Example: IDSET(col, 'sizeThresholdInBytes=1000;expectedInsertions=10000;fpp=0.03')
 public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction<IdSet, String> {
   private static final char PARAMETER_DELIMITER = ';';
   private static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';
@@ -491,8 +487,13 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
     return ColumnDataType.STRING;
   }
 
+  @Nullable
   @Override
-  public String extractFinalResult(IdSet intermediateResult) {
+  public String extractFinalResult(@Nullable IdSet intermediateResult) {
+    // A null intermediate result means nothing was aggregated, and there is no id set to serialize
+    if (intermediateResult == null) {
+      return null;
+    }
     try {
       return intermediateResult.toBase64String();
     } catch (IOException e) {
@@ -500,9 +501,7 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
     }
   }
 
-  /**
-   * Returns the IdSet from the result holder or creates a new one if it does not exist.
-   */
+  /// Returns the IdSet from the result holder or creates a new one if it does not exist.
   private IdSet getIdSet(AggregationResultHolder aggregationResultHolder, DataType valueType) {
     IdSet idSet = aggregationResultHolder.getResult();
     if (idSet == null) {
@@ -512,9 +511,7 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
     return idSet;
   }
 
-  /**
-   * Returns the IdSet for the given group key or creates a new one if it does not exist.
-   */
+  /// Returns the IdSet for the given group key or creates a new one if it does not exist.
   private IdSet getIdSet(GroupByResultHolder groupByResultHolder, int groupKey, DataType valueType) {
     IdSet idSet = groupByResultHolder.getResult(groupKey);
     if (idSet == null) {

@@ -37,6 +37,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.segment.creator.impl.BaseSegmentCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StatsCollectorUtil;
@@ -54,9 +55,11 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.ColumnarOpenStructIndexCreator;
+import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -251,7 +254,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       }
     }
 
-    emitParentColumnMetadata(!sparseKeys.isEmpty());
+    emitParentColumnMetadata(sparseKeys);
   }
 
   @Override
@@ -486,20 +489,35 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     SingleValueVarByteRawIndexCreator fwdCreator = new SingleValueVarByteRawIndexCreator(
         _indexDir, ChunkCompressionType.LZ4, sparseCol, _numDocs, DataType.STRING, maxLen);
     NullValueVectorCreator nullCreator = new NullValueVectorCreator(_indexDir, sparseCol);
+    JsonIndexCreator jsonCreator = _config.isSparseJsonIndex()
+        ? new OffHeapJsonIndexCreator(_indexDir, sparseCol, null, false, JsonIndexConfig.DEFAULT)
+        : null;
     try {
       for (int docId = 0; docId < _numDocs; docId++) {
         if (jsonPerDoc[docId] != null) {
           fwdCreator.putString(jsonPerDoc[docId]);
+          if (jsonCreator != null) {
+            jsonCreator.add(jsonPerDoc[docId]);
+          }
         } else {
           fwdCreator.putString("");
           nullCreator.setNull(docId);
+          if (jsonCreator != null) {
+            jsonCreator.add("{}");
+          }
         }
       }
       fwdCreator.seal();
       nullCreator.seal();
+      if (jsonCreator != null) {
+        jsonCreator.seal();
+      }
     } finally {
       fwdCreator.close();
       nullCreator.close();
+      if (jsonCreator != null) {
+        jsonCreator.close();
+      }
     }
 
     PropertiesConfiguration props = new PropertiesConfiguration();
@@ -525,7 +543,8 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     _materializedColumnMetadata.put(sparseCol, props);
   }
 
-  private void emitParentColumnMetadata(boolean hasSparseColumn) {
+  private void emitParentColumnMetadata(List<String> sparseKeys) {
+    boolean hasSparseColumn = !sparseKeys.isEmpty();
     PropertiesConfiguration props = new PropertiesConfiguration();
     props.setProperty(
         V1Constants.MetadataKeys.Column.getKeyFor(_columnName, V1Constants.MetadataKeys.Column.COLUMN_NAME),
@@ -545,6 +564,15 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     props.setProperty(
         V1Constants.MetadataKeys.Column.getKeyFor(_columnName, V1Constants.MetadataKeys.Column.HAS_SPARSE_COLUMN),
         hasSparseColumn);
+    if (!sparseKeys.isEmpty()) {
+      try {
+        props.setProperty(
+            V1Constants.MetadataKeys.Column.getKeyFor(_columnName, V1Constants.MetadataKeys.Column.SPARSE_KEYS),
+            JsonUtils.objectToString(sparseKeys));
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to serialize sparse-key manifest", e);
+      }
+    }
     _materializedColumnMetadata.put(_columnName, props);
   }
 }

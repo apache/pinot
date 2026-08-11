@@ -32,27 +32,24 @@ import org.apache.datasketches.theta.UpdatableThetaSketch;
 import org.apache.datasketches.thetacommon.ThetaUtil;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.DistinctCountAggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.DistinctCountBitmapAggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.DistinctCountThetaSketchAggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.SegmentPartitionedDistinctCountAggregationFunction;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The {@code FunnelCountAggregationFunctionFactory} builds a {@code FunnelCountAggregationFunction}.
- * Primary role is to validate inputs and select the appropriate aggregation strategy to use based on settings.
- *
- * There are 5 strategies available, mirroring the corresponding distinct count implementations as per below.
- *  <p><ul>
- *  <li>'set': See DISTINCTCOUNT at {@link DistinctCountAggregationFunction}
- *  <li>'bitmap' (default): See DISTINCTCOUNTBITMAP at {@link DistinctCountBitmapAggregationFunction}
- *  <li>'theta_sketch': See DISTINCTCOUNTTHETASKETCH at {@link DistinctCountThetaSketchAggregationFunction}
- *  <li>'partitioned': See SEGMENTPARTITIONEDDISTINCTCOUNT {@link SegmentPartitionedDistinctCountAggregationFunction}
- *  <li>'sorted': sorted counts per segment then sums up. Only available in combination with 'partitioned'.
- *  <li>'nominalEntries=4096': theta sketch configuration, default is 4096.
- *  </ul><p>
- */
+/// The `FunnelCountAggregationFunctionFactory` builds a `FunnelCountAggregationFunction`.
+/// Primary role is to validate inputs and select the appropriate aggregation strategy to use based on settings.
+///
+/// There are 5 strategies available, mirroring the corresponding distinct count implementations as per below.
+///
+/// - 'set': See DISTINCTCOUNT at
+///   [org.apache.pinot.core.query.aggregation.function.DistinctCountAggregationFunction]
+/// - 'bitmap' (default): See DISTINCTCOUNTBITMAP at
+///   [org.apache.pinot.core.query.aggregation.function.DistinctCountBitmapAggregationFunction]
+/// - 'theta_sketch': See DISTINCTCOUNTTHETASKETCH at
+///   [org.apache.pinot.core.query.aggregation.function.DistinctCountThetaSketchAggregationFunction]
+/// - 'partitioned': See SEGMENTPARTITIONEDDISTINCTCOUNT
+///   [org.apache.pinot.core.query.aggregation.function.SegmentPartitionedDistinctCountAggregationFunction]
+/// - 'sorted': sorted counts per segment then sums up. Only available in combination with 'partitioned'.
+/// - 'nominalEntries=4096': theta sketch configuration, default is 4096.
 public class FunnelCountAggregationFunctionFactory implements Supplier<AggregationFunction> {
   final List<ExpressionContext> _expressions;
   final List<ExpressionContext> _stepExpressions;

@@ -29,7 +29,6 @@ import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexTy
 import org.apache.pinot.segment.local.segment.index.fst.FstIndexUtils;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
-import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -50,24 +49,23 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION;
 
 
-/**
- * Helper class for fst indexes used by {@link SegmentPreProcessor}.
- * to create FST index for column during segment load time. Currently FST index is always
- * created (if enabled on a column) during segment generation
- *
- * (1) A new segment with FST index is created/refreshed. Server loads the segment. The handler
- * detects the existence of FST index and returns.
- *
- * (2) A reload is issued on an existing segment with existing FST index. The handler
- * detects the existence of FST index and returns.
- *
- * (3) A reload is issued on an existing segment after FST index is enabled on an existing
- * column. Reads the dictionary to create FST index.
- *
- * (4) A reload is issued on an existing segment after FST index is enabled on a newly
- * added column. In this case, the default column handler would have taken care of adding
- * dictionary for the new column. Read the dictionary to create FST index.
- */
+/// Helper class for fst indexes used by
+/// [org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor].
+/// to create FST index for column during segment load time. Currently FST index is always
+/// created (if enabled on a column) during segment generation
+///
+/// (1) A new segment with FST index is created/refreshed. Server loads the segment. The handler
+/// detects the existence of FST index and returns.
+///
+/// (2) A reload is issued on an existing segment with existing FST index. The handler
+/// detects the existence of FST index and returns.
+///
+/// (3) A reload is issued on an existing segment after FST index is enabled on an existing
+/// column. Reads the dictionary to create FST index.
+///
+/// (4) A reload is issued on an existing segment after FST index is enabled on a newly
+/// added column. In this case, the default column handler would have taken care of adding
+/// dictionary for the new column. Read the dictionary to create FST index.
 public class FSTIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(FSTIndexHandler.class);
 

@@ -62,10 +62,8 @@ import org.slf4j.LoggerFactory;
 import static java.util.Objects.requireNonNull;
 
 
-/**
- * A standalone server which will listen on a port and serve queries based on the given configuration. Cluster
- * management is maintained outside of this class.
- */
+/// A standalone server which will listen on a port and serve queries based on the given configuration. Cluster
+/// management is maintained outside of this class.
 public class ServerInstance {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerInstance.class);
 

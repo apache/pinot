@@ -22,6 +22,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import java.util.Arrays;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -156,11 +157,13 @@ public class ListAggFunction extends NullableSingleInputAggregationFunction<Obje
     }
   }
 
+  @Nullable
   @Override
   public ObjectCollection<String> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public ObjectCollection<String> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
@@ -169,12 +172,6 @@ public class ListAggFunction extends NullableSingleInputAggregationFunction<Obje
   @Override
   public ObjectCollection<String> merge(ObjectCollection<String> intermediateResult1,
       ObjectCollection<String> intermediateResult2) {
-    if (intermediateResult1 == null) {
-      return intermediateResult2;
-    }
-    if (intermediateResult2 == null) {
-      return intermediateResult1;
-    }
     intermediateResult1.addAll(intermediateResult2);
     return intermediateResult1;
   }
@@ -201,8 +198,9 @@ public class ListAggFunction extends NullableSingleInputAggregationFunction<Obje
     return ColumnDataType.STRING;
   }
 
+  @Nullable
   @Override
-  public String extractFinalResult(ObjectCollection<String> strings) {
+  public String extractFinalResult(@Nullable ObjectCollection<String> strings) {
     if (strings == null) {
       return null;
     }

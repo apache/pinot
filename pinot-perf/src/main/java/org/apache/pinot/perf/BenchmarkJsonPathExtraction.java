@@ -47,14 +47,14 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
 /// Compares JsonPath extraction through Jayway (today's implementation, which builds a full Jackson DOM of the
-/// document and then walks to the field) against {@link FastJsonPathExtractor}.
-/// <p>
-/// The {@code fieldPosition} parameter puts the extracted field either near the start or at the very end of a
+/// document and then walks to the field) against [FastJsonPathExtractor].
+///
+/// The `fieldPosition` parameter puts the extracted field either near the start or at the very end of a
 /// ~700 byte nested event payload, because that is what decides whether early exit can pay off.
-/// <p>
-/// The single-column benchmarks are also the per-row cost of {@code jsonExtractScalar}: that transform function
-/// does exactly {@code parseContext.parse(row).read(jsonPath)} per row, so measuring the extraction in isolation
-/// measures it without the surrounding {@code ValueBlock} scaffolding.
+///
+/// The single-column benchmarks are also the per-row cost of `jsonExtractScalar`: that transform function
+/// does exactly `parseContext.parse(row).read(jsonPath)` per row, so measuring the extraction in isolation
+/// measures it without the surrounding `ValueBlock` scaffolding.
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @Fork(1)
@@ -64,7 +64,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 public class BenchmarkJsonPathExtraction {
   private static final Predicate[] NO_PREDICATES = new Predicate[0];
 
-  /// Exactly the context {@code JsonExtractScalarTransformFunction} and {@code JsonFunctions} use.
+  /// Exactly the context `JsonExtractScalarTransformFunction` and `JsonFunctions` use.
   private static final ParseContext PARSE_CONTEXT = JsonPath.using(
       new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonProvider())
           .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS).build());
@@ -84,7 +84,7 @@ public class BenchmarkJsonPathExtraction {
       + "\"trailer\":{\"country\":\"DE\",\"note\":\"last field in the document\"}"
       + "}";
 
-  /// Four derived columns, spread through the document, as an ingestion {@code transformConfigs} would pull.
+  /// Four derived columns, spread through the document, as an ingestion `transformConfigs` would pull.
   private static final String[] FOUR_PATHS = {"$.user.country", "$.event.currency", "$.device.os", "$.geo.city"};
 
   @Param({"early", "late"})

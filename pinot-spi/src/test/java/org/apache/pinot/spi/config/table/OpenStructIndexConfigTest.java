@@ -53,10 +53,25 @@ public class OpenStructIndexConfigTest {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
+  public void testDeprecatedSixArgConstructorDelegatesWithSparseJsonIndexDefault() {
+    FieldConfig keyConfig =
+        new FieldConfig("k", FieldConfig.EncodingType.RAW, (List<FieldConfig.IndexType>) null, null, null);
+    OpenStructIndexConfig config =
+        new OpenStructIndexConfig(false, keyConfig, 5, Set.of("k"), 0.25, List.of(keyConfig));
+    assertFalse(config.isSparseJsonIndex());
+    assertEquals(config.getMaxDenseKeys(), 5);
+    assertEquals(config.getDenseKeyMinFillRate(), 0.25);
+    assertEquals(config.getDenseKeys(), Set.of("k"));
+    assertEquals(config.getDefaultValueFieldConfig(), keyConfig);
+    assertEquals(config.getValueFieldConfigs(), List.of(keyConfig));
+  }
+
+  @Test
   public void testNoDictionaryKeys() {
     FieldConfig rawKey =
         new FieldConfig("raw_payload", FieldConfig.EncodingType.RAW, (List<FieldConfig.IndexType>) null, null, null);
-    OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, 1000, null, 0.5, List.of(rawKey));
+    OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, 1000, null, 0.5, List.of(rawKey), null);
     assertFalse(config.shouldUseDictionaryForKey("raw_payload"));
     // Unconfigured key falls back to built-in default (DICTIONARY).
     assertTrue(config.shouldUseDictionaryForKey("other_key"));
@@ -70,7 +85,7 @@ public class OpenStructIndexConfigTest {
     FieldConfig clicks = JsonUtils.stringToObject(
         "{\"name\":\"clicks\",\"indexes\":{\"inverted\":{\"disabled\":true}}}", FieldConfig.class);
     OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, 1000, null, 0.5,
-        List.of(country, clicks));
+        List.of(country, clicks), null);
     assertTrue(config.shouldEnableInvertedIndexForKey("country"));
     assertFalse(config.shouldEnableInvertedIndexForKey("clicks"));
     // Unconfigured key falls back to built-in default of inverted-on.
@@ -84,7 +99,7 @@ public class OpenStructIndexConfigTest {
     FieldConfig defaultFieldConfig = JsonUtils.stringToObject(
         "{\"name\":\"__default__\",\"encodingType\":\"DICTIONARY\"}", FieldConfig.class);
     OpenStructIndexConfig config =
-        new OpenStructIndexConfig(false, defaultFieldConfig, 1000, null, 0.5, null);
+        new OpenStructIndexConfig(false, defaultFieldConfig, 1000, null, 0.5, null, null);
     assertFalse(config.shouldEnableInvertedIndexForKey("any_key"));
     assertTrue(config.shouldUseDictionaryForKey("any_key"));
   }
@@ -95,7 +110,7 @@ public class OpenStructIndexConfigTest {
     FieldConfig defaultFieldConfig = JsonUtils.stringToObject(
         "{\"name\":\"__default__\",\"indexes\":{\"inverted\":{}}}", FieldConfig.class);
     OpenStructIndexConfig config =
-        new OpenStructIndexConfig(false, defaultFieldConfig, 1000, null, 0.5, null);
+        new OpenStructIndexConfig(false, defaultFieldConfig, 1000, null, 0.5, null, null);
     assertTrue(config.shouldEnableInvertedIndexForKey("any_key"));
   }
 
@@ -107,7 +122,7 @@ public class OpenStructIndexConfigTest {
     FieldConfig country = JsonUtils.stringToObject(
         "{\"name\":\"country\",\"indexes\":{\"inverted\":{}}}", FieldConfig.class);
     OpenStructIndexConfig config =
-        new OpenStructIndexConfig(false, defaultFieldConfig, 1000, null, 0.5, List.of(country));
+        new OpenStructIndexConfig(false, defaultFieldConfig, 1000, null, 0.5, List.of(country), null);
     assertTrue(config.shouldEnableInvertedIndexForKey("country"));
     // Unconfigured key uses default (no inverted), not built-in.
     assertFalse(config.shouldEnableInvertedIndexForKey("other"));
@@ -119,7 +134,7 @@ public class OpenStructIndexConfigTest {
     FieldConfig defaultFieldConfig = JsonUtils.stringToObject(
         "{\"name\":\"__default__\",\"encodingType\":\"RAW\"}", FieldConfig.class);
     OpenStructIndexConfig config =
-        new OpenStructIndexConfig(false, defaultFieldConfig, 1000, null, 0.5, null);
+        new OpenStructIndexConfig(false, defaultFieldConfig, 1000, null, 0.5, null, null);
     assertFalse(config.shouldUseDictionaryForKey("any_key"));
   }
 
@@ -129,7 +144,8 @@ public class OpenStructIndexConfigTest {
         new FieldConfig("blob", FieldConfig.EncodingType.RAW, (List<FieldConfig.IndexType>) null, null, null);
     FieldConfig rawPayload =
         new FieldConfig("raw_payload", FieldConfig.EncodingType.RAW, (List<FieldConfig.IndexType>) null, null, null);
-    OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, 1000, null, 0.5, List.of(blob, rawPayload));
+    OpenStructIndexConfig config =
+        new OpenStructIndexConfig(false, null, 1000, null, 0.5, List.of(blob, rawPayload), null);
     assertFalse(config.shouldUseDictionaryForKey("blob"));
     assertFalse(config.shouldUseDictionaryForKey("raw_payload"));
     // Unconfigured key falls back to built-in default (DICTIONARY).
@@ -242,5 +258,25 @@ public class OpenStructIndexConfigTest {
         JsonUtils.stringToObject("{\"maxDenseKeys\": 500}", OpenStructIndexConfig.class);
     assertEquals(config.getMaxDenseKeys(), 500);
     assertEquals(config.getDenseKeyMinFillRate(), OpenStructIndexConfig.DEFAULT_DENSE_KEY_MIN_FILL_RATE);
+  }
+
+  @Test
+  public void testSparseJsonIndexDefaultsToFalse()
+      throws Exception {
+    OpenStructIndexConfig config = JsonUtils.stringToObject("{}", OpenStructIndexConfig.class);
+    assertFalse(config.isSparseJsonIndex());
+    assertFalse(OpenStructIndexConfig.DEFAULT.isSparseJsonIndex());
+    assertFalse(OpenStructIndexConfig.DISABLED.isSparseJsonIndex());
+  }
+
+  @Test
+  public void testSparseJsonIndexRoundTrip()
+      throws Exception {
+    OpenStructIndexConfig config =
+        JsonUtils.stringToObject("{\"sparseJsonIndex\": true}", OpenStructIndexConfig.class);
+    assertTrue(config.isSparseJsonIndex());
+    OpenStructIndexConfig reparsed =
+        JsonUtils.stringToObject(JsonUtils.objectToString(config), OpenStructIndexConfig.class);
+    assertTrue(reparsed.isSparseJsonIndex());
   }
 }

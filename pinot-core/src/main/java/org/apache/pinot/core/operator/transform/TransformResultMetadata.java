@@ -21,9 +21,7 @@ package org.apache.pinot.core.operator.transform;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * The <code>TransformResultMetadata</code> class contains the metadata for the transform result.
- */
+/// The `TransformResultMetadata` class contains the metadata for the transform result.
 public class TransformResultMetadata {
   private final DataType _dataType;
   private final boolean _isSingleValue;

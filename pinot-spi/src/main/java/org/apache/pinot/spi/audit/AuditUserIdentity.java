@@ -21,21 +21,17 @@ package org.apache.pinot.spi.audit;
 import javax.annotation.Nullable;
 
 
-/**
- * Represents a resolved user identity for audit logging purposes.
- * <p>
- * This interface allows {@link AuditTokenResolver} implementations to return
- * structured identity information that can be extended in the future
- * (e.g., roles, groups) without breaking the SPI contract.
- */
+/// Represents a resolved user identity for audit logging purposes.
+///
+/// This interface allows [AuditTokenResolver] implementations to return
+/// structured identity information that can be extended in the future
+/// (e.g., roles, groups) without breaking the SPI contract.
 @FunctionalInterface
 public interface AuditUserIdentity {
 
-  /**
-   * Returns the principal (user identifier) for this identity.
-   *
-   * @return the principal, or {@code null} if not available
-   */
+  /// Returns the principal (user identifier) for this identity.
+  ///
+  /// @return the principal, or `null` if not available
   @Nullable
   String getPrincipal();
 }

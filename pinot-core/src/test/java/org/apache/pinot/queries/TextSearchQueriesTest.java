@@ -56,7 +56,6 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer;
@@ -79,14 +78,12 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-/**
- * Functional tests for text search feature.
- * The tests use two kinds of input data
- * (1) Skills file
- * (2) Query log file
- * The test table has a SKILLS column and QUERY_LOG column. Text index is created
- * on each of these columns.
- */
+/// Functional tests for text search feature.
+/// The tests use two kinds of input data
+/// (1) Skills file
+/// (2) Query log file
+/// The test table has a SKILLS column and QUERY_LOG column. Text index is created
+/// on each of these columns.
 public class TextSearchQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TextSearchQueriesTest");
   protected static final String TABLE_NAME = "MyTable";
@@ -304,10 +301,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     testTextSearchSelectQueryHelper(query3, 0, false, new ArrayList<>());
   }
 
-  /**
-   * Tests for phrase, term, regex, composite (using AND/OR) text search queries.
-   * Both selection and aggregation queries are used.
-   */
+  /// Tests for phrase, term, regex, composite (using AND/OR) text search queries.
+  /// Both selection and aggregation queries are used.
   @Test
   public void testTextSearch()
       throws Exception {
@@ -1055,10 +1050,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     testTextSearchAggregationQueryHelper(query, expected.size());
   }
 
-  /**
-   * Tests for combining (using AND/OR)
-   * the execution of text match filters with other filters.
-   */
+  /// Tests for combining (using AND/OR)
+  /// the execution of text match filters with other filters.
   @Test
   public void testTextSearchWithAdditionalFilter()
       throws Exception {
@@ -1356,10 +1349,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     testTextSearchAggregationQueryHelper(query, expected.size());
   }
 
-  /**
-   * Test NotFilterOperator with index based doc id iterator (text_match)
-   * @throws Exception
-   */
+  /// Test NotFilterOperator with index based doc id iterator (text_match)
+  /// @throws Exception
   @Test
   public void testTextSearchWithInverse()
       throws Exception {
@@ -1374,11 +1365,9 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     testTextSearchSelectQueryHelper(query, 28, false, expected);
   }
 
-  /**
-   * Test the reference counting mechanism of {@link SearcherManager}
-   * used by {@link RealtimeLuceneTextIndex}
-   * for near realtime text search.
-   */
+  /// Test the reference counting mechanism of [SearcherManager]
+  /// used by [org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex]
+  /// for near realtime text search.
   @Test
   public void testLuceneRealtimeWithSearcherManager()
       throws Exception {
@@ -1544,11 +1533,9 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     indexWriter.close();
   }
 
-  /**
-   * Test the realtime search by verifying that realtime reader is able
-   * to see monotonically increasing number of uncommitted documents
-   * added to the index.
-   */
+  /// Test the realtime search by verifying that realtime reader is able
+  /// to see monotonically increasing number of uncommitted documents
+  /// added to the index.
   @Test
   public void testLuceneRealtimeWithoutSearcherManager()
       throws Exception {

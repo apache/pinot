@@ -22,9 +22,7 @@ import java.util.concurrent.Semaphore;
 import org.slf4j.Logger;
 
 
-/**
- * Wrapper class for semaphore used to control concurrent segment reload/refresh.
- */
+/// Wrapper class for semaphore used to control concurrent segment reload/refresh.
 public class SegmentReloadSemaphore {
   private final Semaphore _semaphore;
 

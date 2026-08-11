@@ -102,31 +102,29 @@ public class IdealStateGroupCommitTest {
     TEST_INSTANCE.cleanup();
   }
 
-  /**
-   * Regression test for the leader-entry cancellation fix in {@link IdealStateGroupCommit#commit}.
-   *
-   * Setup mirrors the pre-fix race condition that produced "in IdealState, no ZK metadata"
-   * orphans in the pauseless segment commit path:
-   *
-   *   1. The queue already contains an entry whose updater will throw PermanentUpdaterException
-   *      (a pauseless segment whose 300s max-completion-time deadline has passed while waiting
-   *      behind a long IdealState operation such as a bulk retention deletion).
-   *   2. A fresh thread calls commit() with a healthy updater. Its entry is enqueued AFTER the
-   *      stuck entry in FIFO order.
-   *   3. The fresh thread becomes leader and iterates the queue in FIFO order.
-   *
-   * Pre-fix behavior (the bug): the stuck entry's updater threw, iteration stopped, the fresh
-   * thread's commit() exited with that exception, but its OWN queued entry was never iterated and
-   * stayed in _pending. A subsequent leader applied it. The fresh thread's caller observed "my
-   * update failed" and ran cleanup (removing the newly-created segment's ZK metadata), yet the
-   * subsequent leader's CAS put the segment in IdealState -- producing the orphan.
-   *
-   * Post-fix behavior (asserted here): the catch in commit() sets _cancelled on the fresh
-   * thread's own entry and adds it to `processed`. The fresh thread's commit() still throws
-   * (pre-fix all-or-nothing batch semantics are preserved), but a subsequent leader's iteration
-   * sees the cancelled entry, skips it, and removes it. No orphan can form because the fresh
-   * updater is never applied to IdealState by any future batch.
-   */
+  /// Regression test for the leader-entry cancellation fix in [IdealStateGroupCommit#commit].
+  ///
+  /// Setup mirrors the pre-fix race condition that produced "in IdealState, no ZK metadata"
+  /// orphans in the pauseless segment commit path:
+  ///
+  ///   1. The queue already contains an entry whose updater will throw PermanentUpdaterException
+  ///      (a pauseless segment whose 300s max-completion-time deadline has passed while waiting
+  ///      behind a long IdealState operation such as a bulk retention deletion).
+  ///   2. A fresh thread calls commit() with a healthy updater. Its entry is enqueued AFTER the
+  ///      stuck entry in FIFO order.
+  ///   3. The fresh thread becomes leader and iterates the queue in FIFO order.
+  ///
+  /// Pre-fix behavior (the bug): the stuck entry's updater threw, iteration stopped, the fresh
+  /// thread's commit() exited with that exception, but its OWN queued entry was never iterated and
+  /// stayed in \_pending. A subsequent leader applied it. The fresh thread's caller observed "my
+  /// update failed" and ran cleanup (removing the newly-created segment's ZK metadata), yet the
+  /// subsequent leader's CAS put the segment in IdealState -- producing the orphan.
+  ///
+  /// Post-fix behavior (asserted here): the catch in commit() sets \_cancelled on the fresh
+  /// thread's own entry and adds it to `processed`. The fresh thread's commit() still throws
+  /// (pre-fix all-or-nothing batch semantics are preserved), but a subsequent leader's iteration
+  /// sees the cancelled entry, skips it, and removes it. No orphan can form because the fresh
+  /// updater is never applied to IdealState by any future batch.
   @Test
   public void testFreshUpdaterAppliedAfterCallerThrows()
       throws Exception {
@@ -207,13 +205,11 @@ public class IdealStateGroupCommitTest {
     }
   }
 
-  /**
-   * Multi-thread consistency test: N stuck owners + M fresh owners race to commit on the same
-   * resource. The post-fix contract is per-owner consistency, not per-owner success: every owner
-   * either observes a successful commit AND its update is present in IdealState, OR observes an
-   * exception AND its update is NOT present in IdealState. The cancellation flag must ensure no
-   * orphan can be left behind by any failed leader.
-   */
+  /// Multi-thread consistency test: N stuck owners + M fresh owners race to commit on the same
+  /// resource. The post-fix contract is per-owner consistency, not per-owner success: every owner
+  /// either observes a successful commit AND its update is present in IdealState, OR observes an
+  /// exception AND its update is NOT present in IdealState. The cancellation flag must ensure no
+  /// orphan can be left behind by any failed leader.
   @Test
   public void testMultipleStuckAndFreshConsistency()
       throws Exception {
@@ -335,26 +331,24 @@ public class IdealStateGroupCommitTest {
     }
   }
 
-  /**
-   * Integration-style test that walks the same chain the orphan-creating production bug walked:
-   *
-   *   - Step 2 of commitSegmentMetadataInternal: write the new consuming segment's ZK metadata
-   *     to the property store with status IN_PROGRESS.
-   *   - Step 3: update IdealState to mark the old segment ONLINE and add the new segment as
-   *     CONSUMING -- via IdealStateGroupCommit.commit().
-   *   - If commit() throws, simulate the catch block in commitSegmentMetadataInternal: call
-   *     removeSegmentZKMetadataBestEffort on the new segment.
-   *   - Then let a drainer commit run (mimics any subsequent batch picking up the queue).
-   *
-   * Orphan condition: the new segment ends up in IdealState but its ZK metadata is gone.
-   * Pre-fix: a co-batched stuck pauseless entry threw, causing this caller's commit() to throw
-   * (so cleanup ran) while the caller's own updater stayed in _pending and was applied by the
-   * next leader -- producing the orphan.
-   *
-   * The test asserts that no orphan is produced. With the cancellation fix it passes -- the
-   * caller still throws (preserving pre-fix all-or-nothing batch semantics), but the entry is
-   * cancelled so the drainer never applies it.
-   */
+  /// Integration-style test that walks the same chain the orphan-creating production bug walked:
+  ///
+  ///   - Step 2 of commitSegmentMetadataInternal: write the new consuming segment's ZK metadata
+  ///     to the property store with status IN_PROGRESS.
+  ///   - Step 3: update IdealState to mark the old segment ONLINE and add the new segment as
+  ///     CONSUMING -- via IdealStateGroupCommit.commit().
+  ///   - If commit() throws, simulate the catch block in commitSegmentMetadataInternal: call
+  ///     removeSegmentZKMetadataBestEffort on the new segment.
+  ///   - Then let a drainer commit run (mimics any subsequent batch picking up the queue).
+  ///
+  /// Orphan condition: the new segment ends up in IdealState but its ZK metadata is gone.
+  /// Pre-fix: a co-batched stuck pauseless entry threw, causing this caller's commit() to throw
+  /// (so cleanup ran) while the caller's own updater stayed in \_pending and was applied by the
+  /// next leader -- producing the orphan.
+  ///
+  /// The test asserts that no orphan is produced. With the cancellation fix it passes -- the
+  /// caller still throws (preserving pre-fix all-or-nothing batch semantics), but the entry is
+  /// cancelled so the drainer never applies it.
   @Test
   public void testNoOrphanWhenCoBatchedEntryThrowsDuringStepThree()
       throws Exception {
@@ -466,11 +460,9 @@ public class IdealStateGroupCommitTest {
     }
   }
 
-  /**
-   * Uses reflection to push a stuck Entry (whose updater throws PermanentUpdaterException) into
-   * IdealStateGroupCommit's internal per-resource queue, without going through commit(). This is
-   * how we make the FIFO race deterministic in a unit test.
-   */
+  /// Uses reflection to push a stuck Entry (whose updater throws PermanentUpdaterException) into
+  /// IdealStateGroupCommit's internal per-resource queue, without going through commit(). This is
+  /// how we make the FIFO race deterministic in a unit test.
   @SuppressWarnings("unchecked")
   private static void injectStuckEntry(IdealStateGroupCommit commit, String resourceName)
       throws Exception {

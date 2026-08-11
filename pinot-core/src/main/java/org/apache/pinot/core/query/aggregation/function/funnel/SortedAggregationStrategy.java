@@ -23,11 +23,9 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
-/**
- * Aggregation strategy for segments partitioned and sorted by the main correlation column.
- * For multi-key correlate-by, data must be sorted by the first (primary) column; secondary
- * keys are handled within each primary-key group by {@link SortedAggregationResult}.
- */
+/// Aggregation strategy for segments partitioned and sorted by the main correlation column.
+/// For multi-key correlate-by, data must be sorted by the first (primary) column; secondary
+/// keys are handled within each primary-key group by [SortedAggregationResult].
 class SortedAggregationStrategy extends AggregationStrategy<SortedAggregationResult> {
   public SortedAggregationStrategy(List<ExpressionContext> stepExpressions,
       List<ExpressionContext> correlateByExpressions) {

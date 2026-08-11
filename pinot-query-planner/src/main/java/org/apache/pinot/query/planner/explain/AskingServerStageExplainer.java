@@ -33,14 +33,13 @@ import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 
 
-/**
- * A class used to explain a {@link DispatchablePlanFragment} by asking the servers to explain their own execution plan.
- *
- * A {@link OnServerExplainer} is used to ask servers for their plans and the results are merged into a single plan.
- * This merge can be configured to be simplified or verbose. Verbose plans keep a plan per segment while simplified
- * plans merge plans that are similar. Usually the latter is the desired behavior but it can be disabled for debugging
- * purposes (ie to be able to see which segments are not using an index in their plans).
- */
+/// A class used to explain a [DispatchablePlanFragment] by asking the servers to explain their own execution
+/// plan.
+///
+/// A [OnServerExplainer] is used to ask servers for their plans and the results are merged into a single plan.
+/// This merge can be configured to be simplified or verbose. Verbose plans keep a plan per segment while simplified
+/// plans merge plans that are similar. Usually the latter is the desired behavior but it can be disabled for debugging
+/// purposes (ie to be able to see which segments are not using an index in their plans).
 public class AskingServerStageExplainer {
   private final OnServerExplainer _onServerExplainer;
   private final boolean _verbose;
@@ -129,32 +128,28 @@ public class AskingServerStageExplainer {
     }
   }
 
-  /**
-   * An abstraction to explain a {@link DispatchablePlanFragment} on the servers.
-   *
-   * It is assumed that the fragment is executed on multiple servers and each server may have a different execution
-   * plan.
-   *
-   * Implementations of this interface are expected to not be in pinot-query-planner but in the module that is
-   * responsible for executing the plan on the servers (ie pinot-query-runtime).
-   *
-   * Implementations can return one node per server, or one node per segment, or any other granularity that makes
-   * sense, but it is important they follow the indications in {@link ExplainNodeSimplifier}, {@link PlanNodeSorter}
-   * and {@link PlanNodeMerger}. This basically means that plans from different segments should be grouped by a
-   * {@lin ExplainedNode} with a title that indicates that contains the word {@code Combine}
-   */
+  /// An abstraction to explain a [DispatchablePlanFragment] on the servers.
+  ///
+  /// It is assumed that the fragment is executed on multiple servers and each server may have a different execution
+  /// plan.
+  ///
+  /// Implementations of this interface are expected to not be in pinot-query-planner but in the module that is
+  /// responsible for executing the plan on the servers (ie pinot-query-runtime).
+  ///
+  /// Implementations can return one node per server, or one node per segment, or any other granularity that makes
+  /// sense, but it is important they follow the indications in [ExplainNodeSimplifier], [PlanNodeSorter]
+  /// and [PlanNodeMerger]. This basically means that plans from different segments should be grouped by a
+  /// {@lin ExplainedNode} with a title that indicates that contains the word `Combine`
   public interface OnServerExplainer {
-    /**
-     * Returns a collection of {@link PlanNode} that explain the given {@link DispatchablePlanFragment}.
-     *
-     * The reason for returning a collection of them is that the fragment may be executed in parallel on multiple
-     * servers.
-     * Each server may contain different segments with different values and indexes and therefore may have a different
-     * execution plan.
-     *
-     * @see ExplainNodeSimplifier
-     * @see PlanNodeSorter
-     */
+    /// Returns a collection of [PlanNode] that explain the given [DispatchablePlanFragment].
+    ///
+    /// The reason for returning a collection of them is that the fragment may be executed in parallel on multiple
+    /// servers.
+    /// Each server may contain different segments with different values and indexes and therefore may have a different
+    /// execution plan.
+    ///
+    /// @see ExplainNodeSimplifier
+    /// @see PlanNodeSorter
     Collection<PlanNode> explainOnServers(DispatchablePlanFragment fragment);
   }
 }

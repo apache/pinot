@@ -52,9 +52,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 
 
-/**
- * Table level index loading config.
- */
+/// Table level index loading config.
 public class IndexLoadingConfig {
   private static final int DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT = 2;
   public static final String READ_MODE_KEY = "readMode";
@@ -94,11 +92,9 @@ public class IndexLoadingConfig {
 
   private MultiColumnTextIndexConfig _multiColTextIndexConfig;
 
-  /**
-   * NOTE: This step might modify the passed in table config and schema.
-   *
-   * TODO: Revisit the init handling. Currently it doesn't apply tiered config override
-   */
+  /// NOTE: This step might modify the passed in table config and schema.
+  ///
+  /// TODO: Revisit the init handling. Currently it doesn't apply tiered config override
   public IndexLoadingConfig(@Nullable InstanceDataManagerConfig instanceDataManagerConfig,
       @Nullable TableConfig tableConfig, @Nullable Schema schema) {
     _instanceDataManagerConfig = instanceDataManagerConfig;
@@ -117,9 +113,7 @@ public class IndexLoadingConfig {
     this(null, tableConfig, schema);
   }
 
-  /**
-   * NOTE: Can be used in production code when we want to load a segment as is without any modifications.
-   */
+  /// NOTE: Can be used in production code when we want to load a segment as is without any modifications.
   public IndexLoadingConfig() {
     this(null, null, null);
   }
@@ -288,9 +282,7 @@ public class IndexLoadingConfig {
     return _segmentVersion;
   }
 
-  /**
-   * For tests only.
-   */
+  /// For tests only.
   public void setSegmentVersion(SegmentVersion segmentVersion) {
     _segmentVersion = segmentVersion;
   }
@@ -376,13 +368,11 @@ public class IndexLoadingConfig {
     return unmodifiable(_indexConfigsByColName);
   }
 
-  /**
-   * Returns a subset of the columns on the table.
-   *
-   * When {@link #getSchema()} is defined, the subset is equal the columns on the schema. In other cases, this method
-   * tries its bests to get the columns from other attributes like {@link #getTableConfig()}, which may also not be
-   * defined or may not be complete.
-   */
+  /// Returns a subset of the columns on the table.
+  ///
+  /// When [#getSchema()] is defined, the subset is equal the columns on the schema. In other cases, this method
+  /// tries its bests to get the columns from other attributes like [#getTableConfig()], which may also not be
+  /// defined or may not be complete.
   private Set<String> getAllKnownColumns() {
     assert _tableConfig != null && _schema == null;
     if (_knownColumns == null) {

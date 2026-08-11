@@ -20,9 +20,7 @@ package org.apache.pinot.controller.helix.core.rebalance;
 import java.util.Map;
 import org.apache.pinot.common.restlet.resources.RebalanceResult;
 
-/**
- * Default No-op TableRebalanceObserver.
- */
+/// Default No-op TableRebalanceObserver.
 public class NoOpTableRebalanceObserver implements TableRebalanceObserver {
   @Override
   public void onTrigger(TableRebalanceObserver.Trigger trigger, Map<String, Map<String, String>> initialState,

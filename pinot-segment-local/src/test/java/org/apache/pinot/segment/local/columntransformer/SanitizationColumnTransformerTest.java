@@ -30,9 +30,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for SanitizationColumnTransformer.
- */
+/// Tests for SanitizationColumnTransformer.
 public class SanitizationColumnTransformerTest {
 
   @Test

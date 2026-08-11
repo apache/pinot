@@ -39,10 +39,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The instance replica-group/partition selector is responsible for selecting the instances for each replica-group and
- * partition.
- */
+/// The instance replica-group/partition selector is responsible for selecting the instances for each replica-group and
+/// partition.
 public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceReplicaGroupPartitionSelector.class);
 
@@ -112,12 +110,10 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
     instancePartitions.setInstances(0, 0, instancesToSelect);
   }
 
-  /**
-   * Selects the instances with minimum movement.
-   * For each instance in the existing instances, if it is still alive, keep it in the same position. Then fill the
-   * vacant positions with the remaining candidate instances.
-   * NOTE: This method will modify the candidate instances.
-   */
+  /// Selects the instances with minimum movement.
+  /// For each instance in the existing instances, if it is still alive, keep it in the same position. Then fill the
+  /// vacant positions with the remaining candidate instances.
+  /// NOTE: This method will modify the candidate instances.
   private static List<String> selectInstancesWithMinimumMovement(int numInstancesToSelect,
       LinkedHashSet<String> candidateInstances, List<String> existingInstances) {
     // Initialize the list with empty positions to fill

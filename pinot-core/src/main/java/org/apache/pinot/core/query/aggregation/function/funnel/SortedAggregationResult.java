@@ -22,13 +22,11 @@ import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.util.Arrays;
 
 
-/**
- * Aggregation result data structure leveraged by sorted aggregation strategy.
- *
- * <p>For single-key, uses simple last-ID tracking since data is sorted by the correlation column.
- * For multi-key, data is sorted by the primary (first) correlation column only; secondary keys
- * are tracked via pre-allocated flat arrays within each primary-key group.
- */
+/// Aggregation result data structure leveraged by sorted aggregation strategy.
+///
+/// For single-key, uses simple last-ID tracking since data is sorted by the correlation column.
+/// For multi-key, data is sorted by the primary (first) correlation column only; secondary keys
+/// are tracked via pre-allocated flat arrays within each primary-key group.
 class SortedAggregationResult {
   private static final int INITIAL_CAPACITY = 8;
 
@@ -70,14 +68,12 @@ class SortedAggregationResult {
     _correlatedSteps[step] = true;
   }
 
-  /**
-   * Multi-key add. Data must be sorted by correlationIds[0] (primary key).
-   * Secondary keys are tracked via linear scan over pre-allocated flat arrays.
-   *
-   * <p>The full correlationIds array (including the primary key at index 0) is used as the
-   * lookup key. The primary key is the same for every entry within a group, so including it
-   * is redundant but harmless — it avoids the cost of copying a sub-array.
-   */
+  /// Multi-key add. Data must be sorted by correlationIds\[0\] (primary key).
+  /// Secondary keys are tracked via linear scan over pre-allocated flat arrays.
+  ///
+  /// The full correlationIds array (including the primary key at index 0) is used as the
+  /// lookup key. The primary key is the same for every entry within a group, so including it
+  /// is redundant but harmless — it avoids the cost of copying a sub-array.
   public void addMultiKey(int step, int[] correlationIds) {
     int primaryId = correlationIds[0];
     if (primaryId != _lastPrimaryId) {
@@ -146,9 +142,7 @@ class SortedAggregationResult {
     }
   }
 
-  /**
-   * Extracts the final funnel result. Must be called exactly once.
-   */
+  /// Extracts the final funnel result. Must be called exactly once.
   public LongArrayList extractResult() {
     if (_numKeys > 1) {
       flushMultiKeyGroup();

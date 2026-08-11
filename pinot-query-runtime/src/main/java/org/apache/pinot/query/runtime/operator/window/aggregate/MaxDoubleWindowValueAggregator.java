@@ -22,21 +22,17 @@ import it.unimi.dsi.fastutil.doubles.DoubleArrayFIFOQueue;
 import javax.annotation.Nullable;
 
 
-/**
- * Window value aggregator for MAX window function.
- */
+/// Window value aggregator for MAX window function.
 public class MaxDoubleWindowValueAggregator implements WindowValueAggregator<Object> {
 
   private final boolean _supportRemoval;
   private final DoubleArrayFIFOQueue _deque = new DoubleArrayFIFOQueue();
   private Double _maxValue = null;
 
-  /**
-   * @param supportRemoval whether this window value aggregator should support removal of values. Some cases require
-   *                       only addition of values in which case this value aggregator will have O(1) space complexity;
-   *                       if {@code supportRemoval} is true, this value aggregator will have O(K) space complexity
-   *                       (where K is the max size of the window).
-   */
+  /// @param supportRemoval whether this window value aggregator should support removal of values. Some cases require
+  ///                       only addition of values in which case this value aggregator will have O(1) space complexity;
+  ///                       if `supportRemoval` is true, this value aggregator will have O(K) space complexity
+  ///                       (where K is the max size of the window).
   public MaxDoubleWindowValueAggregator(boolean supportRemoval) {
     _supportRemoval = supportRemoval;
   }

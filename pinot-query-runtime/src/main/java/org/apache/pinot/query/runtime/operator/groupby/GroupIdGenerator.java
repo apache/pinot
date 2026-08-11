@@ -25,15 +25,13 @@ public interface GroupIdGenerator {
   int INVALID_ID = -1;
   int NULL_ID = -2;
 
-  /**
-   * Returns the group id for the given key. When a new key is encountered, it assigns a new group id to it before
-   * reaching the groups limit, or returns {@link #INVALID_ID} when the limit is reached.
-   * For single key column, the input is a single Object. For multi key columns, the input is an Object[] containing
-   * the values for each key column.
-   *
-   * This method is called once per input row, so the implementation should be as fast as possible and reduce memory
-   * allocation.
-   */
+  /// Returns the group id for the given key. When a new key is encountered, it assigns a new group id to it before
+  /// reaching the groups limit, or returns [#INVALID_ID] when the limit is reached.
+  /// For single key column, the input is a single Object. For multi key columns, the input is an Object\[\] containing
+  /// the values for each key column.
+  ///
+  /// This method is called once per input row, so the implementation should be as fast as possible and reduce memory
+  /// allocation.
   int getGroupId(Object key);
 
   int getNumGroups();

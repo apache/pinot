@@ -39,9 +39,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for IVF_ON_DISK filter-aware ANN search behavior.
- */
+/// Tests for IVF_ON_DISK filter-aware ANN search behavior.
 public class IvfOnDiskFilterAwareTest {
   private static final String COLUMN_NAME = "vectorCol";
   private static final long TEST_SEED = 1234L;

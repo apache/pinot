@@ -28,10 +28,8 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 
 
-/**
- * Variation of {@link InstanceReplicaGroupPartitionSelector} that uses the number of partitions from the stream
- * to determine the number of partitions in each replica group.
- */
+/// Variation of [InstanceReplicaGroupPartitionSelector] that uses the number of partitions from the stream
+/// to determine the number of partitions in each replica group.
 public class ImplicitRealtimeTablePartitionSelector extends InstanceReplicaGroupPartitionSelector {
   private final int _numPartitions;
 

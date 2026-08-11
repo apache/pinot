@@ -37,12 +37,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Sets up a demo Pinot cluster with 1 zookeeper, 1 controller, 1 broker and 1 server
- * Sets up a demo Kafka/Kinesis cluster, and creates a topic pullRequestMergedEvents
- * Creates a realtime table pullRequestMergedEvents
- * Starts the {@link PullRequestMergedEventsStream} to publish pullRequestMergedEvents into the topic
- */
+/// Sets up a demo Pinot cluster with 1 zookeeper, 1 controller, 1 broker and 1 server
+/// Sets up a demo Kafka/Kinesis cluster, and creates a topic pullRequestMergedEvents
+/// Creates a realtime table pullRequestMergedEvents
+/// Starts the [PullRequestMergedEventsStream] to publish pullRequestMergedEvents into the topic
 public class GitHubEventsQuickstart extends QuickStartBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(GitHubEventsQuickstart.class);
   private StreamDataServerStartable _serverStarter;

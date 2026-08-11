@@ -47,16 +47,14 @@ import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-/**
- * The IndexCreator for dictionaries.
- *
- * Although this class implements {@link IndexCreator}, it is not intended to be used as a normal IndexCreator.
- * Specifically, neither {@link #add(Object, int)} or {@link #add(Object[], int[])} should be called on this object.
- * In order to make sure these methods are not being called, they throw exceptions in this class.
- *
- * This requirement is a corollary from the fact that the {@link IndexCreator} contract assumes the dictionary id can be
- * calculated before calling {@code add} methods.
- */
+/// The IndexCreator for dictionaries.
+///
+/// Although this class implements [IndexCreator], it is not intended to be used as a normal IndexCreator.
+/// Specifically, neither [#add(Object, int)] or [#add(Object[], int[])] should be called on this object.
+/// In order to make sure these methods are not being called, they throw exceptions in this class.
+///
+/// This requirement is a corollary from the fact that the [IndexCreator] contract assumes the dictionary id can
+/// be calculated before calling `add` methods.
 public class SegmentDictionaryCreator implements IndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDictionaryCreator.class);
   private static final int MAX_CACHED_SERIALIZED_LENGTHS = 4 * 1024 * 1024 / Integer.BYTES;
@@ -294,7 +292,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
     }
   }
 
-  /** Only call after build(). Used by StarTree json index.  */
+  /// Only call after build(). Used by StarTree json index.
   @SuppressWarnings({"unused"})
   public Map getValueToIndexMap() {
     switch (_storedType) {
@@ -315,12 +313,10 @@ public class SegmentDictionaryCreator implements IndexCreator {
     }
   }
 
-  /**
-   * Helper method to write the given sorted byte[][] to an immutable bytes value dictionary.
-   * The dictionary implementation is chosen based on configuration at column level.
-   *
-   * @param bytesValues The actual sorted byte arrays to be written to the store.
-   */
+  /// Helper method to write the given sorted byte\[\]\[\] to an immutable bytes value dictionary.
+  /// The dictionary implementation is chosen based on configuration at column level.
+  ///
+  /// @param bytesValues The actual sorted byte arrays to be written to the store.
   private void writeBytesValueDictionary(byte[][] bytesValues)
       throws IOException {
     if (_useVarLengthDictionary) {
@@ -374,44 +370,32 @@ public class SegmentDictionaryCreator implements IndexCreator {
     }
   }
 
-  /**
-   * Get dictionary index for a primitive int value without boxing.
-   */
+  /// Get dictionary index for a primitive int value without boxing.
   public int indexOfSV(int value) {
     return _intValueToIndexMap.get(value);
   }
 
-  /**
-   * Get dictionary index for a primitive long value without boxing.
-   */
+  /// Get dictionary index for a primitive long value without boxing.
   public int indexOfSV(long value) {
     return _longValueToIndexMap.get(value);
   }
 
-  /**
-   * Get dictionary index for a primitive float value without boxing.
-   */
+  /// Get dictionary index for a primitive float value without boxing.
   public int indexOfSV(float value) {
     return _floatValueToIndexMap.get(value);
   }
 
-  /**
-   * Get dictionary index for a primitive double value without boxing.
-   */
+  /// Get dictionary index for a primitive double value without boxing.
   public int indexOfSV(double value) {
     return _doubleValueToIndexMap.get(value);
   }
 
-  /**
-   * Get dictionary index for a String value.
-   */
+  /// Get dictionary index for a String value.
   public int indexOfSV(String value) {
     return indexOfVariableLengthValue(value);
   }
 
-  /**
-   * Get dictionary index for a byte array value.
-   */
+  /// Get dictionary index for a byte array value.
   public int indexOfSV(byte[] value) {
     return indexOfVariableLengthValue(new ByteArray(value));
   }
@@ -594,9 +578,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
     return indexes;
   }
 
-  /**
-   * Cleans up the no longer needed objects after all the indexing is done to free up some memory.
-   */
+  /// Cleans up the no longer needed objects after all the indexing is done to free up some memory.
   public void postIndexingCleanup() {
     _intValueToIndexMap = null;
     _longValueToIndexMap = null;

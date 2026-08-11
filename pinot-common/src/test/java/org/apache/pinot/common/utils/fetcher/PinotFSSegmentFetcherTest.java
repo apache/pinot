@@ -76,9 +76,7 @@ public class PinotFSSegmentFetcherTest {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 
-  /**
-   * Creates a tar.gz file containing a test segment directory with some test data
-   */
+  /// Creates a tar.gz file containing a test segment directory with some test data
   private File createTestSegmentTar(String segmentName, String fileContent)
       throws Exception {
     // Create a segment directory with a test file

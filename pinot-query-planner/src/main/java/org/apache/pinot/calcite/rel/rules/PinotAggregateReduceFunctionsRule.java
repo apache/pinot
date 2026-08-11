@@ -23,11 +23,9 @@ import org.apache.calcite.rel.rules.AggregateReduceFunctionsRule;
 import org.apache.calcite.sql.SqlKind;
 
 
-/**
- * Pinot customized version of {@link AggregateReduceFunctionsRule} which only reduce on SUM and AVG.
- * We don't want to reduce on STDDEV_POP, STDDEV_SAMP, VAR_POP, VAR_SAMP, COVAR_POP, COVAR_SAMP because Pinot supports
- * them natively, but not REGR_COUNT which can be generated during reduce.
- */
+/// Pinot customized version of [AggregateReduceFunctionsRule] which only reduce on SUM and AVG.
+/// We don't want to reduce on STDDEV_POP, STDDEV_SAMP, VAR_POP, VAR_SAMP, COVAR_POP, COVAR_SAMP because Pinot supports
+/// them natively, but not REGR_COUNT which can be generated during reduce.
 public class PinotAggregateReduceFunctionsRule extends AggregateReduceFunctionsRule {
   public static final PinotAggregateReduceFunctionsRule INSTANCE =
       new PinotAggregateReduceFunctionsRule(Config.DEFAULT);

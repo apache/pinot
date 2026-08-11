@@ -62,19 +62,15 @@ public interface BrokerRequestHandler {
     }
   }
 
-  /**
-   * Run a query and use the time-series engine.
-   */
+  /// Run a query and use the time-series engine.
   default TimeSeriesBlock handleTimeSeriesRequest(String lang, String rawQueryParamString,
       Map<String, String> queryParams, RequestContext requestContext, @Nullable RequesterIdentity requesterIdentity,
       HttpHeaders httpHeaders) throws QueryException {
     throw new UnsupportedOperationException("Handler does not support Time Series requests");
   }
 
-  /**
-   * Handle an explain request for time-series queries.
-   * Returns a BrokerResponse containing the logical explain plan.
-   */
+  /// Handle an explain request for time-series queries.
+  /// Returns a BrokerResponse containing the logical explain plan.
   default BrokerResponse handleExplainTimeSeriesRequest(String lang, String rawQueryParamString,
       Map<String, String> queryParams) {
     throw new UnsupportedOperationException("Handler does not support Time Series explain requests");
@@ -82,30 +78,26 @@ public interface BrokerRequestHandler {
 
   Map<Long, String> getRunningQueries();
 
-  /**
-   * Cancel a query as identified by the queryId. This method is non-blocking so the query may still run for a while
-   * after calling this method. This cancel method can be called multiple times.
-   * @param queryId the unique Id assigned to the query by the broker
-   * @param timeoutMs timeout to wait for servers to respond the cancel requests
-   * @param executor to send cancel requests to servers in parallel
-   * @param connMgr to provide the http connections
-   * @param serverResponses to collect cancel responses from all servers if a map is provided
-   * @return true if there is a running query for the given queryId.
-   */
+  /// Cancel a query as identified by the queryId. This method is non-blocking so the query may still run for a while
+  /// after calling this method. This cancel method can be called multiple times.
+  /// @param queryId the unique Id assigned to the query by the broker
+  /// @param timeoutMs timeout to wait for servers to respond the cancel requests
+  /// @param executor to send cancel requests to servers in parallel
+  /// @param connMgr to provide the http connections
+  /// @param serverResponses to collect cancel responses from all servers if a map is provided
+  /// @return true if there is a running query for the given queryId.
   boolean cancelQuery(long queryId, int timeoutMs, Executor executor, HttpClientConnectionManager connMgr,
       Map<String, Integer> serverResponses)
       throws Exception;
 
-  /**
-   * Cancel a query as identified by the clientQueryId provided externally. This method is non-blocking so the query may
-   * still run for a while after calling this method. This cancel method can be called multiple times.
-   * @param clientQueryId the Id assigned to the query by the client
-   * @param timeoutMs timeout to wait for servers to respond the cancel requests
-   * @param executor to send cancel requests to servers in parallel
-   * @param connMgr to provide the http connections
-   * @param serverResponses to collect cancel responses from all servers if a map is provided
-   * @return true if there is a running query for the given clientQueryId.
-   */
+  /// Cancel a query as identified by the clientQueryId provided externally. This method is non-blocking so the query
+  /// may still run for a while after calling this method. This cancel method can be called multiple times.
+  /// @param clientQueryId the Id assigned to the query by the client
+  /// @param timeoutMs timeout to wait for servers to respond the cancel requests
+  /// @param executor to send cancel requests to servers in parallel
+  /// @param connMgr to provide the http connections
+  /// @param serverResponses to collect cancel responses from all servers if a map is provided
+  /// @return true if there is a running query for the given clientQueryId.
   boolean cancelQueryByClientId(String clientQueryId, int timeoutMs, Executor executor,
       HttpClientConnectionManager connMgr,
       Map<String, Integer> serverResponses)

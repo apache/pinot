@@ -164,6 +164,17 @@ public final class FastJsonPathExtractor {
     }
   }
 
+  /// UTF-8 overload of [#extract(String, SimpleJsonPath[], Object[], boolean, boolean)] with the same output and
+  /// exception contract.
+  public static void extract(byte[] json, SimpleJsonPath[] paths, Object[] out, boolean useBigDecimal,
+      boolean earlyExit) {
+    try (JsonParser parser = FACTORY.createParser(json)) {
+      extract(parser, paths, out, useBigDecimal, earlyExit);
+    } catch (IOException e) {
+      throw new InvalidJsonException(e);
+    }
+  }
+
   private static void extract(JsonParser parser, SimpleJsonPath[] paths, Object[] out, boolean useBigDecimal,
       boolean earlyExit)
       throws IOException {

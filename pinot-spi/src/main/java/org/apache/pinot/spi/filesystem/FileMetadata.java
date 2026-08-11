@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.spi.filesystem;
 
-/**
- * FileMetadata contains the file path and many optional file attributes like mtime, length etc.
- */
+/// FileMetadata contains the file path and many optional file attributes like mtime, length etc.
 public class FileMetadata {
   private final String _filePath;
   private final long _lastModifiedTime;

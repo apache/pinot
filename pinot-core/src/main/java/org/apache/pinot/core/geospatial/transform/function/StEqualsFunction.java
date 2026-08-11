@@ -23,9 +23,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.locationtech.jts.geom.Geometry;
 
 
-/**
- * Function that returns true if the given geometries represent the same geometry.
- */
+/// Function that returns true if the given geometries represent the same geometry.
 public class StEqualsFunction extends BaseBinaryGeoTransformFunction {
   public static final String FUNCTION_NAME = "ST_Equals";
 

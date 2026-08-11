@@ -26,10 +26,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.Utf8Utils;
 
 
-/**
- * SameValueMutableDictionary is used to wrap any MutableDictionary, but store the same value. This is done to
- * allow noRawDataForTextIndex config to work with mutable indexes.
- */
+/// SameValueMutableDictionary is used to wrap any MutableDictionary, but store the same value. This is done to
+/// allow noRawDataForTextIndex config to work with mutable indexes.
 public class SameValueMutableDictionary implements MutableDictionary {
   private final String _actualValue;
   private final String[] _actualValues;

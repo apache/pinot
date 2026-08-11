@@ -43,23 +43,17 @@ public class MinionConstants {
   public static final String SEGMENT_NAME_SEPARATOR = ",";
   public static final String AUTH_TOKEN = "authToken";
 
-  /**
-   * When minion downloads a segment to do work on, we will save that CRC. We will send that to the controller in an
-   * If-Match header when we upload the segment to ensure that the minion-completed segment hasn't been replaced by
-   * hadoop while minion has been working on it.
-   */
+  /// When minion downloads a segment to do work on, we will save that CRC. We will send that to the controller in an
+  /// If-Match header when we upload the segment to ensure that the minion-completed segment hasn't been replaced by
+  /// hadoop while minion has been working on it.
   public static final String ORIGINAL_SEGMENT_CRC_KEY = "crc";
 
-  /**
-   * For retry policy.
-   */
+  /// For retry policy.
   public static final String MAX_NUM_ATTEMPTS_KEY = "maxNumAttempts";
   public static final String INITIAL_RETRY_DELAY_MS_KEY = "initialRetryDelayMs";
   public static final String RETRY_SCALE_FACTOR_KEY = "retryScaleFactor";
 
-  /**
-   * Cluster level configs
-   */
+  /// Cluster level configs
   public static final String TIMEOUT_MS_KEY_SUFFIX = ".timeoutMs";
   public static final String NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX = ".numConcurrentTasksPerInstance";
   public static final String MAX_ATTEMPTS_PER_TASK_KEY_SUFFIX = ".maxAttemptsPerTask";
@@ -72,24 +66,18 @@ public class MinionConstants {
   // Note - Not all tasks may support this config. Currently, MergeTask and its variants support this config
   public static final String MAX_DISK_USAGE_PERCENTAGE_KEY = "minion.maxDiskUsagePercentage";
 
-  /**
-   * Table level configs
-   */
+  /// Table level configs
   public static final String TABLE_MAX_NUM_TASKS_KEY = "tableMaxNumTasks";
   public static final String ENABLE_REPLACE_SEGMENTS_KEY = "enableReplaceSegments";
   public static final int DEFAULT_TABLE_MAX_NUM_TASKS = 1;
 
-  /**
-   * Job configs
-   */
+  /// Job configs
   public static final int DEFAULT_MAX_ATTEMPTS_PER_TASK = 1;
   public static final int DEFAULT_MINION_MAX_NUM_OF_SUBTASKS_LIMIT = Integer.MAX_VALUE;
   // Source of minion task trigger. Possible values are in enum CommonConstants.TaskTriggers
   public static final String TRIGGERED_BY = "triggeredBy";
 
-  /**
-   * Segment download thread pool size to be set at task level.
-   */
+  /// Segment download thread pool size to be set at task level.
   public static final String SEGMENT_DOWNLOAD_PARALLELISM = "segmentDownloadParallelism";
 
   /// Valid doc ids consensus mode enforced by both the task generators (pre-scheduling) and the executors.
@@ -114,16 +102,12 @@ public class MinionConstants {
   // Common config keys for segment merge tasks.
   public static abstract class MergeTask {
 
-    /**
-     * The time window size for the task.
-     * e.g. if set to "1d", then task is scheduled to run for a 1 day window
-     */
+    /// The time window size for the task.
+    /// e.g. if set to "1d", then task is scheduled to run for a 1 day window
     public static final String BUCKET_TIME_PERIOD_KEY = "bucketTimePeriod";
 
-    /**
-     * The time period to wait before picking segments for this task
-     * e.g. if set to "2d", no task will be scheduled for a time window younger than 2 days
-     */
+    /// The time period to wait before picking segments for this task
+    /// e.g. if set to "2d", no task will be scheduled for a time window younger than 2 days
     public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
 
     // Time handling config
@@ -188,9 +172,7 @@ public class MinionConstants {
             FIRSTWITHTIME, LASTWITHTIME);
   }
 
-  /**
-   * Creates segments for the OFFLINE table, using completed segments from the corresponding REALTIME table
-   */
+  /// Creates segments for the OFFLINE table, using completed segments from the corresponding REALTIME table
   public static class RealtimeToOfflineSegmentsTask extends MergeTask {
     public static final String TASK_TYPE = "RealtimeToOfflineSegmentsTask";
 
@@ -209,22 +191,20 @@ public class MinionConstants {
     public static final String TASK_TYPE = "SegmentGenerationAndPushTask";
   }
 
-  /**
-   * Minion task to refresh segments when there are changes to tableConfigs and Schema. This task currently supports the
-   * following functionality:
-   * 1. Adding/Removing/Updating indexes.
-   * 2. Adding new columns (also supports transform configs for new columns).
-   * 3. Converting segment versions.
-   * 4. Compatible datatype changes to columns (Note that the minion task will fail if the data in the column is not
-   *    compatible with target datatype)
-   *
-   * This is an alternative to performing reload of existing segments on Servers. The reload on servers is sub-optimal
-   * for many reasons:
-   * 1. Requires an explicit reload call when index configurations change.
-   * 2. Is very slow. Happens one (or few - configurable) segment at time to avoid query impact.
-   * 3. Compute price is paid on all servers hosting the segment.q
-   * 4. Increases server startup time as more and more segments require reload.
-   */
+  /// Minion task to refresh segments when there are changes to tableConfigs and Schema. This task currently
+  /// supports the following functionality:
+  /// 1. Adding/Removing/Updating indexes.
+  /// 2. Adding new columns (also supports transform configs for new columns).
+  /// 3. Converting segment versions.
+  /// 4. Compatible datatype changes to columns (Note that the minion task will fail if the data in the column is not
+  ///    compatible with target datatype)
+  ///
+  /// This is an alternative to performing reload of existing segments on Servers. The reload on servers is sub-optimal
+  /// for many reasons:
+  /// 1. Requires an explicit reload call when index configurations change.
+  /// 2. Is very slow. Happens one (or few - configurable) segment at time to avoid query impact.
+  /// 3. Compute price is paid on all servers hosting the segment.q
+  /// 4. Increases server startup time as more and more segments require reload.
   public static class RefreshSegmentTask {
     public static final String TASK_TYPE = "RefreshSegmentTask";
 
@@ -234,45 +214,29 @@ public class MinionConstants {
 
   public static class UpsertCompactionTask {
     public static final String TASK_TYPE = "UpsertCompactionTask";
-    /**
-     * The time period to wait before picking segments for this task
-     * e.g. if set to "2d", no task will be scheduled for a time window younger than 2 days
-     */
+    /// The time period to wait before picking segments for this task
+    /// e.g. if set to "2d", no task will be scheduled for a time window younger than 2 days
     public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
-    /**
-     * The maximum percent of old records allowed for a completed segment.
-     * e.g. if the percent surpasses 30, then the segment may be compacted
-     */
+    /// The maximum percent of old records allowed for a completed segment.
+    /// e.g. if the percent surpasses 30, then the segment may be compacted
     public static final String INVALID_RECORDS_THRESHOLD_PERCENT = "invalidRecordsThresholdPercent";
-    /**
-     * The maximum count of old records for a completed segment
-     * e.g. if the count surpasses 100k, then the segment may be compacted
-     */
+    /// The maximum count of old records for a completed segment
+    /// e.g. if the count surpasses 100k, then the segment may be compacted
     public static final String INVALID_RECORDS_THRESHOLD_COUNT = "invalidRecordsThresholdCount";
 
-    /**
-     * Valid doc ids type
-     */
+    /// Valid doc ids type
     public static final String VALID_DOC_IDS_TYPE = "validDocIdsType";
 
-    /**
-     * Value for the key VALID_DOC_IDS_TYPE
-     */
+    /// Value for the key VALID_DOC_IDS_TYPE
     public static final String SNAPSHOT = "snapshot";
 
-    /**
-     * key representing if upsert compaction task executor should ignore crc mismatch or not during task execution
-     */
+    /// key representing if upsert compaction task executor should ignore crc mismatch or not during task execution
     public static final String IGNORE_CRC_MISMATCH_KEY = "ignoreCrcMismatch";
 
-    /**
-     * default value for the key IGNORE_CRC_MISMATCH_KEY: false
-     */
+    /// default value for the key IGNORE_CRC_MISMATCH_KEY: false
     public static final boolean DEFAULT_IGNORE_CRC_MISMATCH = false;
 
-    /**
-     * number of segments to query in one batch to fetch valid doc id metadata, by default 500
-     */
+    /// number of segments to query in one batch to fetch valid doc id metadata, by default 500
     public static final String NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = "numSegmentsBatchPerServerRequest";
 
     /// Valid doc ids consensus mode used by both the task generators (pre-scheduling) and the executors. UNSAFE =
@@ -290,70 +254,46 @@ public class MinionConstants {
   public static class UpsertCompactMergeTask {
     public static final String TASK_TYPE = "UpsertCompactMergeTask";
 
-    /**
-     * The time period to wait before picking segments for this task
-     * e.g. if set to "2d", no task will be scheduled for a time window younger than 2 days
-     */
+    /// The time period to wait before picking segments for this task
+    /// e.g. if set to "2d", no task will be scheduled for a time window younger than 2 days
     public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
 
-    /**
-     * number of segments to query in one batch to fetch valid doc id metadata, by default 500
-     */
+    /// number of segments to query in one batch to fetch valid doc id metadata, by default 500
     public static final String NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = "numSegmentsBatchPerServerRequest";
 
-    /**
-     * prefix for the new segment name that is created,
-     * {@link org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator} will add __ as delimiter
-     * so not adding _ as a suffix here.
-     */
+    /// prefix for the new segment name that is created,
+    /// [org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator] will add \_\_ as delimiter
+    /// so not adding \_ as a suffix here.
     public static final String MERGED_SEGMENT_NAME_PREFIX = "compacted";
 
-    /**
-     * maximum number of records to process in a single task, sum of all docs in to-be-merged segments
-     */
+    /// maximum number of records to process in a single task, sum of all docs in to-be-merged segments
     public static final String MAX_NUM_RECORDS_PER_TASK_KEY = "maxNumRecordsPerTask";
 
-    /**
-     * default maximum number of records to process in a single task, same as the value in {@link MergeRollupTask}
-     */
+    /// default maximum number of records to process in a single task, same as the value in [MergeRollupTask]
     public static final long DEFAULT_MAX_NUM_RECORDS_PER_TASK = 50_000_000;
 
-    /**
-     * maximum number of records in the output segment
-     */
+    /// maximum number of records in the output segment
     public static final String MAX_NUM_RECORDS_PER_SEGMENT_KEY = "maxNumRecordsPerSegment";
 
-    /**
-     * default maximum number of records in output segment, same as the value in
-     * {@link org.apache.pinot.core.segment.processing.framework.SegmentConfig}
-     */
+    /// default maximum number of records in output segment, same as the value in
+    /// [org.apache.pinot.core.segment.processing.framework.SegmentConfig]
     public static final long DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = 5_000_000;
 
-    /**
-     * maximum number of segments to process in a single task
-     */
+    /// maximum number of segments to process in a single task
     public static final String MAX_NUM_SEGMENTS_PER_TASK_KEY = "maxNumSegmentsPerTask";
 
-    /**
-     * maximum size of output segments to produce
-     */
+    /// maximum size of output segments to produce
     public static final String OUTPUT_SEGMENT_MAX_SIZE_KEY = "outputSegmentMaxSize";
 
-    /**
-     * default maximum number of segments to process in a single task
-     */
+    /// default maximum number of segments to process in a single task
     public static final long DEFAULT_MAX_NUM_SEGMENTS_PER_TASK = 10;
 
-    /**
-     * minimum number of segments to process in a single task
-     */
+    /// minimum number of segments to process in a single task
     public static final String MIN_NUM_SEGMENTS_PER_TASK_KEY = "minNumSegmentsPerTask";
 
-    /**
-     * default minimum number of segments to process in a single task.
-     * Keeping this default to 2 means that we won't run this task if there is only one segment which can be merged.
-     * If this is set to 1, this task can act as UpsertCompact task as well.
-     */
+    /// default minimum number of segments to process in a single task.
+    /// Keeping this default to 2 means that we won't run this task if there is only one segment which can be merged.
+    /// If this is set to 1, this task can act as UpsertCompact task as well.
     public static final long DEFAULT_MIN_NUM_SEGMENTS_PER_TASK = 2;
 
     public static final String MERGED_SEGMENTS_ZK_SUFFIX = ".mergedSegments";

@@ -37,15 +37,13 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
-/**
- * Base class to be used by the various MailboxReceiveOperators such as the sorted and non-sorted versions. This
- * class contains the common logic needed for MailboxReceive
- *
- * BaseMailboxReceiveOperator receives mailbox from mailboxService from sendingStageInstances.
- * We use sendingStageInstance to deduce mailboxId and fetch the content from mailboxService.
- * When exchangeType is Singleton, we find the mapping mailbox for the mailboxService. If not found, use empty list.
- * When exchangeType is non-Singleton, we pull from each instance in round-robin way to get matched mailbox content.
- */
+/// Base class to be used by the various MailboxReceiveOperators such as the sorted and non-sorted versions. This
+/// class contains the common logic needed for MailboxReceive
+///
+/// BaseMailboxReceiveOperator receives mailbox from mailboxService from sendingStageInstances.
+/// We use sendingStageInstance to deduce mailboxId and fetch the content from mailboxService.
+/// When exchangeType is Singleton, we find the mapping mailbox for the mailboxService. If not found, use empty list.
+/// When exchangeType is non-Singleton, we pull from each instance in round-robin way to get matched mailbox content.
 public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   protected final MailboxService _mailboxService;
   protected final RelDistribution.Type _distributionType;
@@ -218,54 +216,36 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
         return true;
       }
     },
-    /**
-     * How many send mailboxes are being read by this receive operator.
-     * <p>
-     * Clock time will be proportional to this number and the parallelism of the stage.
-     */
+    /// How many send mailboxes are being read by this receive operator.
+    ///
+    /// Clock time will be proportional to this number and the parallelism of the stage.
     FAN_IN(StatMap.Type.INT) {
       @Override
       public int merge(int value1, int value2) {
         return Math.max(value1, value2);
       }
     },
-    /**
-     * How many messages have been received in heap format by this mailbox.
-     * <p>
-     * The lower the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the more efficient the exchange is.
-     */
+    /// How many messages have been received in heap format by this mailbox.
+    ///
+    /// The lower the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the more efficient the exchange is.
     IN_MEMORY_MESSAGES(StatMap.Type.INT),
-    /**
-     * How many messages have been received in raw format and therefore deserialized by this mailbox.
-     * <p>
-     * The higher the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the less efficient the exchange is.
-     */
+    /// How many messages have been received in raw format and therefore deserialized by this mailbox.
+    ///
+    /// The higher the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the less efficient the exchange is.
     RAW_MESSAGES(StatMap.Type.INT),
-    /**
-     * How many bytes have been deserialized by this mailbox.
-     * <p>
-     * A high number here indicates that the mailbox is receiving a lot of data from other servers.
-     */
+    /// How many bytes have been deserialized by this mailbox.
+    ///
+    /// A high number here indicates that the mailbox is receiving a lot of data from other servers.
     DESERIALIZED_BYTES(StatMap.Type.LONG),
-    /**
-     * How long (in CPU time) it took to deserialize the raw messages received by this mailbox.
-     */
+    /// How long (in CPU time) it took to deserialize the raw messages received by this mailbox.
     DESERIALIZATION_TIME_MS(StatMap.Type.LONG),
-    /**
-     * How long (in CPU time) it took to offer the messages to downstream operator.
-     */
+    /// How long (in CPU time) it took to offer the messages to downstream operator.
     DOWNSTREAM_WAIT_MS(StatMap.Type.LONG),
-    /**
-     * How long (in CPU time) it took to wait for the messages to be offered to downstream operator.
-     */
+    /// How long (in CPU time) it took to wait for the messages to be offered to downstream operator.
     UPSTREAM_WAIT_MS(StatMap.Type.LONG),
-    /**
-     * Allocated memory in bytes for this operator or its children in the same stage.
-     */
+    /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
-    /**
-     * Time spent on GC while this operator or its children in the same stage were running.
-     */
+    /// Time spent on GC while this operator or its children in the same stage were running.
     GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;

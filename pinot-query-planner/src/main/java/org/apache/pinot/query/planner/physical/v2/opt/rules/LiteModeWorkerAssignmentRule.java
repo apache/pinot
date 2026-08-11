@@ -38,11 +38,9 @@ import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalSort;
 import org.apache.pinot.query.planner.physical.v2.opt.PRelNodeTransformer;
 
 
-/**
- * Lite mode uses a single worker for all stages except the leaf stage. Since leaf stage assignment is done before this
- * rule is called, we simply need to sample a random worker from the leaf stage, and assign it to all the non-leaf
- * plan nodes.
- */
+/// Lite mode uses a single worker for all stages except the leaf stage. Since leaf stage assignment is done before this
+/// rule is called, we simply need to sample a random worker from the leaf stage, and assign it to all the non-leaf
+/// plan nodes.
 public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
   private final PhysicalPlannerContext _context;
   private final boolean _runInBroker;
@@ -89,9 +87,7 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
     return currentNode;
   }
 
-  /**
-   * Infers Exchange to be added on top of the leaf stage.
-   */
+  /// Infers Exchange to be added on top of the leaf stage.
   private PhysicalExchange computeLeafExchange(PRelNode leafStageRoot, List<String> liteModeWorkers) {
     RelCollation collation = leafStageRoot.unwrap().getTraitSet().getCollation();
     PinotDataDistribution pdd;
@@ -109,10 +105,8 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
         _context.getDefaultHashFunction());
   }
 
-  /**
-   * Infers distribution for the current node based on its inputs and node-type. Can also add collation to the PDD
-   * automatically (e.g. if the current node is a Sort or the input is sorted and this node does not drop collation).
-   */
+  /// Infers distribution for the current node based on its inputs and node-type. Can also add collation to the PDD
+  /// automatically (e.g. if the current node is a Sort or the input is sorted and this node does not drop collation).
   private static PinotDataDistribution inferPDD(PRelNode currentNode, List<PRelNode> newInputs,
       List<String> liteModeWorkers) {
     if (currentNode instanceof Sort) {

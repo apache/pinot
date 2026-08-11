@@ -30,10 +30,8 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 
-/**
- * a task generator running history which keeps the most recent several success run timestamp and the most recent
- * several error run messages.
- */
+/// a task generator running history which keeps the most recent several success run timestamp and the most recent
+/// several error run messages.
 @JsonPropertyOrder({"tableNameWithType", "taskType", "mostRecentSuccessRunTS", "mostRecentErrorRunMessages"})
 public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
   @VisibleForTesting
@@ -52,9 +50,7 @@ public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
     _mostRecentSuccessRunTS = new ArrayList<>();
   }
 
-  /**
-   * Returns the table name with type
-   */
+  /// Returns the table name with type
   public String getTableNameWithType() {
     return _tableNameWithType;
   }
@@ -64,9 +60,7 @@ public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
     return _taskType;
   }
 
-  /**
-   * Gets the timestamp to error message map of the most recent several error runs
-   */
+  /// Gets the timestamp to error message map of the most recent several error runs
   public TreeMap<String, String> getMostRecentErrorRunMessages() {
     TreeMap<String, String> result = new TreeMap<>();
     _mostRecentErrorRunMessages.forEach((timestamp, error) -> result.put(
@@ -75,11 +69,9 @@ public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
     return result;
   }
 
-  /**
-   * Adds an error run message
-   * @param ts A timestamp
-   * @param message An error message.
-   */
+  /// Adds an error run message
+  /// @param ts A timestamp
+  /// @param message An error message.
   public void addErrorRunMessage(long ts, String message) {
     _mostRecentErrorRunMessages.put(ts, message);
     if (_mostRecentErrorRunMessages.size() > MAX_NUM_OF_HISTORY_TO_KEEP) {
@@ -87,9 +79,7 @@ public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
     }
   }
 
-  /**
-   * Gets the timestamp of the most recent several success runs
-   */
+  /// Gets the timestamp of the most recent several success runs
   public List<String> getMostRecentSuccessRunTS() {
     return _mostRecentSuccessRunTS.stream().map(
             timestamp -> OffsetDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneOffset.UTC)
@@ -97,10 +87,8 @@ public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
         .collect(Collectors.toList());
   }
 
-  /**
-   * Adds a success task generating run timestamp
-   * @param ts A timestamp
-   */
+  /// Adds a success task generating run timestamp
+  /// @param ts A timestamp
   public void addSuccessRunTs(long ts) {
     _mostRecentSuccessRunTS.add(ts);
     if (_mostRecentSuccessRunTS.size() > MAX_NUM_OF_HISTORY_TO_KEEP) {
@@ -110,12 +98,10 @@ public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
     }
   }
 
-  /**
-   * Creates a new empty {@link TaskGeneratorMostRecentRunInfo}
-   * @param tableNameWithType the table name with type
-   * @param taskType the task type.
-   * @return a new empty {@link TaskGeneratorMostRecentRunInfo}
-   */
+  /// Creates a new empty [TaskGeneratorMostRecentRunInfo]
+  /// @param tableNameWithType the table name with type
+  /// @param taskType the task type.
+  /// @return a new empty [TaskGeneratorMostRecentRunInfo]
   public static TaskGeneratorMostRecentRunInfo newInstance(String tableNameWithType, String taskType) {
     return new TaskGeneratorMostRecentRunInfo(tableNameWithType, taskType);
   }

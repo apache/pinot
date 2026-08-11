@@ -63,10 +63,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>SingleConnectionBrokerRequestHandler</code> class is a thread-safe broker request handler using a single
- * connection per server to route the queries.
- */
+/// The `SingleConnectionBrokerRequestHandler` class is a thread-safe broker request handler using a single
+/// connection per server to route the queries.
 @ThreadSafe
 public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(SingleConnectionBrokerRequestHandler.class);
@@ -131,10 +129,8 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
         rawTableName);
   }
 
-  /**
-   * Executes scatter-gather: sends the query to servers and collects per-server DataTables.
-   * Subclasses may override to replace or augment the scatter step.
-   */
+  /// Executes scatter-gather: sends the query to servers and collects per-server DataTables.
+  /// Subclasses may override to replace or augment the scatter step.
   protected ScatterResult doScatter(long requestId, String rawTableName, TableRouteInfo route, long timeoutMs,
       ServerStats serverStats)
       throws Exception {
@@ -166,11 +162,9 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     return new ScatterResult(dataTableMap, serversNotResponded, stats, timedOut, asyncQueryResponse.getException());
   }
 
-  /**
-   * Executes the reduce step on the scatter result and populates the response with server stats.
-   * Subclasses may override to perform custom reduce logic, or construct a {@link ScatterResult}
-   * with a substituted data table map using {@link ScatterResultStats} to preserve server stats.
-   */
+  /// Executes the reduce step on the scatter result and populates the response with server stats.
+  /// Subclasses may override to perform custom reduce logic, or construct a [ScatterResult]
+  /// with a substituted data table map using [ScatterResultStats] to preserve server stats.
   protected BrokerResponseNative doReduce(BrokerRequest originalBrokerRequest, BrokerRequest serverBrokerRequest,
       ScatterResult scatterResult, long scatterGatherStartTimeNs, long timeoutMs, String rawTableName)
       throws Exception {
@@ -346,11 +340,9 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     return brokerResponse;
   }
 
-  /**
-   * Snapshot of server-side scatter statistics. Passed to {@link ScatterResult} so that server
-   * counts are always derived from the live scatter, not from a data table map that may have been
-   * augmented by a subclass.
-   */
+  /// Snapshot of server-side scatter statistics. Passed to [ScatterResult] so that server
+  /// counts are always derived from the live scatter, not from a data table map that may have been
+  /// augmented by a subclass.
   public static final class ScatterResultStats {
     private final int _numServersQueried;
     private final int _numServersResponded;
@@ -375,9 +367,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     }
   }
 
-  /**
-   * Carries the scatter-gather result before the reduce step.
-   */
+  /// Carries the scatter-gather result before the reduce step.
   public static final class ScatterResult {
     private final Map<ServerRoutingInstance, DataTable> _dataTableMap;
     private final List<ServerRoutingInstance> _serversNotResponded;
@@ -428,9 +418,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     }
   }
 
-  /**
-   * Check if a server that was previously detected as unhealthy is now healthy.
-   */
+  /// Check if a server that was previously detected as unhealthy is now healthy.
   public FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
     LOGGER.info("Retrying unhealthy server: {}", instanceId);
     ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);

@@ -26,16 +26,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Bounded accounting executor service that puts an upper bound on the
- * number of concurrent jobs that can be executed using this service. This service
- * allows us to divide the resources (threads) of an existing executor service between
- * different clients and limit the concurrent executions each client can run.
- *
- * This class also supports a resource accounting interface to accurately track resources
- * utilization based on submission time and end time of a task. This does not require
- * any changes to client code which continue to use ExecutorService interface.
- */
+/// Bounded accounting executor service that puts an upper bound on the
+/// number of concurrent jobs that can be executed using this service. This service
+/// allows us to divide the resources (threads) of an existing executor service between
+/// different clients and limit the concurrent executions each client can run.
+///
+/// This class also supports a resource accounting interface to accurately track resources
+/// utilization based on submission time and end time of a task. This does not require
+/// any changes to client code which continue to use ExecutorService interface.
 public class BoundedAccountingExecutor extends QueryExecutorService {
   private static final Logger LOGGER = LoggerFactory.getLogger(BoundedAccountingExecutor.class);
 

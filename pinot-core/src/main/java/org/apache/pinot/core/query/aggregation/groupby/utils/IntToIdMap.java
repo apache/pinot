@@ -22,9 +22,7 @@ import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 
 
-/**
- * Implementation of {@link ValueToIdMap} for int.
- */
+/// Implementation of [ValueToIdMap] for int.
 public class IntToIdMap implements ValueToIdMap {
   private final Int2IntOpenHashMap _valueToIdMap;
   private final IntArrayList _idToValueMap;

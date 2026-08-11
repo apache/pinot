@@ -31,29 +31,50 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.readers.bloom.OnHeapGuavaBloomFilterReader;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.BloomFilterConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
 public class BloomFilterSegmentPrunerTest {
   private static final BloomFilterSegmentPruner PRUNER = new BloomFilterSegmentPruner();
+  private static final String UUID_COLUMN = "uuidColumn";
+  private static final String UUID_0 = "550e8400-e29b-41d4-a716-446655440000";
+  private static final String ABSENT_UUID = "550e8400-e29b-41d4-a716-446655440001";
+  private static final String UUID_2 = "550e8400-e29b-41d4-a716-446655440002";
+  private static final String UUID_3 = "550e8400-e29b-41d4-a716-446655440003";
 
   @BeforeClass
   public void setUp() {
@@ -93,6 +114,104 @@ public class BloomFilterSegmentPrunerTest {
     assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21.0 OR column = 30.0"));
     // 30 out the bloom filter with AND
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21.0 AND column = 30.0"));
+  }
+
+  @Test(dataProvider = "uuidBloomFilterCreationModes")
+  public void testUuidBloomFilterPruningEndToEnd(boolean noDictionary, boolean multiValue, boolean createOnLoad)
+      throws Exception {
+    File indexDir = Files.createTempDirectory("uuidBloomFilterSegment").toFile();
+    ImmutableSegment segment = null;
+    try {
+      TableConfig tableConfig = createTableConfig(noDictionary, !createOnLoad);
+      Schema schema = createSchema(multiValue);
+
+      List<GenericRow> rows = new ArrayList<>();
+      rows.add(row(UUID_0, multiValue));
+      rows.add(row(UUID_2, multiValue));
+
+      String segmentName = (noDictionary ? "raw" : "dictionary") + (multiValue ? "Mv" : "Sv") + "UuidSegment";
+      SegmentGeneratorConfig generatorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+      generatorConfig.setSegmentName(segmentName);
+      generatorConfig.setOutDir(indexDir.getAbsolutePath());
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(generatorConfig, new GenericRowRecordReader(rows));
+      driver.build();
+
+      File segmentDir = new File(indexDir, segmentName);
+      if (createOnLoad) {
+        segment = ImmutableSegmentLoader.load(segmentDir,
+            new IndexLoadingConfig(createTableConfig(noDictionary, true), schema));
+      } else {
+        segment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
+      }
+      assertEquals(segment.getSegmentMetadata().getColumnMetadataFor(UUID_COLUMN).hasDictionary(), !noDictionary);
+      assertEquals(segment.getSegmentMetadata().getColumnMetadataFor(UUID_COLUMN).isSingleValue(), !multiValue);
+      assertEquals(segment.getDataSource(UUID_COLUMN).getDataSourceMetadata().getDataType(), DataType.UUID);
+      assertNotNull(segment.getDataSource(UUID_COLUMN).getBloomFilter());
+
+      assertFalse(runPruner(segment,
+          "SELECT COUNT(*) FROM testTable WHERE uuidColumn = '" + UUID_0 + "'"));
+      assertFalse(runPruner(segment,
+          "SELECT COUNT(*) FROM testTable WHERE uuidColumn = '550E8400-E29B-41D4-A716-446655440000'"));
+      assertFalse(runPruner(segment,
+          "SELECT COUNT(*) FROM testTable WHERE uuidColumn = '550e8400e29b41d4a716446655440000'"));
+      if (multiValue) {
+        assertFalse(runPruner(segment,
+            "SELECT COUNT(*) FROM testTable WHERE uuidColumn = '" + UUID_3 + "'"));
+      }
+      assertFalse(runPruner(segment,
+          "SELECT COUNT(*) FROM testTable WHERE uuidColumn IN ('" + ABSENT_UUID + "', '" + UUID_2 + "')"));
+      assertTrue(runPruner(segment,
+          "SELECT COUNT(*) FROM testTable WHERE uuidColumn = '" + ABSENT_UUID + "'"));
+    } finally {
+      if (segment != null) {
+        segment.destroy();
+      }
+      FileUtils.deleteDirectory(indexDir);
+    }
+  }
+
+  @DataProvider(name = "uuidBloomFilterCreationModes")
+  public Object[][] uuidBloomFilterCreationModes() {
+    return new Object[][]{
+        {false, false, false},
+        {true, false, false},
+        {false, true, false},
+        {true, true, false},
+        {false, false, true},
+        {true, false, true},
+        {false, true, true},
+        {true, true, true}
+    };
+  }
+
+  private static TableConfig createTableConfig(boolean noDictionary, boolean enableBloomFilter) {
+    TableConfigBuilder builder = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable");
+    if (noDictionary) {
+      builder.setNoDictionaryColumns(List.of(UUID_COLUMN));
+    }
+    TableConfig tableConfig = builder.build();
+    if (enableBloomFilter) {
+      tableConfig.getIndexingConfig().setBloomFilterConfigs(
+          Map.of(UUID_COLUMN, new BloomFilterConfig(1e-9, 0, false)));
+    }
+    return tableConfig;
+  }
+
+  private static Schema createSchema(boolean multiValue) {
+    Schema.SchemaBuilder builder = new Schema.SchemaBuilder();
+    if (multiValue) {
+      builder.addMultiValueDimension(UUID_COLUMN, DataType.UUID);
+    } else {
+      builder.addSingleValueDimension(UUID_COLUMN, DataType.UUID);
+    }
+    return builder.build();
+  }
+
+  private static GenericRow row(String uuid, boolean multiValue) {
+    GenericRow row = new GenericRow();
+    row.putValue(UUID_COLUMN, multiValue ? new String[]{uuid, UUID_3} : uuid);
+    return row;
   }
 
   @Test(expectedExceptions = RuntimeException.class)

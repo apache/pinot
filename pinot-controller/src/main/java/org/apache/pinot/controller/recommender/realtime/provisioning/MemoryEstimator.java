@@ -66,10 +66,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Given a sample segment, this class can estimate how much memory would be used per host, for various combinations
- * of numHostsToProvision and numHoursToConsume
- */
+/// Given a sample segment, this class can estimate how much memory would be used per host, for various combinations
+/// of numHostsToProvision and numHoursToConsume
 public class MemoryEstimator {
 
   public static final String NOT_APPLICABLE = "NA";
@@ -99,9 +97,7 @@ public class MemoryEstimator {
   private String[][] _consumingMemoryPerHost;
   private String[][] _numSegmentsQueriedPerHost;
 
-  /**
-   * Constructor used for processing the given completed segment
-   */
+  /// Constructor used for processing the given completed segment
   public MemoryEstimator(TableConfig tableConfig, Schema schema, File sampleCompletedSegment,
       double ingestionRatePerPartition, long maxUsableHostMemory, int tableRetentionHours, File workingDir) {
     _maxUsableHostMemory = maxUsableHostMemory;
@@ -124,9 +120,7 @@ public class MemoryEstimator {
     _workingDir = workingDir;
   }
 
-  /**
-   * Constructor used for processing the given data characteristics (instead of completed segment)
-   */
+  /// Constructor used for processing the given data characteristics (instead of completed segment)
   public MemoryEstimator(TableConfig tableConfig, Schema schema, SchemaWithMetaData schemaWithMetadata,
       int numberOfRows, double ingestionRatePerPartition, long maxUsableHostMemory, int tableRetentionHours,
       File workingDir) {
@@ -135,14 +129,14 @@ public class MemoryEstimator {
         ingestionRatePerPartition, maxUsableHostMemory, tableRetentionHours, workingDir);
   }
 
-  /**
-   * Initialize the stats file using the sample segment provided.
-   * <br>This involves indexing each row of the sample segment using MutableSegmentImpl. This is equivalent to
-   * consuming the rows of a segment.
-   * Although they will be in a different order than consumed by the host, the stats should be equivalent.
-   * <br>Invoking a destroy on the MutableSegmentImpl at the end will dump the collected stats into the stats.ser
-   * file provided in the statsHistory.
-   */
+  /// Initialize the stats file using the sample segment provided.
+  ///
+  /// This involves indexing each row of the sample segment using MutableSegmentImpl. This is equivalent to
+  /// consuming the rows of a segment.
+  /// Although they will be in a different order than consumed by the host, the stats should be equivalent.
+  ///
+  /// Invoking a destroy on the MutableSegmentImpl at the end will dump the collected stats into the stats.ser
+  /// file provided in the statsHistory.
   public File initializeStatsHistory() {
 
     File statsFile = new File(_workingDir, STATS_FILE_NAME);
@@ -187,47 +181,56 @@ public class MemoryEstimator {
     return statsFile;
   }
 
-  /**
-   * Given a sample segment, the time for which it consumed, numReplicas and numPartitions, estimate how much memory
-   * would be required per host for this table
-   * <br>
-   * <br>Algorithm:
-   * <br>Given numReplicas and numPartitions, we can find out total consuming partitions per host, for various numHosts
-   * <br><b>totalConsumingPartitionsPerHost = (numReplicas * numPartitions)/numHosts</b>
-   * <br>
-   * <br>Given a sample realtime completed segment (with size s), and how long it consumed for (t),
-   * <br>we can estimate how much memory the table would require for various combinations of num hosts and num hours
-   * <br>
-   * <br>For estimating the memory occupied by completed segments-
-   * <br>For each numHoursToConsume we compute:
-   * <br>If a segment with size s takes time t to complete, then consuming for time numHoursToConsume would create
-   * segment with size <b>estimatedSize = (numHoursToConsume/t)*s</b>
-   * <br>If retention for completed segments in memory is rt hours, then the segment would be in memory for <b>
-   *   (rt-numHoursToConsume) hours
-   * </b>
-   * <br>A segment would complete every numHoursToConsume hours, so we would have at a time
-   * <b>numCompletedSegmentsAtATime = (rt-numHoursToConsume)/numHoursToConsume</b> to hold in memory
-   * <br>As a result, <b>totalCompletedSegmentsMemory per ConsumingPartition = estimatedSize *
-   * numCompletedSegmentsAtATime</b>
-   * <br>
-   * <br>For estimating the memory occupied by consuming segments-
-   * <br>Using the sample segment, we initialize the stats history
-   * <br>For each numHoursToConsume we compute:
-   * <br>If totalDocs in sample segment is n when it consumed for time t, then consuming for time numHoursToConsume
-   * would create <b>totalDocs = (numHoursToConsume/t)*n</b>
-   * <br>We create a {@link MutableSegmentImpl} using the totalDocs, and then fetch the memory used by the memory
-   * manager, to get totalConsumingSegmentMemory per ConsumingPartition
-   * <br>
-   * <br><b>totalMemory = (totalCompletedMemory per ConsumingPartition + totalConsumingMemory per ConsumingPartition)
-   * * totalConsumingPartitionsPerHost</b>
-   * <br>
-   * @param statsFile stats file from a sample segment for the same table
-   * @param numHosts list of number of hosts that are to be provisioned
-   * @param numHours list of number of hours to be consumed
-   * @param totalConsumingPartitions total consuming partitions we are provisioning for
-   * @param retentionHours number of most recent hours to be retained in memory for queries.
-   * @throws IOException
-   */
+  /// Given a sample segment, the time for which it consumed, numReplicas and numPartitions, estimate how much memory
+  /// would be required per host for this table
+  ///
+  /// Algorithm:
+  ///
+  /// Given numReplicas and numPartitions, we can find out total consuming partitions per host, for various numHosts
+  ///
+  /// **totalConsumingPartitionsPerHost = (numReplicas \* numPartitions)/numHosts**
+  ///
+  /// Given a sample realtime completed segment (with size s), and how long it consumed for (t),
+  ///
+  /// we can estimate how much memory the table would require for various combinations of num hosts and num hours
+  ///
+  /// For estimating the memory occupied by completed segments-
+  ///
+  /// For each numHoursToConsume we compute:
+  ///
+  /// If a segment with size s takes time t to complete, then consuming for time numHoursToConsume would create
+  /// segment with size **estimatedSize = (numHoursToConsume/t)\*s**
+  ///
+  /// If retention for completed segments in memory is rt hours, then the segment would be in memory for
+  /// **(rt-numHoursToConsume) hours**
+  ///
+  /// A segment would complete every numHoursToConsume hours, so we would have at a time
+  /// **numCompletedSegmentsAtATime = (rt-numHoursToConsume)/numHoursToConsume** to hold in memory
+  ///
+  /// As a result, **totalCompletedSegmentsMemory per ConsumingPartition = estimatedSize \*
+  /// numCompletedSegmentsAtATime**
+  ///
+  /// For estimating the memory occupied by consuming segments-
+  ///
+  /// Using the sample segment, we initialize the stats history
+  ///
+  /// For each numHoursToConsume we compute:
+  ///
+  /// If totalDocs in sample segment is n when it consumed for time t, then consuming for time numHoursToConsume
+  /// would create **totalDocs = (numHoursToConsume/t)\*n**
+  ///
+  /// We create a [MutableSegmentImpl] using the totalDocs, and then fetch the memory used by the memory
+  /// manager, to get totalConsumingSegmentMemory per ConsumingPartition
+  ///
+  /// **totalMemory = (totalCompletedMemory per ConsumingPartition + totalConsumingMemory per ConsumingPartition) \*
+  /// totalConsumingPartitionsPerHost**
+  ///
+  /// @param statsFile stats file from a sample segment for the same table
+  /// @param numHosts list of number of hosts that are to be provisioned
+  /// @param numHours list of number of hours to be consumed
+  /// @param totalConsumingPartitions total consuming partitions we are provisioning for
+  /// @param retentionHours number of most recent hours to be retained in memory for queries.
+  /// @throws IOException
   public void estimateMemoryUsed(File statsFile, int[] numHosts, int[] numHours, final int totalConsumingPartitions,
       final int retentionHours)
       throws IOException {
@@ -338,10 +341,8 @@ public class MemoryEstimator {
     return memoryForConsumingSegmentPerPartition;
   }
 
-  /**
-   * Gets the average num multivalues across all multi value columns in the data
-   * @return
-   */
+  /// Gets the average num multivalues across all multi value columns in the data
+  /// @return
   private int getAvgMultiValues() {
     int avgMultiValues = 0;
     Set<String> multiValueColumns =
@@ -372,12 +373,10 @@ public class MemoryEstimator {
     return avgMultiValues;
   }
 
-  /**
-   * Computes the memory by the inverted indexes in the consuming segment
-   * This is just an estimation. We use MutableRoaringBitmap for inverted indexes, which use heap memory.
-   * @param totalMemoryForConsumingSegment
-   * @return
-   */
+  /// Computes the memory by the inverted indexes in the consuming segment
+  /// This is just an estimation. We use MutableRoaringBitmap for inverted indexes, which use heap memory.
+  /// @param totalMemoryForConsumingSegment
+  /// @return
   private long getMemoryForInvertedIndex(long totalMemoryForConsumingSegment, int invertedColumnsCount) {
     // TODO: better way to estimate inverted indexes memory utilization
     long totalInvertedIndexSizeBytes = 0;
@@ -395,11 +394,9 @@ public class MemoryEstimator {
         .count();
   }
 
-  /**
-   * Creates a sample segment ZK metadata for the given segment metadata
-   * @param segmentMetadata
-   * @return
-   */
+  /// Creates a sample segment ZK metadata for the given segment metadata
+  /// @param segmentMetadata
+  /// @return
   private SegmentZKMetadata getSegmentZKMetadata(SegmentMetadataImpl segmentMetadata, int totalDocs) {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadata.getName());
     segmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
@@ -412,17 +409,15 @@ public class MemoryEstimator {
     return segmentZKMetadata;
   }
 
-  /**
-   * Given the memory required by a completed segment, this method calculates the total memory required by completed
-   * segments at a time for a partition.
-   * This calculation takes into account the number of hours the completed segments need to be retained (configured
-   * retention - numHoursToConsume)
-   * It also takes into account that a new segment will be created every numHoursToConsume hours, and so we might
-   * need to keep multiple completed segments in memory at a time
-   * @param completedSegmentSizeBytes
-   * @param numHoursToConsume
-   * @return
-   */
+  /// Given the memory required by a completed segment, this method calculates the total memory required by completed
+  /// segments at a time for a partition.
+  /// This calculation takes into account the number of hours the completed segments need to be retained (configured
+  /// retention - numHoursToConsume)
+  /// It also takes into account that a new segment will be created every numHoursToConsume hours, and so we might
+  /// need to keep multiple completed segments in memory at a time
+  /// @param completedSegmentSizeBytes
+  /// @param numHoursToConsume
+  /// @return
   private long calculateMemoryForCompletedSegmentsPerPartition(long completedSegmentSizeBytes, int numHoursToConsume,
       int retentionHours) {
 
@@ -455,9 +450,7 @@ public class MemoryEstimator {
     return new SegmentGenerator(schemaWithMetadata, schema, tableConfig, numberOfRows, true, workingDir).generate();
   }
 
-  /**
-   * This class is used in Memory Estimator to generate segment based on the given characteristics of data
-   */
+  /// This class is used in Memory Estimator to generate segment based on the given characteristics of data
   public static class SegmentGenerator {
     private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerator.class);
 

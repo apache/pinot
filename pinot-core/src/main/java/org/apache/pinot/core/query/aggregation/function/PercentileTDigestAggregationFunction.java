@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.tdunning.math.stats.TDigest;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -35,13 +36,11 @@ import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * TDigest based Percentile aggregation function.
- *
- * TODO: Decided not to support custom compression for version 0 queries as it seems to be the older syntax and requires
- *       extra handling for two argument PERCENTILE functions to assess if v0 or v1. This can be revisited later if the
- *       need arises
- */
+/// TDigest based Percentile aggregation function.
+///
+/// TODO: Decided not to support custom compression for version 0 queries as it seems to be the older syntax and
+///       requires extra handling for two argument PERCENTILE functions to assess if v0 or v1. This can be revisited
+///       later if the need arises
 public class PercentileTDigestAggregationFunction extends NullableSingleInputAggregationFunction<TDigest, Double> {
   public static final int DEFAULT_TDIGEST_COMPRESSION = 100;
 
@@ -262,22 +261,12 @@ public class PercentileTDigestAggregationFunction extends NullableSingleInputAgg
 
   @Override
   public TDigest extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    PercentileTDigestAccumulator accumulator = aggregationResultHolder.getResult();
-    if (accumulator == null) {
-      return TDigestUtils.createMergingDigest(_compressionFactor);
-    } else {
-      return accumulator;
-    }
+    return aggregationResultHolder.getResult();
   }
 
   @Override
   public TDigest extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    Object result = groupByResultHolder.getResult(groupKey);
-    if (result == null) {
-      return TDigestUtils.createMergingDigest(_compressionFactor);
-    } else {
-      return (TDigest) result;
-    }
+    return (TDigest) groupByResultHolder.getResult(groupKey);
   }
 
   @Override
@@ -332,8 +321,15 @@ public class PercentileTDigestAggregationFunction extends NullableSingleInputAgg
     return ColumnDataType.DOUBLE;
   }
 
+  @Nullable
   @Override
-  public Double extractFinalResult(TDigest intermediateResult) {
+  public Double extractFinalResult(@Nullable TDigest intermediateResult) {
+    // A null intermediate result means nothing was aggregated, and so does an empty digest, which is what a
+    // deserialized peer can still carry. With null handling enabled the percentile of nothing is NULL; with it
+    // disabled it is what `quantile` returns for an empty digest, which is NaN.
+    if (intermediateResult == null || intermediateResult.size() == 0L) {
+      return _nullHandlingEnabled ? null : Double.NaN;
+    }
     return intermediateResult.quantile(_percentile / 100.0);
   }
 
@@ -350,13 +346,11 @@ public class PercentileTDigestAggregationFunction extends NullableSingleInputAgg
     }
   }
 
-  /**
-   * Returns the TDigest from the result holder or creates a new one with default compression if it does not exist.
-   *
-   * @param aggregationResultHolder Result holder
-   * @param compressionFactor Compression factor to use for the TDigest
-   * @return TDigest from the result holder
-   */
+  /// Returns the TDigest from the result holder or creates a new one with default compression if it does not exist.
+  ///
+  /// @param aggregationResultHolder Result holder
+  /// @param compressionFactor Compression factor to use for the TDigest
+  /// @return TDigest from the result holder
   protected static TDigest getDefaultTDigest(AggregationResultHolder aggregationResultHolder, int compressionFactor) {
     TDigest tDigest = aggregationResultHolder.getResult();
     if (tDigest == null) {
@@ -386,14 +380,12 @@ public class PercentileTDigestAggregationFunction extends NullableSingleInputAgg
     return accumulator;
   }
 
-  /**
-   * Returns the TDigest for the given group key if exists, or creates a new one with default compression.
-   *
-   * @param groupByResultHolder Result holder
-   * @param groupKey Group key for which to return the TDigest
-   * @param compressionFactor Compression factor to use for the TDigest
-   * @return TDigest for the group key
-   */
+  /// Returns the TDigest for the given group key if exists, or creates a new one with default compression.
+  ///
+  /// @param groupByResultHolder Result holder
+  /// @param groupKey Group key for which to return the TDigest
+  /// @param compressionFactor Compression factor to use for the TDigest
+  /// @return TDigest for the group key
   protected static TDigest getDefaultTDigest(GroupByResultHolder groupByResultHolder, int groupKey,
       int compressionFactor) {
     TDigest tDigest = groupByResultHolder.getResult(groupKey);

@@ -22,16 +22,12 @@ import java.io.File;
 import java.util.Objects;
 
 
-/**
- * Data object used to capture the segment metadata files information along with the segment download URI while
- * uploading segments in the mode.
- *
- * <ol>
- *   <li>segmentDownloadURI – The segment download URI</li>
- *   <li>segmentCreationMeta – The creation.meta file within the segment metadata tar file.</li>
- *   <li>segmentMetadataProperties – The metadata.properties file within the segment metadata tar file.</li>
- * </ol>
- */
+/// Data object used to capture the segment metadata files information along with the segment download URI while
+/// uploading segments in the mode.
+///
+/// 1. segmentDownloadURI – The segment download URI
+/// 2. segmentCreationMeta – The creation.meta file within the segment metadata tar file.
+/// 3. segmentMetadataProperties – The metadata.properties file within the segment metadata tar file.
 public class SegmentMetadataInfo {
   private String _segmentDownloadURI;
   private File _segmentCreationMetaFile;

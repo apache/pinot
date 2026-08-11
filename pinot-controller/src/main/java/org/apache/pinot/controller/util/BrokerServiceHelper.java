@@ -40,9 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Helper class for interacting with broker APIs.
- */
+/// Helper class for interacting with broker APIs.
 public class BrokerServiceHelper {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerServiceHelper.class);
   private static final String TIME_BOUNDARY_INFO_API_PATH = "/debug/timeBoundary/%s";

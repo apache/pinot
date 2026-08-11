@@ -332,9 +332,7 @@ public class RexExpressionUtils {
     return new RexExpression.FunctionCall(castType, SqlKind.CAST.name(), operands);
   }
 
-  /**
-   * Reinterpret is a pass-through function that does not change the type of the input.
-   */
+  /// Reinterpret is a pass-through function that does not change the type of the input.
   private static RexExpression handleReinterpret(RexCall rexCall) {
     assert rexCall.operands.size() == 1;
     return fromRexNode(rexCall.operands.get(0));
@@ -506,9 +504,7 @@ public class RexExpressionUtils {
         List.of(leftOperand, fromRexLiteralValue(dataType, range.upperEndpoint())));
   }
 
-  /**
-   * Transforms a set of <b>point based</b> ranges into a list of expressions.
-   */
+  /// Transforms a set of **point based** ranges into a list of expressions.
   private static List<RexExpression> toSearchFunctionOperands(RexNode leftOperand, Set<Range> ranges,
       ColumnDataType dataType) {
     List<RexExpression> operands = new ArrayList<>(1 + ranges.size());

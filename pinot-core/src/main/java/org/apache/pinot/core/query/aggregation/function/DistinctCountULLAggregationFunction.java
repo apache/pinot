@@ -340,15 +340,8 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     }
   }
 
-  @Nullable
   @Override
-  public UltraLogLog merge(@Nullable UltraLogLog intermediateResult1, @Nullable UltraLogLog intermediateResult2) {
-    if (intermediateResult1 == null) {
-      return intermediateResult2;
-    }
-    if (intermediateResult2 == null) {
-      return intermediateResult1;
-    }
+  public UltraLogLog merge(UltraLogLog intermediateResult1, UltraLogLog intermediateResult2) {
     // UltraLogLog object doesn't support merging a smaller p object into a larger p object.
     if (intermediateResult1.getP() > intermediateResult2.getP()) {
       return intermediateResult2.add(intermediateResult1);
@@ -377,7 +370,6 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     return ColumnDataType.LONG;
   }
 
-  @Nullable
   @Override
   public Comparable extractFinalResult(@Nullable UltraLogLog intermediateResult) {
     return intermediateResult == null ? 0L : Math.round(intermediateResult.getDistinctCountEstimate());
@@ -401,9 +393,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     }
   }
 
-  /**
-   * Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
-   */
+  /// Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
   protected static RoaringBitmap getDictIdBitmap(AggregationResultHolder aggregationResultHolder,
       Dictionary dictionary) {
     DictIdsWrapper dictIdsWrapper = aggregationResultHolder.getResult();
@@ -414,9 +404,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     return dictIdsWrapper._dictIdBitmap;
   }
 
-  /**
-   * Returns the HyperLogLogPlus from the result holder or creates a new one if it does not exist.
-   */
+  /// Returns the HyperLogLogPlus from the result holder or creates a new one if it does not exist.
   protected UltraLogLog getULL(AggregationResultHolder aggregationResultHolder) {
     UltraLogLog ull = aggregationResultHolder.getResult();
     if (ull == null) {
@@ -426,9 +414,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     return ull;
   }
 
-  /**
-   * Returns the dictionary id bitmap for the given group key or creates a new one if it does not exist.
-   */
+  /// Returns the dictionary id bitmap for the given group key or creates a new one if it does not exist.
   protected static RoaringBitmap getDictIdBitmap(GroupByResultHolder groupByResultHolder, int groupKey,
       Dictionary dictionary) {
     DictIdsWrapper dictIdsWrapper = groupByResultHolder.getResult(groupKey);
@@ -439,9 +425,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     return dictIdsWrapper._dictIdBitmap;
   }
 
-  /**
-   * Returns the HyperLogLogPlus for the given group key or creates a new one if it does not exist.
-   */
+  /// Returns the HyperLogLogPlus for the given group key or creates a new one if it does not exist.
   protected UltraLogLog getULL(GroupByResultHolder groupByResultHolder, int groupKey) {
     UltraLogLog ull = groupByResultHolder.getResult(groupKey);
     if (ull == null) {
@@ -451,9 +435,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     return ull;
   }
 
-  /**
-   * Helper method to set dictionary id for the given group keys into the result holder.
-   */
+  /// Helper method to set dictionary id for the given group keys into the result holder.
   private static void setDictIdForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys,
       Dictionary dictionary, int dictId) {
     for (int groupKey : groupKeys) {
@@ -461,9 +443,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     }
   }
 
-  /**
-   * Helper method to set value for the given group keys into the result holder.
-   */
+  /// Helper method to set value for the given group keys into the result holder.
   private void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, Object value) {
     for (int groupKey : groupKeys) {
       UltraLogLogUtils.hashObject(value)
@@ -471,9 +451,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     }
   }
 
-  /**
-   * Helper method to read dictionary and convert dictionary ids to HyperLogLogPlus for dictionary-encoded expression.
-   */
+  /// Helper method to read dictionary and convert dictionary ids to HyperLogLogPlus for dictionary-encoded expression.
   private UltraLogLog convertToULL(DictIdsWrapper dictIdsWrapper) {
     UltraLogLog ull = UltraLogLog.create(_p);
     Dictionary dictionary = dictIdsWrapper._dictionary;

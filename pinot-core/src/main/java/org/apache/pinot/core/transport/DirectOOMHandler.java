@@ -33,12 +33,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Handling netty direct memory OOM on broker and server. In this case there is a great chance that multiple channels
- * are receiving large data tables from servers concurrently. We want to close all channels to servers to
- * proactively release the direct memory, because the execution of netty threads can all block in allocating direct
- * memory, in which case no one will reach channelRead0.
- */
+/// Handling netty direct memory OOM on broker and server. In this case there is a great chance that multiple channels
+/// are receiving large data tables from servers concurrently. We want to close all channels to servers to
+/// proactively release the direct memory, because the execution of netty threads can all block in allocating direct
+/// memory, in which case no one will reach channelRead0.
 public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
   private static final Logger LOGGER = LoggerFactory.getLogger(DirectOOMHandler.class);
   private static final AtomicBoolean DIRECT_OOM_SHUTTING_DOWN = new AtomicBoolean(false);
@@ -72,9 +70,7 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
     ctx.fireChannelInactive();
   }
 
-  /**
-   * Closes and removes all active channels from the map to release direct memory.
-   */
+  /// Closes and removes all active channels from the map to release direct memory.
   private void closeAllChannels() {
     LOGGER.warn("OOM detected: Closing all channels to server to release direct memory");
     for (SocketChannel channel : _allChannels.keySet()) {

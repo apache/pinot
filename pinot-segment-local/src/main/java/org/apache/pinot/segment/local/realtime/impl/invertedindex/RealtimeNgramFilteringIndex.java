@@ -29,13 +29,11 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * RealtimeNgramFilteringIndex is a mutable inverted index that supports adding document IDs for n-grams. An n-gram
- * is a contiguous sequence of n characters from input text. The length of the n-gram is variable between
- * [minNgramLength, maxNgramLength] as specified in the index config. Internally, it uses a realtime inverted index
- * which maps n-grams to their posting lists (document IDs). The index is thread-safe for single writer and multiple
- * readers.
- */
+/// RealtimeNgramFilteringIndex is a mutable inverted index that supports adding document IDs for n-grams. An n-gram
+/// is a contiguous sequence of n characters from input text. The length of the n-gram is variable between
+/// \[minNgramLength, maxNgramLength\] as specified in the index config. Internally, it uses a realtime inverted index
+/// which maps n-grams to their posting lists (document IDs). The index is thread-safe for single writer and multiple
+/// readers.
 public class RealtimeNgramFilteringIndex implements MutableTextIndex {
   private final String _column;
   // Under the hood, ngram index is implemented as an inverted index from n-grams to their posting lists.
@@ -69,11 +67,9 @@ public class RealtimeNgramFilteringIndex implements MutableTextIndex {
     _writeLock = readWriteLock.writeLock();
   }
 
-  /**
-   * Index the string value
-   *
-   * @param value the input value as a string
-   */
+  /// Index the string value
+  ///
+  /// @param value the input value as a string
   @Override
   public void add(String value) {
     if (value == null) {
@@ -83,11 +79,9 @@ public class RealtimeNgramFilteringIndex implements MutableTextIndex {
     _nextDocId++;
   }
 
-  /**
-   * Index an array of string values. Each string in the array is treated as a separate document.
-   *
-   * @param values the documents as an array of strings
-   */
+  /// Index an array of string values. Each string in the array is treated as a separate document.
+  ///
+  /// @param values the documents as an array of strings
   @Override
   public void add(String[] values) {
     if (values == null || values.length == 0) {
@@ -101,22 +95,18 @@ public class RealtimeNgramFilteringIndex implements MutableTextIndex {
     _nextDocId++;
   }
 
-  /**
-   * Returns the matching dictionary ids for the given search query (optional).
-   *
-   * @param searchQuery as a literal string
-   */
+  /// Returns the matching dictionary ids for the given search query (optional).
+  ///
+  /// @param searchQuery as a literal string
   @Override
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Returns the matching document ids for the given search query.
-   * Returns null if no n-grams are generated from the search query -- either because the search query is null or empty
-   * or shorter than the minimum n-gram length.
-   * @param searchQuery as a literal string
-   */
+  /// Returns the matching document ids for the given search query.
+  /// Returns null if no n-grams are generated from the search query -- either because the search query is null or empty
+  /// or shorter than the minimum n-gram length.
+  /// @param searchQuery as a literal string
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery) {
     _readLock.lock();
@@ -143,18 +133,16 @@ public class RealtimeNgramFilteringIndex implements MutableTextIndex {
     }
   }
 
-  /**
-   * Closes this stream and releases any system resources associated with it. If the stream is already closed then
-   * invoking this method has no effect.
-   *
-   * <p> As noted in {@link AutoCloseable#close()}, cases where the
-   * close may fail require careful attention. It is strongly advised to relinquish the underlying resources and to
-   * internally
-   * <em>mark</em> the {@code Closeable} as closed, prior to throwing
-   * the {@code IOException}.
-   *
-   * @throws IOException if an I/O error occurs
-   */
+  /// Closes this stream and releases any system resources associated with it. If the stream is already closed then
+  /// invoking this method has no effect.
+  ///
+  /// As noted in [AutoCloseable#close()], cases where the
+  /// close may fail require careful attention. It is strongly advised to relinquish the underlying resources and to
+  /// internally
+  /// _mark_ the `Closeable` as closed, prior to throwing
+  /// the `IOException`.
+  ///
+  /// @throws IOException if an I/O error occurs
   @Override
   public void close()
       throws IOException {

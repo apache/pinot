@@ -43,7 +43,7 @@ public class ResourceUtilsTest {
 
   private ControllerMetrics _metrics;
 
-  /** Reset static Atomics inside ResourceUtils between tests so they don’t bleed values. */
+  /// Reset static Atomics inside ResourceUtils between tests so they don’t bleed values.
   @BeforeMethod
   public void setUp() throws Exception {
     _metrics = mock(ControllerMetrics.class);
@@ -127,7 +127,7 @@ public class ResourceUtilsTest {
         "Expected read latency >= " + simulatedDelay + "ms but got " + durationCaptor.getValue());
   }
 
-  /** resets the private static AtomicLongs inside ResourceUtils. */
+  /// resets the private static AtomicLongs inside ResourceUtils.
   private static void resetStaticCounter(String fieldName) throws Exception {
     Field declaredField = ResourceUtils.class.getDeclaredField(fieldName);
     declaredField.setAccessible(true);

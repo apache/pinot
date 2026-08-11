@@ -25,16 +25,13 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.distinct.BaseSingleColumnDistinctExecutor;
-import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.table.DictIdDistinctTable;
 import org.apache.pinot.core.query.distinct.table.DistinctTable;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * {@link DistinctExecutor} for single dictionary-encoded column.
- */
+/// [org.apache.pinot.core.query.distinct.DistinctExecutor] for single dictionary-encoded column.
 public class DictionaryBasedSingleColumnDistinctExecutor
     extends BaseSingleColumnDistinctExecutor<DictIdDistinctTable, int[], int[][]> {
   private final Dictionary _dictionary;

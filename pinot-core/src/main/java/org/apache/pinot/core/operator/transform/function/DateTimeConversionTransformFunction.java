@@ -29,75 +29,38 @@ import org.apache.pinot.core.operator.transform.transformer.datetime.EpochToEpoc
 import org.apache.pinot.core.operator.transform.transformer.datetime.EpochToSDFTransformer;
 import org.apache.pinot.core.operator.transform.transformer.datetime.SDFToEpochTransformer;
 import org.apache.pinot.core.operator.transform.transformer.datetime.SDFToSDFTransformer;
-import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The <code>DateTimeConversionTransformFunction</code> class implements the date time conversion transform function.
- * <ul>
- *   <li>
- *     This transform function should be invoked with arguments:
- *     <ul>
- *       <li>
- *         Column name to convert. E.g. Date
- *       </li>
- *       <li>
- *         Format (as defined in {@link DateTimeFieldSpec}) of the input column. E.g. 1:HOURS:EPOCH;
- *         1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd
- *       </li>
- *       <li>
- *         Format (as defined in {@link DateTimeFieldSpec}) of the output. E.g. 1:MILLISECONDS:EPOCH; 1:WEEKS:EPOCH;
- *         1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd
- *       </li>
- *       <li>
- *         Granularity to bucket data into. E.g. 1:HOURS; 15:MINUTES
- *       </li>
- *       <li>
- *         Bucketing time zone, e.g. 'PST' (optional).
- *         If not set then output time zone is used when bucketing (e.g. 'UTC' for epoch millis).<br/>
- *         Note: when time zone is not set, bucketing is done relative to epoch, not relative to nearest
- *         bigger time unit. For example, when truncating epoch millis of `2024-09-20T00:13:27.834Z` to 5 hours we get:
- *         <ul>
- *            <li>with no time zone -> 2024-09-19T20:00:00.000Z</li>
- *            <li>with explicit UTC time zone -> 2024-09-20T00:00:00.000Z</li>
- *         </ul>
- *         Similarly, when truncating epoch millis of the date to 5 days we get:
- *         <ul>
- *            <li>with no time zone -> 2024-02-19T00:00:00.000Z</li>
- *            <li>with explicit UTC time zone -> 2024-09-16T00:00:00.000Z</li>
- *         </ul>
- *       </li>
- *     </ul>
- *   </li>
- *   <li>
- *     End to end example:
- *     <ul>
- *       <li>
- *         If Date column is expressed in millis, and output is expected in millis but bucketed to 15 minutes:
- *         dateTimeConvert(Date, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '15:MINUTES')
- *       </li>
- *       <li>
- *         If Date column is expressed in hoursSinceEpoch, and output is expected in weeksSinceEpoch bucketed to
- *         weeks: dateTimeConvert(Date, '1:HOURS:EPOCH', '1:WEEKS:EPOCH', '1:WEEKS')
- *       </li>
- *       <li>
- *         If Date column is expressed in millis, and output is expected in millis but bucketed to days in
- *         PST time zone:
- *         dateTimeConvert(Date, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '1:DAY', 'PST')
- *       </li>
- *     </ul>
- *   </li>
- *   <li>
- *     Outputs:
- *     <ul>
- *       <li>
- *         Time values converted to the desired format and bucketed to desired granularity
- *       </li>
- *     </ul>
- *   </li>
- * </ul>
- */
+/// The `DateTimeConversionTransformFunction` class implements the date time conversion transform function.
+///
+/// - This transform function should be invoked with arguments:
+///   - Column name to convert. E.g. Date
+///   - Format (as defined in [org.apache.pinot.spi.data.DateTimeFieldSpec]) of the input column.
+///     E.g. 1:HOURS:EPOCH; 1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd
+///   - Format (as defined in [org.apache.pinot.spi.data.DateTimeFieldSpec]) of the output.
+///     E.g. 1:MILLISECONDS:EPOCH; 1:WEEKS:EPOCH; 1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd
+///   - Granularity to bucket data into. E.g. 1:HOURS; 15:MINUTES
+///   - Bucketing time zone, e.g. 'PST' (optional).
+///     If not set then output time zone is used when bucketing (e.g. 'UTC' for epoch millis).
+///
+///     Note: when time zone is not set, bucketing is done relative to epoch, not relative to nearest
+///     bigger time unit. For example, when truncating epoch millis of `2024-09-20T00:13:27.834Z` to 5 hours we get:
+///     - with no time zone -> 2024-09-19T20:00:00.000Z
+///     - with explicit UTC time zone -> 2024-09-20T00:00:00.000Z
+///     Similarly, when truncating epoch millis of the date to 5 days we get:
+///     - with no time zone -> 2024-02-19T00:00:00.000Z
+///     - with explicit UTC time zone -> 2024-09-16T00:00:00.000Z
+/// - End to end example:
+///   - If Date column is expressed in millis, and output is expected in millis but bucketed to 15 minutes:
+///     dateTimeConvert(Date, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '15:MINUTES')
+///   - If Date column is expressed in hoursSinceEpoch, and output is expected in weeksSinceEpoch bucketed to
+///     weeks: dateTimeConvert(Date, '1:HOURS:EPOCH', '1:WEEKS:EPOCH', '1:WEEKS')
+///   - If Date column is expressed in millis, and output is expected in millis but bucketed to days in
+///     PST time zone:
+///     dateTimeConvert(Date, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '1:DAY', 'PST')
+/// - Outputs:
+///   - Time values converted to the desired format and bucketed to desired granularity
 public class DateTimeConversionTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "dateTimeConvert";
 

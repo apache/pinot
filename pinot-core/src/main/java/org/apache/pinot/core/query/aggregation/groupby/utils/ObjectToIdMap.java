@@ -22,9 +22,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
 
 
-/**
- * Implementation of {@link ValueToIdMap} for Object.
- */
+/// Implementation of [ValueToIdMap] for Object.
 public class ObjectToIdMap implements ValueToIdMap {
   private final Object2IntOpenHashMap<Object> _valueToIdMap;
   private final ArrayList<Object> _idToValueMap;

@@ -53,24 +53,20 @@ public abstract class BaseRawValueBasedPredicateEvaluator extends BasePredicateE
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Apply a single-value entry to the predicate.
-   *
-   * @param value Raw value
-   * @return Whether the entry matches the predicate
-   */
+  /// Apply a single-value entry to the predicate.
+  ///
+  /// @param value Raw value
+  /// @return Whether the entry matches the predicate
   @Override
   public boolean applySV(int value) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Apply a multi-value entry to the predicate.
-   *
-   * @param values Array of raw values
-   * @param length Number of values in the entry
-   * @return Whether the entry matches the predicate
-   */
+  /// Apply a multi-value entry to the predicate.
+  ///
+  /// @param values Array of raw values
+  /// @param length Number of values in the entry
+  /// @return Whether the entry matches the predicate
   @SuppressWarnings("Duplicates")
   @Override
   public boolean applyMV(int[] values, int length) {

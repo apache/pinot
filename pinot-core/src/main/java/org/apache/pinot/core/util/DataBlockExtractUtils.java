@@ -36,9 +36,7 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Utils to extract values from {@link DataBlock}.
- */
+/// Utils to extract values from [DataBlock].
 public final class DataBlockExtractUtils {
   private DataBlockExtractUtils() {
   }

@@ -34,18 +34,14 @@ import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 
 
-/**
- * A specialized RealtimeSegmentDataManager that lets us inject a forced failure
- * in the commit step, which occurs strictly after the segmentConsumed message.
- */
+/// A specialized RealtimeSegmentDataManager that lets us inject a forced failure
+/// in the commit step, which occurs strictly after the segmentConsumed message.
 public class FailureInjectingRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   // This flag controls whether commit should forcibly fail.
   private final boolean _failCommit;
 
-  /**
-   * Creates a manager that will forcibly fail the commit segment step.
-   */
+  /// Creates a manager that will forcibly fail the commit segment step.
   public FailureInjectingRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
       RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, IndexLoadingConfig indexLoadingConfig,
       Schema schema, LLCSegmentName llcSegmentName, ConsumerCoordinator consumerCoordinator,

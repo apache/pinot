@@ -23,15 +23,17 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.operator.docvalsets.ProjectionBlockValSet;
+import org.apache.pinot.segment.local.segment.index.map.NullDataSource;
+import org.apache.pinot.segment.local.segment.index.openstruct.OpenStructNullDataSource;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.MapDataSource;
+import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
-/**
- * ProjectionBlock holds a column name to Block Map.
- * It provides DocIdSetBlock for a given column.
- */
+/// ProjectionBlock holds a column name to Block Map.
+/// It provides DocIdSetBlock for a given column.
 public class ProjectionBlock implements ValueBlock {
   private final Map<String, DataSource> _dataSourceMap;
   private final DataBlockCache _dataBlockCache;
@@ -59,16 +61,45 @@ public class ProjectionBlock implements ValueBlock {
 
   @Override
   public BlockValSet getBlockValueSet(String column) {
-    return new ProjectionBlockValSet(_dataBlockCache, column, _dataSourceMap.get(column));
+    DataSource dataSource = _dataSourceMap.get(column);
+    // An OPEN_STRUCT parent is only a handle for per-key resolution — it has no forward index, so DataFetcher does
+    // not register it and it cannot be read as a column. Reject it here rather than letting the missing
+    // ColumnValueReader surface as an NPE.
+    if (dataSource instanceof OpenStructDataSource) {
+      throw new BadQueryRequestException(
+          "OPEN_STRUCT column: " + column + " cannot be selected directly; use " + column + "['key']");
+    }
+    return new ProjectionBlockValSet(_dataBlockCache, column, dataSource);
   }
 
   @Override
   public BlockValSet getBlockValueSet(String[] paths) {
     // TODO: only support one level of path for now, e.g. `map.key`
     assert paths.length == 2;
-    MapDataSource mapDataSource = (MapDataSource) _dataSourceMap.get(paths[0]);
-    DataSource keyDataSource = mapDataSource.getDataSource(paths[1]);
     String fullColumnKeyName = ComplexFieldSpec.getFullChildName(paths);
+    // Resolve once per ProjectionOperator, not once per block: _dataSourceMap is owned by the operator and
+    // shared across every block of the segment. Re-resolving an absent OPEN_STRUCT key rebuilds a null bitmap
+    // spanning the whole segment on each block, and DataFetcher keeps the first reader registered under the
+    // name anyway, so every later resolution is garbage that also leaves this map disagreeing with the fetcher.
+    if (_dataSourceMap.containsKey(fullColumnKeyName)) {
+      return getBlockValueSet(fullColumnKeyName);
+    }
+    DataSource columnDataSource = _dataSourceMap.get(paths[0]);
+    DataSource keyDataSource;
+    if (columnDataSource instanceof MapDataSource) {
+      keyDataSource = ((MapDataSource) columnDataSource).getDataSource(paths[1]);
+      if (keyDataSource == null) {
+        keyDataSource = new NullDataSource(paths[1]);
+      }
+    } else if (columnDataSource instanceof OpenStructDataSource) {
+      OpenStructDataSource osDs = (OpenStructDataSource) columnDataSource;
+      keyDataSource = osDs.getDataSource(paths[1]);
+      if (keyDataSource == null) {
+        keyDataSource = OpenStructNullDataSource.forAbsentKey(osDs, paths[1]);
+      }
+    } else {
+      throw new IllegalStateException("Path-based access requires MAP or OPEN_STRUCT column: " + paths[0]);
+    }
     _dataSourceMap.put(fullColumnKeyName, keyDataSource);
     _dataBlockCache.addDataSource(fullColumnKeyName, keyDataSource);
     return getBlockValueSet(fullColumnKeyName);

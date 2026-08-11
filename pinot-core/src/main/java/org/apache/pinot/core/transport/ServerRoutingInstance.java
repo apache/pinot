@@ -27,12 +27,11 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 
 
-/**
- * The {@code ServerRoutingInstance} class represents the routing target instance which contains the information of
- * hostname, port, and table type it serves.
- * <p>Different table types on same host and port are counted as different instances. Therefore, one single Pinot Server
- * might be treated as two different routing target instances based on the types of table it serves.
- */
+/// The `ServerRoutingInstance` class represents the routing target instance which contains the information of
+/// hostname, port, and table type it serves.
+///
+/// Different table types on same host and port are counted as different instances. Therefore, one single Pinot Server
+/// might be treated as two different routing target instances based on the types of table it serves.
 @ThreadSafe
 public final class ServerRoutingInstance {
   private static final String SHORT_OFFLINE_SUFFIX = "_O";

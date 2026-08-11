@@ -36,12 +36,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base implementation of the combine operator.
- * <p>Combine operator uses multiple worker threads to process segments in parallel, and uses the main thread to merge
- * the results blocks from the processed segments. It can early-terminate the query to save the system resources if it
- * detects that the merged results can already satisfy the query, or the query is already errored out or timed out.
- */
+/// Base implementation of the combine operator.
+///
+/// Combine operator uses multiple worker threads to process segments in parallel, and uses the main thread to merge
+/// the results blocks from the processed segments. It can early-terminate the query to save the system resources if it
+/// detects that the merged results can already satisfy the query, or the query is already errored out or timed out.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock> extends BaseCombineOperator<T> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleBlockCombineOperator.class);
@@ -134,9 +133,7 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
   protected void onProcessSegmentsFinish() {
   }
 
-  /**
-   * Merges the results from the worker threads into a results block.
-   */
+  /// Merges the results from the worker threads into a results block.
   protected BaseResultsBlock mergeResults()
       throws Exception {
     T mergedBlock = null;

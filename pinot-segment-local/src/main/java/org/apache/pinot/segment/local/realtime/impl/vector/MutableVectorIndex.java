@@ -36,6 +36,7 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.KnnFloatVectorQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.IOUtils;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.XKnnFloatVectorField;
 import org.apache.pinot.segment.local.segment.index.readers.vector.LuceneHnswRuntimeControlUtils;
@@ -51,11 +52,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A Vector index reader for the real-time Vector index values on the fly.
- * Since there is no good mutable vector index implementation for topK search, we just do brute force search.
- * <p>This class is thread-safe for single writer multiple readers.
- */
+/// A Vector index reader for the real-time Vector index values on the fly.
+/// Since there is no good mutable vector index implementation for topK search, we just do brute force search.
+///
+/// This class is thread-safe for single writer multiple readers.
 public class MutableVectorIndex implements VectorIndexReader, MutableIndex, VectorIndexConfigProvider, EfSearchAware {
   private static final Logger LOGGER = LoggerFactory.getLogger(MutableVectorIndex.class);
   private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =
@@ -66,14 +66,13 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex, Vect
   private final int _vectorDimension;
   private final VectorIndexConfig _vectorIndexConfig;
   private final VectorSimilarityFunction _vectorSimilarityFunction;
-  private final IndexWriter _indexWriter;
   private final String _vectorColumn;
   private final String _segmentName;
   private final long _commitIntervalMs;
   private final long _commitDocs;
   private final File _indexDir;
-
   private final FSDirectory _indexDirectory;
+  private final IndexWriter _indexWriter;
   private int _nextDocId;
 
   private long _lastCommitTime;
@@ -91,40 +90,33 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex, Vect
     _commitDocs = Long.parseLong(
         vectorIndexConfig.getProperties().getOrDefault("commitDocs", String.valueOf(DEFAULT_COMMIT_DOCS)));
     _vectorSimilarityFunction = VectorIndexUtils.toSimilarityFunction(vectorIndexConfig.getVectorDistanceFunction());
-    // Use local variables so that resources opened before a failure can be closed before rethrowing,
-    // preventing file-descriptor and temp-directory leaks.
-    File indexDir = new File(FileUtils.getTempDirectory(), segmentName);
+    // Each column of a segment gets its own directory, so that cleaning up one column does not remove the index of
+    // another column of the same segment.
+    _indexDir = new File(new File(FileUtils.getTempDirectory(), segmentName),
+        _vectorColumn + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+
     FSDirectory indexDirectory = null;
     IndexWriter indexWriter = null;
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
       // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
-      indexDirectory = FSDirectory.open(
-          new File(indexDir, _vectorColumn + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION).toPath());
+      indexDirectory = FSDirectory.open(_indexDir.toPath());
       LOGGER.info("Creating mutable HNSW index for segment: {}, column: {} at path: {} with {}", segmentName,
-          vectorColumn, indexDir.getAbsolutePath(), vectorIndexConfig.getProperties());
+          vectorColumn, _indexDir.getAbsolutePath(), vectorIndexConfig.getProperties());
       indexWriter = new IndexWriter(indexDirectory, VectorIndexUtils.getIndexWriterConfig(vectorIndexConfig));
       indexWriter.commit();
       _lastCommitTime = System.currentTimeMillis();
     } catch (Exception e) {
-      if (indexWriter != null) {
-        try {
-          indexWriter.close();
-        } catch (IOException closeEx) {
-          e.addSuppressed(closeEx);
-        }
-      } else if (indexDirectory != null) {
-        try {
-          indexDirectory.close();
-        } catch (IOException closeEx) {
-          e.addSuppressed(closeEx);
-        }
+      // IndexWriter does not close the Directory passed to it, so both need to be closed.
+      try {
+        IOUtils.close(indexWriter, indexDirectory);
+      } catch (Exception closeEx) {
+        e.addSuppressed(closeEx);
       }
-      FileUtils.deleteQuietly(indexDir);
+      deleteIndexDir();
       throw new RuntimeException(
           "Caught exception while instantiating the LuceneTextIndexCreator for column: " + vectorColumn, e);
     }
-    _indexDir = indexDir;
     _indexDirectory = indexDirectory;
     _indexWriter = indexWriter;
   }
@@ -286,13 +278,23 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex, Vect
   public void close() {
     try {
       _indexWriter.commit();
-      _indexWriter.close();
-      _indexDirectory.close();
+      // IndexWriter does not close the Directory passed to it, so both need to be closed.
+      IOUtils.close(_indexWriter, _indexDirectory);
     } catch (IOException e) {
+      // Both close() implementations are idempotent, so this is a no-op for whatever was already closed above.
+      IOUtils.closeWhileHandlingException(_indexWriter, _indexDirectory);
       throw new RuntimeException(e);
     } finally {
-      // Delete the temporary index directory.
-      FileUtils.deleteQuietly(_indexDir);
+      deleteIndexDir();
     }
+  }
+
+  /// Deletes the temporary index directory of this column, then the segment directory holding it if this was the last
+  /// column with an index under it.
+  private void deleteIndexDir() {
+    FileUtils.deleteQuietly(_indexDir);
+    // Only succeeds when no other column of the same segment still has an index directory under it.
+    //noinspection ResultOfMethodCallIgnored
+    _indexDir.getParentFile().delete();
   }
 }

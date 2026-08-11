@@ -31,15 +31,14 @@ import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * The IN_ID_SET transform function takes 2 arguments:
- * <ul>
- *   <li>Expression: a single-value expression</li>
- *   <li>Base64 encoded IdSet: a literal string</li>
- * </ul>
- * <p>For each docId, the function returns {@code 1} if the IdSet contains the value of the expression, {code 0} if not.
- * <p>E.g. {@code SELECT COUNT(*) FROM myTable WHERE IN_ID_SET(col, '<base64 encoded IdSet>') = 1)}
- */
+/// The IN_ID_SET transform function takes 2 arguments:
+///
+/// - Expression: a single-value expression
+/// - Base64 encoded IdSet: a literal string
+///
+/// For each docId, the function returns `1` if the IdSet contains the value of the expression, {code 0} if not.
+///
+/// E.g. `SELECT COUNT(*) FROM myTable WHERE IN_ID_SET(col, '<base64 encoded IdSet>') = 1)`
 public class InIdSetTransformFunction extends BaseTransformFunction {
   private TransformFunction _transformFunction;
   private IdSet _idSet;

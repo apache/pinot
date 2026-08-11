@@ -18,12 +18,16 @@
  */
 package org.apache.pinot.queries;
 
+import java.util.List;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
 public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleValueQueriesTest {
@@ -46,7 +50,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     AggregationOperator aggregationOperator = getOperator(AGGREGATION_QUERY);
     AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 30000L, 0L,
-        120000L, 30000L);
+        60000L, 30000L);
     QueriesTestUtils.testInnerSegmentAggregationResult(resultsBlock.getResults(), 30000L, 32317185437847L, 2147419555,
         1689277, 28175373944314L, 30000L);
 
@@ -88,8 +92,13 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 120000L, 0L,
         90000L, 30000L);
-    QueriesTestUtils.testInnerSegmentAggregationResult(resultsBlock.getResults(), 22266008882250L, 30000, 2147419555,
-        32289159189150L, 0L, 0L);
+    List<Object> results = resultsBlock.getResults();
+    assertEquals(((Number) results.get(0)).longValue(), 22266008882250L);
+    assertEquals(((Number) results.get(1)).longValue(), 30000L);
+    assertEquals(((Number) results.get(2)).longValue(), 2147419555L);
+    assertEquals(((Number) results.get(3)).longValue(), 32289159189150L);
+    // no row passes this filter, so nothing was aggregated for the average
+    assertNull(results.get(4));
   }
 
   @Test

@@ -35,10 +35,8 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for {@link BrokerResourceValidationManager}, including that getTablesToProcess
- * returns both physical table names and logical table partition names (Issue #15751).
- */
+/// Unit tests for [BrokerResourceValidationManager], including that getTablesToProcess
+/// returns both physical table names and logical table partition names (Issue #15751).
 public class BrokerResourceValidationManagerTest {
 
   private static final String PHYSICAL_TABLE = "myTable_OFFLINE";
@@ -60,11 +58,9 @@ public class BrokerResourceValidationManagerTest {
         controllerMetrics);
   }
 
-  /**
-   * Verifies that getTablesToProcess returns both physical tables (from getAllTables) and
-   * logical table partitions (from getBrokerResourceLogicalTables) so that the
-   * periodic task validates and repairs broker resource for logical tables too.
-   */
+  /// Verifies that getTablesToProcess returns both physical tables (from getAllTables) and
+  /// logical table partitions (from getBrokerResourceLogicalTables) so that the
+  /// periodic task validates and repairs broker resource for logical tables too.
   @Test
   public void testGetTablesToProcessIncludesLogicalTablePartitions() {
     List<String> tables = _validationManager.getTablesToProcess(new Properties());

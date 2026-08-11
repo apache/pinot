@@ -56,7 +56,6 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 ///   - `6.0` — re-aggregation without residual WHERE
 ///   - `7.0` — re-aggregation with residual WHERE
 ///
-///
 /// Implementations should be stateless and thread-safe.
 public class AggregationSubsumptionStrategy extends AbstractSubsumptionStrategy {
 
@@ -70,7 +69,8 @@ public class AggregationSubsumptionStrategy extends AbstractSubsumptionStrategy 
   }
 
   @Override
-  protected boolean groupByMatches(PinotQuery userQuery, PinotQuery viewQuery) {
+  protected boolean groupByMatches(PinotQuery userQuery, PinotQuery viewQuery,
+      Map<Expression, String> viewProjectionMap) {
     List<Expression> userGroupBy = userQuery.getGroupByList();
     List<Expression> materializedViewGroupBy = viewQuery.getGroupByList();
 
@@ -91,7 +91,22 @@ public class AggregationSubsumptionStrategy extends AbstractSubsumptionStrategy 
 
     Set<Expression> userSet = new HashSet<>(userGroupBy);
     Set<Expression> materializedViewSet = new HashSet<>(materializedViewGroupBy);
-    return materializedViewSet.containsAll(userSet);
+    if (!materializedViewSet.containsAll(userSet)) {
+      return false;
+    }
+
+    /// The MV grouping by a key is not enough — buildResult rewrites every user GROUP BY key to the
+    /// MV column that holds it, so the MV must also *project* each key.  An MV such as
+    /// `SELECT UPPER(city) AS uc, SUM(revenue) AS sum_rev FROM orders GROUP BY city` groups by
+    /// `city` without materializing it: the rewritten query would carry `GROUP BY <null>` and fail
+    /// on the server instead of falling back to the base table.  Reject here so the user query
+    /// simply runs against the base table.
+    for (Expression userGroupByExpr : userSet) {
+      if (!viewProjectionMap.containsKey(userGroupByExpr)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @Override
@@ -102,19 +117,20 @@ public class AggregationSubsumptionStrategy extends AbstractSubsumptionStrategy 
     }
     for (Expression expr : userSelectList) {
       Expression stripped = MaterializedViewMatchUtils.stripAlias(expr);
-      /// Plain column reference: direct MV projection hit is sufficient.
-      if (stripped.getFunctionCall() == null) {
+      boolean isAggregate = CalciteSqlParser.isAggregateExpression(stripped);
+      if (isAggregate) {
+        /// Aggregate (incl. ROUND(SUM(x))): rewritable only if a registered equivalence exists,
+        /// else rejected. No new aggregates supported here.
+        if (findEquivalentMaterializedViewEntry(stripped, viewProjectionMap) == null) {
+          return false;
+        }
+      } else {
+        /// Plain column OR scalar grouping function (e.g. DATETRUNC('DAY', ts)): a direct MV
+        /// projection hit is sufficient — the containsKey check below confirms the MV
+        /// materialized this exact expression.
         if (!viewProjectionMap.containsKey(stripped)) {
           return false;
         }
-        continue;
-      }
-      /// Aggregate function: an exact projection match is NOT enough on its own. We need an
-      /// AggregationEquivalence rule to re-aggregate the pre-computed MV column correctly.
-      /// Without a rule we would fall back to a bare column reference (e.g. AVG(revenue) →
-      /// avg_rev), which produces wrong results for non-distributive functions.
-      if (findEquivalentMaterializedViewEntry(stripped, viewProjectionMap) == null) {
-        return false;
       }
     }
     return true;
@@ -193,13 +209,34 @@ public class AggregationSubsumptionStrategy extends AbstractSubsumptionStrategy 
       return false;
     }
 
-    Set<String> groupByColumnNames = new HashSet<>(materializedViewGroupBy.size());
-    for (Expression gbExpr : materializedViewGroupBy) {
-      groupByColumnNames.addAll(MaterializedViewMatchUtils.collectReferencedColumns(gbExpr));
-    }
+    return residualReferencesProjectedGroupKeys(residualFilter, new HashSet<>(materializedViewGroupBy),
+        viewProjectionMap);
+  }
 
-    Set<String> residualColumns = MaterializedViewMatchUtils.collectReferencedColumns(residualFilter);
-    return groupByColumnNames.containsAll(residualColumns);
+  private static boolean residualReferencesProjectedGroupKeys(Expression expr,
+      Set<Expression> materializedViewGroupBy, Map<Expression, String> viewProjectionMap) {
+    /// Treat a projected GROUP BY expression as an atomic value. For example,
+    /// DATETRUNC('DAY', ts) can be remapped to the MV's `day` column, but its source column `ts`
+    /// is not available at the original granularity and cannot be used in a bare residual filter.
+    if (materializedViewGroupBy.contains(expr) && viewProjectionMap.containsKey(expr)) {
+      return true;
+    }
+    if (expr.getType() == ExpressionType.LITERAL) {
+      return true;
+    }
+    if (expr.getType() == ExpressionType.IDENTIFIER) {
+      return false;
+    }
+    Function function = expr.getFunctionCall();
+    if (function == null || function.getOperands() == null) {
+      return false;
+    }
+    for (Expression operand : function.getOperands()) {
+      if (!residualReferencesProjectedGroupKeys(operand, materializedViewGroupBy, viewProjectionMap)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @Override
@@ -281,6 +318,8 @@ public class AggregationSubsumptionStrategy extends AbstractSubsumptionStrategy 
     if (userGroupBy != null && !userGroupBy.isEmpty()) {
       List<Expression> remappedGroupBy = new ArrayList<>(userGroupBy.size());
       for (Expression gbExpr : userGroupBy) {
+        /// Never null: groupByMatches rejected the candidate unless every user GROUP BY key is
+        /// projected by the MV.  A null here would silently emit `GROUP BY <null identifier>`.
         String materializedViewCol = viewProjectionMap.get(gbExpr);
         remappedGroupBy.add(RequestUtils.getIdentifierExpression(materializedViewCol));
       }
@@ -347,11 +386,15 @@ public class AggregationSubsumptionStrategy extends AbstractSubsumptionStrategy 
       String userAlias = MaterializedViewMatchUtils.extractUserAlias(expr);
       Expression rewritten;
 
-      if (viewProjectionMap.containsKey(stripped)
-          && stripped.getFunctionCall() == null) {
+      boolean isAggregate = CalciteSqlParser.isAggregateExpression(stripped);
+      if (!isAggregate && viewProjectionMap.containsKey(stripped)) {
+        /// Plain column OR scalar grouping function: project the MV column directly.
         rewritten = RequestUtils.getIdentifierExpression(viewProjectionMap.get(stripped));
-      } else {
+      } else if (isAggregate) {
         rewritten = rewriteAggregationExpression(stripped, viewProjectionMap);
+      } else {
+        throw new IllegalStateException(
+            "Cannot rewrite non-aggregate expression without MV projection: " + stripped);
       }
 
       /// Preserve the user's expected result-column name. Bare-identifier dimensions that map 1:1
@@ -392,11 +435,13 @@ public class AggregationSubsumptionStrategy extends AbstractSubsumptionStrategy 
 
   private Expression remapExpressionWithEquivalence(Expression expr,
       Map<Expression, String> viewProjectionMap) {
-    if (viewProjectionMap.containsKey(expr) && expr.getFunctionCall() == null) {
+    /// Plain column OR scalar grouping function with a direct MV hit: map to the MV column.
+    boolean isAggregate = CalciteSqlParser.isAggregateExpression(expr);
+    if (!isAggregate && viewProjectionMap.containsKey(expr)) {
       return RequestUtils.getIdentifierExpression(viewProjectionMap.get(expr));
     }
 
-    if (expr.getFunctionCall() != null) {
+    if (isAggregate && expr.getFunctionCall() != null) {
       if (viewProjectionMap.containsKey(expr)) {
         return rewriteAggregationExpression(expr, viewProjectionMap);
       }

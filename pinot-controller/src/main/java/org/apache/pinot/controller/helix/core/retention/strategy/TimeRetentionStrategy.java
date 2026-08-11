@@ -26,9 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>TimeRetentionStrategy</code> class uses segment end time to manage the retention for segments.
- */
+/// The `TimeRetentionStrategy` class uses segment end time to manage the retention for segments.
 public class TimeRetentionStrategy implements RetentionStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimeRetentionStrategy.class);
 

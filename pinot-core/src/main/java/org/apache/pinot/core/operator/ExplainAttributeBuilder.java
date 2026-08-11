@@ -22,9 +22,7 @@ import java.util.Map;
 import org.apache.pinot.common.proto.Plan;
 
 
-/**
- * A builder used to build attributes for an explain node without having to deal with the protobuf API.
- */
+/// A builder used to build attributes for an explain node without having to deal with the protobuf API.
 public class ExplainAttributeBuilder {
   private final Map<String, Plan.ExplainNode.AttributeValue> _attributes = new java.util.HashMap<>();
 

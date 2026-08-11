@@ -59,9 +59,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests the {@link ConsumingSegmentInfoReader}
- */
+/// Tests the [ConsumingSegmentInfoReader]
 @Test(groups = "stateless")
 public class ConsumingSegmentInfoReaderStatelessTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ConsumingSegmentInfoReaderStatelessTest.class);
@@ -165,9 +163,7 @@ public class ConsumingSegmentInfoReaderStatelessTest {
     };
   }
 
-  /**
-   * Server to return fake consuming segment info
-   */
+  /// Server to return fake consuming segment info
   private static class FakeConsumingInfoServer extends FakeHttpServer {
     List<SegmentConsumerInfo> _consumerInfos;
 
@@ -235,9 +231,7 @@ public class ConsumingSegmentInfoReaderStatelessTest {
     assertTrue(consumingSegmentsInfoMap._segmentToConsumingInfoMap.isEmpty());
   }
 
-  /**
-   * 2 servers, 2 partitions, 2 replicas, all CONSUMING
-   */
+  /// 2 servers, 2 partitions, 2 replicas, all CONSUMING
   @Test
   public void testHappyPath()
       throws InvalidConfigException {
@@ -262,9 +256,7 @@ public class ConsumingSegmentInfoReaderStatelessTest {
     }
   }
 
-  /**
-   * 2 servers, 2 partitions, 2 replicas. p0 consumer in NOT_CONSUMING
-   */
+  /// 2 servers, 2 partitions, 2 replicas. p0 consumer in NOT_CONSUMING
   @Test
   public void testNotConsumingState()
       throws InvalidConfigException {
@@ -292,9 +284,7 @@ public class ConsumingSegmentInfoReaderStatelessTest {
     }
   }
 
-  /**
-   * 1 servers, 2 partitions, 1 replicas. No consumer for p0. CONSUMING state in idealstate.
-   */
+  /// 1 servers, 2 partitions, 1 replicas. No consumer for p0. CONSUMING state in idealstate.
   @Test
   public void testNoConsumerButConsumingInIdealState()
       throws InvalidConfigException {
@@ -314,9 +304,7 @@ public class ConsumingSegmentInfoReaderStatelessTest {
         ConsumerState.CONSUMING.toString(), "1", "150");
   }
 
-  /**
-   * 1 servers, 2 partitions, 1 replicas. No consumer for p0. OFFLINE state in idealstate.
-   */
+  /// 1 servers, 2 partitions, 1 replicas. No consumer for p0. OFFLINE state in idealstate.
   @Test
   public void testNoConsumerOfflineInIdealState()
       throws InvalidConfigException {
@@ -337,9 +325,7 @@ public class ConsumingSegmentInfoReaderStatelessTest {
         ConsumerState.CONSUMING.toString(), "1", "150");
   }
 
-  /**
-   * 2 servers, 2 partitions, 2 replicas. server4 times out.
-   */
+  /// 2 servers, 2 partitions, 2 replicas. server4 times out.
   @Test
   public void testErrorFromServer()
       throws InvalidConfigException {

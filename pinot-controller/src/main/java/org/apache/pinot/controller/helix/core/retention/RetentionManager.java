@@ -71,10 +71,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>RetentionManager</code> class manages retention for all segments and delete expired segments.
- * <p>It is scheduled to run only on leader controller.
- */
+/// The `RetentionManager` class manages retention for all segments and delete expired segments.
+///
+/// It is scheduled to run only on leader controller.
 public class RetentionManager extends ControllerPeriodicTask<Void> {
   public static final String TASK_NAME = "RetentionManager";
   public static final long OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(5L);
@@ -385,20 +384,18 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     return segmentsToDelete;
   }
 
-  /**
-   * Identifies segments in deepstore that are ready for deletion based on the retention strategy.
-   *
-   * This method finds segments that are beyond the retention period and are ready to be purged.
-   * It only considers segments that do not have entries in ZooKeeper metadata i.e. untracked segments.
-   * The lastModified time of the file in deepstore is used to determine whether the segment
-   * should be retained or purged.
-   *
-   * @param tableNameWithType   Name of the offline table
-   * @param retentionStrategy  Strategy to determine if a segment should be purged
-   * @param segmentsToExclude  Set of segment names that should be excluded from deletion
-   * @return List of segment names that should be deleted from deepstore
-   * @throws IOException If there's an error accessing the filesystem
-   */
+  /// Identifies segments in deepstore that are ready for deletion based on the retention strategy.
+  ///
+  /// This method finds segments that are beyond the retention period and are ready to be purged.
+  /// It only considers segments that do not have entries in ZooKeeper metadata i.e. untracked segments.
+  /// The lastModified time of the file in deepstore is used to determine whether the segment
+  /// should be retained or purged.
+  ///
+  /// @param tableNameWithType   Name of the offline table
+  /// @param retentionStrategy  Strategy to determine if a segment should be purged
+  /// @param segmentsToExclude  Set of segment names that should be excluded from deletion
+  /// @return List of segment names that should be deleted from deepstore
+  /// @throws IOException If there's an error accessing the filesystem
   @VisibleForTesting
   List<String> findUntrackedSegmentsToDeleteFromDeepstore(String tableNameWithType, RetentionStrategy retentionStrategy,
       Set<String> segmentsToExclude, RetentionStrategy untrackedSegmentsRetentionStrategy)
@@ -457,17 +454,15 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     return segmentName;
   }
 
-  /**
-   * Strips out any segments that participate in a live segment lineage entry from the retention-driven
-   * delete batch. Time-based retention must not delete lineage-locked segments — they are owned by the
-   * lineage lifecycle and get cleaned up by {@link #manageSegmentLineageCleanupForTable} when the lineage
-   * entry becomes eligible. If we left them in, the public delete check would reject the whole batch and
-   * the rest of the eligible segments would never get cleaned up.
-   * <p>
-   * Gated by {@link ControllerConf#LINEAGE_EXCLUSIVE_DELETE_ENABLED}: when the kill switch is off,
-   * {@code deleteSegments} also stops rejecting lineage-locked targets, so retention must mirror legacy
-   * behavior and pass them through to the delete path instead of silently dropping them here.
-   */
+  /// Strips out any segments that participate in a live segment lineage entry from the retention-driven
+  /// delete batch. Time-based retention must not delete lineage-locked segments — they are owned by the
+  /// lineage lifecycle and get cleaned up by [#manageSegmentLineageCleanupForTable] when the lineage
+  /// entry becomes eligible. If we left them in, the public delete check would reject the whole batch and
+  /// the rest of the eligible segments would never get cleaned up.
+  ///
+  /// Gated by [ControllerConf#LINEAGE_EXCLUSIVE_DELETE_ENABLED]: when the kill switch is off,
+  /// `deleteSegments` also stops rejecting lineage-locked targets, so retention must mirror legacy
+  /// behavior and pass them through to the delete path instead of silently dropping them here.
   private void removeLineageLockedSegments(String tableNameWithType, List<String> segmentsToDelete) {
     if (segmentsToDelete.isEmpty()) {
       return;

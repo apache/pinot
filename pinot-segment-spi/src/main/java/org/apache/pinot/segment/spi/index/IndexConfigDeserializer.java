@@ -40,9 +40,7 @@ public class IndexConfigDeserializer {
   private IndexConfigDeserializer() {
   }
 
-  /**
-   * Returns a {@link ColumnConfigDeserializer} that always returns the same config object
-   */
+  /// Returns a [ColumnConfigDeserializer] that always returns the same config object
   public static <C extends IndexConfig> ColumnConfigDeserializer<C> always(C config) {
     return (tableConfig, schema) -> {
       Map<String, C> result = new HashMap<>();
@@ -57,10 +55,8 @@ public class IndexConfigDeserializer {
     return always(indexType.getDefaultConfig());
   }
 
-  /**
-   * Returns a {@link ColumnConfigDeserializer} that always returns whatever is returned by the function given as
-   * parameter.
-   */
+  /// Returns a [ColumnConfigDeserializer] that always returns whatever is returned by the function given as
+  /// parameter.
   public static <C extends IndexConfig> ColumnConfigDeserializer<C> alwaysCall(BiFunction<TableConfig, Schema, C> map) {
     return (tableConfig, schema) -> {
       C config = map.apply(tableConfig, schema);
@@ -72,10 +68,14 @@ public class IndexConfigDeserializer {
     };
   }
 
-  /**
-   * Returns a {@link ColumnConfigDeserializer} that reads a specific fieldName of the <pre>indexes</pre> attribute on
-   * each FieldConfig.
-   */
+  /// Returns a [ColumnConfigDeserializer] that reads a specific fieldName of the
+  ///
+  /// ```
+  /// indexes
+  /// ```
+  ///
+  /// attribute on
+  /// each FieldConfig.
   public static <C extends IndexConfig> ColumnConfigDeserializer<C> fromIndexes(String fieldName, Class<C> aClass) {
     return (tableConfig, schema) -> {
       Map<String, C> result = new HashMap<>();

@@ -30,12 +30,10 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * End-to-end integration tests for bitwise scalar functions over a custom Pinot cluster.
- *
- * <p>This test exercises projection and predicate evaluation for INT and LONG bitwise functions.
- * Test methods mutate the query-engine mode and are not thread-safe.
- */
+/// End-to-end integration tests for bitwise scalar functions over a custom Pinot cluster.
+///
+/// This test exercises projection and predicate evaluation for INT and LONG bitwise functions.
+/// Test methods mutate the query-engine mode and are not thread-safe.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class BitwiseFunctionsIntegrationTest extends CustomDataQueryClusterIntegrationTest {
   private static final String DEFAULT_TABLE_NAME = "BitwiseFunctionsIntegrationTest";

@@ -324,67 +324,6 @@
               </jvmSettings>
             </program>
             <program>
-              <mainClass>org.apache.pinot.tools.UpsertQuickStart</mainClass>
-              <name>quick-start-upsert-streaming</name>
-              <jvmSettings>
-                <initialMemorySize>4G</initialMemorySize>
-                <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
-                </extraArguments>
-              </jvmSettings>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.tools.PartialUpsertQuickStart</mainClass>
-              <name>quick-start-partial-upsert-streaming</name>
-              <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>1G</maxMemorySize>
-                <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
-                </extraArguments>
-              </jvmSettings>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.tools.JsonIndexQuickStart</mainClass>
-              <name>quick-start-json-index-batch</name>
-              <jvmSettings>
-                <initialMemorySize>4G</initialMemorySize>
-                <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
-                </extraArguments>
-              </jvmSettings>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.tools.RealtimeJsonIndexQuickStart</mainClass>
-              <name>quick-start-json-index-streaming</name>
-              <jvmSettings>
-                <initialMemorySize>4G</initialMemorySize>
-                <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
-                </extraArguments>
-              </jvmSettings>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.tools.RealtimeComplexTypeHandlingQuickStart</mainClass>
-              <name>quick-start-complex-type-handling-streaming</name>
-              <jvmSettings>
-                <initialMemorySize>4G</initialMemorySize>
-                <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
-                </extraArguments>
-              </jvmSettings>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.tools.OfflineComplexTypeHandlingQuickStart</mainClass>
-              <name>quick-start-complex-type-handling-offline</name>
-              <jvmSettings>
-                <initialMemorySize>4G</initialMemorySize>
-                <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
-                </extraArguments>
-              </jvmSettings>
-            </program>
-            <program>
               <mainClass>org.apache.pinot.tools.AuthQuickstart</mainClass>
               <name>quick-start-auth</name>
               <jvmSettings>

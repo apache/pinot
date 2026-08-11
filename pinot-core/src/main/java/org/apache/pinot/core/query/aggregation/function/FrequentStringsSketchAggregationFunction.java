@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.lang.foreign.MemorySegment;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.datasketches.common.ArrayOfStringsSerDe;
 import org.apache.datasketches.frequencies.FrequentItemsSketch;
 import org.apache.pinot.common.CustomObject;
@@ -39,37 +40,27 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * <p>
- *  {@code FrequentStringsSketchAggregationFunction} provides an approximate FrequentItems aggregation function based on
- *  <a href="https://datasketches.apache.org/docs/Frequency/FrequentItemsOverview.html">Apache DataSketches library</a>.
- *  It is memory efficient compared to exact counting.
- * </p>
- * <p>
- *   The function takes a STRING column as input and returns a Base64 encoded sketch object which can be
- *   deserialized and used to estimate the frequency of items in the dataset (how many times they appear).
- * </p>
- * <p><b>FREQUENT_STRINGS_SKETCH(col, maxMapSize=256)</b></p>
- * <p>E.g.:</p>
- * <ul>
- *   <li><b>FREQUENT_STRINGS_SKETCH(col)</b></li>
- *   <li><b>FREQUENT_STRINGS_SKETCH(col, 1024)</b></li>
- * </ul>
- *
- * <p>
- *   If the column type is BYTES, the aggregation function will assume it is a serialized FrequentItems data sketch
- *   of type `ItemSketch<String>`and will attempt to deserialize it for merging with other sketch objects.
- * </p>
- *
- * <p>
- *   Second argument, maxMapsSize, refers to the size of the physical length of the hashmap which stores counts. It
- *   influences the accuracy of the sketch and should be a power of 2.
- * </p>
- *
- * <p>
- *   There is a variation of the function (<b>FREQUENT_LONGS_SKETCH</b>) which accept INT and LONG type input columns.
- * </p>
- */
+///  `FrequentStringsSketchAggregationFunction` provides an approximate FrequentItems aggregation function based
+///  on [Apache DataSketches library](https://datasketches.apache.org/docs/Frequency/FrequentItemsOverview.html) . It is
+///  memory efficient compared to exact counting.
+///
+///   The function takes a STRING column as input and returns a Base64 encoded sketch object which can be
+///   deserialized and used to estimate the frequency of items in the dataset (how many times they appear).
+///
+/// **FREQUENT_STRINGS_SKETCH(col, maxMapSize=256)**
+///
+/// E.g.:
+///
+/// - **FREQUENT_STRINGS_SKETCH(col)**
+/// - **FREQUENT_STRINGS_SKETCH(col, 1024)**
+///
+///   If the column type is BYTES, the aggregation function will assume it is a serialized FrequentItems data sketch
+///   of type `ItemSketch<String>`and will attempt to deserialize it for merging with other sketch objects.
+///
+///   Second argument, maxMapsSize, refers to the size of the physical length of the hashmap which stores counts. It
+///   influences the accuracy of the sketch and should be a power of 2.
+///
+///   There is a variation of the function (**FREQUENT_LONGS_SKETCH**) which accept INT and LONG type input columns.
 public class FrequentStringsSketchAggregationFunction
     extends BaseSingleInputAggregationFunction<FrequentItemsSketch<String>, Comparable<?>> {
   protected static final int DEFAULT_MAX_MAP_SIZE = 256;
@@ -173,9 +164,7 @@ public class FrequentStringsSketchAggregationFunction
     }
   }
 
-  /**
-   * Extracts the sketch from the result holder or creates a new one if it does not exist.
-   */
+  /// Extracts the sketch from the result holder or creates a new one if it does not exist.
   protected FrequentItemsSketch<String> getOrCreateSketch(AggregationResultHolder aggregationResultHolder) {
     FrequentItemsSketch<String> sketch = aggregationResultHolder.getResult();
     if (sketch == null) {
@@ -185,10 +174,8 @@ public class FrequentStringsSketchAggregationFunction
     return sketch;
   }
 
-  /**
-   * Extracts the sketch from the group by result holder for key
-   * or creates a new one if it does not exist.
-   */
+  /// Extracts the sketch from the group by result holder for key
+  /// or creates a new one if it does not exist.
   protected FrequentItemsSketch<String> getOrCreateSketch(GroupByResultHolder groupByResultHolder, int groupKey) {
     FrequentItemsSketch<String> sketch = groupByResultHolder.getResult(groupKey);
     if (sketch == null) {
@@ -198,9 +185,7 @@ public class FrequentStringsSketchAggregationFunction
     return sketch;
   }
 
-  /**
-   * Deserializes the sketches from the bytes.
-   */
+  /// Deserializes the sketches from the bytes.
   protected FrequentItemsSketch<String>[] deserializeSketches(byte[][] serializedSketches) {
     FrequentItemsSketch<String>[] sketches = new FrequentItemsSketch[serializedSketches.length];
     for (int i = 0; i < serializedSketches.length; i++) {
@@ -210,11 +195,13 @@ public class FrequentStringsSketchAggregationFunction
     return sketches;
   }
 
+  @Nullable
   @Override
   public FrequentItemsSketch<String> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public FrequentItemsSketch<String> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
@@ -223,12 +210,8 @@ public class FrequentStringsSketchAggregationFunction
   @Override
   public FrequentItemsSketch<String> merge(FrequentItemsSketch<String> sketch1, FrequentItemsSketch<String> sketch2) {
     FrequentItemsSketch<String> union = new FrequentItemsSketch<>(_maxMapSize);
-    if (sketch1 != null) {
-      union.merge(sketch1);
-    }
-    if (sketch2 != null) {
-      union.merge(sketch2);
-    }
+    union.merge(sketch1);
+    union.merge(sketch2);
     return union;
   }
 
@@ -259,8 +242,10 @@ public class FrequentStringsSketchAggregationFunction
         + "(" + _expression + ")";
   }
 
+  @Nullable
   @Override
-  public Comparable<?> extractFinalResult(FrequentItemsSketch<String> sketch) {
-    return new SerializedFrequentStringsSketch(sketch);
+  public Comparable<?> extractFinalResult(@Nullable FrequentItemsSketch<String> sketch) {
+    // A null intermediate result means nothing was aggregated, and there is no sketch to serialize
+    return sketch != null ? new SerializedFrequentStringsSketch(sketch) : null;
   }
 }

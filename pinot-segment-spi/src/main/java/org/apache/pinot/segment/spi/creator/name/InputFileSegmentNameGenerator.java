@@ -30,12 +30,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Segment name generator that supports defining the segment name based on the input file name and path, via a pattern
- * (matched against the input file URI) and a template (currently only supports ${filePathPattern:\N}, where N is the
- * group match number from the regex).
- *
- */
+/// Segment name generator that supports defining the segment name based on the input file name and path, via a pattern
+/// (matched against the input file URI) and a template (currently only supports ${filePathPattern:\N}, where N is the
+/// group match number from the regex).
 @SuppressWarnings("serial")
 public class InputFileSegmentNameGenerator implements SegmentNameGenerator {
 
