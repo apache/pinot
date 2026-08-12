@@ -111,10 +111,9 @@ public class TimeSegmentPruner implements SegmentPruner {
       // Always update segments that have DEFAULT_INTERVAL, which covers two cases:
       // 1. New segments not yet in the map
       // 2. Segments that transitioned from CONSUMING (DEFAULT_INTERVAL) to COMMITTED (valid time range)
-      Interval existing = _intervalMap.get(segment);
-      if (existing == null || existing == DEFAULT_INTERVAL) {
-        _intervalMap.put(segment, extractIntervalFromSegmentZKMetaZNRecord(segment, zNrecord));
-      }
+      _intervalMap.compute(segment, (k, existing) ->
+          (existing == null || existing == DEFAULT_INTERVAL) ? extractIntervalFromSegmentZKMetaZNRecord(k, zNrecord)
+              : existing);
     }
     _intervalMap.keySet().retainAll(onlineSegments);
     _intervalTree = new IntervalTree<>(_intervalMap);
