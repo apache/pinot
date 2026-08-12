@@ -21,31 +21,17 @@ package org.apache.pinot.client;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectReader;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
 import java.math.BigDecimal;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.sql.Date;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLDataException;
 import java.sql.SQLException;
-import java.sql.Time;
 import java.sql.Timestamp;
-import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.apache.commons.codec.DecoderException;
-import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.client.base.AbstractBaseResultSet;
-import org.apache.pinot.client.utils.DateTimeUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -122,13 +108,6 @@ public class PinotResultSet extends AbstractBaseResultSet {
     }
   }
 
-  protected void validateState()
-      throws SQLException {
-    if (isClosed()) {
-      throw new SQLException("Not possible to operate on closed or empty result sets");
-    }
-  }
-
   protected void validateColumn(int columnIndex)
       throws SQLException {
     validateState();
@@ -198,6 +177,11 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
+  protected String getColumnTypeName(int columnIndex) {
+    return _columnDataTypes.getOrDefault(columnIndex, "");
+  }
+
+  @Override
   public boolean first()
       throws SQLException {
     validateState();
@@ -207,113 +191,11 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public InputStream getAsciiStream(int columnIndex)
-      throws SQLException {
-    String value = getString(columnIndex);
-    InputStream in = new ByteArrayInputStream(value.getBytes(StandardCharsets.US_ASCII));
-    return in;
-  }
-
-  @Override
-  public BigDecimal getBigDecimal(int columnIndex, int scale)
-      throws SQLException {
-    try {
-      String value = this.getString(columnIndex);
-      int calculatedScale = getCalculatedScale(value);
-      return value == null ? null : new BigDecimal(value).setScale(calculatedScale);
-    } catch (Exception e) {
-      throw new SQLException("Unable to fetch BigDecimal value", e);
-    }
-  }
-
-  int getCalculatedScale(String value) {
-    int index = value.indexOf(".");
-    return index == -1 ? 0 : value.length() - index - 1;
-  }
-
-  @Override
-  public boolean getBoolean(int columnIndex)
-      throws SQLException {
-    validateColumn(columnIndex);
-    String value = getString(columnIndex);
-    return value == null ? false : Boolean.parseBoolean(value);
-  }
-
-  @Override
-  public byte[] getBytes(int columnIndex)
-      throws SQLException {
-    try {
-      String value = getString(columnIndex);
-      return value == null ? null : Hex.decodeHex(value.toCharArray());
-    } catch (Exception e) {
-      throw new SQLException(String.format("Unable to fetch value for column %d", columnIndex), e);
-    }
-  }
-
-  @Override
-  public Reader getCharacterStream(int columnIndex)
-      throws SQLException {
-    InputStream in = getUnicodeStream(columnIndex);
-    Reader reader = new InputStreamReader(in, StandardCharsets.UTF_8);
-    return reader;
-  }
-
-  @Override
-  public Date getDate(int columnIndex, Calendar cal)
-      throws SQLException {
-    try {
-      String value = getString(columnIndex);
-      return value == null ? null : DateTimeUtils.getDateFromString(value, cal);
-    } catch (Exception e) {
-      throw new SQLException("Unable to fetch date", e);
-    }
-  }
-
-  @Override
-  public double getDouble(int columnIndex)
-      throws SQLException {
-    validateColumn(columnIndex);
-    String value = getString(columnIndex);
-    return value == null ? 0.0 : Double.parseDouble(value);
-  }
-
-  @Override
-  public float getFloat(int columnIndex)
-      throws SQLException {
-    validateColumn(columnIndex);
-    String value = getString(columnIndex);
-    return value == null ? 0.0f : Float.parseFloat(value);
-  }
-
-  @Override
-  public int getInt(int columnIndex)
-      throws SQLException {
-    validateColumn(columnIndex);
-    String value = getString(columnIndex);
-    return value == null ? 0 : Integer.parseInt(value);
-  }
-
-  @Override
-  public long getLong(int columnIndex)
-      throws SQLException {
-    validateColumn(columnIndex);
-    String value = getString(columnIndex);
-    return value == null ? 0 : Long.parseLong(value);
-  }
-
-  @Override
   public int getRow()
       throws SQLException {
     validateState();
 
     return _currentRow;
-  }
-
-  @Override
-  public short getShort(int columnIndex)
-      throws SQLException {
-    Integer value = getInt(columnIndex);
-    return value == null ? null : value.shortValue();
   }
 
   @Override
@@ -329,68 +211,6 @@ public class PinotResultSet extends AbstractBaseResultSet {
     return val;
   }
 
-  @Override
-  public Object getObject(int columnIndex)
-      throws SQLException {
-
-    String dataTypeName = _columnDataTypes.getOrDefault(columnIndex, "");
-    ColumnDataType dataType;
-    try {
-      dataType = ColumnDataType.valueOf(dataTypeName);
-    } catch (IllegalArgumentException e) {
-      throw new SQLDataException("Data type not supported for " + dataTypeName, e);
-    }
-
-    if (dataType.isArray()) {
-      return getList(columnIndex, dataType);
-    }
-    switch (dataType) {
-      case STRING:
-      case JSON:
-        return getString(columnIndex);
-      case INT:
-        return getInt(columnIndex);
-      case LONG:
-        return getLong(columnIndex);
-      case FLOAT:
-        return getFloat(columnIndex);
-      case DOUBLE:
-        return getDouble(columnIndex);
-      case BIG_DECIMAL:
-        return getBigDecimal(columnIndex);
-      case BOOLEAN:
-        return getBoolean(columnIndex);
-      case BYTES:
-        return getBytes(columnIndex);
-      case UUID:
-        return getUuid(columnIndex);
-      case TIMESTAMP:
-        return getTimestamp(columnIndex);
-      case MAP:
-        return getMap(columnIndex);
-      default:
-        throw new SQLDataException("Data type not supported for " + dataType);
-    }
-  }
-
-  @Override
-  public <T> T getObject(int columnIndex, Class<T> type)
-      throws SQLException {
-    Object value = getObject(columnIndex);
-
-    try {
-      return type.cast(value);
-    } catch (ClassCastException e) {
-      throw new SQLDataException("Data type conversion is not supported from :" + value.getClass() + " to: " + type);
-    }
-  }
-
-  @Override
-  public <T> T getObject(String columnLabel, Class<T> type)
-      throws SQLException {
-    return super.getObject(columnLabel, type);
-  }
-
   private boolean checkIsNull(String val) {
     if (val == null || val.toLowerCase().contentEquals(NULL_STRING)) {
       _wasNull = true;
@@ -400,65 +220,13 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public Time getTime(int columnIndex, Calendar cal)
-      throws SQLException {
-    try {
-      String value = getString(columnIndex);
-      return value == null ? null : DateTimeUtils.getTimeFromString(value, cal);
-    } catch (Exception e) {
-      throw new SQLException("Unable to fetch date", e);
-    }
-  }
-
-  @Override
-  public Timestamp getTimestamp(int columnIndex, Calendar cal)
-      throws SQLException {
-    try {
-      String value = getString(columnIndex);
-      return value == null ? null : DateTimeUtils.getTimestampFromString(value, cal);
-    } catch (Exception e) {
-      throw new SQLException("Unable to fetch date", e);
-    }
-  }
-
-  @Override
-  public URL getURL(int columnIndex)
-      throws SQLException {
-    try {
-      URL url = new URL(getString(columnIndex));
-      return url;
-    } catch (Exception e) {
-      throw new SQLException("Unable to fetch URL", e);
-    }
-  }
-
-  @Override
-  public InputStream getUnicodeStream(int columnIndex)
-      throws SQLException {
-    String value = getString(columnIndex);
-    InputStream in = new ByteArrayInputStream(value.getBytes(StandardCharsets.UTF_8));
-    return in;
-  }
-
-  private Map<?, ?> getMap(int columnIndex)
+  protected Map<?, ?> getMap(int columnIndex)
       throws SQLException {
     return parseJson(columnIndex, MAP_READER, "map");
   }
 
-  private UUID getUuid(int columnIndex)
-      throws SQLException {
-    String value = getString(columnIndex);
-    if (value == null) {
-      return null;
-    }
-    try {
-      return UUID.fromString(value);
-    } catch (IllegalArgumentException e) {
-      throw new SQLDataException("Error parsing UUID", e);
-    }
-  }
-
-  private List<?> getList(int columnIndex, ColumnDataType dataType)
+  @Override
+  protected List<?> getList(int columnIndex, ColumnDataType dataType)
       throws SQLException {
     switch (dataType) {
       case BOOLEAN_ARRAY:
@@ -489,53 +257,19 @@ public class PinotResultSet extends AbstractBaseResultSet {
   private List<Timestamp> getTimestampList(int columnIndex)
       throws SQLException {
     List<String> values = parseJson(columnIndex, STRING_LIST_READER, "timestamp array");
-    if (values == null) {
-      return null;
-    }
-    List<Timestamp> timestamps = new ArrayList<>(values.size());
-    Calendar calendar = Calendar.getInstance();
-    try {
-      for (String value : values) {
-        timestamps.add(value == null ? null : DateTimeUtils.getTimestampFromString(value, calendar));
-      }
-      return timestamps;
-    } catch (ParseException e) {
-      throw new SQLDataException("Error parsing timestamp array", e);
-    }
+    return toTimestampList(values);
   }
 
   private List<byte[]> getBytesList(int columnIndex)
       throws SQLException {
     List<String> values = parseJson(columnIndex, STRING_LIST_READER, "bytes array");
-    if (values == null) {
-      return null;
-    }
-    List<byte[]> bytes = new ArrayList<>(values.size());
-    try {
-      for (String value : values) {
-        bytes.add(value == null ? null : Hex.decodeHex(value));
-      }
-      return bytes;
-    } catch (DecoderException e) {
-      throw new SQLDataException("Error parsing bytes array", e);
-    }
+    return toBytesList(values);
   }
 
   private List<UUID> getUuidList(int columnIndex)
       throws SQLException {
     List<String> values = parseJson(columnIndex, STRING_LIST_READER, "UUID array");
-    if (values == null) {
-      return null;
-    }
-    List<UUID> uuids = new ArrayList<>(values.size());
-    try {
-      for (String value : values) {
-        uuids.add(value == null ? null : UUID.fromString(value));
-      }
-      return uuids;
-    } catch (IllegalArgumentException e) {
-      throw new SQLDataException("Error parsing UUID array", e);
-    }
+    return toUuidList(values);
   }
 
   private <T> T parseJson(int columnIndex, ObjectReader reader, String type)
