@@ -110,7 +110,12 @@ public class VectorIndexUtils {
   /// directory once rather than performing `columns × extensions` existence probes. Finding
   /// `<column><extension>` in the listing is equivalent to that path existing, so the answer is the
   /// same.
-  public static Set<String> getColumnsWithVectorIndex(File segDir, Collection<String> columns) {
+  ///
+  /// A null `segDir` means the segment is not backed by a local directory and therefore not supports sidecar index.
+  public static Set<String> getColumnsWithVectorIndex(@Nullable File segDir, Collection<String> columns) {
+    if (segDir == null) {
+      return Set.of();
+    }
     Set<String> entries = listEntryNames(segDir);
     Set<String> columnsWithIndex = new HashSet<>();
     for (String column : columns) {
