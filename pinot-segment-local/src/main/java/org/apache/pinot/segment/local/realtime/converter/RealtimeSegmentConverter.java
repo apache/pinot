@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -42,6 +43,7 @@ import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,10 +62,19 @@ public class RealtimeSegmentConverter {
   private final boolean _nullHandlingEnabled;
   private final boolean _enableColumnMajor;
   private final ServerMetrics _serverMetrics;
+  private final boolean _ingestionGroovyDisabled;
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, SegmentZKPropsConfig segmentZKPropsConfig,
       String outputPath, Schema schema, String tableName, TableConfig tableConfig, String segmentName,
       boolean nullHandlingEnabled) {
+    this(realtimeSegment, segmentZKPropsConfig, outputPath, schema, tableName, tableConfig, segmentName,
+        nullHandlingEnabled,
+        IngestionGroovyPolicy.fromDisabled(FunctionEvaluatorFactory.isIngestionGroovyDisabled()));
+  }
+
+  public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, SegmentZKPropsConfig segmentZKPropsConfig,
+      String outputPath, Schema schema, String tableName, TableConfig tableConfig, String segmentName,
+      boolean nullHandlingEnabled, IngestionGroovyPolicy ingestionGroovyPolicy) {
     _realtimeSegmentImpl = realtimeSegment;
     _segmentZKPropsConfig = segmentZKPropsConfig;
     _outputPath = outputPath;
@@ -72,6 +83,7 @@ public class RealtimeSegmentConverter {
     _tableConfig = tableConfig;
     _segmentName = segmentName;
     _nullHandlingEnabled = nullHandlingEnabled;
+    _ingestionGroovyDisabled = ingestionGroovyPolicy.isIngestionGroovyDisabled();
     if (_tableConfig.getIngestionConfig() != null
         && _tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
       _enableColumnMajor =
@@ -87,6 +99,7 @@ public class RealtimeSegmentConverter {
     SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(_tableConfig, _dataSchema);
     genConfig.setInstanceType(InstanceType.SERVER);
     genConfig.setRealtimeConversion(true);
+    genConfig.setIngestionGroovyDisabled(_ingestionGroovyDisabled);
     genConfig.setConsumerDir(_realtimeSegmentImpl.getConsumerDir());
 
     // The segment generation code in SegmentColumnarIndexCreator will throw

@@ -92,7 +92,7 @@ public class RealtimeProvisioningRule extends AbstractRule {
     MemoryEstimator memoryEstimator =
         new MemoryEstimator(tableConfig, _input.getSchema(), _input.getSchemaWithMetadata(),
             _params.getNumRowsInGeneratedSegment(), ingestionRatePerPartition, maxUsableHostMemoryByte, retentionHours,
-            workingDir);
+            workingDir, _input.getIngestionGroovyPolicy());
     try {
       // run memory estimator
       File statsFile = memoryEstimator.initializeStatsHistory();

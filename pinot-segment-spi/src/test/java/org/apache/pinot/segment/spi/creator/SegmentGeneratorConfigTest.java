@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.spi.creator;
 
+import java.io.ObjectStreamClass;
+import java.lang.reflect.Field;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenerator;
@@ -33,12 +35,36 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 // TODO: add more tests here.
 public class SegmentGeneratorConfigTest {
+
+  @Test
+  public void testGroovyPolicySerializationCompatibility()
+      throws ReflectiveOperationException {
+    assertEquals(ObjectStreamClass.lookup(SegmentGeneratorConfig.class).getSerialVersionUID(),
+        4848997363993935176L);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, new Schema.SchemaBuilder().build());
+    assertFalse(config.resolveIngestionGroovyDisabled(false));
+    assertTrue(config.resolveIngestionGroovyDisabled(true));
+
+    config.setIngestionGroovyDisabled(false);
+    assertFalse(config.isIngestionGroovyDisabled());
+    assertFalse(config.resolveIngestionGroovyDisabled(true));
+
+    // A config serialized before the policy field was introduced deserializes with a null value and must fail closed.
+    Field ingestionGroovyDisabledField = SegmentGeneratorConfig.class.getDeclaredField("_ingestionGroovyDisabled");
+    ingestionGroovyDisabledField.setAccessible(true);
+    ingestionGroovyDisabledField.set(config, null);
+    assertTrue(config.isIngestionGroovyDisabled());
+  }
 
   @Test
   public void testEpochTime() {

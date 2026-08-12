@@ -23,6 +23,8 @@ import com.google.common.base.Preconditions;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
@@ -38,6 +40,7 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationTaskSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
@@ -46,8 +49,8 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-@SuppressWarnings("serial")
 public class SegmentGenerationTaskRunner implements Serializable {
+  private static final long serialVersionUID = -1755560917714370885L;
 
   // For FixedSegmentNameGenerator
   public static final String SEGMENT_NAME = "segment.name";
@@ -71,9 +74,17 @@ public class SegmentGenerationTaskRunner implements Serializable {
   public static final String EXCLUDE_TIME_IN_SEGMENT_NAME = BatchConfigProperties.EXCLUDE_TIME_IN_SEGMENT_NAME;
 
   private final SegmentGenerationTaskSpec _taskSpec;
+  @Nullable
+  private final IngestionGroovyPolicy _ingestionGroovyPolicy;
 
   public SegmentGenerationTaskRunner(SegmentGenerationTaskSpec taskSpec) {
+    this(taskSpec, IngestionGroovyPolicy.fromDisabled(FunctionEvaluatorFactory.isIngestionGroovyDisabled()));
+  }
+
+  public SegmentGenerationTaskRunner(SegmentGenerationTaskSpec taskSpec,
+      IngestionGroovyPolicy ingestionGroovyPolicy) {
     _taskSpec = taskSpec;
+    _ingestionGroovyPolicy = ingestionGroovyPolicy;
   }
 
   public String run()
@@ -107,6 +118,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
     segmentGeneratorConfig.setInputFilePath(_taskSpec.getInputFilePath());
     segmentGeneratorConfig.setCustomProperties(_taskSpec.getCustomProperties());
     segmentGeneratorConfig.setFailOnEmptySegment(_taskSpec.isFailOnEmptySegment());
+    segmentGeneratorConfig.setIngestionGroovyDisabled(isIngestionGroovyDisabled());
 
     //init segmentName Generator
     SegmentNameGenerator segmentNameGenerator = getSegmentNameGenerator(segmentGeneratorConfig);
@@ -117,6 +129,11 @@ public class SegmentGenerationTaskRunner implements Serializable {
     segmentIndexCreationDriver.init(segmentGeneratorConfig);
     segmentIndexCreationDriver.build();
     return segmentIndexCreationDriver.getSegmentName();
+  }
+
+  boolean isIngestionGroovyDisabled() {
+    // Serialized runners created before this field was introduced have a null value and must fail closed.
+    return _ingestionGroovyPolicy == null || _ingestionGroovyPolicy.isIngestionGroovyDisabled();
   }
 
   private SegmentNameGenerator getSegmentNameGenerator(SegmentGeneratorConfig segmentGeneratorConfig) {

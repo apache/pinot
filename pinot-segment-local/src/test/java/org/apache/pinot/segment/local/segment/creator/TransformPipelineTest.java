@@ -18,17 +18,23 @@
  */
 package org.apache.pinot.segment.local.segment.creator;
 
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
+import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.MaxLengthExceedStrategy;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
@@ -37,6 +43,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class TransformPipelineTest {
@@ -864,5 +871,69 @@ public class TransformPipelineTest {
     assertEquals(result.getIncompleteRowCount(), 1);
     assertEquals(result.getSanitizedRowCount(), 0);
     assertEquals(result.getSkippedRowCount(), 0);
+  }
+
+  @Test
+  public void testExplicitGroovyPolicyForFilter() {
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testTable")
+        .addSingleValueDimension("source", DataType.STRING)
+        .build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setFilterConfig(new FilterConfig("Groovy({source == 'drop'}, source)"));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testTable")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    IllegalStateException exception =
+        expectThrows(IllegalStateException.class,
+            () -> new TransformPipeline(tableConfig, schema, IngestionGroovyPolicy.DISABLED));
+    assertTrue(exception.getMessage().contains(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY));
+
+    TransformPipeline pipeline = new TransformPipeline(tableConfig, schema, IngestionGroovyPolicy.ENABLED);
+    GenericRow filteredRow = new GenericRow();
+    filteredRow.putValue("source", "drop");
+    TransformPipeline.Result filteredResult = pipeline.processRow(filteredRow);
+    assertTrue(filteredResult.getTransformedRows().isEmpty());
+    assertEquals(filteredResult.getSkippedRowCount(), 1);
+
+    GenericRow retainedRow = new GenericRow();
+    retainedRow.putValue("source", "keep");
+    TransformPipeline.Result retainedResult = pipeline.processRow(retainedRow);
+    assertEquals(retainedResult.getTransformedRows().size(), 1);
+    assertEquals(retainedResult.getTransformedRows().get(0).getValue("source"), "keep");
+  }
+
+  @Test
+  public void testExplicitGroovyPolicyForGenerateColumnEnricher() {
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testTable")
+        .addSingleValueDimension("source", DataType.STRING)
+        .addSingleValueDimension("destination", DataType.STRING)
+        .build();
+    ObjectNode fieldToFunctionMap = JsonNodeFactory.instance.objectNode();
+    fieldToFunctionMap.put("destination", "Groovy({source.reverse()}, source)");
+    ObjectNode enrichmentProperties = JsonNodeFactory.instance.objectNode();
+    enrichmentProperties.set("fieldToFunctionMap", fieldToFunctionMap);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setEnrichmentConfigs(
+        List.of(new EnrichmentConfig("generateColumn", enrichmentProperties, false)));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testTable")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    IllegalStateException exception =
+        expectThrows(IllegalStateException.class,
+            () -> new TransformPipeline(tableConfig, schema, IngestionGroovyPolicy.DISABLED));
+    assertTrue(exception.getMessage().contains(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY));
+
+    TransformPipeline pipeline = new TransformPipeline(tableConfig, schema, IngestionGroovyPolicy.ENABLED);
+    GenericRow row = new GenericRow();
+    row.putValue("source", "abc");
+    TransformPipeline.Result result = pipeline.processRow(row);
+    assertEquals(result.getTransformedRows().size(), 1);
+    assertEquals(result.getTransformedRows().get(0).getValue("destination"), "cba");
   }
 }

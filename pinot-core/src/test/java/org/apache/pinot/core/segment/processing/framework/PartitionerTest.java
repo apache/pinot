@@ -29,10 +29,13 @@ import org.apache.pinot.core.segment.processing.partitioner.TableConfigPartition
 import org.apache.pinot.core.segment.processing.partitioner.TransformFunctionPartitioner;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 
@@ -169,7 +172,7 @@ public class PartitionerTest {
     partitionerConfig =
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
             .setTransformFunction("toEpochDays(\"timestamp\")").build();
-    Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
+    Partitioner partitioner = PartitionerFactory.getPartitioner(partitionerConfig, IngestionGroovyPolicy.DISABLED);
     assertEquals(partitioner.getClass(), TransformFunctionPartitioner.class);
     GenericRow row = new GenericRow();
     row.putValue("timestamp", 1587410614000L);
@@ -178,7 +181,12 @@ public class PartitionerTest {
     partitionerConfig =
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
             .setTransformFunction("Groovy({a+b},a,b)").build();
-    partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
+    PartitionerConfig groovyPartitionerConfig = partitionerConfig;
+    IllegalStateException exception = expectThrows(IllegalStateException.class,
+        () -> PartitionerFactory.getPartitioner(groovyPartitionerConfig, IngestionGroovyPolicy.DISABLED));
+    assertTrue(exception.getMessage().contains(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY));
+
+    partitioner = PartitionerFactory.getPartitioner(partitionerConfig, IngestionGroovyPolicy.ENABLED);
     row.putValue("a", 10);
     row.putValue("b", 20);
     assertEquals(partitioner.getPartition(row), "30");
@@ -187,7 +195,7 @@ public class PartitionerTest {
     partitionerConfig =
         new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TRANSFORM_FUNCTION)
             .setTransformFunction("Groovy({dMv[1]},dMv)").build();
-    partitioner = PartitionerFactory.getPartitioner(partitionerConfig);
+    partitioner = PartitionerFactory.getPartitioner(partitionerConfig, IngestionGroovyPolicy.ENABLED);
     row.putValue("dMv", new Object[]{1, 2, 3});
     assertEquals(partitioner.getPartition(row), "2");
   }
