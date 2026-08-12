@@ -222,6 +222,19 @@ public class PinotSegmentRestletResourceTest {
         Map.of(HttpHeaders.IF_MATCH, Long.toString(originalCrc)));
     assertEquals(response.getStatusCode(), 400);
 
+    for (String malformedModifier : List.of(
+        "[]",
+        "{}",
+        "{\"mapModifyMode\":null,\"map\":{}}",
+        "{\"mapModifyMode\":1,\"map\":{}}",
+        "{\"mapModifyMode\":\"UPDATE\",\"map\":[]}",
+        "{\"mapModifyMode\":\"UPDATE\",\"map\":{\"key\":1}}",
+        "{\"mapModifyMode\":\"UPDATE\",\"map\":{\"key\":{\"nested\":\"value\"}}}")) {
+      response = ControllerTest.getHttpClient().sendJsonPutRequest(URI.create(endpoint), malformedModifier,
+          Map.of(HttpHeaders.IF_MATCH, Long.toString(originalCrc)));
+      assertEquals(response.getStatusCode(), 400);
+    }
+
     response = ControllerTest.getHttpClient().sendJsonPutRequest(URI.create(endpoint), modifier,
         Map.of(HttpHeaders.IF_MATCH, Long.toString(originalCrc + 1)));
     assertEquals(response.getStatusCode(), 412);

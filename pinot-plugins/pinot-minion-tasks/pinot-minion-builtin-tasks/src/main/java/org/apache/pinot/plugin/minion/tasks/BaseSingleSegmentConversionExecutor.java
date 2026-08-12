@@ -153,13 +153,14 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
               tableNameWithType);
           return segmentConversionResult;
         } catch (HttpErrorStatusException e) {
-          if (e.getStatusCode() != HttpStatus.SC_NOT_FOUND) {
+          if (e.getStatusCode() != HttpStatus.SC_NOT_FOUND
+              && e.getStatusCode() != HttpStatus.SC_METHOD_NOT_ALLOWED) {
             _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_UPLOAD_FAIL_COUNT, 1L);
             _eventObserver.notifyTaskError(_pinotTaskConfig, e);
             throw e;
           }
-          // The endpoint is additive. Fall back to the existing upload path when a mixed-version controller does not
-          // expose it yet. A missing segment also follows the fallback and is rejected by the refresh-only upload.
+          // Older controllers return 405 because this path only supports GET. Controllers without the path return 404.
+          // A missing segment can also return 404 and is rejected by the refresh-only upload fallback.
           LOGGER.info("Segment ZK metadata update API is unavailable for segment: {} of table: {}, falling back to "
               + "segment upload", segmentName, tableNameWithType);
         } catch (Exception e) {

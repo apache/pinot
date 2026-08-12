@@ -325,6 +325,7 @@ public class PinotSegmentRestletResource {
   @PUT
   @Path("segments/{tableNameWithType}/{segmentName}/metadata")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.UPLOAD_SEGMENT)
+  @Authenticate(AccessType.UPDATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update the custom map in the ZK metadata for a segment",

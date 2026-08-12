@@ -52,6 +52,7 @@ import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -151,13 +152,13 @@ public class BaseSingleSegmentConversionExecutorTest {
     }
   }
 
-  @Test
-  public void testExecuteTaskFallsBackToUploadWhenMetadataApiIsUnavailable()
+  @Test(dataProvider = "metadataApiUnavailableStatusCodes")
+  public void testExecuteTaskFallsBackToUploadWhenMetadataApiIsUnavailable(int statusCode)
       throws Exception {
     try (MockedStatic<SegmentConversionUtils> mocked = Mockito.mockStatic(SegmentConversionUtils.class)) {
       mocked.when(() -> SegmentConversionUtils.updateSegmentZKMetadata(Mockito.anyString(), Mockito.anyString(),
               Mockito.anyString(), Mockito.anyString(), Mockito.any(), Mockito.any()))
-          .thenThrow(new HttpErrorStatusException("metadata API not found", HttpStatus.SC_NOT_FOUND));
+          .thenThrow(new HttpErrorStatusException("metadata API unavailable", statusCode));
 
       TestSingleSegmentConversionExecutor executor = new TestSingleSegmentConversionExecutor(true);
       SegmentConversionResult result = executor.executeTask(createTaskConfig());
@@ -166,6 +167,11 @@ public class BaseSingleSegmentConversionExecutorTest {
       mocked.verify(() -> SegmentConversionUtils.uploadSegment(Mockito.any(), Mockito.any(), Mockito.any(),
           Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any(File.class)));
     }
+  }
+
+  @DataProvider(name = "metadataApiUnavailableStatusCodes")
+  public Object[][] metadataApiUnavailableStatusCodes() {
+    return new Object[][]{{HttpStatus.SC_NOT_FOUND}, {HttpStatus.SC_METHOD_NOT_ALLOWED}};
   }
 
   private PinotTaskConfig createTaskConfig() {
