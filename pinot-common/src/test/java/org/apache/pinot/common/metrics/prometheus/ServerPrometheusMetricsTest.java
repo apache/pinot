@@ -73,12 +73,17 @@ public abstract class ServerPrometheusMetricsTest extends PinotPrometheusMetrics
   // match at all, so a generic rule claims it and the assertion passes against a shape that never occurs in
   // production. They are dispatched separately so the exported labels are checked against the real name.
   private static final String OPEN_STRUCT_COLUMN = "metrics";
-  // Exercises three of the four key shapes the server.yml rule claims to support: an embedded '$', a '.', and
-  // a '-'. The embedded '$' is the one worth pinning — '$' is the column/key delimiter, so only a column group
-  // that stops at the first '$' and a greedy key group that takes the rest can round-trip this. Spaces are
-  // also legal in a Prometheus label value but are not covered here: PromMetric#fromExportedMetric splits the
-  // scrape line on the first space, so a space in a label value defeats the harness, not the exporter.
-  private static final String OPEN_STRUCT_KEY = "clicks.v2$promo-code";
+  // The key as ingested. Exercises an embedded '$', a '.', a '-' and a '"'. The '$' is worth pinning
+  // because it is the column/key delimiter, so only a column group that stops at the first '$' and a
+  // greedy key group that takes the rest can round-trip it. The '"' is worth pinning because
+  // ObjectName.quote backslash-escapes it on the way to JMX, which stops the name matching the scrape
+  // rule at all — the metric would silently lose its column/key labels. OpenStructNaming#metricKey
+  // percent-escapes it before emission, so the exported label is OPEN_STRUCT_KEY_EXPORTED below. Spaces
+  // are legal in a label value but are not covered: PromMetric#fromExportedMetric splits the scrape line
+  // on the first space, so a space defeats the harness, not the exporter.
+  private static final String OPEN_STRUCT_KEY = "clicks.v2$promo\"code";
+  // '"' escaped to '%22'; '.', '-' and '$' pass through untouched.
+  private static final String OPEN_STRUCT_KEY_EXPORTED = "clicks.v2$promo%22code";
   private static final String LABEL_KEY_COLUMN = "column";
   private static final String LABEL_KEY_KEY = "key";
 
@@ -96,7 +101,7 @@ public abstract class ServerPrometheusMetricsTest extends PinotPrometheusMetrics
   private static final List<String> TABLENAME_TABLETYPE_COLUMN_KEY =
       List.of(ExportedLabelKeys.TABLE, ExportedLabelValues.TABLENAME, ExportedLabelKeys.TABLETYPE,
           ExportedLabelValues.TABLETYPE_REALTIME, LABEL_KEY_COLUMN, OPEN_STRUCT_COLUMN, LABEL_KEY_KEY,
-          OPEN_STRUCT_KEY);
+          OPEN_STRUCT_KEY_EXPORTED);
 
   // pinot.mse.* metrics share the role-agnostic prefix and must be exported from every JVM role
   // that registers MseMetrics; on server JVMs this exercises the server.yml catch-all rule.
@@ -180,7 +185,7 @@ public abstract class ServerPrometheusMetricsTest extends PinotPrometheusMetrics
         assertGaugeExportedCorrectly(serverGauge.getGaugeName(), ExportedLabels.TABLENAME, EXPORTED_METRIC_PREFIX);
       } else if (serverGauge == ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT) {
         _serverMetrics.setOrUpdateTableGauge(TABLE_NAME_WITH_TYPE,
-            OpenStructNaming.materializedColumnName(OPEN_STRUCT_COLUMN, OPEN_STRUCT_KEY), serverGauge, 100L);
+            OpenStructNaming.metricKey(OPEN_STRUCT_COLUMN, OPEN_STRUCT_KEY), serverGauge, 100L);
         assertGaugeExportedCorrectly(serverGauge.getGaugeName(), TABLENAME_TABLETYPE_COLUMN_KEY,
             EXPORTED_METRIC_PREFIX);
       } else if (GAUGES_ACCEPTING_OPEN_STRUCT_COLUMN.contains(serverGauge)) {

@@ -757,6 +757,38 @@ public class OpenStructColumnSplitterTest {
     }
   }
 
+  /// Pins the emission path to `metricKey`, not `materializedColumnName`. OPEN_STRUCT keys come from
+  /// user JSON, and a '"' in one is backslash-escaped by ObjectName.quote on the way to JMX, which stops
+  /// the exported name matching the per-key scrape rule at all -- the key silently loses its column/key
+  /// labels. Every other per-key test above uses a clean key, for which the two helpers agree, so this is
+  /// the only case here that fails if the call site regresses.
+  @Test
+  public void testPerKeyGaugeEscapesKeyForMetricName()
+      throws Exception {
+    String rawKey = "promo\"code";
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
+          config(0.5, -1, Set.of(rawKey)));
+      for (int d = 0; d < 10; d++) {
+        s.add(Map.of("host", "h", rawKey, (long) d), d);
+      }
+      s.classify();
+      s.seal();
+
+      verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE",
+          OpenStructNaming.metricKey("metrics", rawKey),
+          ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT, 10L);
+      // The unescaped form is what the old call site produced; it must not be emitted.
+      verify(metrics, never()).setOrUpdateTableGauge(
+          eq("testTable_OFFLINE"), eq(OpenStructNaming.materializedColumnName("metrics", rawKey)),
+          eq(ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT), anyLong());
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
   /// The key space is user-controlled, so the seal-time INFO summary names at most
   /// MAX_LOGGED_FAILURE_KEYS keys, highest count first.
   @Test

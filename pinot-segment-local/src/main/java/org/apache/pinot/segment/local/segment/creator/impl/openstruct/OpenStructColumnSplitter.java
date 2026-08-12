@@ -334,15 +334,14 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     // segments is still unbounded. An explicit denseKeys list is the only operator-owned bound.
     // A configured key with no presence bitmap never appeared in this segment and is skipped;
     // one that appeared but was cut by the maxDenseKeys cap still reports, since a configured key
-    // that is not earning its materialized column is the case worth seeing. materializedColumnName
-    // is reused for the metric key even then: it is only the "<column>$<key>" identifier the scrape
-    // rule splits back into column and key labels, not a claim that the column exists on disk, and
-    // sharing the helper keeps the metric key and the dense column name from drifting apart.
+    // that is not earning its materialized column is the case worth seeing. metricKey rather than
+    // materializedColumnName: the key here need not have an on-disk column, and it has to be
+    // sanitised for the JMX name (see OpenStructNaming#metricKey).
     for (String key : _config.getDenseKeys()) {
       RoaringBitmap presence = _presenceBitmaps.get(key);
       if (presence != null) {
         serverMetrics.setOrUpdateTableGauge(_tableNameWithType,
-            OpenStructNaming.materializedColumnName(col, key),
+            OpenStructNaming.metricKey(col, key),
             ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT, presence.getCardinality());
       }
     }
