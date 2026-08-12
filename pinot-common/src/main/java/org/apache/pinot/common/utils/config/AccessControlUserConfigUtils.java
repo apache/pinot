@@ -46,13 +46,15 @@ public class AccessControlUserConfigUtils {
 
     List<String> tableList = znRecord.getListField(UserConfig.TABLES_KEY);
     List<String> excludeTableList = znRecord.getListField(UserConfig.EXCLUDE_TABLES_KEY);
+    List<String> fineGrainedPermissionList = znRecord.getListField(UserConfig.FINE_GRAINED_PERMISSIONS_KEY);
 
     List<String> permissionListFromZNRecord = znRecord.getListField(UserConfig.PERMISSIONS_KEY);
     List<AccessType> permissionList = null;
     if (permissionListFromZNRecord != null) {
       permissionList = permissionListFromZNRecord.stream().map(x -> AccessType.valueOf(x)).collect(Collectors.toList());
     }
-    return new UserConfig(username, password, component, role, tableList, excludeTableList, permissionList);
+    return new UserConfig(username, password, component, role, tableList, excludeTableList, permissionList,
+        fineGrainedPermissionList);
   }
 
   public static ZNRecord toZNRecord(UserConfig userConfig)
@@ -81,6 +83,10 @@ public class AccessControlUserConfigUtils {
     if (permissionList != null) {
       listFields.put(UserConfig.PERMISSIONS_KEY,
           userConfig.getPermissions().stream().map(e -> e.toString()).collect(Collectors.toList()));
+    }
+    List<String> fineGrainedPermissionList = userConfig.getFineGrainedPermissions();
+    if (fineGrainedPermissionList != null) {
+      listFields.put(UserConfig.FINE_GRAINED_PERMISSIONS_KEY, fineGrainedPermissionList);
     }
 
     ZNRecord znRecord = new ZNRecord(userConfig.getUserName());
