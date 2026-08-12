@@ -251,7 +251,9 @@ public class AggregationFunctionNullContractTest {
       AggregationFunctionType.PERCENTILERAWKLLMV, AggregationFunctionType.MINSTRING, AggregationFunctionType.MAXSTRING,
       AggregationFunctionType.MINLONG, AggregationFunctionType.MAXLONG, AggregationFunctionType.SUMINT,
       AggregationFunctionType.SUMLONG, AggregationFunctionType.SUMPRECISION, AggregationFunctionType.FIRSTWITHTIME,
-      AggregationFunctionType.LASTWITHTIME, AggregationFunctionType.ARRAYAGG, AggregationFunctionType.LISTAGG
+      AggregationFunctionType.LASTWITHTIME, AggregationFunctionType.ARRAYAGG, AggregationFunctionType.LISTAGG,
+      // Given the option so they can skip null rows; a row counts only when both input columns are non-null
+      AggregationFunctionType.COVARPOP, AggregationFunctionType.COVARSAMP
   );
 
   /// Functions this test cannot drive with a one-column synthetic block, pinned so that a silent drop-out is always a

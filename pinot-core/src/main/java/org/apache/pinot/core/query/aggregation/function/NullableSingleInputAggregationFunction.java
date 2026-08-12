@@ -123,7 +123,13 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
   }
 
   public IntIterator orNullIterator(BlockValSet valSet1, BlockValSet valSet2) {
-    if (!_nullHandlingEnabled) {
+    return orNullIterator(_nullHandlingEnabled, valSet1, valSet2);
+  }
+
+  /// Merges the null positions of two blocks without materializing a bitmap, for functions that pair a value from
+  /// each of two columns and so must skip a row when either side is null.
+  public static IntIterator orNullIterator(boolean nullHandlingEnabled, BlockValSet valSet1, BlockValSet valSet2) {
+    if (!nullHandlingEnabled) {
       return EmptyIntIterator.INSTANCE;
     } else {
       RoaringBitmap nullBlock1 = valSet1.getNullBitmap();

@@ -1480,6 +1480,68 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertEquals(rows.get(0)[0], 0.5);
   }
 
+  /// A covariance pairs a value from each column, so a row counts only when both are present.
+  @Test
+  public void testCovarPopSkipsRowsWhereEitherColumnIsNull()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(1, 10);
+    insertRowWithTwoColumns(null, 20);
+    insertRowWithTwoColumns(3, null);
+    insertRowWithTwoColumns(4, 40);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT COVAR_POP(%s, %s) FROM testTable", COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    List<Object[]> rows = brokerResponse.getResultTable().getRows();
+    assertEquals(rows.size(), 1);
+    // Only rows 0 and 3 contribute: mean(xy) - mean(x)mean(y) = 85 - 2.5 * 25
+    assertEquals(rows.get(0)[0], 22.5);
+  }
+
+  @Test
+  public void testCovarPopOverAllNullInputIsNull()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, 10);
+    insertRowWithTwoColumns(null, 20);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT COVAR_POP(%s, %s) FROM testTable", COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    List<Object[]> rows = brokerResponse.getResultTable().getRows();
+    assertEquals(rows.size(), 1);
+    assertNull(rows.get(0)[0]);
+  }
+
+  /// With the option off, null rows are read as the column default and folded in, as they always have been.
+  @Test
+  public void testCovarPopFoldsNullRowsWhenOptionDisabled()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, 10);
+    insertRowWithTwoColumns(null, 20);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT COVAR_POP(%s, %s) FROM testTable", COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+
+    List<Object[]> rows = brokerResponse.getResultTable().getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0)[0], 0.0);
+  }
+
   @Test(dataProvider = "NumberTypes")
   public void testGroupByStddevPop(FieldSpec.DataType dataType)
       throws Exception {
