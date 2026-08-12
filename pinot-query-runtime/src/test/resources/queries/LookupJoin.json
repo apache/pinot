@@ -211,7 +211,7 @@
         "ignoreLiteMode": true
       },
       {
-        "description": "A literal binds the LONG primary-key column. The planner types the literal, and a literal of the wrong numeric width misses every row, so the operator converts it to the stored type of the column.",
+        "description": "A constant binds the LONG primary-key column. The planner coerces the operands of the comparison, so the constant arrives with the type of the column, and the operator checks that before it builds the key. A constant of another type would miss every row.",
         "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {fact_tbl}.amount, {dim_tbl}.rate FROM {fact_tbl} JOIN {dim_tbl} ON {dim_tbl}.currency = {fact_tbl}.currency AND {dim_tbl}.rate_start_date = 1",
         "outputs": [
           [10, 125],

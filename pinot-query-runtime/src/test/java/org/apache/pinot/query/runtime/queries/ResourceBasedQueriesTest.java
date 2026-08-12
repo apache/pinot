@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.Maps;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStream;
@@ -52,10 +53,10 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
@@ -133,9 +134,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         List<QueryTestCase.ColumnAndType> columnAndTypes = table._schema;
         List<GenericRow> genericRows = toRow(columnAndTypes, table._inputs);
         if (table._replicated) {
-          addSegmentReplicated(factory1, factory2, offlineTableName, genericRows);
+          ImmutableSegment segment = addSegmentReplicated(factory1, factory2, offlineTableName, genericRows);
           if (table._isDimTable) {
-            registerMockDimensionTable(offlineTableName, schema, table, genericRows);
+            registerMockDimensionTable(offlineTableName, schema, table, segment);
           }
           continue;
         }
@@ -261,37 +262,48 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     }
   }
 
-  private void addSegmentReplicated(MockInstanceDataManagerFactory factory1, MockInstanceDataManagerFactory factory2,
-      String offlineTableName, List<GenericRow> rows) {
+  private ImmutableSegment addSegmentReplicated(MockInstanceDataManagerFactory factory1,
+      MockInstanceDataManagerFactory factory2, String offlineTableName, List<GenericRow> rows) {
     ImmutableSegment segment = factory1.addSegment(offlineTableName, rows);
     factory2.addSegment(offlineTableName, segment);
+    return segment;
   }
 
   /// Registers a mock DimensionTableDataManager for lookup join testing.
   /// The mock stores all rows in a HashMap keyed by primary key, supporting lookupValues(), containsKey() and
   /// getPrimaryKeyColumns().
   ///
-  /// A real dimension table reads its values from a segment, so every value has the stored type of its column. The
-  /// rows here come straight from the test case JSON, where the parser cannot know the column types, so this method
-  /// converts every value to the stored type of its column. Without the conversion the map holds an Integer where the
-  /// query supplies a Long, and [PrimaryKey] compares values with equals, so the lookup misses for reasons that have
-  /// nothing to do with the code under test.
+  /// The map is built from the segment with [PinotSegmentRecordReader], which is how a real
+  /// [DimensionTableDataManager] builds its own. Reading the segment is what keeps every value in the representation
+  /// that the column is stored in, for every data type, without this method holding a copy of the conversion rules.
+  /// The rows of the test case cannot be used directly: they hold the values that the JSON parser produced, where an
+  /// `Integer` stands where the query supplies a `Long`, and [PrimaryKey] compares values with equals, so the lookup
+  /// would miss for reasons that have nothing to do with the code under test.
   private void registerMockDimensionTable(String offlineTableName, Schema schema, QueryTestCase.Table table,
-      List<GenericRow> rows) {
+      ImmutableSegment segment) {
     List<String> primaryKeyColumns = table._primaryKeyColumns;
     if (primaryKeyColumns == null || primaryKeyColumns.isEmpty()) {
       throw new IllegalStateException(
           "isDimTable=true requires primaryKeyColumns to be set for table: " + offlineTableName);
     }
-    // Build an in-memory lookup map: PrimaryKey -> GenericRow
-    Map<PrimaryKey, GenericRow> lookupMap = new HashMap<>();
-    for (GenericRow row : rows) {
-      Object[] pkValues = new Object[primaryKeyColumns.size()];
-      for (int i = 0; i < primaryKeyColumns.size(); i++) {
-        String primaryKeyColumn = primaryKeyColumns.get(i);
-        pkValues[i] = toStoredValue(row.getValue(primaryKeyColumn), schema, primaryKeyColumn);
+    // Build an in-memory lookup map: PrimaryKey -> column name to stored value
+    List<String> columns = new ArrayList<>(schema.getColumnNames());
+    Map<PrimaryKey, Map<String, Object>> lookupMap = new HashMap<>();
+    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+      recordReader.init(segment);
+      int[] primaryKeyIndexes = recordReader.getIndexesForColumns(primaryKeyColumns);
+      int[] columnIndexes = recordReader.getIndexesForColumns(columns);
+      int numDocs = segment.getSegmentMetadata().getTotalDocs();
+      for (int docId = 0; docId < numDocs; docId++) {
+        Object[] values = recordReader.getRecordValues(docId, columnIndexes);
+        Map<String, Object> row = Maps.newHashMapWithExpectedSize(columns.size());
+        for (int i = 0; i < columns.size(); i++) {
+          row.put(columns.get(i), values[i]);
+        }
+        lookupMap.put(new PrimaryKey(recordReader.getRecordValues(docId, primaryKeyIndexes)), row);
       }
-      lookupMap.put(new PrimaryKey(pkValues), row);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to build the mock dimension table for: " + offlineTableName, e);
     }
     // Create and register a mock DimensionTableDataManager
     DimensionTableDataManager mockDimManager = Mockito.mock(DimensionTableDataManager.class);
@@ -304,44 +316,18 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     Mockito.when(mockDimManager.lookupValues(ArgumentMatchers.any(PrimaryKey.class),
         ArgumentMatchers.any(String[].class))).thenAnswer(invocation -> {
           PrimaryKey pk = invocation.getArgument(0);
-          String[] columns = invocation.getArgument(1);
-          GenericRow row = lookupMap.get(pk);
+          String[] lookupColumns = invocation.getArgument(1);
+          Map<String, Object> row = lookupMap.get(pk);
           if (row == null) {
             return null;
           }
-          Object[] values = new Object[columns.length];
-          for (int i = 0; i < columns.length; i++) {
-            values[i] = toStoredValue(row.getValue(columns[i]), schema, columns[i]);
+          Object[] values = new Object[lookupColumns.length];
+          for (int i = 0; i < lookupColumns.length; i++) {
+            values[i] = row.get(lookupColumns[i]);
           }
           return values;
         });
     DimensionTableDataManager.registerDimensionTable(offlineTableName, mockDimManager);
-  }
-
-  /// Converts a raw JSON value to the stored representation of its column, the same way a segment stores it.
-  @Nullable
-  private static Object toStoredValue(@Nullable Object value, Schema schema, String column) {
-    if (value == null) {
-      return null;
-    }
-    FieldSpec fieldSpec = schema.getFieldSpecFor(column);
-    if (fieldSpec == null) {
-      return value;
-    }
-    switch (fieldSpec.getDataType().getStoredType()) {
-      case INT:
-        return ((Number) value).intValue();
-      case LONG:
-        return ((Number) value).longValue();
-      case FLOAT:
-        return ((Number) value).floatValue();
-      case DOUBLE:
-        return ((Number) value).doubleValue();
-      case STRING:
-        return value.toString();
-      default:
-        return value;
-    }
   }
 
   @AfterClass
