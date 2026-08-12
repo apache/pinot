@@ -174,6 +174,9 @@ public class BenchmarkJsonExtractScalarQuery {
     String paddingPrefix = "\"padding\":\"";
     String paddingSuffix = "\",";
     int paddingLength = targetBytes - baseJson.length() - paddingPrefix.length() - paddingSuffix.length();
+    if (paddingLength <= 0) {
+      return baseJson;
+    }
     return baseJson.substring(0, markerOffset) + paddingPrefix + "x".repeat(paddingLength) + paddingSuffix
         + baseJson.substring(markerOffset);
   }

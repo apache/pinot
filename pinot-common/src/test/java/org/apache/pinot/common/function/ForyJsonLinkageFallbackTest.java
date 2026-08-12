@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function;
 
+import com.fasterxml.jackson.core.StreamReadConstraints;
 import java.io.File;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -33,12 +34,20 @@ import static org.testng.Assert.assertTrue;
 
 /// Verifies that an optional Fory runtime linkage failure does not break the JSON functions.
 public class ForyJsonLinkageFallbackTest {
-  private static final String CHILD_ARGUMENT = "verifyFallback";
+  private static final String FALLBACK_ARGUMENT = "verifyFallback";
+  private static final String TOKEN_LIMIT_ARGUMENT = "verifyTokenLimit";
 
   /// Child-process entry point used by the missing-Fory fallback tests.
   public static void main(String[] arguments) {
-    if (arguments.length != 1 || !CHILD_ARGUMENT.equals(arguments[0])) {
-      throw new IllegalArgumentException("Expected the fallback verification argument");
+    if (arguments.length != 1) {
+      throw new IllegalArgumentException("Expected one child-process verification argument");
+    }
+    if (TOKEN_LIMIT_ARGUMENT.equals(arguments[0])) {
+      verifyConfiguredTokenLimit();
+      return;
+    }
+    if (!FALLBACK_ARGUMENT.equals(arguments[0])) {
+      throw new IllegalArgumentException("Unknown child-process verification argument: " + arguments[0]);
     }
     String actual = JsonFunctions.jsonPathStringFory("{\"v\":7}", "$.v", "DEFAULT");
     if (!"7".equals(actual)) {
@@ -57,16 +66,37 @@ public class ForyJsonLinkageFallbackTest {
   @Test
   public void testMissingForyCoreFallsBack()
       throws Exception {
-    runFallbackChild(false);
+    runChild(false, true, FALLBACK_ARGUMENT);
   }
 
   @Test
   public void testMissingForyJsonFallsBack()
       throws Exception {
-    runFallbackChild(true);
+    runChild(true, false, FALLBACK_ARGUMENT);
   }
 
-  private static void runFallbackChild(boolean removeForyJson)
+  @Test
+  public void testConfiguredJacksonTokenLimit()
+      throws Exception {
+    runChild(false, false, TOKEN_LIMIT_ARGUMENT);
+  }
+
+  private static void verifyConfiguredTokenLimit() {
+    StreamReadConstraints constraints = StreamReadConstraints.builder().maxTokenCount(3).build();
+    StreamReadConstraints.overrideDefaultStreamReadConstraints(constraints);
+    SimpleJsonPath path = SimpleJsonPath.compile("$.v");
+    if (path == null) {
+      throw new AssertionError("Expected a simple JSON path");
+    }
+    try {
+      ForyJsonPathExtractor.extract("{\"v\":7}", path);
+      throw new AssertionError("Expected Fory to enforce Jackson's configured token limit");
+    } catch (IllegalArgumentException expected) {
+      // Expected: START_OBJECT, FIELD_NAME, VALUE_NUMBER_INT, END_OBJECT exceeds the configured limit of three.
+    }
+  }
+
+  private static void runChild(boolean removeForyJson, boolean removeForyCore, String childArgument)
       throws Exception {
     String separator = System.getProperty("path.separator");
     StringJoiner childClassPath = new StringJoiner(separator);
@@ -76,7 +106,7 @@ public class ForyJsonLinkageFallbackTest {
       String fileName = new File(entry).getName();
       if (fileName.startsWith("fory-core-")) {
         foundForyCore = true;
-        if (removeForyJson) {
+        if (!removeForyCore) {
           childClassPath.add(entry);
         }
       } else if (fileName.startsWith("fory-json-")) {
@@ -93,7 +123,7 @@ public class ForyJsonLinkageFallbackTest {
 
     String javaExecutable = new File(new File(System.getProperty("java.home"), "bin"), "java").getPath();
     ProcessBuilder processBuilder = new ProcessBuilder(javaExecutable, "-cp", childClassPath.toString(),
-        ForyJsonLinkageFallbackTest.class.getName(), CHILD_ARGUMENT).redirectErrorStream(true);
+        ForyJsonLinkageFallbackTest.class.getName(), childArgument).redirectErrorStream(true);
     processBuilder.environment().remove("JAVA_TOOL_OPTIONS");
     processBuilder.environment().remove("JDK_JAVA_OPTIONS");
 

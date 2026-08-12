@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.transform.function;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.annotations.VisibleForTesting;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
@@ -76,8 +77,10 @@ import org.roaringbitmap.RoaringBitmap;
 /// and malformed-document behavior; see [FastJsonPathExtractor] for one documented unaddressed-value edge case.
 /// `jsonExtractScalarFory` is experimental and must be selected explicitly. It accelerates simple paths over
 /// `STRING` input for scalar result types other than `STRING`, `JSON`, and `BIG_DECIMAL`. `BYTES` input, complex
-/// paths, containers / array result types, precision-sensitive results, deeply nested documents, and Fory failures
-/// use Jayway. Its name, supported envelope, and implementation can change while the integration is evaluated.
+/// paths, containers / array result types, precision-sensitive results, documents beyond Jackson's configured
+/// limits, and Fory failures use Jayway. Its name, supported envelope, and implementation can change while the
+/// integration is evaluated. Fory is an optional runtime dependency and must be added to the application classpath
+/// to activate this experimental path.
 ///
 /// **Arguments:**
 /// - `jsonField` — single-value `STRING` or `BYTES` column / transform expression containing JSON.
@@ -142,6 +145,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   private DataType _storedType;
   private Object _defaultValue;
   private boolean _defaultIsNull;
+  private boolean _foryEligible;
   private TransformResultMetadata _resultMetadata;
 
   public JsonExtractScalarTransformFunction() {
@@ -256,6 +260,15 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       }
     }
     _resultMetadata = new TransformResultMetadata(_dataType, isSingleValue, false);
+    DataType inputDataType = firstArgument.getResultMetadata().getDataType();
+    _foryEligible = _extractionMode == ExtractionMode.FORY && _simpleJsonPath != null
+        && inputDataType == DataType.STRING && isSingleValue && _dataType != DataType.STRING
+        && _dataType != DataType.JSON && _dataType != DataType.BIG_DECIMAL;
+  }
+
+  @VisibleForTesting
+  boolean isForyEligible() {
+    return _foryEligible;
   }
 
   @Override
@@ -817,7 +830,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     if (_jsonFieldTransformFunction.getResultMetadata().getDataType() == DataType.BYTES) {
       byte[][] jsonBytes = _jsonFieldTransformFunction.transformToBytesValuesSV(valueBlock);
       IntFunction<T> jaywayExtractor = i -> parseContext.parseUtf8(jsonBytes[i]).read(_jsonPath);
-      if (_simpleJsonPath == null || useBigDecimal || _extractionMode == ExtractionMode.FORY) {
+      if (_simpleJsonPath == null || _extractionMode == ExtractionMode.FORY) {
         return jaywayExtractor;
       }
       SimpleJsonPath[] paths = {_simpleJsonPath};
@@ -841,7 +854,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
         return jaywayExtractor;
       }
       if (_extractionMode == ExtractionMode.FORY) {
-        if (useBigDecimal) {
+        if (!_foryEligible || useBigDecimal) {
           return jaywayExtractor;
         }
         try {
@@ -853,7 +866,8 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
         }
         return i -> {
           try {
-            return (T) ForyJsonPathExtractor.extract(jsonStrings[i], _simpleJsonPath);
+            Object value = ForyJsonPathExtractor.extract(jsonStrings[i], _simpleJsonPath);
+            return ForyJsonPathExtractor.isFallbackRequired(value) ? jaywayExtractor.apply(i) : (T) value;
           } catch (RuntimeException | LinkageError ignored) {
             return jaywayExtractor.apply(i);
           }

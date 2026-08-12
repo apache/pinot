@@ -35,40 +35,25 @@ import org.slf4j.LoggerFactory;
 
 /// Shared Fory JSON parser for opt-in JSON-path implementations.
 ///
-/// Streaming extraction uses one single-state parser per worker thread to avoid shared-pool contention. Initialization
-/// or runtime linkage failures permanently disable the optional path, allowing callers to fall back to
-/// Jackson/Jayway. Jackson's default scalar token limits are enforced while walking the document, and inputs outside
-/// Fory's safe nesting depth fall back to the reference parser.
+/// Streaming extraction uses one bounded parser pool shared by all worker threads. Initialization or runtime linkage
+/// failures permanently disable the optional path, allowing callers to fall back to Jackson/Jayway. Jackson's
+/// document, token, nesting, field-name, string, and number constraints are enforced while walking the document.
+/// The Fory runtime is an optional dependency; applications must add it to the application classpath to enable this
+/// experimental path.
 public final class ForyJsonPathExtractor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ForyJsonPathExtractor.class);
   private static final StreamReadConstraints JACKSON_CONSTRAINTS = StreamReadConstraints.defaults();
   private static final ThreadLocal<PathContext> PATH_CONTEXT = ThreadLocal.withInitial(PathContext::new);
   private static final AtomicBoolean UNAVAILABLE_WARNING_LOGGED = new AtomicBoolean();
+  private static final Object FALLBACK_REQUIRED = new Object();
 
   private ForyJsonPathExtractor() {
   }
 
   private static final class Holder {
-    private static volatile boolean _streamingAvailable;
-    private static final ThreadLocal<ForyJson> STREAMING_PARSER = ThreadLocal.withInitial(() -> {
-      if (!_streamingAvailable) {
-        throw new IllegalStateException("Fory JSON is unavailable");
-      }
-      ForyJson parser = buildStreamingParser();
-      if (parser == null) {
-        _streamingAvailable = false;
-        throw new IllegalStateException("Fory JSON is unavailable");
-      }
-      return parser;
-    });
-
-    static {
-      ForyJson parser = buildStreamingParser();
-      _streamingAvailable = parser != null;
-      if (parser != null) {
-        STREAMING_PARSER.set(parser);
-      }
-    }
+    @Nullable
+    private static final ForyJson STREAMING_PARSER = buildStreamingParser();
+    private static volatile boolean _streamingAvailable = STREAMING_PARSER != null;
 
     private Holder() {
     }
@@ -76,7 +61,8 @@ public final class ForyJsonPathExtractor {
     @Nullable
     private static ForyJson buildStreamingParser() {
       try {
-        return ForyJson.builder().withCodegen(false).withAsyncCompilation(false).withConcurrencyLevel(1)
+        return ForyJson.builder().withCodegen(false).withAsyncCompilation(false)
+            .maxDepth(JACKSON_CONSTRAINTS.getMaxNestingDepth())
             .registerCodec(PathResult.class, PathCodec.INSTANCE).build();
       } catch (RuntimeException | LinkageError e) {
         logUnavailable(e);
@@ -90,22 +76,29 @@ public final class ForyJsonPathExtractor {
     return Holder._streamingAvailable;
   }
 
+  /// Returns whether an extracted value requires the reference parser for exact container/coercion semantics.
+  public static boolean isFallbackRequired(@Nullable Object value) {
+    return value == FALLBACK_REQUIRED;
+  }
+
   /// Extracts a simple path with Fory's streaming reader without materializing the complete JSON tree.
   ///
   /// Unrelated values are still fully consumed so malformed input and duplicate-key last-wins behavior match the
-  /// reference parser. Jackson's nesting, field-name, string, and number limits are checked while scanning. Callers
-  /// should retry with the reference parser when this method throws.
+  /// reference parser. Jackson's configured limits are checked while scanning. Callers should retry with the
+  /// reference parser when this method throws or [#isFallbackRequired(Object)] returns `true`.
   @Nullable
   public static Object extract(String json, SimpleJsonPath path) {
-    if ((JACKSON_CONSTRAINTS.hasMaxDocumentLength()
-        && json.length() > JACKSON_CONSTRAINTS.getMaxDocumentLength())
-        || (JACKSON_CONSTRAINTS.hasMaxTokenCount() && requiresJacksonFallback(json))) {
+    if (JACKSON_CONSTRAINTS.hasMaxDocumentLength()
+        && json.length() > JACKSON_CONSTRAINTS.getMaxDocumentLength()) {
       throw new IllegalArgumentException("JSON document requires Jackson constraint validation");
     }
     if (!Holder._streamingAvailable) {
       throw new IllegalStateException("Fory JSON is unavailable");
     }
-    ForyJson parser = Holder.STREAMING_PARSER.get();
+    ForyJson parser = Holder.STREAMING_PARSER;
+    if (parser == null) {
+      throw new IllegalStateException("Fory JSON is unavailable");
+    }
     PathContext context = PATH_CONTEXT.get();
     if (context._active) {
       throw new IllegalStateException("Fory JSON path extraction is not reentrant");
@@ -113,6 +106,7 @@ public final class ForyJsonPathExtractor {
     context._active = true;
     context._path = path;
     context._result = null;
+    context._tokenCount = 0;
     try {
       parser.fromJson(json, PathResult.class);
       return context._result;
@@ -123,13 +117,13 @@ public final class ForyJsonPathExtractor {
     } finally {
       context._path = null;
       context._result = null;
+      context._tokenCount = 0;
       context._active = false;
     }
   }
 
   private static void disable() {
     Holder._streamingAvailable = false;
-    Holder.STREAMING_PARSER.remove();
     PATH_CONTEXT.remove();
   }
 
@@ -139,41 +133,47 @@ public final class ForyJsonPathExtractor {
     }
   }
 
-  private static Object readPath(JsonReader reader, SimpleJsonPath path, int depth) {
+  private static Object readPath(JsonReader reader, SimpleJsonPath path, int depth, PathContext context) {
     String key = path.getKey(depth);
     if (key != null) {
-      return readObjectPath(reader, path, depth, key);
+      return readObjectPath(reader, path, depth, key, context);
     }
-    return readArrayPath(reader, path, depth, path.getIndex(depth));
+    return readArrayPath(reader, path, depth, path.getIndex(depth), context);
   }
 
   @Nullable
-  private static Object readObjectPath(JsonReader reader, SimpleJsonPath path, int depth, String expectedKey) {
+  private static Object readObjectPath(JsonReader reader, SimpleJsonPath path, int depth, String expectedKey,
+      PathContext context) {
     if (reader.peekToken() != '{') {
-      skipValue(reader);
+      skipValue(reader, context);
       return null;
     }
     reader.enterDepth();
     try {
+      countToken(context);
       reader.expect('{');
       if (reader.consume('}')) {
+        countToken(context);
         return null;
       }
       Object result = null;
       boolean more;
       do {
+        countToken(context);
         String fieldName = reader.readFieldName();
         if (fieldName.length() > JACKSON_CONSTRAINTS.getMaxNameLength()) {
           throw new IllegalArgumentException("JSON field name exceeds Jackson's configured limit");
         }
         reader.expect(':');
         if (expectedKey.equals(fieldName)) {
-          result = depth + 1 == path.length() ? readScalar(reader) : readPath(reader, path, depth + 1);
+          result = depth + 1 == path.length() ? readScalar(reader, context)
+              : readPath(reader, path, depth + 1, context);
         } else {
-          skipValue(reader);
+          skipValue(reader, context);
         }
         more = reader.consumeCommaOrEndObject();
       } while (more);
+      countToken(context);
       return result;
     } finally {
       reader.exitDepth();
@@ -181,15 +181,18 @@ public final class ForyJsonPathExtractor {
   }
 
   @Nullable
-  private static Object readArrayPath(JsonReader reader, SimpleJsonPath path, int depth, int expectedIndex) {
+  private static Object readArrayPath(JsonReader reader, SimpleJsonPath path, int depth, int expectedIndex,
+      PathContext context) {
     if (reader.peekToken() != '[') {
-      skipValue(reader);
+      skipValue(reader, context);
       return null;
     }
     reader.enterDepth();
     try {
+      countToken(context);
       reader.expect('[');
       if (reader.consume(']')) {
+        countToken(context);
         return null;
       }
       Object result = null;
@@ -197,13 +200,15 @@ public final class ForyJsonPathExtractor {
       boolean more;
       do {
         if (index == expectedIndex) {
-          result = depth + 1 == path.length() ? readScalar(reader) : readPath(reader, path, depth + 1);
+          result = depth + 1 == path.length() ? readScalar(reader, context)
+              : readPath(reader, path, depth + 1, context);
         } else {
-          skipValue(reader);
+          skipValue(reader, context);
         }
         index++;
         more = reader.consumeCommaOrEndArray();
       } while (more);
+      countToken(context);
       return result;
     } finally {
       reader.exitDepth();
@@ -211,9 +216,10 @@ public final class ForyJsonPathExtractor {
   }
 
   @Nullable
-  private static Object readScalar(JsonReader reader) {
+  private static Object readScalar(JsonReader reader, PathContext context) {
     char token = reader.peekToken();
     if (token == '"') {
+      countToken(context);
       String value = reader.readString();
       if (value.length() > JACKSON_CONSTRAINTS.getMaxStringLength()) {
         throw new IllegalArgumentException("JSON string exceeds Jackson's configured limit");
@@ -221,17 +227,21 @@ public final class ForyJsonPathExtractor {
       return value;
     }
     if (token == 't' || token == 'f') {
+      countToken(context);
       return reader.readBoolean();
     }
     if (token == 'n') {
+      countToken(context);
       reader.readNull();
       return null;
     }
     if (token == '{' || token == '[') {
-      // Query scalar coercion has observable error/default behavior for containers. Let Jayway produce the exact
-      // reference value rather than materializing a Fory container on this uncommon path.
-      throw new IllegalArgumentException("Container result requires reference JSON parsing");
+      // Query scalar coercion has observable error/default behavior for containers. Fully consume the value to keep
+      // malformed-tail and duplicate-key semantics, then signal a stack-trace-free retry through Jayway.
+      skipValue(reader, context);
+      return FALLBACK_REQUIRED;
     }
+    countToken(context);
     int start = reader.position();
     Number value = reader.readNumber();
     if (reader.position() - start > JACKSON_CONSTRAINTS.getMaxNumberLength()) {
@@ -240,17 +250,18 @@ public final class ForyJsonPathExtractor {
     return value;
   }
 
-  private static void skipValue(JsonReader reader) {
+  private static void skipValue(JsonReader reader, PathContext context) {
     char token = reader.peekToken();
     if (token == '{') {
-      skipObject(reader);
+      skipObject(reader, context);
       return;
     }
     if (token == '[') {
-      skipArray(reader);
+      skipArray(reader, context);
       return;
     }
     if (token == '"') {
+      countToken(context);
       // Fory 1.6's skipValue() computes an FNV hash over every character. Its string decoder uses packed scans and
       // is substantially faster even when the decoded value is discarded. An upstream fast-skip API could remove
       // this temporary allocation in a future Fory version.
@@ -260,6 +271,7 @@ public final class ForyJsonPathExtractor {
       }
       return;
     }
+    countToken(context);
     int start = reader.position();
     reader.skipValue();
     int rawLength = reader.position() - start;
@@ -269,40 +281,47 @@ public final class ForyJsonPathExtractor {
     }
   }
 
-  private static void skipObject(JsonReader reader) {
+  private static void skipObject(JsonReader reader, PathContext context) {
     reader.enterDepth();
     try {
+      countToken(context);
       reader.expect('{');
       if (reader.consume('}')) {
+        countToken(context);
         return;
       }
       boolean more;
       do {
+        countToken(context);
         String fieldName = reader.readFieldName();
         if (fieldName.length() > JACKSON_CONSTRAINTS.getMaxNameLength()) {
           throw new IllegalArgumentException("JSON field name exceeds Jackson's configured limit");
         }
         reader.expect(':');
-        skipValue(reader);
+        skipValue(reader, context);
         more = reader.consumeCommaOrEndObject();
       } while (more);
+      countToken(context);
     } finally {
       reader.exitDepth();
     }
   }
 
-  private static void skipArray(JsonReader reader) {
+  private static void skipArray(JsonReader reader, PathContext context) {
     reader.enterDepth();
     try {
+      countToken(context);
       reader.expect('[');
       if (reader.consume(']')) {
+        countToken(context);
         return;
       }
       boolean more;
       do {
-        skipValue(reader);
+        skipValue(reader, context);
         more = reader.consumeCommaOrEndArray();
       } while (more);
+      countToken(context);
     } finally {
       reader.exitDepth();
     }
@@ -311,6 +330,7 @@ public final class ForyJsonPathExtractor {
   private static final class PathContext {
     private final PathResult _marker = new PathResult();
     private boolean _active;
+    private long _tokenCount;
     @Nullable
     private SimpleJsonPath _path;
     @Nullable
@@ -344,7 +364,7 @@ public final class ForyJsonPathExtractor {
       if (!context._active || path == null) {
         throw new IllegalStateException("Missing JSON path extraction context");
       }
-      context._result = readPath(reader, path, 0);
+      context._result = readPath(reader, path, 0, context);
       return context._marker;
     }
 
@@ -359,81 +379,10 @@ public final class ForyJsonPathExtractor {
     }
   }
 
-  private static boolean requiresJacksonFallback(String json) {
-    int length = json.length();
-    if (JACKSON_CONSTRAINTS.hasMaxDocumentLength()
-        && length > JACKSON_CONSTRAINTS.getMaxDocumentLength()) {
-      return true;
+  private static void countToken(PathContext context) {
+    if (JACKSON_CONSTRAINTS.hasMaxTokenCount()
+        && ++context._tokenCount > JACKSON_CONSTRAINTS.getMaxTokenCount()) {
+      throw new IllegalArgumentException("JSON token count exceeds Jackson's configured limit");
     }
-
-    int maxNumberLength = JACKSON_CONSTRAINTS.getMaxNumberLength();
-    int maxStringLength = JACKSON_CONSTRAINTS.getMaxStringLength();
-    int maxNameLength = JACKSON_CONSTRAINTS.getMaxNameLength();
-    int maxNestingDepth = JACKSON_CONSTRAINTS.getMaxNestingDepth();
-    long maxTokenCount = JACKSON_CONSTRAINTS.getMaxTokenCount();
-    boolean countTokens = JACKSON_CONSTRAINTS.hasMaxTokenCount();
-    int depth = 0;
-    long tokenCount = 0;
-
-    int offset = 0;
-    while (offset < length) {
-      char current = json.charAt(offset);
-      if (current == '"') {
-        int start = offset++;
-        while (offset < length && json.charAt(offset) != '"') {
-          if (json.charAt(offset) == '\\') {
-            offset++;
-          }
-          offset++;
-        }
-        if (offset >= length) {
-          return true;
-        }
-        int rawLength = offset - start - 1;
-        int next = offset + 1;
-        while (next < length && Character.isWhitespace(json.charAt(next))) {
-          next++;
-        }
-        boolean fieldName = next < length && json.charAt(next) == ':';
-        if (rawLength > (fieldName ? maxNameLength : maxStringLength)) {
-          return true;
-        }
-        tokenCount++;
-        offset++;
-      } else if (current == '{' || current == '[') {
-        if (++depth > maxNestingDepth) {
-          return true;
-        }
-        tokenCount++;
-        offset++;
-      } else if (current == '}' || current == ']') {
-        depth--;
-        tokenCount++;
-        offset++;
-      } else if (current == '-' || current >= '0' && current <= '9') {
-        int start = offset++;
-        while (offset < length && isNumberCharacter(json.charAt(offset))) {
-          offset++;
-        }
-        if (offset - start > maxNumberLength) {
-          return true;
-        }
-        tokenCount++;
-      } else if (current == 't' || current == 'f' || current == 'n') {
-        tokenCount++;
-        offset++;
-      } else {
-        offset++;
-      }
-      if (countTokens && tokenCount > maxTokenCount) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private static boolean isNumberCharacter(char value) {
-    return value >= '0' && value <= '9' || value == '-' || value == '+' || value == '.' || value == 'e'
-        || value == 'E';
   }
 }

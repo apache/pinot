@@ -135,15 +135,19 @@ public class JsonFunctions {
   /// functions below retain the current behavior outside Fory's supported envelope.
   @Nullable
   private static Object foryJsonPath(Object object, String jsonPath) {
+    if (!(object instanceof String)) {
+      return jsonPath(object, jsonPath);
+    }
     SimpleJsonPath simpleJsonPath = SimpleJsonPath.compile(jsonPath);
-    if (!(object instanceof String) || simpleJsonPath == null) {
+    if (simpleJsonPath == null) {
       return jsonPath(object, jsonPath);
     }
     try {
       if (!ForyJsonPathExtractor.isAvailable()) {
         return jsonPath(object, jsonPath);
       }
-      return ForyJsonPathExtractor.extract((String) object, simpleJsonPath);
+      Object value = ForyJsonPathExtractor.extract((String) object, simpleJsonPath);
+      return ForyJsonPathExtractor.isFallbackRequired(value) ? jsonPath(object, jsonPath) : value;
     } catch (RuntimeException | LinkageError e) {
       return jsonPath(object, jsonPath);
     }

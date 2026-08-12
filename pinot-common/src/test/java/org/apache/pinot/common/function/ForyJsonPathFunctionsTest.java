@@ -157,6 +157,48 @@ public class ForyJsonPathFunctionsTest {
   }
 
   @Test
+  public void testStreamingExtractorSignalsContainerFallbackWithoutExceptions() {
+    assertTrue(ForyJsonPathExtractor.isFallbackRequired(extract("{\"v\":{\"n\":1}}", "$.v")));
+    assertTrue(ForyJsonPathExtractor.isFallbackRequired(extract("{\"v\":[1,2]}", "$.v")));
+    assertEquals(extract("{\"v\":{},\"v\":2}", "$.v"), 2L);
+    assertTrue(ForyJsonPathExtractor.isFallbackRequired(extract("{\"v\":2,\"v\":{}}", "$.v")));
+    assertNull(extract("{\"v\":{},\"v\":null}", "$.v"));
+
+    SimpleJsonPath path = SimpleJsonPath.compile("$.v");
+    assertNotNull(path);
+    assertThrows(RuntimeException.class,
+        () -> ForyJsonPathExtractor.extract("{\"v\":{},\"broken\":[}", path));
+    assertEquals(ForyJsonPathExtractor.extract("{\"v\":3}", path), 3L);
+  }
+
+  @Test
+  public void testStreamingExtractorUsesJacksonNestingLimit() {
+    int depth = 25;
+    StringBuilder selectedJson = new StringBuilder();
+    StringBuilder selectedPath = new StringBuilder("$");
+    for (int i = 0; i < depth; i++) {
+      selectedJson.append("{\"a\":");
+      selectedPath.append(".a");
+    }
+    selectedJson.append('7');
+    selectedJson.append("}".repeat(depth));
+    assertEquals(extract(selectedJson.toString(), selectedPath.toString()), 7L);
+
+    String unrelated = "{\"selected\":1,\"deep\":" + "{\"a\":".repeat(depth) + "7" + "}".repeat(depth)
+        + "}";
+    assertEquals(extract(unrelated, "$.selected"), 1L);
+
+    int maximumDepth = StreamReadConstraints.defaults().getMaxNestingDepth();
+    String maximumJson = "{\"a\":".repeat(maximumDepth) + "7" + "}".repeat(maximumDepth);
+    assertEquals(extract(maximumJson, "$." + "a.".repeat(maximumDepth - 1) + "a"), 7L);
+
+    String oversizedJson = "{\"a\":".repeat(maximumDepth + 1) + "7" + "}".repeat(maximumDepth + 1);
+    SimpleJsonPath oversizedPath = SimpleJsonPath.compile("$." + "a.".repeat(maximumDepth) + "a");
+    assertNotNull(oversizedPath);
+    assertThrows(RuntimeException.class, () -> ForyJsonPathExtractor.extract(oversizedJson, oversizedPath));
+  }
+
+  @Test
   public void testStreamingExtractorRejectsMalformedAndTrailingContent() {
     SimpleJsonPath path = SimpleJsonPath.compile("$.v");
     assertNotNull(path);
