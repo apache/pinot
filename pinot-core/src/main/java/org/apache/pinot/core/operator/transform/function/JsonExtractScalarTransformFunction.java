@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.function.IntFunction;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FastJsonPathExtractor;
+import org.apache.pinot.common.function.ForyJsonPathExtractor;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.common.function.SimpleJsonPath;
 import org.apache.pinot.core.operator.ColumnContext;
@@ -55,6 +56,7 @@ import org.roaringbitmap.RoaringBitmap;
 /// | `jsonExtractScalar` | Builds the existing Jayway DOM; unchanged for backward compatibility. |
 /// | `jsonExtractScalarFast` | Uses [FastJsonPathExtractor] and scans the full root value, preserving Jayway results. |
 /// | `jsonExtractScalarFirstMatch` | Uses [FastJsonPathExtractor] and stops when the addressed value is found. |
+/// | `jsonExtractScalarFory` | Experimental Fory streaming extraction with per-row Jayway fallback. |
 ///
 /// Each function reads a JSON document from `jsonField` for each row, resolves the
 /// [Stefan Goessner JsonPath](https://goessner.net/articles/JsonPath/) expression against it, and
@@ -72,6 +74,10 @@ import org.roaringbitmap.RoaringBitmap;
 /// keys to the first non-null occurrence and does not validate malformed content after the resolved value. Use it
 /// only for well-formed, duplicate-free JSON. `Fast` scans the full root value and retains Jayway's last-key-wins
 /// and malformed-document behavior; see [FastJsonPathExtractor] for one documented unaddressed-value edge case.
+/// `jsonExtractScalarFory` is experimental and must be selected explicitly. It accelerates simple paths over
+/// `STRING` input for scalar result types other than `STRING` and `BIG_DECIMAL`. `BYTES` input, complex paths,
+/// containers / array result types, precision-sensitive results, deeply nested documents, and Fory failures use
+/// Jayway. Its name, supported envelope, and implementation can change while the integration is evaluated.
 ///
 /// **Arguments:**
 /// - `jsonField` — single-value `STRING` or `BYTES` column / transform expression containing JSON.
@@ -105,11 +111,13 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "jsonExtractScalar";
   public static final String FAST_FUNCTION_NAME = "jsonExtractScalarFast";
   public static final String FIRST_MATCH_FUNCTION_NAME = "jsonExtractScalarFirstMatch";
+  public static final String FORY_FUNCTION_NAME = "jsonExtractScalarFory";
 
   private enum ExtractionMode {
     JAYWAY,
     FAST,
-    FIRST_MATCH
+    FIRST_MATCH,
+    FORY
   }
 
   // This ObjectMapper requires special configurations, hence we can't use pinot JsonUtils here.
@@ -156,6 +164,13 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   public static final class FirstMatch extends JsonExtractScalarTransformFunction {
     public FirstMatch() {
       super(FIRST_MATCH_FUNCTION_NAME, ExtractionMode.FIRST_MATCH);
+    }
+  }
+
+  /// Experimental Fory-backed variant of [JsonExtractScalarTransformFunction].
+  public static final class Fory extends JsonExtractScalarTransformFunction {
+    public Fory() {
+      super(FORY_FUNCTION_NAME, ExtractionMode.FORY);
     }
   }
 
@@ -802,7 +817,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     if (_jsonFieldTransformFunction.getResultMetadata().getDataType() == DataType.BYTES) {
       byte[][] jsonBytes = _jsonFieldTransformFunction.transformToBytesValuesSV(valueBlock);
       IntFunction<T> jaywayExtractor = i -> parseContext.parseUtf8(jsonBytes[i]).read(_jsonPath);
-      if (_simpleJsonPath == null) {
+      if (_simpleJsonPath == null || useBigDecimal || _extractionMode == ExtractionMode.FORY) {
         return jaywayExtractor;
       }
       SimpleJsonPath[] paths = {_simpleJsonPath};
@@ -824,6 +839,18 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       IntFunction<T> jaywayExtractor = i -> parseContext.parse(jsonStrings[i]).read(_jsonPath);
       if (_simpleJsonPath == null) {
         return jaywayExtractor;
+      }
+      if (_extractionMode == ExtractionMode.FORY) {
+        if (useBigDecimal || !ForyJsonPathExtractor.isAvailable()) {
+          return jaywayExtractor;
+        }
+        return i -> {
+          try {
+            return (T) ForyJsonPathExtractor.extract(jsonStrings[i], _simpleJsonPath);
+          } catch (RuntimeException | LinkageError ignored) {
+            return jaywayExtractor.apply(i);
+          }
+        };
       }
       SimpleJsonPath[] paths = {_simpleJsonPath};
       Object[] result = new Object[1];

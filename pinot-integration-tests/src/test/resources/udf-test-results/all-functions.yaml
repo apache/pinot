@@ -997,6 +997,10 @@ jsonextractscalarfirstmatch:
   scalar: null
   transform: "org.apache.pinot.core.operator.transform.function.JsonExtractScalarTransformFunction.FirstMatch"
   udf: null
+jsonextractscalarfory:
+  scalar: null
+  transform: "org.apache.pinot.core.operator.transform.function.JsonExtractScalarTransformFunction.Fory"
+  udf: null
 jsonformat:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonFormat}"
   transform: null
@@ -1031,6 +1035,10 @@ jsonpathdoublefirstmatch:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathDoubleFirstMatch}"
   transform: null
   udf: null
+jsonpathdoublefory:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathDoubleFory}"
+  transform: null
+  udf: null
 jsonpathexists:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathExists}"
   transform: null
@@ -1048,6 +1056,10 @@ jsonpathlongfirstmatch:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathLongFirstMatch}"
   transform: null
   udf: null
+jsonpathlongfory:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathLongFory}"
+  transform: null
+  udf: null
 jsonpathstring:
   scalar: "ArgumentCountBasedScalarFunction{[2: org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathString,\
     \ 3: org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathString]}"
@@ -1059,6 +1071,10 @@ jsonpathstringfast:
   udf: null
 jsonpathstringfirstmatch:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathStringFirstMatch}"
+  transform: null
+  udf: null
+jsonpathstringfory:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathStringFory}"
   transform: null
   udf: null
 jsonstringtoarray:

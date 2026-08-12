@@ -426,6 +426,8 @@ org.apache.curator:curator-client:5.9.0
 org.apache.curator:curator-framework:5.9.0
 org.apache.curator:curator-recipes:5.9.0
 org.apache.datasketches:datasketches-java:9.0.0
+org.apache.fory:fory-core:1.6.0
+org.apache.fory:fory-json:1.6.0
 org.apache.hadoop.thirdparty:hadoop-shaded-guava:1.5.0
 org.apache.hadoop.thirdparty:hadoop-shaded-protobuf_3_25:1.5.0
 org.apache.hadoop:hadoop-annotations:3.4.3
@@ -642,6 +644,8 @@ com.google.protobuf:protobuf-java:3.25.8
 dnsjava:dnsjava:3.6.4
 org.codehaus.janino:commons-compiler:3.1.12
 org.codehaus.janino:janino:3.1.12
+Kryo-derived collection classes embedded in org.apache.fory:fory-core:1.6.0
+(see licenses/LICENSE-kryo-fory.txt)
 org.fusesource.leveldbjni:leveldbjni-all:1.8
 org.jline:jline:4.0.4
 org.ow2.asm:asm:9.9.1
@@ -746,3 +750,5 @@ Public Domain
 ------------
 
 org.json:json:20250107
+MurmurHash3 code from java_util embedded in org.apache.fory:fory-core:1.6.0
+    (https://github.com/yonik/java_util; org/apache/fory/util/MurmurHash3.class)

@@ -19,6 +19,7 @@
 package org.apache.pinot.perf;
 
 import com.jayway.jsonpath.Configuration;
+import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.ParseContext;
@@ -26,6 +27,7 @@ import com.jayway.jsonpath.Predicate;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.util.concurrent.TimeUnit;
+import org.apache.fory.json.ForyJson;
 import org.apache.pinot.common.function.FastJsonPathExtractor;
 import org.apache.pinot.common.function.SimpleJsonPath;
 import org.apache.pinot.common.function.scalar.JsonFunctions;
@@ -47,10 +49,11 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
 /// Compares JsonPath extraction through Jayway (today's implementation, which builds a full Jackson DOM of the
-/// document and then walks to the field) against [FastJsonPathExtractor].
+/// document and then walks to the field), Fory's dynamic JSON tree, and [FastJsonPathExtractor].
 ///
 /// The `fieldPosition` parameter puts the extracted field either near the start or at the very end of a
-/// ~700 byte nested event payload, because that is what decides whether early exit can pay off.
+/// nested event payload, because that is what decides whether early exit can pay off. `documentBytes` pads the
+/// payload immediately before the late field so parser scaling is visible without changing the addressed values.
 ///
 /// The single-column benchmarks are also the per-row cost of `jsonExtractScalar`: that transform function
 /// does exactly `parseContext.parse(row).read(jsonPath)` per row, so measuring the extraction in isolation
@@ -60,16 +63,17 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @Fork(1)
 @Warmup(iterations = 3, time = 2)
 @Measurement(iterations = 5, time = 3)
-@State(Scope.Benchmark)
+@State(Scope.Thread)
 public class BenchmarkJsonPathExtraction {
   private static final Predicate[] NO_PREDICATES = new Predicate[0];
+  private static final ForyJson FORY_JSON = ForyJson.builder().build();
 
   /// Exactly the context `JsonExtractScalarTransformFunction` and `JsonFunctions` use.
   private static final ParseContext PARSE_CONTEXT = JsonPath.using(
       new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonProvider())
           .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS).build());
 
-  private static final String JSON = "{"
+  private static final String BASE_JSON = "{"
       + "\"ts\":1719878400123,"
       + "\"user\":{\"id\":\"u-19283\",\"country\":\"US\",\"tier\":\"gold\",\"age\":41},"
       + "\"event\":{\"name\":\"checkout\",\"cart\":[{\"sku\":\"A1\",\"qty\":2,\"price\":19.99},"
@@ -86,10 +90,15 @@ public class BenchmarkJsonPathExtraction {
 
   /// Four derived columns, spread through the document, as an ingestion `transformConfigs` would pull.
   private static final String[] FOUR_PATHS = {"$.user.country", "$.event.currency", "$.device.os", "$.geo.city"};
+  private static final String COMPLEX_PATH = "$.event.cart[*].sku";
 
   @Param({"early", "late"})
   private String _fieldPosition;
 
+  @Param({"700", "8192", "65536"})
+  private int _documentBytes;
+
+  private String _json;
   private String _path;
   private SimpleJsonPath _simplePath;
   private SimpleJsonPath[] _simpleFourPaths;
@@ -104,6 +113,7 @@ public class BenchmarkJsonPathExtraction {
 
   @Setup(Level.Trial)
   public void setUp() {
+    _json = buildJson(_documentBytes);
     _path = "early".equals(_fieldPosition) ? "$.user.country" : "$.trailer.country";
     _simplePath = SimpleJsonPath.compile(_path);
     _simpleFourPaths = new SimpleJsonPath[FOUR_PATHS.length];
@@ -111,46 +121,106 @@ public class BenchmarkJsonPathExtraction {
       _simpleFourPaths[i] = SimpleJsonPath.compile(FOUR_PATHS[i]);
     }
     _fourResults = new Object[FOUR_PATHS.length];
+
+    String expected = "early".equals(_fieldPosition) ? "US" : "DE";
+    if (!expected.equals(JsonFunctions.jsonPathStringFory(_json, _path, ""))) {
+      throw new IllegalStateException("Fory result does not match the expected value for " + _path);
+    }
+    for (String path : FOUR_PATHS) {
+      String jayway = JsonFunctions.jsonPathString(_json, path, "");
+      String fory = JsonFunctions.jsonPathStringFory(_json, path, "");
+      if (!jayway.equals(fory)) {
+        throw new IllegalStateException("Fory result does not match Jayway for " + path);
+      }
+    }
+    String expectedCart = "[\"A1\",\"B7\",\"C3\"]";
+    if (!expectedCart.equals(JsonFunctions.jsonPathStringFory(_json, COMPLEX_PATH, ""))) {
+      throw new IllegalStateException("Complex-path fallback does not match the expected cart");
+    }
+  }
+
+  private static String buildJson(int targetBytes) {
+    if (BASE_JSON.length() >= targetBytes) {
+      return BASE_JSON;
+    }
+    String marker = "\"trailer\":";
+    int markerOffset = BASE_JSON.indexOf(marker);
+    String paddingPrefix = "\"padding\":\"";
+    String paddingSuffix = "\",";
+    if (BASE_JSON.length() + paddingPrefix.length() + paddingSuffix.length() >= targetBytes) {
+      return BASE_JSON;
+    }
+    int paddingLength = targetBytes - BASE_JSON.length() - paddingPrefix.length() - paddingSuffix.length();
+    return BASE_JSON.substring(0, markerOffset) + paddingPrefix + "x".repeat(paddingLength) + paddingSuffix
+        + BASE_JSON.substring(markerOffset);
   }
 
   @Benchmark
   public Object jaywayOneColumn() {
-    return PARSE_CONTEXT.parse(JSON).read(_path, NO_PREDICATES);
+    return PARSE_CONTEXT.parse(_json).read(_path, NO_PREDICATES);
+  }
+
+  /// Fory parse plus the same Jayway tree traversal used by the production wrapper.
+  @Benchmark
+  public Object foryOneColumn() {
+    Object root = FORY_JSON.fromJson(_json, Object.class);
+    return PARSE_CONTEXT.parse(root).read(_path, NO_PREDICATES);
   }
 
   @Benchmark
   public Object fastOneColumnFullScan() {
-    return FastJsonPathExtractor.extract(JSON, _simplePath, false, false);
+    return FastJsonPathExtractor.extract(_json, _simplePath, false, false);
   }
 
   @Benchmark
   public Object fastOneColumnEarlyExit() {
-    return FastJsonPathExtractor.extract(JSON, _simplePath, false, true);
+    return FastJsonPathExtractor.extract(_json, _simplePath, false, true);
   }
 
   /// The existing Jayway scalar function (applicability check + String coercion).
   @Benchmark
   public String jsonPathStringJayway() {
-    return JsonFunctions.jsonPathString(JSON, _path, "");
+    return JsonFunctions.jsonPathString(_json, _path, "");
+  }
+
+  /// The production Fory scalar function (applicability check + String coercion).
+  @Benchmark
+  public String jsonPathStringFory() {
+    return JsonFunctions.jsonPathStringFory(_json, _path, "");
   }
 
   /// The opt-in fast scalar function, full scan (exact parity).
   @Benchmark
   public String jsonPathStringFast() {
-    return JsonFunctions.jsonPathStringFast(JSON, _path, "");
+    return JsonFunctions.jsonPathStringFast(_json, _path, "");
   }
 
   /// The opt-in fast scalar function, early exit / first match.
   @Benchmark
   public String jsonPathStringFirstMatch() {
-    return JsonFunctions.jsonPathStringFirstMatch(JSON, _path, "");
+    return JsonFunctions.jsonPathStringFirstMatch(_json, _path, "");
+  }
+
+  @Benchmark
+  public String jsonPathStringJaywayComplex() {
+    return JsonFunctions.jsonPathString(_json, COMPLEX_PATH, "");
+  }
+
+  @Benchmark
+  public String jsonPathStringFastComplex() {
+    return JsonFunctions.jsonPathStringFast(_json, COMPLEX_PATH, "");
+  }
+
+  @Benchmark
+  public String jsonPathStringForyComplex() {
+    return JsonFunctions.jsonPathStringFory(_json, COMPLEX_PATH, "");
   }
 
   @Benchmark
   public Object jaywayFourColumns() {
     Object last = null;
     for (String path : FOUR_PATHS) {
-      last = PARSE_CONTEXT.parse(JSON).read(path, NO_PREDICATES);
+      last = PARSE_CONTEXT.parse(_json).read(path, NO_PREDICATES);
     }
     return last;
   }
@@ -159,14 +229,36 @@ public class BenchmarkJsonPathExtraction {
   public Object fastFourColumnsSeparatePasses() {
     Object last = null;
     for (SimpleJsonPath path : _simpleFourPaths) {
-      last = FastJsonPathExtractor.extract(JSON, path, false, false);
+      last = FastJsonPathExtractor.extract(_json, path, false, false);
     }
     return last;
   }
 
   @Benchmark
   public Object[] fastFourColumnsSinglePass() {
-    FastJsonPathExtractor.extract(JSON, _simpleFourPaths, _fourResults, false, false);
+    FastJsonPathExtractor.extract(_json, _simpleFourPaths, _fourResults, false, false);
     return _fourResults;
+  }
+
+  /// Models four independent scalar expressions: each call parses the document again.
+  @Benchmark
+  public String foryFourColumnsSeparateParses() {
+    String last = null;
+    for (String path : FOUR_PATHS) {
+      last = JsonFunctions.jsonPathStringFory(_json, path, "");
+    }
+    return last;
+  }
+
+  /// Upper bound for a future parse-sharing optimization; Pinot does not currently expose this execution shape.
+  @Benchmark
+  public Object foryFourColumnsSingleParse() {
+    Object root = FORY_JSON.fromJson(_json, Object.class);
+    DocumentContext context = PARSE_CONTEXT.parse(root);
+    Object last = null;
+    for (String path : FOUR_PATHS) {
+      last = context.read(path, NO_PREDICATES);
+    }
+    return last;
   }
 }
