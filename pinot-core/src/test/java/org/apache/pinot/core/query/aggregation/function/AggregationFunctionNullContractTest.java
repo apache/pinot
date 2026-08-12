@@ -253,7 +253,11 @@ public class AggregationFunctionNullContractTest {
       AggregationFunctionType.SUMLONG, AggregationFunctionType.SUMPRECISION, AggregationFunctionType.FIRSTWITHTIME,
       AggregationFunctionType.LASTWITHTIME, AggregationFunctionType.ARRAYAGG, AggregationFunctionType.LISTAGG,
       // Given the option so they can skip null rows; a row counts only when both input columns are non-null
-      AggregationFunctionType.COVARPOP, AggregationFunctionType.COVARSAMP
+      AggregationFunctionType.COVARPOP, AggregationFunctionType.COVARSAMP,
+      // Given the option so they can skip null rows. These two were in this set once before, on the strength of an
+      // identity comparison that reported every serializer-valued function as honouring it; they belong here now
+      // because they genuinely do.
+      AggregationFunctionType.FREQUENTSTRINGSSKETCH, AggregationFunctionType.FREQUENTLONGSSKETCH
   );
 
   /// Functions this test cannot drive with a one-column synthetic block, pinned so that a silent drop-out is always a

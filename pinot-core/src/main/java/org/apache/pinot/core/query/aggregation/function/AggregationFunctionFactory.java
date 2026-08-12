@@ -516,9 +516,9 @@ public class AggregationFunctionFactory {
           case FUNNELEVENTSFUNCTIONEVAL:
             return new FunnelEventsFunctionEvalAggregationFunction(arguments);
           case FREQUENTSTRINGSSKETCH:
-            return new FrequentStringsSketchAggregationFunction(arguments);
+            return new FrequentStringsSketchAggregationFunction(arguments, nullHandlingEnabled);
           case FREQUENTLONGSSKETCH:
-            return new FrequentLongsSketchAggregationFunction(arguments);
+            return new FrequentLongsSketchAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTCPCSKETCH:
             return new DistinctCountCPCSketchAggregationFunction(arguments);
           case DISTINCTCOUNTRAWCPCSKETCH:
