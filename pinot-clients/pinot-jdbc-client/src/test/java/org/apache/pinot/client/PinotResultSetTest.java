@@ -139,6 +139,20 @@ public class PinotResultSetTest {
   }
 
   @Test
+  public void testGetAdditionalScalarTypes()
+      throws Exception {
+    PinotResultSet resultSet = PinotResultSet.fromJson("{\"resultTable\":{"
+        + "\"dataSchema\":{\"columnNames\":[\"json\",\"decimal\",\"timestamp\"],"
+        + "\"columnDataTypes\":[\"JSON\",\"BIG_DECIMAL\",\"TIMESTAMP\"]},"
+        + "\"rows\":[[\"{\\\"key\\\":1}\",\"123.450\",\"2020-01-01 12:00:00\"]]}}");
+
+    Assert.assertTrue(resultSet.next());
+    Assert.assertEquals(resultSet.getObject(1), "{\"key\":1}");
+    Assert.assertEquals(resultSet.getObject(2), new BigDecimal("123.450"));
+    Assert.assertEquals(resultSet.getObject(3), Timestamp.valueOf("2020-01-01 12:00:00"));
+  }
+
+  @Test
   public void testNullAndEmptyArrays()
       throws Exception {
     PinotResultSet resultSet = PinotResultSet.fromJson("{\"resultTable\":{"

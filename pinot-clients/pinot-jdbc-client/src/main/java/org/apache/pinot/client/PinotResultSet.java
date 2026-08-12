@@ -346,6 +346,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
     }
     switch (dataType) {
       case STRING:
+      case JSON:
         return getString(columnIndex);
       case INT:
         return getInt(columnIndex);
@@ -355,12 +356,16 @@ public class PinotResultSet extends AbstractBaseResultSet {
         return getFloat(columnIndex);
       case DOUBLE:
         return getDouble(columnIndex);
+      case BIG_DECIMAL:
+        return getBigDecimal(columnIndex);
       case BOOLEAN:
         return getBoolean(columnIndex);
       case BYTES:
         return getBytes(columnIndex);
       case UUID:
         return getUuid(columnIndex);
+      case TIMESTAMP:
+        return getTimestamp(columnIndex);
       case MAP:
         return getMap(columnIndex);
       default:
