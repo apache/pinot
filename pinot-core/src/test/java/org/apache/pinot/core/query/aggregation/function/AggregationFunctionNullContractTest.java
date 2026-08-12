@@ -64,7 +64,7 @@ public class AggregationFunctionNullContractTest {
       "(column, column2, 'LONG')",
       // histogram(column, lower, upper, numBins)
       "(column, 0, 1000, 10)",
-      // the funnel family: (timestampColumn, windowMillis, numSteps, stepPredicate...)
+      // The funnel family: (timestampColumn, windowMillis, numSteps, stepPredicate...)
       "(column, '1000', 2, column2 = 'a', column2 = 'b')",
       // funnelStepDurationStats takes a trailing settings literal
       "(column, '1000', 2, column2 = 'a', column2 = 'b', 'durationFunctions=count')",
@@ -204,7 +204,7 @@ public class AggregationFunctionNullContractTest {
         AggregationFunctionType.STDDEVPOP, AggregationFunctionType.PERCENTILE,
         AggregationFunctionType.PERCENTILEEST, AggregationFunctionType.PERCENTILETDIGEST,
         AggregationFunctionType.PERCENTILEKLL, AggregationFunctionType.PERCENTILESMARTTDIGEST}) {
-      // built through the shared argument shapes: the percentile families disagree on whether the percentile is a
+      // Built through the shared argument shapes: the percentile families disagree on whether the percentile is a
       // name suffix or an argument, and only some accept both
       AggregationFunction function = tryCreate(type, true);
       assertNotNull(function, "Could not construct " + type.getName());
@@ -222,44 +222,36 @@ public class AggregationFunctionNullContractTest {
   /// only if it both has null-aware aggregation and receives the query's option, so the set is a direct read-out of
   /// which functions the option actually reaches.
   ///
-  /// The multi-value entries are the interesting ones: they used to hard-code the option off, so it had no effect on
-  /// them whatever the query asked for. The raw variants reach the option through the function they delegate to, so
-  /// threading it into one of those changes the raw variant alongside it.
+  /// The raw variants reach the option through the function they delegate to, so threading it into one of those
+  /// changes the raw variant alongside it. Absence is as meaningful as presence: a function missing from here either
+  /// never receives the option, which is the first known deviation on [AggregationFunction], or does not skip null
+  /// rows.
   ///
-  /// The set is bounded by what the harness can drive, so it is a read-out of the functions the option reaches among
-  /// those, not of every function that takes it — see [#NOT_EXERCISABLE_BY_SYNTHETIC_BLOCK].
+  /// Two bounds on how much this set proves. It only covers what the harness can drive — see
+  /// [#NOT_EXERCISABLE_BY_SYNTHETIC_BLOCK] — and it compares the **rendered** answers, because several functions
+  /// return a serializer that implements no `equals`; comparing those objects would compare identities and report
+  /// every one of them as honouring the option.
   private static final Set<AggregationFunctionType> HONOURS_NULL_HANDLING = Set.of(
-      // single-value functions, which have always taken the option
       AggregationFunctionType.COUNT, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
       AggregationFunctionType.SUM, AggregationFunctionType.SUM0, AggregationFunctionType.AVG,
       AggregationFunctionType.MODE, AggregationFunctionType.ANYVALUE, AggregationFunctionType.MINMAXRANGE,
       AggregationFunctionType.DISTINCTCOUNT, AggregationFunctionType.DISTINCTCOUNTOFFHEAP,
-      AggregationFunctionType.DISTINCTSUM, AggregationFunctionType.DISTINCTAVG,
-      AggregationFunctionType.DISTINCTCOUNTRAWHLL, AggregationFunctionType.DISTINCTCOUNTRAWHLLPLUS,
-      AggregationFunctionType.DISTINCTCOUNTRAWULL, AggregationFunctionType.PERCENTILE,
+      AggregationFunctionType.DISTINCTSUM, AggregationFunctionType.DISTINCTAVG, AggregationFunctionType.PERCENTILE,
       AggregationFunctionType.PERCENTILEEST, AggregationFunctionType.PERCENTILERAWEST,
       AggregationFunctionType.PERCENTILETDIGEST, AggregationFunctionType.PERCENTILERAWTDIGEST,
       AggregationFunctionType.PERCENTILESMARTTDIGEST, AggregationFunctionType.PERCENTILEKLL,
       AggregationFunctionType.PERCENTILERAWKLL, AggregationFunctionType.VARPOP, AggregationFunctionType.VARSAMP,
-      AggregationFunctionType.STDDEVPOP, AggregationFunctionType.STDDEVSAMP,
-      // multi-value variants that already took the option
-      AggregationFunctionType.MINMV, AggregationFunctionType.MAXMV, AggregationFunctionType.SUMMV,
-      AggregationFunctionType.AVGMV, AggregationFunctionType.MINMAXRANGEMV,
-      AggregationFunctionType.DISTINCTCOUNTRAWHLLMV, AggregationFunctionType.DISTINCTCOUNTRAWHLLPLUSMV,
-      // multi-value variants this change threads the option into; they hard-coded it off before
-      AggregationFunctionType.DISTINCTCOUNTMV, AggregationFunctionType.DISTINCTSUMMV,
-      AggregationFunctionType.DISTINCTAVGMV, AggregationFunctionType.PERCENTILEMV,
-      AggregationFunctionType.PERCENTILEESTMV, AggregationFunctionType.PERCENTILERAWESTMV,
-      AggregationFunctionType.PERCENTILEKLLMV, AggregationFunctionType.PERCENTILETDIGESTMV,
-      AggregationFunctionType.PERCENTILERAWTDIGESTMV, AggregationFunctionType.PERCENTILERAWKLLMV,
-      // functions the harness reaches only once it probes block shapes and feeds every input column; they have
-      // always taken the option, so these entries are a gain in measurement rather than a change in behaviour
-      AggregationFunctionType.MINSTRING, AggregationFunctionType.MAXSTRING, AggregationFunctionType.MINLONG,
-      AggregationFunctionType.MAXLONG, AggregationFunctionType.SUMINT, AggregationFunctionType.SUMLONG,
-      AggregationFunctionType.SUMPRECISION, AggregationFunctionType.FIRSTWITHTIME,
-      AggregationFunctionType.LASTWITHTIME, AggregationFunctionType.DISTINCTCOUNTRAWCPCSKETCH,
-      AggregationFunctionType.FREQUENTSTRINGSSKETCH, AggregationFunctionType.FREQUENTLONGSSKETCH,
-      AggregationFunctionType.ARRAYAGG, AggregationFunctionType.LISTAGG
+      AggregationFunctionType.STDDEVPOP, AggregationFunctionType.STDDEVSAMP, AggregationFunctionType.MINMV,
+      AggregationFunctionType.MAXMV, AggregationFunctionType.SUMMV, AggregationFunctionType.AVGMV,
+      AggregationFunctionType.MINMAXRANGEMV, AggregationFunctionType.DISTINCTCOUNTMV,
+      AggregationFunctionType.DISTINCTSUMMV, AggregationFunctionType.DISTINCTAVGMV,
+      AggregationFunctionType.PERCENTILEMV, AggregationFunctionType.PERCENTILEESTMV,
+      AggregationFunctionType.PERCENTILERAWESTMV, AggregationFunctionType.PERCENTILEKLLMV,
+      AggregationFunctionType.PERCENTILETDIGESTMV, AggregationFunctionType.PERCENTILERAWTDIGESTMV,
+      AggregationFunctionType.PERCENTILERAWKLLMV, AggregationFunctionType.MINSTRING, AggregationFunctionType.MAXSTRING,
+      AggregationFunctionType.MINLONG, AggregationFunctionType.MAXLONG, AggregationFunctionType.SUMINT,
+      AggregationFunctionType.SUMLONG, AggregationFunctionType.SUMPRECISION, AggregationFunctionType.FIRSTWITHTIME,
+      AggregationFunctionType.LASTWITHTIME, AggregationFunctionType.ARRAYAGG, AggregationFunctionType.LISTAGG
   );
 
   /// Functions this test cannot drive with a one-column synthetic block, pinned so that a silent drop-out is always a
@@ -299,20 +291,22 @@ public class AggregationFunctionNullContractTest {
       boolean driven = false;
       for (Supplier<BlockValSet> shape : BLOCK_SHAPES) {
         try {
-          // the same shape drives both modes, so that the comparison below is between the modes and not the inputs
+          // The same shape drives both modes, so that the comparison below is between the modes and not the inputs
           enabled = aggregateAllNulls(type, true, shape);
           disabled = aggregateAllNulls(type, false, shape);
           driven = true;
           break;
         } catch (RuntimeException e) {
-          // this shape reads a value type the function rejects; fall through to the next
+          // This shape reads a value type the function rejects; fall through to the next
         }
       }
       if (!driven) {
         notExercisable.add(type);
         continue;
       }
-      if (!Objects.equals(enabled, disabled)) {
+      // Deep, because a rendered array compares by identity otherwise and every array-valued function would look
+      // like it honours the option
+      if (!Objects.deepEquals(enabled, disabled)) {
         honours.add(type);
       }
     }
@@ -336,7 +330,13 @@ public class AggregationFunctionNullContractTest {
             + "\n  No longer honouring it, which is a regression unless the entry is stale: " + lost);
   }
 
-  /// Aggregates a block whose rows are all null and returns the final result.
+  /// Aggregates a block whose rows are all null and returns the final result **as the broker would render it**.
+  ///
+  /// The rendered form is what the two modes are compared on, not the object itself. Several functions answer with a
+  /// serializer — `SerializedKLL`, `SerializedTDigest`, the sketch wrappers — and none of those implement `equals`,
+  /// so comparing the objects compares identities: two runs are never equal, every such function looks like it
+  /// honours the option, and the check that one has *stopped* honouring it can never fail. Converting through
+  /// [AggregationFunction#getFinalResultColumnType] gives the value a client would see, which compares properly.
   ///
   /// Every input expression the function declares is given a block, not just the first, so that the functions taking
   /// more than one column are driven rather than failing on a missing entry.
@@ -346,17 +346,18 @@ public class AggregationFunctionNullContractTest {
     assertNotNull(function, "Could not construct " + type.getName());
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
     for (Object inputExpression : function.getInputExpressions()) {
-      // every declared input gets a block, literals included: a function that took a literal for one of its columns
+      // Every declared input gets a block, literals included: a function that took a literal for one of its columns
       // still looks that expression up in the map, and a missing entry makes it throw and drop out of the census
       blockValSetMap.put((ExpressionContext) inputExpression, blockShape.get());
     }
-    // a function whose only argument is a literal, such as COUNT(*), still needs one block to read a length from
+    // A function whose only argument is a literal, such as COUNT(*), still needs one block to read a length from
     if (blockValSetMap.isEmpty()) {
       blockValSetMap.put(ExpressionContext.forIdentifier("column"), blockShape.get());
     }
     AggregationResultHolder resultHolder = function.createAggregationResultHolder();
     function.aggregate(NUM_DOCS, resultHolder, blockValSetMap);
-    return function.extractFinalResult(function.extractAggregationResult(resultHolder));
+    Object finalResult = function.extractFinalResult(function.extractAggregationResult(resultHolder));
+    return finalResult != null ? function.getFinalResultColumnType().convert(finalResult) : null;
   }
 
   /// All-null block shapes, tried in order until one drives the function.
