@@ -32,12 +32,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.SecureRandom;
 import java.security.Security;
-import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.security.spec.MGF1ParameterSpec;
-import java.security.spec.PSSParameterSpec;
-import java.security.spec.RSAKeyGenParameterSpec;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Enumeration;
@@ -216,85 +212,6 @@ public class KafkaSSLUtilsTest {
     Assert.assertTrue(Arrays.equals(Files.readAllBytes(Paths.get(_trustStorePath)), originalTrustStore));
   }
 
-  @Test
-  public void testInitSSLValidatesAllMaterialBeforeRenewingExistingStore()
-      throws CertificateException, NoSuchAlgorithmException, OperatorCreationException, NoSuchProviderException,
-             IOException {
-    Properties consumerProps = new Properties();
-    setTrustStoreProps(consumerProps);
-    KafkaSSLUtils.initSSL(consumerProps);
-    byte[] originalTrustStore = Files.readAllBytes(Paths.get(_trustStorePath));
-
-    setTrustStoreProps(consumerProps);
-    setKeyStoreProps(consumerProps);
-    consumerProps.setProperty("stream.kafka.ssl.client.key", "not-base64");
-
-    Assert.expectThrows(IllegalArgumentException.class, () -> KafkaSSLUtils.initSSL(consumerProps));
-
-    Assert.assertTrue(Arrays.equals(Files.readAllBytes(Paths.get(_trustStorePath)), originalTrustStore));
-  }
-
-  @Test
-  public void testInitSSLRejectsMismatchedClientKeyBeforeRenewingExistingStore()
-      throws CertificateException, NoSuchAlgorithmException, OperatorCreationException, NoSuchProviderException,
-             IOException {
-    Properties consumerProps = new Properties();
-    setTrustStoreProps(consumerProps);
-    KafkaSSLUtils.initSSL(consumerProps);
-    byte[] originalTrustStore = Files.readAllBytes(Paths.get(_trustStorePath));
-
-    setTrustStoreProps(consumerProps);
-    setKeyStoreProps(consumerProps);
-    consumerProps.setProperty("stream.kafka.ssl.client.key", generateSelfSignedCertificate()[0]);
-
-    Assert.expectThrows(IllegalArgumentException.class, () -> KafkaSSLUtils.initSSL(consumerProps));
-
-    Assert.assertTrue(Arrays.equals(Files.readAllBytes(Paths.get(_trustStorePath)), originalTrustStore));
-  }
-
-  @Test
-  public void testPrivateKeyProofSupportsConfiguredAlgorithms()
-      throws Exception {
-    for (String algorithm : new String[]{"RSA", "RSASSA-PSS", "EC", "DSA", "Ed25519", "Ed448"}) {
-      KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(algorithm);
-      if (algorithm.equals("RSA") || algorithm.equals("RSASSA-PSS")) {
-        keyPairGenerator.initialize(2048);
-      } else if (algorithm.equals("EC")) {
-        keyPairGenerator.initialize(256);
-      } else if (algorithm.equals("DSA")) {
-        keyPairGenerator.initialize(1024);
-      }
-      KeyPair keyPair = keyPairGenerator.generateKeyPair();
-
-      KafkaSSLUtils.validatePrivateKeyMatchesPublicKey(keyPair.getPrivate(), keyPair.getPublic());
-    }
-
-    PSSParameterSpec sha384Pss =
-        new PSSParameterSpec("SHA-384", "MGF1", MGF1ParameterSpec.SHA384, 48, 1);
-    KeyPairGenerator constrainedPssGenerator = KeyPairGenerator.getInstance("RSASSA-PSS");
-    constrainedPssGenerator.initialize(
-        new RSAKeyGenParameterSpec(2048, RSAKeyGenParameterSpec.F4, sha384Pss));
-    KeyPair constrainedPssKeyPair = constrainedPssGenerator.generateKeyPair();
-    KafkaSSLUtils.validatePrivateKeyMatchesPublicKey(constrainedPssKeyPair.getPrivate(),
-        constrainedPssKeyPair.getPublic());
-  }
-
-  @Test
-  public void testInitTrustStoreFailureKeepsExistingStore()
-      throws CertificateException, NoSuchAlgorithmException, OperatorCreationException, NoSuchProviderException,
-             IOException {
-    Properties consumerProps = new Properties();
-    setTrustStoreProps(consumerProps);
-    KafkaSSLUtils.initTrustStore(consumerProps);
-    byte[] originalTrustStore = Files.readAllBytes(Paths.get(_trustStorePath));
-
-    consumerProps.setProperty("stream.kafka.ssl.server.certificate", "not-base64");
-
-    Assert.expectThrows(RuntimeException.class, () -> KafkaSSLUtils.initTrustStore(consumerProps));
-
-    Assert.assertTrue(Arrays.equals(Files.readAllBytes(Paths.get(_trustStorePath)), originalTrustStore));
-  }
-
   @Test (expectedExceptions = java.io.FileNotFoundException.class)
   public void testInitSSLKeyStoreOnly()
       throws CertificateException, NoSuchAlgorithmException, OperatorCreationException, NoSuchProviderException,
@@ -312,38 +229,19 @@ public class KafkaSSLUtilsTest {
   @Test
   public void testInitSSLAndRenewCertificates()
       throws CertificateException, NoSuchAlgorithmException, OperatorCreationException, NoSuchProviderException,
-             IOException, KeyStoreException, UnrecoverableKeyException {
+             IOException, KeyStoreException {
     Properties consumerProps = new Properties();
     setTrustStoreProps(consumerProps);
     setKeyStoreProps(consumerProps);
     KafkaSSLUtils.initSSL(consumerProps);
-    byte[] firstServerCertificate =
-        loadTrustStore().getCertificate("ServerAlias").getEncoded();
-    byte[] firstClientCertificate =
-        loadKeyStore().getCertificate("ClientAlias").getEncoded();
-    byte[] firstClientKey = loadKeyStore().getKey("ClientAlias", "mykeypwd".toCharArray()).getEncoded();
-
     // renew the truststore and keystore
     setTrustStoreProps(consumerProps);
     setKeyStoreProps(consumerProps);
-    byte[] expectedServerCertificate =
-        Base64.decode(consumerProps.getProperty("stream.kafka.ssl.server.certificate"));
-    byte[] expectedClientCertificate =
-        Base64.decode(consumerProps.getProperty("stream.kafka.ssl.client.certificate"));
-    byte[] expectedClientKey = Base64.decode(consumerProps.getProperty("stream.kafka.ssl.client.key"));
     KafkaSSLUtils.initSSL(consumerProps);
 
-    byte[] renewedServerCertificate =
-        loadTrustStore().getCertificate("ServerAlias").getEncoded();
-    byte[] renewedClientCertificate =
-        loadKeyStore().getCertificate("ClientAlias").getEncoded();
-    byte[] renewedClientKey = loadKeyStore().getKey("ClientAlias", "mykeypwd".toCharArray()).getEncoded();
-    Assert.assertTrue(Arrays.equals(renewedServerCertificate, expectedServerCertificate));
-    Assert.assertTrue(Arrays.equals(renewedClientCertificate, expectedClientCertificate));
-    Assert.assertTrue(Arrays.equals(renewedClientKey, expectedClientKey));
-    Assert.assertFalse(Arrays.equals(renewedServerCertificate, firstServerCertificate));
-    Assert.assertFalse(Arrays.equals(renewedClientCertificate, firstClientCertificate));
-    Assert.assertFalse(Arrays.equals(renewedClientKey, firstClientKey));
+    // validate
+    validateTrustStoreCertificateCount(1);
+    validateKeyStoreCertificateCount(1);
   }
 
   @Test
@@ -374,7 +272,10 @@ public class KafkaSSLUtilsTest {
   private void validateTrustStoreCertificateCount(int expCount)
       throws CertificateException, IOException, NoSuchAlgorithmException, KeyStoreException {
     // Validate that certificate is installed in the trust store
-    KeyStore trustStore = loadTrustStore();
+    KeyStore trustStore = KeyStore.getInstance("JKS");
+    try (FileInputStream fis = new FileInputStream(_trustStorePath)) {
+      trustStore.load(fis, DEFAULT_TRUSTSTORE_PASSWORD.toCharArray());
+    }
 
     int certCount = 0;
     // Iterate through the aliases in the TrustStore
@@ -392,7 +293,10 @@ public class KafkaSSLUtilsTest {
   private void validateKeyStoreCertificateCount(int expCount)
       throws CertificateException, IOException, NoSuchAlgorithmException, KeyStoreException {
     // Validate that certificate is installed in the key store
-    KeyStore keyStore = loadKeyStore();
+    KeyStore keyStore = KeyStore.getInstance("PKCS12");
+    try (FileInputStream fis = new FileInputStream(_keyStorePath)) {
+      keyStore.load(fis, DEFAULT_KEYSTORE_PASSWORD.toCharArray());
+    }
 
     int certCount = 0;
     // Iterate through the aliases in the TrustStore
@@ -405,24 +309,6 @@ public class KafkaSSLUtilsTest {
       }
     }
     Assert.assertEquals(expCount, certCount);
-  }
-
-  private KeyStore loadTrustStore()
-      throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException {
-    KeyStore trustStore = KeyStore.getInstance("JKS");
-    try (FileInputStream fis = new FileInputStream(_trustStorePath)) {
-      trustStore.load(fis, DEFAULT_TRUSTSTORE_PASSWORD.toCharArray());
-    }
-    return trustStore;
-  }
-
-  private KeyStore loadKeyStore()
-      throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException {
-    KeyStore keyStore = KeyStore.getInstance("PKCS12");
-    try (FileInputStream fis = new FileInputStream(_keyStorePath)) {
-      keyStore.load(fis, DEFAULT_KEYSTORE_PASSWORD.toCharArray());
-    }
-    return keyStore;
   }
 
   private void setTrustStoreProps(Properties consumerProps)

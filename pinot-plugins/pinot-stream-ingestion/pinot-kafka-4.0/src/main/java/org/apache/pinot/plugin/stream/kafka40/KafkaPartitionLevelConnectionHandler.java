@@ -100,12 +100,13 @@ public abstract class KafkaPartitionLevelConnectionHandler {
   }
 
   private Consumer<Bytes, Bytes> createConsumer(Properties consumerProp, RetryPolicy retryPolicy) {
+    Properties filteredConsumerProp =
+        KafkaConfigUtils.filterAndValidateKafkaProperties(consumerProp, CONSUMER_CONFIG_NAMES);
     AtomicReference<Consumer<Bytes, Bytes>> consumer = new AtomicReference<>();
     try {
       retryPolicy.attempt(() -> {
         try {
-          consumer.set(new KafkaConsumer<>(KafkaConfigUtils.filterAndValidateKafkaProperties(consumerProp,
-              CONSUMER_CONFIG_NAMES)));
+          consumer.set(new KafkaConsumer<>(filteredConsumerProp));
           return true;
         } catch (Exception e) {
           LOGGER.warn("Caught exception while creating Kafka consumer, retrying.", e);
@@ -121,13 +122,15 @@ public abstract class KafkaPartitionLevelConnectionHandler {
 
   @VisibleForTesting
   protected Consumer<Bytes, Bytes> createConsumer(Properties consumerProp) {
-    return retry(() -> new KafkaConsumer<>(KafkaConfigUtils.filterAndValidateKafkaProperties(consumerProp,
-        CONSUMER_CONFIG_NAMES)), 5);
+    Properties filteredConsumerProp =
+        KafkaConfigUtils.filterAndValidateKafkaProperties(consumerProp, CONSUMER_CONFIG_NAMES);
+    return retry(() -> new KafkaConsumer<>(filteredConsumerProp), 5);
   }
 
   protected AdminClient createAdminClient() {
-    return retry(() -> AdminClient.create(KafkaConfigUtils.filterAndValidateKafkaProperties(_consumerProp,
-        ADMIN_CLIENT_CONFIG_NAMES)), 5);
+    Properties filteredAdminClientProp =
+        KafkaConfigUtils.filterAndValidateKafkaProperties(_consumerProp, ADMIN_CLIENT_CONFIG_NAMES);
+    return retry(() -> AdminClient.create(filteredAdminClientProp), 5);
   }
 
   /// Gets or creates a reusable admin client instance. The admin client is lazily initialized
@@ -154,9 +157,9 @@ public abstract class KafkaPartitionLevelConnectionHandler {
       synchronized (this) {
         ref = _sharedAdminClientRef;
         if (ref == null) {
-          ref = KafkaAdminClientManager.getInstance()
-              .getOrCreateAdminClient(KafkaConfigUtils.filterAndValidateKafkaProperties(_consumerProp,
-                  ADMIN_CLIENT_CONFIG_NAMES));
+          Properties filteredAdminClientProp =
+              KafkaConfigUtils.filterAndValidateKafkaProperties(_consumerProp, ADMIN_CLIENT_CONFIG_NAMES);
+          ref = KafkaAdminClientManager.getInstance().getOrCreateAdminClient(filteredAdminClientProp);
           _sharedAdminClientRef = ref;
         }
       }
