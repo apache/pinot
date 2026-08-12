@@ -61,6 +61,15 @@ import static org.testng.Assert.*;
 
 @Test(groups = "stateless")
 public class PinotTaskManagerStatelessTest extends ControllerTest {
+
+  @Test
+  public void testTaskGenerationDiagnosticsDoNotExposeExceptionMessage() {
+    String sentinel = "credential-sentinel";
+    String diagnostic = PinotTaskManager.safeTaskGenerationError(new IllegalStateException(sentinel));
+
+    assertEquals(diagnostic, IllegalStateException.class.getName());
+    assertFalse(diagnostic.contains(sentinel));
+  }
   private static final String RAW_TABLE_NAME = "myTable";
   public static final String TABLE_NAME_WITH_TYPE = "myTable_OFFLINE";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);

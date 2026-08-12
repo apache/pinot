@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 
 /// Container object for basic auth principal
@@ -32,6 +33,7 @@ public class BasicAuthPrincipal {
   private final Set<String> _tables;
   private final Set<String> _excludeTables;
   private final Set<String> _permissions;
+  private final Set<String> _explicitPermissions;
   //key: table name, val: list of RLS filters applicable for that table.
   private final Map<String, List<String>> _rlsFilters;
 
@@ -42,11 +44,18 @@ public class BasicAuthPrincipal {
 
   public BasicAuthPrincipal(String name, String token, Set<String> tables, Set<String> excludeTables,
       Set<String> permissions, Map<String, List<String>> rlsFilters) {
+    this(name, token, tables, excludeTables, permissions, permissions, rlsFilters);
+  }
+
+  public BasicAuthPrincipal(String name, String token, Set<String> tables, Set<String> excludeTables,
+      Set<String> permissions, Set<String> explicitPermissions, Map<String, List<String>> rlsFilters) {
     _name = name;
     _token = token;
     _tables = tables;
     _excludeTables = excludeTables;
     _permissions = permissions.stream().map(s -> s.toLowerCase()).collect(Collectors.toSet());
+    _explicitPermissions = Stream.concat(_permissions.stream(), explicitPermissions.stream())
+        .map(s -> s.toLowerCase()).collect(Collectors.toSet());
     _rlsFilters = rlsFilters;
   }
 
@@ -74,9 +83,9 @@ public class BasicAuthPrincipal {
     return _permissions.isEmpty() || _permissions.contains(permission.toLowerCase());
   }
 
-  /// Returns whether this principal was explicitly granted the given permission.
+  /// Returns whether the permission was explicitly assigned, without applying the legacy empty-set wildcard.
   public boolean hasExplicitPermission(String permission) {
-    return _permissions.contains(permission.toLowerCase());
+    return _explicitPermissions.contains(permission.toLowerCase());
   }
 
   /// Gets the Row-Level Security (RLS) filter configured for the given table.

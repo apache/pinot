@@ -461,18 +461,20 @@ public class MaterializedViewTaskScheduler {
       // IllegalStateException) — surface with MV table context for operator triage.
       throw new IllegalStateException("Broker-bound SQL is unparseable for MV table: "
           + viewTableName + ". Check definedSQL for syntax issues (trailing comments, unbalanced "
-          + "quotes, etc). SQL: " + sqlWithTimeRange, e);
+          + "quotes, etc).", e);
     }
     String observedLimit = verifyLimit.map(String::valueOf).orElse("<absent>");
     Preconditions.checkState(
         verifyLimit.isPresent() && verifyLimit.get().intValue() == effectiveLimit,
         "LIMIT verification failed for MV table: %s. Re-parsed SQL has LIMIT=%s, expected %s. "
             + "definedSQL likely contains text (comments, literals) that interfered with SQL "
-            + "manipulation. SQL: %s",
-        viewTableName, observedLimit, effectiveLimit, sqlWithTimeRange);
+            + "manipulation.",
+        viewTableName, observedLimit, effectiveLimit);
 
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, viewTableName);
+    // The executor needs the broker-bound SQL, but this makes the task config credential-bearing. Callers must never
+    // log the full PinotTaskConfig; PinotTaskManager logs only task identifiers and counts.
     configs.put(MaterializedViewTask.DEFINED_SQL_KEY, sqlWithTimeRange);
     configs.put(MaterializedViewTask.WINDOW_START_MS_KEY, String.valueOf(windowStartMs));
     configs.put(MaterializedViewTask.WINDOW_END_MS_KEY, String.valueOf(windowEndMs));
@@ -897,9 +899,10 @@ public class MaterializedViewTaskScheduler {
       }
     }
 
-    // Initialize MaterializedViewDefinitionMetadata with base table info and partition expression maps
+    // Initialize executable MaterializedViewDefinitionMetadata from the same resolved SQL used to populate the view.
+    // Controller display endpoints independently source and redact the unresolved TableConfig.
     Schema viewSchema = _context.getTableSchema(viewTableWithType);
-    Map<String, String> partitionExprMaps = (viewSchema != null)
+    Map<String, String> partitionExprMaps = viewSchema != null
         ? MaterializedViewAnalyzer.extractPartitionExprMaps(definedSQL, viewSchema)
         : new HashMap<>();
 

@@ -40,6 +40,10 @@ public class CopyTablePayload {
   /// The instanceAssignmentConfig's tagPoolConfig contains full tenant name. We will use this field to let user specify
   /// the replacement relation from source cluster's full tenant to target cluster's full tenant.
   private Map<String, String> _tagPoolReplacementMap;
+  /// Literal credentials for fields that the source cluster returns masked. Keys are RFC 6901 JSON Pointers into the
+  /// REALTIME table config (for example, `/ingestionConfig/streamIngestionConfig/streamConfigMaps/0/password`).
+  /// Overrides are accepted only where the source representation contains the redaction marker.
+  private Map<String, String> _credentialOverrides;
 
   @JsonCreator
   public CopyTablePayload(
@@ -47,12 +51,19 @@ public class CopyTablePayload {
       @JsonProperty("sourceClusterHeaders") Map<String, String> headers,
       @JsonProperty(value = "brokerTenant", required = true) String brokerTenant,
       @JsonProperty(value = "serverTenant", required = true) String serverTenant,
-      @JsonProperty("tagPoolReplacementMap") @Nullable Map<String, String> tagPoolReplacementMap) {
+      @JsonProperty("tagPoolReplacementMap") @Nullable Map<String, String> tagPoolReplacementMap,
+      @JsonProperty("credentialOverrides") @Nullable Map<String, String> credentialOverrides) {
     _sourceClusterUri = sourceClusterUri;
     _headers = headers;
     _brokerTenant = brokerTenant;
     _serverTenant = serverTenant;
     _tagPoolReplacementMap = tagPoolReplacementMap;
+    _credentialOverrides = credentialOverrides;
+  }
+
+  public CopyTablePayload(String sourceClusterUri, Map<String, String> headers, String brokerTenant,
+      String serverTenant, @Nullable Map<String, String> tagPoolReplacementMap) {
+    this(sourceClusterUri, headers, brokerTenant, serverTenant, tagPoolReplacementMap, null);
   }
 
   @JsonGetter("sourceClusterUri")
@@ -78,5 +89,11 @@ public class CopyTablePayload {
   @JsonGetter("tagPoolReplacementMap")
   public Map<String, String> getTagPoolReplacementMap() {
     return _tagPoolReplacementMap;
+  }
+
+  @JsonGetter("credentialOverrides")
+  @Nullable
+  public Map<String, String> getCredentialOverrides() {
+    return _credentialOverrides;
   }
 }
