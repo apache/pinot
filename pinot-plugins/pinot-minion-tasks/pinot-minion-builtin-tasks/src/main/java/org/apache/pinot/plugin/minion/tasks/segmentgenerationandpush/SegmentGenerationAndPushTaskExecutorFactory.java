@@ -19,20 +19,13 @@
 package org.apache.pinot.plugin.minion.tasks.segmentgenerationandpush;
 
 import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.minion.MinionConf;
-import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
-import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
+import org.apache.pinot.plugin.minion.tasks.BaseTaskExecutorFactory;
 import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
 
 
 @TaskExecutorFactory
-public class SegmentGenerationAndPushTaskExecutorFactory implements PinotTaskExecutorFactory {
-
-  @Override
-  public void init(MinionTaskZkMetadataManager zkMetadataManager, MinionConf minionConf) {
-  }
-
+public class SegmentGenerationAndPushTaskExecutorFactory extends BaseTaskExecutorFactory {
   @Override
   public String getTaskType() {
     return MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE;
@@ -40,6 +33,6 @@ public class SegmentGenerationAndPushTaskExecutorFactory implements PinotTaskExe
 
   @Override
   public PinotTaskExecutor create() {
-    return new SegmentGenerationAndPushTaskExecutor();
+    return new SegmentGenerationAndPushTaskExecutor(getIngestionGroovyPolicy());
   }
 }

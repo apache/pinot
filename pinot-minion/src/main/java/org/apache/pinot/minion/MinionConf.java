@@ -85,6 +85,11 @@ public class MinionConf extends PinotConfiguration {
     return getProperty(SEGMENT_DOWNLOAD_PARALLELISM, DEFAULT_SEGMENT_DOWNLOAD_PARALLELISM);
   }
 
+  public boolean isIngestionGroovyDisabled() {
+    return CommonConstants.Groovy.isIngestionGroovyDisabled(
+        getProperty(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY));
+  }
+
   public String getMetricsPrefix() {
     return Optional.ofNullable(getProperty(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX_KEY))
         .orElseGet(() -> getProperty(CommonConstants.Minion.DEPRECATED_CONFIG_OF_METRICS_PREFIX_KEY,

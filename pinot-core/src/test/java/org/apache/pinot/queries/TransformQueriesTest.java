@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -97,6 +98,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    FunctionEvaluatorFactory.setIngestionGroovyDisabled(false);
     FileUtils.deleteQuietly(INDEX_DIR);
 
     buildSegment();
@@ -151,6 +153,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
+    config.setIngestionGroovyDisabled(false);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
@@ -159,10 +162,16 @@ public class TransformQueriesTest extends BaseQueriesTest {
     }
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown() {
-    _indexSegment.destroy();
-    FileUtils.deleteQuietly(INDEX_DIR);
+    try {
+      if (_indexSegment != null) {
+        _indexSegment.destroy();
+      }
+      FileUtils.deleteQuietly(INDEX_DIR);
+    } finally {
+      FunctionEvaluatorFactory.setIngestionGroovyDisabled(true);
+    }
   }
 
   @Test
