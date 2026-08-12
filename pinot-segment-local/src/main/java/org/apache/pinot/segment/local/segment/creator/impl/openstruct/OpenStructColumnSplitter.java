@@ -319,14 +319,26 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     serverMetrics.setOrUpdateTableGauge(_tableNameWithType, col,
         ServerGauge.OPEN_STRUCT_SPARSE_KEY_COUNT, sparseKeyCount);
     serverMetrics.setOrUpdateTableGauge(_tableNameWithType, col,
-        ServerGauge.OPEN_STRUCT_TOTAL_KEYS_DISCOVERED, _presenceBitmaps.size());
+        ServerGauge.OPEN_STRUCT_SEGMENT_KEY_COUNT, _presenceBitmaps.size());
     // Denominator for the per-key fill rate. Emitted as a raw count rather than folding the ratio into a
     // single percentage gauge: integer division truncates a configured dense key present in a handful of
     // docs to 0, which is indistinguishable from no data and is exactly the case worth alerting on.
     serverMetrics.setOrUpdateTableGauge(_tableNameWithType, col,
         ServerGauge.OPEN_STRUCT_SEGMENT_DOC_COUNT, _numDocs);
 
-    for (String key : _resolvedDenseKeys) {
+    // Iterates the configured dense keys rather than _resolvedDenseKeys. Under the default config
+    // (denseKeys empty, maxDenseKeys -1) _resolvedDenseKeys is data-driven -- every key at or above
+    // the fill-rate threshold -- so keying a gauge on it would mint one registry entry per distinct
+    // ingested key, and gauges are never removed. maxDenseKeys is not a sufficient gate either: it
+    // caps each segment's set, but different segments resolve different keys, so the union across
+    // segments is still unbounded. An explicit denseKeys list is the only operator-owned bound.
+    // A configured key with no presence bitmap never appeared in this segment and is skipped;
+    // one that appeared but was cut by the maxDenseKeys cap still reports, since a configured key
+    // that is not earning its materialized column is the case worth seeing. materializedColumnName
+    // is reused for the metric key even then: it is only the "<column>$<key>" identifier the scrape
+    // rule splits back into column and key labels, not a claim that the column exists on disk, and
+    // sharing the helper keeps the metric key and the dense column name from drifting apart.
+    for (String key : _config.getDenseKeys()) {
       RoaringBitmap presence = _presenceBitmaps.get(key);
       if (presence != null) {
         serverMetrics.setOrUpdateTableGauge(_tableNameWithType,

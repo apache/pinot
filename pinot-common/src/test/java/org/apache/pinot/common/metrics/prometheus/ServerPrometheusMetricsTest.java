@@ -84,7 +84,7 @@ public abstract class ServerPrometheusMetricsTest extends PinotPrometheusMetrics
 
   private static final List<ServerGauge> GAUGES_ACCEPTING_OPEN_STRUCT_COLUMN =
       List.of(ServerGauge.OPEN_STRUCT_DENSE_KEY_COUNT, ServerGauge.OPEN_STRUCT_SPARSE_KEY_COUNT,
-          ServerGauge.OPEN_STRUCT_TOTAL_KEYS_DISCOVERED, ServerGauge.OPEN_STRUCT_SEGMENT_DOC_COUNT);
+          ServerGauge.OPEN_STRUCT_SEGMENT_KEY_COUNT, ServerGauge.OPEN_STRUCT_SEGMENT_DOC_COUNT);
 
   private static final List<ServerMeter> METERS_ACCEPTING_OPEN_STRUCT_COLUMN =
       List.of(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES);

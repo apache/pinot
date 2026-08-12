@@ -178,14 +178,17 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
       "Number of OPEN_STRUCT keys classified as dense in the most recently sealed segment"),
   OPEN_STRUCT_SPARSE_KEY_COUNT("keys", false,
       "Number of OPEN_STRUCT keys classified as sparse in the most recently sealed segment"),
-  OPEN_STRUCT_TOTAL_KEYS_DISCOVERED("keys", false,
-      "Unique keys discovered in the most recently sealed segment for this OPEN_STRUCT column"),
+  OPEN_STRUCT_SEGMENT_KEY_COUNT("keys", false,
+      "Unique keys in the most recently sealed segment for this OPEN_STRUCT column (dense + sparse)"),
   OPEN_STRUCT_SEGMENT_DOC_COUNT("documents", false,
       "Total docs in the most recently sealed segment for this OPEN_STRUCT column; denominator for "
           + "openStructKeyDocCount"),
+  /// Emitted only for keys named in the table's `denseKeys` config, so the number of registry entries this
+  /// mints is bounded by that config rather than by the ingested key space. See
+  /// `OpenStructColumnSplitter#emitMetrics`.
   OPEN_STRUCT_KEY_DOC_COUNT("documents", false,
-      "Docs in which an OPEN_STRUCT key was present in the most recently sealed segment; divide by "
-          + "openStructSegmentDocCount for the fill rate");
+      "Docs in which a configured dense OPEN_STRUCT key was present in the most recently sealed segment; "
+          + "divide by openStructSegmentDocCount for the fill rate");
 
   private final String _gaugeName;
   private final String _unit;

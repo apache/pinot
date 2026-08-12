@@ -636,11 +636,122 @@ public class OpenStructColumnSplitterTest {
           OpenStructNaming.materializedColumnName("metrics", "rare"),
           ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT, 3L);
       verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", "metrics",
-          ServerGauge.OPEN_STRUCT_TOTAL_KEYS_DISCOVERED, 2L);
+          ServerGauge.OPEN_STRUCT_SEGMENT_KEY_COUNT, 2L);
       verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", "metrics",
           ServerGauge.OPEN_STRUCT_DENSE_KEY_COUNT, 2L);
       verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", "metrics",
           ServerGauge.OPEN_STRUCT_SPARSE_KEY_COUNT, 0L);
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  /// The per-key gauge is bounded by the `denseKeys` config, not by the ingested key space. Under the
+  /// default config it must emit nothing at all: `_resolvedDenseKeys` is data-driven there, so keying a
+  /// gauge on it would mint one registry entry per distinct key and gauges are never removed. The
+  /// column-level gauges are keyed on (table, column) and still emit.
+  @Test
+  public void testPerKeyGaugeIsSkippedWhenNoDenseKeysConfigured()
+      throws Exception {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      // No configured denseKeys: both keys resolve dense from the data alone (100% fill >= 0.5).
+      OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
+          config(0.5, -1, null));
+      for (int d = 0; d < 10; d++) {
+        s.add(Map.of("host", "h", "clicks", (long) d), d);
+      }
+      s.classify();
+      s.seal();
+
+      verify(metrics, never()).setOrUpdateTableGauge(anyString(), anyString(),
+          eq(ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT), anyLong());
+      verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", "metrics",
+          ServerGauge.OPEN_STRUCT_DENSE_KEY_COUNT, 2L);
+      verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", "metrics",
+          ServerGauge.OPEN_STRUCT_SEGMENT_KEY_COUNT, 2L);
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  /// Only the configured key gets a per-key gauge, even when other keys also resolve dense from the data.
+  @Test
+  public void testPerKeyGaugeCoversOnlyConfiguredDenseKeys()
+      throws Exception {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
+          config(0.5, -1, Set.of("clicks")));
+      for (int d = 0; d < 10; d++) {
+        s.add(Map.of("host", "h", "clicks", (long) d), d);
+      }
+      s.classify();
+      s.seal();
+
+      verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE",
+          OpenStructNaming.materializedColumnName("metrics", "clicks"),
+          ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT, 10L);
+      // 'host' is dense too, but only from the data, so it must not mint a gauge.
+      verify(metrics, never()).setOrUpdateTableGauge(
+          eq("testTable_OFFLINE"), eq(OpenStructNaming.materializedColumnName("metrics", "host")),
+          eq(ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT), anyLong());
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  /// A configured key cut from the dense set by the maxDenseKeys cap still reports its doc count: it is
+  /// configured, so it is within the operator-owned bound, and a configured key that did not earn a
+  /// materialized column is the case worth seeing. This is the branch where iterating the config diverges
+  /// from iterating `_resolvedDenseKeys`.
+  @Test
+  public void testPerKeyGaugeCoversConfiguredKeyCutByMaxDenseKeysCap()
+      throws Exception {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      // Both keys qualify on fill rate (100%), but the cap admits only one to the dense set.
+      OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
+          config(0.5, 1, Set.of("alpha", "beta")));
+      for (int d = 0; d < 10; d++) {
+        s.add(Map.of("alpha", (long) d, "beta", (long) d), d);
+      }
+      // Which of the two wins the single slot depends on Set.of iteration order, so assert the count
+      // rather than the identity; the gauge assertions below hold either way.
+      assertEquals(s.classify().size(), 1);
+      s.seal();
+
+      for (String key : List.of("alpha", "beta")) {
+        verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE",
+            OpenStructNaming.materializedColumnName("metrics", key),
+            ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT, 10L);
+      }
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  /// A configured key that never appears in the segment has no presence bitmap and is skipped rather
+  /// than reported as 0, which would be indistinguishable from a key present in no docs but ingested.
+  @Test
+  public void testPerKeyGaugeSkipsConfiguredKeyAbsentFromSegment()
+      throws Exception {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
+          config(0.5, -1, Set.of("never-ingested")));
+      for (int d = 0; d < 10; d++) {
+        s.add(Map.of("host", "h"), d);
+      }
+      s.classify();
+      s.seal();
+
+      verify(metrics, never()).setOrUpdateTableGauge(anyString(), anyString(),
+          eq(ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT), anyLong());
     } finally {
       ServerMetrics.deregister();
     }

@@ -240,7 +240,7 @@ public class PrometheusTemplateRegexpTest {
     Pattern compiled =
         Pattern.compile(loadPatternByName("server.yml", "pinot_server_$1_$7", "openStructDenseKeyCount"));
     for (String metric : List.of("openStructDenseKeyCount", "openStructSparseKeyCount",
-        "openStructTotalKeysDiscovered", "openStructSegmentDocCount")) {
+        "openStructSegmentKeyCount", "openStructSegmentDocCount")) {
       Matcher m = compiled.matcher("\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", "
           + "name=\"pinot.server." + metric + ".myTable_OFFLINE.metrics\"><>Value");
       Assert.assertTrue(m.matches(), "Pattern should match column-level OPEN_STRUCT gauge " + metric);
