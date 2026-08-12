@@ -60,6 +60,8 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONTROLLER_BROKER_PORT_OVERRIDE = "controller.broker.port.override";
   public static final String CONTROLLER_BROKER_TLS_PREFIX = "controller.broker.tls";
   public static final String CONTROLLER_BROKER_AUTH_PREFIX = "controller.broker.auth";
+  /// Namespace for the service credentials used by the controller when invoking Server admin APIs.
+  public static final String CONTROLLER_SERVER_ADMIN_AUTH_PREFIX = "controller.server.admin.auth";
   public static final String CONTROLLER_TLS_PREFIX = "controller.tls";
   public static final String CONTROLLER_HOST = "controller.host";
   public static final String CONTROLLER_PORT = "controller.port";

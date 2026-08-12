@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
+import com.sun.net.httpserver.HttpServer;
+import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -25,7 +27,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
@@ -283,8 +289,19 @@ public class BaseSingleStageBrokerRequestHandlerTest {
   }
 
   @Test
-  public void testCancelQuery() {
+  public void testCancelQuery()
+      throws Exception {
     String tableName = "myTable_OFFLINE";
+    String serviceToken = "server-admin-token";
+    AtomicReference<String> receivedAuthorization = new AtomicReference<>();
+    HttpServer adminServer = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+    adminServer.createContext("/", exchange -> {
+      receivedAuthorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
+      exchange.sendResponseHeaders(200, -1);
+      exchange.close();
+    });
+    adminServer.start();
+
     // Mock pretty much everything until the query can be submitted.
     TableCache tableCache = mock(TableCache.class);
     TableConfig tableCfg = mock(TableConfig.class);
@@ -296,7 +313,12 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     when(routingManager.routingExists(tableName)).thenReturn(true);
     when(routingManager.getQueryTimeoutMs(tableName)).thenReturn(10000L);
     RoutingTable rt = mock(RoutingTable.class);
-    when(rt.getServerInstanceToSegmentsMap()).thenReturn(Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
+    int adminPort = adminServer.getAddress().getPort();
+    InstanceConfig serverConfig = new InstanceConfig("Server_localhost_9000");
+    serverConfig.setHostName("localhost");
+    serverConfig.setPort("9000");
+    serverConfig.getRecord().setIntField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY, adminPort);
+    when(rt.getServerInstanceToSegmentsMap()).thenReturn(Map.of(new ServerInstance(serverConfig),
         new SegmentsToQuery(List.of("segment01"), List.of())));
     when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
     QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
@@ -307,6 +329,8 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     long[] testRequestId = {-1};
     BrokerMetrics.register(mock(BrokerMetrics.class));
     PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(Broker.SERVER_ADMIN_AUTH_PREFIX + ".token", serviceToken);
+    config.setProperty(Broker.SERVER_ADMIN_AUTH_PREFIX + ".prefix", "Bearer");
     BrokerQueryEventListenerFactory.init(config);
     BaseSingleStageBrokerRequestHandler requestHandler =
         new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(), routingManager,
@@ -327,7 +351,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
               throws Exception {
             testRequestId[0] = requestId;
             latch.await();
-            return null;
+            return BrokerResponseNative.empty();
           }
 
           @Override
@@ -339,25 +363,46 @@ public class BaseSingleStageBrokerRequestHandlerTest {
             throw new UnsupportedOperationException("Not implemented in test");
           }
         };
-    CompletableFuture.runAsync(() -> {
+    CompletableFuture<Void> queryFuture = CompletableFuture.runAsync(() -> {
       try {
         requestHandler.handleRequest(String.format("select * from %s limit 10", tableName));
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     });
-    TestUtils.waitForCondition((aVoid) -> requestHandler.getRunningServers(testRequestId[0]).size() == 1, 500, 5000,
-        "Failed to submit query");
-    Map.Entry<Long, String> entry = requestHandler.getRunningQueries().entrySet().iterator().next();
-    Assert.assertEquals(entry.getKey().longValue(), testRequestId[0]);
-    Assert.assertTrue(entry.getValue().contains("select * from myTable_OFFLINE limit 10"));
-    Set<ServerInstance> servers = requestHandler.getRunningServers(testRequestId[0]);
-    Assert.assertEquals(servers.size(), 1);
-    Assert.assertEquals(servers.iterator().next().getHostname(), "server01");
-    Assert.assertEquals(servers.iterator().next().getPort(), 9000);
-    Assert.assertEquals(servers.iterator().next().getInstanceId(), "server01_9000");
-    Assert.assertEquals(servers.iterator().next().getAdminEndpoint(), "http://server01:8097");
-    latch.countDown();
+    ExecutorService cancellationExecutor = Executors.newSingleThreadExecutor();
+    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+    try {
+      TestUtils.waitForCondition((aVoid) -> requestHandler.getRunningServers(testRequestId[0]).size() == 1, 500, 5000,
+          "Failed to submit query");
+      Map.Entry<Long, String> entry = requestHandler.getRunningQueries().entrySet().iterator().next();
+      Assert.assertEquals(entry.getKey().longValue(), testRequestId[0]);
+      Assert.assertTrue(entry.getValue().contains("select * from myTable_OFFLINE limit 10"));
+      Set<ServerInstance> servers = requestHandler.getRunningServers(testRequestId[0]);
+      Assert.assertEquals(servers.size(), 1);
+      Assert.assertEquals(servers.iterator().next().getHostname(), "localhost");
+      Assert.assertEquals(servers.iterator().next().getPort(), 9000);
+      Assert.assertEquals(servers.iterator().next().getInstanceId(), "Server_localhost_9000");
+      Assert.assertEquals(servers.iterator().next().getAdminEndpoint(), "http://localhost:" + adminPort);
+
+      Map<String, Integer> serverResponses = new HashMap<>();
+      Assert.assertTrue(requestHandler.cancelQuery(testRequestId[0], 3000, cancellationExecutor, connectionManager,
+          serverResponses));
+      Assert.assertEquals(receivedAuthorization.get(), "Bearer " + serviceToken);
+      Assert.assertEquals(serverResponses, Map.of("localhost:" + adminPort, 200));
+    } finally {
+      latch.countDown();
+      try {
+        queryFuture.get(5, TimeUnit.SECONDS);
+      } finally {
+        cancellationExecutor.shutdownNow();
+        try {
+          connectionManager.close();
+        } finally {
+          adminServer.stop(0);
+        }
+      }
+    }
   }
 
   @Test
