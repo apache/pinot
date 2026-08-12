@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -100,12 +101,16 @@ abstract class BaseBasicAuthAccessControl<P extends BasicAuthPrincipal> implemen
 
   @Override
   public final boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId, String action) {
+    Optional<P> principal = getPrincipal(httpHeaders);
+    if (Actions.Cluster.GET_ZNODE.equals(action)) {
+      return principal.filter(p -> p.hasExplicitActionPermission(Actions.Cluster.GET_ZNODE)).isPresent();
+    }
     // Basic auth permissions are CRUD access types, not action names. AuthenticationFilter enforces the resolved
     // AccessType before invoking this fine-grained check, so this overload must only prevent unauthenticated access.
     // In particular it must not require unrestricted table scope for TargetType.CLUSTER: several table-scoped
     // endpoints declare a cluster action, and for those the filter already resolved the table name and ran the
     // table-scoped check above. Endpoints that name no table go through the cluster-wide check above instead.
-    return getPrincipal(httpHeaders).isPresent();
+    return principal.isPresent();
   }
 
   /// Reports whether the principal may act on the given target type at all, without a specific target or action.

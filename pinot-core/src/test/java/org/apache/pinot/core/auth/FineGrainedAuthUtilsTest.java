@@ -36,6 +36,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
@@ -115,6 +116,15 @@ public class FineGrainedAuthUtilsTest {
     Method declaredTableMethod = TestResource.class.getDeclaredMethod("getTableByQuery", String.class);
     FineGrainedAuthUtils.validateFineGrainedAuth(declaredTableMethod, mockUriInfo, mockHttpHeaders, ac);
     verify(ac).hasAccess(mockHttpHeaders, TargetType.TABLE, "ownedTable", "getTable");
+  }
+
+  @Test
+  public void testRawZnodeReadIsDeniedByDefault() {
+    FineGrainedAccessControl accessControl = new FineGrainedAccessControl() {
+    };
+
+    assertFalse(accessControl.hasAccess(null, TargetType.CLUSTER, null, Actions.Cluster.GET_ZNODE));
+    assertTrue(accessControl.hasAccess(null, TargetType.CLUSTER, null, Actions.Cluster.GET_CLUSTER_CONFIG));
   }
 
   @Test
