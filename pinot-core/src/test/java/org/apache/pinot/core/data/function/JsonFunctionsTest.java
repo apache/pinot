@@ -147,6 +147,15 @@ public class JsonFunctionsTest {
     inputs.add(new Object[]{
         "json_path_double_fory(json, '$.ratio', -1.0)", Lists.newArrayList("json"), row12, 1.25
     });
+    inputs.add(new Object[]{
+        "json_path_string_fast(json, '$.text', 'DEFAULT')", Lists.newArrayList("json"), row12, "value"
+    });
+    inputs.add(new Object[]{
+        "json_path_long_fast(json, '$.count', -1)", Lists.newArrayList("json"), row12, 10L
+    });
+    inputs.add(new Object[]{
+        "json_path_double_fast(json, '$.ratio', -1.0)", Lists.newArrayList("json"), row12, 1.25
+    });
     return inputs.toArray(new Object[0][]);
   }
 

@@ -75,9 +75,9 @@ import org.roaringbitmap.RoaringBitmap;
 /// only for well-formed, duplicate-free JSON. `Fast` scans the full root value and retains Jayway's last-key-wins
 /// and malformed-document behavior; see [FastJsonPathExtractor] for one documented unaddressed-value edge case.
 /// `jsonExtractScalarFory` is experimental and must be selected explicitly. It accelerates simple paths over
-/// `STRING` input for scalar result types other than `STRING` and `BIG_DECIMAL`. `BYTES` input, complex paths,
-/// containers / array result types, precision-sensitive results, deeply nested documents, and Fory failures use
-/// Jayway. Its name, supported envelope, and implementation can change while the integration is evaluated.
+/// `STRING` input for scalar result types other than `STRING`, `JSON`, and `BIG_DECIMAL`. `BYTES` input, complex
+/// paths, containers / array result types, precision-sensitive results, deeply nested documents, and Fory failures
+/// use Jayway. Its name, supported envelope, and implementation can change while the integration is evaluated.
 ///
 /// **Arguments:**
 /// - `jsonField` — single-value `STRING` or `BYTES` column / transform expression containing JSON.
