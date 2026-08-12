@@ -260,20 +260,12 @@ public class PinotSegmentUploadDownloadRestletResource {
 
   private SuccessResponse uploadSegment(@Nullable String tableName, TableType tableType,
       @Nullable FormDataMultiPart multiPart, boolean copySegmentToFinalLocation, boolean enableParallelPushProtection,
-      boolean allowRefresh, HttpHeaders headers, Request request) {
+      boolean allowRefresh, boolean requireMatchingMetadataTable, HttpHeaders headers, Request request) {
     long segmentUploadStartTimeMs = System.currentTimeMillis();
-    if (StringUtils.isNotEmpty(tableName)) {
-      TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
-      if (tableTypeFromTableName != null && tableTypeFromTableName != tableType) {
-        throw new ControllerApplicationException(LOGGER,
-            String.format("Table name: %s does not match table type: %s", tableName, tableType),
-            Response.Status.BAD_REQUEST);
-      }
-    }
-
-    // TODO: Consider validating the segment name and table name from the header against the actual segment
+    // TODO: Consider validating the segment name from the header against the actual segment
     extractHttpHeader(headers, CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER);
-    extractHttpHeader(headers, CommonConstants.Controller.TABLE_NAME_HTTP_HEADER);
+    String tableNameInHeader = extractHttpHeader(headers, CommonConstants.Controller.TABLE_NAME_HTTP_HEADER);
+    String requestedTableName = resolveRequestedTableName(tableName, tableNameInHeader, tableType, headers);
 
     String uploadTypeStr = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
     String sourceDownloadURIStr = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
@@ -318,7 +310,7 @@ public class PinotSegmentUploadDownloadRestletResource {
                 "Source download URI is required in header field 'DOWNLOAD_URI' for URI upload mode",
                 Response.Status.BAD_REQUEST);
           }
-          downloadSegmentFileFromURI(sourceDownloadURIStr, destFile, tableName);
+          downloadSegmentFileFromURI(sourceDownloadURIStr, destFile, requestedTableName);
           segmentSizeInBytes = destFile.length();
           break;
         case METADATA:
@@ -367,19 +359,15 @@ public class PinotSegmentUploadDownloadRestletResource {
       // Fetch segment name
       String segmentName = segmentMetadata.getName();
 
-      // Fetch table name. Try to derive the table name from the parameter and then from segment metadata
-      String rawTableName;
-      if (StringUtils.isNotEmpty(tableName)) {
-        rawTableName = TableNameBuilder.extractRawTableName(tableName);
-      } else {
-        // TODO: remove this when we completely deprecate the table name from segment metadata
-        rawTableName = segmentMetadata.getTableName();
-        LOGGER.warn("Table name is not provided as request query parameter when uploading segment: {} for table: {}",
-            segmentName, rawTableName);
-      }
-      String tableNameWithType = tableType == TableType.OFFLINE
-          ? TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)
-          : TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+      String rawTableName = resolveDestinationTableName(requestedTableName, segmentMetadata.getTableName(), tableType,
+          headers, requireMatchingMetadataTable);
+      String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
+
+      // The v1 endpoints are authorized at cluster scope before segment extraction because tableName is optional.
+      // Re-authorize all variants against the canonical destination so no AccessControl implementation can permit a
+      // different table through cluster-level CREATE access or database-header translation.
+      ResourceUtils.checkPermissionAndAccess(rawTableName, request, headers, AccessType.CREATE,
+          Actions.Table.UPLOAD_SEGMENT, _accessControlFactory, LOGGER);
 
       if (UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(segmentName) && tableType != TableType.REALTIME) {
         throw new ControllerApplicationException(LOGGER, "Cannot upload segment: " + segmentName
@@ -574,9 +562,20 @@ public class PinotSegmentUploadDownloadRestletResource {
   private SuccessResponse uploadSegments(String tableName, TableType tableType, FormDataMultiPart multiPart,
       boolean enableParallelPushProtection, boolean allowRefresh, HttpHeaders headers, Request request) {
     long segmentsUploadStartTimeMs = System.currentTimeMillis();
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    String tableNameWithType = tableType == TableType.OFFLINE ? TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)
-        : TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+    String rawTableName = normalizeTableName(tableName, tableType, headers, "request tableName");
+    if (rawTableName == null) {
+      throw new ControllerApplicationException(LOGGER, "tableName is required for batch segment upload",
+          Response.Status.BAD_REQUEST);
+    }
+    String tableNameInHeader = normalizeTableName(
+        extractHttpHeader(headers, CommonConstants.Controller.TABLE_NAME_HTTP_HEADER), tableType, headers,
+        CommonConstants.Controller.TABLE_NAME_HTTP_HEADER + " header");
+    validateMatchingTableName(rawTableName, tableNameInHeader,
+        CommonConstants.Controller.TABLE_NAME_HTTP_HEADER + " header");
+    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
+
+    ResourceUtils.checkPermissionAndAccess(rawTableName, request, headers, AccessType.CREATE,
+        Actions.Table.UPLOAD_SEGMENT, _accessControlFactory, LOGGER);
 
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     if (tableConfig == null) {
@@ -648,6 +647,9 @@ public class PinotSegmentUploadDownloadRestletResource {
 
         String metadataProviderClass = DefaultMetadataExtractor.class.getName();
         SegmentMetadata segmentMetadata = getSegmentMetadata(tempDecryptedFile, tempSegmentDir, metadataProviderClass);
+        String segmentMetadataTableName =
+            normalizeTableName(segmentMetadata.getTableName(), tableType, headers, "segment metadata table name");
+        validateMatchingTableName(rawTableName, segmentMetadataTableName, "segment metadata table name");
         LOGGER.info("Processing upload request for segment: {} of table: {} with upload type: {} from client: {}, "
                 + "ingestion descriptor: {}", segmentName, tableNameWithType, uploadType, clientAddress,
             ingestionDescriptor);
@@ -735,6 +737,84 @@ public class PinotSegmentUploadDownloadRestletResource {
     }
   }
 
+  @VisibleForTesting
+  static String resolveDestinationTableName(@Nullable String requestTableName, @Nullable String headerTableName,
+      @Nullable String metadataTableName, TableType tableType, HttpHeaders headers,
+      boolean requireMatchingMetadataTable) {
+    String requestedTableName = resolveRequestedTableName(requestTableName, headerTableName, tableType, headers);
+    return resolveDestinationTableName(requestedTableName, metadataTableName, tableType, headers,
+        requireMatchingMetadataTable);
+  }
+
+  @Nullable
+  private static String resolveRequestedTableName(@Nullable String requestTableName, @Nullable String headerTableName,
+      TableType tableType, HttpHeaders headers) {
+    String normalizedRequestTable = normalizeTableName(requestTableName, tableType, headers, "request tableName");
+    String normalizedHeaderTable = normalizeTableName(headerTableName, tableType, headers,
+        CommonConstants.Controller.TABLE_NAME_HTTP_HEADER + " header");
+    String destinationTable = normalizedRequestTable != null ? normalizedRequestTable
+        : normalizedHeaderTable;
+    if (destinationTable != null) {
+      validateMatchingTableName(destinationTable, normalizedHeaderTable,
+          CommonConstants.Controller.TABLE_NAME_HTTP_HEADER + " header");
+    }
+    return destinationTable;
+  }
+
+  private static String resolveDestinationTableName(@Nullable String requestedTableName,
+      @Nullable String metadataTableName, TableType tableType, HttpHeaders headers,
+      boolean requireMatchingMetadataTable) {
+    String normalizedMetadataTable = null;
+    if (requireMatchingMetadataTable || requestedTableName == null) {
+      normalizedMetadataTable =
+          normalizeTableName(metadataTableName, tableType, headers, "segment metadata table name");
+    }
+    String destinationTable = requestedTableName != null ? requestedTableName : normalizedMetadataTable;
+    if (destinationTable == null) {
+      throw new ControllerApplicationException(LOGGER,
+          "Table name is required in the request, " + CommonConstants.Controller.TABLE_NAME_HTTP_HEADER
+              + " header, or segment metadata",
+          Response.Status.BAD_REQUEST);
+    }
+
+    if (requireMatchingMetadataTable) {
+      validateMatchingTableName(destinationTable, normalizedMetadataTable, "segment metadata table name");
+    }
+    return destinationTable;
+  }
+
+  @Nullable
+  private static String normalizeTableName(@Nullable String tableName, TableType tableType, HttpHeaders headers,
+      String source) {
+    if (tableName == null) {
+      return null;
+    }
+    if (StringUtils.isBlank(tableName)) {
+      throw new ControllerApplicationException(LOGGER, "Invalid " + source + ": table name must not be blank",
+          Response.Status.BAD_REQUEST);
+    }
+    try {
+      TableType tableTypeFromName = TableNameBuilder.getTableTypeFromTableName(tableName);
+      if (tableTypeFromName != null && tableTypeFromName != tableType) {
+        throw new IllegalArgumentException(
+            String.format("Table name: %s does not match table type: %s", tableName, tableType));
+      }
+      return DatabaseUtils.translateTableName(TableNameBuilder.extractRawTableName(tableName), headers);
+    } catch (RuntimeException e) {
+      throw new ControllerApplicationException(LOGGER, "Invalid " + source + ": " + e.getMessage(),
+          Response.Status.BAD_REQUEST, e);
+    }
+  }
+
+  private static void validateMatchingTableName(String destinationTable, @Nullable String suppliedTable,
+      String source) {
+    if (suppliedTable != null && !destinationTable.equals(suppliedTable)) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("%s '%s' does not match destination table '%s'", source, suppliedTable, destinationTable),
+          Response.Status.BAD_REQUEST);
+    }
+  }
+
   @Nullable
   private String extractHttpHeader(HttpHeaders headers, String name) {
     String value = headers.getHeaderString(name);
@@ -778,7 +858,8 @@ public class PinotSegmentUploadDownloadRestletResource {
     return out;
   }
 
-  private void downloadSegmentFileFromURI(String currentSegmentLocationURI, File destFile, String tableName)
+  private void downloadSegmentFileFromURI(String currentSegmentLocationURI, File destFile,
+      @Nullable String tableName)
       throws Exception {
     if (currentSegmentLocationURI == null || currentSegmentLocationURI.isEmpty()) {
       throw new ControllerApplicationException(LOGGER, "Failed to get downloadURI, needed for URI upload",
@@ -830,8 +911,8 @@ public class PinotSegmentUploadDownloadRestletResource {
   // request if a multipart object is not sent. This endpoint does not move the segment to its final location;
   // it keeps it at the downloadURI header that is set. We will not support this endpoint going forward.
   public void uploadSegmentAsJson(String segmentJsonStr,
-      @ApiParam(value = "Name of the table to upload into. Overrides segment.table.name in segment metadata when set "
-          + "(allows promoting a segment built for another table). Falls back to metadata when omitted.")
+      @ApiParam(value = "Name of the table to upload into. Must match segment.table.name in segment metadata when both "
+          + "are set. Falls back to metadata when omitted.")
       @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
       String tableName,
       @ApiParam(value = "Type of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_TYPE)
@@ -844,7 +925,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @Context HttpHeaders headers, @Context Request request, @Suspended AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), null, false,
-          enableParallelPushProtection, allowRefresh, headers, request));
+          enableParallelPushProtection, allowRefresh, true, headers, request));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -871,8 +952,8 @@ public class PinotSegmentUploadDownloadRestletResource {
   @TrackedByGauge(gauge = ControllerGauge.SEGMENT_UPLOADS_IN_PROGRESS)
   // For the multipart endpoint, we will always move segment to final location regardless of the segment endpoint.
   public void uploadSegmentAsMultiPart(FormDataMultiPart multiPart,
-      @ApiParam(value = "Name of the table to upload into. Overrides segment.table.name in segment metadata when set "
-          + "(allows promoting a segment built for another table). Falls back to metadata when omitted.")
+      @ApiParam(value = "Name of the table to upload into. Must match segment.table.name in segment metadata when both "
+          + "are set. Falls back to metadata when omitted.")
       @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
       String tableName,
       @ApiParam(value = "Type of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_TYPE)
@@ -885,7 +966,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @Context HttpHeaders headers, @Context Request request, @Suspended AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart, true,
-          enableParallelPushProtection, allowRefresh, headers, request));
+          enableParallelPushProtection, allowRefresh, true, headers, request));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -989,7 +1070,7 @@ public class PinotSegmentUploadDownloadRestletResource {
     try {
       asyncResponse.resume(
           uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), null, true, enableParallelPushProtection,
-              allowRefresh, headers, request));
+              allowRefresh, false, headers, request));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -1014,7 +1095,6 @@ public class PinotSegmentUploadDownloadRestletResource {
   })
   @TrackInflightRequestMetrics
   @TrackedByGauge(gauge = ControllerGauge.SEGMENT_UPLOADS_IN_PROGRESS)
-  // This behavior does not differ from v1 of the same endpoint.
   public void uploadSegmentAsMultiPartV2(FormDataMultiPart multiPart,
       @ApiParam(value = "Name of the table to upload into. Overrides segment.table.name in segment metadata when set.")
       @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
@@ -1029,7 +1109,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @Context HttpHeaders headers, @Context Request request, @Suspended AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart, true,
-          enableParallelPushProtection, allowRefresh, headers, request));
+          enableParallelPushProtection, allowRefresh, false, headers, request));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
