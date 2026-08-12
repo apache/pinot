@@ -312,7 +312,8 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
           setTableNotFound(true);
           return;
         }
-        const tableObj:any = result.OFFLINE || result.REALTIME;
+        const tableConfigs = get(result, 'configs', result);
+        const tableObj:any = tableConfigs.OFFLINE || tableConfigs.REALTIME;
         setTableType(tableObj.tableType);
         setTableConfig(JSON.stringify(result, null, 2));
         return fetchTableState(tableObj.tableType);
@@ -372,7 +373,10 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const saveConfigAction = async () => {
     let configObj = JSON.parse(config);
     if(actionType === 'editTable'){
-      if(configObj.OFFLINE || configObj.REALTIME){
+      // Preserve the versioned response envelope so unchanged redacted values can
+      // be restored against the exact versions returned by GET. Older controllers
+      // return the table config map directly, which still needs to be unwrapped.
+      if(!configObj.configs && (configObj.OFFLINE || configObj.REALTIME)){
         configObj = configObj.OFFLINE || configObj.REALTIME;
       }
       const result = await PinotMethodUtils.updateTable(tableName, configObj);

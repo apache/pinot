@@ -22,13 +22,34 @@ import com.google.common.collect.ImmutableSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.spi.config.user.AccessType;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
+import org.apache.pinot.spi.config.user.UserConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 public class ZkBasicAuthTest {
+
+  @Test
+  public void testFineGrainedPermissionsAreAddedToZkPrincipal() {
+    UserConfig legacyUser = new UserConfig("legacy", "password", ComponentType.CONTROLLER.name(),
+        RoleType.ADMIN.name(), null, null, List.of(AccessType.READ));
+    ZkBasicAuthPrincipal legacyPrincipal = BasicAuthPrincipalUtils.extractBasicAuthPrincipals(List.of(legacyUser))
+        .get(0);
+    Assert.assertTrue(legacyPrincipal.hasPermission("read"));
+    Assert.assertTrue(legacyPrincipal.hasExplicitPermission("read"));
+    Assert.assertFalse(legacyPrincipal.hasExplicitPermission(Actions.Cluster.GET_ZNODE));
+
+    UserConfig fineGrainedUser = new UserConfig("fineGrained", "password", ComponentType.CONTROLLER.name(),
+        RoleType.ADMIN.name(), null, null, null, List.of(Actions.Cluster.GET_ZNODE));
+    ZkBasicAuthPrincipal fineGrainedPrincipal =
+        BasicAuthPrincipalUtils.extractBasicAuthPrincipals(List.of(fineGrainedUser)).get(0);
+    // The separate fine-grained permission must not turn the legacy empty-set wildcard into a table restriction.
+    Assert.assertTrue(fineGrainedPrincipal.hasPermission("read"));
+    Assert.assertTrue(fineGrainedPrincipal.hasExplicitPermission(Actions.Cluster.GET_ZNODE));
+  }
 
   @Test
   public void testBasicAuthPrincipal() {
