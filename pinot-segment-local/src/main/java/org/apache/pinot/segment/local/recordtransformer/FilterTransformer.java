@@ -26,6 +26,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.function.FunctionEvaluator;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,13 +45,19 @@ public class FilterTransformer implements RecordTransformer {
   private long _numRecordsFiltered;
 
   public FilterTransformer(TableConfig tableConfig) {
+    this(tableConfig, IngestionGroovyPolicy.fromDisabled(FunctionEvaluatorFactory.isIngestionGroovyDisabled()));
+  }
+
+  public FilterTransformer(TableConfig tableConfig, IngestionGroovyPolicy ingestionGroovyPolicy) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     if (ingestionConfig != null && ingestionConfig.getFilterConfig() != null) {
       _filterFunction = ingestionConfig.getFilterConfig().getFilterFunction();
     } else {
       _filterFunction = null;
     }
-    _evaluator = _filterFunction != null ? FunctionEvaluatorFactory.getExpressionEvaluator(_filterFunction) : null;
+    _evaluator = _filterFunction != null
+        ? FunctionEvaluatorFactory.getExpressionEvaluator(_filterFunction,
+            ingestionGroovyPolicy.isIngestionGroovyDisabled()) : null;
     _continueOnError = ingestionConfig != null && ingestionConfig.isContinueOnError();
     _throttledLogger = new ThrottledLogger(LOGGER, ingestionConfig);
   }

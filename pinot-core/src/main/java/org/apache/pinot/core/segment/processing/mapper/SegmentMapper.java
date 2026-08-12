@@ -50,6 +50,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordFetchException;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.tasks.MinionTaskBaseObserverStats;
 import org.apache.pinot.spi.utils.StringUtil;
@@ -87,13 +88,16 @@ public class SegmentMapper {
   public SegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs,
       List<RecordTransformer> customRecordTransformers, SegmentProcessorConfig processorConfig, File mapperOutputDir) {
     this(recordReaderFileConfigs,
-        getTransformPipeline(processorConfig.getTableConfig(), processorConfig.getSchema(), customRecordTransformers),
+        getTransformPipeline(processorConfig.getTableConfig(), processorConfig.getSchema(), customRecordTransformers,
+            processorConfig.getIngestionGroovyPolicy()),
         processorConfig, mapperOutputDir);
   }
 
   private static TransformPipeline getTransformPipeline(TableConfig tableConfig, Schema schema,
-      @Nullable List<RecordTransformer> customRecordTransformers) {
-    List<RecordTransformer> recordTransformers = RecordTransformerUtils.getDefaultTransformers(tableConfig, schema);
+      @Nullable List<RecordTransformer> customRecordTransformers, IngestionGroovyPolicy ingestionGroovyPolicy) {
+    List<RecordTransformer> recordTransformers =
+        RecordTransformerUtils.getDefaultTransformers(tableConfig, schema,
+            ingestionGroovyPolicy.isIngestionGroovyDisabled());
     if (CollectionUtils.isNotEmpty(customRecordTransformers)) {
       recordTransformers.addAll(customRecordTransformers);
     }
@@ -117,7 +121,9 @@ public class SegmentMapper {
         schema.isEnableColumnBasedNullHandling() || tableConfig.getIndexingConfig().isNullHandlingEnabled();
     _transformPipeline = transformPipeline;
     _timeHandler = TimeHandlerFactory.getTimeHandler(processorConfig);
-    _partitioners = PartitionerFactory.getPartitioners(processorConfig.getPartitionerConfigs());
+    _partitioners =
+        PartitionerFactory.getPartitioners(processorConfig.getPartitionerConfigs(),
+            processorConfig.getIngestionGroovyPolicy());
     // Time partition + partition from partitioners
     _partitionsBuffer = new String[_partitioners.length + 1];
     _throttledLogger = new ThrottledLogger(LOGGER, tableConfig.getIngestionConfig());

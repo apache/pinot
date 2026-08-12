@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
@@ -33,8 +34,10 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.SourceFieldConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricher;
+import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherCreationContext;
 import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherRegistry;
 import org.apache.pinot.spi.utils.PinotDataType;
 
@@ -72,10 +75,18 @@ public class RecordTransformerUtils {
   public static List<RecordTransformer> getTransformers(TableConfig tableConfig, @Nullable Schema schema,
       boolean skipPreComplexTypeTransformers, boolean skipComplexTypeTransformer,
       boolean skipPostComplexTypeTransformers, boolean skipFilterTransformer) {
+    return getTransformers(tableConfig, schema, skipPreComplexTypeTransformers, skipComplexTypeTransformer,
+        skipPostComplexTypeTransformers, skipFilterTransformer,
+        FunctionEvaluatorFactory.isIngestionGroovyDisabled());
+  }
+
+  public static List<RecordTransformer> getTransformers(TableConfig tableConfig, @Nullable Schema schema,
+      boolean skipPreComplexTypeTransformers, boolean skipComplexTypeTransformer,
+      boolean skipPostComplexTypeTransformers, boolean skipFilterTransformer, boolean disableGroovy) {
     List<RecordTransformer> transformers = new ArrayList<>();
     if (!skipPreComplexTypeTransformers) {
       addSourceFieldDataTypeTransformer(tableConfig, transformers, true);
-      addRecordEnricherTransformers(tableConfig, transformers, true);
+      addRecordEnricherTransformers(tableConfig, transformers, true, disableGroovy);
     }
     if (!skipComplexTypeTransformer) {
       addIfNotNoOp(transformers, ComplexTypeTransformer.create(tableConfig));
@@ -86,10 +97,11 @@ public class RecordTransformerUtils {
     Preconditions.checkState(schema != null,
         "Schema must be provided when post complex type transformers are requested");
     addSourceFieldDataTypeTransformer(tableConfig, transformers, false);
-    addRecordEnricherTransformers(tableConfig, transformers, false);
-    addIfNotNoOp(transformers, new ExpressionTransformer(tableConfig, schema));
+    addRecordEnricherTransformers(tableConfig, transformers, false, disableGroovy);
+    IngestionGroovyPolicy ingestionGroovyPolicy = IngestionGroovyPolicy.fromDisabled(disableGroovy);
+    addIfNotNoOp(transformers, new ExpressionTransformer(tableConfig, schema, ingestionGroovyPolicy));
     if (!skipFilterTransformer) {
-      addIfNotNoOp(transformers, new FilterTransformer(tableConfig));
+      addIfNotNoOp(transformers, new FilterTransformer(tableConfig, ingestionGroovyPolicy));
     }
     addIfNotNoOp(transformers, SchemaConformingTransformer.create(tableConfig, schema));
     addIfNotNoOp(transformers, new DataTypeTransformer(tableConfig, schema));
@@ -104,6 +116,11 @@ public class RecordTransformerUtils {
     return getTransformers(tableConfig, schema, false, false, false, false);
   }
 
+  public static List<RecordTransformer> getDefaultTransformers(TableConfig tableConfig, Schema schema,
+      boolean disableGroovy) {
+    return getTransformers(tableConfig, schema, false, false, false, false, disableGroovy);
+  }
+
   /// Returns transformers to apply after a partial upsert merge. Only post-merge transform configs are honored to avoid
   /// re-running ingestion-time transforms. Derived columns must exist in the schema to be queryable.
   ///
@@ -112,6 +129,13 @@ public class RecordTransformerUtils {
   /// @return List of transformers to apply after merge, or `null` if none configured
   @Nullable
   public static List<RecordTransformer> getPostPartialUpsertTransformers(TableConfig tableConfig, Schema schema) {
+    return getPostPartialUpsertTransformers(tableConfig, schema,
+        FunctionEvaluatorFactory.isIngestionGroovyDisabled());
+  }
+
+  @Nullable
+  public static List<RecordTransformer> getPostPartialUpsertTransformers(TableConfig tableConfig, Schema schema,
+      boolean disableGroovy) {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     if (upsertConfig == null) {
       return null;
@@ -127,7 +151,7 @@ public class RecordTransformerUtils {
     boolean continueOnError = ingestionConfig != null && ingestionConfig.isContinueOnError();
     addIfNotNoOp(transformers,
         new ExpressionTransformer(postPartialUpsertTransformConfigs, true /* overwriteExistingValues */,
-            continueOnError));
+            continueOnError, IngestionGroovyPolicy.fromDisabled(disableGroovy)));
     addIfNotNoOp(transformers, new DataTypeTransformer(tableConfig, schema));
     addIfNotNoOp(transformers, new TimeValidationTransformer(tableConfig, schema));
     addIfNotNoOp(transformers, new SpecialValueTransformer(schema));
@@ -166,7 +190,7 @@ public class RecordTransformerUtils {
   }
 
   private static void addRecordEnricherTransformers(TableConfig tableConfig, List<RecordTransformer> transformers,
-      boolean preComplexTypeTransformers) {
+      boolean preComplexTypeTransformers, boolean disableGroovy) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     if (ingestionConfig != null) {
       List<EnrichmentConfig> enrichmentConfigs = ingestionConfig.getEnrichmentConfigs();
@@ -179,7 +203,8 @@ public class RecordTransformerUtils {
           }
           RecordEnricher recordEnricher;
           try {
-            recordEnricher = RecordEnricherRegistry.createRecordEnricher(enrichmentConfig);
+            recordEnricher = RecordEnricherRegistry.createRecordEnricher(enrichmentConfig,
+                new RecordEnricherCreationContext(IngestionGroovyPolicy.fromDisabled(disableGroovy)));
           } catch (IOException e) {
             throw new RuntimeException("Failed to instantiate record enricher " + enrichmentConfig.getEnricherType(),
                 e);

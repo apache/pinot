@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.helix.AccessOption;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
@@ -41,14 +42,17 @@ import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.helix.model.builder.FullAutoModeISBuilder;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
+import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixBrokerResourceOnlineOfflineStateModelGenerator;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,6 +120,51 @@ public class HelixSetupUtils {
       }
     } finally {
       admin.close();
+    }
+  }
+
+  /// Reconciles the cluster-wide ingestion Groovy policy from the API-serving controller.
+  ///
+  /// The first API-serving controller atomically seeds a missing policy. Once the policy exists, it is authoritative;
+  /// an explicitly configured controller must match it. HELIX_ONLY controllers do not call this method, so they
+  /// cannot race the API-serving controller with their local default.
+  public static boolean reconcileIngestionGroovyPolicy(String zkAddress, String clusterName,
+      boolean explicitlyConfigured,
+      boolean disableGroovy) {
+    ZkBaseDataAccessor<ZNRecord> accessor = new ZkBaseDataAccessor<>(zkAddress, new ZNRecordSerializer());
+    try {
+      HelixConfigScope configScope =
+          new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(clusterName).build();
+      String key = CommonConstants.Groovy.DISABLE_INGESTION_GROOVY;
+      String configuredValue = Boolean.toString(disableGroovy);
+      while (true) {
+        Stat stat = new Stat();
+        ZNRecord clusterConfig = accessor.get(configScope.getZkPath(), stat, AccessOption.PERSISTENT);
+        Preconditions.checkState(clusterConfig != null,
+            "Helix cluster does not exist for API-serving controller: %s", clusterName);
+        String existingValue = clusterConfig.getSimpleField(key);
+        if (existingValue != null) {
+          String resolvedExistingValue = Boolean.toString(
+              CommonConstants.Groovy.isIngestionGroovyDisabled(existingValue));
+          Preconditions.checkState(!explicitlyConfigured || configuredValue.equals(resolvedExistingValue),
+              "Conflicting ingestion Groovy policy: cluster config '%s=%s' is authoritative, but the controller "
+                  + "config resolves to %s. Update the cluster config before restarting controllers",
+              key, resolvedExistingValue, configuredValue);
+          return Boolean.parseBoolean(resolvedExistingValue);
+        }
+        ZNRecord updatedClusterConfig = new ZNRecord(clusterConfig);
+        updatedClusterConfig.setSimpleField(key, configuredValue);
+        try {
+          Preconditions.checkState(
+              accessor.set(configScope.getZkPath(), updatedClusterConfig, stat.getVersion(), AccessOption.PERSISTENT),
+              "Failed to persist ingestion Groovy policy for Helix cluster: %s", clusterName);
+          return disableGroovy;
+        } catch (ZkBadVersionException e) {
+          // Another API-serving controller won the compare-and-set. Re-read and adopt or reject its value.
+        }
+      }
+    } finally {
+      accessor.close();
     }
   }
 

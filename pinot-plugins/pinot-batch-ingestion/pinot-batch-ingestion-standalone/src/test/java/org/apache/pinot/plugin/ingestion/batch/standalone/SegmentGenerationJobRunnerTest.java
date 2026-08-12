@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
@@ -44,6 +45,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.RecordReaderSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -240,7 +242,9 @@ public class SegmentGenerationJobRunnerTest {
         .setSchemaName(schemaName)
         .addSingleValueDimension("col1", DataType.STRING)
         .addMetric("col2", DataType.INT)
+        .addSingleValueDimension("derived", DataType.STRING)
         .build();
+    schema.getFieldSpecFor("derived").setTransformFunction("Groovy({col1.reverse()}, col1)");
     FileUtils.write(schemaFile, schema.toPrettyJsonString(), StandardCharsets.UTF_8);
     return schemaFile;
   }
@@ -290,6 +294,7 @@ public class SegmentGenerationJobRunnerTest {
     ExecutionFrameworkSpec efSpec = new ExecutionFrameworkSpec();
     efSpec.setName("standalone");
     efSpec.setSegmentGenerationJobRunnerClassName(SegmentGenerationJobRunner.class.getName());
+    efSpec.setExtraConfigs(Map.of(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY, "false"));
     jobSpec.setExecutionFrameworkSpec(efSpec);
 
     PinotFSSpec pfsSpec = new PinotFSSpec();
