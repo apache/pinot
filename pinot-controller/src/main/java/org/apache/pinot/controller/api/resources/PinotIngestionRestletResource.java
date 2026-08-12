@@ -187,7 +187,10 @@ public class PinotIngestionRestletResource {
   @ApiOperation(value = "Ingest from the given URI", notes =
       "Creates a segment using file at the given URI and pushes it to Pinot. "
           + "\n All steps happen on the controller. This API is NOT meant for production environments/large input "
-          + "files. " + "\nExample usage (query params need encoding):" + "\n```"
+          + "files. Local filesystem sources are disabled by default. The compatibility setting "
+          + "controller.ingestFromURI.allowLocalFileSystem permits callers with access to this endpoint to read "
+          + "files visible to the controller process and should only be enabled for trusted callers and paths. "
+          + "\nExample usage (query params need encoding):" + "\n```"
           + "\ncurl -X POST \"http://localhost:9000/ingestFromURI?tableNameWithType=foo_OFFLINE"
           + "\n&batchConfigMapStr={" + "\n  \"inputFormat\":\"json\","
           + "\n  \"input.fs.className\":\"org.apache.pinot.plugin.filesystem.S3PinotFS\","
@@ -204,13 +207,11 @@ public class PinotIngestionRestletResource {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     try {
       asyncResponse.resume(ingestData(tableNameWithType, batchConfigMapStr, new DataPayload(new URI(sourceURIStr))));
-    } catch (IllegalArgumentException e) {
-      asyncResponse.resume(new ControllerApplicationException(LOGGER, String
-          .format("Got illegal argument when ingesting file into table: %s. %s", tableNameWithType, e.getMessage()),
+    } catch (IllegalArgumentException | URISyntaxException e) {
+      asyncResponse.resume(new ControllerApplicationException(LOGGER, "Invalid ingestFromURI request",
           Response.Status.BAD_REQUEST, e));
     } catch (Exception e) {
-      asyncResponse.resume(new ControllerApplicationException(LOGGER,
-          String.format("Caught exception when ingesting file into table: %s. %s", tableNameWithType, e.getMessage()),
+      asyncResponse.resume(new ControllerApplicationException(LOGGER, "Failed to ingest from URI",
           Response.Status.INTERNAL_SERVER_ERROR, e));
     }
   }
@@ -234,7 +235,8 @@ public class PinotIngestionRestletResource {
 
     FileIngestionHelper fileIngestionHelper =
         new FileIngestionHelper(tableConfig, schema, batchConfigMap, getControllerUri(),
-            new File(_controllerConf.getLocalTempDir(), INGESTION_DIR), authProvider);
+            new File(_controllerConf.getLocalTempDir(), INGESTION_DIR), authProvider,
+            _controllerConf.isIngestFromUriLocalFileSystemAllowed());
     return fileIngestionHelper.buildSegmentAndPush(payload);
   }
 

@@ -36,6 +36,9 @@ public class PinotFSFactoryTest {
     PinotFSFactory.init(new PinotConfiguration());
     NoClosePinotFS pinotFS = (NoClosePinotFS) PinotFSFactory.create("file");
     Assert.assertTrue(pinotFS._delegate instanceof LocalPinotFS);
+
+    PinotFS nestedLocalPinotFS = new NoClosePinotFS(new NoClosePinotFS(new LocalPinotFS()));
+    Assert.assertTrue(PinotFSFactory.getEffectiveFileSystem(nestedLocalPinotFS) instanceof LocalPinotFS);
   }
 
   @Test

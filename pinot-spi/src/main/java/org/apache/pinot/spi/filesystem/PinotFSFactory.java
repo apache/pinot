@@ -83,6 +83,16 @@ public class PinotFSFactory {
     return PINOT_FS_MAP.containsKey(scheme);
   }
 
+  /**
+   * Returns the effective filesystem after recursively unwrapping Pinot's non-closing delegates.
+   */
+  public static PinotFS getEffectiveFileSystem(PinotFS pinotFS) {
+    while (pinotFS instanceof NoClosePinotFS) {
+      pinotFS = ((NoClosePinotFS) pinotFS)._delegate;
+    }
+    return pinotFS;
+  }
+
   public static void shutdown()
       throws IOException {
     for (PinotFS pinotFS : PINOT_FS_MAP.values()) {

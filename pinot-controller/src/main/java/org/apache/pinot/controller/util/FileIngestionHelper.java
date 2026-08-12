@@ -41,6 +41,8 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.filesystem.LocalPinotFS;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.segment.uploader.SegmentUploader;
@@ -60,6 +62,9 @@ import org.slf4j.LoggerFactory;
 public class FileIngestionHelper {
   private static final Logger LOGGER = LoggerFactory.getLogger(FileIngestionHelper.class);
   private static final String SEGMENT_UPLOADER_CLASS = "org.apache.pinot.plugin.segmentuploader.SegmentUploaderDefault";
+  private static final String LOCAL_FILE_SYSTEM_DISABLED_MESSAGE =
+      "Local filesystem sources are disabled for /ingestFromURI";
+  private static final String INVALID_FILE_SYSTEM_MESSAGE = "Invalid filesystem source for /ingestFromURI";
 
   private static final String WORKING_DIR_PREFIX = "working_dir";
   private static final String INPUT_DATA_DIR = "input_data_dir";
@@ -73,21 +78,33 @@ public class FileIngestionHelper {
   private final URI _controllerUri;
   private final File _ingestionDir;
   private final AuthProvider _authProvider;
+  private final boolean _allowLocalFileSystemInUri;
 
   public FileIngestionHelper(TableConfig tableConfig, Schema schema, Map<String, String> batchConfigMap,
-      URI controllerUri, File ingestionDir, AuthProvider authProvider) {
+      URI controllerUri, File ingestionDir, AuthProvider authProvider, boolean allowLocalFileSystemInUri) {
     _tableConfig = tableConfig;
     _schema = schema;
     _batchConfigMap = batchConfigMap;
     _controllerUri = controllerUri;
     _ingestionDir = ingestionDir;
     _authProvider = authProvider;
+    _allowLocalFileSystemInUri = allowLocalFileSystemInUri;
   }
 
   /**
    * Creates a segment using the provided data file/URI and uploads to Pinot
    */
   public SuccessResponse buildSegmentAndPush(DataPayload payload)
+      throws Exception {
+    // Resolve and validate the source before creating working directories or parsing input data. Keep the resolved
+    // instance so a concurrent factory registration cannot replace it between validation and copying.
+    try (ResolvedFileSystem sourceFileSystem = payload._payloadType == PayloadType.URI
+        ? resolveSourceFileSystem(_batchConfigMap, payload._uri, _allowLocalFileSystemInUri) : null) {
+      return buildSegmentAndPush(payload, sourceFileSystem);
+    }
+  }
+
+  private SuccessResponse buildSegmentAndPush(DataPayload payload, ResolvedFileSystem sourceFileSystem)
       throws Exception {
     String tableNameWithType = _tableConfig.getTableName();
     // 1. append a timestamp for easy debugging
@@ -112,7 +129,7 @@ public class FileIngestionHelper {
       File inputFile = new File(inputDir, String.format(
           "%s.%s", DATA_FILE_PREFIX, _batchConfigMap.get(BatchConfigProperties.INPUT_FORMAT).toLowerCase()));
       if (payload._payloadType == PayloadType.URI) {
-        copyURIToLocal(_batchConfigMap, payload._uri, inputFile);
+        sourceFileSystem._fileSystem.copyToLocalFile(payload._uri, inputFile);
         LOGGER.info("Copied from URI: {} to local file: {}", payload._uri, inputFile.getAbsolutePath());
       } else {
         copyMultipartToLocal(payload._multiPart, inputFile);
@@ -176,12 +193,111 @@ public class FileIngestionHelper {
    */
   public static void copyURIToLocal(Map<String, String> batchConfigMap, URI sourceFileURI, File destFile)
       throws Exception {
-    String sourceFileURIScheme = sourceFileURI.getScheme();
-    if (!PinotFSFactory.isSchemeSupported(sourceFileURIScheme)) {
-      PinotFSFactory.register(sourceFileURIScheme, batchConfigMap.get(BatchConfigProperties.INPUT_FS_CLASS),
-          IngestionConfigUtils.getInputFsProps(batchConfigMap));
+    copyURIToLocal(batchConfigMap, sourceFileURI, destFile, true);
+  }
+
+  public static void copyURIToLocal(Map<String, String> batchConfigMap, URI sourceFileURI, File destFile,
+      boolean allowLocalFileSystem)
+      throws Exception {
+    try (ResolvedFileSystem sourceFileSystem =
+        resolveSourceFileSystem(batchConfigMap, sourceFileURI, allowLocalFileSystem)) {
+      sourceFileSystem._fileSystem.copyToLocalFile(sourceFileURI, destFile);
     }
-    PinotFSFactory.create(sourceFileURIScheme).copyToLocalFile(sourceFileURI, destFile);
+  }
+
+  private static ResolvedFileSystem resolveSourceFileSystem(Map<String, String> batchConfigMap, URI sourceFileURI,
+      boolean allowLocalFileSystem) {
+    String sourceFileURIScheme = sourceFileURI.getScheme();
+    Preconditions.checkArgument(allowLocalFileSystem || !isLocalSource(sourceFileURI),
+        LOCAL_FILE_SYSTEM_DISABLED_MESSAGE);
+    if (PinotFSFactory.isSchemeSupported(sourceFileURIScheme)) {
+      PinotFS sourceFileSystem;
+      try {
+        sourceFileSystem = PinotFSFactory.create(sourceFileURIScheme);
+      } catch (RuntimeException e) {
+        throw new IllegalArgumentException(INVALID_FILE_SYSTEM_MESSAGE, e);
+      }
+      validateFileSystemInstance(sourceFileSystem, allowLocalFileSystem);
+      return new ResolvedFileSystem(sourceFileSystem, null);
+    }
+
+    String inputFsClassName = batchConfigMap.get(BatchConfigProperties.INPUT_FS_CLASS);
+    Preconditions.checkArgument(StringUtils.isNotBlank(inputFsClassName), INVALID_FILE_SYSTEM_MESSAGE);
+    Class<? extends PinotFS> fileSystemClass = loadFileSystemClass(inputFsClassName, allowLocalFileSystem);
+    PinotFS sourceFileSystem;
+    try {
+      sourceFileSystem = fileSystemClass.getConstructor().newInstance();
+    } catch (ReflectiveOperationException | RuntimeException e) {
+      throw new IllegalArgumentException(INVALID_FILE_SYSTEM_MESSAGE, e);
+    }
+    PinotFS effectiveFileSystem = PinotFSFactory.getEffectiveFileSystem(sourceFileSystem);
+    try {
+      validateFileSystemInstance(sourceFileSystem, allowLocalFileSystem);
+    } catch (RuntimeException e) {
+      closeRequestScopedFileSystem(effectiveFileSystem);
+      throw e;
+    }
+    try {
+      sourceFileSystem.init(IngestionConfigUtils.getInputFsProps(batchConfigMap));
+    } catch (RuntimeException e) {
+      closeRequestScopedFileSystem(effectiveFileSystem);
+      throw new IllegalArgumentException(INVALID_FILE_SYSTEM_MESSAGE, e);
+    }
+    return new ResolvedFileSystem(sourceFileSystem, effectiveFileSystem);
+  }
+
+  private static boolean isLocalSource(URI sourceFileURI) {
+    String scheme = sourceFileURI.getScheme();
+    if (StringUtils.isBlank(scheme) || PinotFSFactory.LOCAL_PINOT_FS_SCHEME.equalsIgnoreCase(scheme)) {
+      return true;
+    }
+    // URI treats a Windows drive letter as a scheme (for example C:/data.csv).
+    return scheme.length() == 1 && sourceFileURI.getAuthority() == null && sourceFileURI.getPath() != null
+        && sourceFileURI.getPath().startsWith("/");
+  }
+
+  private static Class<? extends PinotFS> loadFileSystemClass(String className, boolean allowLocalFileSystem) {
+    Class<?> fileSystemClass;
+    try {
+      fileSystemClass = PluginManager.get().loadClass(className);
+    } catch (Exception e) {
+      throw new IllegalArgumentException(INVALID_FILE_SYSTEM_MESSAGE, e);
+    }
+    Preconditions.checkArgument(PinotFS.class.isAssignableFrom(fileSystemClass), INVALID_FILE_SYSTEM_MESSAGE);
+    Preconditions.checkArgument(allowLocalFileSystem || !LocalPinotFS.class.isAssignableFrom(fileSystemClass),
+        LOCAL_FILE_SYSTEM_DISABLED_MESSAGE);
+    return fileSystemClass.asSubclass(PinotFS.class);
+  }
+
+  private static void validateFileSystemInstance(PinotFS fileSystem, boolean allowLocalFileSystem) {
+    PinotFS effectiveFileSystem = PinotFSFactory.getEffectiveFileSystem(fileSystem);
+    Preconditions.checkArgument(allowLocalFileSystem || !(effectiveFileSystem instanceof LocalPinotFS),
+        LOCAL_FILE_SYSTEM_DISABLED_MESSAGE);
+  }
+
+  private static void closeRequestScopedFileSystem(PinotFS fileSystem) {
+    try {
+      fileSystem.close();
+    } catch (IOException e) {
+      LOGGER.warn("Failed to close request-scoped filesystem", e);
+    }
+  }
+
+  private static class ResolvedFileSystem implements AutoCloseable {
+    private final PinotFS _fileSystem;
+    private final PinotFS _closeWhenDone;
+
+    private ResolvedFileSystem(PinotFS fileSystem, PinotFS closeWhenDone) {
+      _fileSystem = fileSystem;
+      _closeWhenDone = closeWhenDone;
+    }
+
+    @Override
+    public void close() {
+      if (_closeWhenDone != null) {
+        closeRequestScopedFileSystem(_closeWhenDone);
+      }
+    }
   }
 
   /**

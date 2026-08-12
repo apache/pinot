@@ -22,17 +22,20 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.hc.client5.http.classic.HttpClient;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.entity.mime.FileBody;
 import org.apache.hc.client5.http.entity.mime.MultipartEntityBuilder;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.core5.http.HttpEntity;
-import org.apache.hc.core5.http.HttpResponse;
+import org.apache.hc.core5.http.ParseException;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -100,31 +103,57 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
     Map<String, String> batchConfigMap = new HashMap<>();
     batchConfigMap.put(BatchConfigProperties.INPUT_FORMAT, "csv");
     batchConfigMap.put(String.format("%s.delimiter", BatchConfigProperties.RECORD_READER_PROP_PREFIX), "|");
-    sendHttpPost(_controllerRequestURLBuilder.forIngestFromFile(TABLE_NAME_WITH_TYPE, batchConfigMap));
+
+    // Local URI validation happens before any working directory or segment is created, and the response does not
+    // expose the submitted path.
+    String sensitivePathToken = "controller-secret-ingest-source.csv";
+    String errorResponse = sendHttpPost(_controllerRequestURLBuilder.forIngestFromURI(TABLE_NAME_WITH_TYPE,
+        batchConfigMap, "file:///private/" + sensitivePathToken), 400);
+    assertFalse(errorResponse.contains(sensitivePathToken));
+    assertFalse(ingestionDir.exists());
+    segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false);
+    assertEquals(segments.size(), 0);
+
+    sendHttpPost(_controllerRequestURLBuilder.forIngestFromFile(TABLE_NAME_WITH_TYPE, batchConfigMap), 200);
     segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false);
     assertEquals(segments.size(), 1);
 
-    // ingest from URI
-    sendHttpPost(_controllerRequestURLBuilder.forIngestFromURI(TABLE_NAME_WITH_TYPE, batchConfigMap,
-        String.format("file://%s", _inputFile.getAbsolutePath())));
-    segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false);
-    assertEquals(segments.size(), 2);
+    // The compatibility option explicitly restores local URI ingestion.
+    _controllerConfig.setProperty(ControllerConf.INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM, true);
+    try {
+      sendHttpPost(_controllerRequestURLBuilder.forIngestFromURI(TABLE_NAME_WITH_TYPE, batchConfigMap,
+          String.format("file://%s", _inputFile.getAbsolutePath())), 200);
+      segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false);
+      assertEquals(segments.size(), 2);
+    } finally {
+      _controllerConfig.setProperty(ControllerConf.INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM, false);
+    }
 
     // the ingestion dir exists after ingesting files. We check the existence to make sure this dir is created under
     // _controllerConfig.getLocalTempDir()
     assertTrue(ingestionDir.exists());
   }
 
-  private void sendHttpPost(String uri)
+  private String sendHttpPost(String uri, int expectedStatusCode)
       throws IOException {
-    HttpClient httpClient = HttpClientBuilder.create().build();
     HttpPost httpPost = new HttpPost(uri);
     HttpEntity reqEntity =
         MultipartEntityBuilder.create().addPart("file", new FileBody(_inputFile.getAbsoluteFile())).build();
     httpPost.setEntity(reqEntity);
-    HttpResponse response = httpClient.execute(httpPost);
-    int statusCode = response.getCode();
-    assertEquals(statusCode, 200);
+    try (CloseableHttpClient httpClient = HttpClientBuilder.create().build()) {
+      return httpClient.execute(httpPost, response -> {
+        int statusCode = response.getCode();
+        String responseBody;
+        try {
+          responseBody = response.getEntity() != null
+              ? EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8) : "";
+        } catch (ParseException e) {
+          throw new IOException(e);
+        }
+        assertEquals(statusCode, expectedStatusCode, responseBody);
+        return responseBody;
+      });
+    }
   }
 
   @AfterClass
