@@ -135,7 +135,33 @@ public class UserConfigTest {
     assertNull(userConfig.getTables());
     assertNull(userConfig.getExcludeTables());
     assertNull(userConfig.getPermissions());
+    assertNull(userConfig.getFineGrainedPermissions());
     assertNull(userConfig.getPermissios()); // Deprecated method should also return null
+  }
+
+  @Test
+  public void testFineGrainedPermissionsJsonRoundTrip()
+      throws IOException {
+    UserConfig original = new UserConfig("testUser", "testPassword", "CONTROLLER", "ADMIN",
+        List.of("table1"), List.of(), List.of(AccessType.READ), List.of("GetZnode"));
+
+    String jsonString = original.toJsonString();
+    JsonNode jsonNode = JsonUtils.stringToJsonNode(jsonString);
+    assertEquals(jsonNode.get(UserConfig.PERMISSIONS_KEY).get(0).asText(), "READ");
+    assertEquals(jsonNode.get(UserConfig.FINE_GRAINED_PERMISSIONS_KEY).get(0).asText(), "GetZnode");
+
+    UserConfig deserialized = JsonUtils.stringToObject(jsonString, UserConfig.class);
+    assertEquals(deserialized.getPermissions(), List.of(AccessType.READ));
+    assertEquals(deserialized.getFineGrainedPermissions(), List.of("GetZnode"));
+  }
+
+  @Test
+  public void testLegacyPermissionsExcludeFineGrainedActions() {
+    assertFalse(Arrays.stream(AccessType.values()).map(AccessType::name).anyMatch("GET_ZNODE"::equals));
+
+    UserConfig legacyConfig = new UserConfig("testUser", "testPassword", "CONTROLLER", "ADMIN",
+        null, null, List.of(AccessType.READ));
+    assertNull(legacyConfig.getFineGrainedPermissions());
   }
 
   @Test

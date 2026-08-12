@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.InputStream;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -47,6 +48,29 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 public class PinotTableRestletResourceTest {
+
+  @Test
+  public void testCopyTablePayloadCredentialOverridesRoundTrip()
+      throws Exception {
+    String passwordPointer = "/ingestionConfig/streamIngestionConfig/streamConfigMaps/0/password~1value";
+    Map<String, String> overrides = new HashMap<>();
+    overrides.put(passwordPointer, "literal-password");
+    overrides.put("/ingestionConfig/streamIngestionConfig/streamConfigMaps/0/sasl.jaas.config",
+        "example.LoginModule required password=literal-jaas;");
+    CopyTablePayload payload = new CopyTablePayload("http://localhost:9000", Map.of("Authorization", "header"),
+        "brokerTenant", "serverTenant", Map.of("source_REALTIME", "target_REALTIME"), overrides);
+
+    CopyTablePayload roundTripped = JsonUtils.stringToObject(JsonUtils.objectToString(payload),
+        CopyTablePayload.class);
+
+    assertEquals(roundTripped.getSourceClusterUri(), payload.getSourceClusterUri());
+    assertEquals(roundTripped.getHeaders(), payload.getHeaders());
+    assertEquals(roundTripped.getBrokerTenant(), payload.getBrokerTenant());
+    assertEquals(roundTripped.getServerTenant(), payload.getServerTenant());
+    assertEquals(roundTripped.getTagPoolReplacementMap(), payload.getTagPoolReplacementMap());
+    assertEquals(roundTripped.getCredentialOverrides(), overrides);
+    assertEquals(roundTripped.getCredentialOverrides().get(passwordPointer), "literal-password");
+  }
 
   @Test
   public void testTweakRealtimeTableConfig() throws Exception {

@@ -105,6 +105,9 @@ abstract class BaseBasicAuthAccessControl<P extends BasicAuthPrincipal> implemen
   @Override
   public final boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId, String action) {
     Optional<P> principal = getPrincipal(httpHeaders);
+    if (Actions.Cluster.GET_ZNODE.equals(action)) {
+      return principal.filter(p -> p.hasExplicitActionPermission(Actions.Cluster.GET_ZNODE)).isPresent();
+    }
     if (targetType == TargetType.CLUSTER && (Actions.Cluster.CREATE_USER.equals(action)
         || Actions.Cluster.UPDATE_USER.equals(action) || Actions.Cluster.DELETE_USER.equals(action))) {
       return principal.filter(BaseBasicAuthAccessControl::canManageUsers).isPresent();

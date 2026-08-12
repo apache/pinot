@@ -100,7 +100,7 @@ const TaskQueueTable = (props) => {
     const mostRecentErrorRunMessagesTS = get(taskGeneratorDebugData, 'data.0.mostRecentErrorRunMessages', {});
     const mostRecentErrorRunMessagesTSLastTime = last(keys(mostRecentErrorRunMessagesTS).sort());
     setMostRecentErrorRunMessage(get(mostRecentErrorRunMessagesTS, mostRecentErrorRunMessagesTSLastTime, ''));
-    setTableDetail(tableDetailRes);
+    setTableDetail(get(tableDetailRes, 'configs', tableDetailRes));
     setJobDetail(detail);
     setFetching(false);
   };
