@@ -53,6 +53,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -60,6 +61,11 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 /// Configuration properties used in the creation of index segments.
 public class SegmentGeneratorConfig implements Serializable {
+  // Preserve the pre-policy serial form. Older serialized configs contain neither policy field, so the default false
+  // value of _useDefaultIngestionGroovyPolicy plus the null _ingestionGroovyDisabled value is deliberately interpreted
+  // as disabled.
+  private static final long serialVersionUID = 4848997363993935176L;
+
   public enum TimeColumnType {
     EPOCH, SIMPLE_DATE
   }
@@ -125,6 +131,9 @@ public class SegmentGeneratorConfig implements Serializable {
   // Type of the instance (SERVER/MINION) that is trying to create the segment.
   private InstanceType _instanceType;
   private boolean _compressionStatsEnabled;
+  @Nullable
+  private Boolean _ingestionGroovyDisabled;
+  private boolean _useDefaultIngestionGroovyPolicy = true;
 
   /// Constructs the SegmentGeneratorConfig with table config and schema.
   /// NOTE: The passed in table config and schema might be changed.
@@ -686,5 +695,22 @@ public class SegmentGeneratorConfig implements Serializable {
   /// Sets whether this segment build records compression statistics.
   public void setCompressionStatsEnabled(boolean compressionStatsEnabled) {
     _compressionStatsEnabled = compressionStatsEnabled;
+  }
+
+  public boolean isIngestionGroovyDisabled() {
+    return resolveIngestionGroovyDisabled(CommonConstants.Groovy.isIngestionGroovyDisabled(
+        System.getProperty(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY)));
+  }
+
+  /// Resolves an unset policy from the caller's ingestion context. Explicit config values always take precedence;
+  /// configs serialized before the policy fields were introduced remain fail-closed.
+  public boolean resolveIngestionGroovyDisabled(boolean defaultIngestionGroovyDisabled) {
+    return _useDefaultIngestionGroovyPolicy ? defaultIngestionGroovyDisabled
+        : _ingestionGroovyDisabled == null || _ingestionGroovyDisabled;
+  }
+
+  public void setIngestionGroovyDisabled(boolean ingestionGroovyDisabled) {
+    _ingestionGroovyDisabled = ingestionGroovyDisabled;
+    _useDefaultIngestionGroovyPolicy = false;
   }
 }

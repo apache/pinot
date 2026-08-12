@@ -42,6 +42,7 @@ import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
@@ -102,6 +103,15 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
 
   private PinotTaskConfig _pinotTaskConfig;
   private MinionEventObserver _eventObserver;
+  private final IngestionGroovyPolicy _ingestionGroovyPolicy;
+
+  public SegmentGenerationAndPushTaskExecutor() {
+    this(IngestionGroovyPolicy.DISABLED);
+  }
+
+  public SegmentGenerationAndPushTaskExecutor(IngestionGroovyPolicy ingestionGroovyPolicy) {
+    _ingestionGroovyPolicy = ingestionGroovyPolicy;
+  }
 
   @Override
   protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(PinotTaskConfig pinotTaskConfig,
@@ -138,7 +148,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
       throws Exception {
     // Generate Pinot Segment
     _eventObserver.notifyProgress(_pinotTaskConfig, "Generating segment");
-    SegmentGenerationTaskRunner taskRunner = new SegmentGenerationTaskRunner(taskSpec);
+    SegmentGenerationTaskRunner taskRunner = new SegmentGenerationTaskRunner(taskSpec, _ingestionGroovyPolicy);
     String segmentName = taskRunner.run();
 
     // Tar segment directory to compress file

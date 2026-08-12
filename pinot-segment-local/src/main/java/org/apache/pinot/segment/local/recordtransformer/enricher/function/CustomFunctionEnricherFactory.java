@@ -23,6 +23,7 @@ import com.google.auto.service.AutoService;
 import java.io.IOException;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricher;
+import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherCreationContext;
 import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherFactory;
 import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherValidationConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -44,17 +45,35 @@ public class CustomFunctionEnricherFactory implements RecordEnricherFactory {
   }
 
   @Override
+  public RecordEnricher createEnricher(JsonNode enricherProps, RecordEnricherCreationContext creationContext)
+      throws IOException {
+    return new CustomFunctionEnricher(enricherProps, creationContext.getIngestionGroovyPolicy());
+  }
+
+  @Override
+  public void validateSecurityPolicy(JsonNode enricherProps, RecordEnricherValidationConfig validationConfig) {
+    if (enricherProps == null) {
+      return;
+    }
+    JsonNode fieldToFunctionMap = enricherProps.get("fieldToFunctionMap");
+    if (fieldToFunctionMap == null || !fieldToFunctionMap.isObject()) {
+      return;
+    }
+    for (JsonNode function : fieldToFunctionMap) {
+      if (function.isTextual()) {
+        FunctionEvaluatorFactory.validateIngestionGroovyPolicy(function.textValue(),
+            validationConfig.isGroovyDisabled());
+      }
+    }
+  }
+
+  @Override
   public void validateEnrichmentConfig(JsonNode enricherProps, RecordEnricherValidationConfig validationConfig) {
     CustomFunctionEnricherConfig config;
     try {
       config = JsonUtils.jsonNodeToObject(enricherProps, CustomFunctionEnricherConfig.class);
-      if (!validationConfig.isGroovyDisabled()) {
-        return;
-      }
       for (String function : config.getFieldToFunctionMap().values()) {
-        if (FunctionEvaluatorFactory.isGroovyExpression(function)) {
-          throw new IllegalArgumentException("Groovy expression is not allowed for enrichment");
-        }
+        FunctionEvaluatorFactory.validateIngestionGroovyPolicy(function, validationConfig.isGroovyDisabled());
       }
     } catch (IOException e) {
       throw new IllegalArgumentException("Failed to parse custom function enricher config", e);

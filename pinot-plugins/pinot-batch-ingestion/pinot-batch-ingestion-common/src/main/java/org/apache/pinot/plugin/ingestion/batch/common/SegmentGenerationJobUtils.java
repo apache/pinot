@@ -28,14 +28,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.batch.spec.ExecutionFrameworkSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +59,31 @@ public class SegmentGenerationJobUtils implements Serializable {
   // Field names in the executionFrameworkSpec/extraConfigs section shared across ingestion frameworks
   public static final String DEPENDENCY_JAR_DIR = "dependencyJarDir";
   public static final String STAGING_DIR = "stagingDir";
+
+  /// Resolves the ingestion Groovy policy once in the job-launching JVM and persists it in the serialized job spec.
+  /// This keeps standalone and distributed workers on the same explicit policy.
+  public static boolean resolveAndPersistIngestionGroovyPolicy(SegmentGenerationJobSpec spec) {
+    ExecutionFrameworkSpec executionFrameworkSpec = spec.getExecutionFrameworkSpec();
+    if (executionFrameworkSpec == null) {
+      executionFrameworkSpec = new ExecutionFrameworkSpec();
+      spec.setExecutionFrameworkSpec(executionFrameworkSpec);
+    }
+    Map<String, String> extraConfigs = executionFrameworkSpec.getExtraConfigs() != null
+        ? new HashMap<>(executionFrameworkSpec.getExtraConfigs()) : new HashMap<>();
+    String configuredValue = extraConfigs.computeIfAbsent(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY,
+        ignored -> Boolean.toString(FunctionEvaluatorFactory.isIngestionGroovyDisabled()));
+    executionFrameworkSpec.setExtraConfigs(extraConfigs);
+    return FunctionEvaluatorFactory.resolveIngestionGroovyDisabled(configuredValue);
+  }
+
+  /// Reads the persisted ingestion Groovy policy. A legacy or incomplete worker spec fails closed.
+  public static boolean isIngestionGroovyDisabled(SegmentGenerationJobSpec spec) {
+    ExecutionFrameworkSpec executionFrameworkSpec = spec.getExecutionFrameworkSpec();
+    Map<String, String> extraConfigs = executionFrameworkSpec != null ? executionFrameworkSpec.getExtraConfigs() : null;
+    String configuredValue = extraConfigs != null
+        ? extraConfigs.get(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY) : null;
+    return FunctionEvaluatorFactory.resolveIngestionGroovyDisabled(configuredValue);
+  }
 
   /// Always use local directory sequence id unless explicitly config: "use.global.directory.sequence.id".
   public static boolean useGlobalDirectorySequenceId(SegmentNameGeneratorSpec spec) {

@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
@@ -607,6 +608,80 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
         adminClient.getTableClient().deleteTableConfigs(tableName, null);
       } else if (DEFAULT_INSTANCE.getHelixResourceManager().getSchema(tableName) != null) {
         adminClient.getSchemaClient().deleteSchema(tableName);
+      }
+    }
+  }
+
+  @Test
+  public void testGroovyPolicyAcrossCombinedTableConfigsEndpoints()
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
+    String tableName = "combinedGroovyPolicy";
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    String enabledTableName = "combinedGroovyPolicyEnabled";
+    String enabledTableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(enabledTableName);
+    Schema schema = createDummySchema(tableName);
+    String schemaGroovy = "Groovy({metricB.intValue()}, metricB)";
+    String tableGroovy = "Groovy({dimB.reverse()}, dimB)";
+    schema.getFieldSpecFor("metricA").setTransformFunction(schemaGroovy);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("dimA", tableGroovy)));
+    TableConfig offlineTableConfig = getBaseTableConfigBuilder(tableName, TableType.OFFLINE)
+        .setIngestionConfig(ingestionConfig).build();
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
+    String disabledMessage = "controller.disable.ingestion.groovy=false";
+
+    DEFAULT_INSTANCE.getControllerConfig().setProperty(ControllerConf.DISABLE_GROOVY, true);
+    try {
+      String schemaError = Assert.expectThrows(Exception.class,
+              () -> adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null))
+          .getMessage();
+      Assert.assertTrue(schemaError.contains(disabledMessage), schemaError);
+
+      schema.getFieldSpecFor("metricA").setTransformFunction(null);
+      String tableError = Assert.expectThrows(Exception.class,
+              () -> adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), "ALL"))
+          .getMessage();
+      Assert.assertTrue(tableError.contains(disabledMessage), tableError);
+      String createError = Assert.expectThrows(Exception.class,
+              () -> adminClient.getTableClient().createTableConfigs(tableConfigs.toPrettyJsonString(), "ALL", null))
+          .getMessage();
+      Assert.assertTrue(createError.contains(disabledMessage), createError);
+
+      // Seed below REST validation to model persisted legacy table and schema metadata.
+      schema.getFieldSpecFor("metricA").setTransformFunction(schemaGroovy);
+      DEFAULT_INSTANCE.getHelixResourceManager().addSchema(schema, false, false);
+      DEFAULT_INSTANCE.getHelixResourceManager().addTable(offlineTableConfig);
+      String updateError = Assert.expectThrows(Exception.class,
+              () -> adminClient.getTableClient()
+                  .updateTableConfigs(tableName, tableConfigs.toPrettyJsonString(), "ALL", false, false))
+          .getMessage();
+      Assert.assertTrue(updateError.contains(disabledMessage), updateError);
+
+      DEFAULT_INSTANCE.getControllerConfig().setProperty(ControllerConf.DISABLE_GROOVY, false);
+      adminClient.getTableClient().validateTableConfigs(tableConfigs.toPrettyJsonString(), null);
+      adminClient.getTableClient()
+          .updateTableConfigs(tableName, tableConfigs.toPrettyJsonString(), null, false, false);
+
+      Schema enabledSchema = createDummySchema(enabledTableName);
+      enabledSchema.getFieldSpecFor("metricA").setTransformFunction(schemaGroovy);
+      TableConfig enabledTableConfig = getBaseTableConfigBuilder(enabledTableName, TableType.OFFLINE)
+          .setIngestionConfig(ingestionConfig).build();
+      TableConfigs enabledTableConfigs =
+          new TableConfigs(enabledTableName, enabledSchema, enabledTableConfig, null);
+      adminClient.getTableClient().createTableConfigs(enabledTableConfigs.toPrettyJsonString(), null, null);
+    } finally {
+      // The shared controller fixture explicitly opts in to Groovy for its legacy tests.
+      DEFAULT_INSTANCE.getControllerConfig().setProperty(ControllerConf.DISABLE_GROOVY, false);
+      if (DEFAULT_INSTANCE.getHelixResourceManager().hasTable(tableNameWithType)) {
+        adminClient.getTableClient().deleteTableConfigs(tableName, null);
+      } else if (DEFAULT_INSTANCE.getHelixResourceManager().getSchema(tableName) != null) {
+        adminClient.getSchemaClient().deleteSchema(tableName);
+      }
+      if (DEFAULT_INSTANCE.getHelixResourceManager().hasTable(enabledTableNameWithType)) {
+        adminClient.getTableClient().deleteTableConfigs(enabledTableName, null);
+      } else if (DEFAULT_INSTANCE.getHelixResourceManager().getSchema(enabledTableName) != null) {
+        adminClient.getSchemaClient().deleteSchema(enabledTableName);
       }
     }
   }

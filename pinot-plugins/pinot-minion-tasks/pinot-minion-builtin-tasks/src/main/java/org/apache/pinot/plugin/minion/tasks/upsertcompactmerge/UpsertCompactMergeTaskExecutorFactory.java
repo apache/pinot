@@ -19,23 +19,13 @@
 package org.apache.pinot.plugin.minion.tasks.upsertcompactmerge;
 
 import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.minion.MinionConf;
-import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
-import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
+import org.apache.pinot.plugin.minion.tasks.BaseTaskExecutorFactory;
 import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
 
 
 @TaskExecutorFactory
-public class UpsertCompactMergeTaskExecutorFactory implements PinotTaskExecutorFactory {
-
-  private MinionConf _minionConf;
-
-  @Override
-  public void init(MinionTaskZkMetadataManager zkMetadataManager, MinionConf minionConf) {
-    _minionConf = minionConf;
-  }
-
+public class UpsertCompactMergeTaskExecutorFactory extends BaseTaskExecutorFactory {
   @Override
   public String getTaskType() {
     return MinionConstants.UpsertCompactMergeTask.TASK_TYPE;

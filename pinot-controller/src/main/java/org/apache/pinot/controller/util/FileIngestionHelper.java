@@ -32,6 +32,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.controller.api.resources.SuccessResponse;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
@@ -44,6 +45,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.segment.uploader.SegmentUploader;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -77,9 +79,17 @@ public class FileIngestionHelper {
   private final File _ingestionDir;
   private final AuthProvider _authProvider;
   private final boolean _allowLocalFileSystemInUri;
+  private final IngestionGroovyPolicy _ingestionGroovyPolicy;
 
   public FileIngestionHelper(TableConfig tableConfig, Schema schema, Map<String, String> batchConfigMap,
       URI controllerUri, File ingestionDir, AuthProvider authProvider, boolean allowLocalFileSystemInUri) {
+    this(tableConfig, schema, batchConfigMap, controllerUri, ingestionDir, authProvider, allowLocalFileSystemInUri,
+        IngestionGroovyPolicy.fromDisabled(FunctionEvaluatorFactory.isIngestionGroovyDisabled()));
+  }
+
+  public FileIngestionHelper(TableConfig tableConfig, Schema schema, Map<String, String> batchConfigMap,
+      URI controllerUri, File ingestionDir, AuthProvider authProvider, boolean allowLocalFileSystemInUri,
+      IngestionGroovyPolicy ingestionGroovyPolicy) {
     _tableConfig = tableConfig;
     _schema = schema;
     _batchConfigMap = batchConfigMap;
@@ -87,6 +97,7 @@ public class FileIngestionHelper {
     _ingestionDir = ingestionDir;
     _authProvider = authProvider;
     _allowLocalFileSystemInUri = allowLocalFileSystemInUri;
+    _ingestionGroovyPolicy = ingestionGroovyPolicy;
   }
 
   /// Creates a segment using the provided data file/URI and uploads to Pinot
@@ -159,6 +170,7 @@ public class FileIngestionHelper {
       // Get SegmentGeneratorConfig
       SegmentGeneratorConfig segmentGeneratorConfig =
           IngestionUtils.generateSegmentGeneratorConfig(_tableConfig, _schema, batchIngestionConfigOverride);
+      segmentGeneratorConfig.setIngestionGroovyDisabled(_ingestionGroovyPolicy.isIngestionGroovyDisabled());
 
       // Build segment
       String segmentName = IngestionUtils.buildSegment(segmentGeneratorConfig);
