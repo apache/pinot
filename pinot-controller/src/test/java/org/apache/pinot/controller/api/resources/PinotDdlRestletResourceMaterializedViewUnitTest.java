@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
@@ -29,13 +30,18 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.api.resources.ddl.DdlExecutionRequest;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigRedactionUtils;
+import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -89,6 +95,18 @@ public class PinotDdlRestletResourceMaterializedViewUnitTest {
 
   private static final String MATERIALIZED_VIEW_RAW = "mv_orders";
   private static final String MATERIALIZED_VIEW_WITH_TYPE = MATERIALIZED_VIEW_RAW + "_OFFLINE";
+
+  @Test
+  public void createMaterializedViewRejectsRedactionMarkerBeforePersistence() {
+    PinotDdlRestletResource resource = newResource();
+    String ddl = "CREATE MATERIALIZED VIEW " + commonMaterializedViewBody(true)
+        .replace("'replication' = '1'", "'replication' = '1', 'provider.password' = '*****'");
+
+    ControllerApplicationException e = expectThrows(ControllerApplicationException.class,
+        () -> resource.executeDdl(new DdlExecutionRequest(ddl), false, mockHeaders(), mockRequest()));
+
+    assertEquals(e.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+  }
   private static final String SOURCE = "orders";
 
   /// Happy path: REFRESH EVERY supplied → schedule key set on persisted TableConfig,
@@ -210,6 +228,23 @@ public class PinotDdlRestletResourceMaterializedViewUnitTest {
     }
   }
 
+  @Test
+  public void ifNotExistsAllowsMaskedMaterializedViewWriteFreeNoOp()
+      throws Exception {
+    PinotDdlRestletResource resource = newResource();
+    seedStoredMaterializedView(resource);
+    String ddl = "CREATE MATERIALIZED VIEW IF NOT EXISTS " + commonMaterializedViewBody(true)
+        .replace("'replication' = '1'", "'replication' = '1', 'provider.password' = '*****'");
+
+    try (QuietValidationMocks ignored = new QuietValidationMocks()) {
+      Response response = resource.executeDdl(
+          new DdlExecutionRequest(ddl), false, mockHeaders(), mockRequest());
+
+      assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+      verify(resource._pinotHelixResourceManager, never()).addTable(any(TableConfig.class));
+    }
+  }
+
   /// IF NOT EXISTS no-op response shape: the `tableConfig` and `schema` fields must echo
   /// what is *persisted* in ZK, not what the client submitted. Without this contract an
   /// operator running an idempotent deployment script who has since drifted the local DDL
@@ -225,7 +260,10 @@ public class PinotDdlRestletResourceMaterializedViewUnitTest {
     seedStoredMaterializedView(resource);
 
     TableConfig persisted = resource._pinotHelixResourceManager
-        .getTableConfig(MATERIALIZED_VIEW_WITH_TYPE);
+        .getOfflineTableConfig(MATERIALIZED_VIEW_RAW, false, false);
+    persisted.setCustomConfig(new TableCustomConfig(new LinkedHashMap<>(Map.of(
+        "provider.password", "persisted-password",
+        "provider.secondary.password", "${MV_PROVIDER_PASSWORD}"))));
     String persistedCron = persisted.getTaskConfig()
         .getConfigsForTaskType(MaterializedViewTask.TASK_TYPE)
         .get(PinotTaskManager.SCHEDULE_KEY);
@@ -256,6 +294,41 @@ public class PinotDdlRestletResourceMaterializedViewUnitTest {
       // persisted instance, so the schemaName field is a sufficient marker.
       assertEquals(body.path("schema").path("schemaName").asText(), MATERIALIZED_VIEW_RAW,
           "Response.schema must echo the persisted schema; got " + body.get("schema"));
+      String echoedConfig = body.path("tableConfig").toString();
+      assertFalse(echoedConfig.contains("persisted-password"), "No-op response returned a literal password");
+      assertTrue(echoedConfig.contains(TableConfigRedactionUtils.REDACTION_MARKER));
+      assertTrue(echoedConfig.contains("${MV_PROVIDER_PASSWORD}"));
+    }
+  }
+
+  @Test
+  public void ifNotExistsNoOpRequiresReadPermissionToReturnPersistedConfig()
+      throws Exception {
+    PinotDdlRestletResource resource = newResource();
+    seedStoredMaterializedView(resource);
+    when(resource._accessControlFactory.create()).thenReturn(new AccessControl() {
+      @Override
+      public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders headers,
+          String endpointUrl) {
+        return accessType != AccessType.READ;
+      }
+
+      @Override
+      public boolean hasAccess(HttpHeaders headers, TargetType targetType, String targetId,
+          String action) {
+        return Actions.Table.CREATE_TABLE.equals(action);
+      }
+    });
+
+    try (QuietValidationMocks ignored = new QuietValidationMocks()) {
+      ControllerApplicationException e = expectThrows(ControllerApplicationException.class,
+          () -> resource.executeDdl(
+              new DdlExecutionRequest(
+                  "CREATE MATERIALIZED VIEW IF NOT EXISTS " + commonMaterializedViewBody(true)),
+              false, mockHeaders(), mockRequest()));
+
+      assertEquals(e.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
+      verify(resource._pinotHelixResourceManager, never()).addTable(any(TableConfig.class));
     }
   }
 
@@ -293,7 +366,7 @@ public class PinotDdlRestletResourceMaterializedViewUnitTest {
     TableConfig plainTable = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(MATERIALIZED_VIEW_WITH_TYPE)
         .build();
-    when(resource._pinotHelixResourceManager.getTableConfig(MATERIALIZED_VIEW_WITH_TYPE))
+    when(resource._pinotHelixResourceManager.getOfflineTableConfig(MATERIALIZED_VIEW_RAW, false, false))
         .thenReturn(plainTable);
 
     try (QuietValidationMocks ignored = new QuietValidationMocks()) {
@@ -325,7 +398,7 @@ public class PinotDdlRestletResourceMaterializedViewUnitTest {
     TableConfig plainTable = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(MATERIALIZED_VIEW_WITH_TYPE)
         .build();
-    when(resource._pinotHelixResourceManager.getTableConfig(MATERIALIZED_VIEW_WITH_TYPE))
+    when(resource._pinotHelixResourceManager.getOfflineTableConfig(MATERIALIZED_VIEW_RAW, false, false))
         .thenReturn(plainTable);
 
     try (QuietValidationMocks ignored = new QuietValidationMocks()) {
@@ -350,7 +423,7 @@ public class PinotDdlRestletResourceMaterializedViewUnitTest {
       throws Exception {
     PinotDdlRestletResource resource = newResource();
     String realtimeNameWithType = MATERIALIZED_VIEW_RAW + "_REALTIME";
-    when(resource._pinotHelixResourceManager.getTableConfig(MATERIALIZED_VIEW_WITH_TYPE))
+    when(resource._pinotHelixResourceManager.getOfflineTableConfig(MATERIALIZED_VIEW_RAW, false, false))
         .thenReturn(null);
     when(resource._pinotHelixResourceManager.hasTable(realtimeNameWithType)).thenReturn(true);
 
@@ -429,7 +502,7 @@ public class PinotDdlRestletResourceMaterializedViewUnitTest {
     TableConfig plainTable = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(MATERIALIZED_VIEW_WITH_TYPE)
         .build();
-    when(resource._pinotHelixResourceManager.getTableConfig(MATERIALIZED_VIEW_WITH_TYPE))
+    when(resource._pinotHelixResourceManager.getOfflineTableConfig(MATERIALIZED_VIEW_RAW, false, false))
         .thenReturn(null)
         .thenReturn(plainTable);
     when(resource._pinotHelixResourceManager.hasTable(MATERIALIZED_VIEW_WITH_TYPE)).thenReturn(false);
@@ -535,6 +608,81 @@ public class PinotDdlRestletResourceMaterializedViewUnitTest {
         "MV DDL must carry the AS <query> clause; got:\n" + ddl);
   }
 
+  /// The MV representation must use exactly the same display policy as SHOW CREATE TABLE.
+  /// The stored config is deliberately fetched through the unresolved getter so an environment
+  /// placeholder cannot be replaced with controller-process state before redaction runs.
+  @Test
+  public void showCreateMaterializedViewRedactsStoredCredentialsAndPreservesPlaceholders() {
+    String plainPassword = "mv-plain-password-literal";
+    String jaasPassword = "mv-jaas-password-literal";
+    String accessKey = "mv-access-key-literal";
+    String uriUser = "mv-uri-user-literal";
+    String uriPassword = "mv-uri-password-literal";
+    String uriToken = "mv-uri-token-literal";
+    String passwordPlaceholder = "${MV_KAFKA_TRUSTSTORE_PASSWORD}";
+    String benignTopic = "mv-events-topic";
+
+    Map<String, String> streamConfigs = new LinkedHashMap<>();
+    streamConfigs.put("stream.kafka.consumer.prop.ssl.keystore.password", plainPassword);
+    streamConfigs.put("stream.kafka.consumer.prop.ssl.truststore.password", passwordPlaceholder);
+    streamConfigs.put("stream.kafka.consumer.prop.sasl.jaas.config",
+        "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"mv-jaas-user\" password=\""
+            + jaasPassword + "\";");
+    streamConfigs.put("stream.kinesis.accessKey", accessKey);
+    streamConfigs.put("stream.kafka.schema.registry.url",
+        "https://" + uriUser + ":" + uriPassword
+            + "@registry.example.test/schemas?access_token=" + uriToken + "&region=us-west-2");
+    streamConfigs.put("stream.kafka.topic.name", benignTopic);
+
+    CompiledCreateMaterializedView compiled = (CompiledCreateMaterializedView) DdlCompiler.compile(
+        "CREATE MATERIALIZED VIEW " + commonMaterializedViewBody(true));
+    TableConfig storedConfig = compiled.getTableConfig();
+    storedConfig.setTableName(MATERIALIZED_VIEW_WITH_TYPE);
+    storedConfig.getIndexingConfig().setStreamConfigs(streamConfigs);
+
+    PinotDdlRestletResource resource = newResource();
+    when(resource._accessControlFactory.create()).thenReturn(new AccessControl() {
+      @Override
+      public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders headers,
+          String endpointUrl) {
+        return MATERIALIZED_VIEW_RAW.equals(tableName) && accessType == AccessType.READ;
+      }
+
+      @Override
+      public boolean hasAccess(HttpHeaders headers, TargetType targetType, String targetId,
+          String action) {
+        return targetType == TargetType.TABLE && MATERIALIZED_VIEW_WITH_TYPE.equals(targetId)
+            && Actions.Table.GET_TABLE_CONFIG.equals(action);
+      }
+    });
+    when(resource._pinotHelixResourceManager.hasTable(MATERIALIZED_VIEW_WITH_TYPE)).thenReturn(true);
+    when(resource._pinotHelixResourceManager.getOfflineTableConfig(MATERIALIZED_VIEW_RAW, false, false))
+        .thenReturn(storedConfig);
+    when(resource._pinotHelixResourceManager.getTableSchema(MATERIALIZED_VIEW_WITH_TYPE))
+        .thenReturn(compiled.getSchema());
+
+    Response response = resource.executeDdl(
+        new DdlExecutionRequest("SHOW CREATE MATERIALIZED VIEW " + MATERIALIZED_VIEW_RAW),
+        false, mockHeaders(), mockRequest());
+
+    assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    String ddl = readBody(response).get("ddl").asText();
+    assertFalse(ddl.contains(plainPassword), "SHOW CREATE returned a literal password");
+    assertFalse(ddl.contains(jaasPassword), "SHOW CREATE returned a literal JAAS password");
+    assertFalse(ddl.contains(accessKey), "SHOW CREATE returned a literal access key");
+    assertFalse(ddl.contains(uriUser), "SHOW CREATE returned literal URI user-info");
+    assertFalse(ddl.contains(uriPassword), "SHOW CREATE returned a literal URI password");
+    assertFalse(ddl.contains(uriToken), "SHOW CREATE returned a literal URI token");
+    assertTrue(ddl.contains(TableConfigRedactionUtils.REDACTION_MARKER));
+    assertTrue(ddl.contains(passwordPlaceholder));
+    assertTrue(ddl.contains(benignTopic));
+    assertTrue(ddl.contains("registry.example.test/schemas"));
+    assertTrue(ddl.contains("region=us-west-2"));
+    verify(resource._pinotHelixResourceManager)
+        .getOfflineTableConfig(MATERIALIZED_VIEW_RAW, false, false);
+    verify(resource._pinotHelixResourceManager, never()).getTableConfig(MATERIALIZED_VIEW_WITH_TYPE);
+  }
+
   /// Without a stored table the endpoint must 404 — and the message must name the MV-specific
   /// form rather than the generic "Table not found" so tooling can distinguish missing-MV
   /// from missing-table errors when both DDLs run side by side.
@@ -569,6 +717,8 @@ public class PinotDdlRestletResourceMaterializedViewUnitTest {
         .build();
     when(resource._pinotHelixResourceManager.hasTable(MATERIALIZED_VIEW_WITH_TYPE)).thenReturn(true);
     when(resource._pinotHelixResourceManager.getTableConfig(MATERIALIZED_VIEW_WITH_TYPE))
+        .thenReturn(plainTable);
+    when(resource._pinotHelixResourceManager.getOfflineTableConfig(MATERIALIZED_VIEW_RAW, false, false))
         .thenReturn(plainTable);
     when(resource._pinotHelixResourceManager.getTableSchema(MATERIALIZED_VIEW_WITH_TYPE))
         .thenReturn(plainSchema);
@@ -661,7 +811,8 @@ public class PinotDdlRestletResourceMaterializedViewUnitTest {
       throws Exception {
     PinotDdlRestletResource resource = newResource();
     when(resource._pinotHelixResourceManager.hasTable(MATERIALIZED_VIEW_WITH_TYPE)).thenReturn(false);
-    when(resource._pinotHelixResourceManager.getTableConfig(MATERIALIZED_VIEW_WITH_TYPE)).thenReturn(null);
+    when(resource._pinotHelixResourceManager.getOfflineTableConfig(MATERIALIZED_VIEW_RAW, false, false))
+        .thenReturn(null);
 
     ControllerApplicationException e = expectThrows(ControllerApplicationException.class,
         () -> resource.executeDdl(
@@ -682,7 +833,8 @@ public class PinotDdlRestletResourceMaterializedViewUnitTest {
       throws Exception {
     PinotDdlRestletResource resource = newResource();
     when(resource._pinotHelixResourceManager.hasTable(MATERIALIZED_VIEW_WITH_TYPE)).thenReturn(false);
-    when(resource._pinotHelixResourceManager.getTableConfig(MATERIALIZED_VIEW_WITH_TYPE)).thenReturn(null);
+    when(resource._pinotHelixResourceManager.getOfflineTableConfig(MATERIALIZED_VIEW_RAW, false, false))
+        .thenReturn(null);
 
     Response response = resource.executeDdl(
         new DdlExecutionRequest("DROP MATERIALIZED VIEW IF EXISTS " + MATERIALIZED_VIEW_RAW),
@@ -712,7 +864,7 @@ public class PinotDdlRestletResourceMaterializedViewUnitTest {
         .setTableName(MATERIALIZED_VIEW_WITH_TYPE)
         .build();
     when(resource._pinotHelixResourceManager.hasTable(MATERIALIZED_VIEW_WITH_TYPE)).thenReturn(true);
-    when(resource._pinotHelixResourceManager.getTableConfig(MATERIALIZED_VIEW_WITH_TYPE))
+    when(resource._pinotHelixResourceManager.getOfflineTableConfig(MATERIALIZED_VIEW_RAW, false, false))
         .thenReturn(plainTable);
 
     ControllerApplicationException e = expectThrows(ControllerApplicationException.class,
@@ -975,6 +1127,8 @@ public class PinotDdlRestletResourceMaterializedViewUnitTest {
     Schema mvSchema = compiled.getSchema();
     when(resource._pinotHelixResourceManager.hasTable(MATERIALIZED_VIEW_WITH_TYPE)).thenReturn(true);
     when(resource._pinotHelixResourceManager.getTableConfig(MATERIALIZED_VIEW_WITH_TYPE))
+        .thenReturn(mvConfig);
+    when(resource._pinotHelixResourceManager.getOfflineTableConfig(MATERIALIZED_VIEW_RAW, false, false))
         .thenReturn(mvConfig);
     when(resource._pinotHelixResourceManager.getTableSchema(MATERIALIZED_VIEW_WITH_TYPE))
         .thenReturn(mvSchema);
