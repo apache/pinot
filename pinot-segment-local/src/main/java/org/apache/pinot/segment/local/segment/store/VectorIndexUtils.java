@@ -110,7 +110,12 @@ public class VectorIndexUtils {
   /// directory once rather than performing `columns × extensions` existence probes. Finding
   /// `<column><extension>` in the listing is equivalent to that path existing, so the answer is the
   /// same.
-  public static Set<String> getColumnsWithVectorIndex(File segDir, Collection<String> columns) {
+  ///
+  /// A null `segDir` means the segment is not backed by a local directory and therefore not supports sidecar index.
+  public static Set<String> getColumnsWithVectorIndex(@Nullable File segDir, Collection<String> columns) {
+    if (segDir == null) {
+      return Set.of();
+    }
     Set<String> entries = listEntryNames(segDir);
     Set<String> columnsWithIndex = new HashSet<>();
     for (String column : columns) {
@@ -129,9 +134,9 @@ public class VectorIndexUtils {
   }
 
   /// Names of the entries directly inside `dir`, files and directories alike (an HNSW vector index is
-  /// a Lucene directory), or empty when `dir` is null or cannot be listed.
-  private static Set<String> listEntryNames(@Nullable File dir) {
-    String[] names = dir == null ? null : dir.list();
+  /// a Lucene directory), or empty when it cannot be listed.
+  private static Set<String> listEntryNames(File dir) {
+    String[] names = dir.list();
     return names == null ? Set.of() : new HashSet<>(Arrays.asList(names));
   }
 
