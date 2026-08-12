@@ -49,7 +49,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
 /// Compares JsonPath extraction through Jayway (today's implementation, which builds a full Jackson DOM of the
-/// document and then walks to the field), Fory's dynamic JSON tree, and [FastJsonPathExtractor].
+/// document and then walks to the field), Fory's streaming and dynamic-tree parsers, and [FastJsonPathExtractor].
 ///
 /// The `fieldPosition` parameter puts the extracted field either near the start or at the very end of a
 /// nested event payload, because that is what decides whether early exit can pay off. `documentBytes` pads the
@@ -240,7 +240,7 @@ public class BenchmarkJsonPathExtraction {
     return _fourResults;
   }
 
-  /// Models four independent scalar expressions: each call parses the document again.
+  /// Models four independent scalar expressions: each call streams over the document again.
   @Benchmark
   public String foryFourColumnsSeparateParses() {
     String last = null;

@@ -19,8 +19,6 @@
 package org.apache.pinot.common.function;
 
 import com.fasterxml.jackson.core.StreamReadConstraints;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.fory.json.ForyJson;
@@ -37,11 +35,10 @@ import org.slf4j.LoggerFactory;
 
 /// Shared Fory JSON parser for opt-in JSON-path implementations.
 ///
-/// The dynamic-tree parser is initialized lazily because it owns a pool of reusable parsing states. Streaming
-/// extraction uses one single-state parser per worker thread to avoid shared-pool contention. Initialization or
-/// runtime linkage failures permanently disable the optional path, allowing callers to fall back to Jackson/Jayway.
-/// Dynamic tree parsing uses a lexical compatibility guard; streaming extraction instead enforces Jackson's default
-/// scalar token limits while it walks the document and falls back for inputs outside Fory's safe nesting depth.
+/// Streaming extraction uses one single-state parser per worker thread to avoid shared-pool contention. Initialization
+/// or runtime linkage failures permanently disable the optional path, allowing callers to fall back to
+/// Jackson/Jayway. Jackson's default scalar token limits are enforced while walking the document, and inputs outside
+/// Fory's safe nesting depth fall back to the reference parser.
 public final class ForyJsonPathExtractor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ForyJsonPathExtractor.class);
   private static final StreamReadConstraints JACKSON_CONSTRAINTS = StreamReadConstraints.defaults();
@@ -52,10 +49,11 @@ public final class ForyJsonPathExtractor {
   }
 
   private static final class Holder {
-    @Nullable
-    private static volatile ForyJson _treeParser = buildTreeParser();
-    private static volatile boolean _streamingAvailable = _treeParser != null;
+    private static volatile boolean _streamingAvailable;
     private static final ThreadLocal<ForyJson> STREAMING_PARSER = ThreadLocal.withInitial(() -> {
+      if (!_streamingAvailable) {
+        throw new IllegalStateException("Fory JSON is unavailable");
+      }
       ForyJson parser = buildStreamingParser();
       if (parser == null) {
         _streamingAvailable = false;
@@ -64,17 +62,15 @@ public final class ForyJsonPathExtractor {
       return parser;
     });
 
-    private Holder() {
+    static {
+      ForyJson parser = buildStreamingParser();
+      _streamingAvailable = parser != null;
+      if (parser != null) {
+        STREAMING_PARSER.set(parser);
+      }
     }
 
-    @Nullable
-    private static ForyJson buildTreeParser() {
-      try {
-        return ForyJson.builder().withCodegen(false).withAsyncCompilation(false).build();
-      } catch (RuntimeException | LinkageError e) {
-        logUnavailable(e);
-        return null;
-      }
+    private Holder() {
     }
 
     @Nullable
@@ -91,58 +87,7 @@ public final class ForyJsonPathExtractor {
 
   /// Returns whether the optional Fory runtime initialized successfully.
   public static boolean isAvailable() {
-    return Holder._treeParser != null && Holder._streamingAvailable;
-  }
-
-  /// Parses a JSON string into Fory's dynamic object tree.
-  ///
-  /// Callers should catch [RuntimeException] and retry with the reference parser. This method also throws when the
-  /// lexical guard finds a document that might exceed Jackson's limits, so the retry preserves existing semantics.
-  @Nullable
-  public static Object parse(String json) {
-    if (requiresJacksonFallback(json)) {
-      throw new IllegalArgumentException("JSON document requires Jackson constraint validation");
-    }
-    ForyJson parser = Holder._treeParser;
-    if (parser == null) {
-      throw new IllegalStateException("Fory JSON is unavailable");
-    }
-    try {
-      return parser.fromJson(json, Object.class);
-    } catch (LinkageError e) {
-      // A runtime/module mismatch cannot recover for this class loader. Avoid paying for the same linkage failure on
-      // every subsequent row and let all callers use the reference implementation.
-      disable();
-      logUnavailable(e);
-      throw new IllegalStateException("Fory JSON became unavailable", e);
-    }
-  }
-
-  /// Parses a JSON string into Fory's dynamic object tree and resolves a simple path directly over that tree.
-  /// This avoids constructing a second Jayway document wrapper for ingestion scalar functions.
-  @Nullable
-  public static Object parseAndExtract(String json, SimpleJsonPath path) {
-    Object value = parse(json);
-    for (int depth = 0; depth < path.length() && value != null; depth++) {
-      String key = path.getKey(depth);
-      if (key != null) {
-        if (!(value instanceof Map)) {
-          return null;
-        }
-        value = ((Map<?, ?>) value).get(key);
-      } else {
-        if (!(value instanceof List)) {
-          return null;
-        }
-        List<?> values = (List<?>) value;
-        int index = path.getIndex(depth);
-        if (index >= values.size()) {
-          return null;
-        }
-        value = values.get(index);
-      }
-    }
-    return value;
+    return Holder._streamingAvailable;
   }
 
   /// Extracts a simple path with Fory's streaming reader without materializing the complete JSON tree.
@@ -157,7 +102,7 @@ public final class ForyJsonPathExtractor {
         || (JACKSON_CONSTRAINTS.hasMaxTokenCount() && requiresJacksonFallback(json))) {
       throw new IllegalArgumentException("JSON document requires Jackson constraint validation");
     }
-    if (Holder._treeParser == null || !Holder._streamingAvailable) {
+    if (!Holder._streamingAvailable) {
       throw new IllegalStateException("Fory JSON is unavailable");
     }
     ForyJson parser = Holder.STREAMING_PARSER.get();
@@ -183,9 +128,9 @@ public final class ForyJsonPathExtractor {
   }
 
   private static void disable() {
-    Holder._treeParser = null;
     Holder._streamingAvailable = false;
     Holder.STREAMING_PARSER.remove();
+    PATH_CONTEXT.remove();
   }
 
   private static void logUnavailable(Throwable cause) {

@@ -130,8 +130,8 @@ public class JsonFunctions {
     return jsonPath(object, jsonPath);
   }
 
-  /// Resolves a simple path over a JSON string after parsing the document with Fory. Complex paths,
-  /// already-parsed inputs, and Fory parse failures use the existing Jayway implementation so the experimental
+  /// Resolves a simple path over a JSON string with Fory's streaming reader. Complex paths, already-parsed inputs,
+  /// container results, and Fory extraction failures use the existing Jayway implementation so the experimental
   /// functions below retain the current behavior outside Fory's supported envelope.
   @Nullable
   private static Object foryJsonPath(Object object, String jsonPath) {
@@ -140,7 +140,10 @@ public class JsonFunctions {
       return jsonPath(object, jsonPath);
     }
     try {
-      return ForyJsonPathExtractor.parseAndExtract((String) object, simpleJsonPath);
+      if (!ForyJsonPathExtractor.isAvailable()) {
+        return jsonPath(object, jsonPath);
+      }
+      return ForyJsonPathExtractor.extract((String) object, simpleJsonPath);
     } catch (RuntimeException | LinkageError e) {
       return jsonPath(object, jsonPath);
     }

@@ -35,7 +35,7 @@ import static org.testng.Assert.assertTrue;
 public class ForyJsonLinkageFallbackTest {
   private static final String CHILD_ARGUMENT = "verifyFallback";
 
-  /// Child-process entry point used by [#testMissingForyCoreFallsBack()].
+  /// Child-process entry point used by the missing-Fory fallback tests.
   public static void main(String[] arguments) {
     if (arguments.length != 1 || !CHILD_ARGUMENT.equals(arguments[0])) {
       throw new IllegalArgumentException("Expected the fallback verification argument");
@@ -44,22 +44,52 @@ public class ForyJsonLinkageFallbackTest {
     if (!"7".equals(actual)) {
       throw new AssertionError("Expected Jayway fallback result 7, got: " + actual);
     }
+    long longValue = JsonFunctions.jsonPathLongFory("{\"v\":7}", "$.v", -1L);
+    if (longValue != 7L) {
+      throw new AssertionError("Expected Jayway fallback long 7, got: " + longValue);
+    }
+    double doubleValue = JsonFunctions.jsonPathDoubleFory("{\"v\":7.5}", "$.v", -1d);
+    if (doubleValue != 7.5d) {
+      throw new AssertionError("Expected Jayway fallback double 7.5, got: " + doubleValue);
+    }
   }
 
   @Test
   public void testMissingForyCoreFallsBack()
       throws Exception {
+    runFallbackChild(false);
+  }
+
+  @Test
+  public void testMissingForyJsonFallsBack()
+      throws Exception {
+    runFallbackChild(true);
+  }
+
+  private static void runFallbackChild(boolean removeForyJson)
+      throws Exception {
     String separator = System.getProperty("path.separator");
     StringJoiner childClassPath = new StringJoiner(separator);
     boolean foundForyCore = false;
+    boolean foundForyJson = false;
     for (String entry : System.getProperty("java.class.path").split(Pattern.quote(separator))) {
-      if (new File(entry).getName().startsWith("fory-core-")) {
+      String fileName = new File(entry).getName();
+      if (fileName.startsWith("fory-core-")) {
         foundForyCore = true;
+        if (removeForyJson) {
+          childClassPath.add(entry);
+        }
+      } else if (fileName.startsWith("fory-json-")) {
+        foundForyJson = true;
+        if (!removeForyJson) {
+          childClassPath.add(entry);
+        }
       } else {
         childClassPath.add(entry);
       }
     }
     assertTrue(foundForyCore, "Test classpath does not contain fory-core");
+    assertTrue(foundForyJson, "Test classpath does not contain fory-json");
 
     String javaExecutable = new File(new File(System.getProperty("java.home"), "bin"), "java").getPath();
     ProcessBuilder processBuilder = new ProcessBuilder(javaExecutable, "-cp", childClassPath.toString(),

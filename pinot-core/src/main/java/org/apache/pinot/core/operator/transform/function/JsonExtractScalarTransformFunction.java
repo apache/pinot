@@ -841,7 +841,14 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
         return jaywayExtractor;
       }
       if (_extractionMode == ExtractionMode.FORY) {
-        if (useBigDecimal || !ForyJsonPathExtractor.isAvailable()) {
+        if (useBigDecimal) {
+          return jaywayExtractor;
+        }
+        try {
+          if (!ForyJsonPathExtractor.isAvailable()) {
+            return jaywayExtractor;
+          }
+        } catch (LinkageError ignored) {
           return jaywayExtractor;
         }
         return i -> {

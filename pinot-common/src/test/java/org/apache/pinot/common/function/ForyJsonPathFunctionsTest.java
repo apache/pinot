@@ -53,6 +53,7 @@ public class ForyJsonPathFunctionsTest {
         {"{\"v\":true}", "$.v"},
         {"{\"v\":\"café 😀\"}", "$.v"},
         {"{\"v\":[1,2,3]}", "$.v"},
+        {"{\"v\":{\"nested\":1}}", "$.v"},
         {"{\"v\":1,\"v\":2}", "$.v"}
     };
   }
@@ -79,14 +80,11 @@ public class ForyJsonPathFunctionsTest {
   }
 
   @Test
-  public void testDynamicTreeParserIsAvailable() {
+  public void testStreamingParserIsAvailable() {
     assertTrue(ForyJsonPathExtractor.isAvailable());
-    Object parsed = ForyJsonPathExtractor.parse("{\"n\":7,\"nested\":{\"value\":8}}");
-    assertTrue(parsed instanceof Map);
-    assertEquals(((Map<?, ?>) parsed).get("n"), 7L);
     SimpleJsonPath path = SimpleJsonPath.compile("$.nested.value");
     assertNotNull(path);
-    assertEquals(ForyJsonPathExtractor.parseAndExtract("{\"n\":7,\"nested\":{\"value\":8}}", path), 8L);
+    assertEquals(ForyJsonPathExtractor.extract("{\"n\":7,\"nested\":{\"value\":8}}", path), 8L);
   }
 
   @Test
@@ -98,6 +96,10 @@ public class ForyJsonPathFunctionsTest {
     String trailingContent = "{\"v\":7} {\"ignored\":true}";
     assertEquals(JsonFunctions.jsonPathStringFory(trailingContent, "$.v", "DEFAULT"),
         JsonFunctions.jsonPathString(trailingContent, "$.v", "DEFAULT"));
+
+    String malformedAfterMatch = "{\"v\":7,\"broken\":[}";
+    assertEquals(JsonFunctions.jsonPathStringFory(malformedAfterMatch, "$.v", "DEFAULT"),
+        JsonFunctions.jsonPathString(malformedAfterMatch, "$.v", "DEFAULT"));
 
     Map<String, Object> parsed = Map.of("v", Map.of("n", 42));
     assertEquals(JsonFunctions.jsonPathLongFory(parsed, "$.v.n", -1L),
