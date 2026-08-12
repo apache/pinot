@@ -38,6 +38,7 @@ public class UserConfig extends BaseJsonConfig {
   public static final String TABLES_KEY = "tables";
   public static final String EXCLUDE_TABLES_KEY = "excludeTables";
   public static final String PERMISSIONS_KEY = "permissions";
+  public static final String FINE_GRAINED_PERMISSIONS_KEY = "fineGrainedPermissions";
 
   @JsonPropertyDescription("The name of User")
   private String _username;
@@ -60,7 +61,9 @@ public class UserConfig extends BaseJsonConfig {
   @JsonPropertyDescription("The table permission of User")
   private List<AccessType> _permissions;
 
-  @JsonCreator
+  @JsonPropertyDescription("The fine-grained permission of User")
+  private List<String> _fineGrainedPermissions;
+
   public UserConfig(@JsonProperty(value = USERNAME_KEY, required = true) String username,
       @JsonProperty(value = PASSWORD_KEY, required = true) String password,
       @JsonProperty(value = COMPONET_KEY, required = true) String component,
@@ -68,6 +71,18 @@ public class UserConfig extends BaseJsonConfig {
       @JsonProperty(value = TABLES_KEY) @Nullable List<String> tableList,
       @JsonProperty(value = EXCLUDE_TABLES_KEY) @Nullable List<String> excludeTableList,
       @JsonProperty(value = PERMISSIONS_KEY) @Nullable List<AccessType> permissionList) {
+    this(username, password, component, role, tableList, excludeTableList, permissionList, null);
+  }
+
+  @JsonCreator
+  public UserConfig(@JsonProperty(value = USERNAME_KEY, required = true) String username,
+      @JsonProperty(value = PASSWORD_KEY, required = true) String password,
+      @JsonProperty(value = COMPONET_KEY, required = true) String component,
+      @JsonProperty(value = ROLE_KEY, required = true) String role,
+      @JsonProperty(value = TABLES_KEY) @Nullable List<String> tableList,
+      @JsonProperty(value = EXCLUDE_TABLES_KEY) @Nullable List<String> excludeTableList,
+      @JsonProperty(value = PERMISSIONS_KEY) @Nullable List<AccessType> permissionList,
+      @JsonProperty(value = FINE_GRAINED_PERMISSIONS_KEY) @Nullable List<String> fineGrainedPermissionList) {
     Preconditions.checkArgument(username != null, "'username' must be configured");
     Preconditions.checkArgument(password != null, "'password' must be configured");
 
@@ -79,6 +94,7 @@ public class UserConfig extends BaseJsonConfig {
     _tables = tableList;
     _excludeTables = excludeTableList;
     _permissions = permissionList;
+    _fineGrainedPermissions = fineGrainedPermissionList;
   }
 
   @JsonProperty(USERNAME_KEY)
@@ -113,6 +129,12 @@ public class UserConfig extends BaseJsonConfig {
   @JsonProperty(PERMISSIONS_KEY)
   public List<AccessType> getPermissions() {
     return _permissions;
+  }
+
+  @JsonProperty(FINE_GRAINED_PERMISSIONS_KEY)
+  @Nullable
+  public List<String> getFineGrainedPermissions() {
+    return _fineGrainedPermissions;
   }
 
   /// @deprecated Use [#getPermissions()] instead. This method has a typo in its name.

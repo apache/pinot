@@ -21,12 +21,14 @@ package org.apache.pinot.spi.utils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 import java.io.IOException;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import org.apache.pinot.spi.config.table.TableConfigRedactionUtils;
 
 
 /// Simple obfuscator for object trees and configuration containers with key-value pairs. Matches a configurable set of
@@ -66,11 +68,15 @@ public final class Obfuscator {
 
   private final String _maskedValue;
   private final List<Pattern> _patterns;
+  private final boolean _useDefaultCredentialPolicy;
 
-  /// Obfuscator with default behavior matching (ignore case) "secret", "password", and "token" suffixes. Masks any
-  /// values with '\*\*\*\*\*'
+  /// Obfuscator using the shared credential policy. It masks sensitive property names and credential-shaped content
+  /// in textual values, including assignments and URI user-info or query parameters, while preserving whole unresolved
+  /// placeholders. Masked values use '\*\*\*\*\*'.
   public Obfuscator() {
-    this(DEFAULT_MASKED_VALUE, DEFAULT_PATTERNS);
+    _maskedValue = DEFAULT_MASKED_VALUE;
+    _patterns = DEFAULT_PATTERNS;
+    _useDefaultCredentialPolicy = true;
   }
 
   /// Obfuscator with customized masking behavior. Defaults do not apply! Please ensure case-insensitive regex matching.
@@ -80,6 +86,7 @@ public final class Obfuscator {
   public Obfuscator(String maskedValue, List<Pattern> patterns) {
     _maskedValue = maskedValue;
     _patterns = patterns;
+    _useDefaultCredentialPolicy = false;
   }
 
   /// Serialize an object tree to JSON and obfuscate matching keys. This method handles special cases for JsonNode and
@@ -119,14 +126,21 @@ public final class Obfuscator {
   private JsonNode toJsonRecursive(JsonNode node) {
     if (node.isObject()) {
       node.fieldNames().forEachRemaining(field -> {
-        if (_patterns.stream().anyMatch(pattern -> pattern.matcher(field).matches())) {
+        JsonNode fieldValue = node.get(field);
+        boolean preservePlaceholder = _useDefaultCredentialPolicy && fieldValue.isTextual()
+            && TableConfigRedactionUtils.isUnresolvedPlaceholder(fieldValue.textValue());
+        boolean sensitive = _patterns.stream().anyMatch(pattern -> pattern.matcher(field).matches())
+            || (_useDefaultCredentialPolicy && TableConfigRedactionUtils.isSensitivePropertyName(field));
+        if (sensitive && !preservePlaceholder) {
           ((ObjectNode) node).put(field, _maskedValue);
         } else {
-          ((ObjectNode) node).set(field, toJsonRecursive(node.get(field)));
+          ((ObjectNode) node).set(field, toJsonRecursive(fieldValue));
         }
       });
     } else if (node.isArray()) {
       IntStream.range(0, node.size()).forEach(i -> ((ArrayNode) node).set(i, toJsonRecursive(node.get(i))));
+    } else if (_useDefaultCredentialPolicy && node.isTextual()) {
+      return TextNode.valueOf(TableConfigRedactionUtils.redactStructuredText(node.textValue()));
     }
 
     return node;

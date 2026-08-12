@@ -55,7 +55,8 @@ public class TableConfigTunerUtils {
         TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(tunerConfig.getName());
         tuner.apply(pinotHelixResourceManager, tableConfig, schema, extraProperties);
       } catch (Exception e) {
-        LOGGER.error(String.format("Exception occur when applying tuner: %s", tunerConfig.getName()), e);
+        LOGGER.error("Exception applying table config tuner {} ({})", tunerConfig.getName(),
+            e.getClass().getName());
       }
     }
   }

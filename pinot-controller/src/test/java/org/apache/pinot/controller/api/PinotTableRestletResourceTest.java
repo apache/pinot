@@ -473,12 +473,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
   private TableConfig getTableConfig(String tableName, String tableType)
       throws Exception {
-    String tableConfigString = tableClient().getTableConfig(tableName, tableType);
-    JsonNode tableConfigNode = JsonUtils.stringToJsonNode(tableConfigString);
-    if (tableConfigNode.has(tableType)) {
-      tableConfigNode = tableConfigNode.get(tableType);
-    }
-    return JsonUtils.jsonNodeToObject(tableConfigNode, TableConfig.class);
+    return tableClient().getTableConfigObject(tableName, tableType);
   }
 
   @Test

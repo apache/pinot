@@ -30,8 +30,10 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -51,14 +53,22 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.materializedview.analysis.MaterializedViewAnalyzer;
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata;
+import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata.MaterializedViewSplitSpec;
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadataUtils;
 import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadata;
 import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadataUtils;
 import org.apache.pinot.materializedview.metadata.PartitionInfo;
 import org.apache.pinot.materializedview.metadata.PartitionState;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigRedactionUtils;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,8 +78,9 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 
 /// REST endpoints for the Materialized View UI: list, describe, drop.
 ///
-/// Read endpoints hydrate from the ZK definition + runtime znodes that the consistency manager
-/// and minion task executor maintain. The drop endpoint delegates to
+/// Read endpoints hydrate runtime state from the znodes that the consistency manager and minion
+/// task executor maintain. Every config-derived display field is rebuilt from current unresolved
+/// table configuration instead of executable definition metadata. The drop endpoint delegates to
 /// `PinotHelixResourceManager.deleteTable` so the same dependent-MV guards and segment-cleanup
 /// paths apply.
 ///
@@ -113,10 +124,10 @@ public class PinotMaterializedViewRestletResource {
         } catch (Exception e) {
           // One broken znode must not break the entire listing — surface it as a placeholder
           // entry that carries `error` so the UI can render it as a problem row.
-          LOGGER.warn("Failed to summarize MV {}: {}", viewTableName, e.getMessage());
+          LOGGER.warn("Failed to summarize MV {} ({})", viewTableName, e.getClass().getName());
           ObjectNode err = JsonUtils.newObjectNode();
           err.put("materializedViewTableName", viewTableName);
-          err.put("error", e.getMessage());
+          err.put("error", "Unable to summarize materialized view");
           mvs.add(err);
         }
       }
@@ -132,7 +143,7 @@ public class PinotMaterializedViewRestletResource {
   @Authorize(targetType = TargetType.TABLE, paramName = "materializedViewTableName",
       action = Actions.Table.GET_TABLE_CONFIG)
   @ApiOperation(value = "Get materialized view definition + runtime",
-      notes = "Returns the full ZK definition (definedSQL, base tables, split spec, partition expressions, "
+      notes = "Returns a display-safe definition (definedSQL, base tables, split spec, partition expressions, "
           + "stalenessThresholdMs) and runtime metadata (watermarkMs, per-bucket state map).")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -140,22 +151,40 @@ public class PinotMaterializedViewRestletResource {
   public String getMaterializedView(
       @ApiParam(value = "MV table name (with type suffix, e.g. airlineStatsMv_OFFLINE)", required = true)
       @PathParam("materializedViewTableName") String viewTableName) {
-    ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
-    MaterializedViewDefinitionMetadata definition =
-        MaterializedViewDefinitionMetadataUtils.fetch(propertyStore, viewTableName);
-    if (definition == null) {
-      throw new ControllerApplicationException(LOGGER,
-          "Materialized view not found: " + viewTableName, Response.Status.NOT_FOUND);
-    }
-    MaterializedViewRuntimeMetadata runtime = MaterializedViewRuntimeMetadataUtils.fetch(propertyStore, viewTableName);
+    try {
+      ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+      MaterializedViewDefinitionMetadata persistedDefinition =
+          MaterializedViewDefinitionMetadataUtils.fetch(propertyStore, viewTableName);
+      if (persistedDefinition == null) {
+        throw new ControllerApplicationException(LOGGER,
+            "Materialized view not found: " + viewTableName, Response.Status.NOT_FOUND);
+      }
+      MaterializedViewRuntimeMetadata runtime =
+          MaterializedViewRuntimeMetadataUtils.fetch(propertyStore, viewTableName);
 
-    ObjectNode result = JsonUtils.newObjectNode();
-    // Pass the already-fetched runtime so the partition-summary aggregates and the per-bucket
-    // table are computed from the SAME ZK snapshot.  Two reads would risk rendering
-    // VALID/STALE counts that disagree with the partition states on the same page.
-    result.set("definition", buildDefinitionNode(definition, runtime));
-    result.set("runtime", buildRuntimeNode(runtime));
-    return result.toString();
+      // The definition znode can be stale and older controllers may have populated it from an
+      // environment-resolved TableConfig. Read the current unresolved TableConfig instead so this
+      // ordinary table-read representation never returns a resolved value and preserves placeholders.
+      String rawTableName = TableNameBuilder.extractRawTableName(viewTableName);
+      TableConfig tableConfig = _pinotHelixResourceManager.getOfflineTableConfig(rawTableName, false, false);
+      MaterializedViewDefinitionMetadata displayDefinition =
+          buildDisplayDefinition(viewTableName, tableConfig);
+
+      ObjectNode result = JsonUtils.newObjectNode();
+      // Pass the already-fetched runtime so the partition-summary aggregates and the per-bucket
+      // table are computed from the SAME ZK snapshot.  Two reads would risk rendering
+      // VALID/STALE counts that disagree with the partition states on the same page.
+      result.set("definition", buildDefinitionNode(displayDefinition, runtime));
+      result.set("runtime", buildRuntimeNode(runtime));
+      return result.toString();
+    } catch (ControllerApplicationException e) {
+      throw e;
+    } catch (RuntimeException e) {
+      // Do not attach the cause: metadata parse/redaction failures can contain persisted SQL.
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to render materialized view details for " + viewTableName,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @DELETE
@@ -195,13 +224,14 @@ public class PinotMaterializedViewRestletResource {
       _pinotHelixResourceManager.deleteTable(viewTableName, tableType, null);
     } catch (IllegalStateException e) {
       // Thrown when a dependent MV blocks the delete.
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
+      throw new ControllerApplicationException(LOGGER,
+          "Materialized view cannot be dropped because another view depends on it", Response.Status.CONFLICT);
     } catch (WebApplicationException e) {
       throw e;
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
-          "Failed to drop materialized view " + viewTableName + ": " + e.getMessage(),
-          Response.Status.INTERNAL_SERVER_ERROR, e);
+          "Failed to drop materialized view " + viewTableName,
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
     ObjectNode result = JsonUtils.newObjectNode();
     result.put("status", "Materialized view " + viewTableName + " dropped.");
@@ -259,25 +289,151 @@ public class PinotMaterializedViewRestletResource {
   private ObjectNode buildDefinitionNode(MaterializedViewDefinitionMetadata definition,
       MaterializedViewRuntimeMetadata runtime) {
     ObjectNode node = JsonUtils.newObjectNode();
-    node.put("materializedViewTableName", definition.getMaterializedViewTableNameWithType());
-    node.put("definedSQL", definition.getDefinedSql());
-    node.set("baseTables", JsonUtils.objectToJsonNode(definition.getBaseTables()));
-    node.set("partitionExprMaps", JsonUtils.objectToJsonNode(definition.getPartitionExprMaps()));
+    node.put("materializedViewTableName", TableConfigRedactionUtils.redactStructuredText(
+        definition.getMaterializedViewTableNameWithType()));
+    node.put("definedSQL", TableConfigRedactionUtils.redactStructuredText(definition.getDefinedSql()));
+    node.set("baseTables", JsonUtils.objectToJsonNode(
+        definition.getBaseTables().stream().map(TableConfigRedactionUtils::redactStructuredText).toList()));
+    node.set("partitionExprMaps", JsonUtils.objectToJsonNode(
+        redactPartitionExprMaps(definition.getPartitionExprMaps())));
     node.put("stalenessThresholdMs", definition.getStalenessThresholdMs());
     // Summary partition stats computed from the SAME runtime snapshot the partition table
     // below uses, so the two views can never disagree on a single page render.
     appendPartitionSummary(node, runtime);
     if (definition.getSplitSpec() != null) {
       ObjectNode split = JsonUtils.newObjectNode();
-      split.put("sourceTimeColumn", definition.getSplitSpec().getSourceTimeColumn());
-      split.put("sourceTimeFormat", definition.getSplitSpec().getSourceTimeFormat());
-      split.put("materializedViewTimeColumn", definition.getSplitSpec().getMaterializedViewTimeColumn());
+      split.put("sourceTimeColumn", TableConfigRedactionUtils.redactStructuredText(
+          definition.getSplitSpec().getSourceTimeColumn()));
+      split.put("sourceTimeFormat", TableConfigRedactionUtils.redactStructuredText(
+          definition.getSplitSpec().getSourceTimeFormat()));
+      split.put("materializedViewTimeColumn", TableConfigRedactionUtils.redactStructuredText(
+          definition.getSplitSpec().getMaterializedViewTimeColumn()));
       split.put("bucketMs", definition.getSplitSpec().getBucketMs());
       node.set("splitSpec", split);
     } else {
       node.putNull("splitSpec");
     }
     return node;
+  }
+
+  private MaterializedViewDefinitionMetadata buildDisplayDefinition(String viewTableName,
+      TableConfig tableConfig) {
+    if (tableConfig == null || !tableConfig.isMaterializedView()) {
+      throw new IllegalStateException("Current unresolved materialized-view TableConfig is unavailable");
+    }
+    if (tableConfig.getTaskConfig() == null || tableConfig.getTaskConfig().getTaskTypeConfigsMap() == null) {
+      throw new IllegalStateException("Current materialized-view task config is unavailable");
+    }
+
+    Map<String, String> displayTaskConfigs = null;
+    for (Map<String, String> taskConfigs : tableConfig.getTaskConfig().getTaskTypeConfigsMap().values()) {
+      if (taskConfigs == null) {
+        continue;
+      }
+      String candidate = taskConfigs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
+      if (candidate == null || candidate.trim().isEmpty()) {
+        continue;
+      }
+      if (displayTaskConfigs != null) {
+        boolean sameDisplayInputs = Objects.equals(
+            displayTaskConfigs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY), candidate)
+            && Objects.equals(
+                displayTaskConfigs.get(CommonConstants.MaterializedViewTask.BUCKET_TIME_PERIOD_KEY),
+                taskConfigs.get(CommonConstants.MaterializedViewTask.BUCKET_TIME_PERIOD_KEY))
+            && Objects.equals(
+                displayTaskConfigs.get(CommonConstants.MaterializedViewTask.STALENESS_THRESHOLD_MS_KEY),
+                taskConfigs.get(CommonConstants.MaterializedViewTask.STALENESS_THRESHOLD_MS_KEY));
+        if (!sameDisplayInputs) {
+          throw new IllegalStateException("Materialized-view task configs contain ambiguous display definitions");
+        }
+        continue;
+      }
+      displayTaskConfigs = taskConfigs;
+    }
+    if (displayTaskConfigs == null) {
+      throw new IllegalStateException("Current materialized-view SQL is unavailable");
+    }
+    String definedSql = displayTaskConfigs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
+
+    // Rebuild every config-derived display field from unresolved state. The persisted
+    // definition remains the executable runtime contract and can contain values substituted by
+    // an environment provider, so none of its fields are eligible for an ordinary read response.
+    String sourceRawTableName = MaterializedViewAnalyzer.extractSourceTableName(definedSql);
+    String viewRawTableName = TableNameBuilder.extractRawTableName(viewTableName);
+    Schema viewSchema = _pinotHelixResourceManager.getSchema(viewRawTableName);
+    Schema sourceSchema = _pinotHelixResourceManager.getSchema(sourceRawTableName);
+    if (viewSchema == null || sourceSchema == null) {
+      throw new IllegalStateException("Current materialized-view schemas are unavailable");
+    }
+
+    TableConfig sourceTableConfig =
+        _pinotHelixResourceManager.getOfflineTableConfig(sourceRawTableName, false, false);
+    if (sourceTableConfig == null) {
+      sourceTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(sourceRawTableName, false, false);
+    }
+    if (sourceTableConfig == null || sourceTableConfig.getValidationConfig() == null
+        || tableConfig.getValidationConfig() == null) {
+      throw new IllegalStateException("Current unresolved materialized-view split configuration is unavailable");
+    }
+
+    String sourceTimeColumn = sourceTableConfig.getValidationConfig().getTimeColumnName();
+    String viewTimeColumn = tableConfig.getValidationConfig().getTimeColumnName();
+    DateTimeFieldSpec sourceTimeFieldSpec = sourceSchema.getSpecForTimeColumn(sourceTimeColumn);
+    DateTimeFieldSpec viewTimeFieldSpec = viewSchema.getSpecForTimeColumn(viewTimeColumn);
+    if (sourceTimeFieldSpec == null || viewTimeFieldSpec == null) {
+      throw new IllegalStateException("Current materialized-view time-column metadata is unavailable");
+    }
+
+    String bucketTimePeriod = displayTaskConfigs.get(CommonConstants.MaterializedViewTask.BUCKET_TIME_PERIOD_KEY);
+    if (bucketTimePeriod == null || bucketTimePeriod.isEmpty()) {
+      throw new IllegalStateException("Current materialized-view bucket period is unavailable");
+    }
+    long bucketMs = TimeUtils.convertPeriodToMillis(bucketTimePeriod);
+    if (bucketMs <= 0) {
+      throw new IllegalStateException("Current materialized-view bucket period is invalid");
+    }
+
+    long stalenessThresholdMs = CommonConstants.MaterializedViewTask.DEFAULT_STALENESS_THRESHOLD_MS;
+    String staleness = displayTaskConfigs.get(CommonConstants.MaterializedViewTask.STALENESS_THRESHOLD_MS_KEY);
+    if (staleness != null && !staleness.isEmpty()) {
+      try {
+        stalenessThresholdMs = Long.parseLong(staleness);
+      } catch (NumberFormatException e) {
+        throw new IllegalStateException("Current materialized-view staleness threshold is not displayable");
+      }
+      if (stalenessThresholdMs < 0) {
+        throw new IllegalStateException("Current materialized-view staleness threshold is invalid");
+      }
+    }
+
+    Map<String, String> partitionExprMaps =
+        MaterializedViewAnalyzer.extractPartitionExprMaps(definedSql, viewSchema);
+    MaterializedViewSplitSpec splitSpec = new MaterializedViewSplitSpec(
+        sourceTimeColumn, sourceTimeFieldSpec.getFormat(), viewTimeColumn, viewTimeFieldSpec.getFormat(), bucketMs);
+    return new MaterializedViewDefinitionMetadata(viewTableName, List.of(sourceRawTableName), definedSql,
+        partitionExprMaps, splitSpec, stalenessThresholdMs, true);
+  }
+
+  private static Map<String, String> redactPartitionExprMaps(Map<String, String> partitionExprMaps) {
+    Map<String, String> redacted = new LinkedHashMap<>();
+    if (partitionExprMaps == null) {
+      return redacted;
+    }
+    for (Map.Entry<String, String> entry : partitionExprMaps.entrySet()) {
+      if (entry.getKey() == null) {
+        throw new IllegalStateException("Materialized-view partition expression key is null");
+      }
+      String key = TableConfigRedactionUtils.redactStructuredText(entry.getKey());
+      String value = entry.getValue() != null
+          ? TableConfigRedactionUtils.redactStructuredText(entry.getValue()) : null;
+      // JSON object keys must remain unique. If masking makes two distinct expressions collide,
+      // returning either one would silently misrepresent persisted state, so fail closed.
+      if (redacted.containsKey(key)) {
+        throw new IllegalStateException("Redacted materialized-view partition expressions collide");
+      }
+      redacted.put(key, value);
+    }
+    return redacted;
   }
 
   /// Counts VALID / STALE / total partitions from the supplied runtime snapshot and attaches

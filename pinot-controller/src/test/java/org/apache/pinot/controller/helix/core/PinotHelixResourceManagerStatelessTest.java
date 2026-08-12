@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.controller.dataproviders.ResourceControllerDataProvider;
 import org.apache.helix.controller.rebalancer.strategy.CrushEdRebalanceStrategy;
@@ -41,6 +42,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.exception.TableConfigVersionMismatchException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
@@ -79,6 +81,7 @@ import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
@@ -101,6 +104,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -1127,6 +1131,143 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
       verify(resourceManager).sendTableConfigSchemaRefreshMessage(offlineTableName);
     } finally {
       _helixResourceManager.deleteOfflineTable(rawTableName);
+      deleteSchema(rawTableName);
+    }
+  }
+
+  @Test
+  public void testUpdateTableConfigRejectsStaleVersionAndPreservesInterveningConfig()
+      throws Exception {
+    String rawTableName = "tableConfigCompareAndSetTest";
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    addDummySchema(rawTableName);
+
+    IngestionConfig initialIngestionConfig = new IngestionConfig();
+    initialIngestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(
+        List.of(Map.of("input.fs.prop.secretKey", "initial-value")), "REFRESH", "DAILY"));
+    TableConfig initialTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+        .setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME)
+        .setIngestionConfig(initialIngestionConfig)
+        .build();
+    waitForEVToDisappear(initialTableConfig.getTableName());
+    _helixResourceManager.addTable(initialTableConfig);
+
+    try {
+      Pair<TableConfig, Integer> staleRead =
+          _helixResourceManager.getTableConfigWithVersion(offlineTableName, false, false);
+      assertNotNull(staleRead);
+
+      IngestionConfig interveningIngestionConfig = new IngestionConfig();
+      interveningIngestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(
+          List.of(Map.of("input.fs.prop.secretKey", "intervening-value")), "REFRESH", "DAILY"));
+      TableConfig interveningTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+          .setBrokerTenant(BROKER_TENANT_NAME)
+          .setServerTenant(SERVER_TENANT_NAME)
+          .setIngestionConfig(interveningIngestionConfig)
+          .build();
+      _helixResourceManager.updateTableConfig(interveningTableConfig);
+
+      IngestionConfig staleIngestionConfig = new IngestionConfig();
+      staleIngestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(
+          List.of(Map.of("input.fs.prop.secretKey", "stale-value")), "REFRESH", "DAILY"));
+      TableConfig staleTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+          .setBrokerTenant(BROKER_TENANT_NAME)
+          .setServerTenant(SERVER_TENANT_NAME)
+          .setIngestionConfig(staleIngestionConfig)
+          .build();
+      assertThrows(TableConfigVersionMismatchException.class,
+          () -> _helixResourceManager.updateTableConfig(staleTableConfig, staleRead.getRight(), false));
+
+      TableConfig storedTableConfig =
+          _helixResourceManager.getTableConfigWithVersion(offlineTableName, false, false).getLeft();
+      assertEquals(storedTableConfig.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps().get(0)
+          .get("input.fs.prop.secretKey"), "intervening-value");
+    } finally {
+      _helixResourceManager.deleteOfflineTable(rawTableName);
+      deleteSchema(rawTableName);
+    }
+  }
+
+  @Test
+  public void testAtomicSchemaAndHybridConfigUpdateRollsBackOnSecondConfigRace()
+      throws Exception {
+    String rawTableName = "atomicHybridConfigRaceTest";
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+    addDummySchema(rawTableName);
+
+    try {
+      TableConfig initialOfflineConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+          .setBrokerTenant(BROKER_TENANT_NAME)
+          .setServerTenant(SERVER_TENANT_NAME)
+          .build();
+      waitForEVToDisappear(offlineTableName);
+      _helixResourceManager.addTable(initialOfflineConfig);
+      TableConfig initialRealtimeConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName)
+          .setBrokerTenant(BROKER_TENANT_NAME)
+          .setServerTenant(SERVER_TENANT_NAME)
+          .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+          .build();
+      waitForEVToDisappear(realtimeTableName);
+      _helixResourceManager.addTable(initialRealtimeConfig);
+
+      Pair<Schema, Integer> schemaSnapshot = _helixResourceManager.getSchemaWithVersion(rawTableName);
+      Pair<TableConfig, Integer> offlineSnapshot =
+          _helixResourceManager.getTableConfigWithVersion(offlineTableName, false, false);
+      Pair<TableConfig, Integer> realtimeSnapshot =
+          _helixResourceManager.getTableConfigWithVersion(realtimeTableName, false, false);
+      assertNotNull(schemaSnapshot);
+      assertNotNull(offlineSnapshot);
+      assertNotNull(realtimeSnapshot);
+
+      String originalSchemaDescription = schemaSnapshot.getLeft().getDescription();
+      Schema updatedSchema = schemaSnapshot.getLeft();
+      updatedSchema.setDescription("atomic update should roll back");
+      TableConfig updatedOfflineConfig = new TableConfig(offlineSnapshot.getLeft());
+      updatedOfflineConfig.setQueryConfig(new QueryConfig(11_000L, null, null, null, null, null));
+      TableConfig updatedRealtimeConfig = new TableConfig(realtimeSnapshot.getLeft());
+      updatedRealtimeConfig.setQueryConfig(new QueryConfig(22_000L, null, null, null, null, null));
+      TableConfig interveningRealtimeConfig = new TableConfig(realtimeSnapshot.getLeft());
+      interveningRealtimeConfig.setQueryConfig(new QueryConfig(33_000L, null, null, null, null, null));
+
+      PinotHelixResourceManager resourceManager = spy(_helixResourceManager);
+      doAnswer(invocation -> {
+        assertTrue(ZKMetadataProvider.setTableConfig(
+            _propertyStore, interveningRealtimeConfig, realtimeSnapshot.getRight()));
+        return _helixResourceManager.multiWriteZK();
+      }).when(resourceManager).multiWriteZK();
+
+      Map<TableType, TableConfig> updates = new LinkedHashMap<>();
+      updates.put(TableType.OFFLINE, updatedOfflineConfig);
+      updates.put(TableType.REALTIME, updatedRealtimeConfig);
+      Map<TableType, Integer> expectedVersions = new LinkedHashMap<>();
+      expectedVersions.put(TableType.OFFLINE, offlineSnapshot.getRight());
+      expectedVersions.put(TableType.REALTIME, realtimeSnapshot.getRight());
+
+      assertThrows(TableConfigVersionMismatchException.class,
+          () -> resourceManager.updateTableConfigsAtomically(
+              updatedSchema, schemaSnapshot.getRight(), updates, expectedVersions, false, false));
+      verify(resourceManager).multiWriteZK();
+
+      Pair<Schema, Integer> storedSchema = _helixResourceManager.getSchemaWithVersion(rawTableName);
+      Pair<TableConfig, Integer> storedOfflineConfig =
+          _helixResourceManager.getTableConfigWithVersion(offlineTableName, false, false);
+      Pair<TableConfig, Integer> storedRealtimeConfig =
+          _helixResourceManager.getTableConfigWithVersion(realtimeTableName, false, false);
+      assertEquals(storedSchema.getRight(), schemaSnapshot.getRight());
+      assertEquals(storedSchema.getLeft().getDescription(), originalSchemaDescription);
+      assertEquals(storedOfflineConfig.getRight(), offlineSnapshot.getRight());
+      assertNull(storedOfflineConfig.getLeft().getQueryConfig());
+      assertEquals(storedRealtimeConfig.getRight().intValue(), realtimeSnapshot.getRight() + 1);
+      assertEquals(storedRealtimeConfig.getLeft().getQueryConfig().getTimeoutMs(), Long.valueOf(33_000L));
+    } finally {
+      if (_helixResourceManager.hasOfflineTable(rawTableName)) {
+        _helixResourceManager.deleteOfflineTable(rawTableName);
+      }
+      if (_helixResourceManager.hasRealtimeTable(rawTableName)) {
+        _helixResourceManager.deleteRealtimeTable(rawTableName);
+      }
       deleteSchema(rawTableName);
     }
   }
