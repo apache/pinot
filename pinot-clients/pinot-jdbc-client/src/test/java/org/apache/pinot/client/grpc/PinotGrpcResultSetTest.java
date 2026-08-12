@@ -148,6 +148,20 @@ public class PinotGrpcResultSetTest {
         "nested", Map.of("values", List.of(2, 3.5d))));
   }
 
+  @Test
+  public void testGetAdditionalScalarTypes()
+      throws Exception {
+    PinotGrpcResultSet resultSet = createResultSet(
+        new String[]{"json", "decimal", "timestamp"},
+        new ColumnDataType[]{ColumnDataType.JSON, ColumnDataType.BIG_DECIMAL, ColumnDataType.TIMESTAMP},
+        new Object[]{"{\"key\":1}", new BigDecimal("123.450"), Timestamp.valueOf("2020-01-01 12:00:00")});
+
+    Assert.assertTrue(resultSet.next());
+    Assert.assertEquals(resultSet.getObject(1), "{\"key\":1}");
+    Assert.assertEquals(resultSet.getObject(2), new BigDecimal("123.450"));
+    Assert.assertEquals(resultSet.getObject(3), Timestamp.valueOf("2020-01-01 12:00:00"));
+  }
+
   private static PinotGrpcResultSet createResultSet(String[] columnNames, ColumnDataType[] columnTypes, Object[] row)
       throws Exception {
     DataSchema schema = new DataSchema(columnNames, columnTypes);
