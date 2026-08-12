@@ -22,13 +22,51 @@ import com.google.common.collect.ImmutableSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.spi.config.user.AccessType;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
+import org.apache.pinot.spi.config.user.UserConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+
 
 public class ZkBasicAuthTest {
+
+  @Test
+  public void testFineGrainedPermissionsAreAddedToZkPrincipal() {
+    UserConfig legacyUser = new UserConfig("legacy", "password", ComponentType.CONTROLLER.name(),
+        RoleType.ADMIN.name(), null, null, List.of(AccessType.READ));
+    ZkBasicAuthPrincipal legacyPrincipal = BasicAuthPrincipalUtils.extractBasicAuthPrincipals(List.of(legacyUser))
+        .get(0);
+    Assert.assertTrue(legacyPrincipal.hasPermission("read"));
+    Assert.assertTrue(legacyPrincipal.hasExplicitPermission("read"));
+    assertFalse(legacyPrincipal.hasExplicitActionPermission(Actions.Cluster.GET_ZNODE));
+
+    UserConfig fineGrainedUser = new UserConfig("fineGrained", "password", ComponentType.CONTROLLER.name(),
+        RoleType.ADMIN.name(), null, null, null, List.of(Actions.Cluster.GET_ZNODE));
+    ZkBasicAuthPrincipal fineGrainedPrincipal =
+        BasicAuthPrincipalUtils.extractBasicAuthPrincipals(List.of(fineGrainedUser)).get(0);
+    // The separate fine-grained permission must not turn the legacy empty-set wildcard into a table restriction.
+    Assert.assertTrue(fineGrainedPrincipal.hasPermission("read"));
+    assertTrue(fineGrainedPrincipal.hasExplicitActionPermission(Actions.Cluster.GET_ZNODE));
+  }
+
+  @Test
+  public void testFineGrainedPermissionsDoNotGrantCrudDelete() {
+    for (List<AccessType> permissions : List.of(List.<AccessType>of(), List.of(AccessType.READ))) {
+      UserConfig user = new UserConfig("fineGrained", "password", ComponentType.CONTROLLER.name(),
+          RoleType.USER.name(), null, null, permissions, List.of(Actions.Cluster.GET_ZNODE, "DELETE"));
+      ZkBasicAuthPrincipal principal = BasicAuthPrincipalUtils.extractBasicAuthPrincipals(List.of(user)).get(0);
+
+      assertTrue(principal.hasExplicitActionPermission(Actions.Cluster.GET_ZNODE));
+      assertFalse(principal.hasExplicitPermission("DELETE"));
+      assertFalse(BasicAuthPrincipalUtils.authorizeDeleteRows(principal, "myTable", principal.hasTable("myTable"))
+          .hasAccess());
+    }
+  }
 
   @Test
   public void testBasicAuthPrincipal() {

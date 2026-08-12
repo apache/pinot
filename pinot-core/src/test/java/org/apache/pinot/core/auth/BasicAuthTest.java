@@ -78,6 +78,11 @@ public class BasicAuthTest {
     assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(),
         ImmutableSet.of("read"))
         .hasPermission("write"));
+    assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(), Set.of())
+        .hasExplicitPermission(Actions.Cluster.GET_ZNODE));
+    assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(),
+        ImmutableSet.of(Actions.Cluster.GET_ZNODE))
+        .hasExplicitPermission(Actions.Cluster.GET_ZNODE));
 
     assertEquals(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Set.of(),
         ImmutableSet.of("read"), Map.of("myTable", List.of("cityID > 100")))
@@ -173,6 +178,7 @@ public class BasicAuthTest {
     Map<String, Object> config = new HashMap<>();
     config.put("principals", "admin,user");
     config.put("principals.admin.password", "verysecret");
+    config.put("principals.admin.permissions", Actions.Cluster.GET_ZNODE);
     config.put("principals.user.password", "secret");
     config.put("principals.user.tables", "lessImportantStuff,lesserImportantStuff,leastImportantStuff");
     config.put("principals.user.excludeTables", "excludedTable");
@@ -193,6 +199,7 @@ public class BasicAuthTest {
         .orElse(null);
     assertNotNull(adminPrincipal);
     assertEquals(adminPrincipal.getName(), "admin");
+    assertTrue(adminPrincipal.hasExplicitPermission(Actions.Cluster.GET_ZNODE));
 
     // Verify user principal
     BasicAuthPrincipal userPrincipal = principals.stream()

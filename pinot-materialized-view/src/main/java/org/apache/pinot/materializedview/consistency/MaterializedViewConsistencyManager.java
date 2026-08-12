@@ -720,7 +720,7 @@ public class MaterializedViewConsistencyManager {
         // leave a stale definition znode here; re-registering it would resurrect a ghost
         // MV that source-table updates would chase. Skip the orphan and surface a WARN so
         // operators can clean up the stranded znode.
-        TableConfig viewConfig = ZKMetadataProvider.getTableConfig(_propertyStore, viewTableName);
+        TableConfig viewConfig = ZKMetadataProvider.getTableConfig(_propertyStore, viewTableName, false, false);
         if (viewConfig == null || !viewConfig.isMaterializedView()) {
           LOGGER.warn("Skipping orphan MV definition znode '{}': underlying TableConfig is "
               + "missing or no longer an MV. Operator should DELETE /materializedViewDefinitions "
