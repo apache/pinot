@@ -21,16 +21,17 @@ package org.apache.pinot.broker.routing.instanceselector;
 import javax.annotation.concurrent.Immutable;
 
 
-/// Per-segment view of how well a table's segments are replicated across the servers this broker can
-/// actually route to. Computed alongside [SegmentStates] and published as a whole so the values stay
-/// mutually consistent. A segment's percentage is `servingReplicas * 100 / expectedReplicas`, taken per
-/// segment so that a table whose segments are not uniformly replicated still reads correctly.
+/// Table-level view of how well a table's segments are replicated across the servers this broker can
+/// actually route to: one set of numbers per table, aggregated over its segments. Computed alongside
+/// [SegmentStates] and published as a whole so the values stay mutually consistent. The percentage is
+/// `servingReplicas * 100 / expectedReplicas` evaluated per segment and then minimised, so that a table
+/// whose segments are not uniformly replicated still reads correctly.
 ///
 /// A snapshot, not a history: a segment is reported the moment it drops, and debouncing belongs in the
 /// alert. Only two populations are left out - single-replica segments, and segments routing still calls new
 /// (it does not serve those either, so a stuck push is invisible here by design). Consuming segments count.
 @Immutable
-public class SegmentReplicaHealth {
+public class TableReplicaHealth {
   /// Value reported when a table has no segments to measure.
   public static final int FULLY_REPLICATED_PERCENT = 100;
 
@@ -45,7 +46,7 @@ public class SegmentReplicaHealth {
   private final int _numSegmentsWithoutRedundancy;
   private final int _numUnavailableSegments;
 
-  public SegmentReplicaHealth(int minPercentOfReplicas, int numSegmentsWithoutRedundancy,
+  public TableReplicaHealth(int minPercentOfReplicas, int numSegmentsWithoutRedundancy,
       int numUnavailableSegments) {
     _minPercentOfReplicas = minPercentOfReplicas;
     _numSegmentsWithoutRedundancy = numSegmentsWithoutRedundancy;

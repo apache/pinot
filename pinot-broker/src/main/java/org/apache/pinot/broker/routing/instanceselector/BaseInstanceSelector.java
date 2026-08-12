@@ -82,7 +82,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID
 /// creation time more than 5 minutes ago).
 /// TODO: refresh new/old segment state where there is no update from helix for long time.
 ///
-/// Alongside the selection state, this class maintains a [SegmentReplicaHealth] describing how well the
+/// Alongside the selection state, this class maintains a [TableReplicaHealth] describing how well the
 /// table's segments are replicated across the instances it can route to, and emits it as the
 /// [BrokerGauge#PERCENT_OF_REPLICAS], [BrokerGauge#UNAVAILABLE_SEGMENTS],
 /// [BrokerGauge#SEGMENTS_WITHOUT_REDUNDANCY] and related gauges. Because it is derived from what routing
@@ -127,7 +127,7 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   // _segmentStates is needed for instance selection (multi-threaded), so it is made volatile.
   protected volatile SegmentStates _segmentStates;
   // Read by the metrics registry while the change handling thread replaces it, so it is made volatile.
-  protected volatile SegmentReplicaHealth _replicaHealth;
+  protected volatile TableReplicaHealth _replicaHealth;
   protected Map<String, ServerInstance> _enabledServerStore;
 
   @Override
@@ -186,7 +186,7 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   /// Returns how well the table's segments are currently replicated across the instances this selector
   /// can route to.
   @VisibleForTesting
-  SegmentReplicaHealth getReplicaHealth() {
+  TableReplicaHealth getReplicaHealth() {
     return _replicaHealth;
   }
 
@@ -211,8 +211,6 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
       _oldSegmentExpectedReplicasMap.put(segment, numIdealStateReplicas);
     }
   }
-
-
 
   /// Returns the number of instances in the given ideal state assignment that are ONLINE/CONSUMING.
   protected static int getNumInstancesOnlineForRouting(Map<String, String> idealStateInstanceStateMap) {
@@ -409,7 +407,7 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
         new HashMap<>(HashUtil.getHashMapCapacity(_oldSegmentCandidatesMap.size() + _newSegmentStateMap.size()));
     Set<String> servingInstances = new HashSet<>();
     Set<String> unavailableSegments = new HashSet<>();
-    int minPercentOfReplicas = SegmentReplicaHealth.FULLY_REPLICATED_PERCENT;
+    int minPercentOfReplicas = TableReplicaHealth.FULLY_REPLICATED_PERCENT;
     int numSegmentsWithoutRedundancy = 0;
 
     for (Map.Entry<String, List<SegmentInstanceCandidate>> entry : _oldSegmentCandidatesMap.entrySet()) {
@@ -420,10 +418,10 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
       if (_emitReplicaHealthMetrics) {
         int expectedReplicas = getExpectedReplicas(segment, candidates.size());
         int servingReplicas = enabledCandidates.size();
-        if (SegmentReplicaHealth.shouldMeasure(expectedReplicas)) {
+        if (TableReplicaHealth.shouldMeasure(expectedReplicas)) {
           minPercentOfReplicas = Math.min(minPercentOfReplicas,
-              SegmentReplicaHealth.toPercent(servingReplicas, expectedReplicas));
-          if (SegmentReplicaHealth.isWithoutRedundancy(servingReplicas)) {
+              TableReplicaHealth.toPercent(servingReplicas, expectedReplicas));
+          if (TableReplicaHealth.isWithoutRedundancy(servingReplicas)) {
             numSegmentsWithoutRedundancy++;
           }
         }
@@ -465,12 +463,11 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
 
     _segmentStates = new SegmentStates(instanceCandidatesMap, servingInstances, unavailableSegments);
     _replicaHealth =
-        new SegmentReplicaHealth(minPercentOfReplicas, numSegmentsWithoutRedundancy, unavailableSegments.size());
+        new TableReplicaHealth(minPercentOfReplicas, numSegmentsWithoutRedundancy, unavailableSegments.size());
     emitReplicaHealthMetrics(_replicaHealth);
   }
 
-
-  private void emitReplicaHealthMetrics(SegmentReplicaHealth replicaHealth) {
+  private void emitReplicaHealthMetrics(TableReplicaHealth replicaHealth) {
     if (!_emitReplicaHealthMetrics) {
       return;
     }

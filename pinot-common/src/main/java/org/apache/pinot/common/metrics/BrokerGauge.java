@@ -110,12 +110,17 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   WORKLOAD_CONFIG_FETCH_STATUS("status", true),
 
   /// Replica availability of a table as observed by this broker's routing: the smallest percentage of
-  /// assigned replicas that are actually routable, across all the table's segments. `100` means every segment can be
-  ///  served from every replica the ideal state assigns to it; `0` means at least one segment cannot be served at all.
+  /// assigned replicas that are actually routable, across all the table's measured segments. `100` means every
+  /// measured segment can be served from every replica the ideal state assigns to it; `0` means at least one measured
+  /// segment cannot be served at all.
   ///
-  /// Segments still classified new (see
-  /// [org.apache.pinot.spi.utils.CommonConstants.Broker#CONFIG_OF_NEW_SEGMENT_EXPIRATION_SECONDS]) are
-  /// excluded because they are commonly not yet loaded everywhere
+  /// Two populations are left out of the measurement, so this gauge can read `100` while such a segment is
+  /// unavailable - watch [#UNAVAILABLE_SEGMENTS] for those:
+  /// - Segments assigned a single replica, which have no redundancy to report on and would otherwise pin a table of
+  ///   mixed replication (e.g. a tier assigned fewer replicas) to `0` for the length of any restart or rebalance.
+  /// - Segments still classified new (see
+  ///   [org.apache.pinot.spi.utils.CommonConstants.Broker#CONFIG_OF_NEW_SEGMENT_EXPIRATION_SECONDS]), which are
+  ///   commonly not yet loaded everywhere.
   PERCENT_OF_REPLICAS("percent", false),
 
   /// Number of the table's segments that this broker currently cannot route to any server. Segments assigned a
@@ -126,8 +131,6 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   /// Segments assigned a single replica are excluded, since they never had redundancy to lose. Recently created
   /// segments are excluded on the same terms as [#PERCENT_OF_REPLICAS].
   SEGMENTS_WITHOUT_REDUNDANCY("segments", false);
-
-
 
   private final String _brokerGaugeName;
   private final String _unit;
