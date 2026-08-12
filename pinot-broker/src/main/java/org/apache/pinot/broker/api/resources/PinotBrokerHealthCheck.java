@@ -47,6 +47,7 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -83,10 +84,14 @@ public class PinotBrokerHealthCheck {
   public String getBrokerHealth(@QueryParam("serverInstance") String serverInstance) {
     ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
     if (status == ServiceStatus.Status.GOOD) {
-      if (serverInstance != null && !_routingManager.isServerRoutable(serverInstance)) {
-        String errMessage = String.format("Server %s is not available for routing", serverInstance);
-        throw new WebApplicationException(errMessage,
-            Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build());
+      if (serverInstance != null) {
+        if (!_routingManager.isServerRoutable(serverInstance)) {
+          String errMessage = String.format("Server %s is not available for routing", serverInstance);
+          throw new WebApplicationException(errMessage,
+              Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build());
+        }
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_OK_CALLS, 1);
+        return CommonConstants.Broker.SERVER_ROUTING_READY_RESPONSE;
       }
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_OK_CALLS, 1);
       return "OK";

@@ -912,9 +912,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _serverInstance.startQueryServer();
     _helixAdmin.setConfig(_instanceConfigScope,
         Map.of(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(false)));
+    if (_serverConf.getProperty(Server.CONFIG_OF_STARTUP_ENABLE_BROKER_ROUTING_CHECK,
+        Server.DEFAULT_STARTUP_ENABLE_BROKER_ROUTING_CHECK)) {
+      _brokerRoutingReadyChecker = createBrokerRoutingReadyChecker();
+      _brokerRoutingReadyChecker.start();
+    }
+    // Publish query readiness only after the optional routing checker is installed. Otherwise a concurrent health
+    // request could observe a transient ready state while the checker is still null.
     _isServerReadyToServeQueries = true;
-    _brokerRoutingReadyChecker = createBrokerRoutingReadyChecker();
-    _brokerRoutingReadyChecker.start();
     // Throttling for realtime consumption is disabled up to this point to allow maximum consumption during startup time
     RealtimeConsumptionRateManager.getInstance().enablePartitionRateLimiter();
 
@@ -972,11 +977,16 @@ public abstract class BaseServerStarter implements ServiceStartable {
   }
 
   protected boolean isServerReadyForHealthCheck() {
-    return isServerReadyToServeQueries() && _brokerRoutingReadyChecker != null && _brokerRoutingReadyChecker.isReady();
+    return isServerReadyToServeQueries()
+        && (_brokerRoutingReadyChecker == null || _brokerRoutingReadyChecker.isReady());
   }
 
   protected BrokerRoutingReadyChecker createBrokerRoutingReadyChecker() {
-    return new BrokerRoutingReadyChecker(_helixManager, _instanceId);
+    long timeoutMs = _serverConf.getProperty(Server.CONFIG_OF_STARTUP_BROKER_ROUTING_CHECK_TIMEOUT_MS,
+        Server.DEFAULT_STARTUP_BROKER_ROUTING_CHECK_TIMEOUT_MS);
+    boolean failOpen = _serverConf.getProperty(Server.CONFIG_OF_STARTUP_BROKER_ROUTING_CHECK_FAIL_OPEN,
+        Server.DEFAULT_STARTUP_BROKER_ROUTING_CHECK_FAIL_OPEN);
+    return new BrokerRoutingReadyChecker(_helixManager, _instanceId, timeoutMs, failOpen);
   }
 
   protected SegmentOperationsThrottler createMultiColumnIndexPreprocessThrottler() {

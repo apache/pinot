@@ -165,6 +165,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
       WebTarget healthTarget = client.target("http://localhost:18099/health");
       try (Response response = healthTarget.queryParam("serverInstance", serverInstance).request().get()) {
         assertEquals(response.getStatus(), 200);
+        assertEquals(response.readEntity(String.class), CommonConstants.Broker.SERVER_ROUTING_READY_RESPONSE);
       }
       try (Response response = healthTarget.queryParam("serverInstance", "Server_unknown_8098").request().get()) {
         assertEquals(response.getStatus(), 503);

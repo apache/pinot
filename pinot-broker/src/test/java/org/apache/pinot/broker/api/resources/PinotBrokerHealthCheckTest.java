@@ -23,6 +23,7 @@ import javax.ws.rs.WebApplicationException;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -69,7 +70,7 @@ public class PinotBrokerHealthCheckTest {
     assertEquals(exception.getResponse().getStatus(), 503);
 
     when(_routingManager.isServerRoutable(SERVER_INSTANCE)).thenReturn(true);
-    assertEquals(_healthCheck.getBrokerHealth(SERVER_INSTANCE), "OK");
+    assertEquals(_healthCheck.getBrokerHealth(SERVER_INSTANCE), CommonConstants.Broker.SERVER_ROUTING_READY_RESPONSE);
   }
 
   private void setField(String name, Object value)

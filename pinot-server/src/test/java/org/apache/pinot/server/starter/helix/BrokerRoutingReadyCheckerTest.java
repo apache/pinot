@@ -20,6 +20,7 @@ package org.apache.pinot.server.starter.helix;
 
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.testng.annotations.Test;
 
@@ -68,5 +69,35 @@ public class BrokerRoutingReadyCheckerTest {
 
     checker.check();
     assertFalse(checker.isReady());
+  }
+
+  @Test
+  public void testTimeoutFailsOpen() {
+    AtomicLong currentTimeMs = new AtomicLong(1_000L);
+    BrokerRoutingReadyChecker checker = new BrokerRoutingReadyChecker(SERVER_INSTANCE,
+        () -> Set.of("Broker_localhost_8099"), brokers -> false, 5_000L, true, currentTimeMs::get);
+
+    checker.check();
+    assertFalse(checker.isReady());
+
+    currentTimeMs.set(6_000L);
+    checker.check();
+    assertTrue(checker.isReady());
+  }
+
+  @Test
+  public void testTimeoutFailsClosedButRecovers() {
+    AtomicLong currentTimeMs = new AtomicLong(1_000L);
+    AtomicReference<Boolean> brokerReady = new AtomicReference<>(false);
+    BrokerRoutingReadyChecker checker = new BrokerRoutingReadyChecker(SERVER_INSTANCE,
+        () -> Set.of("Broker_localhost_8099"), brokers -> brokerReady.get(), 5_000L, false, currentTimeMs::get);
+
+    currentTimeMs.set(6_000L);
+    checker.check();
+    assertFalse(checker.isReady());
+
+    brokerReady.set(true);
+    checker.check();
+    assertTrue(checker.isReady());
   }
 }
