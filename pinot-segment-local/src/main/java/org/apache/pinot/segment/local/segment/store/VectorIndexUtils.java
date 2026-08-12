@@ -129,9 +129,9 @@ public class VectorIndexUtils {
   }
 
   /// Names of the entries directly inside `dir`, files and directories alike (an HNSW vector index is
-  /// a Lucene directory), or empty when it cannot be listed.
-  private static Set<String> listEntryNames(File dir) {
-    String[] names = dir.list();
+  /// a Lucene directory), or empty when `dir` is null or cannot be listed.
+  private static Set<String> listEntryNames(@Nullable File dir) {
+    String[] names = dir == null ? null : dir.list();
     return names == null ? Set.of() : new HashSet<>(Arrays.asList(names));
   }
 

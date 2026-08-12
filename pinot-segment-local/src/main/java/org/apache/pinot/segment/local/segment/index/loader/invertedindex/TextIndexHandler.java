@@ -380,7 +380,15 @@ public class TextIndexHandler extends BaseIndexHandler {
   }
 
   private Set<String> getColumnsWithLegacyNativeTextIndex() {
+    // Legacy native text indexes are sidecar files that older segment formats wrote into the segment's local
+    // directory. A SegmentDirectory that is not backed by a local directory reports a null index dir and cannot
+    // hold such files, so there is nothing to look for. Returning early also keeps the version sub-directory
+    // resolution below from being handed a null parent, which yields a path relative to the working directory
+    // for v3 and another null for v1/v2.
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    if (indexDir == null) {
+      return Set.of();
+    }
     File segmentDirectory =
         SegmentDirectoryPaths.segmentDirectoryFor(indexDir, _segmentDirectory.getSegmentMetadata().getVersion());
     Collection<String> allColumns = _segmentDirectory.getSegmentMetadata().getAllColumns();
