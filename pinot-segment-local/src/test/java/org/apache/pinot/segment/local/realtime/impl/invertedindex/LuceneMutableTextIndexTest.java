@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -46,6 +47,8 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class LuceneMutableTextIndexTest {
@@ -317,18 +320,74 @@ public class LuceneMutableTextIndexTest {
     assertEquals(_realtimeLuceneTextIndex.getDocIds("invalid"), ImmutableRoaringBitmap.bitmapOf());
   }
 
-  @Test(expectedExceptions = ExecutionException.class,
-      expectedExceptionsMessageRegExp = ".*TEXT_MATCH query interrupted while querying the consuming segment.*")
+  @Test
   public void testQueryCancellationIsSuccessful()
-      throws InterruptedException, ExecutionException {
+      throws Exception {
     configureIndex(null, null, null, null);
+    CountDownLatch searcherTaskStarted = new CountDownLatch(1);
+    CountDownLatch releaseSearcherTask = new CountDownLatch(1);
+    Future<?> searcherTask = SEARCHER_POOL.getExecutorService().submit(() -> {
+      searcherTaskStarted.countDown();
+      awaitUninterruptibly(releaseSearcherTask);
+    });
+
     // Avoid early finalization by not using Executors.newSingleThreadExecutor (java <= 20, JDK-8145304)
     ExecutorService baseExecutor = Executors.newFixedThreadPool(1);
     // Wrap with contextAwareExecutorService to propagate QueryThreadContext to child threads
     ExecutorService executor = QueryThreadContext.contextAwareExecutorService(baseExecutor);
-    Future<MutableRoaringBitmap> res = executor.submit(() -> _realtimeLuceneTextIndex.getDocIds("/.*read.*/"));
-    // Shutdown the base executor to trigger interrupt on the worker thread
-    baseExecutor.shutdownNow();
-    res.get();
+    CountDownLatch queryTaskStarted = new CountDownLatch(1);
+    CountDownLatch runQuery = new CountDownLatch(1);
+
+    try {
+      assertTrue(searcherTaskStarted.await(10, TimeUnit.SECONDS), "Timed out waiting for searcher task to start");
+      Future<MutableRoaringBitmap> result = executor.submit(() -> {
+        queryTaskStarted.countDown();
+        awaitUninterruptibly(runQuery);
+        return _realtimeLuceneTextIndex.getDocIds("/.*read.*/");
+      });
+      assertTrue(queryTaskStarted.await(10, TimeUnit.SECONDS), "Timed out waiting for query task to start");
+
+      // Interrupt the query worker before it submits to the saturated searcher pool, reproducing the CI race.
+      baseExecutor.shutdownNow();
+      runQuery.countDown();
+
+      ExecutionException exception =
+          expectThrows(ExecutionException.class, () -> result.get(10, TimeUnit.SECONDS));
+      Throwable cause = exception.getCause();
+      assertTrue(cause instanceof RuntimeException, "Expected RuntimeException but got: " + cause);
+      assertTrue(cause.getMessage().contains("TEXT_MATCH query interrupted while querying the consuming segment"),
+          "Unexpected exception: " + cause);
+    } finally {
+      runQuery.countDown();
+      baseExecutor.shutdownNow();
+      boolean queryExecutorTerminated = baseExecutor.awaitTermination(10, TimeUnit.SECONDS);
+
+      // Queue a marker behind the nested Lucene search, then release the single searcher thread. Waiting for the
+      // marker guarantees the search completed before tearDownMethod closes the index.
+      Future<?> searcherDrain;
+      try {
+        searcherDrain = SEARCHER_POOL.getExecutorService().submit(() -> { });
+      } finally {
+        releaseSearcherTask.countDown();
+      }
+      searcherTask.get(10, TimeUnit.SECONDS);
+      searcherDrain.get(10, TimeUnit.SECONDS);
+      assertTrue(queryExecutorTerminated, "Query executor did not terminate");
+    }
+  }
+
+  private static void awaitUninterruptibly(CountDownLatch latch) {
+    boolean interrupted = false;
+    while (true) {
+      try {
+        latch.await();
+        break;
+      } catch (InterruptedException e) {
+        interrupted = true;
+      }
+    }
+    if (interrupted) {
+      Thread.currentThread().interrupt();
+    }
   }
 }
