@@ -72,19 +72,27 @@ public class ScalingThreadPoolExecutor extends ThreadPoolExecutor {
   public static ExecutorService newScalingThreadPool(int min, int max, long keepAliveTime) {
     ScalingQueue<Runnable> queue = new ScalingQueue<>();
     ThreadPoolExecutor executor = new ScalingThreadPoolExecutor(min, max, keepAliveTime, TimeUnit.MILLISECONDS, queue);
-    executor.setRejectedExecutionHandler(new ForceQueuePolicy());
+    executor.setRejectedExecutionHandler(new ForceQueuePolicy(queue));
     return executor;
   }
 
   /// Used to handle queue rejections. The policy ensures we still queue the Runnable, and the rejection ensures the
   /// pool will be expanded if necessary
   static class ForceQueuePolicy implements RejectedExecutionHandler {
+    private final ScalingQueue<Runnable> _queue;
+
+    ForceQueuePolicy(ScalingQueue<Runnable> queue) {
+      _queue = queue;
+    }
+
+    @Override
     public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
-      try {
-        executor.getQueue().put(r);
-      } catch (InterruptedException e) {
-        // should never happen since we never wait
-        throw new RejectedExecutionException(e);
+      if (executor.isShutdown() || !_queue.forceOffer(r)) {
+        throw new RejectedExecutionException("Task " + r + " rejected from " + executor);
+      }
+      // Match ThreadPoolExecutor's queueing recheck: do not leave a task stranded if shutdown raced the offer.
+      if (executor.isShutdown() && executor.remove(r)) {
+        throw new RejectedExecutionException("Task " + r + " rejected from " + executor);
       }
     }
   }
@@ -131,6 +139,13 @@ public class ScalingThreadPoolExecutor extends ThreadPoolExecutor {
     @Override
     public boolean offer(E e) {
       return _currentIdleThreadCount.get() > 0 && super.offer(e);
+    }
+
+    /// Unconditionally offers an element after the executor has reached its maximum pool size.
+    /// LinkedBlockingQueue.offer is non-interruptible, which allows an already-interrupted caller
+    /// to queue work while preserving its interrupt status.
+    boolean forceOffer(E e) {
+      return super.offer(e);
     }
   }
 }
