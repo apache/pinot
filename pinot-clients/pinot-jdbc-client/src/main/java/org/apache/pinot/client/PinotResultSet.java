@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import javax.annotation.Nullable;
 import org.apache.pinot.client.base.AbstractBaseResultSet;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -199,6 +200,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
+  @Nullable
   public String getString(int columnIndex)
       throws SQLException {
     validateColumn(columnIndex);
@@ -220,12 +222,14 @@ public class PinotResultSet extends AbstractBaseResultSet {
   }
 
   @Override
+  @Nullable
   protected Map<?, ?> getMap(int columnIndex)
       throws SQLException {
     return parseJson(columnIndex, MAP_READER, "map");
   }
 
   @Override
+  @Nullable
   protected List<?> getList(int columnIndex, ColumnDataType dataType)
       throws SQLException {
     switch (dataType) {
@@ -254,24 +258,28 @@ public class PinotResultSet extends AbstractBaseResultSet {
     }
   }
 
+  @Nullable
   private List<Timestamp> getTimestampList(int columnIndex)
       throws SQLException {
     List<String> values = parseJson(columnIndex, STRING_LIST_READER, "timestamp array");
     return toTimestampList(values);
   }
 
+  @Nullable
   private List<byte[]> getBytesList(int columnIndex)
       throws SQLException {
     List<String> values = parseJson(columnIndex, STRING_LIST_READER, "bytes array");
     return toBytesList(values);
   }
 
+  @Nullable
   private List<UUID> getUuidList(int columnIndex)
       throws SQLException {
     List<String> values = parseJson(columnIndex, STRING_LIST_READER, "UUID array");
     return toUuidList(values);
   }
 
+  @Nullable
   private <T> T parseJson(int columnIndex, ObjectReader reader, String type)
       throws SQLException {
     try {
