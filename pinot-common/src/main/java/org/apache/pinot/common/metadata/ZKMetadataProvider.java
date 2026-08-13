@@ -86,6 +86,10 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_MATERIALIZED_VIEW_RUNTIME_PREFIX = "/CONFIGS/MATERIALIZED_VIEW/RUNTIME";
   private static final String PROPERTYSTORE_QUERY_WORKLOAD_CONFIGS_PREFIX = "/CONFIGS/QUERYWORKLOAD";
   private static final String PROPERTYSTORE_TASK_LOCK_SUFFIX = "-Lock";
+  private static final String PROPERTYSTORE_TABLE_DELETION_IN_PROGRESS_PREFIX = "/TABLE_DELETION_IN_PROGRESS";
+  private static final String DELETION_MARKER_CONTROLLER_ID_KEY = "controllerId";
+  private static final String DELETION_MARKER_START_TIME_KEY = "startTimeMs";
+  private static final long DELETION_MARKER_EXPIRY_MS = 24 * 60 * 60 * 1000L; // 24 hours
 
   public static void setUserConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String username, ZNRecord znRecord) {
     propertyStore.set(constructPropertyStorePathForUserConfig(username), znRecord, AccessOption.PERSISTENT);
@@ -889,5 +893,110 @@ public class ZKMetadataProvider {
   public static boolean isTableConfigExists(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
     return propertyStore.exists(constructPropertyStorePathForResourceConfig(tableNameWithType),
         AccessOption.PERSISTENT);
+  }
+
+  /// Creates a deletion marker for a table to indicate that deletion is in progress.
+  /// This marker is used to prevent concurrent deletions and prevent recreation of a table
+  /// while deletion is in progress.
+  ///
+  /// @param propertyStore The Helix property store
+  /// @param tableNameWithType The table name with type suffix (e.g., myTable_REALTIME)
+  /// @param controllerId The ID of the controller performing the deletion
+  /// @return true if the marker was created successfully, false if a marker already exists
+  public static boolean createTableDeletionMarker(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableNameWithType, String controllerId) {
+    String markerPath = constructPropertyStorePathForTableDeletionMarker(tableNameWithType);
+    ZNRecord markerRecord = new ZNRecord(tableNameWithType);
+    markerRecord.setSimpleField(DELETION_MARKER_CONTROLLER_ID_KEY, controllerId);
+    markerRecord.setLongField(DELETION_MARKER_START_TIME_KEY, System.currentTimeMillis());
+    return propertyStore.create(markerPath, markerRecord, AccessOption.PERSISTENT);
+  }
+
+  /// Checks if a deletion marker exists for the table and is still valid (not expired).
+  /// A marker is considered expired if it is older than DELETION_MARKER_EXPIRY_MS (24 hours).
+  ///
+  /// @param propertyStore The Helix property store
+  /// @param tableNameWithType The table name with type suffix (e.g., myTable_REALTIME)
+  /// @return true if a valid (non-expired) deletion marker exists, false otherwise
+  public static boolean isValidTableDeletionMarkerExists(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableNameWithType) {
+    String markerPath = constructPropertyStorePathForTableDeletionMarker(tableNameWithType);
+    if (!propertyStore.exists(markerPath, AccessOption.PERSISTENT)) {
+      return false;
+    }
+    ZNRecord markerRecord = propertyStore.get(markerPath, null, AccessOption.PERSISTENT);
+    if (markerRecord == null) {
+      return false;
+    }
+    Long startTimeMs = markerRecord.getLongField(DELETION_MARKER_START_TIME_KEY);
+    if (startTimeMs == null) {
+      // Marker exists but has no start time, consider it invalid
+      return false;
+    }
+    // Check if marker has expired
+    long ageMs = System.currentTimeMillis() - startTimeMs;
+    return ageMs < DELETION_MARKER_EXPIRY_MS;
+  }
+
+  /// Removes the deletion marker for a table.
+  /// This should be called after table deletion completes successfully.
+  ///
+  /// @param propertyStore The Helix property store
+  /// @param tableNameWithType The table name with type suffix (e.g., myTable_REALTIME)
+  public static void removeTableDeletionMarker(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableNameWithType) {
+    String markerPath = constructPropertyStorePathForTableDeletionMarker(tableNameWithType);
+    if (propertyStore.exists(markerPath, AccessOption.PERSISTENT)) {
+      propertyStore.remove(markerPath, AccessOption.PERSISTENT);
+    }
+  }
+
+  /// Allows taking over an expired deletion marker.
+  /// If the marker exists but is expired, it will be removed and a new marker will be created.
+  /// This handles the case where a controller crashes during deletion, leaving a stale marker.
+  ///
+  /// @param propertyStore The Helix property store
+  /// @param tableNameWithType The table name with type suffix (e.g., myTable_REALTIME)
+  /// @param controllerId The ID of the controller performing the deletion
+  /// @return true if the marker was created (either new or by taking over expired), false if a valid marker exists
+  public static boolean createOrTakeoverTableDeletionMarker(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableNameWithType, String controllerId) {
+    String markerPath = constructPropertyStorePathForTableDeletionMarker(tableNameWithType);
+    if (!propertyStore.exists(markerPath, AccessOption.PERSISTENT)) {
+      return createTableDeletionMarker(propertyStore, tableNameWithType, controllerId);
+    }
+    ZNRecord markerRecord = propertyStore.get(markerPath, null, AccessOption.PERSISTENT);
+    if (markerRecord == null) {
+      // Marker exists but is null, try to remove and recreate
+      propertyStore.remove(markerPath, AccessOption.PERSISTENT);
+      return createTableDeletionMarker(propertyStore, tableNameWithType, controllerId);
+    }
+    Long startTimeMs = markerRecord.getLongField(DELETION_MARKER_START_TIME_KEY);
+    if (startTimeMs == null) {
+      // Marker has no start time, consider it stale and remove
+      propertyStore.remove(markerPath, AccessOption.PERSISTENT);
+      return createTableDeletionMarker(propertyStore, tableNameWithType, controllerId);
+    }
+    long ageMs = System.currentTimeMillis() - startTimeMs;
+    if (ageMs >= DELETION_MARKER_EXPIRY_MS) {
+      // Marker has expired, remove it and create a new one
+      LOGGER.info("Taking over expired deletion marker for table: {} (age: {}ms)", tableNameWithType, ageMs);
+      propertyStore.remove(markerPath, AccessOption.PERSISTENT);
+      return createTableDeletionMarker(propertyStore, tableNameWithType, controllerId);
+    }
+    // Valid marker exists, cannot take over
+    return false;
+  }
+
+  private static String constructPropertyStorePathForTableDeletionMarker(String tableNameWithType) {
+    return PROPERTYSTORE_TABLE_DELETION_IN_PROGRESS_PREFIX + "/" + tableNameWithType;
+  }
+
+  /// Gets the property store prefix for table deletion in progress markers.
+  /// This is exposed for error messages to help users manually clean up stale markers.
+  ///
+  /// @return the property store prefix for table deletion in progress markers
+  public static String getPropertyStoreTableDeletionInProgressPrefix() {
+    return PROPERTYSTORE_TABLE_DELETION_IN_PROGRESS_PREFIX;
   }
 }
