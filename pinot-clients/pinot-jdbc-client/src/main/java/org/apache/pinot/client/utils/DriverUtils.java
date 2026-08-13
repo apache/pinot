@@ -154,7 +154,7 @@ public class DriverUtils {
     if (columnDataType == null) {
       return Types.VARCHAR;
     }
-    if (isArrayDataType(columnDataType)) {
+    if (ColumnDataType.isArray(columnDataType)) {
       return Types.JAVA_OBJECT;
     }
     if (ColumnDataType.MAP.name().equals(columnDataType)) {
@@ -203,7 +203,7 @@ public class DriverUtils {
     if (columnDataType == null) {
       return String.class.getTypeName();
     }
-    if (isArrayDataType(columnDataType)) {
+    if (ColumnDataType.isArray(columnDataType)) {
       return List.class.getTypeName();
     }
     if (ColumnDataType.MAP.name().equals(columnDataType)) {
@@ -246,14 +246,6 @@ public class DriverUtils {
         break;
     }
     return columnsJavaClassName;
-  }
-
-  private static boolean isArrayDataType(String columnDataType) {
-    try {
-      return ColumnDataType.valueOf(columnDataType).isArray();
-    } catch (IllegalArgumentException e) {
-      return false;
-    }
   }
 
   public static boolean queryContainsLimitStatement(String query) {
