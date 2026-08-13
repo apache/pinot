@@ -192,6 +192,10 @@ Check out [Pinot documentation](https://docs.pinot.apache.org/) for a complete d
 - [Quick Demo](https://docs.pinot.apache.org/getting-started/running-pinot-locally)
 - [Pinot Architecture](https://docs.pinot.apache.org/basics/architecture)
 - [Pinot Query Language](https://docs.pinot.apache.org/users/user-guide-query/pinot-query-language)
+- [Broker FailureDetector](https://docs.pinot.apache.org/basics/components/broker#failure-detector)
+
+### Broker FailureDetector
+The broker `FailureDetector` module tracks the health of servers from the broker's point of view. When queries to a server fail, the server is marked unhealthy and excluded from query routing; a retry loop periodically probes the server and restores it to the routing table once it recovers.
 
 ## License
 Apache Pinot is under [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)
