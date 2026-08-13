@@ -99,8 +99,8 @@ public class SegmentMessageHandlerFactoryTest {
   @Test
   public void testNoKeysWithoutConfiguredDenseKeys()
       throws Exception {
-    // An OPEN_STRUCT column with no denseKeys resolves its dense set from the data, and the gauge is
-    // deliberately not emitted for those keys, so there is nothing to remove.
+    // No configured denseKeys → nothing recoverable for removal. When perKeyDocCountEnabled is on,
+    // discovered-key gauges are emitted but not reachable here; they survive until server restart.
     TableConfig tableConfig = tableConfig(List.of(openStructField("metrics", "[]")));
 
     assertTrue(SegmentMessageHandlerFactory.openStructMetricKeys(tableConfig, schema()).isEmpty());

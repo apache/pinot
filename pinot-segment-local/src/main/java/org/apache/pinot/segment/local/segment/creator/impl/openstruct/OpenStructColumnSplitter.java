@@ -208,13 +208,17 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
           // Resolve per value rather than only on first sighting: the key's inferred type is cached,
           // so folding the counter into a computeIfAbsent would record one failure per key no matter
           // how many values actually took the STRING fallback.
-          OpenStructTypeInference.Resolution resolution =
-              OpenStructTypeInference.resolve(rawValue, _inferredTypes.get(key));
-          valueType = resolution.getStoredType();
-          _inferredTypes.putIfAbsent(key, valueType);
-          if (resolution.isStringFallback()) {
-            _inferenceFailuresPerKey.merge(key, 1L, Long::sum);
+          DataType established = _inferredTypes.get(key);
+          DataType inferred = OpenStructTypeInference.inferDataType(rawValue);
+          if (inferred == null) {
+            valueType = DataType.STRING;
+            if (established == null || established == DataType.STRING) {
+              _inferenceFailuresPerKey.merge(key, 1L, Long::sum);
+            }
+          } else {
+            valueType = established != null ? established : inferred;
           }
+          _inferredTypes.putIfAbsent(key, valueType);
         }
         if (!_presenceBitmaps.containsKey(key)) {
           _presenceBitmaps.put(key, new RoaringBitmap());
@@ -308,17 +312,23 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
         ServerGauge.OPEN_STRUCT_LAST_SEGMENT_DOC_COUNT, _numDocs);
 
-    // Every key seen in this segment, dense or sparse, configured or discovered: the fill rate of a
-    // key that is *not* in denseKeys is what tells an operator it should be, which is the main thing
-    // this gauge is for. The cost is that the registry entry count follows the ingested key space,
-    // and gauges are only swept for keys recoverable from config when the table is deleted (see
-    // SegmentMessageHandlerFactory#openStructMetricKeys) -- an id-like key will accumulate entries
-    // until the server restarts. Gating this emission on a config switch is the follow-up.
-    // metricKey rather than materializedColumnName: a sparse key has no on-disk column, and the key
-    // has to be sanitised for the JMX name (see OpenStructNaming#metricKey).
-    _presenceBitmaps.forEach((key, presence) -> serverMetrics.setOrUpdateTableGauge(_tableNameWithType,
-        OpenStructNaming.metricKey(_columnName, key),
-        ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT, presence.getCardinality()));
+    if (_config.isPerKeyDocCountEnabled()) {
+      // Emit for every key in the segment. Registry entries follow the ingested key space;
+      // table deletion can only sweep keys recoverable from denseKeys.
+      _presenceBitmaps.forEach((key, presence) -> serverMetrics.setOrUpdateTableGauge(_tableNameWithType,
+          OpenStructNaming.metricKey(_columnName, key),
+          ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT, presence.getCardinality()));
+    } else {
+      // Emit only for configured dense keys — bounded by the table config.
+      for (String key : _config.getDenseKeys()) {
+        RoaringBitmap presence = _presenceBitmaps.get(key);
+        if (presence != null) {
+          serverMetrics.setOrUpdateTableGauge(_tableNameWithType,
+              OpenStructNaming.metricKey(_columnName, key),
+              ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT, presence.getCardinality());
+        }
+      }
+    }
   }
 
   @Override

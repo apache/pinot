@@ -135,35 +135,31 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   /// the STRING fallback. `establishedType` is the key's already-resolved stored type, or `null` on
   /// first sighting.
   ///
-  /// Delegates the fallback rule to [OpenStructTypeInference#resolve] so this path and the sealed
-  /// build path ([OpenStructColumnSplitter#addMap]) cannot drift: a value whose type cannot be
-  /// mapped is stored as its serialized string form rather than discarded, so dropping here would
-  /// make a doc resolve differently before and after seal (and make the REALTIME and OFFLINE halves
-  /// of a hybrid table disagree for the same row).
+  /// The fallback rule (unmappable value → STRING) must match the sealed build path
+  /// ([OpenStructColumnSplitter#addMap]) so a value reads the same before and after seal.
   private DataType resolveStoredType(String key, Object rawValue, @Nullable DataType establishedType) {
     FieldSpec spec = _childFieldSpecs.get(key);
     if (spec != null) {
       return spec.getDataType().getStoredType();
     }
-    OpenStructTypeInference.Resolution resolution = OpenStructTypeInference.resolve(rawValue, establishedType);
-    if (resolution.isStringFallback()) {
+    if (establishedType != null && establishedType != DataType.STRING) {
+      return establishedType;
+    }
+    DataType inferred = OpenStructTypeInference.inferDataType(rawValue);
+    if (inferred == null) {
       if (establishedType == null) {
-        // Only on first sighting: this runs on the consuming path, so logging every offending value
-        // of a key would flood the ingestion critical path. Subsequent values are counted by the
-        // meter below, which is what the volume signal is for.
         LOGGER.warn("OPEN_STRUCT '{}': could not infer DataType for key '{}' from value of class '{}'."
                 + " Falling back to STRING.",
             _openStructColumn, key, rawValue.getClass().getName());
       }
       ServerMetrics serverMetrics = ServerMetrics.get();
       if (serverMetrics != null) {
-        // Keyed on the column, not the key: this fires on malformed input, so an id-like key would
-        // otherwise mint one meter per id and meters are never removed from the registry.
         serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
             ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, 1);
       }
+      return DataType.STRING;
     }
-    return resolution.getStoredType().getStoredType();
+    return establishedType != null ? establishedType : inferred;
   }
 
   /// Coerces rawValue to storedType. Returns null on failure; the caller drops the entry. Failures

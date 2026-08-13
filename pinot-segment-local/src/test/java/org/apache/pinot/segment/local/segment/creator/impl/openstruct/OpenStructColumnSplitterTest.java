@@ -85,7 +85,13 @@ public class OpenStructColumnSplitterTest {
   }
 
   private OpenStructIndexConfig config(double minFillRate, int maxDenseKeys, Set<String> denseKeys) {
-    return new OpenStructIndexConfig(false, null, maxDenseKeys, denseKeys, minFillRate, null, null);
+    return config(minFillRate, maxDenseKeys, denseKeys, false);
+  }
+
+  private OpenStructIndexConfig config(double minFillRate, int maxDenseKeys, Set<String> denseKeys,
+      boolean perKeyDocCountEnabled) {
+    return new OpenStructIndexConfig(false, null, maxDenseKeys, denseKeys, minFillRate, null, null,
+        perKeyDocCountEnabled);
   }
 
   @Test
@@ -645,16 +651,13 @@ public class OpenStructColumnSplitterTest {
     }
   }
 
-  /// The per-key gauge follows the ingested key space, not `denseKeys`: with no keys configured at all,
-  /// every key discovered in the segment still reports its doc count. Knowing the fill rate of a key that
-  /// is not configured is the point -- that is how an operator decides to configure it.
+  /// Default: flag off, no configured denseKeys → no per-key gauge at all.
   @Test
-  public void testPerKeyGaugeCoversDiscoveredKeysWithNoDenseKeysConfigured()
+  public void testPerKeyGaugeOffByDefaultWithNoDenseKeys()
       throws Exception {
     ServerMetrics metrics = mock(ServerMetrics.class);
     assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
     try {
-      // No configured denseKeys: both keys resolve dense from the data alone (100% fill >= 0.5).
       OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
           config(0.5, -1, null));
       for (int d = 0; d < 10; d++) {
@@ -663,36 +666,34 @@ public class OpenStructColumnSplitterTest {
       s.classify();
       s.seal();
 
-      for (String key : List.of("host", "clicks")) {
-        verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", OpenStructNaming.metricKey("metrics", key),
-            ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT, 10L);
-      }
+      verify(metrics, never()).setOrUpdateTableGauge(anyString(), anyString(),
+          eq(ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT), anyLong());
+      // Column-level gauges still emit.
       verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", "metrics",
           ServerGauge.OPEN_STRUCT_LAST_SEGMENT_DENSE_KEY_COUNT, 2L);
-      verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", "metrics",
-          ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_COUNT, 2L);
     } finally {
       ServerMetrics.deregister();
     }
   }
 
-  /// A sparse key reports too. It has no materialized column, which is why the emission path keys the
-  /// gauge on `metricKey` rather than on a column name.
+  /// Flag on: every discovered key emits, including sparse ones.
   @Test
-  public void testPerKeyGaugeCoversSparseKeys()
+  public void testPerKeyGaugeCoversAllKeysWhenEnabled()
       throws Exception {
     ServerMetrics metrics = mock(ServerMetrics.class);
     assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
     try {
       OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
-          config(0.5, -1, null));
-      // 'host' fills every doc and goes dense; 'rare' fills 2 of 10 (20% < 50%) and goes sparse.
+          config(0.5, -1, null, true));
+      // 'host' fills every doc (dense); 'rare' fills 2 of 10 (sparse).
       for (int d = 0; d < 10; d++) {
         s.add(d < 2 ? Map.of("host", "h", "rare", (long) d) : Map.of("host", "h"), d);
       }
-      assertEquals(s.classify(), Set.of("host"));
+      s.classify();
       s.seal();
 
+      verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", OpenStructNaming.metricKey("metrics", "host"),
+          ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT, 10L);
       verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", OpenStructNaming.metricKey("metrics", "rare"),
           ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT, 2L);
       verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", "metrics",
@@ -741,7 +742,7 @@ public class OpenStructColumnSplitterTest {
     assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
     try {
       OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
-          config(0.5, -1, Set.of("never-ingested")));
+          config(0.5, -1, Set.of("host", "never-ingested")));
       for (int d = 0; d < 10; d++) {
         s.add(Map.of("host", "h"), d);
       }
@@ -751,8 +752,8 @@ public class OpenStructColumnSplitterTest {
       verify(metrics, never()).setOrUpdateTableGauge(
           eq("testTable_OFFLINE"), eq(OpenStructNaming.metricKey("metrics", "never-ingested")),
           eq(ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT), anyLong());
-      // The key that was ingested still reports, so the assertion above is about absence, not about
-      // the gauge being off entirely.
+      // The configured key that was ingested still reports, so the assertion above is about
+      // absence, not about the gauge being off entirely.
       verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", OpenStructNaming.metricKey("metrics", "host"),
           ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT, 10L);
     } finally {

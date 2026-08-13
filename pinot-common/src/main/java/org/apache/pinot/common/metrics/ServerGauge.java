@@ -181,9 +181,8 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   OPEN_STRUCT_LAST_SEGMENT_DOC_COUNT("documents", false,
       "Total docs in the most recently sealed segment for this OPEN_STRUCT column; denominator for "
           + "openStructLastSegmentKeyDocCount"),
-  /// Emitted for every key seen in the segment, so the number of registry entries this mints follows the
-  /// ingested key space rather than the table config. A high-cardinality key will accumulate entries that
-  /// only a server restart clears -- table deletion sweeps just the keys recoverable from `denseKeys`.
+  /// When `perKeyDocCountEnabled` is false (default), emitted only for keys named in `denseKeys`. When
+  /// true, emitted for every key in the sealed segment — registry entries follow the ingested key space.
   /// See `OpenStructColumnSplitter#emitMetrics`.
   OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT("documents", false,
       "Docs in which an OPEN_STRUCT key was present in the most recently sealed segment; "

@@ -237,14 +237,10 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     }
   }
 
-  /// The `<column>$<key>` metric keys of the per-key OPEN_STRUCT gauges that are recoverable from the
-  /// given table's config -- one per configured `denseKeys` entry.
-  ///
-  /// This is a subset of what was actually emitted: the gauge fires for every key seen in a segment
-  /// (see `OpenStructColumnSplitter#emitMetrics`), and a discovered key exists only in ingested data,
-  /// so nothing at deletion time can name it. Those gauges, and any whose key was dropped from
-  /// `denseKeys` after a segment emitted it, survive until the server restarts. Closing the gap needs
-  /// the emitted key names tracked at emit time rather than re-derived here.
+  /// The `<column>$<key>` metric keys of the per-key OPEN_STRUCT gauges recoverable from the given
+  /// table's config — one per configured `denseKeys` entry. Complete when `perKeyDocCountEnabled` is
+  /// off; a subset when on, since discovered keys exist only in ingested data and cannot be named at
+  /// deletion time. Gauges for discovered keys survive until the server restarts.
   @VisibleForTesting
   static List<String> openStructMetricKeys(TableConfig tableConfig, Schema schema) {
     List<String> metricKeys = new ArrayList<>();
