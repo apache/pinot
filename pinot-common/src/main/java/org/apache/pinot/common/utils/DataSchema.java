@@ -43,6 +43,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.type.SqlTypeName;
@@ -1167,6 +1168,11 @@ public class DataSchema {
         default:
           throw new IllegalStateException("Cannot convert ColumnDataType: " + this + " to PinotDataType");
       }
+    }
+
+    @Nullable
+    public static ColumnDataType get(String typeName) {
+      return NAME_TO_TYPES.get(typeName);
     }
 
     public static boolean isArray(String typeName) {
