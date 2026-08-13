@@ -30,6 +30,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.MapUtils;
+import org.apache.pinot.spi.utils.MapUtils.PreparedMapKey;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
 
@@ -464,6 +465,25 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
     throw new UnsupportedOperationException("This ForwardIndexReader does not support MAP types. "
         + "This indicates that either the column is getting mistyped or the wrong "
         + "ForwardIndexReader is being created to read this column.");
+  }
+
+  /// Reads a value for a key from a MAP type single-value column at the given document id.
+  /// Implementations can override this method to avoid deserializing the entire map when only one key is needed.
+  ///
+  /// @param docId Document id
+  /// @param context Reader context
+  /// @param key Map key
+  /// @return Value for the key, or `null` if the key is missing or its value is null
+  @Nullable
+  default Object getMapEntryValue(int docId, T context, String key) {
+    return getMapEntryValue(docId, context, new PreparedMapKey(key));
+  }
+
+  /// Variant of [#getMapEntryValue(int, ForwardIndexReaderContext, String)] that reuses a pre-encoded MAP key.
+  /// Implementations can override this method to avoid repeated key encoding as well as full-map deserialization.
+  @Nullable
+  default Object getMapEntryValue(int docId, T context, PreparedMapKey key) {
+    return getMap(docId, context).get(key.getKey());
   }
 
   default int get32BitsMurmur3Hash(int docId, T context) {

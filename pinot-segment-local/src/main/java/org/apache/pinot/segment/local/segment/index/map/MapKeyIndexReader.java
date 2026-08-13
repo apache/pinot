@@ -20,23 +20,23 @@ package org.apache.pinot.segment.local.segment.index.map;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.MapUtils.PreparedMapKey;
 
 
 public class MapKeyIndexReader implements ForwardIndexReader {
   private final ForwardIndexReader _forwardIndexReader;
   private final FieldSpec _keyFieldSpec;
-  private final String _keyName;
+  private final PreparedMapKey _mapKey;
   private final Object _defaultNullValue;
 
   public MapKeyIndexReader(ForwardIndexReader forwardIndexReader, String keyName, FieldSpec keyFieldSpec) {
     _forwardIndexReader = forwardIndexReader;
-    _keyName = keyName;
+    _mapKey = new PreparedMapKey(keyName);
     _keyFieldSpec = keyFieldSpec;
     _defaultNullValue = keyFieldSpec.getDefaultNullValue();
   }
@@ -58,42 +58,41 @@ public class MapKeyIndexReader implements ForwardIndexReader {
 
   @Override
   public int getInt(int docId, ForwardIndexReaderContext context) {
-    return Integer.parseInt(extractMapValue(docId, context, _keyName).toString());
+    return Integer.parseInt(extractMapValue(docId, context).toString());
   }
 
   @Override
   public long getLong(int docId, ForwardIndexReaderContext context) {
-    return Long.parseLong(extractMapValue(docId, context, _keyName).toString());
+    return Long.parseLong(extractMapValue(docId, context).toString());
   }
 
   @Override
   public float getFloat(int docId, ForwardIndexReaderContext context) {
-    return Float.parseFloat(extractMapValue(docId, context, _keyName).toString());
+    return Float.parseFloat(extractMapValue(docId, context).toString());
   }
 
   @Override
   public double getDouble(int docId, ForwardIndexReaderContext context) {
-    return Double.parseDouble(extractMapValue(docId, context, _keyName).toString());
+    return Double.parseDouble(extractMapValue(docId, context).toString());
   }
 
   @Override
   public String getString(int docId, ForwardIndexReaderContext context) {
-    return extractMapValue(docId, context, _keyName).toString();
+    return extractMapValue(docId, context).toString();
   }
 
   @Override
   public byte[] getBytes(int docId, ForwardIndexReaderContext context) {
-    return (byte[]) extractMapValue(docId, context, _keyName);
+    return (byte[]) extractMapValue(docId, context);
   }
 
   @Override
   public BigDecimal getBigDecimal(int docId, ForwardIndexReaderContext context) {
-    return BigDecimalUtils.deserialize((byte[]) extractMapValue(docId, context, _keyName));
+    return BigDecimalUtils.deserialize((byte[]) extractMapValue(docId, context));
   }
 
-  private Object extractMapValue(int docId, ForwardIndexReaderContext context, String key) {
-    Map map = _forwardIndexReader.getMap(docId, context);
-    Object object = map.get(key);
+  private Object extractMapValue(int docId, ForwardIndexReaderContext context) {
+    Object object = _forwardIndexReader.getMapEntryValue(docId, context, _mapKey);
     if (object == null) {
       return _defaultNullValue;
     }
