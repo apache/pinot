@@ -304,7 +304,9 @@ public class JsonFunctions {
 
   /// **Experimental.** Fory-backed variant of [#jsonPathString(Object, String, String)]. Fory parses JSON strings
   /// for simple paths; unsupported inputs and parse failures fall back to Jayway. This function can change or be
-  /// removed while the Fory integration is evaluated and must be explicitly selected by name.
+  /// removed while the Fory integration is evaluated and must be explicitly selected by name. The optional
+  /// `org.apache.fory:fory-json:1.6.0` runtime must be on the application classpath to activate Fory; otherwise this
+  /// function uses Jayway.
   @ScalarFunction(nullableParameters = true)
   public static String jsonPathStringFory(@Nullable Object object, String jsonPath, String defaultValue) {
     if (!canExtractJsonPath(object)) {
@@ -394,6 +396,7 @@ public class JsonFunctions {
 
   /// **Experimental.** Fory-backed variant of [#jsonPathLong(Object, String, long)]. Unsupported inputs and parse
   /// failures fall back to Jayway. This function can change or be removed while the Fory integration is evaluated.
+  /// The optional `org.apache.fory:fory-json:1.6.0` runtime must be on the application classpath to activate Fory.
   @ScalarFunction(nullableParameters = true)
   public static long jsonPathLongFory(@Nullable Object object, String jsonPath, long defaultValue) {
     if (!canExtractJsonPath(object)) {
@@ -482,7 +485,8 @@ public class JsonFunctions {
 
   /// **Experimental.** Fory-backed variant of [#jsonPathDouble(Object, String, double)]. Unsupported inputs and
   /// parse failures fall back to Jayway. This function can change or be removed while the Fory integration is
-  /// evaluated.
+  /// evaluated. The optional `org.apache.fory:fory-json:1.6.0` runtime must be on the application classpath to
+  /// activate Fory.
   @ScalarFunction(nullableParameters = true)
   public static double jsonPathDoubleFory(@Nullable Object object, String jsonPath, double defaultValue) {
     if (!canExtractJsonPath(object)) {

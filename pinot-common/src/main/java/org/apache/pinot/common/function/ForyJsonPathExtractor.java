@@ -38,8 +38,8 @@ import org.slf4j.LoggerFactory;
 /// Streaming extraction uses one bounded parser pool shared by all worker threads. Initialization or runtime linkage
 /// failures permanently disable the optional path, allowing callers to fall back to Jackson/Jayway. Jackson's
 /// document, token, nesting, field-name, string, and number constraints are enforced while walking the document.
-/// The Fory runtime is an optional dependency; applications must add it to the application classpath to enable this
-/// experimental path.
+/// The Fory runtime is an optional dependency; applications must add `org.apache.fory:fory-json:1.6.0` (and its
+/// transitive `fory-core` dependency) to the application classpath to enable this experimental path.
 public final class ForyJsonPathExtractor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ForyJsonPathExtractor.class);
   private static final StreamReadConstraints JACKSON_CONSTRAINTS = StreamReadConstraints.defaults();
