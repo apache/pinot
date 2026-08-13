@@ -85,6 +85,11 @@ public interface ColumnMetadata extends ColumnShape {
   /// index does not update them, so a caller that needs the current packed layout should use [#getIndexSizeFor]
   /// instead. Distinct from [#getIndexSizeFor] precisely because that one reflects the live layout while this one
   /// survives without the segment being loaded, which is what lets cold-tier segments be reported.
+  ///
+  /// Not serialized: [SegmentMetadataImpl#toJson] writes every `ColumnMetadata` through a mapper with no
+  /// non-empty inclusion rule, so without this the field would appear on every column of every segment even with
+  /// the feature disabled. Matches the other size accessors on this interface.
+  @JsonIgnore
   default Map<String, Long> getPersistedIndexSizesInBytes() {
     return Map.of();
   }
