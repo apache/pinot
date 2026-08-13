@@ -463,4 +463,40 @@ public class IndexSizeStatsTest {
         && f.getName().contains(".index"));
     return candidates == null || candidates.length == 0 ? null : candidates[0];
   }
+
+  /// Spec 13 must not lose sizes that `index_map` cannot describe. External text/vector directories are never in
+  /// `index_map`, and a V1/V2 segment has no `index_map` at all, so a refresh driven only by `getIndexSizeFor()`
+  /// clears those keys and never restores them — deleting data rather than refreshing it.
+  @Test
+  public void testReloadPreservesExternalAndV1Sizes()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(List.of("column4"))
+        .setIndexSizeStatsEnabled(true)
+        .addFieldConfig(
+            new FieldConfig("column4", FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT), null, null))
+        .build();
+    URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
+    assertNotNull(resource);
+    SegmentGeneratorConfig config =
+        SegmentTestUtils.getSegmentGeneratorConfig(new File(TestUtils.getFileFromResourceUrl(resource)),
+            FileFormat.AVRO, INDEX_DIR, RAW_TABLE_NAME, tableConfig, schema());
+    config.setSegmentNamePostfix("1");
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config);
+    driver.build();
+    File segmentDir = segmentDirectory();
+
+    String textKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column4", StandardIndexes.text().getId());
+    assertTrue(indexSizeKeys(loadMetadata(segmentDir)).contains(textKey), "Sanity: seal recorded the text index size");
+    long atSeal = loadMetadata(segmentDir).getLong(textKey);
+
+    runPreProcessor(segmentDir, tableConfig, schema());
+
+    PropertiesConfiguration afterReload = loadMetadata(segmentDir);
+    assertTrue(indexSizeKeys(afterReload).contains(textKey),
+        "A reload must not delete the external text index size; keys were: " + indexSizeKeys(afterReload));
+    assertEquals(afterReload.getLong(textKey), atSeal,
+        "The external directory size should be re-measured to the same value");
+  }
 }
