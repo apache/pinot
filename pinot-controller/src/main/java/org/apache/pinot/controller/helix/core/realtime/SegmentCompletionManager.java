@@ -157,7 +157,7 @@ public class SegmentCompletionManager {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String instanceId = reqParams.getInstanceId();
-    final String stopReason = reqParams.getReason();
+    final SegmentCompletionProtocol.ReasonCode stopReasonCode = reqParams.getReasonCode();
     final StreamPartitionMsgOffsetFactory factory = getStreamPartitionMsgOffsetFactory(segmentName);
     final StreamPartitionMsgOffset offset = factory.create(reqParams.getStreamPartitionMsgOffset());
 
@@ -165,7 +165,7 @@ public class SegmentCompletionManager {
     SegmentCompletionFSM fsm = null;
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_CONSUMED);
-      response = fsm.segmentConsumed(instanceId, offset, stopReason);
+      response = fsm.segmentConsumed(instanceId, offset, stopReasonCode);
     } catch (Exception e) {
       LOGGER.error("Caught exception in segmentConsumed for segment {}", segmentNameStr, e);
     }

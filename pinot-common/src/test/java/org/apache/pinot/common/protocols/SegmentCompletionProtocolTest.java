@@ -47,6 +47,7 @@ public class SegmentCompletionProtocolTest {
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_SEGMENT_NAME), "UNKNOWN_SEGMENT");
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_INSTANCE_ID), "UNKNOWN_INSTANCE");
     Assert.assertNull(paramsMap.get(SegmentCompletionProtocol.PARAM_REASON));
+    Assert.assertNull(paramsMap.get(SegmentCompletionProtocol.PARAM_REASON_CODE));
     Assert.assertNull(paramsMap.get(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS));
     Assert.assertNull(paramsMap.get(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS));
     Assert.assertNull(paramsMap.get(SegmentCompletionProtocol.PARAM_EXTRA_TIME_SEC));
@@ -69,6 +70,7 @@ public class SegmentCompletionProtocolTest {
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_SEGMENT_NAME), "foo__0__0__12345Z");
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_INSTANCE_ID), "Server_localhost_8099");
     Assert.assertNull(paramsMap.get(SegmentCompletionProtocol.PARAM_REASON));
+    Assert.assertNull(paramsMap.get(SegmentCompletionProtocol.PARAM_REASON_CODE));
     Assert.assertNull(paramsMap.get(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS));
     Assert.assertNull(paramsMap.get(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS));
     Assert.assertNull(paramsMap.get(SegmentCompletionProtocol.PARAM_EXTRA_TIME_SEC));
@@ -79,7 +81,8 @@ public class SegmentCompletionProtocolTest {
     Assert.assertNull(paramsMap.get(SegmentCompletionProtocol.PARAM_STREAM_PARTITION_MSG_OFFSET));
 
     params = new SegmentCompletionProtocol.Request.Params().withSegmentName("foo__0__0__12345Z")
-        .withInstanceId("Server_localhost_8099").withReason("ROW_LIMIT").withBuildTimeMillis(1000)
+        .withInstanceId("Server_localhost_8099").withReason(SegmentCompletionProtocol.REASON_ROW_LIMIT)
+        .withBuildTimeMillis(1000)
         .withWaitTimeMillis(2000).withExtraTimeSec(3000).withMemoryUsedBytes(4000).withSegmentSizeBytes(5000)
         .withNumRows(6000).withSegmentLocation("/tmp/segment").withStreamPartitionMsgOffset("7000");
     SegmentCompletionProtocol.SegmentCommitStartRequest commitStartRequestWithAllParams =
@@ -89,7 +92,10 @@ public class SegmentCompletionProtocolTest {
         Arrays.stream(uri.getQuery().split("&")).collect(Collectors.toMap(e -> e.split("=")[0], e -> e.split("=")[1]));
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_SEGMENT_NAME), "foo__0__0__12345Z");
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_INSTANCE_ID), "Server_localhost_8099");
-    Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_REASON), "ROW_LIMIT");
+    Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_REASON),
+        SegmentCompletionProtocol.REASON_ROW_LIMIT);
+    Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_REASON_CODE),
+        SegmentCompletionProtocol.ReasonCode.ROW_LIMIT.name());
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS), "1000");
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS), "2000");
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_EXTRA_TIME_SEC), "3000");
@@ -122,6 +128,7 @@ public class SegmentCompletionProtocolTest {
         URIUtils.encode("Server_localhost_8099"));
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_REASON),
         "%7B%22type%22%3A%22ROW_LIMIT%22%2C%20%22value%22%3A1000%7D");
+    Assert.assertNull(paramsMap.get(SegmentCompletionProtocol.PARAM_REASON_CODE));
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS), "1000");
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS), "2000");
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_EXTRA_TIME_SEC), "3000");
@@ -132,5 +139,27 @@ public class SegmentCompletionProtocolTest {
         URIUtils.encode("s3://my.bucket/segment"));
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_STREAM_PARTITION_MSG_OFFSET),
         URIUtils.encode("{\"shardId-000000000001\":\"49615238429973311938200772279310862572716999467690098706\"}"));
+  }
+
+  @Test
+  public void testReasonCodeCompatibility() {
+    SegmentCompletionProtocol.Request.Params params =
+        new SegmentCompletionProtocol.Request.Params().withReasonCode(SegmentCompletionProtocol.ReasonCode.TIME_LIMIT);
+    Assert.assertEquals(params.getReason(), SegmentCompletionProtocol.REASON_TIME_LIMIT);
+    Assert.assertEquals(params.getReasonCode(), SegmentCompletionProtocol.ReasonCode.TIME_LIMIT);
+
+    params = new SegmentCompletionProtocol.Request.Params().withReason("customReason")
+        .withReasonCode(SegmentCompletionProtocol.ReasonCode.ROW_LIMIT);
+    Assert.assertEquals(params.getReason(), "customReason");
+    Assert.assertEquals(params.getReasonCode(), SegmentCompletionProtocol.ReasonCode.ROW_LIMIT);
+
+    params = new SegmentCompletionProtocol.Request.Params().withReason(SegmentCompletionProtocol.REASON_ROW_LIMIT)
+        .withReasonCode("FUTURE_REASON_CODE");
+    Assert.assertEquals(params.getReason(), SegmentCompletionProtocol.REASON_ROW_LIMIT);
+    Assert.assertEquals(params.getReasonCode(), SegmentCompletionProtocol.ReasonCode.ROW_LIMIT);
+
+    params = new SegmentCompletionProtocol.Request.Params().withReasonCode("FUTURE_REASON_CODE");
+    Assert.assertNull(params.getReason());
+    Assert.assertNull(params.getReasonCode());
   }
 }

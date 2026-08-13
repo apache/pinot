@@ -129,6 +129,7 @@ public class SegmentCompletionProtocol {
   public static final String PARAM_MEMORY_USED_BYTES = "memoryUsedBytes";
   public static final String PARAM_SEGMENT_SIZE_BYTES = "segmentSizeBytes";
   public static final String PARAM_REASON = "reason";
+  public static final String PARAM_REASON_CODE = "reasonCode";
   // Sent by servers to request additional time to build
   public static final String PARAM_EXTRA_TIME_SEC = "extraTimeSec";
   // Sent by servers to indicate the number of rows read so far
@@ -149,6 +150,52 @@ public class SegmentCompletionProtocol {
   // Stop reason sent by server as mutable index cannot consume more rows
   // (like size reaching close to its limit or number of col values for a col is about to overflow int max)
   public static final String REASON_INDEX_CAPACITY_THRESHOLD_BREACHED = "indexCapacityThresholdBreached";
+
+  public enum ReasonCode {
+    ROW_LIMIT(REASON_ROW_LIMIT),
+    TIME_LIMIT(REASON_TIME_LIMIT),
+    END_OF_PARTITION_GROUP(REASON_END_OF_PARTITION_GROUP),
+    FORCE_COMMIT_MESSAGE_RECEIVED(REASON_FORCE_COMMIT_MESSAGE_RECEIVED),
+    INDEX_CAPACITY_THRESHOLD_BREACHED(REASON_INDEX_CAPACITY_THRESHOLD_BREACHED);
+
+    private final String _reason;
+
+    ReasonCode(String reason) {
+      _reason = reason;
+    }
+
+    public String getReason() {
+      return _reason;
+    }
+
+    public boolean shouldPickWinnerImmediately() {
+      return this == ROW_LIMIT || this == END_OF_PARTITION_GROUP;
+    }
+
+    public static ReasonCode fromCode(String reasonCode) {
+      if (reasonCode == null) {
+        return null;
+      }
+      for (ReasonCode value : values()) {
+        if (value.name().equals(reasonCode) || value.getReason().equals(reasonCode)) {
+          return value;
+        }
+      }
+      return null;
+    }
+
+    public static ReasonCode fromReason(String reason) {
+      if (reason == null) {
+        return null;
+      }
+      for (ReasonCode value : values()) {
+        if (value.getReason().equals(reason)) {
+          return value;
+        }
+      }
+      return null;
+    }
+  }
 
   // Canned responses
   public static final Response RESP_NOT_LEADER =
@@ -201,6 +248,9 @@ public class SegmentCompletionProtocol {
       if (_params.getReason() != null) {
         params.put(PARAM_REASON, _params.getReason());
       }
+      if (_params.getReasonCode() != null) {
+        params.put(PARAM_REASON_CODE, _params.getReasonCode().name());
+      }
       if (_params.getBuildTimeMillis() > 0) {
         params.put(PARAM_BUILD_TIME_MILLIS, String.valueOf(_params.getBuildTimeMillis()));
       }
@@ -232,6 +282,7 @@ public class SegmentCompletionProtocol {
       private String _segmentName;
       private String _instanceId;
       private String _reason;
+      private ReasonCode _reasonCode;
       private int _numRows;
       private long _buildTimeMillis;
       private long _waitTimeMillis;
@@ -253,6 +304,7 @@ public class SegmentCompletionProtocol {
         _segmentSizeBytes = SEGMENT_SIZE_BYTES_DEFAULT;
         _streamPartitionMsgOffset = null;
         _reason = null;
+        _reasonCode = null;
       }
 
       public Params(Params params) {
@@ -267,6 +319,7 @@ public class SegmentCompletionProtocol {
         _segmentSizeBytes = params.getSegmentSizeBytes();
         _streamPartitionMsgOffset = params.getStreamPartitionMsgOffset();
         _reason = params.getReason();
+        _reasonCode = params.getReasonCode();
       }
 
       public Params withSegmentName(String segmentName) {
@@ -281,6 +334,23 @@ public class SegmentCompletionProtocol {
 
       public Params withReason(String reason) {
         _reason = reason;
+        _reasonCode = ReasonCode.fromReason(reason);
+        return this;
+      }
+
+      public Params withReasonCode(String reasonCode) {
+        ReasonCode parsedReasonCode = ReasonCode.fromCode(reasonCode);
+        if (parsedReasonCode != null) {
+          return withReasonCode(parsedReasonCode);
+        }
+        return this;
+      }
+
+      public Params withReasonCode(ReasonCode reasonCode) {
+        _reasonCode = reasonCode;
+        if (reasonCode != null && _reason == null) {
+          _reason = reasonCode.getReason();
+        }
         return this;
       }
 
@@ -332,6 +402,10 @@ public class SegmentCompletionProtocol {
         return _reason;
       }
 
+      public ReasonCode getReasonCode() {
+        return _reasonCode;
+      }
+
       public String getInstanceId() {
         return _instanceId;
       }
@@ -372,6 +446,7 @@ public class SegmentCompletionProtocol {
         return "Segment name: " + _segmentName
             + ",Instance Id: " + _instanceId
             + ",Reason: " + _reason
+            + ",ReasonCode: " + _reasonCode
             + ",NumRows: " + _numRows
             + ",BuildTimeMillis: " + _buildTimeMillis
             + ",WaitTimeMillis: " + _waitTimeMillis

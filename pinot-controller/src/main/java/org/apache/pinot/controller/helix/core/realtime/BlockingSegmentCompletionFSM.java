@@ -200,7 +200,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
    */
   @Override
   public SegmentCompletionProtocol.Response segmentConsumed(String instanceId, StreamPartitionMsgOffset offset,
-      final String stopReason) {
+      final SegmentCompletionProtocol.ReasonCode stopReasonCode) {
     final long now = _segmentCompletionManager.getCurrentTimeMs();
     // We can synchronize the entire block for the SegmentConsumed message.
     synchronized (this) {
@@ -214,10 +214,10 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
       _commitStateMap.put(instanceId, offset);
       switch (_state) {
         case PARTIAL_CONSUMING:
-          return partialConsumingConsumed(instanceId, offset, now, stopReason);
+          return partialConsumingConsumed(instanceId, offset, now, stopReasonCode);
 
         case HOLDING:
-          return holdingConsumed(instanceId, offset, now, stopReason);
+          return holdingConsumed(instanceId, offset, now, stopReasonCode);
 
         case COMMITTER_DECIDED: // This must be a retransmit
           return committerDecidedConsumed(instanceId, offset, now);
@@ -466,12 +466,12 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
   }
 
   private SegmentCompletionProtocol.Response partialConsumingConsumed(String instanceId,
-      StreamPartitionMsgOffset offset, long now, final String stopReason) {
+      StreamPartitionMsgOffset offset, long now, final SegmentCompletionProtocol.ReasonCode stopReasonCode) {
     // This is the first time we are getting segmentConsumed() for this segment.
     // Some instance thinks we can close this segment, so go to HOLDING state, and process as normal.
     // We will just be looking for less replicas.
     _state = BlockingSegmentCompletionFSMState.HOLDING;
-    return holdingConsumed(instanceId, offset, now, stopReason);
+    return holdingConsumed(instanceId, offset, now, stopReasonCode);
   }
 
   /*
@@ -502,11 +502,11 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
    * If we can go to COMMITTER_NOTIFIED then we respond with a COMMIT message, otherwise with a HOLD message.
    */
   private SegmentCompletionProtocol.Response holdingConsumed(String instanceId, StreamPartitionMsgOffset offset,
-      long now, final String stopReason) {
+      long now, final SegmentCompletionProtocol.ReasonCode stopReasonCode) {
     SegmentCompletionProtocol.Response response;
     // If we are past the max time to pick a winner, or we have heard from all replicas,
     // we are ready to pick a winner.
-    if (isWinnerPicked(instanceId, now, stopReason)) {
+    if (isWinnerPicked(instanceId, now, stopReasonCode)) {
       if (_winner.equals(instanceId)) {
         _logger.info("{}:Committer notified winner instance={} offset={}", _state, instanceId, offset);
         response = commit(instanceId, offset);
@@ -895,12 +895,11 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
   ///
   /// @param preferredInstance The instance that is reporting in this thread.
   /// @param now current time
-  /// @param stopReason reason reported by instance for stopping consumption.
+  /// @param stopReasonCode reason code reported by instance for stopping consumption.
   /// @return true if winner picked, false otherwise.
-  private boolean isWinnerPicked(String preferredInstance, long now, final String stopReason) {
-    if ((SegmentCompletionProtocol.REASON_ROW_LIMIT.equals(stopReason)
-        || SegmentCompletionProtocol.REASON_END_OF_PARTITION_GROUP.equals(stopReason))
-        && _commitStateMap.size() == 1) {
+  private boolean isWinnerPicked(String preferredInstance, long now,
+      final SegmentCompletionProtocol.ReasonCode stopReasonCode) {
+    if (stopReasonCode != null && stopReasonCode.shouldPickWinnerImmediately() && _commitStateMap.size() == 1) {
       _winner = preferredInstance;
       _winningOffset = _commitStateMap.get(preferredInstance);
       return true;

@@ -68,10 +68,10 @@ public interface SegmentCompletionFSM {
   ///
   /// @param instanceId The ID of the server instance reporting consumption.
   /// @param offset The offset up to which the server has consumed.
-  /// @param stopReason The reason the server stopped consuming (e.g., row limit or end of partition).
+  /// @param stopReasonCode The reason code the server stopped consuming with (e.g., row limit or end of partition).
   /// @return A response indicating the next action for the server (e.g., HOLD, CATCHUP, or COMMIT).
   SegmentCompletionProtocol.Response segmentConsumed(String instanceId, StreamPartitionMsgOffset offset,
-      String stopReason);
+      SegmentCompletionProtocol.ReasonCode stopReasonCode);
 
   /// Processes the start of a segment commit from a server.
   ///

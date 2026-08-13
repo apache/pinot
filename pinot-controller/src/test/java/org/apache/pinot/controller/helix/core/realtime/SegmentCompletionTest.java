@@ -590,6 +590,44 @@ public class SegmentCompletionTest {
   }
 
   @Test
+  public void testWinnerOnRowLimitReasonCodeOverridesLegacyReason() {
+    SegmentCompletionProtocol.Response response;
+    Request.Params params;
+    _segmentCompletionMgr._seconds = 10L;
+    params = new Request.Params().withInstanceId(S_1).withStreamPartitionMsgOffset(_s1Offset.toString())
+        .withSegmentName(_segmentNameStr)
+        .withReason("unknownReason")
+        .withReasonCode(SegmentCompletionProtocol.ReasonCode.ROW_LIMIT);
+    response = _segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
+  }
+
+  @Test
+  public void testUnknownReasonCodeFallsBackToLegacyReason() {
+    SegmentCompletionProtocol.Response response;
+    Request.Params params;
+    _segmentCompletionMgr._seconds = 10L;
+    params = new Request.Params().withInstanceId(S_1).withStreamPartitionMsgOffset(_s1Offset.toString())
+        .withSegmentName(_segmentNameStr)
+        .withReason(SegmentCompletionProtocol.REASON_ROW_LIMIT)
+        .withReasonCode("FUTURE_REASON_CODE");
+    response = _segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
+  }
+
+  @Test
+  public void testUnknownReasonCodeWithoutLegacyReason() {
+    SegmentCompletionProtocol.Response response;
+    Request.Params params;
+    _segmentCompletionMgr._seconds = 10L;
+    params = new Request.Params().withInstanceId(S_1).withStreamPartitionMsgOffset(_s1Offset.toString())
+        .withSegmentName(_segmentNameStr)
+        .withReasonCode("FUTURE_REASON_CODE");
+    response = _segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
+  }
+
+  @Test
   public void testWinnerOnForceCommit() {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
