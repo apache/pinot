@@ -2340,8 +2340,8 @@ public class TableConfigUtilsTest {
   @Test
   public void testValidateStarTreeIndexWithTimestampIndexDerivedColumns() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addDateTime("OrderDate", FieldSpec.DataType.TIMESTAMP, "TIMESTAMP", "1:MILLISECONDS")
-        .addMetric("value", FieldSpec.DataType.LONG)
+        .addDateTime("OrderDate", DataType.TIMESTAMP, "TIMESTAMP", "1:MILLISECONDS")
+        .addMetric("value", DataType.LONG)
         .build();
 
     // Derived TIMESTAMP-index columns ($OrderDate$DAY, ...) are declared via TimestampConfig granularities and are
