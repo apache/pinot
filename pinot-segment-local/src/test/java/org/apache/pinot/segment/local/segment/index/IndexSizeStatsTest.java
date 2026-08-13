@@ -23,6 +23,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
@@ -52,6 +53,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -107,7 +109,15 @@ public class IndexSizeStatsTest {
 
   private File buildSegment(Boolean indexSizeStatsEnabled)
       throws Exception {
+    return buildSegment(indexSizeStatsEnabled, null);
+  }
+
+  private File buildSegment(Boolean indexSizeStatsEnabled, @Nullable SegmentVersion segmentVersion)
+      throws Exception {
     SegmentGeneratorConfig config = createSegmentConfig(indexSizeStatsEnabled);
+    if (segmentVersion != null) {
+      config.setSegmentVersion(segmentVersion);
+    }
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     driver.build();
@@ -157,10 +167,18 @@ public class IndexSizeStatsTest {
   /// magic marker and records `payload + 8` as the entry size (`entry._size = size + MAGIC_MARKER_SIZE_BYTES`), so
   /// segment creation adds the same constant for V3 file-backed indexes. This assertion therefore pins both the
   /// collection logic and that format detail.
-  @Test
-  public void testEnabledPersistsSizeForEveryPackedIndex()
+  /// Both `v2` and `v3` are packed into `columns.psf` by the converter, so both need the magic marker added.
+  /// Gating the marker on `== v3` instead of `!= v1` under-reports every v2 index by 8 bytes per entry, and without
+  /// this data provider every other test still passes.
+  @DataProvider(name = "packedVersions")
+  public static Object[][] packedVersions() {
+    return new Object[][]{{SegmentVersion.v2}, {SegmentVersion.v3}};
+  }
+
+  @Test(dataProvider = "packedVersions")
+  public void testEnabledPersistsSizeForEveryPackedIndex(SegmentVersion segmentVersion)
       throws Exception {
-    File segmentDir = buildSegment(true);
+    File segmentDir = buildSegment(true, segmentVersion);
     PropertiesConfiguration metadata = loadMetadata(segmentDir);
     List<String> keys = indexSizeKeys(metadata);
     assertFalse(keys.isEmpty(), "Expected indexSize keys to be persisted when enabled");
