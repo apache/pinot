@@ -22,6 +22,7 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.ResultSetMetaData;
+import java.sql.SQLDataException;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
@@ -136,6 +137,22 @@ public class PinotResultSetTest {
         "float", 1.25d,
         "decimal", 2.5d,
         "nested", Map.of("values", List.of(2, 3.5d))));
+  }
+
+  @Test
+  public void testGetObjectErrors()
+      throws Exception {
+    PinotResultSet resultSet = PinotResultSet.fromJson("{\"resultTable\":{"
+        + "\"dataSchema\":{\"columnNames\":[\"map\",\"bytes\",\"timestamp\",\"decimal\",\"unknown\"],"
+        + "\"columnDataTypes\":[\"MAP\",\"BYTES\",\"TIMESTAMP\",\"BIG_DECIMAL\",\"UNKNOWN\"]},"
+        + "\"rows\":[[\"not-json\",\"zz\",\"not-a-timestamp\",\"not-a-decimal\",\"value\"]]}}");
+
+    Assert.assertTrue(resultSet.next());
+    Assert.expectThrows(SQLDataException.class, () -> resultSet.getObject(1));
+    Assert.expectThrows(SQLDataException.class, () -> resultSet.getObject(2));
+    Assert.expectThrows(SQLDataException.class, () -> resultSet.getObject(3));
+    Assert.expectThrows(SQLDataException.class, () -> resultSet.getObject(4));
+    Assert.expectThrows(SQLDataException.class, () -> resultSet.getObject(5));
   }
 
   @Test
