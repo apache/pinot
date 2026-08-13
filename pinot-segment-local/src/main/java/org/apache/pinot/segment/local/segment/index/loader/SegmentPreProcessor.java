@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
@@ -39,6 +40,7 @@ import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexService;
@@ -54,6 +56,7 @@ import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -184,10 +187,75 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
       // Create/modify/remove multi-col text index if required.
       if (processMultiColTextIndex(indexDir, segmentWriter, segmentOperationsThrottlerSet)) {
-        // NOTE: When adding new steps after this, un-comment the next line.
-        //_segmentDirectory.reloadMetadata();
+        _segmentDirectory.reloadMetadata();
         segmentWriter.save();
       }
+    }
+
+    // Every index handler has finished, so the on-disk layout is final: refresh the persisted per-index sizes.
+    refreshPersistedIndexSizes(indexDir);
+  }
+
+  /// Rewrites the `column.<column>.indexSizeInBytes.<indexTypeId>` entries in `metadata.properties` to match the
+  /// layout the handlers have just produced, and clears entries for indexes that no longer exist.
+  ///
+  /// Without this the values would stay a build-time snapshot: reload can add, drop or re-compress an index, and a
+  /// stale size is indistinguishable from a current one. This is the only hook, deliberately: index sizes span every
+  /// index type, so updating them per handler -- as `compressionStatsEnabled` does in `ForwardIndexHandler`, where a
+  /// single index is involved -- would require every future handler to remember to participate.
+  ///
+  /// The current sizes come from different places by format, because a V3 segment has no per-index files left to
+  /// measure: the converter packs them into `columns.psf` and deletes the originals.
+  /// - **V3**: [ColumnMetadata#getIndexSize] positions, which `SegmentMetadataImpl` has already populated from
+  ///   `v3/index_map`. Used only as the input for this write; readers still consult `metadata.properties` alone, so
+  ///   there remains a single source of truth on the read path.
+  /// - **V1/V2**: the individual index files, measured the same way segment creation does.
+  ///
+  /// No-op unless `indexSizeStatsEnabled` is set. Failures are logged and swallowed: these statistics are advisory and
+  /// must never fail a segment load.
+  private void refreshPersistedIndexSizes(File indexDir) {
+    if (!_tableConfig.getIndexingConfig().isIndexSizeStatsEnabled()) {
+      return;
+    }
+    try {
+      SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
+      if (segmentMetadata.getTotalDocs() == 0) {
+        return;
+      }
+      IndexService indexService = IndexService.getInstance();
+      PropertiesConfiguration properties = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
+      String infix = "." + V1Constants.MetadataKeys.Column.INDEX_SIZE_IN_BYTES + ".";
+
+      // Drop every existing entry first so an index removed at reload does not leave a phantom size behind.
+      for (String key : CommonsConfigurationUtils.getKeys(properties)) {
+        if (key.contains(infix)) {
+          properties.clearProperty(key);
+        }
+      }
+
+      for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
+        String column = entry.getKey();
+        ColumnMetadata columnMetadata = entry.getValue();
+        for (int i = 0, numIndexes = columnMetadata.getNumIndexes(); i < numIndexes; i++) {
+          long size = columnMetadata.getIndexSize(i);
+          if (size < 0) {
+            continue;
+          }
+          String indexTypeId;
+          try {
+            indexTypeId = indexService.get(columnMetadata.getIndexType(i)).getId();
+          } catch (Exception e) {
+            // An index type this node does not have registered; nothing useful to record for it.
+            continue;
+          }
+          properties.setProperty(V1Constants.MetadataKeys.Column.getIndexSizeKeyFor(column, indexTypeId),
+              String.valueOf(size));
+        }
+      }
+      SegmentMetadataUtils.savePropertiesConfiguration(properties, indexDir);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to refresh persisted index sizes for segment: {}", _segmentDirectory.getSegmentMetadata()
+          .getName(), e);
     }
   }
 
