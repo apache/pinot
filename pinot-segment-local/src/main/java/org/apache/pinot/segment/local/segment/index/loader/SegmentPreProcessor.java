@@ -238,9 +238,14 @@ public class SegmentPreProcessor implements AutoCloseable {
         }
       }
 
+      File segmentContentDir = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
+      List<IndexType<?, ?, ?>> allIndexTypes = indexService.getAllIndexes();
       for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
         String column = entry.getKey();
         ColumnMetadata columnMetadata = entry.getValue();
+
+        // 1. Indexes packed into columns.psf. Their individual files were deleted by the converter, so index_map --
+        //    already parsed into these positions by SegmentMetadataImpl -- is the only description of them.
         for (int i = 0, numIndexes = columnMetadata.getNumIndexes(); i < numIndexes; i++) {
           long size = columnMetadata.getIndexSize(i);
           if (size < 0) {
@@ -255,6 +260,41 @@ public class SegmentPreProcessor implements AutoCloseable {
           }
           properties.setProperty(V1Constants.MetadataKeys.Column.getIndexSizeKeyFor(column, indexTypeId),
               String.valueOf(size));
+        }
+
+        // 2. Anything still present as its own file or directory. This covers two cases index_map cannot describe:
+        //    external text and vector directories, which are copied alongside columns.psf and never packed into it,
+        //    and every index of a V1/V2 segment, which has no index map at all. Without this the refresh would clear
+        //    those keys and never restore them, deleting sizes rather than refreshing them.
+        for (IndexType<?, ?, ?> indexType : allIndexTypes) {
+          String indexTypeId = indexType.getId();
+          String key = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor(column, indexTypeId);
+          if (properties.containsKey(key)) {
+            // Already described by the packed entry above, which reflects the live layout.
+            continue;
+          }
+          long size = 0;
+          boolean found = false;
+          for (String extension : indexType.getFileExtensions(null)) {
+            File indexFile = new File(segmentContentDir, column + extension);
+            if (!indexFile.exists()) {
+              continue;
+            }
+            if (indexFile.isDirectory()) {
+              try {
+                size += org.apache.commons.io.FileUtils.sizeOfDirectory(indexFile);
+                found = true;
+              } catch (Exception e) {
+                LOGGER.debug("Could not size index directory: {}", indexFile, e);
+              }
+            } else {
+              size += indexFile.length();
+              found = true;
+            }
+          }
+          if (found) {
+            properties.setProperty(key, String.valueOf(size));
+          }
         }
       }
       SegmentMetadataUtils.savePropertiesConfiguration(properties, indexDir);
