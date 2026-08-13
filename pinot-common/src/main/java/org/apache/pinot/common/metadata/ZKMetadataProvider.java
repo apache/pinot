@@ -20,7 +20,6 @@ package org.apache.pinot.common.metadata;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -640,35 +639,8 @@ public class ZKMetadataProvider {
     return getTableSchema(propertyStore, tableConfig.getTableName());
   }
 
-  /// Reads the ZK metadata of the named segments of the given table in a single batched request, and returns it
-  /// index-aligned with `segmentNames`. An entry is `null` when the segment has no ZK metadata.
-  /// Any other read failure throws rather than being reported as missing metadata.
-  ///
-  /// When `stats` is non-null it is filled with the [Stat] of each segment's znode, also index-aligned with
-  /// `segmentNames`.
-  public static List<SegmentZKMetadata> getSegmentsZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String tableNameWithType, List<String> segmentNames, @Nullable List<Stat> stats) {
-    int numSegments = segmentNames.size();
-    List<String> paths = new ArrayList<>(numSegments);
-    for (String segmentName : segmentNames) {
-      paths.add(constructPropertyStorePathForSegment(tableNameWithType, segmentName));
-    }
-    // NOTE: throwException is true so that a failed read (e.g. connection loss) surfaces as an exception instead of
-    //       being indistinguishable from a segment whose znode does not exist. Helix still returns null for the latter.
-    List<ZNRecord> znRecords = propertyStore.get(paths, stats, AccessOption.PERSISTENT, true);
-    Preconditions.checkState(znRecords.size() == numSegments,
-        "Got %s segment ZN records for %s segments of table: %s", znRecords.size(), numSegments, tableNameWithType);
-    List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>(numSegments);
-    for (ZNRecord znRecord : znRecords) {
-      segmentsZKMetadata.add(znRecord != null ? new SegmentZKMetadata(znRecord) : null);
-    }
-    return segmentsZKMetadata;
-  }
-
   /// NOTE: this method is very expensive, use [#getSegments(ZkHelixPropertyStore, String)] instead if only
-  /// segment names are needed. Segments whose ZK metadata cannot be read are dropped from the returned list; use
-  /// [#getSegmentsZKMetadata(ZkHelixPropertyStore, String, List, List)] when the result must line up with a known list
-  /// of segments, or when the znodes' [Stat] is needed.
+  /// segment names are needed.
   public static List<SegmentZKMetadata> getSegmentsZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
       String tableNameWithType) {
     String parentPath = constructPropertyStorePathForResource(tableNameWithType);

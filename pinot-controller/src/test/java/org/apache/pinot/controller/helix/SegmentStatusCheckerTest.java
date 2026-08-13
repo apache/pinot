@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
@@ -64,6 +65,7 @@ import org.mockito.ArgumentCaptor;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -73,6 +75,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 
@@ -306,8 +309,7 @@ public class SegmentStatusCheckerTest {
     SegmentZKMetadata committedSegmentZKMetadata = mockCommittedSegmentZKMetadata();
     SegmentZKMetadata consumingSegmentZKMetadata = mockConsumingSegmentZKMetadata(11111L);
     mockSegmentsZKMetadata(resourceManager, REALTIME_TABLE_NAME,
-        Map.of(seg1, committedSegmentZKMetadata, seg2, committedSegmentZKMetadata, seg3, consumingSegmentZKMetadata),
-        Map.of());
+        Map.of(seg1, committedSegmentZKMetadata, seg2, committedSegmentZKMetadata, seg3, consumingSegmentZKMetadata));
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
@@ -372,8 +374,7 @@ public class SegmentStatusCheckerTest {
     SegmentZKMetadata committedSegmentZKMetadata = mockCommittedSegmentZKMetadata();
     SegmentZKMetadata consumingSegmentZKMetadata = mockConsumingSegmentZKMetadata(11111L);
     mockSegmentsZKMetadata(resourceManager, REALTIME_TABLE_NAME,
-        Map.of(seg1, committedSegmentZKMetadata, seg2, committedSegmentZKMetadata, seg3, consumingSegmentZKMetadata),
-        Map.of());
+        Map.of(seg1, committedSegmentZKMetadata, seg2, committedSegmentZKMetadata, seg3, consumingSegmentZKMetadata));
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
@@ -445,8 +446,7 @@ public class SegmentStatusCheckerTest {
     SegmentZKMetadata committedSegmentZKMetadata = mockCommittedSegmentZKMetadata();
     SegmentZKMetadata consumingSegmentZKMetadata = mockConsumingSegmentZKMetadata(11111L);
     mockSegmentsZKMetadata(resourceManager, REALTIME_TABLE_NAME,
-        Map.of(seg1, committedSegmentZKMetadata, seg2, committedSegmentZKMetadata, seg3, consumingSegmentZKMetadata),
-        Map.of());
+        Map.of(seg1, committedSegmentZKMetadata, seg2, committedSegmentZKMetadata, seg3, consumingSegmentZKMetadata));
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
@@ -531,8 +531,7 @@ public class SegmentStatusCheckerTest {
     SegmentZKMetadata committedSegmentZKMetadata = mockCommittedSegmentZKMetadata();
     SegmentZKMetadata consumingSegmentZKMetadata = mockConsumingSegmentZKMetadata(11111L);
     mockSegmentsZKMetadata(resourceManager, REALTIME_TABLE_NAME,
-        Map.of(seg1, committedSegmentZKMetadata, seg2, committedSegmentZKMetadata, seg3, consumingSegmentZKMetadata),
-        Map.of());
+        Map.of(seg1, committedSegmentZKMetadata, seg2, committedSegmentZKMetadata, seg3, consumingSegmentZKMetadata));
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
@@ -585,43 +584,49 @@ public class SegmentStatusCheckerTest {
     return stat;
   }
 
-  /// Stubs the batched segment ZK metadata read, resolving each requested segment through `segmentZKMetadataMap` and
-  /// `segmentZNodeMTimesMs` (segment name -> znode mtime in epoch millis) while preserving the index alignment with the
-  /// requested segment names that [SegmentStatusChecker] relies on. A segment missing from `segmentZKMetadataMap` reads
-  /// back as having no ZK metadata; a segment missing from `segmentZNodeMTimesMs` reads back with no znode stat, which
-  /// makes the checker fall back to the metadata's creation time.
+  /// Stubs the batched whole-table segment ZK metadata read with the metadata of `segmentZKMetadataMap` (segment name
+  /// -> metadata). [SegmentStatusChecker] keys the result by [SegmentZKMetadata#getSegmentName()], so each entry is
+  /// returned under its own name even when the same metadata mock is shared by several segments. A segment missing from
+  /// the map reads back as having no ZK metadata.
   private void mockSegmentsZKMetadata(PinotHelixResourceManager resourceManager, String tableNameWithType,
-      Map<String, SegmentZKMetadata> segmentZKMetadataMap, Map<String, Long> segmentZNodeMTimesMs) {
-    when(resourceManager.getSegmentsZKMetadataForSegmentNames(eq(tableNameWithType), any(), any())).thenAnswer(
-        invocation -> {
-          List<String> segmentNames = invocation.getArgument(1);
-          List<Stat> stats = invocation.getArgument(2);
-          List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>(segmentNames.size());
-          if (stats != null) {
-            // Helix discards whatever the caller passed in, so the double must too
-            stats.clear();
-          }
-          for (String segmentName : segmentNames) {
-            segmentsZKMetadata.add(segmentZKMetadataMap.get(segmentName));
-            if (stats != null) {
-              Long mTimeMs = segmentZNodeMTimesMs.get(segmentName);
-              stats.add(mTimeMs != null ? mockStatWithMTime(mTimeMs) : null);
-            }
-          }
-          return segmentsZKMetadata;
-        });
+      Map<String, SegmentZKMetadata> segmentZKMetadataMap) {
+    List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>(segmentZKMetadataMap.size());
+    segmentZKMetadataMap.forEach((segmentName, segmentZKMetadata) -> {
+      SegmentZKMetadata named =
+          mock(SegmentZKMetadata.class, withSettings().defaultAnswer(delegatesTo(segmentZKMetadata)));
+      when(named.getSegmentName()).thenReturn(segmentName);
+      segmentsZKMetadata.add(named);
+    });
+    when(resourceManager.getSegmentsZKMetadata(tableNameWithType)).thenReturn(segmentsZKMetadata);
   }
 
-  /// Stubs the batched segment ZK metadata read so that every segment of `idealState` resolves to
-  /// `segmentZKMetadata`, with no znode stat (see [#mockSegmentsZKMetadata(PinotHelixResourceManager, String, Map,
-  /// Map)]).
+  /// Stubs the batched whole-table segment ZK metadata read so that every segment of `idealState` resolves to
+  /// `segmentZKMetadata` (see [#mockSegmentsZKMetadata(PinotHelixResourceManager, String, Map)]).
   private void mockSegmentsZKMetadataForAllSegments(PinotHelixResourceManager resourceManager,
       String tableNameWithType, IdealState idealState, SegmentZKMetadata segmentZKMetadata) {
     Map<String, SegmentZKMetadata> segmentZKMetadataMap = new HashMap<>();
     for (String segmentName : idealState.getPartitionSet()) {
       segmentZKMetadataMap.put(segmentName, segmentZKMetadata);
     }
-    mockSegmentsZKMetadata(resourceManager, tableNameWithType, segmentZKMetadataMap, Map.of());
+    mockSegmentsZKMetadata(resourceManager, tableNameWithType, segmentZKMetadataMap);
+  }
+
+  /// Stubs the batched znode stat read, resolving each requested path to the mtime its segment has in
+  /// `segmentZNodeMTimesMs` (segment name -> znode mtime in epoch millis) while preserving the index alignment with the
+  /// requested paths that [SegmentStatusChecker] relies on. A segment missing from the map reads back with no stat,
+  /// which makes the checker fall back to the metadata's creation time.
+  private void mockSegmentZNodeMTimes(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      Map<String, Long> segmentZNodeMTimesMs) {
+    when(propertyStore.getStats(any(), anyInt())).thenAnswer(invocation -> {
+      List<String> paths = invocation.getArgument(0);
+      Stat[] stats = new Stat[paths.size()];
+      for (int i = 0; i < paths.size(); i++) {
+        String path = paths.get(i);
+        Long mTimeMs = segmentZNodeMTimesMs.get(path.substring(path.lastIndexOf('/') + 1));
+        stats[i] = mTimeMs != null ? mockStatWithMTime(mTimeMs) : null;
+      }
+      return stats;
+    });
   }
 
   /// A pauseless COMMITTING segment whose replicas are still building (only 1/3 ONLINE in the external view) must not
@@ -654,15 +659,15 @@ public class SegmentStatusCheckerTest {
     when(resourceManager.getTableIdealState(REALTIME_TABLE_NAME)).thenReturn(idealState);
     when(resourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
     SegmentZKMetadata committingSegmentZKMetadata = mockCommittingSegmentZKMetadata();
-    // Just committed: znode mtime is now, within the grace window.
-    mockSegmentsZKMetadata(resourceManager, REALTIME_TABLE_NAME, Map.of(seg, committingSegmentZKMetadata),
-        Map.of(seg, System.currentTimeMillis()));
+    mockSegmentsZKMetadata(resourceManager, REALTIME_TABLE_NAME, Map.of(seg, committingSegmentZKMetadata));
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
     ZNRecord znRecord = new ZNRecord("0");
     znRecord.setSimpleField(CommonConstants.Segment.Realtime.END_OFFSET, "10000");
     when(propertyStore.get(anyString(), any(), anyInt())).thenReturn(znRecord);
+    // Just committed: znode mtime is now, within the grace window.
+    mockSegmentZNodeMTimes(propertyStore, Map.of(seg, System.currentTimeMillis()));
 
     // 1h grace window; the segment was just created, so it must be skipped and the table stays fully replicated.
     runSegmentStatusChecker(resourceManager, 3600);
@@ -704,7 +709,7 @@ public class SegmentStatusCheckerTest {
     // Creation time is now, and no znode stat is available -> the fallback must keep the segment within the grace
     // window
     SegmentZKMetadata consumingSegmentZKMetadata = mockConsumingSegmentZKMetadata(System.currentTimeMillis());
-    mockSegmentsZKMetadata(resourceManager, REALTIME_TABLE_NAME, Map.of(seg, consumingSegmentZKMetadata), Map.of());
+    mockSegmentsZKMetadata(resourceManager, REALTIME_TABLE_NAME, Map.of(seg, consumingSegmentZKMetadata));
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
@@ -720,13 +725,13 @@ public class SegmentStatusCheckerTest {
         ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS), 0);
   }
 
-  /// The whole table's metadata comes back from one batched read, so each segment's metadata and znode stat must be
-  /// matched to that segment and not to whichever position it happens to hold in the result. Every segment is
-  /// under-replicated and carries a distinct size, exactly one segment was pushed recently enough to be graced, and the
-  /// last segment is the only one with 4 replicas so it alone determines PERCENT_OF_REPLICAS. Together the gauges pin
-  /// that every segment was examined under its own name, that the grace window applied to exactly the segment whose
-  /// znode stat is recent, and that the sizes accumulate. One segment has no ZK metadata, which shifts the alignment if
-  /// the pairing gets it wrong.
+  /// The whole table's metadata and znode stats come back from batched reads, so each segment must be matched to its
+  /// own metadata (by name) and its own stat (by position) rather than to whichever entry happens to sit at its index.
+  /// Every segment is under-replicated and carries a distinct size, exactly one segment was pushed recently enough to
+  /// be graced, and the last segment is the only one with 4 replicas so it alone determines PERCENT_OF_REPLICAS.
+  /// Together the gauges pin that every segment was examined under its own name, that the grace window applied to
+  /// exactly the segment whose znode stat is recent, and that the sizes accumulate. One segment has no ZK metadata,
+  /// which shifts the alignment if the pairing gets it wrong.
   @Test
   public void segmentsStayAlignedWithTheirBatchedMetadata() {
     TableConfig tableConfig =
@@ -772,10 +777,11 @@ public class SegmentStatusCheckerTest {
     when(resourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
     when(resourceManager.getTableIdealState(OFFLINE_TABLE_NAME)).thenReturn(idealState);
     when(resourceManager.getTableExternalView(OFFLINE_TABLE_NAME)).thenReturn(externalView);
-    mockSegmentsZKMetadata(resourceManager, OFFLINE_TABLE_NAME, segmentZKMetadataMap, segmentZNodeMTimesMs);
+    mockSegmentsZKMetadata(resourceManager, OFFLINE_TABLE_NAME, segmentZKMetadataMap);
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    mockSegmentZNodeMTimes(propertyStore, segmentZNodeMTimesMs);
 
     // 10min grace window, so only the recently pushed segment is skipped
     runSegmentStatusChecker(resourceManager, 600, mock(TableSizeReader.class));
@@ -794,13 +800,18 @@ public class SegmentStatusCheckerTest {
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, OFFLINE_TABLE_NAME,
         ControllerGauge.TABLE_COMPRESSED_SIZE), expectedTableCompressedSize);
 
-    // One batched read must cover the whole table: a second call means the per-segment reads crept back in some form
-    ArgumentCaptor<List<String>> segmentNamesCaptor = ArgumentCaptor.forClass(List.class);
-    verify(resourceManager).getSegmentsZKMetadataForSegmentNames(eq(OFFLINE_TABLE_NAME),
-        segmentNamesCaptor.capture(), any());
-    List<String> requestedSegments = segmentNamesCaptor.getValue();
-    assertEquals(requestedSegments.size(), numSegments);
-    assertEquals(new HashSet<>(requestedSegments), idealState.getPartitionSet());
+    // One batched read each must cover the whole table: more than one call means the per-segment reads crept back in
+    // some form
+    verify(resourceManager).getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+    ArgumentCaptor<List<String>> segmentPathsCaptor = ArgumentCaptor.forClass(List.class);
+    verify(propertyStore).getStats(segmentPathsCaptor.capture(), anyInt());
+    List<String> requestedPaths = segmentPathsCaptor.getValue();
+    assertEquals(requestedPaths.size(), numSegments);
+    Set<String> requestedSegments = new HashSet<>();
+    for (String path : requestedPaths) {
+      requestedSegments.add(path.substring(path.lastIndexOf('/') + 1));
+    }
+    assertEquals(requestedSegments, idealState.getPartitionSet());
   }
 
   /// A COMMITTING segment that has been under-replicated for longer than the grace window is a genuinely stuck commit
@@ -831,15 +842,15 @@ public class SegmentStatusCheckerTest {
     when(resourceManager.getTableIdealState(REALTIME_TABLE_NAME)).thenReturn(idealState);
     when(resourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
     SegmentZKMetadata committingSegmentZKMetadata = mockCommittingSegmentZKMetadata();
-    // Committed 2h ago (znode mtime), still under-replicated -> a stuck commit, must not be graced.
-    mockSegmentsZKMetadata(resourceManager, REALTIME_TABLE_NAME, Map.of(seg, committingSegmentZKMetadata),
-        Map.of(seg, System.currentTimeMillis() - 7200000L));
+    mockSegmentsZKMetadata(resourceManager, REALTIME_TABLE_NAME, Map.of(seg, committingSegmentZKMetadata));
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
     ZNRecord znRecord = new ZNRecord("0");
     znRecord.setSimpleField(CommonConstants.Segment.Realtime.END_OFFSET, "10000");
     when(propertyStore.get(anyString(), any(), anyInt())).thenReturn(znRecord);
+    // Committed 2h ago (znode mtime), still under-replicated -> a stuck commit, must not be graced.
+    mockSegmentZNodeMTimes(propertyStore, Map.of(seg, System.currentTimeMillis() - 7200000L));
 
     // 1h grace window; the segment is 2h old and still 1/3 replicas up, so it must be flagged (33%).
     runSegmentStatusChecker(resourceManager, 3600);
@@ -967,14 +978,15 @@ public class SegmentStatusCheckerTest {
     when(resourceManager.getTableExternalView(OFFLINE_TABLE_NAME)).thenReturn(externalView);
     SegmentZKMetadata segmentZKMetadata01 = mockPushedSegmentZKMetadata(1234, 11111L);
     SegmentZKMetadata segmentZKMetadata2 = mockPushedSegmentZKMetadata(1234, System.currentTimeMillis());
-    // myTable_2 was just pushed (znode mtime is now) so it is within the grace window and skipped; the others were
-    // pushed long ago.
     mockSegmentsZKMetadata(resourceManager, OFFLINE_TABLE_NAME,
-        Map.of("myTable_0", segmentZKMetadata01, "myTable_1", segmentZKMetadata01, "myTable_2", segmentZKMetadata2),
-        Map.of("myTable_0", 11111L, "myTable_1", 11111L, "myTable_2", System.currentTimeMillis()));
+        Map.of("myTable_0", segmentZKMetadata01, "myTable_1", segmentZKMetadata01, "myTable_2", segmentZKMetadata2));
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    // myTable_2 was just pushed (znode mtime is now) so it is within the grace window and skipped; the others were
+    // pushed long ago.
+    mockSegmentZNodeMTimes(propertyStore,
+        Map.of("myTable_0", 11111L, "myTable_1", 11111L, "myTable_2", System.currentTimeMillis()));
 
     runSegmentStatusChecker(resourceManager, 600);
     verifyControllerMetrics(OFFLINE_TABLE_NAME, 0, 3, 3, 2, 100, 0, 100, 0, 3702);
@@ -993,13 +1005,14 @@ public class SegmentStatusCheckerTest {
     when(resourceManager.getTableIdealState(REALTIME_TABLE_NAME)).thenReturn(idealState);
     SegmentZKMetadata updatedSegmentZKMetadata = mockPushedSegmentZKMetadata(1234, System.currentTimeMillis());
     SegmentZKMetadata consumingSegmentZKMetadata = mockConsumingSegmentZKMetadata(System.currentTimeMillis());
-    // Both segments were just updated/created (znode mtime is now), so they are within the grace window and skipped.
     mockSegmentsZKMetadata(resourceManager, REALTIME_TABLE_NAME,
-        Map.of("myTable_0", updatedSegmentZKMetadata, "myTable_1", consumingSegmentZKMetadata),
-        Map.of("myTable_0", System.currentTimeMillis(), "myTable_1", System.currentTimeMillis()));
+        Map.of("myTable_0", updatedSegmentZKMetadata, "myTable_1", consumingSegmentZKMetadata));
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    // Both segments were just updated/created (znode mtime is now), so they are within the grace window and skipped.
+    mockSegmentZNodeMTimes(propertyStore,
+        Map.of("myTable_0", System.currentTimeMillis(), "myTable_1", System.currentTimeMillis()));
 
     runSegmentStatusChecker(resourceManager, 600);
     verifyControllerMetrics(REALTIME_TABLE_NAME, 0, 2, 2, 1, 100, 0, 100, 0, 1234);
@@ -1039,7 +1052,7 @@ public class SegmentStatusCheckerTest {
     when(resourceManager.getAllTables()).thenReturn(List.of(OFFLINE_TABLE_NAME));
     when(resourceManager.getTableIdealState(OFFLINE_TABLE_NAME)).thenReturn(idealState);
     // The segment is in the ideal state but has no ZK metadata at all
-    mockSegmentsZKMetadata(resourceManager, OFFLINE_TABLE_NAME, Map.of(), Map.of());
+    mockSegmentsZKMetadata(resourceManager, OFFLINE_TABLE_NAME, Map.of());
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);

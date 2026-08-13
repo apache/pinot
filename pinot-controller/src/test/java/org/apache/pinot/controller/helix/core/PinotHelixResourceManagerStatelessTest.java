@@ -91,7 +91,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.apache.zookeeper.data.Stat;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.DateTimeFormatterBuilder;
@@ -586,50 +585,6 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
       assertEquals(retrievedSegmentsZKMetadata.size(), 1);
       assertTrue(ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, REALTIME_TABLE_NAME, segmentName));
       assertTrue(_helixResourceManager.getSegmentsZKMetadata(REALTIME_TABLE_NAME).isEmpty());
-    }
-  }
-
-  /// Pins the contract [SegmentStatusChecker] depends on: the batched read returns the metadata and the znode [Stat]
-  /// index-aligned with the requested segment names, with `null` in both for a segment that has no ZK metadata.
-  @Test
-  public void testRetrieveSegmentsZKMetadataBatched() {
-    long beforeMs = System.currentTimeMillis();
-    List<String> segmentNames = List.of("testSegment0", "testSegment1", "testSegment2");
-    // Write ZK metadata for the first and last segment only, leaving a gap in the middle
-    for (String segmentName : List.of("testSegment0", "testSegment2")) {
-      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
-      segmentZKMetadata.setSizeInBytes(segmentName.hashCode());
-      ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segmentZKMetadata);
-    }
-
-    try {
-      List<Stat> stats = new ArrayList<>();
-      List<SegmentZKMetadata> segmentsZKMetadata =
-          _helixResourceManager.getSegmentsZKMetadataForSegmentNames(OFFLINE_TABLE_NAME, segmentNames, stats);
-
-      // Both lists must line up with the requested names, so that the gap does not shift the entries after it
-      assertEquals(segmentsZKMetadata.size(), 3);
-      assertEquals(stats.size(), 3);
-      for (int i : new int[]{0, 2}) {
-        String segmentName = segmentNames.get(i);
-        assertNotNull(segmentsZKMetadata.get(i), segmentName);
-        assertEquals(segmentsZKMetadata.get(i).getSegmentName(), segmentName);
-        assertEquals(segmentsZKMetadata.get(i).getSizeInBytes(), segmentName.hashCode());
-        // A real znode mtime, not a default or the metadata's own creation time
-        assertNotNull(stats.get(i), segmentName);
-        assertTrue(stats.get(i).getMtime() >= beforeMs,
-            segmentName + " mtime: " + stats.get(i).getMtime() + " < " + beforeMs);
-      }
-      assertNull(segmentsZKMetadata.get(1));
-      assertNull(stats.get(1));
-
-      // The stats are optional
-      assertEquals(
-          _helixResourceManager.getSegmentsZKMetadataForSegmentNames(OFFLINE_TABLE_NAME, segmentNames, null).size(), 3);
-    } finally {
-      for (String segmentName : List.of("testSegment0", "testSegment2")) {
-        ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segmentName);
-      }
     }
   }
 
