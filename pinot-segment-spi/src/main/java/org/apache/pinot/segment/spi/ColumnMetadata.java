@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -74,6 +75,18 @@ public interface ColumnMetadata extends ColumnShape {
   @Deprecated(since = "1.6.0", forRemoval = true)
   default int getColumnMaxLength() {
     return getLengthOfLongestElement();
+  }
+
+  /// On-disk size in bytes of each index of this column, keyed by [IndexType#getId()], as recorded in
+  /// `metadata.properties` when the table had `indexSizeStatsEnabled` set at segment build time.
+  ///
+  /// Empty when the flag was off, on segments built before it existed, and for indexes built after the sizes are
+  /// taken (star-tree, multi-column text). Values are a build-time snapshot: a reload that adds, drops or rewrites an
+  /// index does not update them, so a caller that needs the current packed layout should use [#getIndexSizeFor]
+  /// instead. Distinct from [#getIndexSizeFor] precisely because that one reflects the live layout while this one
+  /// survives without the segment being loaded, which is what lets cold-tier segments be reported.
+  default Map<String, Long> getPersistedIndexSizesInBytes() {
+    return Map.of();
   }
 
   /// Returns serialized value bytes presented to the raw forward-index chunk compressor, or [#UNAVAILABLE].

@@ -22,16 +22,20 @@ import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -228,5 +232,71 @@ public class IndexSizeStatsTest {
       }
     }
     assertTrue(verified > 0, "Expected at least one persisted size to be verified against a V1 file");
+  }
+
+  /// Spec 5: the persisted keys must be readable through [ColumnMetadata], which is what makes the feature
+  /// observable rather than a write-only on-disk format.
+  ///
+  /// Read via [ColumnMetadata#getPersistedIndexSizesInBytes], deliberately separate from `getIndexSizeFor` — that one
+  /// is fed from `v3/index_map` and reflects the live packed layout, while these are a build-time snapshot readable
+  /// without loading the segment payload, which is what lets cold-tier segments be reported.
+  @Test
+  public void testPersistedSizesAreReadableViaColumnMetadata()
+      throws Exception {
+    File segmentDir = buildSegment(true);
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDir);
+    ColumnMetadata column3 = segmentMetadata.getColumnMetadataFor("column3");
+    assertNotNull(column3);
+    Map<String, Long> sizes = column3.getPersistedIndexSizesInBytes();
+
+    for (String indexTypeId : List.of(StandardIndexes.dictionary().getId(), StandardIndexes.forward().getId(),
+        StandardIndexes.inverted().getId())) {
+      Long size = sizes.get(indexTypeId);
+      assertNotNull(size, "Expected a persisted size for " + indexTypeId + ", got " + sizes);
+      assertTrue(size > 0, indexTypeId + " size should be positive, got " + size);
+    }
+
+    // Values must match what was written, and reading must not disturb the live packed sizes.
+    PropertiesConfiguration metadata = loadMetadata(segmentDir);
+    assertEquals(sizes.get(StandardIndexes.dictionary().getId()).longValue(),
+        metadata.getLong(V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+            StandardIndexes.dictionary().getId())));
+    assertEquals(column3.getIndexSizeFor(StandardIndexes.dictionary()),
+        metadata.getLong(V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+            StandardIndexes.dictionary().getId())),
+        "getIndexSizeFor still comes from v3/index_map and must be unaffected by the persisted keys");
+  }
+
+  /// V1 segments have no `v3/index_map`, so the persisted keys are the only possible source. This is the case that
+  /// the old index-map-only path could not serve at all.
+  @Test
+  public void testPersistedSizesReadableForV1Segment()
+      throws Exception {
+    SegmentGeneratorConfig config = createSegmentConfig(true);
+    config.setSegmentVersion(SegmentVersion.v1);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config);
+    driver.build();
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDirectory());
+    ColumnMetadata column3 = segmentMetadata.getColumnMetadataFor("column3");
+    assertNotNull(column3);
+    assertFalse(column3.getPersistedIndexSizesInBytes().isEmpty(),
+        "A V1 segment built with the flag on must expose persisted index sizes");
+    assertEquals(column3.getIndexSizeFor(StandardIndexes.dictionary()), ColumnMetadata.UNAVAILABLE,
+        "getIndexSizeFor has no index map to read on V1 and must stay UNAVAILABLE");
+  }
+
+  /// Without the flag there is nothing persisted, so the map must be empty rather than absent or throwing.
+  @Test
+  public void testNoPersistedSizesWhenFlagUnset()
+      throws Exception {
+    File segmentDir = buildSegment(null);
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDir);
+    ColumnMetadata column3 = segmentMetadata.getColumnMetadataFor("column3");
+    assertNotNull(column3);
+    assertTrue(column3.getPersistedIndexSizesInBytes().isEmpty(),
+        "No keys are written when the flag is unset, so the map must be empty");
   }
 }
