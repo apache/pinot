@@ -19,6 +19,7 @@
 package org.apache.pinot.common.request.context;
 
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.UUID;
@@ -234,6 +235,24 @@ public class LiteralContextTest {
     assertEquals(literalContext.getBytesValue(), BytesUtils.toBytes("deadbeef"));
     assertFalse(literalContext.isNull());
     assertEquals(literalContext.toString(), "'deadbeef'");
+  }
+
+  @Test
+  public void testBytesArrayLiteral() {
+    Literal literal = Literal.bytesArrayValue(List.of(ByteBuffer.wrap(new byte[0]), ByteBuffer.wrap(new byte[]{0}),
+        ByteBuffer.wrap(new byte[]{1, 2}), ByteBuffer.wrap(new byte[]{(byte) 0xff})));
+    LiteralContext literalContext = new LiteralContext(literal);
+
+    assertFalse(literalContext.isSingleValue());
+    assertEquals(literalContext.getType(), DataType.BYTES);
+    assertEquals(literalContext.getValue(), new byte[][]{{}, {0}, {1, 2}, {(byte) 0xff}});
+    assertEquals(literalContext.toString(), "'[, 00, 0102, ff]'");
+
+    LiteralContext equalContext =
+        new LiteralContext(DataType.BYTES, new byte[][]{{}, {0}, {1, 2}, {(byte) 0xff}});
+    assertEquals(equalContext, literalContext);
+    assertEquals(equalContext.hashCode(), literalContext.hashCode());
+    assertNotEquals(new LiteralContext(DataType.BYTES, new byte[][]{{}, {0}, {1, 3}, {(byte) 0xff}}), literalContext);
   }
 
   @Test
