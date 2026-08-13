@@ -137,7 +137,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
       int calculatedScale = getCalculatedScale(value);
       return value == null ? null : new BigDecimal(value).setScale(calculatedScale);
     } catch (Exception e) {
-      throw new SQLException("Unable to fetch BigDecimal value", e);
+      throw new SQLDataException("Unable to fetch BigDecimal value", e);
     }
   }
 
@@ -217,7 +217,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
       String value = getString(columnIndex);
       return value == null ? null : Hex.decodeHex(value.toCharArray());
     } catch (Exception e) {
-      throw new SQLException(String.format("Unable to fetch value for column %d", columnIndex), e);
+      throw new SQLDataException(String.format("Unable to fetch value for column %d", columnIndex), e);
     }
   }
 
@@ -570,7 +570,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
       String value = getString(columnIndex);
       return value == null ? null : DateTimeUtils.getTimestampFromString(value, cal);
     } catch (Exception e) {
-      throw new SQLException("Unable to fetch date", e);
+      throw new SQLDataException("Unable to fetch date", e);
     }
   }
 
