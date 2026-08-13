@@ -130,6 +130,11 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
     return MapUtils.deserializeMap(getBytes(docId, context));
   }
 
+  @Override
+  public String getMapAsJsonString(int docId, ChunkReaderContext context) {
+    return MapUtils.frameToJsonString(getBytes(docId, context));
+  }
+
   /// Helper method to read BYTES value from the compressed index.
   private byte[] getBytesCompressed(int docId, ChunkReaderContext context) {
     int chunkRowId = docId % _numDocsPerChunk;
