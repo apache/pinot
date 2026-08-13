@@ -48,6 +48,7 @@ import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import javax.annotation.Nullable;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.client.utils.DateTimeUtils;
@@ -59,6 +60,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   protected abstract void validateColumn(int columnIndex)
       throws SQLException;
 
+  @Nullable
   protected abstract Map<?, ?> getMap(int columnIndex)
       throws SQLException;
 
@@ -201,12 +203,14 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   }
 
   @Override
+  @Nullable
   public byte[] getBytes(String columnLabel)
       throws SQLException {
     return getBytes(findColumn(columnLabel));
   }
 
   @Override
+  @Nullable
   public byte[] getBytes(int columnIndex)
       throws SQLException {
     try {
@@ -429,30 +433,35 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   }
 
   @Override
+  @Nullable
   public Object getObject(String columnLabel)
       throws SQLException {
     return getObject(findColumn(columnLabel));
   }
 
   @Override
+  @Nullable
   public Object getObject(int columnIndex, Map<String, Class<?>> map)
       throws SQLException {
     return getObject(columnIndex);
   }
 
   @Override
+  @Nullable
   public Object getObject(String columnLabel, Map<String, Class<?>> map)
       throws SQLException {
     return getObject(findColumn(columnLabel), map);
   }
 
   @Override
+  @Nullable
   public <T> T getObject(String columnLabel, Class<T> type)
       throws SQLException {
     return getObject(findColumn(columnLabel), type);
   }
 
   @Override
+  @Nullable
   public <T> T getObject(int columnIndex, Class<T> type)
       throws SQLException {
     Object value = getObject(columnIndex);
@@ -501,6 +510,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   }
 
   @Override
+  @Nullable
   public Statement getStatement()
       throws SQLException {
     return null;
@@ -602,7 +612,8 @@ public abstract class AbstractBaseResultSet implements ResultSet {
     return in;
   }
 
-  protected UUID getUuid(int columnIndex)
+  @Nullable
+  private UUID getUuid(int columnIndex)
       throws SQLException {
     String value = getString(columnIndex);
     if (value == null) {
@@ -1198,6 +1209,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   }
 
   @Override
+  @Nullable
   public Object getObject(int columnIndex)
       throws SQLException {
 
@@ -1215,6 +1227,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
     return getScalar(columnIndex, dataType);
   }
 
+  @Nullable
   private Object getScalar(int columnIndex, ColumnDataType dataType)
       throws SQLException {
     switch (dataType) {
@@ -1249,6 +1262,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   protected abstract List<?> getList(int columnIndex, ColumnDataType dataType)
       throws SQLException;
 
+  @Nullable
   protected List<Timestamp> toTimestampList(List<String> values)
       throws SQLException {
     if (values == null) {
@@ -1266,6 +1280,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
     }
   }
 
+  @Nullable
   protected List<byte[]> toBytesList(List<String> values)
       throws SQLException {
     if (values == null) {
@@ -1282,6 +1297,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
     }
   }
 
+  @Nullable
   protected List<UUID> toUuidList(List<String> values)
       throws SQLException {
     if (values == null) {
