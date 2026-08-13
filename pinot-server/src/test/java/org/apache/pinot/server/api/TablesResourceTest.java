@@ -172,6 +172,45 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
+  /// Spec 6/7a: `indexSizeBreakdown` appears only when `includeIndexSizeStats=true`, and is a table-level aggregate
+  /// that the `columns=` filter does not narrow.
+  ///
+  /// These fixture segments are built without `indexSizeStatsEnabled`, which makes them the right case for pinning the
+  /// distinction the implementation is careful about: absent means the caller did not ask, an empty object means they
+  /// asked and no segment carried persisted sizes. Collapsing the two would make "feature disabled" and "no data" look
+  /// identical to a client.
+  @Test
+  public void getTableMetadataIndexSizeBreakdown()
+      throws Exception {
+    String tableMetadataPath = "/tables/" + OFFLINE_TABLE_NAME + "/metadata";
+
+    JsonNode withoutParam =
+        JsonUtils.stringToJsonNode(_webTarget.path(tableMetadataPath).request().get(String.class));
+    Assert.assertFalse(withoutParam.has("indexSizeBreakdown"),
+        "indexSizeBreakdown must be omitted entirely when not requested, payload was: " + withoutParam);
+
+    JsonNode withParam = JsonUtils.stringToJsonNode(_webTarget.path(tableMetadataPath)
+        .queryParam("includeIndexSizeStats", "true")
+        .request()
+        .get(String.class));
+    Assert.assertTrue(withParam.has("indexSizeBreakdown"),
+        "indexSizeBreakdown must be present when requested, payload was: " + withParam);
+    Assert.assertTrue(withParam.get("indexSizeBreakdown").isEmpty(),
+        "These segments carry no persisted index sizes, so the breakdown must be empty rather than fabricated: "
+            + withParam.get("indexSizeBreakdown"));
+
+    // The columns= filter narrows columnLengthMap and columnIndexSizeMap but must leave the breakdown alone.
+    JsonNode withColumnFilter = JsonUtils.stringToJsonNode(_webTarget.path(tableMetadataPath)
+        .queryParam("includeIndexSizeStats", "true")
+        .queryParam("columns", "column1")
+        .request()
+        .get(String.class));
+    Assert.assertTrue(withColumnFilter.has("indexSizeBreakdown"),
+        "indexSizeBreakdown must survive a columns= filter, payload was: " + withColumnFilter);
+    Assert.assertEquals(withColumnFilter.get("indexSizeBreakdown"), withParam.get("indexSizeBreakdown"),
+        "indexSizeBreakdown is a table-level aggregate and must be identical with and without columns=");
+  }
+
   @Test
   public void getTableMetadata()
       throws Exception {
