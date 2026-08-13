@@ -28,6 +28,9 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
+import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -36,6 +39,7 @@ import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -43,6 +47,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterMethod;
@@ -298,5 +303,89 @@ public class IndexSizeStatsTest {
     assertNotNull(column3);
     assertTrue(column3.getPersistedIndexSizesInBytes().isEmpty(),
         "No keys are written when the flag is unset, so the map must be empty");
+  }
+
+  /// Spec 13: the persisted sizes must track the layout across a reload, not stay frozen at build time.
+  ///
+  /// Builds without an inverted index, reloads with one configured, then reloads again with it removed. Asserts the key
+  /// appears and then disappears. Without the refresh hook the first assertion fails; without clearing existing entries
+  /// first, the last one fails because a dropped index leaves a phantom size behind.
+  @Test
+  public void testReloadRefreshesAndClearsIndexSizes()
+      throws Exception {
+    Schema schema = schema();
+    File segmentDir = buildSegmentWithoutInvertedIndex();
+
+    String invertedKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+        StandardIndexes.inverted().getId());
+    assertFalse(indexSizeKeys(loadMetadata(segmentDir)).contains(invertedKey),
+        "No inverted index was built, so its size must not be recorded");
+
+    // Reload with the inverted index configured: the handler creates it, and the refresh must record its size.
+    runPreProcessor(segmentDir, tableConfig(true, List.of("column3")), schema);
+    PropertiesConfiguration afterAdd = loadMetadata(segmentDir);
+    assertTrue(indexSizeKeys(afterAdd).contains(invertedKey),
+        "Reload added an inverted index, so its size must appear; keys were: " + indexSizeKeys(afterAdd));
+    assertTrue(afterAdd.getLong(invertedKey) > 0, "A newly created index must have a positive recorded size");
+
+    // Reload with it removed: the key must be cleared rather than left behind as a phantom.
+    runPreProcessor(segmentDir, tableConfig(true, List.of()), schema);
+    PropertiesConfiguration afterDrop = loadMetadata(segmentDir);
+    assertFalse(indexSizeKeys(afterDrop).contains(invertedKey),
+        "The inverted index was dropped, so its stale size must be cleared; keys were: " + indexSizeKeys(afterDrop));
+    assertTrue(indexSizeKeys(afterDrop).stream().anyMatch(k -> k.contains("forward")),
+        "Surviving indexes must still be recorded after the refresh");
+  }
+
+  /// With the flag off, a reload must not introduce any keys.
+  @Test
+  public void testReloadWritesNothingWhenFlagOff()
+      throws Exception {
+    File segmentDir = buildSegment(null);
+    assertTrue(indexSizeKeys(loadMetadata(segmentDir)).isEmpty(), "Sanity: the build wrote no keys");
+    runPreProcessor(segmentDir, tableConfig(false, List.of("column3")), schema());
+    assertTrue(indexSizeKeys(loadMetadata(segmentDir)).isEmpty(),
+        "The flag is off, so a reload must not write index size keys either");
+  }
+
+  private File buildSegmentWithoutInvertedIndex()
+      throws Exception {
+    URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
+    assertNotNull(resource);
+    SegmentGeneratorConfig config =
+        SegmentTestUtils.getSegmentGeneratorConfig(new File(TestUtils.getFileFromResourceUrl(resource)),
+            FileFormat.AVRO, INDEX_DIR, RAW_TABLE_NAME, tableConfig(true, List.of()), schema());
+    config.setSegmentNamePostfix("1");
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config);
+    driver.build();
+    return segmentDirectory();
+  }
+
+  private static void runPreProcessor(File segmentDir, TableConfig tableConfig, Schema schema)
+      throws Exception {
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(segmentDir, ReadMode.mmap);
+        SegmentPreProcessor processor =
+            new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(tableConfig, schema))) {
+      processor.process();
+    }
+  }
+
+  private static TableConfig tableConfig(boolean indexSizeStatsEnabled, List<String> invertedIndexColumns) {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInvertedIndexColumns(invertedIndexColumns)
+        .setNoDictionaryColumns(List.of("column4"))
+        .setIndexSizeStatsEnabled(indexSizeStatsEnabled)
+        .build();
+  }
+
+  private static Schema schema() {
+    return new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension("column3", DataType.STRING)
+        .addSingleValueDimension("column4", DataType.STRING)
+        .addMultiValueDimension("column6", DataType.INT)
+        .addMultiValueDimension("column7", DataType.INT)
+        .addDateTime("daysSinceEpoch", DataType.INT, "EPOCH|HOURS", "1:HOURS")
+        .build();
   }
 }
