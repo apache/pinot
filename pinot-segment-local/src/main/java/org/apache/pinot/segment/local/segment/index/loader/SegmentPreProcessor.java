@@ -218,7 +218,12 @@ public class SegmentPreProcessor implements AutoCloseable {
       return;
     }
     try {
-      SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
+      // Read the metadata fresh off disk rather than using _segmentDirectory.getSegmentMetadata(). That returns a
+      // cached instance describing the layout as it was before the handlers ran, so a removed index would still be
+      // listed and its size re-recorded -- exactly the phantom entry this refresh exists to prevent. Calling
+      // reloadMetadata() is not an option here either: it also touches _columnIndexDirectory, which is null once the
+      // reader and writer scopes above have closed.
+      SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
       if (segmentMetadata.getTotalDocs() == 0) {
         return;
       }
