@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.openstruct;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -86,10 +85,6 @@ import org.slf4j.LoggerFactory;
 public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(OpenStructColumnSplitter.class);
-
-  /// Cap on how many offending keys the seal-time failure summaries name at INFO. The key space is
-  /// user-controlled, so a wide struct would otherwise emit an unbounded log line on every seal.
-  private static final int MAX_LOGGED_FAILURE_KEYS = 5;
 
   private final File _indexDir;
   private final String _columnName;
@@ -266,17 +261,15 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
 
     long totalCoercionFailures = sumValues(_coercionFailuresPerKey);
     if (totalCoercionFailures > 0) {
-      LOGGER.info("OPEN_STRUCT '{}': dropped {} values due to type coercion failures across {} keys; top: {}",
-          _columnName, totalCoercionFailures, _coercionFailuresPerKey.size(),
-          topFailures(_coercionFailuresPerKey));
+      LOGGER.info("OPEN_STRUCT '{}': dropped {} values due to type coercion failures across {} keys",
+          _columnName, totalCoercionFailures, _coercionFailuresPerKey.size());
+      // The key space is user-controlled, so the per-key breakdown is DEBUG-only.
       LOGGER.debug("OPEN_STRUCT '{}': full coercion failure counts: {}", _columnName, _coercionFailuresPerKey);
     }
     long totalInferenceFailures = sumValues(_inferenceFailuresPerKey);
     if (totalInferenceFailures > 0) {
-      LOGGER.info("OPEN_STRUCT '{}': {} values across {} keys fell back to STRING after type inference failed;"
-              + " top: {}",
-          _columnName, totalInferenceFailures, _inferenceFailuresPerKey.size(),
-          topFailures(_inferenceFailuresPerKey));
+      LOGGER.info("OPEN_STRUCT '{}': {} values across {} keys fell back to STRING after type inference failed",
+          _columnName, totalInferenceFailures, _inferenceFailuresPerKey.size());
       LOGGER.debug("OPEN_STRUCT '{}': full inference failure counts: {}", _columnName, _inferenceFailuresPerKey);
     }
     emitMetrics(sparseKeys.size(), totalCoercionFailures, totalInferenceFailures);
@@ -288,42 +281,31 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     return counts.values().stream().mapToLong(Long::longValue).sum();
   }
 
-  /// Returns the highest-count entries, capped at [#MAX_LOGGED_FAILURE_KEYS]. The key space is
-  /// user-controlled, so the full map is only logged at DEBUG.
-  @VisibleForTesting
-  static List<Map.Entry<String, Long>> topFailures(Map<String, Long> counts) {
-    return counts.entrySet().stream()
-        .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
-        .limit(MAX_LOGGED_FAILURE_KEYS)
-        .toList();
-  }
-
   private void emitMetrics(int sparseKeyCount, long totalCoercionFailures, long totalInferenceFailures) {
     ServerMetrics serverMetrics = ServerMetrics.get();
     if (serverMetrics == null || _numDocs == 0) {
       return;
     }
-    String col = _columnName;
 
     if (totalCoercionFailures > 0) {
-      serverMetrics.addMeteredTableValue(_tableNameWithType, col,
+      serverMetrics.addMeteredTableValue(_tableNameWithType, _columnName,
           ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, totalCoercionFailures);
     }
     if (totalInferenceFailures > 0) {
-      serverMetrics.addMeteredTableValue(_tableNameWithType, col,
+      serverMetrics.addMeteredTableValue(_tableNameWithType, _columnName,
           ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, totalInferenceFailures);
     }
 
-    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, col,
+    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
         ServerGauge.OPEN_STRUCT_DENSE_KEY_COUNT, _resolvedDenseKeys.size());
-    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, col,
+    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
         ServerGauge.OPEN_STRUCT_SPARSE_KEY_COUNT, sparseKeyCount);
-    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, col,
+    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
         ServerGauge.OPEN_STRUCT_SEGMENT_KEY_COUNT, _presenceBitmaps.size());
     // Denominator for the per-key fill rate. Emitted as a raw count rather than folding the ratio into a
     // single percentage gauge: integer division truncates a configured dense key present in a handful of
     // docs to 0, which is indistinguishable from no data and is exactly the case worth alerting on.
-    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, col,
+    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
         ServerGauge.OPEN_STRUCT_SEGMENT_DOC_COUNT, _numDocs);
 
     // Iterates the configured dense keys rather than _resolvedDenseKeys. Under the default config
@@ -341,7 +323,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       RoaringBitmap presence = _presenceBitmaps.get(key);
       if (presence != null) {
         serverMetrics.setOrUpdateTableGauge(_tableNameWithType,
-            OpenStructNaming.metricKey(col, key),
+            OpenStructNaming.metricKey(_columnName, key),
             ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT, presence.getCardinality());
       }
     }

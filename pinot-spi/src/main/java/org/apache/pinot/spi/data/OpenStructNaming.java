@@ -59,35 +59,9 @@ public final class OpenStructNaming {
   /// what `ObjectName.quote` escapes -- and would need revisiting if metrics stopped being exported
   /// through JMX.
   public static String metricKey(String openStructColumn, String key) {
-    return openStructColumn + SEPARATOR + escapeKeyForMetricName(key);
-  }
-
-  private static String escapeKeyForMetricName(String key) {
-    StringBuilder sb = null;
-    for (int i = 0; i < key.length(); i++) {
-      char c = key.charAt(i);
-      String escape = null;
-      if (c == '%') {
-        escape = "%25";
-      } else if (c == '"') {
-        escape = "%22";
-      } else if (c == '\\') {
-        escape = "%5C";
-      } else if (c == '*') {
-        escape = "%2A";
-      } else if (c == '?') {
-        escape = "%3F";
-      }
-      if (escape != null) {
-        if (sb == null) {
-          sb = new StringBuilder(key.length() + 8).append(key, 0, i);
-        }
-        sb.append(escape);
-      } else if (sb != null) {
-        sb.append(c);
-      }
-    }
-    return sb == null ? key : sb.toString();
+    // '%' first so the escapes introduced below are not themselves re-escaped.
+    return openStructColumn + SEPARATOR + key.replace("%", "%25").replace("\"", "%22").replace("\\", "%5C")
+        .replace("*", "%2A").replace("?", "%3F");
   }
 
   public static String sparseColumnName(String openStructColumn) {

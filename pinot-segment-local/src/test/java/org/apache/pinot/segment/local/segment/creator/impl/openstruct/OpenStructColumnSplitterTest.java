@@ -24,7 +24,6 @@ import java.io.File;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -787,19 +786,5 @@ public class OpenStructColumnSplitterTest {
     } finally {
       ServerMetrics.deregister();
     }
-  }
-
-  /// The key space is user-controlled, so the seal-time INFO summary names at most
-  /// MAX_LOGGED_FAILURE_KEYS keys, highest count first.
-  @Test
-  public void testTopFailuresCapsAndSortsByCount() {
-    Map<String, Long> counts = new LinkedHashMap<>();
-    for (int i = 1; i <= 9; i++) {
-      counts.put("key" + i, (long) i);
-    }
-    List<Map.Entry<String, Long>> top = OpenStructColumnSplitter.topFailures(counts);
-    assertEquals(top.size(), 5);
-    assertEquals(top.stream().map(Map.Entry::getKey).toList(),
-        List.of("key9", "key8", "key7", "key6", "key5"));
   }
 }
