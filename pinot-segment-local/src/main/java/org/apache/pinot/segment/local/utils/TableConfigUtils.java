@@ -457,7 +457,8 @@ public final class TableConfigUtils {
   /// - Enrichment configs: each config is valid.
   /// - Transform configs: non-null column and function, no duplicate destination, and each destination is a schema
   ///   column, an intermediate consumed by another transform, or an aggregation source column; the function is valid
-  ///   and does not reference its own destination.
+  ///   and does not reference its own destination. REALTIME tables require immutable functions, while OFFLINE tables
+  ///   allow all volatility categories.
   /// - Complex-type config: no schema field collides with a `prefixesToRename` prefix.
   /// - Schema-conforming transformer config.
   @VisibleForTesting
@@ -621,7 +622,9 @@ public final class TableConfigUtils {
                   + columnName + "'");
         }
         try {
-          validateIngestionTransformFunctionVolatility(transformConfig, existingTransformConfigs);
+          if (tableConfig.getTableType() == TableType.REALTIME) {
+            validateIngestionTransformFunctionVolatility(transformConfig, existingTransformConfigs);
+          }
           expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
         } catch (Exception e) {
           throw new IllegalStateException(

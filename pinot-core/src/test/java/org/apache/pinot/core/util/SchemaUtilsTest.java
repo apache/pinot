@@ -190,12 +190,17 @@ public class SchemaUtilsTest {
 
   @Test
   public void testCompatibilityGrandfathersExistingNonDeterministicTransform() {
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("eventTimeMs", DataType.LONG).build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addMetric("eventTimeMs", DataType.LONG)
+        .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(List.of(new TransformConfig("eventTimeMs", "now()")));
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(ingestionConfig).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(getStreamConfigs())
+        .setIngestionConfig(ingestionConfig)
+        .build();
 
     // A new table using this transform is still rejected.
     Assert.expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, schema));

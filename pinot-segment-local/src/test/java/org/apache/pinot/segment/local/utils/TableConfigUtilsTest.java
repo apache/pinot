@@ -381,7 +381,9 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validate(tableConfig, schema);
 
     // valid transform configs
-    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", DataType.STRING)
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", DataType.STRING)
+        .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
     indexingConfig.setNoDictionaryColumns(List.of("myCol"));
     ingestionConfig.setAggregationConfigs(null);
@@ -390,35 +392,36 @@ public class TableConfigUtilsTest {
 
     Schema transformSchema = schema;
     ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "now()")));
-    IllegalStateException nonDeterministicError =
-        expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, transformSchema));
-    assertTrue(nonDeterministicError.getMessage().contains("Function 'now' has VOLATILE volatility"));
+    TableConfigUtils.validate(tableConfig, transformSchema);
 
-    IngestionConfig existingIngestionConfig = new IngestionConfig();
-    existingIngestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "now()")));
-    TableConfig existingTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setIngestionConfig(existingIngestionConfig)
+    TableConfig realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(getStreamConfigs())
+        .setIngestionConfig(ingestionConfig)
         .build();
-    TableConfigUtils.validate(tableConfig, schema, null, existingTableConfig);
+    IllegalStateException nonDeterministicError = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validate(realtimeTableConfig, transformSchema));
+    assertTrue(nonDeterministicError.getMessage().contains("Function 'now' has VOLATILE volatility"));
+    TableConfigUtils.validate(realtimeTableConfig, transformSchema, null, realtimeTableConfig);
 
     ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "plus(now(), 1)")));
     nonDeterministicError = expectThrows(IllegalStateException.class,
-        () -> TableConfigUtils.validate(tableConfig, transformSchema, null, existingTableConfig));
+        () -> TableConfigUtils.validate(realtimeTableConfig, transformSchema));
     assertTrue(nonDeterministicError.getMessage().contains("Function 'now' has VOLATILE volatility"));
 
     ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "rand()")));
-    nonDeterministicError =
-        expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, transformSchema));
+    nonDeterministicError = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validate(realtimeTableConfig, transformSchema));
     assertTrue(nonDeterministicError.getMessage().contains("Function 'rand' has VOLATILE volatility"));
 
     ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "reqId('unused')")));
-    nonDeterministicError =
-        expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, transformSchema));
+    nonDeterministicError = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validate(realtimeTableConfig, transformSchema));
     assertTrue(nonDeterministicError.getMessage().contains("Function 'reqid' has STABLE volatility"),
         nonDeterministicError.getMessage());
 
     ingestionConfig.setTransformConfigs(List.of(new TransformConfig("myCol", "rand(123)")));
-    TableConfigUtils.validate(tableConfig, schema);
+    TableConfigUtils.validate(realtimeTableConfig, transformSchema);
 
     // Legacy schema-level transforms are also part of the ingestion pipeline. A new table must reject them, while
     // validation of an existing table stays permissive so unrelated config updates are not stranded.
