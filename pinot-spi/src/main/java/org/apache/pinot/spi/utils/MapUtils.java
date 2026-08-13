@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.io.JsonStringEncoder;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.base.Preconditions;
@@ -28,6 +29,7 @@ import java.io.OutputStream;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
@@ -296,6 +298,114 @@ public class MapUtils {
   private static void checkLength(ByteBuffer byteBuffer, int length) {
     if (length < 0 || length > byteBuffer.remaining()) {
       throw new BufferUnderflowException();
+    }
+  }
+
+  /// Renders a serialized MAP frame as a JSON object without materializing the map.
+  ///
+  /// The frame already stores each value as the JSON bytes that [#serializeMap] produced, so the values are copied
+  /// through verbatim and only the keys are quoted. That skips the parse-into-`HashMap`-then-serialize-again round
+  /// trip [#toString(Map)] performs, and it skips Jackson entirely.
+  ///
+  /// Entries are emitted in frame order. Both forward-index write paths (`ForwardIndexCreator#putValue` at segment
+  /// build and `MutableSegmentImpl` while consuming) frame maps through the key-sorting [#serializeMap(Map)], so for
+  /// those frames this is byte-identical to `toString(deserializeMap(frame))`. A frame written through
+  /// [#serializeMap(Map, boolean)] with `sortByKey = false` renders in its own insertion order instead.
+  public static String frameToJsonString(byte[] bytes) {
+    return frameToJsonString(ByteBuffer.wrap(bytes));
+  }
+
+  /// Variant of [#frameToJsonString(byte\[\])] reading from the buffer's current position.
+  public static String frameToJsonString(ByteBuffer byteBuffer) {
+    byteBuffer.order(ByteOrder.BIG_ENDIAN);
+    int size = byteBuffer.getInt();
+    if (size == 0) {
+      return "{}";
+    }
+    // Quoting a key adds 2 bytes and the separators add 2, while the two length prefixes it replaces free up 8, so
+    // an unescaped rendering never exceeds the remaining frame bytes. Escaping is the only path that can grow.
+    JsonBuilder builder = new JsonBuilder(byteBuffer.remaining() + 2);
+    builder.append((byte) '{');
+    for (int i = 0; i < size; i++) {
+      if (i > 0) {
+        builder.append((byte) ',');
+      }
+      int keyLength = byteBuffer.getInt();
+      checkLength(byteBuffer, keyLength);
+      builder.appendQuotedKey(byteBuffer, keyLength);
+      byteBuffer.position(byteBuffer.position() + keyLength);
+      builder.append((byte) ':');
+      int valueLength = byteBuffer.getInt();
+      checkLength(byteBuffer, valueLength);
+      builder.appendRaw(byteBuffer, valueLength);
+      byteBuffer.position(byteBuffer.position() + valueLength);
+    }
+    builder.append((byte) '}');
+    return builder.toUtf8String();
+  }
+
+  /// Growable byte sink for [#frameToJsonString]. Assembling UTF-8 bytes and decoding once at the end avoids
+  /// decoding every key individually, which is what makes the common all-ASCII frame allocation-light.
+  private static final class JsonBuilder {
+    private byte[] _bytes;
+    private int _length;
+
+    private JsonBuilder(int capacity) {
+      _bytes = new byte[capacity];
+    }
+
+    private void ensure(int extra) {
+      if (_length + extra > _bytes.length) {
+        _bytes = Arrays.copyOf(_bytes, Math.max(_length + extra, _bytes.length * 2));
+      }
+    }
+
+    private void append(byte b) {
+      ensure(1);
+      _bytes[_length++] = b;
+    }
+
+    /// Copies `length` bytes from the buffer's current position without advancing it.
+    private void appendRaw(ByteBuffer byteBuffer, int length) {
+      ensure(length);
+      int offset = byteBuffer.position();
+      for (int i = 0; i < length; i++) {
+        _bytes[_length++] = byteBuffer.get(offset + i);
+      }
+    }
+
+    /// Writes the key as a JSON string. Keys needing no escaping - the overwhelming majority - are copied as raw
+    /// UTF-8; anything else falls back to decoding the key and letting Jackson escape it.
+    private void appendQuotedKey(ByteBuffer byteBuffer, int length) {
+      int offset = byteBuffer.position();
+      boolean clean = true;
+      for (int i = 0; i < length; i++) {
+        byte b = byteBuffer.get(offset + i);
+        // Signed bytes below 0x20 are control characters; continuation bytes of multi-byte UTF-8 are negative and
+        // need no escaping, so only the ASCII range is inspected.
+        if ((b >= 0 && b < 0x20) || b == '"' || b == '\\') {
+          clean = false;
+          break;
+        }
+      }
+      append((byte) '"');
+      if (clean) {
+        appendRaw(byteBuffer, length);
+      } else {
+        byte[] keyBytes = new byte[length];
+        for (int i = 0; i < length; i++) {
+          keyBytes[i] = byteBuffer.get(offset + i);
+        }
+        byte[] escaped = JsonStringEncoder.getInstance().quoteAsUTF8(Utf8Utils.decode(keyBytes));
+        ensure(escaped.length);
+        System.arraycopy(escaped, 0, _bytes, _length, escaped.length);
+        _length += escaped.length;
+      }
+      append((byte) '"');
+    }
+
+    private String toUtf8String() {
+      return new String(_bytes, 0, _length, StandardCharsets.UTF_8);
     }
   }
 
