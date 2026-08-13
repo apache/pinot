@@ -119,6 +119,18 @@ public class PinotGrpcResultSetTest {
   }
 
   @Test
+  public void testGetStringForNullScalar()
+      throws Exception {
+    PinotGrpcResultSet resultSet = createResultSet(
+        new String[]{"value"}, new ColumnDataType[]{ColumnDataType.STRING}, new Object[]{"placeholder"});
+
+    Assert.assertTrue(resultSet.next());
+    setCurrentRowValue(resultSet, 0, null);
+    Assert.assertNull(resultSet.getString(1));
+    Assert.assertTrue(resultSet.wasNull());
+  }
+
+  @Test
   public void testGetUuid()
       throws Exception {
     UUID uuid = UUID.fromString("00000000-0000-0000-0000-000000000001");
