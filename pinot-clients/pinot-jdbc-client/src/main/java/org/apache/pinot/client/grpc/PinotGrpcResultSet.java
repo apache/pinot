@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.client.PinotResultMetadata;
 import org.apache.pinot.client.base.AbstractBaseResultSet;
 import org.apache.pinot.common.proto.Broker;
@@ -162,6 +163,7 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
   }
 
   @Override
+  @Nullable
   public String getString(int columnIndex)
       throws SQLException {
     Object value = getValue(columnIndex);
@@ -172,6 +174,7 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
     return val;
   }
 
+  @Nullable
   private Object getValue(int columnIndex)
       throws SQLException {
     validateColumn(columnIndex);
@@ -183,6 +186,7 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
   }
 
   @Override
+  @Nullable
   protected Map<?, ?> getMap(int columnIndex)
       throws SQLException {
     Object value = getValue(columnIndex);
@@ -202,6 +206,7 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
   }
 
   @Override
+  @Nullable
   protected List<?> getList(int columnIndex, ColumnDataType dataType)
       throws SQLException {
     Object value = getValue(columnIndex);
