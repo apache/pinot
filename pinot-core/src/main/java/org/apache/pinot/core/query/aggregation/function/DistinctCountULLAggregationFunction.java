@@ -85,19 +85,8 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     DataType dataType = blockValSet.getValueType();
     DataType storedType = dataType.getStoredType();
 
-    // UUID values are logical scalars (stored as 16-byte BYTES) — not serialized UltraLogLog state. Hash the
-    // canonical UUID string so DISTINCTCOUNTULL(uuidCol) matches DISTINCTCOUNTULL(CAST(uuidCol AS STRING)).
-    if (dataType == DataType.UUID) {
-      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
-      UltraLogLog ull = getULL(aggregationResultHolder);
-      for (int i = 0; i < length; i++) {
-        UltraLogLogUtils.hashObject(uuidBytesValues[i]).ifPresent(ull::add);
-      }
-      return;
-    }
-
     // Treat BYTES value as serialized UltraLogLog
-    if (storedType == DataType.BYTES) {
+    if (storedType == DataType.BYTES && dataType != DataType.UUID) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         UltraLogLog ull = aggregationResultHolder.getResult();
@@ -157,6 +146,13 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
           UltraLogLogUtils.hashObject(stringValues[i]).ifPresent(ull::add);
         }
         break;
+      // Reached only by UUID: a real BYTES column is serialized ULL state and is handled above.
+      case BYTES:
+        byte[][] uuidValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          UltraLogLogUtils.hashObject(uuidValues[i]).ifPresent(ull::add);
+        }
+        break;
       default:
         throw new IllegalStateException(
             "Illegal data type for DISTINCT_COUNT_ULL aggregation function: " + storedType);
@@ -171,18 +167,8 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     DataType dataType = blockValSet.getValueType();
     DataType storedType = dataType.getStoredType();
 
-    // UUID columns: hash canonical UUID strings converted from raw bytes (see aggregate() for rationale).
-    if (dataType == DataType.UUID) {
-      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        UltraLogLog ull = getULL(groupByResultHolder, groupKeyArray[i]);
-        UltraLogLogUtils.hashObject(uuidBytesValues[i]).ifPresent(ull::add);
-      }
-      return;
-    }
-
     // Treat BYTES value as serialized UltraLogLogs
-    if (storedType == DataType.BYTES) {
+    if (storedType == DataType.BYTES && dataType != DataType.UUID) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         for (int i = 0; i < length; i++) {
@@ -248,6 +234,14 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
               .ifPresent(getULL(groupByResultHolder, groupKeyArray[i])::add);
         }
         break;
+      // Reached only by UUID: a real BYTES column is serialized ULL state and is handled above.
+      case BYTES:
+        byte[][] uuidValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          UltraLogLogUtils.hashObject(uuidValues[i])
+              .ifPresent(getULL(groupByResultHolder, groupKeyArray[i])::add);
+        }
+        break;
       default:
         throw new IllegalStateException(
             "Illegal data type for DISTINCT_COUNT_ULL aggregation function: " + storedType);
@@ -262,21 +256,8 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     DataType dataType = blockValSet.getValueType();
     DataType storedType = dataType.getStoredType();
 
-    // UUID columns: hash canonical UUID strings converted from raw bytes (see aggregate() for rationale).
-    if (dataType == DataType.UUID) {
-      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        byte[] canonical = uuidBytesValues[i];
-        for (int groupKey : groupKeysArray[i]) {
-          UltraLogLog ull = getULL(groupByResultHolder, groupKey);
-          UltraLogLogUtils.hashObject(canonical).ifPresent(ull::add);
-        }
-      }
-      return;
-    }
-
     // Treat BYTES value as serialized UltraLogLogs
-    if (storedType == DataType.BYTES) {
+    if (storedType == DataType.BYTES && dataType != DataType.UUID) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         for (int i = 0; i < length; i++) {
@@ -338,6 +319,13 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], stringValues[i]);
+        }
+        break;
+      // Reached only by UUID: a real BYTES column is serialized ULL state and is handled above.
+      case BYTES:
+        byte[][] uuidValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], uuidValues[i]);
         }
         break;
       default:

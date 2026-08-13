@@ -96,19 +96,8 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     DataType dataType = blockValSet.getValueType();
     DataType storedType = dataType.getStoredType();
 
-    // UUID values are logical scalars (stored as 16-byte BYTES) — not serialized HyperLogLogPlus state. Offer the
-    // canonical UUID string so DISTINCTCOUNTHLLPLUS(uuidCol) matches DISTINCTCOUNTHLLPLUS(CAST(uuidCol AS STRING)).
-    if (dataType == DataType.UUID) {
-      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
-      HyperLogLogPlus hyperLogLogPlus = getHyperLogLogPlus(aggregationResultHolder);
-      for (int i = 0; i < length; i++) {
-        hyperLogLogPlus.offer(uuidBytesValues[i]);
-      }
-      return;
-    }
-
     // Treat BYTES value as serialized HyperLogLogPlus
-    if (storedType == DataType.BYTES) {
+    if (storedType == DataType.BYTES && dataType != DataType.UUID) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         HyperLogLogPlus hyperLogLogPlus = aggregationResultHolder.getResult();
@@ -177,6 +166,13 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
           hyperLogLogPlus.offer(stringValues[i]);
         }
         break;
+      // Reached only by UUID: a real BYTES column is serialized HLL+ state and is handled above.
+      case BYTES:
+        byte[][] uuidValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          hyperLogLogPlus.offer(uuidValues[i]);
+        }
+        break;
       default:
         throw new IllegalStateException(
             "Illegal data type for DISTINCT_COUNT_HLL_PLUS aggregation function: " + storedType);
@@ -239,6 +235,15 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
           }
         }
         break;
+      // Reached only by UUID: a real BYTES column is serialized HLL+ state and is handled above.
+      case BYTES:
+        byte[][][] uuidValuesArray = blockValSet.getBytesValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (byte[] value : uuidValuesArray[i]) {
+            hyperLogLogPlus.offer(value);
+          }
+        }
+        break;
       default:
         throw new IllegalStateException(
             "Illegal data type for DISTINCT_COUNT_HLL_PLUS aggregation function: " + storedType);
@@ -253,17 +258,8 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     DataType dataType = blockValSet.getValueType();
     DataType storedType = dataType.getStoredType();
 
-    // UUID columns: offer canonical UUID strings converted from raw bytes (see aggregate() for rationale).
-    if (dataType == DataType.UUID) {
-      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        getHyperLogLogPlus(groupByResultHolder, groupKeyArray[i]).offer(uuidBytesValues[i]);
-      }
-      return;
-    }
-
     // Treat BYTES value as serialized HyperLogLogPlus
-    if (storedType == DataType.BYTES) {
+    if (storedType == DataType.BYTES && dataType != DataType.UUID) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         for (int i = 0; i < length; i++) {
@@ -333,6 +329,13 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
           getHyperLogLogPlus(groupByResultHolder, groupKeyArray[i]).offer(stringValues[i]);
         }
         break;
+      // Reached only by UUID: a real BYTES column is serialized HLL+ state and is handled above.
+      case BYTES:
+        byte[][] uuidValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          getHyperLogLogPlus(groupByResultHolder, groupKeyArray[i]).offer(uuidValues[i]);
+        }
+        break;
       default:
         throw new IllegalStateException(
             "Illegal data type for DISTINCT_COUNT_HLL_PLUS aggregation function: " + storedType);
@@ -398,6 +401,16 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
           }
         }
         break;
+      // Reached only by UUID: a real BYTES column is serialized HLL+ state and is handled above.
+      case BYTES:
+        byte[][][] uuidValuesArray = blockValSet.getBytesValuesMV();
+        for (int i = 0; i < length; i++) {
+          HyperLogLogPlus hyperLogLogPlus = getHyperLogLogPlus(groupByResultHolder, groupKeyArray[i]);
+          for (byte[] value : uuidValuesArray[i]) {
+            hyperLogLogPlus.offer(value);
+          }
+        }
+        break;
       default:
         throw new IllegalStateException(
             "Illegal data type for DISTINCT_COUNT_HLL_PLUS aggregation function: " + storedType);
@@ -412,20 +425,8 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     DataType dataType = blockValSet.getValueType();
     DataType storedType = dataType.getStoredType();
 
-    // UUID columns: offer canonical UUID strings converted from raw bytes (see aggregate() for rationale).
-    if (dataType == DataType.UUID) {
-      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        byte[] canonical = uuidBytesValues[i];
-        for (int groupKey : groupKeysArray[i]) {
-          getHyperLogLogPlus(groupByResultHolder, groupKey).offer(canonical);
-        }
-      }
-      return;
-    }
-
     // Treat BYTES value as serialized HyperLogLogPlus
-    if (storedType == DataType.BYTES) {
+    if (storedType == DataType.BYTES && dataType != DataType.UUID) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         for (int i = 0; i < length; i++) {
@@ -496,6 +497,13 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], stringValues[i]);
+        }
+        break;
+      // Reached only by UUID: a real BYTES column is serialized HLL+ state and is handled above.
+      case BYTES:
+        byte[][] uuidValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], uuidValues[i]);
         }
         break;
       default:
@@ -575,6 +583,19 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
           for (int groupKey : groupKeysArray[i]) {
             HyperLogLogPlus hyperLogLogPlus = getHyperLogLogPlus(groupByResultHolder, groupKey);
             for (String value : stringValues) {
+              hyperLogLogPlus.offer(value);
+            }
+          }
+        }
+        break;
+      // Reached only by UUID: a real BYTES column is serialized HLL+ state and is handled above.
+      case BYTES:
+        byte[][][] uuidValuesArray = blockValSet.getBytesValuesMV();
+        for (int i = 0; i < length; i++) {
+          byte[][] uuidValues = uuidValuesArray[i];
+          for (int groupKey : groupKeysArray[i]) {
+            HyperLogLogPlus hyperLogLogPlus = getHyperLogLogPlus(groupByResultHolder, groupKey);
+            for (byte[] value : uuidValues) {
               hyperLogLogPlus.offer(value);
             }
           }
