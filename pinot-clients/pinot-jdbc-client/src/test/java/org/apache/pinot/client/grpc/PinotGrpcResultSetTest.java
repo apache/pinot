@@ -19,8 +19,10 @@
 package org.apache.pinot.client.grpc;
 
 import com.google.protobuf.ByteString;
+import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.sql.ResultSetMetaData;
+import java.sql.SQLDataException;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
@@ -98,16 +100,22 @@ public class PinotGrpcResultSetTest {
   }
 
   @Test
-  public void testEmptyArrays()
+  public void testNullAndEmptyValues()
       throws Exception {
     PinotGrpcResultSet resultSet = createResultSet(
-        new String[]{"ints", "strings"},
-        new ColumnDataType[]{ColumnDataType.INT_ARRAY, ColumnDataType.STRING_ARRAY},
-        new Object[]{new int[0], new String[0]});
+        new String[]{"map", "ints", "strings"},
+        new ColumnDataType[]{ColumnDataType.MAP, ColumnDataType.INT_ARRAY, ColumnDataType.STRING_ARRAY},
+        new Object[]{Map.of(), new int[0], new String[0]});
 
     Assert.assertTrue(resultSet.next());
-    Assert.assertEquals(resultSet.getObject(1), List.of());
-    Assert.assertEquals(resultSet.getObject(2), List.of());
+    setCurrentRowValue(resultSet, 0, null);
+    setCurrentRowValue(resultSet, 1, null);
+    Assert.assertNull(resultSet.getObject(1));
+    Assert.assertTrue(resultSet.wasNull());
+    Assert.assertNull(resultSet.getObject(2));
+    Assert.assertTrue(resultSet.wasNull());
+    Assert.assertEquals(resultSet.getObject(3), List.of());
+    Assert.assertFalse(resultSet.wasNull());
   }
 
   @Test
@@ -162,13 +170,48 @@ public class PinotGrpcResultSetTest {
     Assert.assertEquals(resultSet.getObject(3), Timestamp.valueOf("2020-01-01 12:00:00"));
   }
 
+  @Test
+  public void testGetObjectErrors()
+      throws Exception {
+    DataSchema schema = new DataSchema(
+        new String[]{"map", "ints", "bytes", "timestamp", "decimal"},
+        new ColumnDataType[]{ColumnDataType.MAP, ColumnDataType.INT_ARRAY, ColumnDataType.BYTES,
+            ColumnDataType.TIMESTAMP, ColumnDataType.BIG_DECIMAL});
+    PinotGrpcResultSet resultSet = createResultSetFromFormattedRow(
+        schema, new Object[]{Map.of(), new int[0], "zz", "not-a-timestamp", "not-a-decimal"});
+
+    Assert.assertTrue(resultSet.next());
+    setCurrentRowValue(resultSet, 0, "not-a-map");
+    setCurrentRowValue(resultSet, 1, "not-an-array");
+    Assert.expectThrows(SQLDataException.class, () -> resultSet.getObject(1));
+    Assert.expectThrows(SQLDataException.class, () -> resultSet.getObject(2));
+    Assert.expectThrows(SQLDataException.class, () -> resultSet.getObject(3));
+    Assert.expectThrows(SQLDataException.class, () -> resultSet.getObject(4));
+    Assert.expectThrows(SQLDataException.class, () -> resultSet.getObject(5));
+  }
+
+  private static void setCurrentRowValue(PinotGrpcResultSet resultSet, int columnIndex, Object value)
+      throws Exception {
+    Field currentRowBatchField = PinotGrpcResultSet.class.getDeclaredField("_currentRowBatch");
+    currentRowBatchField.setAccessible(true);
+    ResultTable currentRowBatch = (ResultTable) currentRowBatchField.get(resultSet);
+    currentRowBatch.getRows().get(0)[columnIndex] = value;
+  }
+
   private static PinotGrpcResultSet createResultSet(String[] columnNames, ColumnDataType[] columnTypes, Object[] row)
       throws Exception {
     DataSchema schema = new DataSchema(columnNames, columnTypes);
     Object[] formattedRow = row.clone();
     for (int i = 0; i < formattedRow.length; i++) {
-      formattedRow[i] = columnTypes[i].format(formattedRow[i]);
+      if (formattedRow[i] != null) {
+        formattedRow[i] = columnTypes[i].format(formattedRow[i]);
+      }
     }
+    return createResultSetFromFormattedRow(schema, formattedRow);
+  }
+
+  private static PinotGrpcResultSet createResultSetFromFormattedRow(DataSchema schema, Object[] formattedRow)
+      throws Exception {
     List<Object[]> rows = new ArrayList<>();
     rows.add(formattedRow);
     byte[] encodedRows = new JsonResponseEncoder().encodeResultTable(new ResultTable(schema, rows), 0, rows.size());
