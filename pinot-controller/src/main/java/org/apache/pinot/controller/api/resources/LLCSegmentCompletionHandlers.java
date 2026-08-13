@@ -120,6 +120,7 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
       @QueryParam(SegmentCompletionProtocol.PARAM_STREAM_PARTITION_MSG_OFFSET) String streamPartitionMsgOffset,
       @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) String stopReasonCode,
       @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
       @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows) {
     if (instanceId == null || segmentName == null || streamPartitionMsgOffset == null) {
@@ -133,6 +134,7 @@ public class LLCSegmentCompletionHandlers {
         .withSegmentName(segmentName)
         .withStreamPartitionMsgOffset(streamPartitionMsgOffset)
         .withReason(stopReason)
+        .withReasonCode(stopReasonCode)
         .withMemoryUsedBytes(memoryUsedBytes)
         .withNumRows(numRows);
     LOGGER.info("Processing segmentConsumed: {}", requestParams);
@@ -149,7 +151,8 @@ public class LLCSegmentCompletionHandlers {
   public String segmentStoppedConsuming(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
       @QueryParam(SegmentCompletionProtocol.PARAM_STREAM_PARTITION_MSG_OFFSET) String streamPartitionMsgOffset,
-      @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason) {
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) String stopReasonCode) {
     if (instanceId == null || segmentName == null || streamPartitionMsgOffset == null) {
       LOGGER.error("Invalid call: segmentName={}, instanceId={}, streamPartitionMsgOffset={}", segmentName, instanceId,
           streamPartitionMsgOffset);
@@ -160,7 +163,8 @@ public class LLCSegmentCompletionHandlers {
         .withInstanceId(instanceId)
         .withSegmentName(segmentName)
         .withStreamPartitionMsgOffset(streamPartitionMsgOffset)
-        .withReason(stopReason);
+        .withReason(stopReason)
+        .withReasonCode(stopReasonCode);
     LOGGER.info("Processing segmentStoppedConsuming: {}", requestParams);
 
     String response = _segmentCompletionManager.segmentStoppedConsuming(requestParams).toJsonString();
@@ -269,7 +273,9 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
       @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
-      @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason, FormDataMultiPart metadataFiles) {
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) String stopReasonCode,
+      FormDataMultiPart metadataFiles) {
     if (instanceId == null || segmentName == null || segmentLocation == null || metadataFiles == null
         || streamPartitionMsgOffset == null) {
       LOGGER.error("Invalid call: segmentName={}, instanceId={}, segmentLocation={}, streamPartitionMsgOffset={}",
@@ -288,7 +294,8 @@ public class LLCSegmentCompletionHandlers {
         .withWaitTimeMillis(waitTimeMillis)
         .withNumRows(numRows)
         .withMemoryUsedBytes(memoryUsedBytes)
-        .withReason(stopReason);
+        .withReason(stopReason)
+        .withReasonCode(stopReasonCode);
     LOGGER.info("Processing segmentCommitEndWithMetadata: {}", requestParams);
 
     SegmentMetadataImpl segmentMetadata;
