@@ -369,12 +369,20 @@ public class IndexSizeStatsTest {
 
   private File buildSegmentWithoutInvertedIndex()
       throws Exception {
+    return buildSegmentWithoutInvertedIndex(null);
+  }
+
+  private File buildSegmentWithoutInvertedIndex(@Nullable SegmentVersion segmentVersion)
+      throws Exception {
     URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
     assertNotNull(resource);
     SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGeneratorConfig(new File(TestUtils.getFileFromResourceUrl(resource)),
             FileFormat.AVRO, INDEX_DIR, RAW_TABLE_NAME, tableConfig(true, List.of()), schema());
     config.setSegmentNamePostfix("1");
+    if (segmentVersion != null) {
+      config.setSegmentVersion(segmentVersion);
+    }
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     driver.build();
@@ -498,5 +506,49 @@ public class IndexSizeStatsTest {
         "A reload must not delete the external text index size; keys were: " + indexSizeKeys(afterReload));
     assertEquals(afterReload.getLong(textKey), atSeal,
         "The external directory size should be re-measured to the same value");
+  }
+
+  /// The other half of the data-loss bug: a V1 segment has no `v3/index_map` at all, so `getNumIndexes()` is 0 for
+  /// every column and a refresh driven only by source 1 would restore nothing on reload -- wiping every persisted
+  /// size, not just the ones the index_map-only view of the previous test covers.
+  ///
+  /// Reloads a V1 segment that never had an inverted index, with one now configured, and checks that both the
+  /// pre-existing forward-index size and the newly-created inverted-index size survive with the exact V1 file
+  /// length -- proving source 3 (individual file stat), not source 1, is what populated them.
+  @Test
+  public void testReloadRestoresSizesForV1Segment()
+      throws Exception {
+    Schema schema = schema();
+    File segmentDir = buildSegmentWithoutInvertedIndex(SegmentVersion.v1);
+    assertFalse(
+        new File(SegmentDirectoryPaths.findSegmentDirectory(segmentDir), V1Constants.INDEX_MAP_FILE_NAME).exists(),
+        "Sanity: a V1 segment has no index_map, so source 1 cannot describe anything here");
+
+    String forwardKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+        StandardIndexes.forward().getId());
+    long forwardAtSeal = loadMetadata(segmentDir).getLong(forwardKey);
+    assertTrue(forwardAtSeal > 0, "Sanity: seal recorded the forward index size");
+
+    runPreProcessor(segmentDir, tableConfig(true, List.of("column3")), schema);
+
+    PropertiesConfiguration afterReload = loadMetadata(segmentDir);
+    String invertedKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+        StandardIndexes.inverted().getId());
+    assertTrue(indexSizeKeys(afterReload).contains(invertedKey),
+        "Reload added an inverted index on a V1 segment, so its size must appear; keys were: "
+            + indexSizeKeys(afterReload));
+    assertTrue(indexSizeKeys(afterReload).contains(forwardKey),
+        "A refresh limited to index_map would wipe every V1 key, including the untouched forward index; keys were: "
+            + indexSizeKeys(afterReload));
+
+    File segmentContentDir = SegmentDirectoryPaths.findSegmentDirectory(segmentDir);
+    for (String extension : IndexService.getInstance().get(StandardIndexes.inverted().getId())
+        .getFileExtensions(null)) {
+      File indexFile = new File(segmentContentDir, "column3" + extension);
+      if (indexFile.isFile()) {
+        assertEquals(afterReload.getLong(invertedKey), indexFile.length(),
+            "The new inverted index size must equal the actual V1 file length");
+      }
+    }
   }
 }
