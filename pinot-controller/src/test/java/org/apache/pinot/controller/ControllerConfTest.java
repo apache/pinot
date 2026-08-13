@@ -243,4 +243,13 @@ public class ControllerConfTest {
     Assert.assertEquals(conf.getPinotTaskQueueCapacity(), 10000);
     Assert.assertEquals(conf.getPinotTaskQueueWarningThreshold(), 8000);
   }
+
+  @Test
+  public void testIngestFromUriLocalFileSystemCompatibilityOption() {
+    ControllerConf controllerConf = new ControllerConf();
+    Assert.assertFalse(controllerConf.isIngestFromUriLocalFileSystemAllowed());
+
+    controllerConf.setProperty(ControllerConf.INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM, true);
+    Assert.assertTrue(controllerConf.isIngestFromUriLocalFileSystemAllowed());
+  }
 }
