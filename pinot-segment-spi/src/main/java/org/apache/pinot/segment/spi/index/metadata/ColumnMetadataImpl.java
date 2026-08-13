@@ -481,9 +481,9 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     return builder.build();
   }
 
-  @Nullable
   /// Collects `column.<column>.indexSizeInBytes.<indexTypeId>` entries for `column`. Unparseable values are skipped:
-  /// these statistics are advisory and must never prevent a segment from loading.
+  /// these statistics are advisory and must never prevent a segment from loading. Never null; empty when nothing was
+  /// persisted.
   private static Map<String, Long> readPersistedIndexSizes(PropertiesConfiguration config, String column) {
     String keyPrefix = Column.getKeyFor(column, Column.INDEX_SIZE_IN_BYTES) + ".";
     Map<String, Long> indexSizes = null;
@@ -513,6 +513,7 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     return indexSizes == null ? Map.of() : Collections.unmodifiableMap(indexSizes);
   }
 
+  @Nullable
   private static ChunkCompressionType parseCompressionType(String column, @Nullable String value) {
     if (value == null) {
       return null;
