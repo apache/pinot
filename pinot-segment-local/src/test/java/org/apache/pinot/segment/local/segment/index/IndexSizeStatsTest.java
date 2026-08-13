@@ -42,6 +42,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -405,5 +406,61 @@ public class IndexSizeStatsTest {
         .addMultiValueDimension("column7", DataType.INT)
         .addDateTime("daysSinceEpoch", DataType.INT, "EPOCH|HOURS", "1:HOURS")
         .build();
+  }
+
+  /// Specs 3/4: a text index held in its own directory is measured recursively and gets **no** magic marker, because
+  /// the converter copies such directories alongside `columns.psf` rather than packing them into it.
+  ///
+  /// This is the only coverage of the directory branch and of `sizeOfDirectoryQuietly`. It also pins the marker rule:
+  /// applying the marker here would over-report by 8 bytes, and adding it to a directory is the mistake the
+  /// file-versus-directory split exists to prevent.
+  @Test
+  public void testTextIndexDirectorySizedWithoutMarker()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(List.of("column4"))
+        .setIndexSizeStatsEnabled(true)
+        .addFieldConfig(
+            new FieldConfig("column4", FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT), null, null))
+        .build();
+    URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
+    assertNotNull(resource);
+    SegmentGeneratorConfig config =
+        SegmentTestUtils.getSegmentGeneratorConfig(new File(TestUtils.getFileFromResourceUrl(resource)),
+            FileFormat.AVRO, INDEX_DIR, RAW_TABLE_NAME, tableConfig, schema());
+    config.setSegmentNamePostfix("1");
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config);
+    driver.build();
+
+    File segmentDir = segmentDirectory();
+    File textIndexDir = findTextIndexDirectory(new File(segmentDir, "v3"));
+    assertNotNull(textIndexDir, "The text index should be a directory copied alongside columns.psf");
+    long onDisk = org.apache.commons.io.FileUtils.sizeOfDirectory(textIndexDir);
+    assertTrue(onDisk > 0, "Sanity: the text index directory should not be empty");
+
+    PropertiesConfiguration metadata = loadMetadata(segmentDir);
+    String textKey =
+        V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column4", StandardIndexes.text().getId());
+    assertTrue(indexSizeKeys(metadata).contains(textKey),
+        "A text index size must be recorded; keys were: " + indexSizeKeys(metadata));
+    assertEquals(metadata.getLong(textKey), onDisk,
+        "The recorded text index size must equal the recursive directory size of " + textIndexDir.getName()
+            + " with no magic marker added, since directories are copied rather than packed");
+
+    // The directory is not an entry in columns.psf, which is why it needs measuring separately at all.
+    PropertiesConfiguration indexMap = CommonsConfigurationUtils.fromFile(
+        new File(SegmentDirectoryPaths.findSegmentDirectory(segmentDir), V1Constants.INDEX_MAP_FILE_NAME));
+    for (String key : CommonsConfigurationUtils.getKeys(indexMap)) {
+      assertFalse(key.startsWith("column4.text_index"),
+          "An externally stored text index must not appear in index_map, but found: " + key);
+    }
+  }
+
+  @Nullable
+  private static File findTextIndexDirectory(File v3Dir) {
+    File[] candidates = v3Dir.listFiles(f -> f.isDirectory() && f.getName().contains(".lucene")
+        && f.getName().contains(".index"));
+    return candidates == null || candidates.length == 0 ? null : candidates[0];
   }
 }
