@@ -98,6 +98,19 @@
           </java>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <configuration>
+          <artifactSet>
+            <excludes>
+              <!-- Experimental Fory support is activated only when applications add Fory to their classpath. -->
+              <exclude>org.apache.fory:fory-json</exclude>
+              <exclude>org.apache.fory:fory-core</exclude>
+            </excludes>
+          </artifactSet>
+        </configuration>
+      </plugin>
       <!-- Stage 1 of SQL parser codegen: FMPP plugs Pinot's custom grammar (config.fmpp +
            templates/Parser.jj) into Calcite's parser template and writes the JavaCC grammar to
            target/generated-sources/javacc/Parser.jj. Declared before javacc-maven-plugin so it runs
@@ -279,6 +292,11 @@
     <dependency>
       <groupId>com.jayway.jsonpath</groupId>
       <artifactId>json-path</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.fory</groupId>
+      <artifactId>fory-json</artifactId>
+      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>org.apache.zookeeper</groupId>

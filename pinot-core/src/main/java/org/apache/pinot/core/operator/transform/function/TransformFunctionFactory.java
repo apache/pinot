@@ -132,6 +132,8 @@ public class TransformFunctionFactory {
         JsonExtractScalarTransformFunction.Fast.class);
     typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_SCALAR_FIRST_MATCH,
         JsonExtractScalarTransformFunction.FirstMatch.class);
+    typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_SCALAR_FORY,
+        JsonExtractScalarTransformFunction.Fory.class);
     typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_KEY, JsonExtractKeyTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.TIME_CONVERT, TimeConversionTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.DATE_TIME_CONVERT, DateTimeConversionTransformFunction.class);

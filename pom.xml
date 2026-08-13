@@ -191,6 +191,7 @@
     <helix.version>2.0.1</helix.version>
     <zkclient.version>0.11</zkclient.version>
     <jackson.version>2.22.1</jackson.version>
+    <fory.version>1.6.0</fory.version>
     <zookeeper.version>3.9.5</zookeeper.version>
     <async-http-client.version>3.0.12</async-http-client.version>
     <jersey.version>2.48</jersey.version>
@@ -1431,6 +1432,11 @@
         <groupId>com.jayway.jsonpath</groupId>
         <artifactId>json-path</artifactId>
         <version>${jsonpath.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.fory</groupId>
+        <artifactId>fory-json</artifactId>
+        <version>${fory.version}</version>
       </dependency>
       <dependency>
         <groupId>net.minidev</groupId>
