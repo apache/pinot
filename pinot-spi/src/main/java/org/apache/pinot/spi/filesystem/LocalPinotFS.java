@@ -115,7 +115,8 @@ public class LocalPinotFS extends BasePinotFS {
       throws IOException {
     File file = toFile(fileUri);
     if (!recursive) {
-      return Arrays.stream(file.list()).map(s -> new File(file, s)).map(File::getAbsolutePath).toArray(String[]::new);
+      return Arrays.stream(listFileNames(file)).map(s -> new File(file, s)).map(File::getAbsolutePath)
+          .toArray(String[]::new);
     } else {
       try (Stream<Path> pathStream = Files.walk(Paths.get(fileUri))) {
         return pathStream.filter(s -> !s.equals(file.toPath())).map(Path::toString).toArray(String[]::new);
@@ -128,7 +129,8 @@ public class LocalPinotFS extends BasePinotFS {
       throws IOException {
     File file = toFile(fileUri);
     if (!recursive) {
-      return Arrays.stream(file.list()).map(s -> getFileMetadata(new File(file, s))).collect(Collectors.toList());
+      return Arrays.stream(listFileNames(file)).map(s -> getFileMetadata(new File(file, s)))
+          .collect(Collectors.toList());
     } else {
       try (Stream<Path> pathStream = Files.walk(Paths.get(fileUri))) {
         return pathStream.filter(s -> !s.equals(file.toPath()))
@@ -136,6 +138,20 @@ public class LocalPinotFS extends BasePinotFS {
             .collect(Collectors.toList());
       }
     }
+  }
+
+  /// Returns the names of the entries directly under the given directory.
+  ///
+  /// [File#list()] returns `null` instead of throwing when the path does not exist, is not a directory, or cannot be
+  /// read, so translate that into the `IOException` the listing methods are contracted to throw for an invalid path.
+  private static String[] listFileNames(File file)
+      throws IOException {
+    String[] fileNames = file.list();
+    if (fileNames == null) {
+      throw new IOException("Failed to list files under: " + file.getAbsolutePath()
+          + " because it does not exist, is not a directory, or cannot be read");
+    }
+    return fileNames;
   }
 
   private static FileMetadata getFileMetadata(File file) {
