@@ -45,6 +45,12 @@ public class TableMetadataInfo {
   // upgrades where servers and controllers may temporarily run different versions of this class.
   private final Map<Integer, Map<String, Long>> _partitionToServerPrimaryKeyCountMap;
   private final List<ColumnCompressionStatsInfo> _columnCompressionStats;
+
+  /// Per-index-type on-disk sizes aggregated across all columns and servers, keyed by `IndexType#getId()`. Null when
+  /// the caller did not ask for it, and also null when any server response failed to parse -- a per-index-type total
+  /// that silently omits a server is worse than no total at all.
+  @Nullable
+  private final Map<String, IndexSizeBreakdownInfo> _indexSizeBreakdown;
   private final CompressionStatsSummary _compressionStats;
 
   @JsonCreator
@@ -58,6 +64,7 @@ public class TableMetadataInfo {
       Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap,
       @JsonProperty("columnCompressionStats") @Nullable
       List<ColumnCompressionStatsInfo> columnCompressionStats,
+      @JsonProperty("indexSizeBreakdown") @Nullable Map<String, IndexSizeBreakdownInfo> indexSizeBreakdown,
       @JsonProperty("compressionStats") @Nullable CompressionStatsSummary compressionStats) {
     _tableName = tableName;
     _diskSizeInBytes = sizeInBytes;
@@ -69,6 +76,7 @@ public class TableMetadataInfo {
     _columnIndexSizeMap = columnIndexSizeMap;
     _partitionToServerPrimaryKeyCountMap = partitionToServerPrimaryKeyCountMap;
     _columnCompressionStats = columnCompressionStats != null ? List.copyOf(columnCompressionStats) : null;
+    _indexSizeBreakdown = indexSizeBreakdown != null ? Map.copyOf(indexSizeBreakdown) : null;
     _compressionStats = compressionStats;
   }
 
@@ -79,7 +87,7 @@ public class TableMetadataInfo {
       Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap,
       @Nullable List<ColumnCompressionStatsInfo> columnCompressionStats) {
     this(tableName, sizeInBytes, numSegments, numRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap,
-        columnIndexSizeMap, partitionToServerPrimaryKeyCountMap, columnCompressionStats, null);
+        columnIndexSizeMap, partitionToServerPrimaryKeyCountMap, columnCompressionStats, null, null);
   }
 
   /// Backwards-compatible constructor for callers that do not provide compression fields.
@@ -88,7 +96,15 @@ public class TableMetadataInfo {
       Map<String, Double> maxNumMultiValuesMap, Map<String, Map<String, Double>> columnIndexSizeMap,
       Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap) {
     this(tableName, sizeInBytes, numSegments, numRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap,
-        columnIndexSizeMap, partitionToServerPrimaryKeyCountMap, null, null);
+        columnIndexSizeMap, partitionToServerPrimaryKeyCountMap, null, null, null);
+  }
+
+  /// Returns the per-index-type size breakdown, or null when the caller did not request it or when any server
+  /// response failed to parse. Omitted from the payload when null.
+  @Nullable
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public Map<String, IndexSizeBreakdownInfo> getIndexSizeBreakdown() {
+    return _indexSizeBreakdown;
   }
 
   public String getTableName() {

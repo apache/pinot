@@ -42,6 +42,7 @@ import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.pinot.common.restlet.resources.IndexSizeBreakdownInfo;
 import org.apache.pinot.common.restlet.resources.ServerTableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
@@ -94,10 +95,19 @@ public class ServerSegmentMetadataReader {
         false, false, Map.of());
   }
 
+  /// Overload that does not request the per-index-type size breakdown. Kept so existing callers compile unchanged.
   public TableMetadataInfo getAggregatedTableMetadataFromServer(String tableNameWithType,
       BiMap<String, String> serverEndPoints, @Nullable List<String> columns, int numReplica, int timeoutMs,
       boolean compressionStatsEnabled, boolean includeColumnCompressionStats,
       Map<String, List<String>> serverToSegmentsMap) {
+    return getAggregatedTableMetadataFromServer(tableNameWithType, serverEndPoints, columns, numReplica, timeoutMs,
+        compressionStatsEnabled, includeColumnCompressionStats, serverToSegmentsMap, false);
+  }
+
+  public TableMetadataInfo getAggregatedTableMetadataFromServer(String tableNameWithType,
+      BiMap<String, String> serverEndPoints, @Nullable List<String> columns, int numReplica, int timeoutMs,
+      boolean compressionStatsEnabled, boolean includeColumnCompressionStats,
+      Map<String, List<String>> serverToSegmentsMap, boolean includeIndexSizeStats) {
     int numServers = serverEndPoints.size();
     LOGGER.info("Reading aggregated segment metadata from {} servers for table: {} with timeout: {}ms", numServers,
         tableNameWithType, timeoutMs);
@@ -106,7 +116,8 @@ public class ServerSegmentMetadataReader {
     List<String> serverUrls = new ArrayList<>(numServers);
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     for (String endpoint : endpointsToServers.keySet()) {
-      String serverUrl = generateAggregateSegmentMetadataServerURL(tableNameWithType, columns, endpoint, false);
+      String serverUrl = generateAggregateSegmentMetadataServerURL(tableNameWithType, columns, endpoint,
+          includeColumnCompressionStats, includeIndexSizeStats);
       serverUrls.add(serverUrl);
     }
 
@@ -128,6 +139,8 @@ public class ServerSegmentMetadataReader {
     Map<String, Double> maxNumMultiValuesMap = new HashMap<>();
     Map<String, Map<String, Double>> columnIndexSizeMap = new HashMap<>();
     Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap = new HashMap<>();
+    // Summed bytes and contributing-segment count per index type id, across every server that answered.
+    Map<String, long[]> indexSizeTotals = new HashMap<>();
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         ServerTableMetadataInfo tableMetadataInfo =
@@ -146,6 +159,18 @@ public class ServerSegmentMetadataReader {
             indexSizes.forEach((index, size) -> aggregateIndexSizes.merge(index, size, Double::sum));
           }
         });
+        Map<String, IndexSizeBreakdownInfo> serverBreakdown = tableMetadataInfo.getIndexSizeBreakdown();
+        if (serverBreakdown != null) {
+          serverBreakdown.forEach((indexTypeId, info) -> {
+            long size = info.getSizePerReplicaInBytes();
+            if (size < 0) {
+              return;
+            }
+            long[] total = indexSizeTotals.computeIfAbsent(indexTypeId, k -> new long[2]);
+            total[0] += size;
+            total[1] += info.getSegmentsWithStats();
+          });
+        }
         tableMetadataInfo.getPartitionToServerPrimaryKeyCountMap().forEach(
             (partition, serverToPrimaryKeyCount) -> partitionToServerPrimaryKeyCountMap.merge(partition,
                 new HashMap<>(serverToPrimaryKeyCount), (l, r) -> {
@@ -179,10 +204,30 @@ public class ServerSegmentMetadataReader {
         ? new ServerCompressionStatsReader(_executor, _connectionManager).read(tableNameWithType,
             serverToSegmentsMap, serverEndPoints, columns, includeColumnCompressionStats, deadlineNanos) : null;
 
+    // Report the breakdown only if every server answered. `totalNumSegments` only counts parsed responses, so a
+    // failed parse leaves no trace a caller could use to notice the shortfall -- and a per-index-type total that
+    // silently omits a server is worse than no total at all.
+    Map<String, IndexSizeBreakdownInfo> indexSizeBreakdown = null;
+    if (indexSizeTotals.isEmpty()) {
+      LOGGER.debug("No server reported index size stats for table: {}", tableNameWithType);
+    } else if (failedParses != 0) {
+      LOGGER.warn("Omitting indexSizeBreakdown for table: {}; {} server response(s) failed to parse so the total "
+          + "would be incomplete", tableNameWithType, failedParses);
+    } else {
+      indexSizeBreakdown = new HashMap<>();
+      for (Map.Entry<String, long[]> entry : indexSizeTotals.entrySet()) {
+        long[] value = entry.getValue();
+        // Divide by numReplica for the same reason diskSizeInBytes is: every logical segment was counted once per
+        // replica, and the reported figure is per replica.
+        indexSizeBreakdown.put(entry.getKey(),
+            new IndexSizeBreakdownInfo(value[0] / numReplica, (int) (value[1] / numReplica)));
+      }
+    }
+
     TableMetadataInfo aggregateTableMetadataInfo =
         new TableMetadataInfo(tableNameWithType, totalDiskSizeInBytes, totalNumSegments, totalNumRows, columnLengthMap,
             columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizeMap, partitionToServerPrimaryKeyCountMap,
-            compressionStats != null ? compressionStats.getColumnStats() : null,
+            compressionStats != null ? compressionStats.getColumnStats() : null, indexSizeBreakdown,
             compressionStats != null ? compressionStats.getSummary() : null);
     if (failedParses != 0) {
       LOGGER.warn("Failed to parse {} / {} aggregated segment metadata responses from servers.", failedParses,
@@ -440,18 +485,22 @@ public class ServerSegmentMetadataReader {
   }
 
   private String generateAggregateSegmentMetadataServerURL(String tableNameWithType, @Nullable List<String> columns,
-      String endpoint, boolean includeColumnCompressionStats) {
+      String endpoint, boolean includeColumnCompressionStats, boolean includeIndexSizeStats) {
     tableNameWithType = encode(tableNameWithType);
+    StringBuilder sb = new StringBuilder(String.format("%s/tables/%s/metadata", endpoint, tableNameWithType));
+    List<String> params = new ArrayList<>(3);
     String columnsParam = UrlBuilderUtils.generateColumnsParam(columns);
-    String url = String.format("%s/tables/%s/metadata", endpoint, tableNameWithType);
-    StringBuilder sb = new StringBuilder(url);
     if (columnsParam != null) {
-      sb.append("?").append(columnsParam);
-      if (includeColumnCompressionStats) {
-        sb.append("&includeColumnCompressionStats=true");
-      }
-    } else if (includeColumnCompressionStats) {
-      sb.append("?includeColumnCompressionStats=true");
+      params.add(columnsParam);
+    }
+    if (includeColumnCompressionStats) {
+      params.add("includeColumnCompressionStats=true");
+    }
+    if (includeIndexSizeStats) {
+      params.add("includeIndexSizeStats=true");
+    }
+    if (!params.isEmpty()) {
+      sb.append('?').append(String.join("&", params));
     }
     return sb.toString();
   }
