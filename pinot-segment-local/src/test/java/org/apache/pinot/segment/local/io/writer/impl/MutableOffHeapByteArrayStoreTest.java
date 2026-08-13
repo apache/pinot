@@ -18,7 +18,15 @@
  */
 package org.apache.pinot.segment.local.io.writer.impl;
 
+import java.nio.ByteBuffer;
+import java.nio.ReadOnlyBufferException;
 import java.util.Arrays;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.testng.Assert;
@@ -58,6 +66,100 @@ public class MutableOffHeapByteArrayStoreTest implements PinotBuffersAfterClassC
       int index = store.add(dataIn);
       byte[] dataOut = store.get(index);
       Assert.assertTrue(Arrays.equals(dataIn, dataOut));
+    }
+  }
+
+  @Test
+  public void byteBufferTest()
+      throws Exception {
+    try (MutableOffHeapByteArrayStore store =
+        new MutableOffHeapByteArrayStore(_memoryManager, "bytesColumn", 1, 1)) {
+      byte[] firstValue = {1};
+      byte[] secondValue = {2, 3, 4};
+      int firstIndex = store.add(firstValue);
+      int secondIndex = store.add(secondValue);
+
+      ByteBuffer firstBuffer = store.getByteBuffer(firstIndex);
+      byte[] firstResult = new byte[firstBuffer.remaining()];
+      firstBuffer.get(firstResult);
+      Assert.assertEquals(firstResult, firstValue);
+
+      ByteBuffer secondBuffer = store.getByteBuffer(secondIndex);
+      Assert.assertTrue(secondBuffer.isReadOnly());
+      byte[] secondResult = new byte[secondBuffer.remaining()];
+      secondBuffer.get(secondResult);
+      Assert.assertEquals(secondResult, secondValue);
+      Assert.assertThrows(ReadOnlyBufferException.class, () -> store.getByteBuffer(secondIndex).put((byte) 0));
+    }
+  }
+
+  @Test
+  public void getByteBufferDuringConcurrentAppendTest()
+      throws Exception {
+    int numReaders = 4;
+    int numValues = 2_048;
+    ExecutorService executor = Executors.newFixedThreadPool(numReaders + 1);
+    AtomicInteger publishedCount = new AtomicInteger();
+    CountDownLatch start = new CountDownLatch(1);
+    CountDownLatch firstValueRead = new CountDownLatch(numReaders);
+    try (MutableOffHeapByteArrayStore store =
+        new MutableOffHeapByteArrayStore(_memoryManager, "concurrentBytesColumn", 1, 1)) {
+      Future<?> writer = executor.submit(() -> {
+        await(start);
+        Assert.assertEquals(store.add(valueForIndex(0)), 0);
+        publishedCount.set(1);
+        await(firstValueRead);
+        for (int i = 1; i < numValues; i++) {
+          Assert.assertEquals(store.add(valueForIndex(i)), i);
+          // Publish only after the value and any expanded buffer are visible to readers.
+          publishedCount.set(i + 1);
+        }
+      });
+
+      Future<?>[] readers = new Future<?>[numReaders];
+      for (int i = 0; i < numReaders; i++) {
+        readers[i] = executor.submit(() -> {
+          await(start);
+          int nextIndex = 0;
+          while (nextIndex < numValues) {
+            int readableCount = publishedCount.get();
+            while (nextIndex < readableCount) {
+              ByteBuffer byteBuffer = store.getByteBuffer(nextIndex);
+              Assert.assertTrue(byteBuffer.isReadOnly());
+              byte[] actual = new byte[byteBuffer.remaining()];
+              byteBuffer.get(actual);
+              Assert.assertEquals(actual, valueForIndex(nextIndex));
+              nextIndex++;
+              if (nextIndex == 1) {
+                firstValueRead.countDown();
+              }
+            }
+            Thread.yield();
+          }
+        });
+      }
+
+      start.countDown();
+      writer.get(30, TimeUnit.SECONDS);
+      for (Future<?> reader : readers) {
+        reader.get(30, TimeUnit.SECONDS);
+      }
+    } finally {
+      executor.shutdownNow();
+      Assert.assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+    }
+  }
+
+  private static byte[] valueForIndex(int index) {
+    return ByteBuffer.allocate(2 * Integer.BYTES).putInt(index).putInt(~index).array();
+  }
+
+  private static void await(CountDownLatch latch) {
+    try {
+      Assert.assertTrue(latch.await(30, TimeUnit.SECONDS));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
     }
   }
 
