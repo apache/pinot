@@ -20,6 +20,7 @@ package org.apache.pinot.common.request.context;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.List;
 import java.util.UUID;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -208,6 +209,16 @@ public class LiteralContextTest {
 
     // Parse string as BYTES
     assertEquals(new LiteralContext(DataType.STRING, "deadbeef").getBytesValue(), BytesUtils.toBytes("deadbeef"));
+  }
+
+  @Test
+  public void testStringArrayLiteral() {
+    LiteralContext literalContext = new LiteralContext(Literal.stringArrayValue(List.of("foo", "bar")));
+
+    assertFalse(literalContext.isSingleValue());
+    assertEquals(literalContext.getType(), DataType.STRING);
+    assertEquals(literalContext.getValue(), new String[]{"foo", "bar"});
+    assertEquals(literalContext.toString(), "'[foo, bar]'");
   }
 
   @Test
