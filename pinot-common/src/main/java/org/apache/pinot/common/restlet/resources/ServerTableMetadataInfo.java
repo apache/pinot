@@ -20,6 +20,7 @@ package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.Maps;
 import java.util.Collections;
@@ -42,6 +43,11 @@ public final class ServerTableMetadataInfo {
   private final Map<String, Double> _columnCardinalityMap;
   private final Map<String, Double> _maxNumMultiValuesMap;
   private final Map<String, Map<String, Double>> _columnIndexSizeMap;
+  /// Per-index-type on-disk sizes for this server's segments, keyed by `IndexType#getId()`. Null unless the caller
+  /// asked for it with `includeIndexSizeStats=true`; absence of an index type means no segment reported a size for it,
+  /// not that it occupies no space.
+  @Nullable
+  private final Map<String, IndexSizeBreakdownInfo> _indexSizeBreakdown;
   private final Map<Integer, Map<String, Long>> _partitionToServerPrimaryKeyCountMap;
 
   @JsonCreator
@@ -53,7 +59,8 @@ public final class ServerTableMetadataInfo {
       @JsonProperty("maxNumMultiValuesMap") @Nullable Map<String, Double> maxNumMultiValuesMap,
       @JsonProperty("columnIndexSizeMap") @Nullable Map<String, Map<String, Double>> columnIndexSizeMap,
       @JsonProperty("upsertPartitionToServerPrimaryKeyCountMap")
-      @Nullable Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap) {
+      @Nullable Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap,
+      @JsonProperty("indexSizeBreakdown") @Nullable Map<String, IndexSizeBreakdownInfo> indexSizeBreakdown) {
     _tableName = tableName;
     _diskSizeInBytes = sizeInBytes;
     _numSegments = numSegments;
@@ -63,6 +70,7 @@ public final class ServerTableMetadataInfo {
     _maxNumMultiValuesMap = unmodifiableView(maxNumMultiValuesMap);
     _columnIndexSizeMap = nestedUnmodifiableView(columnIndexSizeMap);
     _partitionToServerPrimaryKeyCountMap = nestedUnmodifiableView(partitionToServerPrimaryKeyCountMap);
+    _indexSizeBreakdown = indexSizeBreakdown == null ? null : Map.copyOf(indexSizeBreakdown);
   }
 
   public static Builder builder(String tableName) {
@@ -109,6 +117,14 @@ public final class ServerTableMetadataInfo {
     return _columnIndexSizeMap;
   }
 
+  /// Returns the per-index-type size breakdown, or null when the caller did not request it. Omitted from the payload
+  /// entirely when null so an older or non-requesting response stays byte-identical.
+  @Nullable
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public Map<String, IndexSizeBreakdownInfo> getIndexSizeBreakdown() {
+    return _indexSizeBreakdown;
+  }
+
   /// Returns primary-key counts by partition and server.
   @JsonProperty("upsertPartitionToServerPrimaryKeyCountMap")
   public Map<Integer, Map<String, Long>> getPartitionToServerPrimaryKeyCountMap() {
@@ -141,6 +157,7 @@ public final class ServerTableMetadataInfo {
     private Map<String, Double> _columnCardinalityMap = Map.of();
     private Map<String, Double> _maxNumMultiValuesMap = Map.of();
     private Map<String, Map<String, Double>> _columnIndexSizeMap = Map.of();
+    private Map<String, IndexSizeBreakdownInfo> _indexSizeBreakdown;
     private Map<Integer, Map<String, Long>> _partitionToServerPrimaryKeyCountMap = Map.of();
 
     private Builder(String tableName) {
@@ -182,6 +199,11 @@ public final class ServerTableMetadataInfo {
       return this;
     }
 
+    public Builder withIndexSizeBreakdown(@Nullable Map<String, IndexSizeBreakdownInfo> indexSizeBreakdown) {
+      _indexSizeBreakdown = indexSizeBreakdown;
+      return this;
+    }
+
     public Builder withPartitionToServerPrimaryKeyCountMap(
         Map<Integer, Map<String, Long>> partitionToServerPrimaryKeyCountMap) {
       _partitionToServerPrimaryKeyCountMap = partitionToServerPrimaryKeyCountMap;
@@ -191,7 +213,7 @@ public final class ServerTableMetadataInfo {
     public ServerTableMetadataInfo build() {
       return new ServerTableMetadataInfo(_tableName, _diskSizeInBytes, _numSegments, _numRows, _columnLengthMap,
           _columnCardinalityMap, _maxNumMultiValuesMap, _columnIndexSizeMap,
-          _partitionToServerPrimaryKeyCountMap);
+          _partitionToServerPrimaryKeyCountMap, _indexSizeBreakdown);
     }
   }
 }
