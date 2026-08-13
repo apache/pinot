@@ -19,10 +19,19 @@
 package org.apache.pinot.core.startree.v2;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.segment.local.aggregator.SumValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -37,6 +46,8 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -97,6 +108,29 @@ public class TimestampIndexStarTreeV2Test extends BaseStarTreeV2Test<Object, Dou
     assertTrue(getStarTreeV2().getMetadata().getDimensionsSplitOrder().contains(TIMESTAMP_COLUMN_WITH_GRANULARITY));
     assertEquals(getStarTreeV2().getDataSource(TIMESTAMP_COLUMN_WITH_GRANULARITY).getDictionary().length(),
         DIMENSION_CARDINALITY);
+  }
+
+  @Test
+  public void testStarTreeFitForQueryOnTimestampIndexColumn() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        String.format("SELECT %s FROM %s WHERE %s < 10 GROUP BY %s", getAggregation(), TABLE_NAME,
+            TIMESTAMP_COLUMN_WITH_GRANULARITY, TIMESTAMP_COLUMN_WITH_GRANULARITY));
+    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
+    assertNotNull(aggregationFunctions);
+    AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
+        StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
+    assertNotNull(aggregationFunctionColumnPairs);
+    List<Pair<AggregationFunction, AggregationFunctionColumnPair>> aggregations =
+        new ArrayList<>(aggregationFunctions.length);
+    for (int i = 0; i < aggregationFunctions.length; i++) {
+      aggregations.add(Pair.of(aggregationFunctions[i], aggregationFunctionColumnPairs[i]));
+    }
+    List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
+    assertNotNull(groupByExpressions);
+    assertTrue(StarTreeUtils.isFitForStarTree(getStarTreeV2().getMetadata(), aggregations,
+        groupByExpressions.toArray(new ExpressionContext[0]), Set.of(TIMESTAMP_COLUMN_WITH_GRANULARITY)));
+    assertFalse(StarTreeUtils.isFitForStarTree(getStarTreeV2().getMetadata(), aggregations,
+        groupByExpressions.toArray(new ExpressionContext[0]), Set.of(TIMESTAMP_COLUMN)));
   }
 
   @Test
