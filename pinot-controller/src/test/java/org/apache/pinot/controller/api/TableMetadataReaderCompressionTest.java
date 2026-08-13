@@ -431,11 +431,12 @@ public class TableMetadataReaderCompressionTest {
         List.of(segment("segment0", true, 100, 25)));
     AtomicInteger preferredRequests = new AtomicInteger();
     AtomicInteger fallbackRequests = new AtomicInteger();
-    CountDownLatch preferredStarted = new CountDownLatch(1);
+    CountDownLatch preferredStarted = new CountDownLatch(2);
     CountDownLatch releasePreferred = new CountDownLatch(1);
     CountDownLatch fallbackStarted = new CountDownLatch(1);
+    ExecutorService preferredExecutor = Executors.newFixedThreadPool(2);
     HttpServer preferred = startServer(createBlockingCompressionHandler(currentInfo(), preferredResponse,
-        preferredRequests, preferredStarted, releasePreferred));
+        preferredRequests, preferredStarted, releasePreferred), preferredExecutor);
     HttpServer fallback = startServer(createSignalingHandler(currentInfo(), fallbackResponse, fallbackRequests,
         fallbackStarted));
     ExecutorService caller = Executors.newSingleThreadExecutor();
@@ -464,6 +465,7 @@ public class TableMetadataReaderCompressionTest {
     } finally {
       releasePreferred.countDown();
       preferred.stop(0);
+      preferredExecutor.shutdownNow();
       fallback.stop(0);
       caller.shutdownNow();
     }
