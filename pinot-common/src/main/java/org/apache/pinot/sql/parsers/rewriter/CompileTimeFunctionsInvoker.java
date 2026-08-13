@@ -72,9 +72,8 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
     for (int i = 0; i < numOperands; i++) {
       Expression operand = invokeCompileTimeFunctionExpression(operands.get(i));
       operands.set(i, operand);
-      Literal literal = operand.getLiteral();
-      if (compilable && literal != null) {
-        Pair<ColumnDataType, Object> typeAndValue = RequestUtils.getLiteralTypeAndValue(literal);
+      Pair<ColumnDataType, Object> typeAndValue = getCompileTimeValue(operand);
+      if (compilable && typeAndValue != null) {
         argumentTypes[i] = typeAndValue.getLeft();
         arguments[i] = typeAndValue.getRight();
       } else {
@@ -100,11 +99,39 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
         invoker.convertTypes(arguments);
         result = invoker.invoke(arguments);
       }
+      // Literal has a BYTES_ARRAY arm for upgraded readers, but ordinary broker-to-server requests must remain
+      // decodable by older servers. Preserve the constructor with scalar BINARY_VALUE operands until the wire has
+      // server capability negotiation.
+      if (result instanceof byte[][]) {
+        return expression;
+      }
       return RequestUtils.getLiteralExpression(result);
     } catch (Exception e) {
       throw new SqlCompilationException(
           "Caught exception while invoking method: " + functionInfo.getMethod().getName() + " with arguments: "
               + Arrays.toString(arguments) + ": " + e.getMessage(), e);
     }
+  }
+
+  @Nullable
+  private static Pair<ColumnDataType, Object> getCompileTimeValue(Expression expression) {
+    Literal literal = expression.getLiteral();
+    if (literal != null) {
+      return RequestUtils.getLiteralTypeAndValue(literal);
+    }
+    Function function = expression.getFunctionCall();
+    if (function == null || !function.getOperator().equals("arrayvalueconstructor")) {
+      return null;
+    }
+    List<Expression> operands = function.getOperands();
+    byte[][] bytes = new byte[operands.size()][];
+    for (int i = 0; i < operands.size(); i++) {
+      Literal operand = operands.get(i).getLiteral();
+      if (operand == null || !operand.isSetBinaryValue()) {
+        return null;
+      }
+      bytes[i] = operand.getBinaryValue();
+    }
+    return Pair.of(ColumnDataType.BYTES_ARRAY, bytes);
   }
 }

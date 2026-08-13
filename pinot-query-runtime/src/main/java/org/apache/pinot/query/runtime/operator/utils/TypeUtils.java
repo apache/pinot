@@ -132,6 +132,14 @@ public class TypeUtils {
           // For ArrayAggregationFunction
           return ArrayListUtils.toBytesArray((ObjectArrayList<ByteArray>) value);
         }
+        if (value instanceof byte[][]) {
+          byte[][] bytesArray = (byte[][]) value;
+          ByteArray[] internalBytesArray = new ByteArray[bytesArray.length];
+          for (int i = 0; i < bytesArray.length; i++) {
+            internalBytesArray[i] = new ByteArray(bytesArray[i]);
+          }
+          return internalBytesArray;
+        }
         assert value instanceof ByteArray[];
         return value;
       // TODO: Add more conversions

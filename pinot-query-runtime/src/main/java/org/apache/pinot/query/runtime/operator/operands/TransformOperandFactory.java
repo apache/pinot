@@ -21,7 +21,9 @@ package org.apache.pinot.query.runtime.operator.operands;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 public class TransformOperandFactory {
@@ -77,8 +79,61 @@ public class TransformOperandFactory {
         return new FilterOperand.Predicate(operands, dataSchema, v -> v < 0);
       case "LESS_THAN_OR_EQUAL":
         return new FilterOperand.Predicate(operands, dataSchema, v -> v <= 0);
+      case "ARRAY_VALUE_CONSTRUCTOR":
+        return getArrayValueConstructorOperand(functionCall, dataSchema);
       default:
         return new FunctionOperand(functionCall, dataSchema);
+    }
+  }
+
+  private static TransformOperand getArrayValueConstructorOperand(RexExpression.FunctionCall functionCall,
+      DataSchema dataSchema) {
+    if (functionCall.getDataType() == ColumnDataType.BYTES_ARRAY) {
+      List<RexExpression> operands = functionCall.getFunctionOperands();
+      ByteArray[] values = new ByteArray[operands.size()];
+      for (int i = 0; i < operands.size(); i++) {
+        RexExpression operand = operands.get(i);
+        if (!(operand instanceof RexExpression.Literal)) {
+          return new FunctionOperand(functionCall, dataSchema);
+        }
+        RexExpression.Literal literal = (RexExpression.Literal) operand;
+        if (literal.getDataType() != ColumnDataType.BYTES || !(literal.getValue() instanceof ByteArray)) {
+          return new FunctionOperand(functionCall, dataSchema);
+        }
+        values[i] = (ByteArray) literal.getValue();
+      }
+      // ARRAY literals are constant for the operator. Store the internal and external values once instead of
+      // allocating byte[][], ByteArray[], and ByteArray wrappers for every input row in FunctionOperand.
+      return new BytesArrayLiteralOperand(values);
+    }
+    return new FunctionOperand(functionCall, dataSchema);
+  }
+
+  private static final class BytesArrayLiteralOperand implements TransformOperand {
+    private final ByteArray[] _value;
+    private final byte[][] _externalValue;
+
+    private BytesArrayLiteralOperand(ByteArray[] value) {
+      _value = value;
+      _externalValue = new byte[value.length][];
+      for (int i = 0; i < value.length; i++) {
+        _externalValue[i] = value[i].getBytes();
+      }
+    }
+
+    @Override
+    public ColumnDataType getResultType() {
+      return ColumnDataType.BYTES_ARRAY;
+    }
+
+    @Override
+    public ByteArray[] apply(List<Object> row) {
+      return _value;
+    }
+
+    @Override
+    public byte[][] applyExternal(List<Object> row) {
+      return _externalValue;
     }
   }
 }

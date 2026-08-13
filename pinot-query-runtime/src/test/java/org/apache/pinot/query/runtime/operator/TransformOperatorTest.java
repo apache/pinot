@@ -28,6 +28,8 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
+import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.UuidUtils;
@@ -40,6 +42,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
@@ -112,6 +115,34 @@ public class TransformOperatorTest {
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{2.0, 0.0});
     assertEquals(resultRows.get(1), new Object[]{5.0, -1.0});
+  }
+
+  @Test
+  public void shouldHandleBytesArrayLiteralTransform() {
+    DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{ColumnDataType.INT});
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema, new Object[]{1}, new Object[]{2}, new Object[]{3}));
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"bytesArray"}, new ColumnDataType[]{ColumnDataType.BYTES_ARRAY});
+    ByteArray first = new ByteArray(new byte[]{0});
+    ByteArray second = new ByteArray(new byte[]{1, 2});
+    List<RexExpression> operands = List.of(new RexExpression.Literal(ColumnDataType.BYTES, first),
+        new RexExpression.Literal(ColumnDataType.BYTES, second));
+    List<RexExpression> projects = List.of(
+        new RexExpression.FunctionCall(ColumnDataType.BYTES_ARRAY, "ARRAY_VALUE_CONSTRUCTOR", operands));
+
+    TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(resultRows.size(), 3);
+    ByteArray[] firstResult = (ByteArray[]) resultRows.get(0)[0];
+    assertEquals(firstResult, new ByteArray[]{first, second});
+    assertSame(resultRows.get(1)[0], firstResult);
+    assertSame(resultRows.get(2)[0], firstResult);
+
+    TransformOperand literalOperand = TransformOperandFactory.getTransformOperand(projects.get(0), inputSchema);
+    Object externalValue = literalOperand.applyExternal(List.of(1));
+    assertEquals((byte[][]) externalValue, new byte[][]{{0}, {1, 2}});
+    assertSame(literalOperand.applyExternal(List.of(2)), externalValue);
   }
 
   @Test

@@ -118,8 +118,7 @@ public class FunctionOperand implements TransformOperand {
   public Object apply(List<Object> row) {
     for (int i = 0; i < _operands.size(); i++) {
       TransformOperand operand = _operands.get(i);
-      Object value = operand.apply(row);
-      _reusableOperandHolder[i] = value != null ? operand.getResultType().toExternal(value) : null;
+      _reusableOperandHolder[i] = operand.applyExternal(row);
     }
     Object result;
     if (_functionInvoker.getMethod().isVarArgs()) {

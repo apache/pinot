@@ -81,6 +81,29 @@ public class LiteralOnlyBrokerRequestTest {
   }
 
   @Test
+  public void testBytesArrayLiteralBrokerRequestFromSQL()
+      throws Exception {
+    SingleConnectionBrokerRequestHandler requestHandler =
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId",
+            new BrokerRequestIdGenerator(), null, ACCESS_CONTROL_FACTORY, null, null, null, null,
+            mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
+            ThreadAccountantUtils.getNoOpAccountant(), null, null);
+
+    BrokerResponse brokerResponse = requestHandler.handleRequest("SELECT ARRAY[X'00', X'0102'] AS bytes");
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getDataSchema().getColumnName(0), "bytes");
+    assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.BYTES_ARRAY);
+    assertEquals(resultTable.getRows().size(), 1);
+    assertEquals(resultTable.getRows().get(0), new Object[]{new String[]{"00", "0102"}});
+
+    brokerResponse = requestHandler.handleRequest(
+        "SELECT ARRAYS_OVERLAP(ARRAY[X'00', X'0102'], ARRAY[X'03', X'0102']) AS overlaps");
+    resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.BOOLEAN);
+    assertEquals(resultTable.getRows().get(0)[0], true);
+  }
+
+  @Test
   public void testLiteralOnlyTransformBrokerRequestFromSQL() {
     assertTrue(isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery("SELECT now()")));
     assertTrue(isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery("SELECT ago('PT1H')")));

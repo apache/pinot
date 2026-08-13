@@ -352,6 +352,13 @@ public class ArrayFunctions {
       }
       return strArr;
     }
+    if (clazz == byte[].class) {
+      byte[][] bytesArr = new byte[arr.length][];
+      for (int i = 0; i < arr.length; i++) {
+        bytesArr[i] = (byte[]) arr[i];
+      }
+      return bytesArr;
+    }
     return arr;
   }
 
