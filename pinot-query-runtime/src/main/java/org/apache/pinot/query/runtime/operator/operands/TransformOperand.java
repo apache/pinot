@@ -34,4 +34,11 @@ public interface TransformOperand {
 
   @Nullable
   Object apply(List<Object> row);
+
+  /// Returns the value in the external Java representation expected by scalar functions.
+  @Nullable
+  default Object applyExternal(List<Object> row) {
+    Object value = apply(row);
+    return value != null ? getResultType().toExternal(value) : null;
+  }
 }
