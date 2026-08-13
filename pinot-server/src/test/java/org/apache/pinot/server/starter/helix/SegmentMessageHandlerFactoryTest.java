@@ -50,7 +50,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/// Covers the OPEN_STRUCT gauge keys resolved on table deletion. `OPEN_STRUCT_KEY_DOC_COUNT` is a
+/// Covers the OPEN_STRUCT gauge keys resolved on table deletion. `OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT` is a
 /// keyed gauge, so the generic `removeTableGauge(table, gauge)` sweep cannot reach it; the handler
 /// re-derives its keys from the table config instead.
 public class SegmentMessageHandlerFactoryTest {
@@ -143,7 +143,7 @@ public class SegmentMessageHandlerFactoryTest {
 
     runDeletion(instanceDataManagerReturning(Pair.of(tableConfig, schema())), serverMetrics);
 
-    verify(serverMetrics).removeTableGauge(TABLE, "metrics$clicks", ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT);
+    verify(serverMetrics).removeTableGauge(TABLE, "metrics$clicks", ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT);
   }
 
   /// The keys have to be read off the table data manager before deleteTable discards it.
@@ -160,7 +160,7 @@ public class SegmentMessageHandlerFactoryTest {
     inOrder.verify(instanceDataManager).getTableDataManager(TABLE);
     inOrder.verify(instanceDataManager).deleteTable(eq(TABLE), anyLong());
     inOrder.verify(serverMetrics)
-        .removeTableGauge(TABLE, "metrics$clicks", ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT);
+        .removeTableGauge(TABLE, "metrics$clicks", ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT);
   }
 
   /// Metric bookkeeping must never block table deletion.

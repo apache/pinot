@@ -192,12 +192,13 @@ public class PrometheusTemplateRegexpTest {
   @Test
   public void testServerOpenStructPerKeyGaugePattern()
       throws Exception {
-    Pattern compiled = Pattern.compile(loadPatternByName("server.yml", "pinot_server_$1_$8", "openStructKeyDocCount"));
+    Pattern compiled = Pattern.compile(
+        loadPatternByName("server.yml", "pinot_server_$1_$8", "openStructLastSegmentKeyDocCount"));
 
     Matcher plain = compiled.matcher("\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", "
-        + "name=\"pinot.server.openStructKeyDocCount.myTable_REALTIME.metrics$clicks\"><>Value");
+        + "name=\"pinot.server.openStructLastSegmentKeyDocCount.myTable_REALTIME.metrics$clicks\"><>Value");
     Assert.assertTrue(plain.matches(), "Pattern should match per-key OPEN_STRUCT gauge");
-    Assert.assertEquals(plain.group(1), "openStructKeyDocCount");
+    Assert.assertEquals(plain.group(1), "openStructLastSegmentKeyDocCount");
     Assert.assertEquals(plain.group(4), "myTable");
     Assert.assertEquals(plain.group(5), "REALTIME");
     Assert.assertEquals(plain.group(6), "metrics");
@@ -207,7 +208,7 @@ public class PrometheusTemplateRegexpTest {
     // A key containing '.' would be swallowed by the generic rules; the column group is ([^.$]+)
     // so the split stays unambiguous and the whole remainder lands in the key label.
     Matcher dotted = compiled.matcher("\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", "
-        + "name=\"pinot.server.openStructKeyDocCount.myDb.myTable_OFFLINE.metrics$user.id\"><>Value");
+        + "name=\"pinot.server.openStructLastSegmentKeyDocCount.myDb.myTable_OFFLINE.metrics$user.id\"><>Value");
     Assert.assertTrue(dotted.matches(), "Pattern should match a key containing '.'");
     Assert.assertEquals(dotted.group(3), "myDb");
     Assert.assertEquals(dotted.group(4), "myTable");
@@ -217,14 +218,14 @@ public class PrometheusTemplateRegexpTest {
     // A key containing '$' — greedy (.+) puts the split at the first '$', which is the separator
     // the splitter emitted, so the trailing '$' stays part of the key.
     Matcher dollar = compiled.matcher("\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", "
-        + "name=\"pinot.server.openStructKeyDocCount.myTable_OFFLINE.metrics$a$b\"><>Value");
+        + "name=\"pinot.server.openStructLastSegmentKeyDocCount.myTable_OFFLINE.metrics$a$b\"><>Value");
     Assert.assertTrue(dollar.matches(), "Pattern should match a key containing '$'");
     Assert.assertEquals(dollar.group(6), "metrics");
     Assert.assertEquals(dollar.group(7), "a$b");
 
     // The sparse catch-all column is named with the reserved __sparse__ suffix rather than a key.
     Matcher sparse = compiled.matcher("\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", "
-        + "name=\"pinot.server.openStructKeyDocCount.myTable_OFFLINE.metrics$__sparse__\"><>Value");
+        + "name=\"pinot.server.openStructLastSegmentKeyDocCount.myTable_OFFLINE.metrics$__sparse__\"><>Value");
     Assert.assertTrue(sparse.matches(), "Pattern should match the sparse column");
     Assert.assertEquals(sparse.group(7), "__sparse__");
   }
@@ -238,9 +239,9 @@ public class PrometheusTemplateRegexpTest {
   public void testServerOpenStructColumnGaugePattern()
       throws Exception {
     Pattern compiled =
-        Pattern.compile(loadPatternByName("server.yml", "pinot_server_$1_$7", "openStructDenseKeyCount"));
-    for (String metric : List.of("openStructDenseKeyCount", "openStructSparseKeyCount",
-        "openStructSegmentKeyCount", "openStructSegmentDocCount")) {
+        Pattern.compile(loadPatternByName("server.yml", "pinot_server_$1_$7", "openStructLastSegmentDenseKeyCount"));
+    for (String metric : List.of("openStructLastSegmentDenseKeyCount", "openStructLastSegmentSparseKeyCount",
+        "openStructLastSegmentKeyCount", "openStructLastSegmentDocCount")) {
       Matcher m = compiled.matcher("\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", "
           + "name=\"pinot.server." + metric + ".myTable_OFFLINE.metrics\"><>Value");
       Assert.assertTrue(m.matches(), "Pattern should match column-level OPEN_STRUCT gauge " + metric);
@@ -284,12 +285,12 @@ public class PrometheusTemplateRegexpTest {
     List<String> ordered = extractPatterns(CONFIG_BASE_PATH + "/server.yml");
     assertFirstMatchingPatternContains(ordered,
         "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", "
-            + "name=\"pinot.server.openStructKeyDocCount.myTable_OFFLINE.metrics$clicks\"><>Value",
-        "openStructKeyDocCount");
+            + "name=\"pinot.server.openStructLastSegmentKeyDocCount.myTable_OFFLINE.metrics$clicks\"><>Value",
+        "openStructLastSegmentKeyDocCount");
     assertFirstMatchingPatternContains(ordered,
         "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", "
-            + "name=\"pinot.server.openStructDenseKeyCount.myTable_OFFLINE.metrics\"><>Value",
-        "openStructDenseKeyCount");
+            + "name=\"pinot.server.openStructLastSegmentDenseKeyCount.myTable_OFFLINE.metrics\"><>Value",
+        "openStructLastSegmentDenseKeyCount");
     assertFirstMatchingPatternContains(ordered,
         "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", "
             + "name=\"pinot.server.myTable_REALTIME.metrics.openStructTypeInferenceFailures\"><>Count",

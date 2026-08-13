@@ -6,7 +6,7 @@ rules:
 # contain '$', '.', '-' or spaces, all of which are legal in a Prometheus label value. The closing quote is
 # excluded because the trailing "? is optional and a greedy (.+) would otherwise swallow it. The column name
 # cannot contain '.' or '$', so ([^.$"]+) splits the two unambiguously. The sparse column renders as key="__sparse__".
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"ServerMetrics\", name=\"?pinot\\.server\\.(openStructKeyDocCount)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.([^.$\"]+)\\$([^\"]+)\"?><>(\\w+)"
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"ServerMetrics\", name=\"?pinot\\.server\\.(openStructLastSegmentKeyDocCount)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.([^.$\"]+)\\$([^\"]+)\"?><>(\\w+)"
   name: "pinot_server_$1_$8"
   cache: true
   labels:
@@ -16,7 +16,7 @@ rules:
     column: "$6"
     key: "$7"
 # Column-level OPEN_STRUCT gauges.
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"ServerMetrics\", name=\"?pinot\\.server\\.(openStructDenseKeyCount|openStructSparseKeyCount|openStructSegmentKeyCount|openStructSegmentDocCount)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.([^.\"]+)\"?><>(\\w+)"
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"ServerMetrics\", name=\"?pinot\\.server\\.(openStructLastSegmentDenseKeyCount|openStructLastSegmentSparseKeyCount|openStructLastSegmentKeyCount|openStructLastSegmentDocCount)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.([^.\"]+)\"?><>(\\w+)"
   name: "pinot_server_$1_$7"
   cache: true
   labels:

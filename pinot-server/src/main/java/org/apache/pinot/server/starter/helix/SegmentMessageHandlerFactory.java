@@ -201,11 +201,11 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         Arrays.stream(ServerGauge.values())
             .filter(g -> !g.isGlobal())
             .forEach(g -> _metrics.removeTableGauge(_tableNameWithType, g));
-        // OPEN_STRUCT_KEY_DOC_COUNT registers as <gauge>.<table>.<column>$<key>, so the sweep above --
+        // OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT registers as <gauge>.<table>.<column>$<key>, so the sweep above --
         // which composes only the unkeyed <gauge>.<table> -- cannot reach it.
         openStructMetricKeys.forEach(
             metricKey -> _metrics.removeTableGauge(_tableNameWithType, metricKey,
-                ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT));
+                ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT));
         Arrays.stream(ServerTimer.values())
             .filter(t -> !t.isGlobal())
             .forEach(t -> _metrics.removeTableTimer(_tableNameWithType, t));

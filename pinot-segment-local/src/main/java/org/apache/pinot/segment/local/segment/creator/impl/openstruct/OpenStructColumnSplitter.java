@@ -297,16 +297,16 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     }
 
     serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
-        ServerGauge.OPEN_STRUCT_DENSE_KEY_COUNT, _resolvedDenseKeys.size());
+        ServerGauge.OPEN_STRUCT_LAST_SEGMENT_DENSE_KEY_COUNT, _resolvedDenseKeys.size());
     serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
-        ServerGauge.OPEN_STRUCT_SPARSE_KEY_COUNT, sparseKeyCount);
+        ServerGauge.OPEN_STRUCT_LAST_SEGMENT_SPARSE_KEY_COUNT, sparseKeyCount);
     serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
-        ServerGauge.OPEN_STRUCT_SEGMENT_KEY_COUNT, _presenceBitmaps.size());
+        ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_COUNT, _presenceBitmaps.size());
     // Denominator for the per-key fill rate. Emitted as a raw count rather than folding the ratio into a
     // single percentage gauge: integer division truncates a configured dense key present in a handful of
     // docs to 0, which is indistinguishable from no data and is exactly the case worth alerting on.
     serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
-        ServerGauge.OPEN_STRUCT_SEGMENT_DOC_COUNT, _numDocs);
+        ServerGauge.OPEN_STRUCT_LAST_SEGMENT_DOC_COUNT, _numDocs);
 
     // Iterates the configured dense keys rather than _resolvedDenseKeys. Under the default config
     // (denseKeys empty, maxDenseKeys -1) _resolvedDenseKeys is data-driven -- every key at or above
@@ -324,7 +324,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       if (presence != null) {
         serverMetrics.setOrUpdateTableGauge(_tableNameWithType,
             OpenStructNaming.metricKey(_columnName, key),
-            ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT, presence.getCardinality());
+            ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT, presence.getCardinality());
       }
     }
   }

@@ -169,26 +169,24 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
       "Current number of tasks in the throttle executor queue"),
   // Workload config fetch status: 1 = success, 0 = failure
   WORKLOAD_CONFIG_FETCH_STATUS("status", true),
-  // OPEN_STRUCT segment build observability.
-  // Written at segment-seal time and scoped to whichever segment sealed last: each seal on this server
-  // overwrites the previous value for the same (table, column), so these read as "the most recently sealed
-  // segment" rather than as a table-wide total or a sum across segments. Sampling them over time gives the
-  // trend.
-  OPEN_STRUCT_DENSE_KEY_COUNT("keys", false,
+  // OPEN_STRUCT segment build observability. Each seal on this server overwrites the previous value for the
+  // same (table, column), so these are not table-wide totals and must not be summed across segments or
+  // replicas; sampling them over time gives the trend.
+  OPEN_STRUCT_LAST_SEGMENT_DENSE_KEY_COUNT("keys", false,
       "Number of OPEN_STRUCT keys classified as dense in the most recently sealed segment"),
-  OPEN_STRUCT_SPARSE_KEY_COUNT("keys", false,
+  OPEN_STRUCT_LAST_SEGMENT_SPARSE_KEY_COUNT("keys", false,
       "Number of OPEN_STRUCT keys classified as sparse in the most recently sealed segment"),
-  OPEN_STRUCT_SEGMENT_KEY_COUNT("keys", false,
+  OPEN_STRUCT_LAST_SEGMENT_KEY_COUNT("keys", false,
       "Unique keys in the most recently sealed segment for this OPEN_STRUCT column (dense + sparse)"),
-  OPEN_STRUCT_SEGMENT_DOC_COUNT("documents", false,
+  OPEN_STRUCT_LAST_SEGMENT_DOC_COUNT("documents", false,
       "Total docs in the most recently sealed segment for this OPEN_STRUCT column; denominator for "
-          + "openStructKeyDocCount"),
+          + "openStructLastSegmentKeyDocCount"),
   /// Emitted only for keys named in the table's `denseKeys` config, so the number of registry entries this
   /// mints is bounded by that config rather than by the ingested key space. See
   /// `OpenStructColumnSplitter#emitMetrics`.
-  OPEN_STRUCT_KEY_DOC_COUNT("documents", false,
+  OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT("documents", false,
       "Docs in which a configured dense OPEN_STRUCT key was present in the most recently sealed segment; "
-          + "divide by openStructSegmentDocCount for the fill rate");
+          + "divide by openStructLastSegmentDocCount for the fill rate");
 
   private final String _gaugeName;
   private final String _unit;

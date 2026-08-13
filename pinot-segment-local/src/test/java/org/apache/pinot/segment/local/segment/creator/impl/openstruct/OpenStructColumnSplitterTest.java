@@ -630,16 +630,16 @@ public class OpenStructColumnSplitterTest {
       s.seal();
 
       verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", "metrics",
-          ServerGauge.OPEN_STRUCT_SEGMENT_DOC_COUNT, 200L);
+          ServerGauge.OPEN_STRUCT_LAST_SEGMENT_DOC_COUNT, 200L);
       verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE",
           OpenStructNaming.materializedColumnName("metrics", "rare"),
-          ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT, 3L);
+          ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT, 3L);
       verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", "metrics",
-          ServerGauge.OPEN_STRUCT_SEGMENT_KEY_COUNT, 2L);
+          ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_COUNT, 2L);
       verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", "metrics",
-          ServerGauge.OPEN_STRUCT_DENSE_KEY_COUNT, 2L);
+          ServerGauge.OPEN_STRUCT_LAST_SEGMENT_DENSE_KEY_COUNT, 2L);
       verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", "metrics",
-          ServerGauge.OPEN_STRUCT_SPARSE_KEY_COUNT, 0L);
+          ServerGauge.OPEN_STRUCT_LAST_SEGMENT_SPARSE_KEY_COUNT, 0L);
     } finally {
       ServerMetrics.deregister();
     }
@@ -665,11 +665,11 @@ public class OpenStructColumnSplitterTest {
       s.seal();
 
       verify(metrics, never()).setOrUpdateTableGauge(anyString(), anyString(),
-          eq(ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT), anyLong());
+          eq(ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT), anyLong());
       verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", "metrics",
-          ServerGauge.OPEN_STRUCT_DENSE_KEY_COUNT, 2L);
+          ServerGauge.OPEN_STRUCT_LAST_SEGMENT_DENSE_KEY_COUNT, 2L);
       verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE", "metrics",
-          ServerGauge.OPEN_STRUCT_SEGMENT_KEY_COUNT, 2L);
+          ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_COUNT, 2L);
     } finally {
       ServerMetrics.deregister();
     }
@@ -692,11 +692,11 @@ public class OpenStructColumnSplitterTest {
 
       verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE",
           OpenStructNaming.materializedColumnName("metrics", "clicks"),
-          ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT, 10L);
+          ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT, 10L);
       // 'host' is dense too, but only from the data, so it must not mint a gauge.
       verify(metrics, never()).setOrUpdateTableGauge(
           eq("testTable_OFFLINE"), eq(OpenStructNaming.materializedColumnName("metrics", "host")),
-          eq(ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT), anyLong());
+          eq(ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT), anyLong());
     } finally {
       ServerMetrics.deregister();
     }
@@ -726,7 +726,7 @@ public class OpenStructColumnSplitterTest {
       for (String key : List.of("alpha", "beta")) {
         verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE",
             OpenStructNaming.materializedColumnName("metrics", key),
-            ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT, 10L);
+            ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT, 10L);
       }
     } finally {
       ServerMetrics.deregister();
@@ -750,7 +750,7 @@ public class OpenStructColumnSplitterTest {
       s.seal();
 
       verify(metrics, never()).setOrUpdateTableGauge(anyString(), anyString(),
-          eq(ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT), anyLong());
+          eq(ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT), anyLong());
     } finally {
       ServerMetrics.deregister();
     }
@@ -778,11 +778,11 @@ public class OpenStructColumnSplitterTest {
 
       verify(metrics).setOrUpdateTableGauge("testTable_OFFLINE",
           OpenStructNaming.metricKey("metrics", rawKey),
-          ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT, 10L);
+          ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT, 10L);
       // The unescaped form is what the old call site produced; it must not be emitted.
       verify(metrics, never()).setOrUpdateTableGauge(
           eq("testTable_OFFLINE"), eq(OpenStructNaming.materializedColumnName("metrics", rawKey)),
-          eq(ServerGauge.OPEN_STRUCT_KEY_DOC_COUNT), anyLong());
+          eq(ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT), anyLong());
     } finally {
       ServerMetrics.deregister();
     }
