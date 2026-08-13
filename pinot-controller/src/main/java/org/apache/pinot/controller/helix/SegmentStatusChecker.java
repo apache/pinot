@@ -382,10 +382,22 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     List<String> unavailableSegmentsByState = new ArrayList<>();
     List<String> unavailableSegmentsByInstance = new ArrayList<>();
 
-    for (String segment : segments) {
+    // The segment ZK metadata and the znode stats are read in a single batched request, because reading them one
+    // segment at a time costs two blocking ZooKeeper round trips per segment (the Helix property store is not cached),
+    // which is why the status check can take several minutes on tables with a large number of segments.
+    List<String> segmentsToCheck = new ArrayList<>(segments);
+    // Both lists are index-aligned with segmentsToCheck, and hold null for segments without ZK metadata
+    List<Stat> segmentStats = new ArrayList<>(numSegments);
+    List<SegmentZKMetadata> segmentsZKMetadata =
+        _pinotHelixResourceManager.getSegmentsZKMetadataForSegmentNames(tableNameWithType, segmentsToCheck,
+            segmentStats);
+
+    for (int i = 0; i < numSegments; i++) {
+      String segment = segmentsToCheck.get(i);
+      Map<String, String> isStateMap = idealState.getInstanceStateMap(segment);
       // Number of replicas in ideal state that is in ONLINE/CONSUMING state
       int numISReplicasUp = 0;
-      for (Map.Entry<String, String> entry : idealState.getInstanceStateMap(segment).entrySet()) {
+      for (Map.Entry<String, String> entry : isStateMap.entrySet()) {
         String state = entry.getValue();
         if (state.equals(SegmentStateModel.ONLINE) || state.equals(SegmentStateModel.CONSUMING)) {
           numISReplicasUp++;
@@ -397,7 +409,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       }
       maxISReplicasUp = Math.max(maxISReplicasUp, numISReplicasUp);
 
-      SegmentZKMetadata segmentZKMetadata = _pinotHelixResourceManager.getSegmentZKMetadata(tableNameWithType, segment);
+      SegmentZKMetadata segmentZKMetadata = segmentsZKMetadata.get(i);
       // Skip the segment when it doesn't have ZK metadata. Most likely the segment is just deleted.
       if (segmentZKMetadata == null) {
         segmentsWithoutZKMetadata.add(segment);
@@ -419,11 +431,10 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       //       The grace window is _waitForPushTimeSeconds. Once a segment is older than it and still
       //       under-replicated, it is checked normally, so genuinely stuck commits and real replica losses still alert.
       //       The comparison uses evSnapshotTimestamp instead of System.currentTimeMillis() because for large tables
-      //       with many segments, the status check can take several minutes. A segment updated after
-      //       the EV snapshot was taken but before this individual segment check runs could be incorrectly flagged as
-      //       OFFLINE when using current time.
-      Stat segmentStat = propertyStore == null ? null : propertyStore.getStat(
-          ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segment), AccessOption.PERSISTENT);
+      //       with many segments, the status check can still take a while. A segment updated after the EV snapshot was
+      //       taken but before this individual segment check runs could be incorrectly flagged as OFFLINE when using
+      //       current time.
+      Stat segmentStat = segmentStats.get(i);
       long refTimeMs = segmentStat != null ? segmentStat.getMtime() : segmentZKMetadata.getCreationTime();
       if (refTimeMs > evSnapshotTimestamp - _waitForPushTimeSeconds * 1000L) {
         continue;
@@ -472,7 +483,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
       minEVReplicasUp = Math.min(minEVReplicasUp, numEVReplicasUp);
       // Total number of replicas in ideal state (including ERROR/OFFLINE states)
-      int numISReplicasTotal = Math.max(idealState.getInstanceStateMap(segment).entrySet().size(), 1);
+      int numISReplicasTotal = Math.max(isStateMap.size(), 1);
       minEVReplicasUpPercent = Math.min(minEVReplicasUpPercent, numEVReplicasUp * 100 / numISReplicasTotal);
     }
 
