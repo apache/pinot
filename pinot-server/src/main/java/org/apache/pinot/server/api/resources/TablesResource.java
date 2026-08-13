@@ -68,6 +68,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
+import org.apache.pinot.common.restlet.resources.IndexSizeBreakdownInfo;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentCompressionStatsContribution;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
@@ -210,6 +211,8 @@ public class TablesResource {
   public String getSegmentMetadata(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") List<String> columns,
+      @ApiParam(value = "Whether to include the per-index-type size breakdown")
+      @QueryParam("includeIndexSizeStats") @DefaultValue("false") boolean includeIndexSizeStats,
       @Context HttpHeaders headers)
       throws WebApplicationException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
@@ -232,6 +235,10 @@ public class TablesResource {
     Map<String, Double> columnCardinalityMap = new HashMap<>();
     Map<String, Double> maxNumMultiValuesMap = new HashMap<>();
     Map<String, Map<String, Double>> columnIndexSizesMap = new HashMap<>();
+    // Only accumulated when the caller opts in: the breakdown is a table-level aggregate that would otherwise be
+    // computed on every metadata call. Left null when not requested so the field is omitted from the response
+    // entirely rather than serialized as an empty object.
+    Map<String, long[]> indexSizeTotals = includeIndexSizeStats ? new HashMap<>() : null;
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         for (IndexSegment indexSegment : segmentDataManager.getReportableSegments()) {
@@ -285,6 +292,28 @@ public class TablesResource {
                 columnIndexSizesMap.put(column, columnIndexSizes);
               }
             }
+
+            if (indexSizeTotals != null) {
+              // Deliberately iterates every column of the segment, not `columnSet`: indexSizeBreakdown is a
+              // table-level per-index-type total and does not honour the `columns=` filter, unlike columnIndexSizeMap
+              // above. Sizes come from the keys persisted at seal time, so a segment built without
+              // indexSizeStatsEnabled contributes nothing and is not counted.
+              for (String column : allSegmentColumns) {
+                ColumnMetadata metadata = segmentMetadata.getColumnMetadataMap().get(column);
+                if (metadata == null) {
+                  continue;
+                }
+                for (Map.Entry<String, Long> entry : metadata.getPersistedIndexSizesInBytes().entrySet()) {
+                  long size = entry.getValue();
+                  if (size < 0) {
+                    continue;
+                  }
+                  long[] total = indexSizeTotals.computeIfAbsent(entry.getKey(), k -> new long[2]);
+                  total[0] += size;
+                  total[1]++;
+                }
+              }
+            }
           }
         }
       }
@@ -315,6 +344,7 @@ public class TablesResource {
         .withMaxNumMultiValuesMap(maxNumMultiValuesMap)
         .withColumnIndexSizeMap(columnIndexSizesMap)
         .withPartitionToServerPrimaryKeyCountMap(partitionToServerPrimaryKeyCountMap)
+        .withIndexSizeBreakdown(toIndexSizeBreakdown(indexSizeTotals))
         .build();
     return ResourceUtils.convertToJsonString(tableMetadataInfo);
   }
@@ -1296,5 +1326,21 @@ public class TablesResource {
     } catch (Exception e) {
       throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  /// Converts the (summed bytes, contributing segment count) accumulator into the response DTO. Returns null when the
+  /// caller did not request the breakdown, and an empty map when they did but no segment carried persisted sizes --
+  /// those are different answers and must not collapse into one.
+  @Nullable
+  private static Map<String, IndexSizeBreakdownInfo> toIndexSizeBreakdown(@Nullable Map<String, long[]> totals) {
+    if (totals == null) {
+      return null;
+    }
+    Map<String, IndexSizeBreakdownInfo> breakdown = new HashMap<>();
+    for (Map.Entry<String, long[]> entry : totals.entrySet()) {
+      long[] value = entry.getValue();
+      breakdown.put(entry.getKey(), new IndexSizeBreakdownInfo(value[0], (int) value[1]));
+    }
+    return breakdown;
   }
 }
