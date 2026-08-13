@@ -134,8 +134,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
       throws SQLException {
     try {
       String value = this.getString(columnIndex);
-      int calculatedScale = getCalculatedScale(value);
-      return value == null ? null : new BigDecimal(value).setScale(calculatedScale);
+      return value == null ? null : new BigDecimal(value).setScale(getCalculatedScale(value));
     } catch (Exception e) {
       throw new SQLDataException("Unable to fetch BigDecimal value", e);
     }
@@ -380,14 +379,13 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   @Override
   public short getShort(String columnLabel)
       throws SQLException {
-    return getShort(columnLabel);
+    return getShort(findColumn(columnLabel));
   }
 
   @Override
   public short getShort(int columnIndex)
       throws SQLException {
-    Integer value = getInt(columnIndex);
-    return value == null ? null : value.shortValue();
+    return (short) getInt(columnIndex);
   }
 
   @Override
