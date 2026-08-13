@@ -272,11 +272,14 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   ///   over the threshold there is an error whatever the rebalance config, since no way of running the rebalance
   ///   brings the end state back within the threshold.
   /// - **During the rebalance**, where a server can transiently hold the segments it is gaining on top of the ones it
-  ///   is about to lose. Only `lowDiskMode` rules that peak out, by waiting for the segments to be deleted before
-  ///   adding the new ones, so going over the threshold there is an error unless it is enabled. `downtime` does not
-  ///   help: it replaces the IdealState with the target assignment in one go, without ordering the drops before the
-  ///   adds. Worse, that one-shot path skips the incremental one `lowDiskMode` acts on, so `downtime` cancels
-  ///   `lowDiskMode` out entirely.
+  ///   is about to lose. Only servers actually gaining segments are estimated: one that merely sheds them can only be
+  ///   over the threshold because it already was, which the rebalance neither causes nor can be blamed for. Only
+  ///   `lowDiskMode` rules that peak out, by waiting for the segments to be deleted before adding the new ones, so
+  ///   going over the threshold there is an error unless it is enabled. `downtime` does not help: it replaces the
+  ///   IdealState with the target assignment in one go, without ordering the drops before the adds. Worse, that
+  ///   one-shot path skips the incremental one `lowDiskMode` acts on, so `downtime` cancels `lowDiskMode` out
+  ///   entirely. `bestEfforts` weakens it rather than cancelling it — the deletes are still awaited, just no longer
+  ///   unconditionally — so it downgrades the result to a warning instead of an error.
   ///
   /// Every segment is assumed to take up disk space on each server it is assigned to. Downstream projects where that
   /// does not hold (e.g. because a segment can be stored outside of the server, as indicated by
@@ -332,9 +335,14 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       long diskUtilizationGain = newSegmentSet.size() * avgSegmentSize;
       long diskUtilizationLoss = removedSegmentSet.size() * avgSegmentSize;
 
-      // While the rebalance is running, the segments being added can co-exist with the ones being removed
-      addIfOverThreshold(serversUnsafeDuringRebalance, server,
-          (double) (diskUsage.getUsedSpaceBytes() + diskUtilizationGain) / diskUsage.getTotalSpaceBytes(), threshold);
+      // While the rebalance is running, the segments being added can co-exist with the ones being removed. A server
+      // gaining nothing never builds up that transient usage: it is only ever over the threshold because it already
+      // was, which is not something this rebalance causes nor something lowDiskMode could do anything about. If it is
+      // still over once the rebalance is done, the estimate below catches it
+      if (diskUtilizationGain > 0) {
+        addIfOverThreshold(serversUnsafeDuringRebalance, server,
+            (double) (diskUsage.getUsedSpaceBytes() + diskUtilizationGain) / diskUsage.getTotalSpaceBytes(), threshold);
+      }
       addIfOverThreshold(serversUnsafeAfterRebalance, server,
           (double) (diskUsage.getUsedSpaceBytes() + diskUtilizationGain - diskUtilizationLoss)
               / diskUsage.getTotalSpaceBytes(), threshold);
@@ -355,16 +363,18 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     // deleted before adding the new ones. It is however only honored by the incremental rebalance path, which downtime
     // skips altogether by replacing the IdealState with the target assignment in one go
     RebalanceConfig rebalanceConfig = preCheckContext.getRebalanceConfig();
-    if (rebalanceConfig.isLowDiskMode() && !rebalanceConfig.isDowntime()) {
-      return RebalancePreCheckerResult.pass(withinThreshold + " AFTER rebalance. Some servers would go over it DURING "
-          + "the rebalance, but lowDiskMode avoids that transient disk usage");
+    if (rebalanceConfig.isDowntime() || !rebalanceConfig.isLowDiskMode()) {
+      return RebalancePreCheckerResult.error(
+          getUnsafeDiskUtilizationMessage("DURING rebalance", serversUnsafeDuringRebalance, threshold)
+              + (rebalanceConfig.isDowntime()
+              ? ". lowDiskMode, which would delete segments before adding the new ones, has no effect while downtime "
+              + "is enabled"
+              : ". Enable lowDiskMode to delete segments before adding the new ones"));
     }
-    return RebalancePreCheckerResult.error(
-        getUnsafeDiskUtilizationMessage("DURING rebalance", serversUnsafeDuringRebalance, threshold) + (
-            rebalanceConfig.isLowDiskMode()
-                ? ". lowDiskMode has no effect while downtime is enabled, disable downtime for it to delete segments "
-                + "before adding the new ones"
-                : ". Enable lowDiskMode to delete segments before adding the new ones"));
+    String serversGoingOver = " Servers that would go over it DURING the rebalance: " + String.join(", ",
+        serversUnsafeDuringRebalance) + ".";
+    return RebalancePreCheckerResult.pass(withinThreshold + " AFTER rebalance." + serversGoingOver + " lowDiskMode "
+        + "avoids that transient disk usage by deleting segments before adding the new ones");
   }
 
   private static void addIfOverThreshold(List<String> servers, String server, double utilizationRatio,
@@ -374,9 +384,11 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     }
   }
 
+  /// The threshold is rendered as `>=` because [#addIfOverThreshold] flags a server whose utilization reaches it, not
+  /// only one that exceeds it.
   private static String getUnsafeDiskUtilizationMessage(String when, List<String> servers, double threshold) {
-    return String.format("UNSAFE. Servers with unsafe disk utilization %s (>%d%%): %s", when, (short) (threshold * 100),
-        String.join(", ", servers));
+    return String.format("UNSAFE. Servers with unsafe disk utilization %s (>=%d%%): %s", when,
+        (short) (threshold * 100), String.join(", ", servers));
   }
 
   private RebalancePreCheckerResult checkRebalanceConfig(RebalanceConfig rebalanceConfig, TableConfig tableConfig,

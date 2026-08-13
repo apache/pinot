@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance;
 
-import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
@@ -40,15 +39,31 @@ import static org.testng.Assert.assertTrue;
 
 /// Tests the consolidated disk utilization pre-check of [DefaultRebalancePreChecker].
 ///
-/// All the tests share the same assignment: 4 segments of 100 bytes each, all on `Server_0`, out of which `segment_2`
-/// and `segment_3` move to `Server_1`. Every server has 1000 bytes of total space and the threshold is 50% of it.
+/// Unless stated otherwise, the tests share the same assignment: 4 segments of 100 bytes each, moving so that both
+/// servers gain and shed some. `Server_0` gains 100 bytes and sheds 200, `Server_1` gains 200 and sheds 100. Every
+/// server has 1000 bytes of total space and the threshold is 50% of it.
 public class DefaultRebalancePreCheckerTest {
   private static final String SERVER_0 = "Server_0";
   private static final String SERVER_1 = "Server_1";
-  private static final int NUM_SEGMENTS = 4;
   private static final long TOTAL_SPACE_BYTES = 1000L;
   private static final long TABLE_SIZE_PER_REPLICA_BYTES = 400L;
   private static final double THRESHOLD = 0.5;
+
+  private static final Map<String, Map<String, String>> CURRENT_ASSIGNMENT =
+      Map.of("segment_0", Map.of(SERVER_0, ONLINE), "segment_1", Map.of(SERVER_0, ONLINE), "segment_2",
+          Map.of(SERVER_0, ONLINE), "segment_3", Map.of(SERVER_1, ONLINE));
+  private static final Map<String, Map<String, String>> TARGET_ASSIGNMENT =
+      Map.of("segment_0", Map.of(SERVER_0, ONLINE), "segment_1", Map.of(SERVER_1, ONLINE), "segment_2",
+          Map.of(SERVER_1, ONLINE), "segment_3", Map.of(SERVER_0, ONLINE));
+
+  /// An assignment where `Server_0` only sheds segments: it gives its 2 remaining segments to `Server_1` and gains
+  /// nothing.
+  private static final Map<String, Map<String, String>> SHED_ONLY_CURRENT_ASSIGNMENT =
+      Map.of("segment_0", Map.of(SERVER_0, ONLINE), "segment_1", Map.of(SERVER_0, ONLINE), "segment_2",
+          Map.of(SERVER_0, ONLINE), "segment_3", Map.of(SERVER_0, ONLINE));
+  private static final Map<String, Map<String, String>> SHED_ONLY_TARGET_ASSIGNMENT =
+      Map.of("segment_0", Map.of(SERVER_0, ONLINE), "segment_1", Map.of(SERVER_0, ONLINE), "segment_2",
+          Map.of(SERVER_1, ONLINE), "segment_3", Map.of(SERVER_1, ONLINE));
 
   private final DefaultRebalancePreChecker _preChecker = new DefaultRebalancePreChecker();
 
@@ -60,8 +75,8 @@ public class DefaultRebalancePreCheckerTest {
 
   @Test
   public void testWithinThresholdBothDuringAndAfterRebalance() {
-    // Server_0 sheds 200 bytes and Server_1 gains them, neither ever goes over 500 bytes
-    setDiskUsage(400L, 0L);
+    // Server_0 peaks at 400 of its 1000 bytes and Server_1 at 300, neither reaches 500
+    setDiskUsage(300L, 100L);
     RebalancePreCheckerResult result = checkDiskUtilization(new RebalanceConfig());
     assertEquals(result.getPreCheckStatus(), PreCheckStatus.PASS);
     assertEquals(result.getMessage(), "Within threshold (<50%)");
@@ -69,54 +84,78 @@ public class DefaultRebalancePreCheckerTest {
 
   @Test
   public void testOverThresholdAfterRebalanceIsAnErrorWhateverTheRebalanceConfig() {
-    // Server_1 ends up at 550 of its 1000 bytes, which no rebalance config can bring back under the threshold
-    setDiskUsage(400L, 350L);
+    // Server_1 ends up at 520 of its 1000 bytes, which no rebalance config can bring back under the threshold
+    setDiskUsage(100L, 420L);
     for (RebalanceConfig rebalanceConfig : new RebalanceConfig[]{
-        new RebalanceConfig(), lowDiskMode(), downtime()
+        new RebalanceConfig(), lowDiskMode(), downtime(), bestEfforts()
     }) {
       RebalancePreCheckerResult result = checkDiskUtilization(rebalanceConfig);
       assertEquals(result.getPreCheckStatus(), PreCheckStatus.ERROR);
       assertEquals(result.getMessage(),
-          "UNSAFE. Servers with unsafe disk utilization AFTER rebalance (>50%): " + SERVER_1 + " (55%)");
+          "UNSAFE. Servers with unsafe disk utilization AFTER rebalance (>=50%): " + SERVER_1 + " (52%)");
     }
   }
 
   @Test
   public void testOverThresholdOnlyDuringRebalanceIsAnErrorWithoutLowDiskMode() {
-    // Server_0 is at 550 of its 1000 bytes and only gets back under the threshold once it has shed its 200 bytes.
-    // downtime does not order the drops before the adds, so it does not rule the transient peak out either.
-    setDiskUsage(550L, 0L);
-    for (RebalanceConfig rebalanceConfig : new RebalanceConfig[]{new RebalanceConfig(), downtime()}) {
-      RebalancePreCheckerResult result = checkDiskUtilization(rebalanceConfig);
-      assertEquals(result.getPreCheckStatus(), PreCheckStatus.ERROR);
-      assertTrue(result.getMessage()
-              .startsWith("UNSAFE. Servers with unsafe disk utilization DURING rebalance (>50%): " + SERVER_0
-                  + " (55%)"), result.getMessage());
-    }
+    // Server_1 transiently holds the 200 bytes it gains on top of the 100 it is about to shed, peaking at 520
+    setDiskUsage(100L, 320L);
+    RebalancePreCheckerResult result = checkDiskUtilization(new RebalanceConfig());
+    assertEquals(result.getPreCheckStatus(), PreCheckStatus.ERROR);
+    assertEquals(result.getMessage(),
+        "UNSAFE. Servers with unsafe disk utilization DURING rebalance (>=50%): " + SERVER_1 + " (52%). Enable "
+            + "lowDiskMode to delete segments before adding the new ones");
   }
 
   @Test
   public void testOverThresholdOnlyDuringRebalanceIsSafeWithLowDiskMode() {
-    setDiskUsage(550L, 0L);
+    setDiskUsage(100L, 320L);
     RebalancePreCheckerResult result = checkDiskUtilization(lowDiskMode());
     assertEquals(result.getPreCheckStatus(), PreCheckStatus.PASS);
-    assertTrue(result.getMessage().startsWith("Within threshold (<50%) AFTER rebalance"), result.getMessage());
+    assertEquals(result.getMessage(),
+        "Within threshold (<50%) AFTER rebalance. Servers that would go over it DURING the rebalance: " + SERVER_1
+            + " (52%). lowDiskMode avoids that transient disk usage by deleting segments before adding the new ones");
   }
 
   @Test
   public void testDowntimeCancelsLowDiskModeOut() {
     // Downtime replaces the IdealState with the target assignment in one go, skipping the incremental path that is the
-    // only one honoring lowDiskMode, so the transient peak stands and the message has to say so
-    setDiskUsage(550L, 0L);
-    RebalanceConfig rebalanceConfig = lowDiskMode();
-    rebalanceConfig.setDowntime(true);
+    // only one honoring lowDiskMode, so the transient peak stands whether or not lowDiskMode is set
+    setDiskUsage(100L, 320L);
+    RebalanceConfig lowDiskModeAndDowntime = lowDiskMode();
+    lowDiskModeAndDowntime.setDowntime(true);
 
-    RebalancePreCheckerResult result = checkDiskUtilization(rebalanceConfig);
+    for (RebalanceConfig rebalanceConfig : new RebalanceConfig[]{downtime(), lowDiskModeAndDowntime}) {
+      RebalancePreCheckerResult result = checkDiskUtilization(rebalanceConfig);
+      assertEquals(result.getPreCheckStatus(), PreCheckStatus.ERROR);
+      assertEquals(result.getMessage(),
+          "UNSAFE. Servers with unsafe disk utilization DURING rebalance (>=50%): " + SERVER_1 + " (52%). lowDiskMode, "
+              + "which would delete segments before adding the new ones, has no effect while downtime is enabled");
+    }
+  }
+
+  @Test
+  public void testServerGainingNothingIsNotFlaggedDuringRebalance() {
+    // Server_0 is already at 550 of its 1000 bytes and only sheds segments. The rebalance cannot push it any higher
+    // and lowDiskMode would have nothing to delete first, so flagging it would blame the rebalance for a pre-existing
+    // condition. It drops to 350 once done, so there is nothing to report at all.
+    setDiskUsage(550L, 0L);
+    RebalancePreCheckerResult result = checkDiskUtilization(new RebalanceConfig(), SHED_ONLY_CURRENT_ASSIGNMENT,
+        SHED_ONLY_TARGET_ASSIGNMENT);
+    assertEquals(result.getPreCheckStatus(), PreCheckStatus.PASS);
+    assertEquals(result.getMessage(), "Within threshold (<50%)");
+  }
+
+  @Test
+  public void testServerGainingNothingAndStayingOverThresholdIsStillFlagged() {
+    // Server_0 shedding its 2 segments is not enough to bring it back under the threshold, which the AFTER estimate
+    // catches even though the DURING one skips it
+    setDiskUsage(750L, 0L);
+    RebalancePreCheckerResult result = checkDiskUtilization(new RebalanceConfig(), SHED_ONLY_CURRENT_ASSIGNMENT,
+        SHED_ONLY_TARGET_ASSIGNMENT);
     assertEquals(result.getPreCheckStatus(), PreCheckStatus.ERROR);
     assertEquals(result.getMessage(),
-        "UNSAFE. Servers with unsafe disk utilization DURING rebalance (>50%): " + SERVER_0 + " (55%). lowDiskMode has "
-            + "no effect while downtime is enabled, disable downtime for it to delete segments before adding the new "
-            + "ones");
+        "UNSAFE. Servers with unsafe disk utilization AFTER rebalance (>=50%): " + SERVER_0 + " (55%)");
   }
 
   @Test
@@ -128,7 +167,13 @@ public class DefaultRebalancePreCheckerTest {
   }
 
   private RebalancePreCheckerResult checkDiskUtilization(RebalanceConfig rebalanceConfig) {
-    return _preChecker.checkDiskUtilization(getPreCheckContext(rebalanceConfig), THRESHOLD);
+    return checkDiskUtilization(rebalanceConfig, CURRENT_ASSIGNMENT, TARGET_ASSIGNMENT);
+  }
+
+  private RebalancePreCheckerResult checkDiskUtilization(RebalanceConfig rebalanceConfig,
+      Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment) {
+    return _preChecker.checkDiskUtilization(getPreCheckContext(rebalanceConfig, currentAssignment, targetAssignment),
+        THRESHOLD);
   }
 
   private static RebalanceConfig lowDiskMode() {
@@ -143,6 +188,12 @@ public class DefaultRebalancePreCheckerTest {
     return rebalanceConfig;
   }
 
+  private static RebalanceConfig bestEfforts() {
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setBestEfforts(true);
+    return rebalanceConfig;
+  }
+
   private static void setDiskUsage(long usedSpaceBytesServer0, long usedSpaceBytesServer1) {
     long now = System.currentTimeMillis();
     ResourceUtilizationInfo.setDiskUsageInfo(
@@ -150,26 +201,11 @@ public class DefaultRebalancePreCheckerTest {
             new DiskUsageInfo(SERVER_1, "", TOTAL_SPACE_BYTES, usedSpaceBytesServer1, now)));
   }
 
-  private static PreCheckContext getPreCheckContext(RebalanceConfig rebalanceConfig) {
+  private static PreCheckContext getPreCheckContext(RebalanceConfig rebalanceConfig,
+      Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment) {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
-    return new PreCheckContext("jobId", tableConfig.getTableName(), tableConfig, getCurrentAssignment(),
-        getTargetAssignment(), getTableSizeDetails(), rebalanceConfig, null, null);
-  }
-
-  private static Map<String, Map<String, String>> getCurrentAssignment() {
-    Map<String, Map<String, String>> currentAssignment = new HashMap<>();
-    for (int i = 0; i < NUM_SEGMENTS; i++) {
-      currentAssignment.put("segment_" + i, Map.of(SERVER_0, ONLINE));
-    }
-    return currentAssignment;
-  }
-
-  private static Map<String, Map<String, String>> getTargetAssignment() {
-    Map<String, Map<String, String>> targetAssignment = new HashMap<>();
-    for (int i = 0; i < NUM_SEGMENTS; i++) {
-      targetAssignment.put("segment_" + i, Map.of(i < NUM_SEGMENTS / 2 ? SERVER_0 : SERVER_1, ONLINE));
-    }
-    return targetAssignment;
+    return new PreCheckContext("jobId", tableConfig.getTableName(), tableConfig, currentAssignment, targetAssignment,
+        getTableSizeDetails(), rebalanceConfig, null, null);
   }
 
   private static TableSizeReader.TableSubTypeSizeDetails getTableSizeDetails() {
