@@ -144,8 +144,9 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  protected String getColumnTypeName(int columnIndex) {
-    return _columnDataTypes.getOrDefault(columnIndex, "");
+  @Nullable
+  protected ColumnDataType getColumnType(int columnIndex) {
+    return _dataSchema.getColumnDataType(columnIndex - 1);
   }
 
   @Override
