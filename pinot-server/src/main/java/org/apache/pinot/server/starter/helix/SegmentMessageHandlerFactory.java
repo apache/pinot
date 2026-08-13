@@ -202,7 +202,8 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
             .filter(g -> !g.isGlobal())
             .forEach(g -> _metrics.removeTableGauge(_tableNameWithType, g));
         // OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT registers as <gauge>.<table>.<column>$<key>, so the sweep above --
-        // which composes only the unkeyed <gauge>.<table> -- cannot reach it.
+        // which composes only the unkeyed <gauge>.<table> -- cannot reach it. Only the configured keys are
+        // recoverable here; see openStructMetricKeys for the keys this misses.
         openStructMetricKeys.forEach(
             metricKey -> _metrics.removeTableGauge(_tableNameWithType, metricKey,
                 ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT));
@@ -236,15 +237,14 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     }
   }
 
-  /// The `<column>$<key>` metric keys of every per-key OPEN_STRUCT gauge the given table can have
-  /// emitted. That gauge is keyed on the configured `denseKeys` rather than on the ingested key space
-  /// (see `OpenStructColumnSplitter#emitMetrics`), which is what makes the set recoverable from the
-  /// table config at deletion time.
+  /// The `<column>$<key>` metric keys of the per-key OPEN_STRUCT gauges that are recoverable from the
+  /// given table's config -- one per configured `denseKeys` entry.
   ///
-  /// Derives from the *current* config, so a key dropped from `denseKeys` after a segment already
-  /// emitted its gauge is not returned here. That gauge is already orphaned by the config change
-  /// itself and survives until the server restarts; closing the gap needs the emitted key names
-  /// tracked at emit time rather than re-derived.
+  /// This is a subset of what was actually emitted: the gauge fires for every key seen in a segment
+  /// (see `OpenStructColumnSplitter#emitMetrics`), and a discovered key exists only in ingested data,
+  /// so nothing at deletion time can name it. Those gauges, and any whose key was dropped from
+  /// `denseKeys` after a segment emitted it, survive until the server restarts. Closing the gap needs
+  /// the emitted key names tracked at emit time rather than re-derived here.
   @VisibleForTesting
   static List<String> openStructMetricKeys(TableConfig tableConfig, Schema schema) {
     List<String> metricKeys = new ArrayList<>();

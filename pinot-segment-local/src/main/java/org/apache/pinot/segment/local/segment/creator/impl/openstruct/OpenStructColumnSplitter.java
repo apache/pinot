@@ -303,30 +303,22 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
         ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_COUNT, _presenceBitmaps.size());
     // Denominator for the per-key fill rate. Emitted as a raw count rather than folding the ratio into a
-    // single percentage gauge: integer division truncates a configured dense key present in a handful of
-    // docs to 0, which is indistinguishable from no data and is exactly the case worth alerting on.
+    // single percentage gauge: integer division truncates a key present in a handful of docs to 0, which
+    // is indistinguishable from no data and is exactly the case worth alerting on.
     serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
         ServerGauge.OPEN_STRUCT_LAST_SEGMENT_DOC_COUNT, _numDocs);
 
-    // Iterates the configured dense keys rather than _resolvedDenseKeys. Under the default config
-    // (denseKeys empty, maxDenseKeys -1) _resolvedDenseKeys is data-driven -- every key at or above
-    // the fill-rate threshold -- so keying a gauge on it would mint one registry entry per distinct
-    // ingested key, and gauges are never removed. maxDenseKeys is not a sufficient gate either: it
-    // caps each segment's set, but different segments resolve different keys, so the union across
-    // segments is still unbounded. An explicit denseKeys list is the only operator-owned bound.
-    // A configured key with no presence bitmap never appeared in this segment and is skipped;
-    // one that appeared but was cut by the maxDenseKeys cap still reports, since a configured key
-    // that is not earning its materialized column is the case worth seeing. metricKey rather than
-    // materializedColumnName: the key here need not have an on-disk column, and it has to be
-    // sanitised for the JMX name (see OpenStructNaming#metricKey).
-    for (String key : _config.getDenseKeys()) {
-      RoaringBitmap presence = _presenceBitmaps.get(key);
-      if (presence != null) {
-        serverMetrics.setOrUpdateTableGauge(_tableNameWithType,
-            OpenStructNaming.metricKey(_columnName, key),
-            ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT, presence.getCardinality());
-      }
-    }
+    // Every key seen in this segment, dense or sparse, configured or discovered: the fill rate of a
+    // key that is *not* in denseKeys is what tells an operator it should be, which is the main thing
+    // this gauge is for. The cost is that the registry entry count follows the ingested key space,
+    // and gauges are only swept for keys recoverable from config when the table is deleted (see
+    // SegmentMessageHandlerFactory#openStructMetricKeys) -- an id-like key will accumulate entries
+    // until the server restarts. Gating this emission on a config switch is the follow-up.
+    // metricKey rather than materializedColumnName: a sparse key has no on-disk column, and the key
+    // has to be sanitised for the JMX name (see OpenStructNaming#metricKey).
+    _presenceBitmaps.forEach((key, presence) -> serverMetrics.setOrUpdateTableGauge(_tableNameWithType,
+        OpenStructNaming.metricKey(_columnName, key),
+        ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT, presence.getCardinality()));
   }
 
   @Override
