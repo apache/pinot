@@ -41,8 +41,15 @@ public class SegmentSizeInfo {
   private final Long _compressionStatsForwardIndexAndDictionaryStorageSizeInBytes;
   private final Map<String, ColumnCompressionStatsInfo> _columnCompressionStats;
 
+  /// Per-index-type on-disk sizes for this segment, keyed by `IndexType#getId()`. Null unless the caller asked with
+  /// `includeIndexSizeStats=true`; an index type absent from the map means no size was recorded for it, not that it
+  /// occupies no space.
+  @JsonProperty("indexSizeInBytes")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private final Map<String, Long> _indexSizeInBytes;
+
   public SegmentSizeInfo(String segmentName, long sizeBytes) {
-    this(segmentName, sizeBytes, (Long) null, null, null);
+    this(segmentName, sizeBytes, (Long) null, null, null, null);
   }
 
   public SegmentSizeInfo(String segmentName, long sizeBytes, long compressionStatsUncompressedValueSizeInBytes,
@@ -55,7 +62,7 @@ public class SegmentSizeInfo {
       long compressionStatsForwardIndexAndDictionaryStorageSizeInBytes,
       @Nullable Map<String, ColumnCompressionStatsInfo> columnCompressionStats) {
     this(segmentName, sizeBytes, availableValue(compressionStatsUncompressedValueSizeInBytes),
-        availableValue(compressionStatsForwardIndexAndDictionaryStorageSizeInBytes), columnCompressionStats);
+        availableValue(compressionStatsForwardIndexAndDictionaryStorageSizeInBytes), columnCompressionStats, null);
   }
 
   @JsonCreator
@@ -66,13 +73,22 @@ public class SegmentSizeInfo {
       @JsonProperty("compressionStatsForwardIndexAndDictionaryStorageSizeInBytes") @Nullable
       Long compressionStatsForwardIndexAndDictionaryStorageSizeInBytes,
       @JsonProperty("columnCompressionStats") @Nullable Map<String, ColumnCompressionStatsInfo>
-          columnCompressionStats) {
+          columnCompressionStats,
+      @JsonProperty("indexSizeInBytes") @Nullable Map<String, Long> indexSizeInBytes) {
     _segmentName = segmentName;
     _diskSizeInBytes = sizeBytes;
     _compressionStatsUncompressedValueSizeInBytes = compressionStatsUncompressedValueSizeInBytes;
     _compressionStatsForwardIndexAndDictionaryStorageSizeInBytes =
         compressionStatsForwardIndexAndDictionaryStorageSizeInBytes;
     _columnCompressionStats = columnCompressionStats != null ? Map.copyOf(columnCompressionStats) : null;
+    _indexSizeInBytes = indexSizeInBytes != null ? Map.copyOf(indexSizeInBytes) : null;
+  }
+
+  /// Returns the per-index-type sizes for this segment, or null when the caller did not request them.
+  @Nullable
+  @JsonIgnore
+  public Map<String, Long> getIndexSizeInBytes() {
+    return _indexSizeInBytes;
   }
 
   public String getSegmentName() {
