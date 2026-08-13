@@ -75,20 +75,8 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     DataType dataType = blockValSet.getValueType();
     DataType storedType = dataType.getStoredType();
 
-    // UUID values are logical scalars (stored as 16-byte BYTES) — not serialized RoaringBitmap state. Add the
-    // hashCode of the canonical UUID string so DISTINCTCOUNTBITMAP(uuidCol) matches
-    // DISTINCTCOUNTBITMAP(CAST(uuidCol AS STRING)).
-    if (dataType == DataType.UUID) {
-      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
-      RoaringBitmap bitmap = getValueBitmap(aggregationResultHolder);
-      for (int i = 0; i < length; i++) {
-        bitmap.add(Arrays.hashCode(uuidBytesValues[i]));
-      }
-      return;
-    }
-
     // Treat BYTES value as serialized RoaringBitmap
-    if (storedType == DataType.BYTES) {
+    if (storedType == DataType.BYTES && dataType != DataType.UUID) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       RoaringBitmap valueBitmap = aggregationResultHolder.getResult();
       if (valueBitmap != null) {
@@ -153,6 +141,13 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
           valueBitmap.add(stringValues[i].hashCode());
         }
         break;
+      // Reached only by UUID: a real BYTES column is serialized sketch state and is handled above.
+      case BYTES:
+        byte[][] uuidValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          valueBitmap.add(Arrays.hashCode(uuidValues[i]));
+        }
+        break;
       default:
         throw new IllegalStateException(
             "Illegal data type for DISTINCT_COUNT_BITMAP aggregation function: " + storedType);
@@ -213,6 +208,15 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
           }
         }
         break;
+      // Reached only by UUID: a real BYTES column is serialized sketch state and is handled above.
+      case BYTES:
+        byte[][][] uuidValues = blockValSet.getBytesValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (byte[] value : uuidValues[i]) {
+            valueBitmap.add(Arrays.hashCode(value));
+          }
+        }
+        break;
       default:
         throw new IllegalStateException(
             "Illegal data type for DISTINCT_COUNT_BITMAP aggregation function: " + storedType);
@@ -227,18 +231,8 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     DataType dataType = blockValSet.getValueType();
     DataType storedType = dataType.getStoredType();
 
-    // UUID columns: add hashCode of canonical UUID string (see aggregate() for rationale).
-    if (dataType == DataType.UUID) {
-      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        getValueBitmap(groupByResultHolder, groupKeyArray[i])
-            .add(Arrays.hashCode(uuidBytesValues[i]));
-      }
-      return;
-    }
-
     // Treat BYTES value as serialized RoaringBitmap
-    if (storedType == DataType.BYTES) {
+    if (storedType == DataType.BYTES && dataType != DataType.UUID) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
         RoaringBitmap value = RoaringBitmapUtils.deserialize(bytesValues[i]);
@@ -304,6 +298,13 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
           getValueBitmap(groupByResultHolder, groupKeyArray[i]).add(stringValues[i].hashCode());
         }
         break;
+      // Reached only by UUID: a real BYTES column is serialized sketch state and is handled above.
+      case BYTES:
+        byte[][] uuidValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          getValueBitmap(groupByResultHolder, groupKeyArray[i]).add(Arrays.hashCode(uuidValues[i]));
+        }
+        break;
       default:
         throw new IllegalStateException(
             "Illegal data type for DISTINCT_COUNT_BITMAP aggregation function: " + storedType);
@@ -366,6 +367,16 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
           }
         }
         break;
+      // Reached only by UUID: a real BYTES column is serialized sketch state and is handled above.
+      case BYTES:
+        byte[][][] uuidValues = blockValSet.getBytesValuesMV();
+        for (int i = 0; i < length; i++) {
+          RoaringBitmap bitmap = getValueBitmap(groupByResultHolder, groupKeyArray[i]);
+          for (byte[] value : uuidValues[i]) {
+            bitmap.add(Arrays.hashCode(value));
+          }
+        }
+        break;
       default:
         throw new IllegalStateException(
             "Illegal data type for DISTINCT_COUNT_BITMAP aggregation function: " + storedType);
@@ -380,20 +391,8 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     DataType dataType = blockValSet.getValueType();
     DataType storedType = dataType.getStoredType();
 
-    // UUID columns: add hashCode of canonical UUID string (see aggregate() for rationale).
-    if (dataType == DataType.UUID) {
-      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        int hash = Arrays.hashCode(uuidBytesValues[i]);
-        for (int groupKey : groupKeysArray[i]) {
-          getValueBitmap(groupByResultHolder, groupKey).add(hash);
-        }
-      }
-      return;
-    }
-
     // Treat BYTES value as serialized RoaringBitmap
-    if (storedType == DataType.BYTES) {
+    if (storedType == DataType.BYTES && dataType != DataType.UUID) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
         RoaringBitmap value = RoaringBitmapUtils.deserialize(bytesValues[i]);
@@ -459,6 +458,13 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], stringValues[i].hashCode());
+        }
+        break;
+      // Reached only by UUID: a real BYTES column is serialized sketch state and is handled above.
+      case BYTES:
+        byte[][] uuidValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], Arrays.hashCode(uuidValues[i]));
         }
         break;
       default:
@@ -531,6 +537,18 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
             RoaringBitmap bitmap = getValueBitmap(groupByResultHolder, groupKey);
             for (String value : stringValues[i]) {
               bitmap.add(value.hashCode());
+            }
+          }
+        }
+        break;
+      // Reached only by UUID: a real BYTES column is serialized sketch state and is handled above.
+      case BYTES:
+        byte[][][] uuidValues = blockValSet.getBytesValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            RoaringBitmap bitmap = getValueBitmap(groupByResultHolder, groupKey);
+            for (byte[] value : uuidValues[i]) {
+              bitmap.add(Arrays.hashCode(value));
             }
           }
         }
@@ -699,6 +717,13 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
       case STRING:
         while (iterator.hasNext()) {
           valueBitmap.add(dictionary.getStringValue(iterator.next()).hashCode());
+        }
+        break;
+      // A UUID column's dictionary reports BYTES (it is a plain BytesDictionary); hash the stored bytes to match
+      // the scan path above. A real BYTES column holds serialized bitmaps and never reaches the dictionary path.
+      case BYTES:
+        while (iterator.hasNext()) {
+          valueBitmap.add(Arrays.hashCode(dictionary.getBytesValue(iterator.next())));
         }
         break;
       default:
