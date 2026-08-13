@@ -37,27 +37,16 @@ public final class OpenStructNaming {
   }
 
   /// Builds the `<openStructColumn>$<key>` identifier used as the key segment of a per-key OPEN_STRUCT
-  /// metric. Deliberately distinct from [#materializedColumnName]: it is only a metric identifier -- the
-  /// scrape rule splits it back into `column` and `key` labels -- and the key it carries need not have a
-  /// materialized column on disk. Its output is not a column name: do not feed it to [#parseKey] or
-  /// [#parseParentColumn], which would hand back the still-escaped key.
+  /// metric name; the scrape rule splits it back into `column` and `key` labels. Not a column name --
+  /// the key need not have one on disk, and the escaped output must not be fed to [#parseKey] or
+  /// [#parseParentColumn].
   ///
-  /// It also differs in escaping the key. OPEN_STRUCT keys come from user JSON, and the metric name is
-  /// wrapped by `javax.management.ObjectName.quote` on the way to JMX, which backslash-escapes exactly
-  /// `"`, `\`, `*` and `?`. An escaped `"` stops the name matching the per-key rule in
-  /// `docker/images/pinot/etc/jmx_prometheus_javaagent/configs/server.yml` at all, so the key silently
-  /// loses its `column`/`key` labels and falls through to a generic rule; the other three still match but
-  /// leave a spurious backslash in the exported label value.
-  ///
-  /// Those four are percent-escaped rather than folded to `_`, which would not be injective -- `_` is a
-  /// legal key character, so `a"b` and `a_b` would collapse onto one series and silently overwrite each
-  /// other's gauge on every seal. `%` is escaped first to keep the mapping reversible. Nothing else is
-  /// touched: `.`, `-`, `_`, `,`, `=` and spaces are all safe in a quoted `ObjectName` and in a
-  /// Prometheus label value, so `user.id`, `user-id` and `user_id` stay distinct series.
-  ///
-  /// The escape set tracks the JMX export path rather than Pinot's registry abstraction -- it is exactly
-  /// what `ObjectName.quote` escapes -- and would need revisiting if metrics stopped being exported
-  /// through JMX.
+  /// Percent-escapes the four characters `javax.management.ObjectName.quote` backslash-escapes on the
+  /// way to JMX (`"`, `\`, `*`, `?`), plus `%` itself so the mapping stays reversible. An escaped `"`
+  /// stops the name matching the per-key rule in
+  /// `docker/images/pinot/etc/jmx_prometheus_javaagent/configs/server.yml` at all; the other three
+  /// leave a stray backslash in the label value. Nothing else is touched, so `user.id`, `user-id` and
+  /// `user_id` stay distinct series.
   public static String metricKey(String openStructColumn, String key) {
     // '%' first so the escapes introduced below are not themselves re-escaped.
     return openStructColumn + SEPARATOR + key.replace("%", "%25").replace("\"", "%22").replace("\\", "%5C")

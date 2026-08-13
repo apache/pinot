@@ -67,8 +67,7 @@ public final class OpenStructTypeInference {
   }
 
   /// The stored type to use for one value of an undeclared OPEN_STRUCT key, and whether that value
-  /// took the STRING fallback. A plain class rather than a record because this module still targets
-  /// Java 11 bytecode.
+  /// took the STRING fallback.
   public static final class Resolution {
     private final FieldSpec.DataType _storedType;
     private final boolean _stringFallback;
@@ -84,21 +83,18 @@ public final class OpenStructTypeInference {
     }
 
     /// True when this value's own Java type maps to no [FieldSpec.DataType] and it is therefore
-    /// being stored as its serialized string form. This is what the type-inference-failure meter
-    /// counts, and it is deliberately false when the key already has a non-STRING type: such a
-    /// value is dropped by coercion and counted there instead, so counting it here too would
-    /// record one dropped value against two different meters.
+    /// stored as its serialized string form -- what the type-inference-failure meter counts. False
+    /// when the key already has a non-STRING type: coercion drops such a value and counts it there,
+    /// so counting it here too would bill one dropped value to two meters.
     public boolean isStringFallback() {
       return _stringFallback;
     }
   }
 
   /// Resolves the stored type for one value of an OPEN_STRUCT key that has no declared child spec.
-  ///
-  /// Shared by the consuming and the sealed build paths so the two cannot drift: a value that maps
-  /// to no [FieldSpec.DataType] is stored as its serialized string form rather than dropped, and if
-  /// only one path did that, the same row would read differently either side of the seal boundary
-  /// (and the REALTIME and OFFLINE halves of a hybrid table would disagree).
+  /// Shared by the consuming and sealed build paths so a value that maps to no [FieldSpec.DataType]
+  /// is stored as its serialized string form on both, rather than reading differently either side of
+  /// the seal boundary.
   ///
   /// @param rawValue        the non-null value being indexed
   /// @param establishedType the type already resolved for this key, or `null` on first sighting
