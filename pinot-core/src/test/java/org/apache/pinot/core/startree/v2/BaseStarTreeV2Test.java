@@ -97,7 +97,7 @@ abstract class BaseStarTreeV2Test<R, A> {
   // as AggregationFunctionColumnPair
   protected static final String DIMENSION1 = "d1__COLUMN_NAME";
   protected static final String DIMENSION2 = "DISTINCTCOUNTRAWHLL__d2";
-  private static final int DIMENSION_CARDINALITY = 100;
+  protected static final int DIMENSION_CARDINALITY = 100;
   private static final String AGG_COL = "m";
 
   // Supported filters
@@ -146,8 +146,8 @@ abstract class BaseStarTreeV2Test<R, A> {
     _aggregatedValueType = _valueAggregator.getAggregatedValueType();
     _aggregation = getAggregation(_valueAggregator.getAggregationType());
 
-    Schema.SchemaBuilder schemaBuilder = new Schema.SchemaBuilder().addSingleValueDimension(DIMENSION1, DataType.INT)
-        .addSingleValueDimension(DIMENSION2, DataType.INT);
+    Schema.SchemaBuilder schemaBuilder = new Schema.SchemaBuilder();
+    addDimensionFields(schemaBuilder);
     DataType rawValueType = getRawValueType();
     // Raw value type will be null for COUNT aggregation function
     if (rawValueType != null) {
@@ -160,8 +160,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     List<GenericRow> segmentRecords = new ArrayList<>(NUM_SEGMENT_RECORDS);
     for (int i = 0; i < NUM_SEGMENT_RECORDS; i++) {
       GenericRow segmentRecord = new GenericRow();
-      segmentRecord.putValue(DIMENSION1, RANDOM.nextInt(DIMENSION_CARDINALITY));
-      segmentRecord.putValue(DIMENSION2, RANDOM.nextInt(DIMENSION_CARDINALITY));
+      addDimensionValues(segmentRecord, RANDOM);
       if (rawValueType != null) {
         segmentRecord.putValue(AGG_COL, getRandomRawValue(RANDOM));
       }
@@ -175,7 +174,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(segmentRecords));
     driver.build();
 
-    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList(DIMENSION1, DIMENSION2), null, null,
+    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(getDimensionsSplitOrder(), null, null,
         List.of(new StarTreeAggregationConfig(AGG_COL,
                 _valueAggregator.getAggregationType().getName(), null, getCompressionCodec(),
                 true, getIndexVersion(), null, null)), MAX_LEAF_RECORDS);
@@ -254,7 +253,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     assertNull(predicateEvaluatorsMap);
   }
 
-  private void testQuery(String query)
+  protected void testQuery(String query)
       throws IOException {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
 
@@ -511,6 +510,27 @@ abstract class BaseStarTreeV2Test<R, A> {
   /// forward-index encoding or dictionary configuration for the dimension columns).
   protected TableConfig createTableConfig() {
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+  }
+
+  protected void addDimensionFields(Schema.SchemaBuilder schemaBuilder) {
+    schemaBuilder.addSingleValueDimension(DIMENSION1, DataType.INT).addSingleValueDimension(DIMENSION2, DataType.INT);
+  }
+
+  protected void addDimensionValues(GenericRow segmentRecord, Random random) {
+    segmentRecord.putValue(DIMENSION1, random.nextInt(DIMENSION_CARDINALITY));
+    segmentRecord.putValue(DIMENSION2, random.nextInt(DIMENSION_CARDINALITY));
+  }
+
+  protected List<String> getDimensionsSplitOrder() {
+    return List.of(DIMENSION1, DIMENSION2);
+  }
+
+  protected String getAggregation() {
+    return _aggregation;
+  }
+
+  protected StarTreeV2 getStarTreeV2() {
+    return _starTreeV2;
   }
 
   abstract ValueAggregator<R, A> getValueAggregator();
