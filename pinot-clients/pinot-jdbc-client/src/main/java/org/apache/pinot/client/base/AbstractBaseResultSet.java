@@ -64,7 +64,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   protected abstract Map<?, ?> getMap(int columnIndex)
       throws SQLException;
 
-  protected abstract String getColumnTypeName(int columnIndex);
+  protected abstract ColumnDataType getColumnType(int columnIndex);
 
   protected void validateState()
       throws SQLException {
@@ -1213,12 +1213,9 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   public Object getObject(int columnIndex)
       throws SQLException {
 
-    String dataTypeName = getColumnTypeName(columnIndex);
-    ColumnDataType dataType;
-    try {
-      dataType = ColumnDataType.valueOf(dataTypeName);
-    } catch (IllegalArgumentException e) {
-      throw new SQLDataException("Data type not supported for " + dataTypeName, e);
+    ColumnDataType dataType = getColumnType(columnIndex);
+    if (dataType == null) {
+      throw new SQLDataException("Data type not supported for column " + columnIndex);
     }
 
     if (dataType.isArray()) {
