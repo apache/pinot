@@ -410,7 +410,10 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
   }
 
   /// Writes segment metadata to disk.
-  protected void writeMetadata()
+  /// Writes `metadata.properties`. `indexSizes` maps column to [IndexType#getId()] to on-disk size in bytes and is
+  /// empty unless `indexSizeStatsEnabled` is set; when populated, the sizes are written as
+  /// `column.<column>.indexSizeInBytes.<indexTypeId>` in this same single pass.
+  protected void writeMetadata(Map<String, Map<String, Long>> indexSizes)
       throws ConfigurationException {
     File metadataFile = new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
     PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(metadataFile);
@@ -612,6 +615,14 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       properties.setProperty(Realtime.START_OFFSET, segmentZKPropsConfig.getStartOffset());
       properties.setProperty(Realtime.END_OFFSET, segmentZKPropsConfig.getEndOffset());
     }
+    for (Map.Entry<String, Map<String, Long>> columnEntry : indexSizes.entrySet()) {
+      String column = columnEntry.getKey();
+      for (Map.Entry<String, Long> indexEntry : columnEntry.getValue().entrySet()) {
+        properties.setProperty(getIndexSizeKeyFor(column, indexEntry.getKey()),
+            String.valueOf(indexEntry.getValue()));
+      }
+    }
+
     CommonsConfigurationUtils.saveToFile(properties, metadataFile);
   }
 
@@ -863,9 +874,107 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     for (ColumnIndexCreators colIndexes : _colIndexes.values()) {
       colIndexes.seal();
     }
-    writeMetadata();
+    if (_config.isIndexSizeStatsEnabled()) {
+      // Close the creators before measuring. `seal()` alone does not leave every index file complete: the raw chunk
+      // forward-index writers only write their trailing chunk and their header in `close()`, so statting a raw
+      // forward index before this point reports a fraction of its final size (measured: 984 bytes for a 428208-byte
+      // index). Closing here is safe for the metadata written below because the creators keep the fields it reads --
+      // `SegmentDictionaryCreator.close()` delegates to `postIndexingCleanup()`, which `seal()` has already run, and
+      // which only clears indexing-time lookup maps. Gated on the flag so the default path keeps the original
+      // ordering exactly, since `writeMetadata()` reading creator state after `close()` is not a documented SPI
+      // contract for plugin-supplied creators.
+      closeColIndexes();
+    }
+    // Index files are still in V1 layout here, not yet packed into `columns.psf`, so their sizes can be read straight
+    // off the filesystem and persisted in the same single metadata write.
+    writeMetadata(collectIndexSizes());
   }
 
+  /// Returns the on-disk size in bytes of each index, keyed by column then by [IndexType#getId()]. Empty unless
+  /// `indexSizeStatsEnabled` is set on the table.
+  ///
+  /// Called from [#flushColIndexes()] after the index creators have sealed and before
+  /// [#convertFormatIfNecessary], so every index still exists as its own V1 file or directory. The V1-to-V3 converter
+  /// copies these byte counts verbatim into `v3/index_map`, so the values recorded here are identical to the packed
+  /// sizes, and the same code path serves V1, V2 and V3 segments.
+  ///
+  /// Two sources are covered: individual index files, located via [IndexType#getFileExtensions], and text or vector
+  /// indexes built with `storeInSegmentFile=false`, which live in their own directories and are sized recursively.
+  ///
+  /// These statistics are advisory. Any failure is logged and the affected entry omitted rather than failing an
+  /// otherwise valid segment build.
+  private Map<String, Map<String, Long>> collectIndexSizes() {
+    if (!_config.isIndexSizeStatsEnabled()) {
+      return Map.of();
+    }
+    // Anything other than v1 is packed into `columns.psf` by `convertFormatIfNecessary`, which prefixes each entry
+    // with a magic marker and records `payload + marker` as the entry size. Add the same constant so the reported
+    // value is the extent the index occupies in the finished segment. The predicate deliberately mirrors
+    // `convertFormatIfNecessary`: a `v2` request is also converted, so gating on `== v3` would leave every v2 size
+    // short by the marker.
+    long packedIndexOverhead = _config.getSegmentVersion() != SegmentVersion.v1
+        ? V1Constants.INDEX_ENTRY_MAGIC_MARKER_SIZE_BYTES : 0;
+    Map<String, Map<String, Long>> indexSizes = new TreeMap<>();
+    List<IndexType<?, ?, ?>> allIndexTypes = IndexService.getInstance().getAllIndexes();
+    for (String column : _colIndexes.keySet()) {
+      Map<String, Long> columnSizes = new TreeMap<>();
+      for (IndexType<?, ?, ?> indexType : allIndexTypes) {
+        // Scoped per (column, index type) so a plugin index type that throws only drops its own entry.
+        try {
+          long size = 0;
+          boolean anyFile = false;
+          boolean anyDirectory = false;
+          for (String extension : indexType.getFileExtensions(null)) {
+            File indexFile = new File(_indexDir, column + extension);
+            if (!indexFile.exists()) {
+              continue;
+            }
+            if (indexFile.isDirectory()) {
+              // Text and vector indexes built with `storeInSegmentFile=false` live in their own directory, which the
+              // converter copies alongside `columns.psf` rather than packing into it, so no marker applies.
+              long directorySize = sizeOfDirectoryQuietly(indexFile);
+              if (directorySize < 0) {
+                continue;
+              }
+              anyDirectory = true;
+              size += directorySize;
+            } else {
+              anyFile = true;
+              size += indexFile.length();
+            }
+          }
+          if (anyFile || anyDirectory) {
+            columnSizes.put(indexType.getId(), size + (anyFile ? packedIndexOverhead : 0));
+          }
+        } catch (Exception e) {
+          LOGGER.warn("Failed to measure index size for column: {}, index type: {} in segment: {}", column,
+              indexType.getId(), _segmentName, e);
+        }
+      }
+      if (!columnSizes.isEmpty()) {
+        indexSizes.put(column, columnSizes);
+      }
+    }
+    return indexSizes;
+  }
+
+  /// Recursive size of `directory`, or `-1` if it could not be measured. Callers must skip the entry on `-1` rather
+  /// than record `0`, which a consumer would read as "this index costs nothing".
+  private long sizeOfDirectoryQuietly(File directory) {
+    try {
+      // Fully qualified: `org.apache.pinot.common.utils.FileUtils` is already imported here, and checkstyle
+      // forbids static imports (AvoidStaticImport).
+      return org.apache.commons.io.FileUtils.sizeOfDirectory(directory);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to size index directory: {} for segment: {}", directory, _segmentName, e);
+      return -1;
+    }
+  }
+
+  /// Closes the index creators. Safe to call twice: [#flushColIndexes()] closes them as soon as the index files are
+  /// complete so their sizes can be measured, and [#seal()] keeps its `finally` call as the failure-path safety net.
+  /// `ColumnIndexCreators#close()` is itself idempotent via its own `_isClosed` guard, so no extra flag is needed
+  /// here -- and adding one would break creator reuse across `init()` calls.
   private void closeColIndexes() throws IOException {
     List<Closeable> creators = new ArrayList<>(_colIndexes.values());
     FileUtils.close(creators);
