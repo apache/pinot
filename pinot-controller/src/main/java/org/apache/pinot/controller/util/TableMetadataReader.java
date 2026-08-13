@@ -255,6 +255,16 @@ public class TableMetadataReader {
   public JsonNode getAggregateTableMetadata(String tableNameWithType, @Nullable List<String> columns, int numReplica,
       int timeoutMs, boolean compressionStatsEnabled, boolean includeColumnCompressionStats)
       throws InvalidConfigException {
+    return getAggregateTableMetadata(tableNameWithType, columns, numReplica, timeoutMs, compressionStatsEnabled,
+        includeColumnCompressionStats, false);
+  }
+
+  /// As above, additionally requesting the per-index-type size breakdown from each server when
+  /// `includeIndexSizeStats` is set.
+  public JsonNode getAggregateTableMetadata(String tableNameWithType, @Nullable List<String> columns, int numReplica,
+      int timeoutMs, boolean compressionStatsEnabled, boolean includeColumnCompressionStats,
+      boolean includeIndexSizeStats)
+      throws InvalidConfigException {
     final Map<String, List<String>> serverToSegments =
         _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
     BiMap<String, String> endpoints =
@@ -264,7 +274,8 @@ public class TableMetadataReader {
 
     TableMetadataInfo aggregateTableMetadataInfo =
         serverSegmentMetadataReader.getAggregatedTableMetadataFromServer(tableNameWithType, endpoints, columns,
-            numReplica, timeoutMs, compressionStatsEnabled, includeColumnCompressionStats, serverToSegments);
+            numReplica, timeoutMs, compressionStatsEnabled, includeColumnCompressionStats, serverToSegments,
+            includeIndexSizeStats);
     return JsonUtils.objectToJsonNode(aggregateTableMetadataInfo);
   }
 
