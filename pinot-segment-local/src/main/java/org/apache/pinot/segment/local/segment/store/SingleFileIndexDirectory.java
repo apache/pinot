@@ -77,7 +77,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   private static final Logger LOGGER = LoggerFactory.getLogger(SingleFileIndexDirectory.class);
 
   private static final long MAGIC_MARKER = 0xdeadbeefdeafbeadL;
-  private static final int MAGIC_MARKER_SIZE_BYTES = 8;
+  private static final int MAGIC_MARKER_SIZE_BYTES = V1Constants.INDEX_ENTRY_MAGIC_MARKER_SIZE_BYTES;
 
   /// Prefix of the [RuntimeException] message thrown when a requested index is absent from the
   /// segment directory. Single source of truth: [FilePerIndexDirectory] reuses it for the same

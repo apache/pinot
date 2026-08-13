@@ -108,6 +108,29 @@ public class IndexingConfig extends BaseJsonConfig {
   /// default.
   private boolean _compressionStatsEnabled;
 
+  /// When true, segment creation records the on-disk size of each index, per column and per index type, into
+  /// `metadata.properties` under `column.<column>.indexSizeInBytes.<indexTypeId>`, where `indexTypeId` is
+  /// `IndexType#getId()`.
+  ///
+  /// Sizes are measured after the index creators are closed and before the V1-to-V3 format conversion, from the V1
+  /// on-disk layout, so they are recorded for every segment version. Any version other than `v1` is packed into
+  /// `columns.psf`, and for those the magic marker prefixed to each packed entry is included so a value matches the
+  /// corresponding `v3/index_map` entry exactly. Externally stored text and vector directories are copied rather
+  /// than packed and carry no marker.
+  ///
+  /// Covers the per-column index files plus text and vector indexes held in their own directories. Does not cover
+  /// star-tree or multi-column text indexes, which are built after this point. A missing entry means "not measured"
+  /// and must not be read as zero bytes.
+  ///
+  /// A recorded value is a creation-time snapshot. Reload-time index handlers can add, drop or rewrite indexes
+  /// without updating these keys, so a present value may be stale; readers should prefer `v3/index_map` when it is
+  /// available. Enabling the flag also changes the segment CRC, because the keys live in `metadata.properties`.
+  ///
+  /// Existing segments are not backfilled; only newly built segments carry the keys. Enabling this adds roughly one
+  /// property per column per index type, which is re-parsed on every segment load, so the cost is not build-time
+  /// only. Disabled by default.
+  private boolean _indexSizeStatsEnabled;
+
   @Nullable
   public List<String> getInvertedIndexColumns() {
     return _invertedIndexColumns;
@@ -420,6 +443,16 @@ public class IndexingConfig extends BaseJsonConfig {
   /// Enables or disables compression-statistics collection for newly built or rewritten indexes.
   public void setCompressionStatsEnabled(boolean compressionStatsEnabled) {
     _compressionStatsEnabled = compressionStatsEnabled;
+  }
+
+  /// Returns whether new segments persist per-index-type storage sizes.
+  public boolean isIndexSizeStatsEnabled() {
+    return _indexSizeStatsEnabled;
+  }
+
+  /// Enables or disables per-index-type size collection for newly built segments.
+  public void setIndexSizeStatsEnabled(boolean indexSizeStatsEnabled) {
+    _indexSizeStatsEnabled = indexSizeStatsEnabled;
   }
 
   /// Returns all columns referenced in the indexing config. This is useful to construct FieldIndexConfigs in

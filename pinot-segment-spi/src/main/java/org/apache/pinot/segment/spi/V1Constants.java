@@ -25,6 +25,9 @@ public class V1Constants {
   public static final String SEGMENT_CREATION_META = "creation.meta";
   public static final String INDEX_MAP_FILE_NAME = "index_map";
   public static final String INDEX_FILE_NAME = "columns.psf";
+  /// Size of the marker prefixed to every index entry packed into [#INDEX_FILE_NAME]. An `index_map` entry size is
+  /// the index payload plus this constant, so segment creation adds it when recording V3 index sizes.
+  public static final int INDEX_ENTRY_MAGIC_MARKER_SIZE_BYTES = 8;
   public static final String VALID_DOC_IDS_SNAPSHOT_FILE_NAME = "validdocids.bitmap.snapshot";
   public static final String QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME = "queryabledocids.bitmap.snapshot";
   public static final String TTL_WATERMARK_TABLE_PARTITION = "ttl.watermark.partition.";
@@ -231,8 +234,33 @@ public class V1Constants {
       public static final String FORWARD_INDEX_DICTIONARY_ENCODED_UNCOMPRESSED_VALUE_SIZE_IN_BYTES =
           "forwardIndex.dictionaryEncodedUncompressedValueSizeInBytes";
 
+      // Optional. NOTE: Added in release 1.6.0. Only exists in segments created after the 1.6.0 release.
+      /// Key fragment for the per-index-type on-disk size entries written at seal time when `indexSizeStatsEnabled`
+      /// is on. Full key shape is `column.<column>.indexSizeInBytes.<indexTypeId>`; build it with
+      /// [#getIndexSizeKeyFor].
+      ///
+      /// Recorded for every segment version, covering the per-column index files plus text and vector indexes held in
+      /// their own directories. Any version other than `v1` is packed into `columns.psf`, so for those the value
+      /// includes the magic marker prefixed to each packed entry and therefore matches the corresponding
+      /// `v3/index_map` entry. Externally stored index directories are copied rather than packed and carry no marker.
+      ///
+      /// Star-tree and multi-column text indexes are not covered, and segments built before this flag existed carry
+      /// no entries at all. A missing entry means "not measured" and must not be read as zero bytes. A present value
+      /// is a creation-time snapshot: reload-time index handlers can add, drop or rewrite indexes without updating
+      /// these keys, so readers should prefer `v3/index_map` when it is available.
+      public static final String INDEX_SIZE_IN_BYTES = "indexSizeInBytes";
+
       public static String getKeyFor(String column, String key) {
         return COLUMN_PROPS_KEY_PREFIX + column + "." + key;
+      }
+
+      /// Returns the `metadata.properties` key holding the on-disk size in bytes of `indexTypeId` for `column`.
+      ///
+      /// `indexTypeId` must be [org.apache.pinot.segment.spi.index.IndexType#getId()], which is the same identifier
+      /// the table metadata REST API already reports index sizes under. This is part of the on-disk format and cannot
+      /// change once released.
+      public static String getIndexSizeKeyFor(String column, String indexTypeId) {
+        return getKeyFor(column, INDEX_SIZE_IN_BYTES + "." + indexTypeId);
       }
     }
   }

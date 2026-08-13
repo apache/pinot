@@ -113,6 +113,7 @@ public class TableConfigBuilder {
   private List<String> _jsonIndexColumns;
   private boolean _aggregateMetrics;
   private boolean _compressionStatsEnabled;
+  private boolean _indexSizeStatsEnabled;
   private boolean _optimizeDictionary;
   private boolean _optimizeDictionaryForMetrics;
   // This threshold determines if dictionary should be enabled or not for a metric column and is relevant
@@ -370,6 +371,12 @@ public class TableConfigBuilder {
     return this;
   }
 
+  /// Sets whether newly built segments persist per-index-type storage sizes. Disabled by default.
+  public TableConfigBuilder setIndexSizeStatsEnabled(boolean indexSizeStatsEnabled) {
+    _indexSizeStatsEnabled = indexSizeStatsEnabled;
+    return this;
+  }
+
   public TableConfigBuilder setStreamConfigs(Map<String, String> streamConfigs) {
     Preconditions.checkState(_tableType == TableType.REALTIME);
     _streamConfigs = streamConfigs;
@@ -554,6 +561,7 @@ public class TableConfigBuilder {
     indexingConfig.setJsonIndexColumns(_jsonIndexColumns);
     indexingConfig.setAggregateMetrics(_aggregateMetrics);
     indexingConfig.setCompressionStatsEnabled(_compressionStatsEnabled);
+    indexingConfig.setIndexSizeStatsEnabled(_indexSizeStatsEnabled);
     indexingConfig.setOptimizeDictionary(_optimizeDictionary);
     indexingConfig.setOptimizeDictionaryForMetrics(_optimizeDictionaryForMetrics);
     indexingConfig.setOptimizeDictionaryType(_optimizeDictionaryType);

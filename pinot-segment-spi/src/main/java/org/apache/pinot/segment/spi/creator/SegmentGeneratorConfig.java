@@ -125,6 +125,7 @@ public class SegmentGeneratorConfig implements Serializable {
   // Type of the instance (SERVER/MINION) that is trying to create the segment.
   private InstanceType _instanceType;
   private boolean _compressionStatsEnabled;
+  private boolean _indexSizeStatsEnabled;
 
   /// Constructs the SegmentGeneratorConfig with table config and schema.
   /// NOTE: The passed in table config and schema might be changed.
@@ -168,6 +169,7 @@ public class SegmentGeneratorConfig implements Serializable {
     setEnableDefaultStarTree(indexingConfig.isEnableDefaultStarTree());
     _multiColumnTextIndexConfig = indexingConfig.getMultiColumnTextIndexConfig();
     _compressionStatsEnabled = indexingConfig.isCompressionStatsEnabled();
+    _indexSizeStatsEnabled = indexingConfig.isIndexSizeStatsEnabled();
 
     List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
     if (fieldConfigs != null) {
@@ -686,5 +688,15 @@ public class SegmentGeneratorConfig implements Serializable {
   /// Sets whether this segment build records compression statistics.
   public void setCompressionStatsEnabled(boolean compressionStatsEnabled) {
     _compressionStatsEnabled = compressionStatsEnabled;
+  }
+
+  /// Returns whether this segment build persists per-index-type storage sizes.
+  public boolean isIndexSizeStatsEnabled() {
+    return _indexSizeStatsEnabled;
+  }
+
+  /// Sets whether this segment build persists per-index-type storage sizes.
+  public void setIndexSizeStatsEnabled(boolean indexSizeStatsEnabled) {
+    _indexSizeStatsEnabled = indexSizeStatsEnabled;
   }
 }
