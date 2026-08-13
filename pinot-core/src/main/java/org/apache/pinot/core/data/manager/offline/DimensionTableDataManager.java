@@ -241,7 +241,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
               }
 
               Object[] primaryKey = recordReader.getRecordValues(i, pkIndexes);
-                primaryKey = wrapPrimaryKey(primaryKey);
+              primaryKey = wrapPrimaryKey(primaryKey);
               Object[] values = recordReader.getRecordValues(i, valIndexes);
 
               Object[] previousValue = lookupTable.put(primaryKey, values);
@@ -320,7 +320,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
             }
 
             Object[] primaryKey = recordReader.getRecordValues(i, pkIndexes);
-              primaryKey = wrapPrimaryKey(primaryKey);
+            primaryKey = wrapPrimaryKey(primaryKey);
 
             long readerIdxAndDocId = (((long) readerIdx) << 32) | (i & 0xffffffffL);
             long previousValue = lookupTable.put(primaryKey, readerIdxAndDocId);
