@@ -53,6 +53,7 @@ import org.apache.parquet.variant.Variant;
 import org.apache.parquet.variant.VariantArrayBuilder;
 import org.apache.parquet.variant.VariantBuilder;
 import org.apache.parquet.variant.VariantObjectBuilder;
+import org.apache.pinot.common.utils.VariantUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.VariantEnvelope;
@@ -131,6 +132,25 @@ public class ParquetVariantRecordReaderTest {
     VariantEnvelope.Decoded decoded = VariantEnvelope.decode(converter.convert(variantGroup));
     assertEquals(remainingBytes(decoded.getMetadata()), expectedMetadata);
     assertEquals(remainingBytes(decoded.getValue()), expectedValue);
+  }
+
+  @Test
+  public void testUnshreddedNonMonotonicObjectOffsetsArePreserved()
+      throws Exception {
+    Variant expected = nonMonotonicObjectVariant();
+    File dataFile = writeScalarVariantFile(expected, "non-monotonic-object-offsets.parquet", Map.of());
+    try (ParquetNativeRecordReader reader = new ParquetNativeRecordReader()) {
+      reader.init(dataFile, null, null);
+      List<GenericRow> rows = readAll(reader);
+      byte[] actualEnvelope = (byte[]) rows.get(2).getValue(VARIANT_FIELD);
+      byte[] expectedEnvelope = VariantEnvelope.encode(expected.getMetadataBuffer(), expected.getValueBuffer());
+
+      assertTrue(Arrays.equals(actualEnvelope, expectedEnvelope),
+          "Unshredded ingestion must preserve producer-owned metadata/value bytes exactly");
+      assertEquals(VariantUtils.variantGet(actualEnvelope, "$.a", "INT"), 1);
+      assertEquals(VariantUtils.variantGet(actualEnvelope, "$.b", "INT"), 2);
+      assertEquals(VariantUtils.variantGet(actualEnvelope, "$.c", "INT"), 3);
+    }
   }
 
   @Test
@@ -821,6 +841,20 @@ public class ParquetVariantRecordReaderTest {
     System.arraycopy(source, Math.max(0, source.length - length), result, Math.max(0, length - source.length),
         Math.min(source.length, length));
     return result;
+  }
+
+  /// Returns a valid object whose a/b/c offsets are `[4, 2, 0, 6]` because its int8 values are physically reversed.
+  private static Variant nonMonotonicObjectVariant() {
+    byte[] metadata = {0x11, 0x03, 0x00, 0x01, 0x02, 0x03, 'a', 'b', 'c'};
+    byte[] value = {
+        0x02, 0x03,
+        0x00, 0x01, 0x02,
+        0x04, 0x02, 0x00, 0x06,
+        0x0C, 0x03,
+        0x0C, 0x02,
+        0x0C, 0x01
+    };
+    return new Variant(value, metadata);
   }
 
   private static Variant objectVariant(Object... keysAndValues) {
