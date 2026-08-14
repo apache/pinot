@@ -224,4 +224,33 @@ public class TableSizeResourceTest extends BaseResourceTest {
       _tableDataManagerMap.remove(tableName);
     }
   }
+
+  @Test
+  public void testTableSizeIndexSizeStatsOmittedWhenSegmentHasNone()
+      throws Exception {
+    // The flag is requested, but the segment predates indexSizeStatsEnabled, so nothing was persisted for it.
+    String tableName = "indexSizeStatsNone_OFFLINE";
+    List<ImmutableSegment> segments = new ArrayList<>();
+    addTable(tableName);
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableName);
+    ImmutableSegment trackedSegment = setUpSegment(tableName, null, "tracked", segments, false, false);
+
+    try {
+      String response = _webTarget.path("/tables/" + tableName + "/size")
+          .queryParam("includeIndexSizeStats", "true")
+          .request().get(String.class);
+      TableSizeInfo tableSizeInfo = JsonUtils.stringToObject(response, TableSizeInfo.class);
+
+      Assert.assertEquals(tableSizeInfo.getSegments().size(), 1);
+      Assert.assertNull(tableSizeInfo.getSegments().get(0).getIndexSizeInBytes(),
+          "A segment with nothing persisted must report indexSizeInBytes as absent, not an empty map");
+      JsonNode segment = JsonUtils.stringToJsonNode(response).get("segments").get(0);
+      Assert.assertFalse(segment.has("indexSizeInBytes"),
+          "indexSizeInBytes must not be serialized as {} when the segment persisted no sizes");
+    } finally {
+      tableDataManager.offloadSegment(trackedSegment.getSegmentName());
+      tableDataManager.shutDown();
+      _tableDataManagerMap.remove(tableName);
+    }
+  }
 }

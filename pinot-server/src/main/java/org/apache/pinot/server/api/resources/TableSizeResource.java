@@ -100,7 +100,10 @@ public class TableSizeResource {
           + "tableIndexConfig.compressionStatsEnabled; this also populates segment summary fields")
       @DefaultValue("false") @QueryParam("includeColumnCompressionStats") boolean includeColumnCompressionStats,
       @ApiParam(value = "Include per-index-type size totals when detailed=true, from sizes persisted for segments "
-          + "built while tableIndexConfig.indexSizeStatsEnabled was set")
+          + "built while tableIndexConfig.indexSizeStatsEnabled was set. Governs collection at segment-build time "
+          + "only: disabling the config later does not hide sizes already persisted into existing segments. A "
+          + "server that predates this flag ignores it and omits indexSizeInBytes from its response, which looks "
+          + "identical to a segment that genuinely has no persisted sizes -- expect this during a rolling upgrade.")
       @DefaultValue("false") @QueryParam("includeIndexSizeStats") boolean includeIndexSizeStats,
       @Context HttpHeaders headers)
       throws WebApplicationException {
@@ -177,6 +180,11 @@ public class TableSizeResource {
             }
             hasImmutable = true;
           }
+        }
+        // An empty-but-non-null map means nothing was persisted for this segment; report that as absent rather
+        // than serializing an empty "indexSizeInBytes":{} on every segment of a table that never enabled the flag.
+        if (indexSizeTotals != null && indexSizeTotals.isEmpty()) {
+          indexSizeTotals = null;
         }
         if (hasImmutable) {
           if (detailed) {
