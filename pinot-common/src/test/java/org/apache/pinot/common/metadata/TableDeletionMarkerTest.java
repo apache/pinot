@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.common.metadata;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.AccessOption;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
@@ -55,13 +61,27 @@ public class TableDeletionMarkerTest {
   private ZkStarter.ZookeeperInstance _zk;
   private ZkClient _zkClient;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  /// A second, independent property store over the same ZK, modelling a different controller process. A single
+  /// ZkHelixPropertyStore serializes its own operations, so two controllers cannot be simulated through one
+  /// instance.
+  private ZkClient _otherZkClient;
+  private ZkHelixPropertyStore<ZNRecord> _otherPropertyStore;
 
   @BeforeClass
   public void beforeClass() {
     _zk = ZkStarter.startLocalZkServer();
-    _zkClient = new ZkClient.Builder().setZkServer(_zk.getZkUrl()).setZkSerializer(new ZNRecordSerializer()).build();
-    assertTrue(_zkClient.waitUntilConnected(10_000, TimeUnit.MILLISECONDS));
+    _zkClient = newZkClient();
     _propertyStore = new ZkHelixPropertyStore<>(new ZkBaseDataAccessor<>(_zkClient), PROPERTY_STORE_ROOT, null);
+    _otherZkClient = newZkClient();
+    _otherPropertyStore =
+        new ZkHelixPropertyStore<>(new ZkBaseDataAccessor<>(_otherZkClient), PROPERTY_STORE_ROOT, null);
+  }
+
+  private ZkClient newZkClient() {
+    ZkClient client =
+        new ZkClient.Builder().setZkServer(_zk.getZkUrl()).setZkSerializer(new ZNRecordSerializer()).build();
+    assertTrue(client.waitUntilConnected(10_000, TimeUnit.MILLISECONDS));
+    return client;
   }
 
   @AfterClass
@@ -69,8 +89,14 @@ public class TableDeletionMarkerTest {
     if (_propertyStore != null) {
       _propertyStore.stop();
     }
+    if (_otherPropertyStore != null) {
+      _otherPropertyStore.stop();
+    }
     if (_zkClient != null) {
       _zkClient.close();
+    }
+    if (_otherZkClient != null) {
+      _otherZkClient.close();
     }
     if (_zk != null) {
       ZkStarter.stopLocalZkServer(_zk);
@@ -140,7 +166,7 @@ public class TableDeletionMarkerTest {
     assertTrue(ZKMetadataProvider.createTableDeletionMarker(_propertyStore, TABLE_NAME, CONTROLLER_1));
     assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TABLE_NAME));
 
-    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, TABLE_NAME);
+    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, TABLE_NAME, CONTROLLER_1);
     assertFalse(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TABLE_NAME));
 
     // A fresh deletion of the same table must be possible once the marker is gone.
@@ -149,8 +175,23 @@ public class TableDeletionMarkerTest {
 
   @Test
   public void testRemoveNonExistentMarkerIsNoOp() {
-    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, TABLE_NAME);
+    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, TABLE_NAME, CONTROLLER_1);
     assertFalse(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TABLE_NAME));
+  }
+
+  /// A controller that stalled long enough to be taken over must not release the new owner's marker when it
+  /// eventually reaches its finally block, or both deletions would run unguarded.
+  @Test
+  public void testRemoveMarkerDoesNotReleaseAnotherControllersMarker() {
+    assertTrue(ZKMetadataProvider.createTableDeletionMarker(_propertyStore, TABLE_NAME, CONTROLLER_2));
+
+    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, TABLE_NAME, CONTROLLER_1);
+
+    assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TABLE_NAME),
+        "Controller 1 must not be able to release a marker owned by controller 2");
+    ZNRecord record = _propertyStore.get(markerPath(TABLE_NAME), null, AccessOption.PERSISTENT);
+    assertNotNull(record);
+    assertEquals(record.getSimpleField(CONTROLLER_ID_KEY), CONTROLLER_2);
   }
 
   @Test
@@ -209,6 +250,46 @@ public class TableDeletionMarkerTest {
         "The refreshed marker should be valid again");
   }
 
+  /// Two controllers must never both hold the marker for one table. Uses two independent property stores because
+  /// a single ZkHelixPropertyStore serializes its own operations and so cannot model two controller processes.
+  ///
+  /// NOTE: this asserts the invariant but is not a regression test for the non-atomic takeover it replaced. The
+  /// vulnerable window in a remove-then-create takeover is sub-millisecond and could not be hit reliably from a
+  /// test. The takeover's correctness rests on the ZK version check in
+  /// [ZKMetadataProvider#createOrTakeoverTableDeletionMarker], not on this test.
+  @Test
+  public void testOnlyOneOfTwoControllersAcquiresTheMarker()
+      throws Exception {
+    CyclicBarrier startLine = new CyclicBarrier(2);
+    List<String> contenders = List.of(CONTROLLER_1, CONTROLLER_2);
+    List<ZkHelixPropertyStore<ZNRecord>> stores = List.of(_propertyStore, _otherPropertyStore);
+    List<Future<Boolean>> results = new ArrayList<>(2);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      for (int i = 0; i < contenders.size(); i++) {
+        String contender = contenders.get(i);
+        ZkHelixPropertyStore<ZNRecord> store = stores.get(i);
+        results.add(executor.submit(() -> {
+          startLine.await(10, TimeUnit.SECONDS);
+          return ZKMetadataProvider.createOrTakeoverTableDeletionMarker(store, TABLE_NAME, contender);
+        }));
+      }
+      int winners = 0;
+      for (Future<Boolean> result : results) {
+        if (result.get(20, TimeUnit.SECONDS)) {
+          winners++;
+        }
+      }
+      assertEquals(winners, 1, "Exactly one controller may acquire the deletion marker, but " + winners + " did");
+    } finally {
+      executor.shutdownNow();
+    }
+
+    ZNRecord record = _propertyStore.get(markerPath(TABLE_NAME), null, AccessOption.PERSISTENT);
+    assertNotNull(record);
+    assertTrue(contenders.contains(record.getSimpleField(CONTROLLER_ID_KEY)));
+  }
+
   @Test
   public void testMarkersForDifferentTablesAreIndependent() {
     String realtimeTable = "table1_REALTIME";
@@ -219,7 +300,7 @@ public class TableDeletionMarkerTest {
     assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, realtimeTable));
     assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, offlineTable));
 
-    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, realtimeTable);
+    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, realtimeTable, CONTROLLER_1);
 
     assertFalse(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, realtimeTable));
     assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, offlineTable),

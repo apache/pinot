@@ -2547,8 +2547,30 @@ public class PinotHelixResourceManager {
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
     LOGGER.info("Deleting table {}: Start", tableNameWithType);
 
-    // Create deletion marker to prevent concurrent deletions and prevent recreation during deletion
-    // This implements atomic deletion by using a ZK-based distributed lock mechanism
+    // Block the delete when materialized views depend on this base table. Orphaning an MV
+    // leaves its runtime znode pointing at a base that no longer exists; the MV's task
+    // generator would then fail forever on every cycle, and the broker rewrite engine (PR 2)
+    // would keep serving the now-orphaned MV partitions as if the base were intact — silent
+    // stale data. Force the operator to drop dependent MVs first.
+    // NOTE: This runs before the deletion marker is acquired so that a refused delete does not leave a marker
+    // that would make an unrelated addTable() report a deletion in progress.
+    MaterializedViewConsistencyManager mvMgr = _materializedViewConsistencyManager;
+    if (mvMgr != null) {
+      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+      List<String> dependentMVs = new ArrayList<>(mvMgr.getDependentMaterializedViews(rawTableName));
+      // Don't block when the table being dropped IS an MV (self-reference impossible, but the
+      // index entry exists for MVs over MVs — currently unsupported, but the guard is cheap).
+      dependentMVs.remove(tableNameWithType);
+      if (!dependentMVs.isEmpty()) {
+        throw new IllegalStateException(String.format(
+            "Cannot delete table '%s': %d materialized view(s) depend on it: %s. "
+                + "Drop the dependent materialized views first.",
+            tableNameWithType, dependentMVs.size(), dependentMVs));
+      }
+    }
+
+    // Acquire the deletion marker. It gives concurrent deletes mutual exclusion and makes addTable() refuse to
+    // re-create the table while this deletion is still tearing its metadata down.
     if (!ZKMetadataProvider.createOrTakeoverTableDeletionMarker(_propertyStore, tableNameWithType, _controllerId)) {
       throw new IllegalStateException(String.format(
           "Cannot delete table '%s': a deletion is already in progress. "
@@ -2560,26 +2582,6 @@ public class PinotHelixResourceManager {
     boolean deletionMarkerCreated = true;
 
     try {
-      // Block the delete when materialized views depend on this base table. Orphaning an MV
-      // leaves its runtime znode pointing at a base that no longer exists; the MV's task
-      // generator would then fail forever on every cycle, and the broker rewrite engine (PR 2)
-      // would keep serving the now-orphaned MV partitions as if the base were intact — silent
-      // stale data. Force the operator to drop dependent MVs first.
-      MaterializedViewConsistencyManager mvMgr = _materializedViewConsistencyManager;
-      if (mvMgr != null) {
-        String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-        List<String> dependentMVs = new ArrayList<>(mvMgr.getDependentMaterializedViews(rawTableName));
-        // Don't block when the table being dropped IS an MV (self-reference impossible, but the
-        // index entry exists for MVs over MVs — currently unsupported, but the guard is cheap).
-        dependentMVs.remove(tableNameWithType);
-        if (!dependentMVs.isEmpty()) {
-          throw new IllegalStateException(String.format(
-              "Cannot delete table '%s': %d materialized view(s) depend on it: %s. "
-                  + "Drop the dependent materialized views first.",
-              tableNameWithType, dependentMVs.size(), dependentMVs));
-        }
-      }
-
       // Remove the table from brokerResource
       HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, tableNameWithType);
       LOGGER.info("Deleting table {}: Removed from broker resource", tableNameWithType);
@@ -2591,30 +2593,13 @@ public class PinotHelixResourceManager {
       _helixDataAccessor.removeProperty(_keyBuilder.idealStates(tableNameWithType));
       LOGGER.info("Deleting table {}: Removed ideal state", tableNameWithType);
 
-      // Remove all stored segments for the table
-      // Determine retention period with priority: query parameter > table config > cluster default
-      Long retentionPeriodMs;
-      if (retentionPeriod != null) {
-        // Query parameter takes highest priority
-        retentionPeriodMs = TimeUtils.convertPeriodToMillis(retentionPeriod);
-      } else {
-        // Check table config for deletedSegmentsRetentionPeriod
-        TableConfig tableConfig = getTableConfig(tableNameWithType);
-        if (tableConfig != null && tableConfig.getValidationConfig() != null) {
-          String tableRetentionPeriod = tableConfig.getValidationConfig().getDeletedSegmentsRetentionPeriod();
-          if (tableRetentionPeriod != null) {
-            retentionPeriodMs = TimeUtils.convertPeriodToMillis(tableRetentionPeriod);
-            LOGGER.info("Using table config retention period: {} for table {}", tableRetentionPeriod,
-                tableNameWithType);
-          } else {
-            // Fall back to null (will use cluster default in SegmentDeletionManager)
-            retentionPeriodMs = null;
-          }
-        } else {
-          // Fall back to null (will use cluster default in SegmentDeletionManager)
-          retentionPeriodMs = null;
-        }
-      }
+      // Remove all stored segments for the table.
+      // Retention precedence: the request's retention parameter, then the table config, then the cluster default
+      // that SegmentDeletionManager applies when this is null. Reuse SegmentDeletionManager's own extraction
+      // helper rather than re-reading the config here: it tolerates an empty or malformed period, which
+      // TimeUtils.convertPeriodToMillis would otherwise throw on and make the table undeletable.
+      Long retentionPeriodMs = retentionPeriod != null ? TimeUtils.convertPeriodToMillis(retentionPeriod)
+          : SegmentDeletionManager.getRetentionMsFromTableConfig(getTableConfig(tableNameWithType));
       _segmentDeletionManager.removeSegmentsFromStoreInBatch(tableNameWithType,
           getSegmentsFromPropertyStore(tableNameWithType),
           retentionPeriodMs);
@@ -2687,7 +2672,7 @@ public class PinotHelixResourceManager {
       // Always remove the deletion marker, even if deletion failed
       // This allows retry of deletion or recreation of the table
       if (deletionMarkerCreated) {
-        ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, tableNameWithType);
+        ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, tableNameWithType, _controllerId);
       }
     }
   }
