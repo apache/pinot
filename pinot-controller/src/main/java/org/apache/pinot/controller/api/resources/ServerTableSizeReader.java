@@ -84,6 +84,10 @@ public class ServerTableSizeReader {
 
   /// Reads versioned server table-size responses with explicit control over compression statistics, per-column
   /// compression statistics, and per-index-type size totals.
+  ///
+  /// NOTE: the 4th parameter here is `includeCompressionStats`, unlike the single-boolean overload above where the
+  /// 4th parameter is `includeColumnCompressionStats` (which also forces `includeCompressionStats` on). Prefer
+  /// naming booleans at the call site (e.g. via a comment) to avoid mixing the two up.
   public Map<String, TableSizeInfo> getTableSizeInfoFromServers(BiMap<String, String> serverEndPoints,
       String tableNameWithType, int timeoutMs, boolean includeCompressionStats, boolean includeColumnCompressionStats,
       boolean includeIndexSizeStats) {
@@ -94,19 +98,17 @@ public class ServerTableSizeReader {
     List<String> serverUrls = new ArrayList<>(numServers);
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     boolean requestCompressionStats = includeCompressionStats || includeColumnCompressionStats;
-    StringBuilder queryString = new StringBuilder();
+    List<String> queryParams = new ArrayList<>();
     if (requestCompressionStats) {
-      queryString.append("&includeCompressionStats=true");
+      queryParams.add("includeCompressionStats=true");
     }
     if (includeColumnCompressionStats) {
-      queryString.append("&includeColumnCompressionStats=true");
+      queryParams.add("includeColumnCompressionStats=true");
     }
     if (includeIndexSizeStats) {
-      queryString.append("&includeIndexSizeStats=true");
+      queryParams.add("includeIndexSizeStats=true");
     }
-    if (queryString.length() > 0) {
-      queryString.setCharAt(0, '?');
-    }
+    String queryString = queryParams.isEmpty() ? "" : "?" + String.join("&", queryParams);
     for (String endpoint : endpointsToServers.keySet()) {
       String tableSizeUri = endpoint + "/tables/" + tableNameWithType + "/size" + queryString;
       serverUrls.add(tableSizeUri);

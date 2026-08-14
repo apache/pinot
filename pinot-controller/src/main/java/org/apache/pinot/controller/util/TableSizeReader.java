@@ -21,6 +21,7 @@ package org.apache.pinot.controller.util;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import java.util.ArrayList;
@@ -373,8 +374,12 @@ public class TableSizeReader {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public List<ColumnCompressionStatsInfo> _columnCompressionStats;
 
-    /// Per-index-type size totals, one representative server's contribution per segment summed across segments. Null
-    /// unless the caller asked with `includeIndexSizeStats=true`.
+    /// Per-index-type size totals, one reporting server's contribution per segment summed across segments. Null
+    /// unless the caller asked with `includeIndexSizeStats=true`. Deliberately not divided by `numReplica` and not
+    /// all-or-nothing on partial server failure, unlike the sibling breakdown on `/tables/{t}/metadata`
+    /// ([org.apache.pinot.controller.util.ServerSegmentMetadataReader]): a segment simply contributes nothing to
+    /// this map if no server reported sizes for it, which the `missingSegments`/`segmentsWithStats` fields make
+    /// observable, so a partial answer here is still informative.
     @Nullable
     @JsonProperty("indexSizeBreakdown")
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -417,7 +422,10 @@ public class TableSizeReader {
         includeColumnCompressionStats, true, false);
   }
 
-  /// Reads one typed table size with optional per-column compression details and per-index-type size totals.
+  /// Reads one typed table size with optional per-column compression details and per-index-type size totals. No
+  /// production caller needs this combination directly; production reaches `includeIndexSizeStats` through
+  /// [#getTableSizeDetails]. Exists as a narrower entry point for testing the aggregation in isolation.
+  @VisibleForTesting
   public TableSubTypeSizeDetails getTableSubtypeSize(String tableNameWithType, int timeoutMs,
       boolean includeReplacedSegments, boolean includeColumnCompressionStats, boolean includeIndexSizeStats)
       throws InvalidConfigException {
@@ -435,8 +443,8 @@ public class TableSizeReader {
     ServerTableSizeReader serverTableSizeReader = new ServerTableSizeReader(_executor, _connectionManager);
     BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(serverToSegmentsMap.keySet());
     Map<String, TableSizeInfo> serverToTableSizeInfoMap =
-        serverTableSizeReader.getTableSizeInfoFromServers(endpoints, tableNameWithType, timeoutMs, false, false,
-            includeIndexSizeStats);
+        serverTableSizeReader.getTableSizeInfoFromServers(endpoints, tableNameWithType, timeoutMs,
+            /* includeCompressionStats */ false, /* includeColumnCompressionStats */ false, includeIndexSizeStats);
 
     TableSubTypeSizeDetails subTypeSizeDetails = new TableSubTypeSizeDetails();
     Map<String, SegmentSizeDetails> segmentToSizeDetailsMap = subTypeSizeDetails._segments;
@@ -486,6 +494,7 @@ public class TableSizeReader {
       // Iterate over all segment size info: update reported size, track max segment size and count errored servers.
       sizeDetails._maxReportedSizePerReplicaInBytes = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
       SegmentSizeInfo maxSizeInfo = null;
+      SegmentSizeInfo maxIndexSizeInfo = null;
       int errors = 0;
       for (SegmentSizeInfo sizeInfo : sizeDetails._serverInfo.values()) {
         if (sizeInfo.getDiskSizeInBytes() != DEFAULT_SIZE_WHEN_MISSING_OR_ERROR) {
@@ -493,6 +502,10 @@ public class TableSizeReader {
           if (sizeInfo.getDiskSizeInBytes() >= sizeDetails._maxReportedSizePerReplicaInBytes) {
             sizeDetails._maxReportedSizePerReplicaInBytes = sizeInfo.getDiskSizeInBytes();
             maxSizeInfo = sizeInfo;
+          }
+          if (sizeInfo.getIndexSizeInBytes() != null && (maxIndexSizeInfo == null
+              || sizeInfo.getDiskSizeInBytes() >= maxIndexSizeInfo.getDiskSizeInBytes())) {
+            maxIndexSizeInfo = sizeInfo;
           }
         } else {
           errors++;
@@ -507,10 +520,13 @@ public class TableSizeReader {
         subTypeSizeDetails._reportedSizeInBytes += sizeDetails._reportedSizeInBytes;
         subTypeSizeDetails._estimatedSizeInBytes += sizeDetails._estimatedSizeInBytes;
         subTypeSizeDetails._reportedSizePerReplicaInBytes += sizeDetails._maxReportedSizePerReplicaInBytes;
-        // The server contributing the max per-replica size stands in for one logical replica of this segment;
-        // its per-index-type sizes are the ones summed into the table-level breakdown.
-        if (indexSizeTotals != null && maxSizeInfo != null && maxSizeInfo.getIndexSizeInBytes() != null) {
-          for (Map.Entry<String, Long> indexSize : maxSizeInfo.getIndexSizeInBytes().entrySet()) {
+        // Use the max-disk-size replica that actually reports index sizes as the donor -- consistent with the
+        // disk-size representative above, and correct even when that representative (maxSizeInfo) is an old
+        // server that predates indexSizeStatsEnabled and so reports no index sizes at all. Without this, such
+        // a segment would silently drop out of the breakdown despite a same-size or smaller replica having the
+        // data.
+        if (indexSizeTotals != null && maxIndexSizeInfo != null) {
+          for (Map.Entry<String, Long> indexSize : maxIndexSizeInfo.getIndexSizeInBytes().entrySet()) {
             long size = indexSize.getValue();
             if (size >= 0) {
               long[] total = indexSizeTotals.computeIfAbsent(indexSize.getKey(), k -> new long[2]);

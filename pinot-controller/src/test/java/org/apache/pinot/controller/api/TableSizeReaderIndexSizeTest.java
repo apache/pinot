@@ -114,6 +114,13 @@ public class TableSizeReaderIndexSizeTest {
 
     // server3: old server that does not report indexSizeInBytes at all, even though the flag was requested.
     addServer("server3", List.of(new SegmentSizeInfo("s4", 700)));
+
+    // server4: replica holding the larger (representative) disk size for s5, but an old server that does not
+    // report indexSizeInBytes at all -- simulates a rolling upgrade where the larger replica predates the flag.
+    addServer("server4", List.of(new SegmentSizeInfo("s5", 2000)));
+
+    // server5: replica of s5 with a smaller disk size, but a current server that does report indexSizeInBytes.
+    addServer("server5", List.of(new SegmentSizeInfo("s5", 1000, Map.of("forward_index", 400L))));
   }
 
   @AfterClass
@@ -242,6 +249,21 @@ public class TableSizeReaderIndexSizeTest {
     Map<String, IndexSizeBreakdownInfo> breakdown = details._indexSizeBreakdown;
     assertNotNull(breakdown, "Requesting the flag with no reporting server must yield an empty map, not null");
     assertTrue(breakdown.isEmpty());
+  }
+
+  @Test
+  public void testFallsBackToAnyReportingServerWhenRepresentativeIsOld()
+      throws InvalidConfigException {
+    // The representative server (server4, larger disk size) is an old server reporting no indexSizeInBytes at all.
+    // Without a fallback, s5 would silently drop out of the breakdown despite server5's replica having the data.
+    TableSizeReader reader = createReader("server4", "server5");
+    TableSizeReader.TableSubTypeSizeDetails details =
+        reader.getTableSubtypeSize("indexSizeTable_OFFLINE", TIMEOUT_MSEC, true, false, true);
+
+    Map<String, IndexSizeBreakdownInfo> breakdown = details._indexSizeBreakdown;
+    assertNotNull(breakdown);
+    assertEquals(breakdown.get("forward_index").getSizePerReplicaInBytes(), 400L);
+    assertEquals(breakdown.get("forward_index").getSegmentsWithStats(), 1);
   }
 
   @Test
