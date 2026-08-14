@@ -81,10 +81,12 @@ public interface ColumnMetadata extends ColumnShape {
   /// `metadata.properties` when the table had `indexSizeStatsEnabled` set at segment build time.
   ///
   /// Empty when the flag was off, on segments built before it existed, and for indexes built after the sizes are
-  /// taken (star-tree, multi-column text). Values are a build-time snapshot: a reload that adds, drops or rewrites an
-  /// index does not update them, so a caller that needs the current packed layout should use [#getIndexSizeFor]
-  /// instead. Distinct from [#getIndexSizeFor] precisely because that one reflects the live layout while this one
-  /// survives without the segment being loaded, which is what lets cold-tier segments be reported.
+  /// taken (star-tree, multi-column text) -- these are not per-column, so the reload refresh described below has
+  /// no per-column entry to rewrite for them either. Otherwise kept current: `SegmentPreProcessor` rewrites these
+  /// entries once every reload's index handlers have finished, so a value here does not go stale the way a
+  /// build-time-only snapshot would. Distinct from [#getIndexSizeFor] because this one is read straight from
+  /// `metadata.properties` without needing the segment loaded or `v3/index_map` parsed, which is what lets
+  /// cold-tier segments be reported.
   ///
   /// Not serialized: [SegmentMetadataImpl#toJson] writes every `ColumnMetadata` through a mapper with no
   /// non-empty inclusion rule, so without this the field would appear on every column of every segment even with
