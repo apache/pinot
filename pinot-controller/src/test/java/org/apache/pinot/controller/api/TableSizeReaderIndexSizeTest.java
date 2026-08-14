@@ -121,6 +121,32 @@ public class TableSizeReaderIndexSizeTest {
 
     // server5: replica of s5 with a smaller disk size, but a current server that does report indexSizeInBytes.
     addServer("server5", List.of(new SegmentSizeInfo("s5", 1000, Map.of("forward_index", 400L))));
+
+    // server6/server7/server8: three replicas of s6, all reporting indexSizeInBytes, at three different disk
+    // sizes. Exercises the "pick the largest reporting replica" half of the selection, not just the
+    // "skip the non-reporting replica" half covered by server4/server5 above.
+    addServer("server6", List.of(new SegmentSizeInfo("s6", 1000, Map.of("forward_index", 111L))));
+    addServer("server7", List.of(new SegmentSizeInfo("s6", 3000, Map.of("forward_index", 333L))));
+    addServer("server8", List.of(new SegmentSizeInfo("s6", 2000, Map.of("forward_index", 222L))));
+
+    // server9: reports indexSizeInBytes as an empty (but non-null) map -- must be treated the same as a server
+    // that omits indexSizeInBytes entirely, not as a reporting replica contributing zero index types.
+    addServer("server9", List.of(new SegmentSizeInfo("s7", 2000, Map.of())));
+    addServer("server10", List.of(new SegmentSizeInfo("s7", 1000, Map.of("forward_index", 700L))));
+
+    // server11/server12: two replicas of s8 tied on disk size, both reporting the same indexSizeInBytes value.
+    // The donor is whichever one _serverInfo (a HashMap) iterates last -- unspecified -- but both report 150, so
+    // the expected total is unambiguous: 300 would mean both were double-counted.
+    addServer("server11", List.of(new SegmentSizeInfo("s8", 1500, Map.of("forward_index", 150L))));
+    addServer("server12", List.of(new SegmentSizeInfo("s8", 1500, Map.of("forward_index", 150L))));
+
+    // server13: healthy replica of s9, reports indexSizeInBytes. server14: errored replica of the same segment.
+    addServer("server13", List.of(new SegmentSizeInfo("s9", 1000, Map.of("forward_index", 900L))));
+    addServer("server14", 404, List.of(new SegmentSizeInfo("s9", 1000, Map.of("forward_index", 900L))));
+
+    // server15/server16: both replicas of s10 error out, so the segment is missing from all servers.
+    addServer("server15", 404, List.of(new SegmentSizeInfo("s10", 1000, Map.of("forward_index", 1000L))));
+    addServer("server16", 404, List.of(new SegmentSizeInfo("s10", 1000, Map.of("forward_index", 1000L))));
   }
 
   @AfterClass
@@ -134,12 +160,17 @@ public class TableSizeReaderIndexSizeTest {
 
   private void addServer(String name, List<SegmentSizeInfo> sizes)
       throws IOException {
+    addServer(name, 200, sizes);
+  }
+
+  private void addServer(String name, int status, List<SegmentSizeInfo> sizes)
+      throws IOException {
     FakeSizeServer server = new FakeSizeServer(sizes);
-    server.start(URI_PATH, createHandler(sizes));
+    server.start(URI_PATH, createHandler(status, sizes));
     _serverMap.put(name, server);
   }
 
-  private HttpHandler createHandler(List<SegmentSizeInfo> segmentSizes) {
+  private HttpHandler createHandler(int status, List<SegmentSizeInfo> segmentSizes) {
     return httpExchange -> {
       boolean includeIndexSizeStats = httpExchange.getRequestURI().getQuery() != null
           && httpExchange.getRequestURI().getQuery().contains("includeIndexSizeStats=true");
@@ -155,7 +186,7 @@ public class TableSizeReaderIndexSizeTest {
       TableSizeInfo tableInfo = new TableSizeInfo("indexSizeTable", tableSizeInBytes, responseSegments,
           TableSizeInfo.CURRENT_METADATA_VERSION);
       byte[] json = JsonUtils.objectToString(tableInfo).getBytes(StandardCharsets.UTF_8);
-      httpExchange.sendResponseHeaders(200, json.length);
+      httpExchange.sendResponseHeaders(status, json.length);
       try (OutputStream responseBody = httpExchange.getResponseBody()) {
         responseBody.write(json);
       }
@@ -203,7 +234,7 @@ public class TableSizeReaderIndexSizeTest {
   }
 
   @Test
-  public void testRepresentativeServerSelectionAndDisjointMerge()
+  public void testPicksDonorPerSegmentAndMergesDisjointIndexTypes()
       throws InvalidConfigException {
     TableSizeReader reader = createReader("server0", "server1");
     TableSizeReader.TableSubTypeSizeDetails details =
@@ -212,8 +243,8 @@ public class TableSizeReaderIndexSizeTest {
     Map<String, IndexSizeBreakdownInfo> breakdown = details._indexSizeBreakdown;
     assertNotNull(breakdown);
 
-    // s1's representative is server0 (diskSize 5000 > 4999): forward_index=1000, inverted_index=200.
-    // s2's representative is server1 (diskSize 6001 > 6000): forward_index=2001, bloom_filter=301.
+    // s1's donor is server0 (diskSize 5000 > 4999): forward_index=1000, inverted_index=200.
+    // s2's donor is server1 (diskSize 6001 > 6000): forward_index=2001, bloom_filter=301.
     // A doubled sum (both replicas counted) would give forward_index=3999 instead of 3001.
     assertEquals(breakdown.get("forward_index").getSizePerReplicaInBytes(), 3001L);
     assertEquals(breakdown.get("forward_index").getSegmentsWithStats(), 2);
@@ -252,10 +283,11 @@ public class TableSizeReaderIndexSizeTest {
   }
 
   @Test
-  public void testFallsBackToAnyReportingServerWhenRepresentativeIsOld()
+  public void testPicksReportingReplicaWhenLargestReplicaIsOld()
       throws InvalidConfigException {
-    // The representative server (server4, larger disk size) is an old server reporting no indexSizeInBytes at all.
-    // Without a fallback, s5 would silently drop out of the breakdown despite server5's replica having the data.
+    // The largest-disk-size replica (server4) is an old server reporting no indexSizeInBytes at all. Without
+    // picking a different donor, s5 would silently drop out of the breakdown despite server5's replica having
+    // the data.
     TableSizeReader reader = createReader("server4", "server5");
     TableSizeReader.TableSubTypeSizeDetails details =
         reader.getTableSubtypeSize("indexSizeTable_OFFLINE", TIMEOUT_MSEC, true, false, true);
@@ -264,6 +296,89 @@ public class TableSizeReaderIndexSizeTest {
     assertNotNull(breakdown);
     assertEquals(breakdown.get("forward_index").getSizePerReplicaInBytes(), 400L);
     assertEquals(breakdown.get("forward_index").getSegmentsWithStats(), 1);
+
+    // The disk-size representative (server4, the larger, non-reporting replica) must stay decoupled from the
+    // index-size donor (server5) selected above: they are allowed to be different replicas for the same segment.
+    assertEquals(details._reportedSizePerReplicaInBytes, 2000L);
+    assertEquals(details._segments.get("s5")._maxReportedSizePerReplicaInBytes, 2000L);
+    assertEquals(details._reportedSizeInBytes, 3000L);
+  }
+
+  @Test
+  public void testPicksLargestAmongMultipleReportingReplicas()
+      throws InvalidConfigException {
+    // All three replicas of s6 report indexSizeInBytes, at three different disk sizes. The donor must be the
+    // largest (server7, disk 3000, forward_index=333), not the first or last one iterated.
+    TableSizeReader reader = createReader("server6", "server7", "server8");
+    TableSizeReader.TableSubTypeSizeDetails details =
+        reader.getTableSubtypeSize("indexSizeTable_OFFLINE", TIMEOUT_MSEC, true, false, true);
+
+    Map<String, IndexSizeBreakdownInfo> breakdown = details._indexSizeBreakdown;
+    assertNotNull(breakdown);
+    assertEquals(breakdown.get("forward_index").getSizePerReplicaInBytes(), 333L);
+    assertEquals(breakdown.get("forward_index").getSegmentsWithStats(), 1);
+  }
+
+  @Test
+  public void testSkipsReplicaReportingEmptyIndexSizeMap()
+      throws InvalidConfigException {
+    // server9 holds the larger disk size for s7 but reports indexSizeInBytes as an empty map, which must be
+    // treated the same as not reporting at all -- not as a reporting replica contributing zero index types.
+    // Without that normalization, s7 would silently drop out of the breakdown despite server10 having the data.
+    TableSizeReader reader = createReader("server9", "server10");
+    TableSizeReader.TableSubTypeSizeDetails details =
+        reader.getTableSubtypeSize("indexSizeTable_OFFLINE", TIMEOUT_MSEC, true, false, true);
+
+    Map<String, IndexSizeBreakdownInfo> breakdown = details._indexSizeBreakdown;
+    assertNotNull(breakdown);
+    assertEquals(breakdown.get("forward_index").getSizePerReplicaInBytes(), 700L);
+    assertEquals(breakdown.get("forward_index").getSegmentsWithStats(), 1);
+  }
+
+  @Test
+  public void testTiedDiskSizesPickExactlyOneDonorNotBoth()
+      throws InvalidConfigException {
+    // server11 and server12 both hold s8 at the same disk size (1500) and both report forward_index=150.
+    // Regardless of which one wins the tie, exactly one must be summed -- 300 would mean both were double-counted.
+    TableSizeReader reader = createReader("server11", "server12");
+    TableSizeReader.TableSubTypeSizeDetails details =
+        reader.getTableSubtypeSize("indexSizeTable_OFFLINE", TIMEOUT_MSEC, true, false, true);
+
+    Map<String, IndexSizeBreakdownInfo> breakdown = details._indexSizeBreakdown;
+    assertNotNull(breakdown);
+    assertEquals(breakdown.get("forward_index").getSizePerReplicaInBytes(), 150L);
+    assertEquals(breakdown.get("forward_index").getSegmentsWithStats(), 1);
+  }
+
+  @Test
+  public void testErroredReplicaDoesNotBlockHealthyReplicaFromDonatingIndexSizes()
+      throws InvalidConfigException {
+    // server14 errors out (404) for s9; server13 is healthy and reports indexSizeInBytes. The errored replica
+    // must not prevent the healthy one from contributing to the breakdown, nor count as a missing segment.
+    TableSizeReader reader = createReader("server13", "server14");
+    TableSizeReader.TableSubTypeSizeDetails details =
+        reader.getTableSubtypeSize("indexSizeTable_OFFLINE", TIMEOUT_MSEC, true, false, true);
+
+    Map<String, IndexSizeBreakdownInfo> breakdown = details._indexSizeBreakdown;
+    assertNotNull(breakdown);
+    assertEquals(breakdown.get("forward_index").getSizePerReplicaInBytes(), 900L);
+    assertEquals(breakdown.get("forward_index").getSegmentsWithStats(), 1);
+    assertEquals(details._missingSegments, 0);
+  }
+
+  @Test
+  public void testSegmentMissingFromAllServersIsExcludedFromBreakdown()
+      throws InvalidConfigException {
+    // server15 and server16 both error out (404) for s10, so it's missing from every server. It must be counted
+    // as missing and must not contribute any (bogus) entry to the breakdown.
+    TableSizeReader reader = createReader("server15", "server16");
+    TableSizeReader.TableSubTypeSizeDetails details =
+        reader.getTableSubtypeSize("indexSizeTable_OFFLINE", TIMEOUT_MSEC, true, false, true);
+
+    assertEquals(details._missingSegments, 1);
+    Map<String, IndexSizeBreakdownInfo> breakdown = details._indexSizeBreakdown;
+    assertNotNull(breakdown);
+    assertTrue(breakdown.isEmpty(), "A segment missing from all servers must not contribute to the breakdown");
   }
 
   @Test
@@ -276,5 +391,22 @@ public class TableSizeReaderIndexSizeTest {
     assertNotNull(details._offlineSegments);
     assertNotNull(details._offlineSegments._indexSizeBreakdown);
     assertEquals(details._offlineSegments._indexSizeBreakdown.get("forward_index").getSizePerReplicaInBytes(), 3001L);
+  }
+
+  @Test
+  public void testRollingUpgradeDonorSelectionThroughGetTableSizeDetails()
+      throws InvalidConfigException {
+    // Same rolling-upgrade scenario as testPicksReportingReplicaWhenLargestReplicaIsOld, but through the
+    // production getTableSizeDetails entry point rather than the @VisibleForTesting getTableSubtypeSize overload.
+    TableSizeReader reader = createReader("server4", "server5");
+    TableSizeReader.TableSizeDetails details =
+        reader.getTableSizeDetails("indexSizeTable", TIMEOUT_MSEC, true, false, true);
+
+    assertNotNull(details);
+    assertNotNull(details._offlineSegments);
+    Map<String, IndexSizeBreakdownInfo> breakdown = details._offlineSegments._indexSizeBreakdown;
+    assertNotNull(breakdown);
+    assertEquals(breakdown.get("forward_index").getSizePerReplicaInBytes(), 400L);
+    assertEquals(breakdown.get("forward_index").getSegmentsWithStats(), 1);
   }
 }
