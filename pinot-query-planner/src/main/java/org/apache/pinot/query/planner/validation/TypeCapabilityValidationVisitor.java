@@ -34,12 +34,13 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 
 
-/// Rejects operations that would otherwise assign physical byte ordering, equality, or hashing semantics to a raw
-/// VARIANT value. The visitor has no mutable state and is thread-safe, so callers may share {@link #INSTANCE}.
-public final class VariantTypeValidationVisitor extends PlanNodeVisitor.DepthFirstVisitor<Void, Void> {
-  public static final VariantTypeValidationVisitor INSTANCE = new VariantTypeValidationVisitor();
+/// Validates that each logical input type supports the capabilities required by its operation, including equality,
+/// hashing, ordering, aggregation, and lossless result projection. The visitor has no mutable state and is thread-safe,
+/// so callers may share {@link #INSTANCE}.
+public final class TypeCapabilityValidationVisitor extends PlanNodeVisitor.DepthFirstVisitor<Void, Void> {
+  public static final TypeCapabilityValidationVisitor INSTANCE = new TypeCapabilityValidationVisitor();
 
-  private VariantTypeValidationVisitor() {
+  private TypeCapabilityValidationVisitor() {
   }
 
   @Override

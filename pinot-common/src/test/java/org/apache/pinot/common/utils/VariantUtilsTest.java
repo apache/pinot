@@ -22,9 +22,12 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.parquet.variant.Variant;
 import org.apache.parquet.variant.VariantBuilder;
@@ -36,6 +39,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.spi.utils.VariantEnvelope;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -379,6 +383,10 @@ public class VariantUtilsTest {
   public void testParseRenderAndLogicalDataSchema() {
     byte[] variant = VariantUtils.parseJsonToVariant("{\"a\":[1,true,null],\"b\":\"text\"}");
     assertEquals(VariantUtils.variantToJson(variant), "{\"a\":[1,true,null],\"b\":\"text\"}");
+    ReusableResult reusableResult = new ReusableResult();
+    assertEquals(VariantUtils.variantToJson(variant, reusableResult), "{\"a\":[1,true,null],\"b\":\"text\"}");
+    assertEquals(VariantUtils.variantToJson(VariantUtils.parseJsonToVariant("[2,3]"), reusableResult), "[2,3]");
+    assertNull(VariantUtils.variantToJson(new byte[0], reusableResult));
     assertNull(VariantUtils.tryParseJsonToVariant("{not-json"));
     assertThrows(IllegalArgumentException.class, () -> VariantUtils.parseJsonToVariant("{not-json"));
 
@@ -387,6 +395,68 @@ public class VariantUtilsTest {
     assertEquals(ColumnDataType.VARIANT.toExternal(new ByteArray(variant)), variant);
     assertEquals(ColumnDataType.VARIANT.convertAndFormat(new ByteArray(variant)),
         "{\"a\":[1,true,null],\"b\":\"text\"}");
+  }
+
+  @DataProvider(name = "variantJsonRenderingCases")
+  public Object[][] variantJsonRenderingCases() {
+    return new Object[][]{
+        jsonRenderingCase(Variant.Type.OBJECT, VariantUtils.parseJsonToVariant("{\"a\":1}"), "{\"a\":1}"),
+        jsonRenderingCase(Variant.Type.ARRAY, VariantUtils.parseJsonToVariant("[1,true]"), "[1,true]"),
+        jsonRenderingCase(Variant.Type.NULL, "null", VariantBuilder::appendNull),
+        jsonRenderingCase(Variant.Type.BOOLEAN, "true", builder -> builder.appendBoolean(true)),
+        jsonRenderingCase(Variant.Type.BYTE, "-8", builder -> builder.appendByte((byte) -8)),
+        jsonRenderingCase(Variant.Type.SHORT, "32000", builder -> builder.appendShort((short) 32_000)),
+        jsonRenderingCase(Variant.Type.INT, "-123456", builder -> builder.appendInt(-123_456)),
+        jsonRenderingCase(Variant.Type.LONG, "9876543210", builder -> builder.appendLong(9_876_543_210L)),
+        jsonRenderingCase(Variant.Type.STRING, "\"text\"", builder -> builder.appendString("text")),
+        jsonRenderingCase(Variant.Type.DOUBLE, "-123.5", builder -> builder.appendDouble(-123.5D)),
+        jsonRenderingCase(Variant.Type.DECIMAL4, "12.34", builder -> builder.appendDecimal(new BigDecimal("12.34"))),
+        jsonRenderingCase(Variant.Type.DECIMAL8, "1234567890.12",
+            builder -> builder.appendDecimal(new BigDecimal("1234567890.12"))),
+        jsonRenderingCase(Variant.Type.DECIMAL16, "12345678901234567890.1234",
+            builder -> builder.appendDecimal(new BigDecimal("12345678901234567890.1234"))),
+        jsonRenderingCase(Variant.Type.DATE, "\"1970-01-02\"", builder -> builder.appendDate(1)),
+        jsonRenderingCase(Variant.Type.TIMESTAMP_TZ, "\"1970-01-01T00:00:01.234567Z\"",
+            builder -> builder.appendTimestampTz(1_234_567L)),
+        jsonRenderingCase(Variant.Type.TIMESTAMP_NTZ, "\"1970-01-01T00:00:01.234567\"",
+            builder -> builder.appendTimestampNtz(1_234_567L)),
+        jsonRenderingCase(Variant.Type.FLOAT, "1.25", builder -> builder.appendFloat(1.25F)),
+        jsonRenderingCase(Variant.Type.BINARY, "\"AAH/Kg==\"",
+            builder -> builder.appendBinary(ByteBuffer.wrap(new byte[]{0, 1, -1, 42}))),
+        jsonRenderingCase(Variant.Type.TIME, "\"01:02:03.004005\"",
+            builder -> builder.appendTime(3_723_004_005L)),
+        jsonRenderingCase(Variant.Type.TIMESTAMP_NANOS_TZ, "\"1970-01-01T00:00:01.234567891Z\"",
+            builder -> builder.appendTimestampNanosTz(1_234_567_891L)),
+        jsonRenderingCase(Variant.Type.TIMESTAMP_NANOS_NTZ, "\"1970-01-01T00:00:01.234567891\"",
+            builder -> builder.appendTimestampNanosNtz(1_234_567_891L)),
+        jsonRenderingCase(Variant.Type.UUID, "\"00112233-4455-6677-8899-aabbccddeeff\"",
+            builder -> builder.appendUUID(UUID.fromString("00112233-4455-6677-8899-aabbccddeeff")))
+    };
+  }
+
+  @Test(dataProvider = "variantJsonRenderingCases")
+  public void testVariantToJsonForEveryParquetType(Variant.Type expectedType, byte[] envelope, String expectedJson) {
+    VariantEnvelope.Decoded decoded = VariantEnvelope.decode(envelope);
+    assertEquals(new Variant(decoded.getValue(), decoded.getMetadata()).getType(), expectedType);
+    assertEquals(VariantUtils.variantToJson(envelope), expectedJson);
+    assertEquals(VariantUtils.variantToJson(envelope, new ReusableResult()), expectedJson);
+  }
+
+  @Test
+  public void testVariantToJsonCoversEveryParquetTypeAndRejectsMalformedEnvelope() {
+    Set<Variant.Type> coveredTypes = EnumSet.noneOf(Variant.Type.class);
+    for (Object[] testCase : variantJsonRenderingCases()) {
+      coveredTypes.add((Variant.Type) testCase[0]);
+    }
+    assertEquals(coveredTypes, EnumSet.allOf(Variant.Type.class));
+
+    byte[] valid = VariantUtils.parseJsonToVariant("{\"a\":1}");
+    byte[] badMagic = Arrays.copyOf(valid, valid.length);
+    badMagic[0] = 0;
+    ReusableResult reusableResult = new ReusableResult();
+    assertThrows(IllegalArgumentException.class, () -> VariantUtils.variantToJson(badMagic));
+    assertThrows(IllegalArgumentException.class, () -> VariantUtils.variantToJson(badMagic, reusableResult));
+    assertEquals(VariantUtils.variantToJson(valid, reusableResult), "{\"a\":1}");
   }
 
   @Test
@@ -542,6 +612,17 @@ public class VariantUtilsTest {
   private static byte[] encode(VariantBuilder builder) {
     Variant variant = builder.build();
     return VariantEnvelope.encode(variant.getMetadataBuffer(), variant.getValueBuffer());
+  }
+
+  private static Object[] jsonRenderingCase(Variant.Type type, String expectedJson,
+      Consumer<VariantBuilder> appender) {
+    VariantBuilder builder = new VariantBuilder();
+    appender.accept(builder);
+    return jsonRenderingCase(type, encode(builder), expectedJson);
+  }
+
+  private static Object[] jsonRenderingCase(Variant.Type type, byte[] envelope, String expectedJson) {
+    return new Object[]{type, envelope, expectedJson};
   }
 
   private static int readBigEndianInt(byte[] bytes, int offset) {
