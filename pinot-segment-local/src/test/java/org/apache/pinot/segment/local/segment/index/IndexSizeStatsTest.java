@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
@@ -51,6 +52,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -897,6 +899,7 @@ public class IndexSizeStatsTest {
   /// cleared as if the index had disappeared. Every other index type's refresh must be unaffected by the failure.
   private static final class ThrowingIndexTypeSegmentDirectory extends SegmentLocalFSDirectory {
     private final IndexType<?, ?, ?> _throwingIndexType;
+    private int _throwCount;
 
     ThrowingIndexTypeSegmentDirectory(File indexDir, IndexType<?, ?, ?> throwingIndexType)
         throws Exception {
@@ -905,29 +908,68 @@ public class IndexSizeStatsTest {
     }
 
     @Override
-    public java.util.Set<String> getColumnsWithIndex(IndexType<?, ?, ?> type) {
+    public Set<String> getColumnsWithIndex(IndexType<?, ?, ?> type) {
       // Index handlers call this same method for their own purposes while computing operations, before the
       // post-reload snapshot ever runs; only the snapshot's own probe -- not those handler calls -- should fail.
       if (type == _throwingIndexType && calledFromSnapshotIndexTypeIds()) {
+        _throwCount++;
         throw new RuntimeException("Simulated probe failure for " + type.getId());
       }
       return super.getColumnsWithIndex(type);
     }
 
-    private static boolean calledFromSnapshotIndexTypeIds() {
-      for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
-        if (element.getMethodName().equals("snapshotIndexTypeIds")) {
-          return true;
-        }
-      }
-      return false;
+    private int getThrowCount() {
+      return _throwCount;
     }
   }
 
-  private static void runPreProcessorWithThrowingProbe(File segmentDir, TableConfig tableConfig, Schema schema,
+  /// A backing `SegmentDirectory` that reports no indexes on any column for every index type, but only while
+  /// `snapshotIndexTypeIds` itself is probing -- the empty-snapshot state its javadoc treats the same as a probe
+  /// failure, skipping the refresh entirely rather than clearing every persisted size.
+  private static final class EmptyProbeSegmentDirectory extends SegmentLocalFSDirectory {
+    EmptyProbeSegmentDirectory(File indexDir)
+        throws Exception {
+      super(indexDir, ReadMode.mmap);
+    }
+
+    @Override
+    public Set<String> getColumnsWithIndex(IndexType<?, ?, ?> type) {
+      if (calledFromSnapshotIndexTypeIds()) {
+        return Set.of();
+      }
+      return super.getColumnsWithIndex(type);
+    }
+  }
+
+  /// Index handlers call `getColumnsWithIndex` for their own purposes while computing operations, before the
+  /// post-reload snapshot ever runs; the test doubles above must only simulate a probe issue for the snapshot's own
+  /// call, not those handler calls.
+  private static boolean calledFromSnapshotIndexTypeIds() {
+    for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
+      if (element.getMethodName().equals("snapshotIndexTypeIds")) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Runs the preprocessor with the given index type's probe rigged to fail, returning how many times the
+  /// simulated failure actually fired -- so callers can assert it fired at all, not just that the run completed.
+  private static int runPreProcessorWithThrowingProbe(File segmentDir, TableConfig tableConfig, Schema schema,
       IndexType<?, ?, ?> throwingIndexType)
       throws Exception {
-    try (SegmentDirectory segmentDirectory = new ThrowingIndexTypeSegmentDirectory(segmentDir, throwingIndexType);
+    try (ThrowingIndexTypeSegmentDirectory segmentDirectory =
+        new ThrowingIndexTypeSegmentDirectory(segmentDir, throwingIndexType);
+        SegmentPreProcessor processor =
+            new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(tableConfig, schema))) {
+      processor.process();
+      return segmentDirectory.getThrowCount();
+    }
+  }
+
+  private static void runPreProcessorWithEmptyProbe(File segmentDir, TableConfig tableConfig, Schema schema)
+      throws Exception {
+    try (SegmentDirectory segmentDirectory = new EmptyProbeSegmentDirectory(segmentDir);
         SegmentPreProcessor processor =
             new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(tableConfig, schema))) {
       processor.process();
@@ -952,7 +994,10 @@ public class IndexSizeStatsTest {
 
     // Drop the inverted index on this reload, but force its probe to throw: the drop must not be observed, so the
     // stale size must survive exactly as if the probe had never run, while unrelated indexes still refresh normally.
-    runPreProcessorWithThrowingProbe(segmentDir, tableConfig(true, List.of()), schema, StandardIndexes.inverted());
+    int throwCount =
+        runPreProcessorWithThrowingProbe(segmentDir, tableConfig(true, List.of()), schema, StandardIndexes.inverted());
+    assertTrue(throwCount > 0,
+        "Sanity: the simulated probe failure must actually have fired, or this test would pass vacuously");
 
     PropertiesConfiguration afterReload = loadMetadata(segmentDir);
     assertTrue(indexSizeKeys(afterReload).contains(invertedKey),
@@ -964,6 +1009,69 @@ public class IndexSizeStatsTest {
         "A probe failure for one index type must not affect another index type's persisted size");
     assertTrue(indexSizeKeys(afterReload).contains(forwardKey),
         "An index type whose probe did not throw must still be refreshed normally");
+  }
+
+  /// A persisted key can name an index type this node has no plugin for at all -- e.g. persisted by a different
+  /// node or version with a plugin this node lacks. Such an id can never appear in a probe, since probing only
+  /// iterates locally-registered [IndexType]s (see `snapshotIndexTypeIds`), so its persisted entry must survive a
+  /// reload untouched even while unrelated, registered index types refresh normally.
+  @Test
+  public void testReloadPreservesSizeForUnregisteredIndexTypeId()
+      throws Exception {
+    Schema schema = schema();
+    File segmentDir = buildSegment(true);
+    String unregisteredKey =
+        V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3", "someUnregisteredPlugin");
+
+    PropertiesConfiguration properties = SegmentMetadataUtils.getPropertiesConfiguration(segmentDir);
+    properties.setProperty(unregisteredKey, "12345");
+    SegmentMetadataUtils.savePropertiesConfiguration(properties, segmentDir);
+    assertEquals(loadMetadata(segmentDir).getLong(unregisteredKey), 12345L,
+        "Sanity: the hand-written key for an unregistered plugin was saved");
+
+    String forwardKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+        StandardIndexes.forward().getId());
+    String invertedKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+        StandardIndexes.inverted().getId());
+    // Trigger a real reload for an unrelated reason (dropping the inverted index) so the refresh path actually runs.
+    runPreProcessor(segmentDir, tableConfig(true, List.of()), schema);
+
+    PropertiesConfiguration afterReload = loadMetadata(segmentDir);
+    assertEquals(afterReload.getLong(unregisteredKey), 12345L,
+        "A persisted size for an index type this node has no plugin for must survive a reload unchanged, since it "
+            + "can never be probed");
+    assertTrue(afterReload.getLong(forwardKey) > 0,
+        "Sanity: the refresh must still run normally for a registered index type in the same reload");
+    assertFalse(indexSizeKeys(afterReload).contains(invertedKey),
+        "Sanity: the refresh must actually have run this reload, evidenced by the dropped inverted index's size "
+            + "being cleared -- both prior assertions above would hold even if the refresh never ran at all");
+  }
+
+  /// [SegmentPreProcessor]'s post-reload snapshot treats an empty result as equivalent to a probe failure -- see its
+  /// javadoc -- because a non-empty segment always has a forward index or dictionary on every column, so "no
+  /// indexes anywhere" means the backing directory answered spuriously rather than reporting a genuine state. That
+  /// must skip the size refresh entirely for this reload, leaving every already-persisted size untouched.
+  @Test
+  public void testReloadSkipsRefreshWhenPostReloadSnapshotIsEmpty()
+      throws Exception {
+    Schema schema = schema();
+    File segmentDir = buildSegment(true);
+    PropertiesConfiguration before = loadMetadata(segmentDir);
+    Map<String, Long> beforeValues = new HashMap<>();
+    for (String key : indexSizeKeys(before)) {
+      beforeValues.put(key, before.getLong(key));
+    }
+    assertFalse(beforeValues.isEmpty(), "Sanity: seal recorded at least one index size");
+
+    // Drop the inverted index on this reload, but force the post-reload snapshot to see no indexes anywhere: the
+    // drop must not be observed, so every persisted size must survive exactly as if no refresh had run at all.
+    runPreProcessorWithEmptyProbe(segmentDir, tableConfig(true, List.of()), schema);
+
+    PropertiesConfiguration after = loadMetadata(segmentDir);
+    assertEquals(new HashMap<>(indexSizeKeys(after).stream()
+            .collect(Collectors.toMap(k -> k, after::getLong))), beforeValues,
+        "An empty post-reload snapshot must skip the refresh entirely, leaving every persisted size unchanged, even "
+            + "though the index handler dropped the inverted index");
   }
 
   /// Shared assertion for a file-backed (packed) index: the persisted `metadata.properties` size for
