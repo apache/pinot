@@ -103,6 +103,8 @@ public final class VariantUtils {
   private static final int VARIANT_UUID = 20;
   private static final int VARIANT_METADATA_VERSION_MASK = 0x0F;
   private static final int VARIANT_METADATA_VERSION = 1;
+  private static final int OBJECT_BINARY_SEARCH_THRESHOLD = 32;
+  private static final int INVALID_UTF8_COMPARISON = Integer.MIN_VALUE;
   private static final VariantPath ROOT_PATH = new VariantPath(new PathElement[0]);
 
   private VariantUtils() {
@@ -222,7 +224,7 @@ public final class VariantUtils {
     ///
     /// <p>For BYTES and VARIANT, the returned {@code byte[]} may be retained after this result is reused. It must be
     /// treated as immutable and copied before mutation.
-    public Object getExternalValue(ResultType resultType) {
+    public Object toExternalValue(ResultType resultType) {
       switch (resultType) {
         case BOOLEAN:
           return _intValue != 0;
@@ -257,7 +259,7 @@ public final class VariantUtils {
     /// external-object round trip in the multi-stage engine. For BYTES, UUID, and VARIANT, the returned
     /// {@link ByteArray} wraps a newly materialized array that may be retained after this result is reused. Neither the
     /// wrapper nor its array may be mutated; callers must copy the array before mutation.
-    public Object getInternalValue(ResultType resultType) {
+    public Object toInternalValue(ResultType resultType) {
       switch (resultType) {
         case BOOLEAN:
           return _intValue;
@@ -359,7 +361,7 @@ public final class VariantUtils {
   @Nullable
   public static Object variantGet(@Nullable byte[] envelope, VariantPath path, ResultType targetType) {
     ReusableResult result = new ReusableResult();
-    return extractInto(envelope, path, targetType, result) ? result.getExternalValue(targetType) : null;
+    return extractInto(envelope, path, targetType, result) ? result.toExternalValue(targetType) : null;
   }
 
   /// Strictly extracts into a reusable, unboxed result.
@@ -405,7 +407,7 @@ public final class VariantUtils {
   public static Object tryVariantGet(@Nullable byte[] envelope, VariantPath path, ResultType targetType) {
     try {
       ReusableResult result = new ReusableResult();
-      return tryExtractInto(envelope, path, targetType, result) ? result.getExternalValue(targetType) : null;
+      return tryExtractInto(envelope, path, targetType, result) ? result.toExternalValue(targetType) : null;
     } catch (RuntimeException e) {
       return null;
     }
@@ -1188,7 +1190,7 @@ public final class VariantUtils {
       reset(envelope);
       for (PathElement element : path._elements) {
         if (element._field != null) {
-          if (getType() != Variant.Type.OBJECT || !selectObjectField(element._fieldUtf8)) {
+          if (getType() != Variant.Type.OBJECT || !selectObjectField(element)) {
             return false;
           }
         } else if (getType() != Variant.Type.ARRAY || !selectArrayElement(element._index)) {
@@ -1392,7 +1394,7 @@ public final class VariantUtils {
       return new Variant(_envelope, _selectedOffset, _selectedLength, _envelope, _metadataOffset, _metadataLength);
     }
 
-    private boolean selectObjectField(byte[] fieldUtf8) {
+    private boolean selectObjectField(PathElement field) {
       int header = getHeader();
       int typeInfo = (header >>> 2) & VARIANT_PRIMITIVE_TYPE_MASK;
       int sizeBytes = ((typeInfo >>> 4) & 1) == 0 ? 1 : Integer.BYTES;
@@ -1409,21 +1411,69 @@ public final class VariantUtils {
       int totalDataLength = readUnsignedLittleEndian(finalOffsetPosition, offsetSize, selectedLimit());
       requireRange(dataStart, totalDataLength, selectedLimit(), "Variant object data");
 
-      for (int i = 0; i < numElements; i++) {
+      if (numElements < OBJECT_BINARY_SEARCH_THRESHOLD || !field._binarySearchSafe) {
+        return selectObjectFieldLinear(field._fieldUtf8, 0, numElements, idStart, idSize, offsetStart, offsetSize,
+            dataStart, totalDataLength);
+      }
+
+      // Preserve the linear lookup's constant-time first-field case before paying the binary-search cost for the rest
+      // of a wide object.
+      int firstId = readUnsignedLittleEndian(idStart, idSize, offsetStart);
+      if (metadataKeyEquals(firstId, field._fieldUtf8)) {
+        selectObjectFieldAtIndex(0, offsetStart, offsetSize, dataStart, totalDataLength);
+        return true;
+      }
+
+      int low = 1;
+      int high = numElements - 1;
+      while (low <= high) {
+        int index = (low + high) >>> 1;
+        int id = readUnsignedLittleEndian(idStart + index * idSize, idSize, offsetStart);
+        int comparison = metadataKeyCompare(id, field._field);
+        if (comparison == INVALID_UTF8_COMPARISON) {
+          // Malformed UTF-8 is not a valid Variant key, but retain the old byte-equality behavior for tolerant
+          // callers instead of relying on an ordering that is no longer defined.
+          return selectObjectFieldLinear(field._fieldUtf8, 1, numElements, idStart, idSize, offsetStart, offsetSize,
+              dataStart, totalDataLength);
+        }
+        if (comparison < 0) {
+          low = index + 1;
+        } else if (comparison > 0) {
+          high = index - 1;
+        } else {
+          selectObjectFieldAtIndex(index, offsetStart, offsetSize, dataStart, totalDataLength);
+          return true;
+        }
+      }
+      // parquet-java orders object keys with String.compareTo (UTF-16 code units), while other conforming producers
+      // such as Arrow Rust use Unicode scalar/UTF-8 order. Those orders differ for supplementary characters relative
+      // to U+E000..U+FFFF, so a miss under the parquet-java ordering is not authoritative for an external envelope.
+      // Preserve the allocation-free binary fast path for hits, then use byte equality as the interoperability-safe
+      // fallback for misses and unknown producer orderings.
+      return selectObjectFieldLinear(field._fieldUtf8, 1, numElements, idStart, idSize, offsetStart, offsetSize,
+          dataStart, totalDataLength);
+    }
+
+    private boolean selectObjectFieldLinear(byte[] fieldUtf8, int startIndex, int numElements, int idStart,
+        int idSize, int offsetStart, int offsetSize, int dataStart, int totalDataLength) {
+      for (int i = startIndex; i < numElements; i++) {
         int id = readUnsignedLittleEndian(idStart + i * idSize, idSize, offsetStart);
         if (metadataKeyEquals(id, fieldUtf8)) {
-          int offset = readUnsignedLittleEndian(offsetStart + i * offsetSize, offsetSize, dataStart);
-          int nextOffset = readUnsignedLittleEndian(offsetStart + (i + 1) * offsetSize, offsetSize, dataStart);
-          if (offset > nextOffset || nextOffset > totalDataLength) {
-            throw new IllegalStateException(
-                "Invalid Variant object offsets: " + offset + ", " + nextOffset + ", total=" + totalDataLength);
-          }
-          _selectedOffset = dataStart + offset;
-          _selectedLength = nextOffset - offset;
+          selectObjectFieldAtIndex(i, offsetStart, offsetSize, dataStart, totalDataLength);
           return true;
         }
       }
       return false;
+    }
+
+    private void selectObjectFieldAtIndex(int index, int offsetStart, int offsetSize, int dataStart,
+        int totalDataLength) {
+      int offset = readUnsignedLittleEndian(offsetStart + index * offsetSize, offsetSize, dataStart);
+      int valueOffset = checkedPosition((long) dataStart + offset, dataStart + totalDataLength,
+          "Variant object field");
+      int valueLength = encodedValueLength(valueOffset, dataStart + totalDataLength);
+      _selectedOffset = valueOffset;
+      _selectedLength = valueLength;
     }
 
     private boolean selectArrayElement(int index) {
@@ -1452,6 +1502,208 @@ public final class VariantUtils {
       _selectedOffset = dataStart + offset;
       _selectedLength = nextOffset - offset;
       return true;
+    }
+
+    /// Returns the exact byte length of the self-delimiting Variant value at {@code valueOffset}.
+    ///
+    /// <p>Object field offsets are sorted by key, while their encoded values may appear in any physical order. The
+    /// adjacent field offset is therefore not necessarily the end of the selected value. Reading the selected value's
+    /// own header preserves exact subtree envelopes without scanning every object offset.
+    private int encodedValueLength(int valueOffset, int limit) {
+      requireRange(valueOffset, 1, limit, "Variant value");
+      int header = Byte.toUnsignedInt(_envelope[valueOffset]);
+      int basicType = header & VARIANT_BASIC_TYPE_MASK;
+      int typeInfo = (header >>> 2) & VARIANT_PRIMITIVE_TYPE_MASK;
+      int length;
+      switch (basicType) {
+        case VARIANT_SHORT_STRING:
+          length = 1 + typeInfo;
+          break;
+        case VARIANT_OBJECT: {
+          int sizeBytes = ((typeInfo >>> 4) & 1) == 0 ? 1 : Integer.BYTES;
+          int numElements = readUnsignedLittleEndian(valueOffset + 1, sizeBytes, limit);
+          int idSize = ((typeInfo >>> 2) & 3) + 1;
+          int offsetSize = (typeInfo & 3) + 1;
+          int offsetStart = checkedPosition((long) valueOffset + 1 + sizeBytes + (long) numElements * idSize,
+              limit, "Variant object offsets");
+          int dataStart = checkedPosition((long) offsetStart + ((long) numElements + 1) * offsetSize, limit,
+              "Variant object data");
+          int finalOffsetPosition = checkedPosition((long) offsetStart + (long) numElements * offsetSize, limit,
+              "Variant object final offset");
+          int dataLength = readUnsignedLittleEndian(finalOffsetPosition, offsetSize, limit);
+          int valueEnd = checkedPosition((long) dataStart + dataLength, limit, "Variant object value");
+          return valueEnd - valueOffset;
+        }
+        case VARIANT_ARRAY: {
+          int sizeBytes = ((typeInfo >>> 2) & 1) == 0 ? 1 : Integer.BYTES;
+          int numElements = readUnsignedLittleEndian(valueOffset + 1, sizeBytes, limit);
+          int offsetSize = (typeInfo & 3) + 1;
+          int offsetStart = checkedPosition((long) valueOffset + 1 + sizeBytes, limit, "Variant array offsets");
+          int dataStart = checkedPosition((long) offsetStart + ((long) numElements + 1) * offsetSize, limit,
+              "Variant array data");
+          int finalOffsetPosition = checkedPosition((long) offsetStart + (long) numElements * offsetSize, limit,
+              "Variant array final offset");
+          int dataLength = readUnsignedLittleEndian(finalOffsetPosition, offsetSize, limit);
+          int valueEnd = checkedPosition((long) dataStart + dataLength, limit, "Variant array value");
+          return valueEnd - valueOffset;
+        }
+        case VARIANT_PRIMITIVE:
+          switch (typeInfo) {
+            case VARIANT_NULL:
+            case VARIANT_TRUE:
+            case VARIANT_FALSE:
+              length = 1;
+              break;
+            case VARIANT_INT8:
+              length = 2;
+              break;
+            case VARIANT_INT16:
+              length = 3;
+              break;
+            case VARIANT_INT32:
+            case VARIANT_DATE:
+            case VARIANT_FLOAT:
+              length = 5;
+              break;
+            case VARIANT_INT64:
+            case VARIANT_DOUBLE:
+            case VARIANT_TIMESTAMP_TZ:
+            case VARIANT_TIMESTAMP_NTZ:
+            case VARIANT_TIME:
+            case VARIANT_TIMESTAMP_NANOS_TZ:
+            case VARIANT_TIMESTAMP_NANOS_NTZ:
+              length = 9;
+              break;
+            case VARIANT_DECIMAL4:
+              length = 6;
+              break;
+            case VARIANT_DECIMAL8:
+              length = 10;
+              break;
+            case VARIANT_DECIMAL16:
+              length = 18;
+              break;
+            case VARIANT_BINARY:
+            case VARIANT_LONG_STRING:
+              length = checkedPosition((long) valueOffset + 1 + Integer.BYTES
+                  + readUnsignedLittleEndian(valueOffset + 1, Integer.BYTES, limit), limit, "Variant binary value")
+                  - valueOffset;
+              break;
+            case VARIANT_UUID:
+              length = 1 + UuidUtils.UUID_NUM_BYTES;
+              break;
+            default:
+              throw new UnsupportedOperationException("Unknown type in Variant. primitive type: " + typeInfo);
+          }
+          break;
+        default:
+          throw new IllegalStateException("Unhandled Variant basic type: " + basicType);
+      }
+      requireRange(valueOffset, length, limit, "Variant value");
+      return length;
+    }
+
+    /// Compares one encoded metadata key with {@code expected} using Java String's UTF-16 code-unit order without
+    /// materializing the encoded key. Returns {@link #INVALID_UTF8_COMPARISON} when the metadata key is not valid
+    /// UTF-8, in which case callers must not rely on object-key ordering.
+    private int metadataKeyCompare(int id, String expected) {
+      ensureMetadataParsed();
+      if (id < 0 || id >= _metadataDictSize) {
+        throw new IllegalArgumentException(
+            "Invalid dictionary id: " + id + ". dictionary size: " + _metadataDictSize);
+      }
+      int offset = readUnsignedLittleEndian(_metadataOffsetListOffset + id * _metadataOffsetSize,
+          _metadataOffsetSize, _metadataDataOffset);
+      int nextOffset = readUnsignedLittleEndian(_metadataOffsetListOffset + (id + 1) * _metadataOffsetSize,
+          _metadataOffsetSize, _metadataDataOffset);
+      if (offset > nextOffset || nextOffset > _metadataDataLength) {
+        throw new IllegalStateException(
+            "Invalid Variant metadata offsets: " + offset + ", " + nextOffset + ", total=" + _metadataDataLength);
+      }
+
+      int byteIndex = _metadataDataOffset + offset;
+      int byteLimit = _metadataDataOffset + nextOffset;
+      int charIndex = 0;
+      while (byteIndex < byteLimit) {
+        int decoded = decodeUtf8CodePoint(byteIndex, byteLimit);
+        if (decoded < 0) {
+          return INVALID_UTF8_COMPARISON;
+        }
+        byteIndex += decoded >>> 24;
+        int codePoint = decoded & 0x1F_FFFF;
+        if (codePoint < Character.MIN_SUPPLEMENTARY_CODE_POINT) {
+          if (charIndex == expected.length()) {
+            return 1;
+          }
+          int comparison = Character.compare((char) codePoint, expected.charAt(charIndex++));
+          if (comparison != 0) {
+            return comparison;
+          }
+        } else {
+          if (charIndex == expected.length()) {
+            return 1;
+          }
+          int comparison = Character.compare(Character.highSurrogate(codePoint), expected.charAt(charIndex++));
+          if (comparison != 0) {
+            return comparison;
+          }
+          if (charIndex == expected.length()) {
+            return 1;
+          }
+          comparison = Character.compare(Character.lowSurrogate(codePoint), expected.charAt(charIndex++));
+          if (comparison != 0) {
+            return comparison;
+          }
+        }
+      }
+      return charIndex == expected.length() ? 0 : -1;
+    }
+
+    /// Returns the decoded code point with its encoded width in the top byte, or {@code -1} for malformed UTF-8.
+    private int decodeUtf8CodePoint(int index, int limit) {
+      int first = Byte.toUnsignedInt(_envelope[index]);
+      if (first <= 0x7F) {
+        return 1 << 24 | first;
+      }
+      if (first >= 0xC2 && first <= 0xDF) {
+        if (index + 1 >= limit) {
+          return -1;
+        }
+        int second = Byte.toUnsignedInt(_envelope[index + 1]);
+        if ((second & 0xC0) != 0x80) {
+          return -1;
+        }
+        return 2 << 24 | (first & 0x1F) << 6 | second & 0x3F;
+      }
+      if (first >= 0xE0 && first <= 0xEF) {
+        if (index + 2 >= limit) {
+          return -1;
+        }
+        int second = Byte.toUnsignedInt(_envelope[index + 1]);
+        int third = Byte.toUnsignedInt(_envelope[index + 2]);
+        if ((third & 0xC0) != 0x80
+            || (first == 0xE0 ? second < 0xA0 || second > 0xBF
+            : first == 0xED ? second < 0x80 || second > 0x9F : (second & 0xC0) != 0x80)) {
+          return -1;
+        }
+        return 3 << 24 | (first & 0x0F) << 12 | (second & 0x3F) << 6 | third & 0x3F;
+      }
+      if (first >= 0xF0 && first <= 0xF4) {
+        if (index + 3 >= limit) {
+          return -1;
+        }
+        int second = Byte.toUnsignedInt(_envelope[index + 1]);
+        int third = Byte.toUnsignedInt(_envelope[index + 2]);
+        int fourth = Byte.toUnsignedInt(_envelope[index + 3]);
+        if ((third & 0xC0) != 0x80 || (fourth & 0xC0) != 0x80
+            || (first == 0xF0 ? second < 0x90 || second > 0xBF
+            : first == 0xF4 ? second < 0x80 || second > 0x8F : (second & 0xC0) != 0x80)) {
+          return -1;
+        }
+        return 4 << 24 | (first & 0x07) << 18 | (second & 0x3F) << 12 | (third & 0x3F) << 6
+            | fourth & 0x3F;
+      }
+      return -1;
     }
 
     private boolean metadataKeyEquals(int id, byte[] expected) {
@@ -1577,19 +1829,39 @@ public final class VariantUtils {
     private final String _field;
     private final byte[] _fieldUtf8;
     private final int _index;
+    private final boolean _binarySearchSafe;
 
-    private PathElement(String field, byte[] fieldUtf8, int index) {
+    private PathElement(String field, byte[] fieldUtf8, int index, boolean binarySearchSafe) {
       _field = field;
       _fieldUtf8 = fieldUtf8;
       _index = index;
+      _binarySearchSafe = binarySearchSafe;
     }
 
     private static PathElement forField(String field) {
-      return new PathElement(field, field.getBytes(StandardCharsets.UTF_8), -1);
+      return new PathElement(field, field.getBytes(StandardCharsets.UTF_8), -1, hasWellFormedUtf16(field));
     }
 
     private static PathElement forIndex(int index) {
-      return new PathElement(null, null, index);
+      return new PathElement(null, null, index, false);
+    }
+
+    private static boolean hasWellFormedUtf16(String value) {
+      int i = 0;
+      while (i < value.length()) {
+        char current = value.charAt(i);
+        if (Character.isHighSurrogate(current)) {
+          if (i + 1 == value.length() || !Character.isLowSurrogate(value.charAt(i + 1))) {
+            return false;
+          }
+          i += 2;
+        } else if (Character.isLowSurrogate(current)) {
+          return false;
+        } else {
+          i++;
+        }
+      }
+      return true;
     }
   }
 }

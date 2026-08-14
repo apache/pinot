@@ -179,7 +179,7 @@ public class AggregationFunctionUtils {
       }
       for (ExpressionContext inputExpression : aggregationFunction.getInputExpressions()) {
         if (inputExpression.getType() == ExpressionContext.Type.IDENTIFIER) {
-          FieldSpec.DataType dataType =
+          DataType dataType =
               segmentContext.getIndexSegment().getDataSource(inputExpression.getIdentifier(), queryContext.getSchema())
                   .getDataSourceMetadata().getDataType();
           if (!dataType.supportsDirectAggregation()) {
