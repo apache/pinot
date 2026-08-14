@@ -80,6 +80,7 @@ public class ExpressionScanDocIdIteratorTest {
   private static final String SEGMENT_NAME = "testSegment";
   private static final String INT_COLUMN = "intColumn";
   private static final String NULLABLE_INT_COLUMN = "nullableIntColumn";
+  private static final String INT_MV_COLUMN = "intMvColumn";
   // Enough docs for the candidate set to span multiple 10k doc-id batches
   private static final int NUM_DOCS = 50_000;
 
@@ -88,6 +89,7 @@ public class ExpressionScanDocIdIteratorTest {
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
       .addSingleValueDimension(INT_COLUMN, FieldSpec.DataType.INT)
       .addSingleValueDimension(NULLABLE_INT_COLUMN, FieldSpec.DataType.INT)
+      .addMultiValueDimension(INT_MV_COLUMN, FieldSpec.DataType.INT)
       .build();
 
   private IndexSegment _segment;
@@ -98,7 +100,7 @@ public class ExpressionScanDocIdIteratorTest {
     FileUtils.deleteDirectory(TEMP_DIR);
 
     // Column values == docId, so expected results are directly computable from docIds; nullableIntColumn is null for
-    // every docId divisible by 3
+    // every docId divisible by 3; intMvColumn holds [docId % 100, 500 + docId % 100]
     List<GenericRow> records = new ArrayList<>(NUM_DOCS);
     for (int i = 0; i < NUM_DOCS; i++) {
       GenericRow record = new GenericRow();
@@ -108,6 +110,7 @@ public class ExpressionScanDocIdIteratorTest {
       } else {
         record.putValue(NULLABLE_INT_COLUMN, i);
       }
+      record.putValue(INT_MV_COLUMN, new Object[]{i % 100, 500 + i % 100});
       records.add(record);
     }
 
@@ -146,14 +149,16 @@ public class ExpressionScanDocIdIteratorTest {
     }
 
     // Control: default projection operator (pulls one block at a time)
-    assertEquals(runApplyAnd(candidates), expected);
+    assertEquals(runApplyAnd(candidates, "SELECT COUNT(*) FROM testTable WHERE MOD(intColumn, 7) = 0"),
+        expected);
 
     // Regression: a projection operator that pulls all blocks from the doc-id source up front, like prefetching
     // implementations plugged in via ProjectionOperatorUtils. Matches must still be attributed to the docIds of the
     // block being processed, not to whatever the source's shared scratch buffer holds after the last pull.
     ProjectionOperatorUtils.setImplementation(PullAheadProjectionOperator::new);
     try {
-      assertEquals(runApplyAnd(candidates), expected);
+      assertEquals(runApplyAnd(candidates, "SELECT COUNT(*) FROM testTable WHERE MOD(intColumn, 7) = 0"),
+        expected);
     } finally {
       ProjectionOperatorUtils.setImplementation(new ProjectionOperatorUtils.DefaultImplementation());
     }
@@ -193,9 +198,37 @@ public class ExpressionScanDocIdIteratorTest {
     }
   }
 
-  private MutableRoaringBitmap runApplyAnd(MutableRoaringBitmap candidates) {
-    QueryContext queryContext =
-        QueryContextConverterUtils.getQueryContext("SELECT COUNT(*) FROM testTable WHERE MOD(intColumn, 7) = 0");
+  @Test
+  public void testApplyAndMultiValueAttributesMatchesToCorrectDocIds() {
+    // Candidates: every even docId (25k candidates -> three 10k doc-id batches)
+    MutableRoaringBitmap candidates = new MutableRoaringBitmap();
+    for (int i = 0; i < NUM_DOCS; i += 2) {
+      candidates.add(i);
+    }
+    // Expected: candidates whose MV values [docId % 100, 500 + docId % 100] contain 8
+    MutableRoaringBitmap expected = new MutableRoaringBitmap();
+    for (int i = 0; i < NUM_DOCS; i += 2) {
+      if (i % 100 == 8) {
+        expected.add(i);
+      }
+    }
+    // CAST keeps the multi-value-ness of its argument, driving the MV emission branches
+    String query = "SELECT COUNT(*) FROM testTable WHERE CAST(intMvColumn AS LONG) = 8";
+
+    // Control: default projection operator (pulls one block at a time)
+    assertEquals(runApplyAnd(candidates, query), expected);
+
+    // Regression: same pull-ahead scenario as testApplyAndAttributesMatchesToCorrectDocIds for the MV branches
+    ProjectionOperatorUtils.setImplementation(PullAheadProjectionOperator::new);
+    try {
+      assertEquals(runApplyAnd(candidates, query), expected);
+    } finally {
+      ProjectionOperatorUtils.setImplementation(new ProjectionOperatorUtils.DefaultImplementation());
+    }
+  }
+
+  private MutableRoaringBitmap runApplyAnd(MutableRoaringBitmap candidates, String query) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     Predicate predicate = queryContext.getFilter().getPredicate();
     ExpressionFilterOperator filterOperator =
         new ExpressionFilterOperator(_segment, queryContext, predicate, NUM_DOCS);
