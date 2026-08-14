@@ -31,7 +31,10 @@ import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
+import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -43,15 +46,19 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Point;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
@@ -550,5 +557,235 @@ public class IndexSizeStatsTest {
             "The new inverted index size must equal the actual V1 file length");
       }
     }
+  }
+
+  /// Shared assertion for a file-backed (packed) index: the persisted `metadata.properties` size for
+  /// `column`/`indexTypeId` must exist, be positive, and equal the `v3/index_map` extent it was measured from (magic
+  /// marker included), mirroring [#testEnabledPersistsSizeForEveryPackedIndex].
+  private static void assertPackedIndexSizeMatchesIndexMap(File segmentDir, String column, String indexTypeId)
+      throws ConfigurationException {
+    PropertiesConfiguration metadata = loadMetadata(segmentDir);
+    String key = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor(column, indexTypeId);
+    assertTrue(indexSizeKeys(metadata).contains(key),
+        "Expected a persisted size for " + key + ", keys were: " + indexSizeKeys(metadata));
+    long persisted = metadata.getLong(key);
+    assertTrue(persisted > 0, "Index size should be positive for " + key + " but was " + persisted);
+
+    File indexMapFile =
+        new File(SegmentDirectoryPaths.findSegmentDirectory(segmentDir), V1Constants.INDEX_MAP_FILE_NAME);
+    assertTrue(indexMapFile.exists(), "v3 index_map should exist for a V3 segment");
+    PropertiesConfiguration indexMap = CommonsConfigurationUtils.fromFile(indexMapFile);
+    String indexMapKey = column + "." + indexTypeId + ".size";
+    assertTrue(indexMap.containsKey(indexMapKey), "Expected an index_map entry for " + indexMapKey);
+    long packed = indexMap.getLong(indexMapKey);
+    assertEquals(persisted, packed,
+        "Persisted size should equal the index_map extent, magic marker included, for " + key + ": persisted="
+            + persisted + " packed=" + packed);
+  }
+
+  /// Builds a V3 segment from the shared AVRO fixture with a caller-supplied `tableConfig`, reusing [#schema()] for
+  /// the columns. Lets each packed-index test configure just the index it cares about without duplicating the
+  /// resource-lookup/driver boilerplate.
+  private File buildAvroSegment(TableConfig tableConfig)
+      throws Exception {
+    URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
+    assertNotNull(resource);
+    SegmentGeneratorConfig config =
+        SegmentTestUtils.getSegmentGeneratorConfig(new File(TestUtils.getFileFromResourceUrl(resource)),
+            FileFormat.AVRO, INDEX_DIR, RAW_TABLE_NAME, tableConfig, schema());
+    config.setSegmentNamePostfix("1");
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config);
+    driver.build();
+    return segmentDirectory();
+  }
+
+  /// Builds a V3 segment from caller-supplied rows rather than the AVRO fixture, for index types (H3, null value
+  /// vector, vector) whose data cannot be expressed with the fixture's plain string/int columns.
+  private File buildCustomSegment(TableConfig tableConfig, Schema schema, List<GenericRow> rows)
+      throws Exception {
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(INDEX_DIR.getAbsolutePath());
+    config.setSegmentName(RAW_TABLE_NAME);
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+    return segmentDirectory();
+  }
+
+  /// Range index: file-backed/packed, built on the dictionary-encoded `column3` via the same
+  /// `TableConfigBuilder` setter [RangeIndexType] tests configure it with.
+  @Test
+  public void testRangeIndexSizeMatchesPackedExtent()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(List.of("column4"))
+        .setIndexSizeStatsEnabled(true)
+        .setRangeIndexColumns(List.of("column3"))
+        .build();
+    File segmentDir = buildAvroSegment(tableConfig);
+    assertPackedIndexSizeMatchesIndexMap(segmentDir, "column3", StandardIndexes.range().getId());
+  }
+
+  /// Bloom filter: file-backed/packed. Bloom filters hash raw values directly, so they need no dictionary and work
+  /// on the same `column3` used above.
+  @Test
+  public void testBloomFilterSizeMatchesPackedExtent()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(List.of("column4"))
+        .setIndexSizeStatsEnabled(true)
+        .setBloomFilterColumns(List.of("column3"))
+        .build();
+    File segmentDir = buildAvroSegment(tableConfig);
+    assertPackedIndexSizeMatchesIndexMap(segmentDir, "column3", StandardIndexes.bloomFilter().getId());
+  }
+
+  /// JSON index: file-backed/packed. `column3`'s fixture values are not valid JSON, so `skipInvalidJson` is set
+  /// (mirroring how `JsonIndexTest` pairs `setJsonIndexColumns` with a per-column `JsonIndexConfig` via
+  /// `setJsonIndexConfigs`) rather than requiring a dedicated JSON-shaped fixture.
+  @Test
+  public void testJsonIndexSizeMatchesPackedExtent()
+      throws Exception {
+    JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+    jsonIndexConfig.setSkipInvalidJson(true);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(List.of("column4"))
+        .setIndexSizeStatsEnabled(true)
+        .setJsonIndexColumns(List.of("column3"))
+        .setJsonIndexConfigs(Map.of("column3", jsonIndexConfig))
+        .build();
+    File segmentDir = buildAvroSegment(tableConfig);
+    assertPackedIndexSizeMatchesIndexMap(segmentDir, "column3", StandardIndexes.json().getId());
+  }
+
+  /// FST index: file-backed/packed. FST is built over the dictionary, so it is configured (like
+  /// `testTextIndexDirectorySizedWithoutMarker`'s TEXT index) via a `FieldConfig`, on the already dictionary-encoded
+  /// `column3`.
+  @Test
+  public void testFstIndexSizeMatchesPackedExtent()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(List.of("column4"))
+        .setIndexSizeStatsEnabled(true)
+        .addFieldConfig(new FieldConfig("column3", FieldConfig.EncodingType.DICTIONARY,
+            List.of(FieldConfig.IndexType.FST), null, null))
+        .build();
+    File segmentDir = buildAvroSegment(tableConfig);
+    assertPackedIndexSizeMatchesIndexMap(segmentDir, "column3", StandardIndexes.fst().getId());
+  }
+
+  /// H3 index: file-backed/packed. Needs real serialized geometry values, which the AVRO fixture cannot provide, so
+  /// this builds a small custom BYTES-column segment. The `FieldConfig`/`resolutions` property wiring mirrors
+  /// `SegmentPreProcessorTest`'s H3 coverage.
+  @Test
+  public void testH3IndexSizeMatchesPackedExtent()
+      throws Exception {
+    String column = "h3Column";
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension(column, DataType.BYTES)
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setIndexSizeStatsEnabled(true)
+        .addFieldConfig(new FieldConfig(column, FieldConfig.EncodingType.DICTIONARY,
+            List.of(FieldConfig.IndexType.H3), null, Map.of("resolutions", "5")))
+        .build();
+    List<GenericRow> rows = new ArrayList<>();
+    for (double[] lonLat : new double[][]{{-122.084, 37.421}, {-73.968, 40.785}, {2.349, 48.864}}) {
+      GenericRow row = new GenericRow();
+      Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(lonLat[0], lonLat[1]));
+      row.putValue(column, GeometrySerializer.serialize(point));
+      rows.add(row);
+    }
+    File segmentDir = buildCustomSegment(tableConfig, schema, rows);
+    assertPackedIndexSizeMatchesIndexMap(segmentDir, column, StandardIndexes.h3().getId());
+  }
+
+  /// Null value vector index: file-backed/packed. The bitmap file (and therefore a recorded size) is only written
+  /// when at least one doc is actually null, so this mirrors
+  /// `NullValueVectorHandlerTest#testNonNullFlagWrittenAtCreation`: null handling on at the table level, and a null
+  /// passed straight into `GenericRow#putValue` for one row.
+  @Test
+  public void testNullValueVectorIndexSizeMatchesPackedExtent()
+      throws Exception {
+    String column = "svInt";
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension(column, DataType.INT)
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNullHandlingEnabled(true)
+        .setIndexSizeStatsEnabled(true)
+        .build();
+    GenericRow nonNullRow = new GenericRow();
+    nonNullRow.putValue(column, 1);
+    GenericRow nullRow = new GenericRow();
+    nullRow.putValue(column, null);
+    File segmentDir = buildCustomSegment(tableConfig, schema, List.of(nonNullRow, nullRow));
+    assertPackedIndexSizeMatchesIndexMap(segmentDir, column, StandardIndexes.nullValueVector().getId());
+  }
+
+  /// HNSW vector index with `storeInSegmentFile=false` (the default): directory-backed, exactly like the TEXT index
+  /// in `testTextIndexDirectorySizedWithoutMarker`, which this test otherwise mirrors. The property wiring
+  /// (`vectorIndexType`/`vectorDimension`/`vectorDistanceFunction`/`version`) matches `VectorTest`'s table config.
+  @Test
+  public void testVectorIndexDirectorySizedWithoutMarker()
+      throws Exception {
+    String column = "vectorColumn";
+    int dimension = 4;
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addMultiValueDimension(column, DataType.FLOAT)
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setIndexSizeStatsEnabled(true)
+        .setFieldConfigList(List.of(new FieldConfig.Builder(column)
+            .withEncodingType(FieldConfig.EncodingType.RAW)
+            .withIndexTypes(List.of(FieldConfig.IndexType.VECTOR))
+            .withProperties(Map.of(
+                "vectorIndexType", "HNSW",
+                "vectorDimension", String.valueOf(dimension),
+                "vectorDistanceFunction", "COSINE",
+                "version", "1",
+                "storeInSegmentFile", "false"))
+            .build()))
+        .build();
+    List<GenericRow> rows = new ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      Object[] vector = new Object[dimension];
+      for (int d = 0; d < dimension; d++) {
+        vector[d] = (float) (i + d);
+      }
+      GenericRow row = new GenericRow();
+      row.putValue(column, vector);
+      rows.add(row);
+    }
+    File segmentDir = buildCustomSegment(tableConfig, schema, rows);
+
+    File hnswDir = findDirectoryEndingWith(new File(segmentDir, "v3"),
+        V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+    assertNotNull(hnswDir, "The HNSW vector index should be a directory copied alongside columns.psf when "
+        + "storeInSegmentFile=false");
+    long onDisk = FileUtils.sizeOfDirectory(hnswDir);
+    assertTrue(onDisk > 0, "Sanity: the vector index directory should not be empty");
+
+    PropertiesConfiguration metadata = loadMetadata(segmentDir);
+    String vectorKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor(column, StandardIndexes.vector().getId());
+    assertTrue(indexSizeKeys(metadata).contains(vectorKey),
+        "A vector index size must be recorded; keys were: " + indexSizeKeys(metadata));
+    assertEquals(metadata.getLong(vectorKey), onDisk,
+        "The recorded vector index size must equal the recursive directory size of " + hnswDir.getName()
+            + " with no magic marker added, since directories are copied rather than packed");
+
+    PropertiesConfiguration indexMap = CommonsConfigurationUtils.fromFile(
+        new File(SegmentDirectoryPaths.findSegmentDirectory(segmentDir), V1Constants.INDEX_MAP_FILE_NAME));
+    for (String key : CommonsConfigurationUtils.getKeys(indexMap)) {
+      assertFalse(key.startsWith(column + ".vector_index"),
+          "An externally stored vector index must not appear in index_map, but found: " + key);
+    }
+  }
+
+  @Nullable
+  private static File findDirectoryEndingWith(File dir, String suffix) {
+    File[] candidates = dir.listFiles(f -> f.isDirectory() && f.getName().endsWith(suffix));
+    return candidates == null || candidates.length == 0 ? null : candidates[0];
   }
 }
