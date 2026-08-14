@@ -123,4 +123,18 @@ public class OrderByComparatorFactoryTest {
             ENABLE_NULL_HANDLING));
     Assert.assertTrue(exception.getMessage().contains("ORDER BY does not support raw VARIANT"));
   }
+
+  @Test
+  public void testNamesUnsupportedNonVariantType() {
+    List<OrderByExpressionContext> orderBys =
+        List.of(new OrderByExpressionContext(COLUMN1, ASC, NULLS_LAST));
+    ColumnContext columnContext = Mockito.mock(ColumnContext.class);
+    Mockito.when(columnContext.isSingleValue()).thenReturn(true);
+    Mockito.when(columnContext.getDataType()).thenReturn(DataType.MAP);
+
+    BadQueryRequestException exception = Assert.expectThrows(BadQueryRequestException.class,
+        () -> OrderByComparatorFactory.getComparator(orderBys, new ColumnContext[]{columnContext},
+            ENABLE_NULL_HANDLING));
+    Assert.assertTrue(exception.getMessage().contains("ORDER BY does not support MAP values"));
+  }
 }

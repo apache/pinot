@@ -31,6 +31,8 @@ import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TimestampConfig;
+import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -309,6 +311,34 @@ public class VariantTableConfigValidationTest {
         .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
         .build();
     assertInvalid(tableConfig, SCHEMA, "Star-tree index cannot be created on VARIANT column");
+  }
+
+  @Test
+  public void testTimestampDerivedNameCannotHideVariantFromStarTreeValidation() {
+    String timestampColumn = "eventTime";
+    String collidingVariantColumn = "$eventTime$DAY";
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(ID_COLUMN, DataType.STRING)
+        .addDateTime(timestampColumn, DataType.TIMESTAMP, "TIMESTAMP", "1:MILLISECONDS")
+        .addSingleValueDimension(collidingVariantColumn, DataType.VARIANT)
+        .build();
+    FieldConfig timestampFieldConfig = new FieldConfig.Builder(timestampColumn)
+        .withTimestampConfig(new TimestampConfig(List.of(TimestampIndexGranularity.DAY)))
+        .build();
+    FieldConfig variantFieldConfig = new FieldConfig.Builder(collidingVariantColumn)
+        .withEncodingType(EncodingType.RAW)
+        .build();
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of(ID_COLUMN), null, List.of("SUM__" + collidingVariantColumn), null, 1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
+        .setNullHandlingEnabled(true)
+        .setFieldConfigList(List.of(timestampFieldConfig, variantFieldConfig))
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+
+    assertInvalid(tableConfig, schema, "Star-tree index cannot be created on VARIANT column");
   }
 
   private static FieldConfig rawVariantFieldConfig() {

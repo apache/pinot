@@ -132,7 +132,7 @@ final class VariantOperand implements TransformOperand {
         externalResult = VariantUtils.variantTypeOf(variant, _path, _reusableResult);
         break;
       case TO_JSON:
-        externalResult = VariantUtils.variantToJson(variant);
+        externalResult = VariantUtils.variantToJson(variant, _reusableResult);
         break;
       default:
         throw new IllegalStateException("Unhandled Variant operation: " + _operation);

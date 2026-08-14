@@ -135,6 +135,28 @@ public class AggregateOperatorTest {
   }
 
   @Test
+  public void testGroupingSetValidationUsesExpandedInputSchema() {
+    DataSchema inputSchema =
+        new DataSchema(new String[]{"dimension", "metric"}, new ColumnDataType[]{STRING, INT});
+    ValueNode inputPlanNode = new ValueNode(0, inputSchema, PlanNode.NodeHint.EMPTY, List.of(), List.of());
+    DataSchema expandedInputSchema = new DataSchema(
+        new String[]{"dimension", "metric", "$groupingSetKey$0", "$groupingId"},
+        new ColumnDataType[]{STRING, INT, STRING, INT});
+    RepeatOperator repeatOperator = new RepeatOperator(OperatorTestUtil.getTracingContext(), _input, new int[]{0},
+        List.of(List.of(0), List.of()), expandedInputSchema);
+    RexExpression.FunctionCall sum =
+        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.SUM.name(),
+            List.of(new RexExpression.InputRef(1)));
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"dimension", "sum"}, new ColumnDataType[]{STRING, DOUBLE});
+    AggregateNode rewrittenAggregateNode = new AggregateNode(0, resultSchema, PlanNode.NodeHint.EMPTY,
+        List.of(inputPlanNode), List.of(sum), List.of(-1), List.of(2, 3), AggType.DIRECT, false, List.of(), 0);
+
+    Assert.assertNotNull(
+        new AggregateOperator(OperatorTestUtil.getTracingContext(), repeatOperator, rewrittenAggregateNode));
+  }
+
+  @Test
   public void shouldHandleEndOfStreamBlockWithNoOtherInputs() {
     // Given:
     List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
