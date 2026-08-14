@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.starter;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.netty.channel.ChannelHandler;
 import java.util.HashSet;
@@ -176,6 +177,17 @@ public class ServerInstance {
     }
     _instanceRequestHandler = instanceRequestHandler;
 
+    initTransformFunctions(serverConf);
+
+    LOGGER.info("Finish initializing server instance");
+  }
+
+  /// Initializes [TransformFunctionFactory] with the explicitly configured transform function classes
+  /// (`pinot.server.transforms`). The factory additionally discovers [TransformFunction] service providers from the
+  /// application classpath and the plugin classloaders via `ServiceLoader`, so external transform functions register
+  /// without any server configuration. Must run after all plugins have been loaded and before serving queries.
+  @VisibleForTesting
+  static void initTransformFunctions(ServerConf serverConf) {
     LOGGER.info("Initializing transform functions");
     Set<Class<TransformFunction>> transformFunctionClasses = new HashSet<>();
     for (String transformFunctionClassName : serverConf.getTransformFunctions()) {
@@ -187,8 +199,6 @@ public class ServerInstance {
       }
     }
     TransformFunctionFactory.init(transformFunctionClasses);
-
-    LOGGER.info("Finish initializing server instance");
   }
 
   public synchronized void startDataManager() {
