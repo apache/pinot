@@ -523,10 +523,16 @@ public final class VariantUtils {
   /// Renders the Variant value as canonical JSON text without constructing a JSON tree.
   @Nullable
   public static String variantToJson(@Nullable byte[] envelope) {
+    return variantToJson(envelope, new ReusableResult());
+  }
+
+  /// Allocation-reduced form of [#variantToJson(byte[])] when the caller retains the supplied result between rows.
+  @Nullable
+  public static String variantToJson(@Nullable byte[] envelope, ReusableResult result) {
+    Objects.requireNonNull(result, "result must not be null");
     if (isSqlNull(envelope)) {
       return null;
     }
-    ReusableResult result = new ReusableResult();
     Cursor cursor = result._cursor;
     cursor.navigate(envelope, ROOT_PATH);
     return variantToJson(cursor.asVariant());

@@ -511,6 +511,17 @@ public class SortOperatorTest {
     assertTrue(exception.getMessage().contains("ORDER BY does not support raw VARIANT"));
   }
 
+  @Test
+  public void shouldNameUnsupportedNonVariantCollationType() {
+    DataSchema schema =
+        new DataSchema(new String[]{"payload"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.OBJECT});
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0));
+
+    IllegalArgumentException exception =
+        expectThrows(IllegalArgumentException.class, () -> getOperator(schema, collations));
+    assertTrue(exception.getMessage().contains("ORDER BY does not support OBJECT values"));
+  }
+
   private SortOperator getOperator(DataSchema schema, List<RelFieldCollation> collations, int fetch, int offset) {
     return new SortOperator(OperatorTestUtil.getTracingContext(), _input,
         new SortNode(-1, schema, PlanNode.NodeHint.EMPTY, List.of(), collations, fetch, offset));

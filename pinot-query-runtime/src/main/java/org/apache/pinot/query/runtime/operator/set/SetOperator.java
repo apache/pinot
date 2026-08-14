@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator.set;
 
-import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
@@ -41,10 +40,13 @@ public abstract class SetOperator extends MultiStageOperator {
     _inputOperators = inputOperators;
   }
 
-  protected static void validateEqualitySupported(DataSchema dataSchema, String operation) {
+  protected static void validateEqualityAndHashingSupported(DataSchema dataSchema, String operation) {
     for (DataSchema.ColumnDataType dataType : dataSchema.getColumnDataTypes()) {
-      Preconditions.checkArgument(dataType.supportsEquality() && dataType.supportsHashing(),
-          "%s does not support raw VARIANT values; extract a typed path with variantGet first", operation);
+      if (!dataType.supportsEquality() || !dataType.supportsHashing()) {
+        throw new IllegalArgumentException(dataType == DataSchema.ColumnDataType.VARIANT
+            ? operation + " does not support raw VARIANT values; extract a typed path with variantGet first"
+            : operation + " does not support " + dataType + " values");
+      }
     }
   }
 
