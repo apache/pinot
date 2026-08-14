@@ -73,8 +73,8 @@ public class MultistageGroupByExecutor {
   private final GroupIdGenerator _groupIdGenerator;
 
   public MultistageGroupByExecutor(int[] groupKeyIds, AggregationFunction[] aggFunctions, int[] filterArgIds,
-      int maxFilterArgId, AggType aggType, boolean leafReturnFinalResult, DataSchema resultSchema,
-      Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {
+      int maxFilterArgId, AggType aggType, boolean leafReturnFinalResult, @Nullable DataSchema inputSchema,
+      DataSchema resultSchema, Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {
     _groupKeyIds = groupKeyIds;
     _aggFunctions = aggFunctions;
     _filterArgIds = filterArgIds;
@@ -83,10 +83,12 @@ public class MultistageGroupByExecutor {
     _leafReturnFinalResult = leafReturnFinalResult;
     _resultSchema = resultSchema;
     for (int i = 0; i < groupKeyIds.length; i++) {
-      ColumnDataType dataType = resultSchema.getColumnDataType(i);
+      ColumnDataType dataType = inputSchema != null ? inputSchema.getColumnDataType(groupKeyIds[i])
+          : resultSchema.getColumnDataType(i);
       if (!dataType.supportsEquality() || !dataType.supportsHashing()) {
-        throw new IllegalArgumentException(
-            "Raw VARIANT values do not support GROUP BY; extract a typed path with variantGet first");
+        throw new IllegalArgumentException(dataType == ColumnDataType.VARIANT
+            ? "Raw VARIANT values do not support GROUP BY; extract a typed path with variantGet first"
+            : "GROUP BY does not support " + dataType + " values");
       }
     }
 

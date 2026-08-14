@@ -37,7 +37,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.validation.ArrayToMvValidationVisitor;
-import org.apache.pinot.query.planner.validation.VariantTypeValidationVisitor;
+import org.apache.pinot.query.planner.validation.TypeCapabilityValidationVisitor;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.routing.WorkerMetadata;
 
@@ -157,13 +157,13 @@ public class PinotDispatchPlanner {
   private void runValidations(PlanFragment planFragment, DispatchablePlanContext context) {
     PlanNode rootPlanNode = planFragment.getFragmentRoot();
     if (rootPlanNode.getStageId() == 0) {
-      VariantTypeValidationVisitor.validateResultSchema(rootPlanNode.getDataSchema(),
+      TypeCapabilityValidationVisitor.validateResultSchema(rootPlanNode.getDataSchema(),
           context.getPlannerContext().getEnvConfig().isNullHandlingEnabled());
     }
     boolean isIntermediateStage =
         context.getDispatchablePlanMetadataMap().get(rootPlanNode.getStageId()).getScannedTables().isEmpty();
     rootPlanNode.visit(ArrayToMvValidationVisitor.INSTANCE, isIntermediateStage);
-    rootPlanNode.visit(VariantTypeValidationVisitor.INSTANCE, null);
+    rootPlanNode.visit(TypeCapabilityValidationVisitor.INSTANCE, null);
     for (PlanFragment child : planFragment.getChildren()) {
       runValidations(child, context);
     }

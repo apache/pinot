@@ -203,16 +203,12 @@
     <dependency>
       <groupId>org.apache.parquet</groupId>
       <artifactId>parquet-variant</artifactId>
-      <!-- Query-time Variant navigation uses only parquet-variant's standalone codec classes. Keep the full
-           parquet-column/schema stack isolated to the Parquet ingestion plugin. -->
+      <!-- Query-time Variant navigation uses parquet-variant's codec classes and their parquet-common utilities.
+           Keep the full parquet-column/schema stack isolated to the Parquet ingestion plugin. -->
       <exclusions>
         <exclusion>
           <groupId>org.apache.parquet</groupId>
           <artifactId>parquet-column</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.parquet</groupId>
-          <artifactId>parquet-common</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
