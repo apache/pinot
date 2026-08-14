@@ -115,11 +115,6 @@ public class SegmentPreProcessor implements AutoCloseable {
     // This fixes the issue of temporary files not getting deleted after creating new inverted indexes.
     removeInvertedIndexTempFiles(indexDir);
 
-    boolean indexSizeStatsEnabled = _tableConfig.getIndexingConfig().isIndexSizeStatsEnabled();
-    // Starts equal to indexSizeStatsEnabled; only set to false below if the post-reload snapshot fails, to skip the
-    // refresh for this reload without altering what indexSizeStatsEnabled itself reports.
-    boolean shouldRefreshIndexSizeStats = indexSizeStatsEnabled;
-
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
       // Backward-compat shim: invalidate any legacy raw-value embedded-dictionary inverted indexes left over from
       // PR #17060 (reverted by PR #18410) so the standard handlers can rebuild them in the dict-id format. Must
@@ -203,12 +198,12 @@ public class SegmentPreProcessor implements AutoCloseable {
       // Snapshot which (column, indexType) pairs exist right now, straight from this still-open writer -- not from
       // a later independent metadata read -- so refreshPersistedIndexSizes() reconciles against the exact on-disk
       // layout this reload just produced. See its javadoc for why a live snapshot matters here.
-      if (indexSizeStatsEnabled) {
+      if (_tableConfig.getIndexingConfig().isIndexSizeStatsEnabled()) {
         try {
           List<IndexType<?, ?, ?>> allIndexTypes = IndexService.getInstance().getAllIndexes();
-          indexPresenceSnapshot = snapshotIndexTypeIds(segmentWriter,
+          IndexPresenceSnapshot snapshot = snapshotIndexTypeIds(segmentWriter,
               _segmentDirectory.getSegmentMetadata().getColumnMetadataMap().keySet(), allIndexTypes);
-          if (indexPresenceSnapshot.getColumnToIndexTypeIds().isEmpty()) {
+          if (snapshot.getColumnToIndexTypeIds().isEmpty()) {
             // A non-empty segment always has a forward index or dictionary on every column, so an empty snapshot
             // means the backing SegmentDirectory answered "no indexes anywhere" rather than reporting a genuine
             // state -- e.g. SegmentLocalFSDirectory#getColumnsWithIndex returns Set.of() for every type while its
@@ -216,7 +211,11 @@ public class SegmentPreProcessor implements AutoCloseable {
             // rather than let a spurious empty answer clear every persisted size below.
             LOGGER.warn("Post-reload index snapshot for segment: {} was unexpectedly empty; skipping index size "
                 + "stats refresh for this reload", segmentName);
-            shouldRefreshIndexSizeStats = false;
+          } else {
+            // Only publish a fully-validated snapshot, so that a failure anywhere above -- including inside this
+            // same try block, e.g. the LOGGER.warn call above throwing -- always leaves indexPresenceSnapshot null
+            // and the refresh skipped below, with no dependence on how far the try body got before failing.
+            indexPresenceSnapshot = snapshot;
           }
         } catch (Exception e) {
           // Advisory stats must never fail a segment load: skip the size refresh for this reload entirely rather
@@ -225,7 +224,6 @@ public class SegmentPreProcessor implements AutoCloseable {
           // else unexpected (e.g. IndexService.getAllIndexes() itself misbehaving).
           LOGGER.warn("Failed to snapshot post-reload index sizes for segment: {}; skipping index size stats "
               + "refresh for this reload", segmentName, e);
-          shouldRefreshIndexSizeStats = false;
         }
       }
     }
@@ -234,7 +232,7 @@ public class SegmentPreProcessor implements AutoCloseable {
     // This is opportunistic only: it rides along with whatever reload just ran for some other reason, and never
     // itself decides that a reload is needed. See needProcess() javadoc for why index size stats are excluded from
     // that decision entirely.
-    if (shouldRefreshIndexSizeStats) {
+    if (indexPresenceSnapshot != null) {
       refreshPersistedIndexSizes(indexDir, indexPresenceSnapshot);
     }
   }
@@ -307,7 +305,7 @@ public class SegmentPreProcessor implements AutoCloseable {
   }
 
   /// Updates the `column.<column>.indexSizeInBytes.<indexTypeId>` entries in `metadata.properties` to match
-  /// `indexTypeIdsAfterReload`, the live post-reload index presence for every column, and leaves every other entry
+  /// `indexPresenceSnapshot`, the live post-reload index presence for every column, and leaves every other entry
   /// untouched.
   ///
   /// Without this the values would stay a build-time snapshot: reload can add, drop or re-compress an index, and a
@@ -316,7 +314,7 @@ public class SegmentPreProcessor implements AutoCloseable {
   /// single index is involved -- would require every future handler to remember to participate.
   ///
   /// For every column and every currently-registered [IndexType]:
-  /// - Present (per `indexTypeIdsAfterReload`): (re)sized the same way segment creation would size it -- from the
+  /// - Present (per `indexPresenceSnapshot`): (re)sized the same way segment creation would size it -- from the
   ///   packed [ColumnMetadata#getIndexSize] position if there is one, else from the index's own file/directory --
   ///   which is reliable here specifically because this reload just wrote the current layout, locally, moments ago.
   ///   The size is only written if it differs from what is already persisted, so a reload that left an index
@@ -341,7 +339,9 @@ public class SegmentPreProcessor implements AutoCloseable {
   ///   node lacks survives reload here rather than being wiped by a node that cannot even see it exists.
   /// No tier logic anywhere here: the same rule applies to every segment format and every storage tier.
   ///
-  /// Only called by [#process] when `indexSizeStatsEnabled` is set, so this method does not re-check it. Failures
+  /// Only called by [#process] with a non-null, already-validated `indexPresenceSnapshot` (non-empty, and produced
+  /// without the snapshotting step itself throwing), so this method re-checks neither `indexSizeStatsEnabled` nor
+  /// emptiness. Failures
   /// are logged and swallowed: these statistics are advisory and must never fail a segment load, and -- because
   /// nothing outside this method ever asks "are the persisted sizes still accurate," see [#needProcess] -- must
   /// never force one either. Refreshing only happens as a side effect of a reload that some other check already
