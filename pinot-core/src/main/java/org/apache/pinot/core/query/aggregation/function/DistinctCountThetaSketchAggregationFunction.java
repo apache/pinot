@@ -55,7 +55,6 @@ import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
@@ -193,8 +192,12 @@ public class DistinctCountThetaSketchAggregationFunction
     extractValues(length, blockValSetMap, singleValues, valueTypes, valueArrays);
     int numFilters = _filterEvaluators.size();
 
-    // Main expression is always index 0
-    if (valueTypes[0] != DataType.BYTES) {
+    // Main expression is always index 0. A UUID column reports BYTES here because that is its stored type, but
+    // its values are logical scalars rather than serialized sketches, so it takes the scalar path below and is
+    // handled by `case BYTES`.
+    boolean uuidMainExpression =
+        blockValSetMap.get(_inputExpressions.get(0)).getValueType() == DataType.UUID;
+    if (valueTypes[0] != DataType.BYTES || uuidMainExpression) {
       List<UpdatableThetaSketch> updateSketches = getUpdateSketches(aggregationResultHolder);
       if (singleValues[0]) {
         switch (valueTypes[0]) {
@@ -284,6 +287,24 @@ public class DistinctCountThetaSketchAggregationFunction
               for (int j = 0; j < length; j++) {
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
                   updateSketch.update(stringValues[j]);
+                }
+              }
+            }
+            break;
+          case BYTES:
+            byte[][] uuidValues = (byte[][]) valueArrays[0];
+            if (_includeDefaultSketch) {
+              UpdatableThetaSketch defaultSketch = updateSketches.get(0);
+              for (int i = 0; i < length; i++) {
+                defaultSketch.update(uuidValues[i]);
+              }
+            }
+            for (int i = 0; i < numFilters; i++) {
+              FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
+              UpdatableThetaSketch updateSketch = updateSketches.get(i + 1);
+              for (int j = 0; j < length; j++) {
+                if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
+                  updateSketch.update(uuidValues[j]);
                 }
               }
             }
@@ -405,6 +426,28 @@ public class DistinctCountThetaSketchAggregationFunction
               }
             }
             break;
+          case BYTES:
+            byte[][][] uuidValues = (byte[][][]) valueArrays[0];
+            if (_includeDefaultSketch) {
+              UpdatableThetaSketch defaultSketch = updateSketches.get(0);
+              for (int i = 0; i < length; i++) {
+                for (byte[] value : uuidValues[i]) {
+                  defaultSketch.update(value);
+                }
+              }
+            }
+            for (int i = 0; i < numFilters; i++) {
+              FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
+              UpdatableThetaSketch updateSketch = updateSketches.get(i + 1);
+              for (int j = 0; j < length; j++) {
+                if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
+                  for (byte[] value : uuidValues[j]) {
+                    updateSketch.update(value);
+                  }
+                }
+              }
+            }
+            break;
           default:
             throw new IllegalStateException(
                 "Illegal multi-value data type for DISTINCT_COUNT_THETA_SKETCH aggregation function: " + valueTypes[0]);
@@ -442,8 +485,12 @@ public class DistinctCountThetaSketchAggregationFunction
     extractValues(length, blockValSetMap, singleValues, valueTypes, valueArrays);
     int numFilters = _filterEvaluators.size();
 
-    // Main expression is always index 0
-    if (valueTypes[0] != DataType.BYTES) {
+    // Main expression is always index 0. A UUID column reports BYTES here because that is its stored type, but
+    // its values are logical scalars rather than serialized sketches, so it takes the scalar path below and is
+    // handled by `case BYTES`.
+    boolean uuidMainExpression =
+        blockValSetMap.get(_inputExpressions.get(0)).getValueType() == DataType.UUID;
+    if (valueTypes[0] != DataType.BYTES || uuidMainExpression) {
       if (singleValues[0]) {
         switch (valueTypes[0]) {
           case INT:
@@ -511,6 +558,21 @@ public class DistinctCountThetaSketchAggregationFunction
             for (int i = 0; i < length; i++) {
               List<UpdatableThetaSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
               String value = stringValues[i];
+              if (_includeDefaultSketch) {
+                updateSketches.get(0).update(value);
+              }
+              for (int j = 0; j < numFilters; j++) {
+                if (_filterEvaluators.get(j).evaluate(singleValues, valueTypes, valueArrays, i)) {
+                  updateSketches.get(j + 1).update(value);
+                }
+              }
+            }
+            break;
+          case BYTES:
+            byte[][] uuidValues = (byte[][]) valueArrays[0];
+            for (int i = 0; i < length; i++) {
+              List<UpdatableThetaSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
+              byte[] value = uuidValues[i];
               if (_includeDefaultSketch) {
                 updateSketches.get(0).update(value);
               }
@@ -633,6 +695,27 @@ public class DistinctCountThetaSketchAggregationFunction
               }
             }
             break;
+          case BYTES:
+            byte[][][] uuidValues = (byte[][][]) valueArrays[0];
+            for (int i = 0; i < length; i++) {
+              List<UpdatableThetaSketch> updateSketches = getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
+              byte[][] values = uuidValues[i];
+              if (_includeDefaultSketch) {
+                UpdatableThetaSketch defaultSketch = updateSketches.get(0);
+                for (byte[] value : values) {
+                  defaultSketch.update(value);
+                }
+              }
+              for (int j = 0; j < numFilters; j++) {
+                if (_filterEvaluators.get(j).evaluate(singleValues, valueTypes, valueArrays, i)) {
+                  UpdatableThetaSketch updateSketch = updateSketches.get(j + 1);
+                  for (byte[] value : values) {
+                    updateSketch.update(value);
+                  }
+                }
+              }
+            }
+            break;
           default:
             throw new IllegalStateException(
                 "Illegal multi-value data type for DISTINCT_COUNT_THETA_SKETCH aggregation function: " + valueTypes[0]);
@@ -666,8 +749,12 @@ public class DistinctCountThetaSketchAggregationFunction
     extractValues(length, blockValSetMap, singleValues, valueTypes, valueArrays);
     int numFilters = _filterEvaluators.size();
 
-    // Main expression is always index 0
-    if (valueTypes[0] != DataType.BYTES) {
+    // Main expression is always index 0. A UUID column reports BYTES here because that is its stored type, but
+    // its values are logical scalars rather than serialized sketches, so it takes the scalar path below and is
+    // handled by `case BYTES`.
+    boolean uuidMainExpression =
+        blockValSetMap.get(_inputExpressions.get(0)).getValueType() == DataType.UUID;
+    if (valueTypes[0] != DataType.BYTES || uuidMainExpression) {
       if (singleValues[0]) {
         switch (valueTypes[0]) {
           case INT:
@@ -765,6 +852,26 @@ public class DistinctCountThetaSketchAggregationFunction
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
                   for (int groupKey : groupKeysArray[i]) {
                     getUpdateSketches(groupByResultHolder, groupKey).get(i + 1).update(stringValues[j]);
+                  }
+                }
+              }
+            }
+            break;
+          case BYTES:
+            byte[][] uuidValues = (byte[][]) valueArrays[0];
+            if (_includeDefaultSketch) {
+              for (int i = 0; i < length; i++) {
+                for (int groupKey : groupKeysArray[i]) {
+                  getUpdateSketches(groupByResultHolder, groupKey).get(0).update(uuidValues[i]);
+                }
+              }
+            }
+            for (int i = 0; i < numFilters; i++) {
+              FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
+              for (int j = 0; j < length; j++) {
+                if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
+                  for (int groupKey : groupKeysArray[i]) {
+                    getUpdateSketches(groupByResultHolder, groupKey).get(i + 1).update(uuidValues[j]);
                   }
                 }
               }
@@ -900,6 +1007,32 @@ public class DistinctCountThetaSketchAggregationFunction
                   for (int groupKey : groupKeysArray[i]) {
                     UpdatableThetaSketch updateSketch = getUpdateSketches(groupByResultHolder, groupKey).get(i + 1);
                     for (String value : stringValues[i]) {
+                      updateSketch.update(value);
+                    }
+                  }
+                }
+              }
+            }
+            break;
+          case BYTES:
+            byte[][][] uuidValues = (byte[][][]) valueArrays[0];
+            if (_includeDefaultSketch) {
+              for (int i = 0; i < length; i++) {
+                for (int groupKey : groupKeysArray[i]) {
+                  UpdatableThetaSketch defaultSketch = getUpdateSketches(groupByResultHolder, groupKey).get(0);
+                  for (byte[] value : uuidValues[i]) {
+                    defaultSketch.update(value);
+                  }
+                }
+              }
+            }
+            for (int i = 0; i < numFilters; i++) {
+              FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
+              for (int j = 0; j < length; j++) {
+                if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
+                  for (int groupKey : groupKeysArray[i]) {
+                    UpdatableThetaSketch updateSketch = getUpdateSketches(groupByResultHolder, groupKey).get(i + 1);
+                    for (byte[] value : uuidValues[i]) {
                       updateSketch.update(value);
                     }
                   }
@@ -1236,36 +1369,6 @@ public class DistinctCountThetaSketchAggregationFunction
       DataType dataType = blockValSet.getValueType();
       DataType storedType = dataType.getStoredType();
       singleValues[i] = singleValue;
-      // UUID columns are stored as 16-byte BYTES but a UUID value is a logical scalar, not a pre-serialized
-      // theta sketch: without this branch the function takes the serialized-sketch path below and Sketch.wrap
-      // fails on raw 16-byte UUID content. Unlike the other distinct-count functions this one cannot consume the
-      // stored bytes directly -- DataType.BYTES here means "serialized sketch", with no scalar-bytes mode -- so
-      // the stored value is surfaced as its hex rendering, the same form used at every other String-typed UUID
-      // boundary (see PredicateUtils#getStoredValue and the Bloom filter key).
-      if (dataType == DataType.UUID) {
-        valueTypes[i] = DataType.STRING;
-        if (singleValue) {
-          byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
-          String[] hexValues = new String[length];
-          for (int j = 0; j < length; j++) {
-            hexValues[j] = BytesUtils.toHexString(uuidBytesValues[j]);
-          }
-          valueArrays[i] = hexValues;
-        } else {
-          byte[][][] uuidBytesValuesMV = blockValSet.getBytesValuesMV();
-          String[][] hexValuesMV = new String[length][];
-          for (int j = 0; j < length; j++) {
-            byte[][] row = uuidBytesValuesMV[j];
-            String[] hexRow = new String[row.length];
-            for (int k = 0; k < row.length; k++) {
-              hexRow[k] = BytesUtils.toHexString(row[k]);
-            }
-            hexValuesMV[j] = hexRow;
-          }
-          valueArrays[i] = hexValuesMV;
-        }
-        continue;
-      }
       valueTypes[i] = storedType;
       if (singleValue) {
         switch (storedType) {
