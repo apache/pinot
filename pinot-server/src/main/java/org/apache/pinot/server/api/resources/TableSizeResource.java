@@ -181,11 +181,6 @@ public class TableSizeResource {
             hasImmutable = true;
           }
         }
-        // An empty-but-non-null map means nothing was persisted for this segment; report that as absent rather
-        // than serializing an empty "indexSizeInBytes":{} on every segment of a table that never enabled the flag.
-        if (indexSizeTotals != null && indexSizeTotals.isEmpty()) {
-          indexSizeTotals = null;
-        }
         if (hasImmutable) {
           if (detailed) {
             if (compressionStatsEnabled) {
