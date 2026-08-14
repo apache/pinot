@@ -158,7 +158,7 @@ public class ExpressionScanDocIdIteratorTest {
     ProjectionOperatorUtils.setImplementation(PullAheadProjectionOperator::new);
     try {
       assertEquals(runApplyAnd(candidates, "SELECT COUNT(*) FROM testTable WHERE MOD(intColumn, 7) = 0"),
-        expected);
+          expected);
     } finally {
       ProjectionOperatorUtils.setImplementation(new ProjectionOperatorUtils.DefaultImplementation());
     }
