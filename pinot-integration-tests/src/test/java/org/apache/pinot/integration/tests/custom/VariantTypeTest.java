@@ -24,13 +24,30 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import org.apache.hadoop.fs.Path;
+import org.apache.parquet.example.data.Group;
+import org.apache.parquet.example.data.simple.SimpleGroupFactory;
+import org.apache.parquet.hadoop.ParquetWriter;
+import org.apache.parquet.hadoop.example.ExampleParquetWriter;
+import org.apache.parquet.io.api.Binary;
+import org.apache.parquet.schema.MessageType;
+import org.apache.parquet.schema.MessageTypeParser;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.VariantEnvelope;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -44,7 +61,7 @@ public class VariantTypeTest extends CustomDataQueryClusterIntegrationTest {
   private static final String EVENT_ID = "eventId";
   private static final String EVENT_TYPE = "eventType";
   private static final String PAYLOAD = "payload";
-  private static final int NUM_DOCS = 5;
+  private static final int NUM_DOCS = 6;
 
   @Override
   public String getTableName() {
@@ -88,6 +105,14 @@ public class VariantTypeTest extends CustomDataQueryClusterIntegrationTest {
     }
     ClusterIntegrationTestUtils.buildSegmentFromFile(parquetFile, tableConfig, schema, "0", _segmentDir, _tarDir,
         FileFormat.PARQUET);
+
+    Set<String> existingSegments = segmentNames(_segmentDir);
+    byte[] nonMonotonicEnvelope = nonMonotonicObjectEnvelope();
+    File interoperabilityFile = writeNonMonotonicVariantFile(nonMonotonicEnvelope);
+    ClusterIntegrationTestUtils.buildSegmentFromFile(interoperabilityFile, tableConfig, schema, "1", _segmentDir,
+        _tarDir, FileFormat.PARQUET);
+    File interoperabilitySegment = findNewSegment(_segmentDir, existingSegments);
+    assertSegmentPreservesVariantEnvelope(interoperabilitySegment, nonMonotonicEnvelope);
     uploadSegments(getTableName(), _tarDir);
   }
 
@@ -136,6 +161,33 @@ public class VariantTypeTest extends CustomDataQueryClusterIntegrationTest {
       Assert.assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0L,
           "The materialized eventType filter should use its inverted index");
     }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testNonMonotonicObjectOffsetsFromExternalParquet(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    JsonNode response = postVariantQuery(
+        "SELECT variant_get(" + PAYLOAD + ", '$.a', 'INT'), "
+            + "try_variant_get(" + PAYLOAD + ", '$.b', 'INT'), "
+            + "variant_get(" + PAYLOAD + ", '$.c'), variant_to_json(" + PAYLOAD + ") "
+            + "FROM " + TABLE_NAME + " WHERE " + EVENT_ID + " = 'evt-006'");
+    assertNoExceptions(response);
+    Assert.assertEquals(
+        response.get("resultTable").get("dataSchema").get("columnDataTypes").toString(),
+        "[\"INT\",\"INT\",\"VARIANT\",\"STRING\"]");
+    JsonNode row = response.get("resultTable").get("rows").get(0);
+    Assert.assertEquals(row.get(0).asInt(), 1);
+    Assert.assertEquals(row.get(1).asInt(), 2);
+    Assert.assertEquals(row.get(2).asText(), "3");
+    Assert.assertEquals(row.get(3).asText(), "{\"a\":1,\"b\":2,\"c\":3,\"eventType\":\"interop\"}");
+
+    response = postVariantQuery(
+        "SELECT try_variant_get(" + PAYLOAD + ", '$.missing', 'INT') FROM " + TABLE_NAME
+            + " WHERE " + EVENT_ID + " = 'evt-006'");
+    assertNoExceptions(response);
+    Assert.assertTrue(response.get("resultTable").get("rows").get(0).get(0).isNull());
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -305,7 +357,7 @@ public class VariantTypeTest extends CustomDataQueryClusterIntegrationTest {
 
     JsonNode response = postVariantQuery("SELECT COUNT(" + PAYLOAD + ") FROM " + TABLE_NAME);
     assertNoExceptions(response);
-    Assert.assertEquals(response.get("resultTable").get("rows").get(0).get(0).asLong(), 4L,
+    Assert.assertEquals(response.get("resultTable").get("rows").get(0).get(0).asLong(), 5L,
         "COUNT is raw-value-independent and must retain SQL-null semantics");
   }
 
@@ -394,6 +446,9 @@ public class VariantTypeTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertEquals(rows.get(4).get(0).asText(), "evt-005");
     Assert.assertTrue(rows.get(4).get(1).isNull(), "SQL null must remain in the SQL-null partition");
     Assert.assertEquals(rows.get(4).get(2).asLong(), 2L);
+    Assert.assertEquals(rows.get(5).get(0).asText(), "evt-006");
+    Assert.assertEquals(rows.get(5).get(1).asText(), "interop");
+    Assert.assertEquals(rows.get(5).get(2).asLong(), 1L);
   }
 
   @Test
@@ -413,6 +468,101 @@ public class VariantTypeTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertEquals(
         response.get("resultTable").get("dataSchema").get("columnDataTypes").toString(), "[\"VARIANT\"]");
     Assert.assertEquals(response.get("resultTable").get("rows").size(), 2);
+  }
+
+  private File writeNonMonotonicVariantFile(byte[] envelope)
+      throws IOException {
+    MessageType parquetSchema = MessageTypeParser.parseMessageType(
+        "message variant_interoperability {"
+            + " required binary eventId (STRING);"
+            + " required int64 eventTime;"
+            + " optional group payload (VARIANT(1)) {"
+            + "   required binary metadata;"
+            + "   required binary value;"
+            + " }"
+            + "}");
+    File parquetFile = new File(_tempDir, "variant_non_monotonic_offsets.parquet");
+    Files.deleteIfExists(parquetFile.toPath());
+    VariantEnvelope.Decoded decoded = VariantEnvelope.decode(envelope);
+    try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(parquetFile.getAbsolutePath()))
+        .withType(parquetSchema).build()) {
+      Group row = new SimpleGroupFactory(parquetSchema).newGroup()
+          .append(EVENT_ID, "evt-006")
+          .append("eventTime", 1_700_000_005_000L);
+      row.addGroup(PAYLOAD)
+          .append("metadata", Binary.fromConstantByteBuffer(decoded.getMetadata()))
+          .append("value", Binary.fromConstantByteBuffer(decoded.getValue()));
+      writer.write(row);
+    }
+    return parquetFile;
+  }
+
+  private static Set<String> segmentNames(File segmentDirectory) {
+    Set<String> names = new HashSet<>();
+    File[] segments = segmentDirectory.listFiles(File::isDirectory);
+    if (segments != null) {
+      for (File segment : segments) {
+        names.add(segment.getName());
+      }
+    }
+    return names;
+  }
+
+  private static File findNewSegment(File segmentDirectory, Set<String> existingNames) {
+    File[] segments = segmentDirectory.listFiles(File::isDirectory);
+    Assert.assertNotNull(segments, "Failed to list generated segments in " + segmentDirectory);
+    File newSegment = null;
+    for (File segment : segments) {
+      if (!existingNames.contains(segment.getName())) {
+        Assert.assertNull(newSegment, "Expected exactly one new interoperability segment");
+        newSegment = segment;
+      }
+    }
+    Assert.assertNotNull(newSegment, "Missing generated interoperability segment");
+    return newSegment;
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private static void assertSegmentPreservesVariantEnvelope(File segmentDirectory, byte[] expected) {
+    ImmutableSegment segment = null;
+    ForwardIndexReaderContext context = null;
+    try {
+      segment = ImmutableSegmentLoader.load(segmentDirectory, ReadMode.heap);
+      ForwardIndexReader reader = segment.getForwardIndex(PAYLOAD);
+      context = reader.createContext();
+      byte[] actual = reader.getBytes(0, context);
+      Assert.assertTrue(Arrays.equals(actual, expected),
+          "Segment generation must preserve the unshredded producer envelope exactly");
+    } catch (Exception e) {
+      throw new IllegalStateException("Failed to validate generated VARIANT segment", e);
+    } finally {
+      if (context != null) {
+        context.close();
+      }
+      if (segment != null) {
+        segment.destroy();
+      }
+    }
+  }
+
+  /// Returns a valid object whose a/b/c/eventType offsets are `[12, 10, 8, 0, 14]`; its values are physically
+  /// encoded in eventType/c/b/a order instead of lexicographic key order.
+  private static byte[] nonMonotonicObjectEnvelope() {
+    byte[] metadata = {
+        0x11, 0x04,
+        0x00, 0x01, 0x02, 0x03, 0x0C,
+        'a', 'b', 'c', 'e', 'v', 'e', 'n', 't', 'T', 'y', 'p', 'e'
+    };
+    byte[] value = {
+        0x02, 0x04,
+        0x00, 0x01, 0x02, 0x03,
+        0x0C, 0x0A, 0x08, 0x00, 0x0E,
+        0x1D, 'i', 'n', 't', 'e', 'r', 'o', 'p',
+        0x0C, 0x03,
+        0x0C, 0x02,
+        0x0C, 0x01
+    };
+    return VariantEnvelope.encode(metadata, 0, metadata.length, value, 0, value.length);
   }
 
   private static InputStream openResource(String relativePath) {

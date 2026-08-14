@@ -146,7 +146,7 @@ final class VariantOperand implements TransformOperand {
     boolean present = tolerant
         ? VariantUtils.tryExtractInto(variant, _path, targetType, _reusableResult)
         : VariantUtils.extractInto(variant, _path, targetType, _reusableResult);
-    return present ? _reusableResult.getInternalValue(targetType) : null;
+    return present ? _reusableResult.toInternalValue(targetType) : null;
   }
 
   private static Operation operation(String canonicalName) {

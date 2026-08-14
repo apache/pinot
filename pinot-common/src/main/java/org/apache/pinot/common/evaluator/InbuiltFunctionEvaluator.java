@@ -259,7 +259,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
       if (!present) {
         return null;
       }
-      return _reusableResult.getExternalValue(targetType);
+      return _reusableResult.toExternalValue(targetType);
     }
 
     @Nullable
