@@ -54,6 +54,7 @@ import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.mockito.Mockito;
@@ -499,6 +500,44 @@ public class SegmentPrunerTest extends ControllerTest {
     assertEquals(segmentPruner.prune(brokerRequest7, input), Set.of(segment0));
     assertEquals(segmentPruner.prune(brokerRequest8, input), input);
     assertEquals(segmentPruner.prune(brokerRequest9, input), Set.of()); // Query with invalid range
+  }
+
+  @Test
+  public void testTimeSegmentPrunerConsumingSegmentCommit() {
+    // Query range [20, 30] does not overlap the segment's post-commit interval [50, 65]
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(TIME_QUERY_2);
+
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+            .build();
+    DateTimeFieldSpec timeFieldSpec = new DateTimeFieldSpec(TIME_COLUMN, DataType.INT, "EPOCH|DAYS", "1:DAYS");
+    TimeSegmentPruner segmentPruner = new TimeSegmentPruner(tableConfig, timeFieldSpec);
+    SegmentZkMetadataFetcher segmentZkMetadataFetcher =
+        new SegmentZkMetadataFetcher(REALTIME_TABLE_NAME, _propertyStore);
+    segmentZkMetadataFetcher.register(segmentPruner);
+
+    String segment = "consumingSegment";
+    Set<String> onlineSegments = Set.of(segment);
+    Set<String> input = Set.of(segment);
+    IdealState idealState = Mockito.mock(IdealState.class);
+
+    // Segment starts CONSUMING with no time-range metadata yet: should not be pruned (matches every query)
+    ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, REALTIME_TABLE_NAME, new SegmentZKMetadata(segment));
+    ExternalView consumingExternalView = Mockito.mock(ExternalView.class);
+    when(consumingExternalView.getStateMap(segment)).thenReturn(
+        Map.of("server0", CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING));
+    segmentZkMetadataFetcher.init(idealState, consumingExternalView, onlineSegments);
+    assertEquals(segmentPruner.prune(brokerRequest, input), input);
+
+    // Segment commits: real time-range metadata is written and the external view moves it to ONLINE
+    setSegmentZKTimeRangeMetadata(REALTIME_TABLE_NAME, segment, 50, 65, TimeUnit.DAYS);
+    ExternalView onlineExternalView = Mockito.mock(ExternalView.class);
+    when(onlineExternalView.getStateMap(segment)).thenReturn(
+        Map.of("server0", CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE));
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, onlineExternalView, onlineSegments);
+
+    // Committed interval no longer overlaps the query range: segment should now be pruned
+    assertEquals(segmentPruner.prune(brokerRequest, input), Set.of());
   }
 
   @Test
