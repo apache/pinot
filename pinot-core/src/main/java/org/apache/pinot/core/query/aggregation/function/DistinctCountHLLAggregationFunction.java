@@ -82,22 +82,32 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES values contain serialized HyperLogLog objects.
+      // They always use the single-value representation.
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      for (int i = 0; i < length; i++) {
+        mergeSerializedHyperLogLog(aggregationResultHolder, bytesValues[i]);
+      }
+      return;
+    }
+
     DataType storedType = dataType.getStoredType();
 
     if (blockValSet.isSingleValue()) {
-      aggregateSV(length, aggregationResultHolder, blockValSet, dataType, storedType);
+      aggregateSV(length, aggregationResultHolder, blockValSet, storedType);
     } else {
       aggregateMV(length, aggregationResultHolder, blockValSet, storedType);
     }
   }
 
   protected void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet,
-      DataType dataType, DataType storedType) {
+      DataType storedType) {
     // For dictionary-encoded expression, collect dictionary ids into a BitSet for deduplication.
     // BitSet gives O(1) insertion with no container-switching overhead (unlike RoaringBitmap), and uses
     // dictSize/8 bytes of memory (e.g. 128 KB for a 1M-entry dictionary).
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
-    if (dictionary != null && dataType != DataType.BYTES) {
+    if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       BitSet bitSet = getDictIdBitSet(aggregationResultHolder, dictionary);
       for (int i = 0; i < length; i++) {
@@ -107,7 +117,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     }
 
     // For non-dictionary-encoded expression, store values into the HyperLogLog
-    HyperLogLog hyperLogLog = dataType == DataType.BYTES ? null : getHyperLogLog(aggregationResultHolder);
+    HyperLogLog hyperLogLog = getHyperLogLog(aggregationResultHolder);
     switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
@@ -141,15 +151,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        if (dataType == DataType.BYTES) {
-          // SV logical BYTES values contain serialized HyperLogLog objects.
-          for (int i = 0; i < length; i++) {
-            mergeSerializedHyperLogLog(aggregationResultHolder, bytesValues[i]);
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
-            hyperLogLog.offer(bytesValues[i]);
-          }
+        for (int i = 0; i < length; i++) {
+          hyperLogLog.offer(bytesValues[i]);
         }
         break;
       default:
@@ -234,23 +237,33 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES values contain serialized HyperLogLog objects.
+      // They always use the single-value representation.
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      for (int i = 0; i < length; i++) {
+        mergeSerializedHyperLogLog(groupByResultHolder, groupKeyArray[i], bytesValues[i]);
+      }
+      return;
+    }
+
     DataType storedType = dataType.getStoredType();
 
     if (blockValSet.isSingleValue()) {
-      aggregateSVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet, dataType, storedType);
+      aggregateSVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet, storedType);
     } else {
       aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet, storedType);
     }
   }
 
   protected void aggregateSVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet blockValSet, DataType dataType, DataType storedType) {
+      BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, collect dictionary ids into a RoaringBitmap for deduplication.
     // RoaringBitmap is used (not BitSet) because it is sparse: memory scales with the number of distinct dict IDs
     // seen per group, not with the full dictionary size. This avoids OOM when many groups each see few distinct values
     // (contrast with the non-group-by path, which uses a single BitSet across the entire dictionary).
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
-    if (dictionary != null && dataType != DataType.BYTES) {
+    if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
         getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
@@ -292,15 +305,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        if (dataType == DataType.BYTES) {
-          // SV logical BYTES values contain serialized HyperLogLog objects.
-          for (int i = 0; i < length; i++) {
-            mergeSerializedHyperLogLog(groupByResultHolder, groupKeyArray[i], bytesValues[i]);
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
-            getHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(bytesValues[i]);
-          }
+        for (int i = 0; i < length; i++) {
+          getHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(bytesValues[i]);
         }
         break;
       default:
@@ -387,20 +393,32 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES values contain serialized HyperLogLog objects.
+      // They always use the single-value representation.
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      for (int i = 0; i < length; i++) {
+        for (int groupKey : groupKeysArray[i]) {
+          mergeSerializedHyperLogLog(groupByResultHolder, groupKey, bytesValues[i]);
+        }
+      }
+      return;
+    }
+
     DataType storedType = dataType.getStoredType();
 
     if (blockValSet.isSingleValue()) {
-      aggregateSVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet, dataType, storedType);
+      aggregateSVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet, storedType);
     } else {
       aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet, storedType);
     }
   }
 
   protected void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet blockValSet, DataType dataType, DataType storedType) {
+      BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, collect dictionary ids into a RoaringBitmap (see aggregateSVGroupBySV).
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
-    if (dictionary != null && dataType != DataType.BYTES) {
+    if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
         int dictId = dictIds[i];
@@ -445,17 +463,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        if (dataType == DataType.BYTES) {
-          // SV logical BYTES values contain serialized HyperLogLog objects.
-          for (int i = 0; i < length; i++) {
-            for (int groupKey : groupKeysArray[i]) {
-              mergeSerializedHyperLogLog(groupByResultHolder, groupKey, bytesValues[i]);
-            }
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
-            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], bytesValues[i]);
-          }
+        for (int i = 0; i < length; i++) {
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], bytesValues[i]);
         }
         break;
       default:

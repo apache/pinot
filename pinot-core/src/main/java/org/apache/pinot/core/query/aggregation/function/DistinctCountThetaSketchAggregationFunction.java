@@ -196,7 +196,7 @@ public class DistinctCountThetaSketchAggregationFunction
 
     // Main expression is always index 0
     DataType dataType = valueTypes[0];
-    if (dataType != DataType.BYTES || !singleValues[0]) {
+    if (dataType != DataType.BYTES) {
       List<UpdatableThetaSketch> updateSketches = getUpdateSketches(aggregationResultHolder);
       if (singleValues[0]) {
         switch (valueTypes[0].getStoredType()) {
@@ -454,7 +454,8 @@ public class DistinctCountThetaSketchAggregationFunction
         }
       }
     } else {
-      // SV logical BYTES values contain serialized ThetaSketch objects.
+      // Logical BYTES values contain serialized ThetaSketch objects.
+      // They always use the single-value representation.
       List<ThetaSketchAccumulator> thetaSketchAccumulators = getUnions(aggregationResultHolder);
       ThetaSketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       if (_includeDefaultSketch) {
@@ -487,7 +488,7 @@ public class DistinctCountThetaSketchAggregationFunction
 
     // Main expression is always index 0
     DataType dataType = valueTypes[0];
-    if (dataType != DataType.BYTES || !singleValues[0]) {
+    if (dataType != DataType.BYTES) {
       if (singleValues[0]) {
         switch (valueTypes[0].getStoredType()) {
           case INT:
@@ -722,7 +723,8 @@ public class DistinctCountThetaSketchAggregationFunction
         }
       }
     } else {
-      // SV logical BYTES values contain serialized ThetaSketch objects.
+      // Logical BYTES values contain serialized ThetaSketch objects.
+      // They always use the single-value representation.
       ThetaSketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       for (int i = 0; i < length; i++) {
         List<ThetaSketchAccumulator> thetaSketchAccumulators =
@@ -752,7 +754,7 @@ public class DistinctCountThetaSketchAggregationFunction
 
     // Main expression is always index 0
     DataType dataType = valueTypes[0];
-    if (dataType != DataType.BYTES || !singleValues[0]) {
+    if (dataType != DataType.BYTES) {
       if (singleValues[0]) {
         switch (valueTypes[0].getStoredType()) {
           case INT:
@@ -1046,7 +1048,8 @@ public class DistinctCountThetaSketchAggregationFunction
         }
       }
     } else {
-      // SV logical BYTES values contain serialized ThetaSketch objects.
+      // Logical BYTES values contain serialized ThetaSketch objects.
+      // They always use the single-value representation.
       ThetaSketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       if (_includeDefaultSketch) {
         for (int i = 0; i < length; i++) {

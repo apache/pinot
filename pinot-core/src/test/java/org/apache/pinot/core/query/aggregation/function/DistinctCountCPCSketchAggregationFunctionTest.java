@@ -55,14 +55,6 @@ public class DistinctCountCPCSketchAggregationFunctionTest {
   private static final byte[] UUID_3 = UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440003");
   private static final byte[][] UUID_VALUES_SV = {UUID_0, UUID_1, UUID_0, UUID_2};
   private static final byte[][][] UUID_VALUES_MV = {{UUID_0, UUID_1}, {UUID_1, UUID_2}, {UUID_0}, {UUID_3}};
-  // These payloads are intentionally too short to be serialized CPC sketches. MV BYTES are raw values.
-  private static final byte[] RAW_BYTES_0 = {1};
-  private static final byte[] RAW_BYTES_1 = {2};
-  private static final byte[] RAW_BYTES_2 = {3};
-  private static final byte[] RAW_BYTES_3 = {4};
-  private static final byte[][][] RAW_BYTES_VALUES_MV = {
-      {RAW_BYTES_0, RAW_BYTES_1}, {RAW_BYTES_1, RAW_BYTES_2}, {RAW_BYTES_0}, {RAW_BYTES_3}
-  };
 
   @DataProvider(name = "uuidValueModes")
   public static Object[][] uuidValueModes() {
@@ -238,7 +230,7 @@ public class DistinctCountCPCSketchAggregationFunctionTest {
   }
 
   @Test
-  public void testAggregateSingleValueSerializedSketches() {
+  public void testLogicalBytesUsesSerializedSingleValueAccessorBeforeDispatch() {
     byte[][] serializedSketches = {
         serializedSketch("a", "b"),
         serializedSketch("b", "c"),
@@ -247,8 +239,6 @@ public class DistinctCountCPCSketchAggregationFunctionTest {
     };
     BlockValSet blockValSet = mock(BlockValSet.class);
     when(blockValSet.getValueType()).thenReturn(DataType.BYTES);
-    when(blockValSet.isSingleValue()).thenReturn(true);
-    when(blockValSet.isDictionaryEncoded()).thenReturn(false);
     when(blockValSet.getBytesValuesSV()).thenReturn(serializedSketches);
     DistinctCountCPCSketchAggregationFunction function =
         new DistinctCountCPCSketchAggregationFunction(List.of(BYTES_EXPRESSION));
@@ -270,59 +260,41 @@ public class DistinctCountCPCSketchAggregationFunctionTest {
     Assert.assertEquals(extractFinalResult(function, groupByMVResultHolder, 1), 3L);
     verify(blockValSet, atLeastOnce()).getBytesValuesSV();
     verify(blockValSet, never()).getBytesValuesMV();
+    verify(blockValSet, never()).isSingleValue();
   }
 
   @Test
-  public void testAggregateMultiValueRawBytes() {
-    BlockValSet blockValSet = mock(BlockValSet.class);
-    when(blockValSet.getValueType()).thenReturn(DataType.BYTES);
-    when(blockValSet.isSingleValue()).thenReturn(false);
-    when(blockValSet.isDictionaryEncoded()).thenReturn(false);
-    when(blockValSet.getBytesValuesMV()).thenReturn(RAW_BYTES_VALUES_MV);
-    DistinctCountCPCSketchAggregationFunction function =
-        new DistinctCountCPCSketchAggregationFunction(List.of(BYTES_EXPRESSION));
-
-    AggregationResultHolder aggregationResultHolder = function.createAggregationResultHolder();
-    function.aggregate(RAW_BYTES_VALUES_MV.length, aggregationResultHolder,
-        Map.of(BYTES_EXPRESSION, blockValSet));
-    Assert.assertEquals(extractFinalResult(function, aggregationResultHolder), 4L);
-
-    GroupByResultHolder groupBySVResultHolder = function.createGroupByResultHolder(2, 2);
-    function.aggregateGroupBySV(RAW_BYTES_VALUES_MV.length, new int[]{0, 0, 1, 1}, groupBySVResultHolder,
-        Map.of(BYTES_EXPRESSION, blockValSet));
-    Assert.assertEquals(extractFinalResult(function, groupBySVResultHolder, 0), 3L);
-    Assert.assertEquals(extractFinalResult(function, groupBySVResultHolder, 1), 2L);
-
-    GroupByResultHolder groupByMVResultHolder = function.createGroupByResultHolder(2, 2);
-    function.aggregateGroupByMV(RAW_BYTES_VALUES_MV.length, new int[][]{{0}, {1}, {0, 1}, {1}},
-        groupByMVResultHolder, Map.of(BYTES_EXPRESSION, blockValSet));
-    Assert.assertEquals(extractFinalResult(function, groupByMVResultHolder, 0), 2L);
-    Assert.assertEquals(extractFinalResult(function, groupByMVResultHolder, 1), 4L);
-    verify(blockValSet, atLeastOnce()).getBytesValuesMV();
-    verify(blockValSet, never()).getBytesValuesSV();
-  }
-
-  @Test
-  public void testAggregateDictionaryEncodedMultiValueRawBytes() {
+  public void testAggregateDictionaryEncodedMultiValueUuid() {
     Dictionary dictionary = mock(Dictionary.class);
-    when(dictionary.get(0)).thenReturn(RAW_BYTES_0);
-    when(dictionary.get(1)).thenReturn(RAW_BYTES_1);
-    when(dictionary.get(2)).thenReturn(RAW_BYTES_2);
-    when(dictionary.get(3)).thenReturn(RAW_BYTES_3);
+    when(dictionary.get(0)).thenReturn(UUID_0);
+    when(dictionary.get(1)).thenReturn(UUID_1);
+    when(dictionary.get(2)).thenReturn(UUID_2);
+    when(dictionary.get(3)).thenReturn(UUID_3);
 
     BlockValSet blockValSet = mock(BlockValSet.class);
-    when(blockValSet.getValueType()).thenReturn(DataType.BYTES);
+    when(blockValSet.getValueType()).thenReturn(DataType.UUID);
     when(blockValSet.isSingleValue()).thenReturn(false);
     when(blockValSet.isDictionaryEncoded()).thenReturn(true);
     when(blockValSet.getDictionary()).thenReturn(dictionary);
     when(blockValSet.getDictionaryIdsMV()).thenReturn(new int[][]{{0, 1}, {1, 2}, {0}, {3}});
     DistinctCountCPCSketchAggregationFunction function =
-        new DistinctCountCPCSketchAggregationFunction(List.of(BYTES_EXPRESSION));
+        new DistinctCountCPCSketchAggregationFunction(List.of(UUID_EXPRESSION));
 
-    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
-    function.aggregate(RAW_BYTES_VALUES_MV.length, resultHolder, Map.of(BYTES_EXPRESSION, blockValSet));
+    AggregationResultHolder aggregationResultHolder = function.createAggregationResultHolder();
+    function.aggregate(UUID_VALUES_MV.length, aggregationResultHolder, Map.of(UUID_EXPRESSION, blockValSet));
+    Assert.assertEquals(extractFinalResult(function, aggregationResultHolder), 4L);
 
-    Assert.assertEquals(extractFinalResult(function, resultHolder), 4L);
+    GroupByResultHolder groupBySVResultHolder = function.createGroupByResultHolder(2, 2);
+    function.aggregateGroupBySV(UUID_VALUES_MV.length, new int[]{0, 0, 1, 1}, groupBySVResultHolder,
+        Map.of(UUID_EXPRESSION, blockValSet));
+    Assert.assertEquals(extractFinalResult(function, groupBySVResultHolder, 0), 3L);
+    Assert.assertEquals(extractFinalResult(function, groupBySVResultHolder, 1), 2L);
+
+    GroupByResultHolder groupByMVResultHolder = function.createGroupByResultHolder(2, 2);
+    function.aggregateGroupByMV(UUID_VALUES_MV.length, new int[][]{{0}, {1}, {0, 1}, {1}},
+        groupByMVResultHolder, Map.of(UUID_EXPRESSION, blockValSet));
+    Assert.assertEquals(extractFinalResult(function, groupByMVResultHolder, 0), 2L);
+    Assert.assertEquals(extractFinalResult(function, groupByMVResultHolder, 1), 4L);
     verify(blockValSet, atLeastOnce()).getDictionaryIdsMV();
     verify(blockValSet, never()).getBytesValuesSV();
     verify(blockValSet, never()).getBytesValuesMV();

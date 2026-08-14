@@ -28,6 +28,7 @@ import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -39,7 +40,11 @@ import static org.mockito.Mockito.when;
 
 
 public class DistinctCountBitmapMVAggregationFunctionTest extends AbstractAggregationFunctionTest {
-  private static final ExpressionContext BYTES_EXPRESSION = ExpressionContext.forIdentifier("bytesCol");
+  private static final ExpressionContext UUID_EXPRESSION = ExpressionContext.forIdentifier("uuidCol");
+  private static final byte[] UUID_0 = UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440000");
+  private static final byte[] UUID_1 = UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440001");
+  private static final byte[] UUID_2 = UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440002");
+  private static final byte[] UUID_3 = UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440003");
 
   @Test
   public void testAggregationMV() {
@@ -109,34 +114,34 @@ public class DistinctCountBitmapMVAggregationFunctionTest extends AbstractAggreg
   }
 
   @Test
-  public void testMultiValueBytesUseMultiValueAccessor() {
-    byte[][][] bytesValues = {
-        {{1}, {2}},
-        {{2}, {3}},
-        {{1}},
-        {{4}}
+  public void testMultiValueUuidUsesMultiValueAccessor() {
+    byte[][][] uuidValues = {
+        {UUID_0, UUID_1},
+        {UUID_1, UUID_2},
+        {UUID_0},
+        {UUID_3}
     };
     BlockValSet blockValSet = mock(BlockValSet.class);
-    when(blockValSet.getValueType()).thenReturn(DataType.BYTES);
+    when(blockValSet.getValueType()).thenReturn(DataType.UUID);
     when(blockValSet.isSingleValue()).thenReturn(false);
     when(blockValSet.isDictionaryEncoded()).thenReturn(false);
-    when(blockValSet.getBytesValuesMV()).thenReturn(bytesValues);
+    when(blockValSet.getBytesValuesMV()).thenReturn(uuidValues);
     DistinctCountBitmapAggregationFunction function =
-        new DistinctCountBitmapAggregationFunction(List.of(BYTES_EXPRESSION));
+        new DistinctCountBitmapAggregationFunction(List.of(UUID_EXPRESSION));
 
     AggregationResultHolder aggregationResultHolder = function.createAggregationResultHolder();
-    function.aggregate(bytesValues.length, aggregationResultHolder, Map.of(BYTES_EXPRESSION, blockValSet));
+    function.aggregate(uuidValues.length, aggregationResultHolder, Map.of(UUID_EXPRESSION, blockValSet));
     Assert.assertEquals(extractFinalResult(function, aggregationResultHolder), 4);
 
     GroupByResultHolder groupBySVResultHolder = function.createGroupByResultHolder(2, 2);
-    function.aggregateGroupBySV(bytesValues.length, new int[]{0, 0, 1, 1}, groupBySVResultHolder,
-        Map.of(BYTES_EXPRESSION, blockValSet));
+    function.aggregateGroupBySV(uuidValues.length, new int[]{0, 0, 1, 1}, groupBySVResultHolder,
+        Map.of(UUID_EXPRESSION, blockValSet));
     Assert.assertEquals(extractFinalResult(function, groupBySVResultHolder, 0), 3);
     Assert.assertEquals(extractFinalResult(function, groupBySVResultHolder, 1), 2);
 
     GroupByResultHolder groupByMVResultHolder = function.createGroupByResultHolder(2, 2);
-    function.aggregateGroupByMV(bytesValues.length, new int[][]{{0}, {1}, {0, 1}, {1}},
-        groupByMVResultHolder, Map.of(BYTES_EXPRESSION, blockValSet));
+    function.aggregateGroupByMV(uuidValues.length, new int[][]{{0}, {1}, {0, 1}, {1}},
+        groupByMVResultHolder, Map.of(UUID_EXPRESSION, blockValSet));
     Assert.assertEquals(extractFinalResult(function, groupByMVResultHolder, 0), 2);
     Assert.assertEquals(extractFinalResult(function, groupByMVResultHolder, 1), 4);
 

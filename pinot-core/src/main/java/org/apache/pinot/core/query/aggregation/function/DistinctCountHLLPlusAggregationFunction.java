@@ -94,28 +94,37 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES values contain serialized HyperLogLogPlus objects.
+      // They always use the single-value representation.
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      for (int i = 0; i < length; i++) {
+        mergeSerializedHyperLogLogPlus(aggregationResultHolder, bytesValues[i]);
+      }
+      return;
+    }
+
     DataType storedType = dataType.getStoredType();
 
     if (blockValSet.isSingleValue()) {
-      aggregateSV(length, aggregationResultHolder, blockValSet, dataType, storedType);
+      aggregateSV(length, aggregationResultHolder, blockValSet, storedType);
     } else {
       aggregateMV(length, aggregationResultHolder, blockValSet, storedType);
     }
   }
 
   protected void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet,
-      DataType dataType, DataType storedType) {
+      DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
-    if (dictionary != null && dataType != DataType.BYTES) {
+    if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       getDictIdBitmap(aggregationResultHolder, dictionary).addN(dictIds, 0, length);
       return;
     }
 
     // For non-dictionary-encoded expression, store values into the HyperLogLogPlus
-    HyperLogLogPlus hyperLogLogPlus =
-        dataType == DataType.BYTES ? null : getHyperLogLogPlus(aggregationResultHolder);
+    HyperLogLogPlus hyperLogLogPlus = getHyperLogLogPlus(aggregationResultHolder);
     switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
@@ -149,15 +158,8 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        if (dataType == DataType.BYTES) {
-          // SV logical BYTES values contain serialized HyperLogLogPlus objects.
-          for (int i = 0; i < length; i++) {
-            mergeSerializedHyperLogLogPlus(aggregationResultHolder, bytesValues[i]);
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
-            hyperLogLogPlus.offer(bytesValues[i]);
-          }
+        for (int i = 0; i < length; i++) {
+          hyperLogLogPlus.offer(bytesValues[i]);
         }
         break;
       default:
@@ -242,20 +244,30 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES values contain serialized HyperLogLogPlus objects.
+      // They always use the single-value representation.
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      for (int i = 0; i < length; i++) {
+        mergeSerializedHyperLogLogPlus(groupByResultHolder, groupKeyArray[i], bytesValues[i]);
+      }
+      return;
+    }
+
     DataType storedType = dataType.getStoredType();
 
     if (blockValSet.isSingleValue()) {
-      aggregateSVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet, dataType, storedType);
+      aggregateSVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet, storedType);
     } else {
       aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet, storedType);
     }
   }
 
   protected void aggregateSVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet blockValSet, DataType dataType, DataType storedType) {
+      BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
-    if (dictionary != null && dataType != DataType.BYTES) {
+    if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
         getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
@@ -297,15 +309,8 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        if (dataType == DataType.BYTES) {
-          // SV logical BYTES values contain serialized HyperLogLogPlus objects.
-          for (int i = 0; i < length; i++) {
-            mergeSerializedHyperLogLogPlus(groupByResultHolder, groupKeyArray[i], bytesValues[i]);
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
-            getHyperLogLogPlus(groupByResultHolder, groupKeyArray[i]).offer(bytesValues[i]);
-          }
+        for (int i = 0; i < length; i++) {
+          getHyperLogLogPlus(groupByResultHolder, groupKeyArray[i]).offer(bytesValues[i]);
         }
         break;
       default:
@@ -394,20 +399,32 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES values contain serialized HyperLogLogPlus objects.
+      // They always use the single-value representation.
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      for (int i = 0; i < length; i++) {
+        for (int groupKey : groupKeysArray[i]) {
+          mergeSerializedHyperLogLogPlus(groupByResultHolder, groupKey, bytesValues[i]);
+        }
+      }
+      return;
+    }
+
     DataType storedType = dataType.getStoredType();
 
     if (blockValSet.isSingleValue()) {
-      aggregateSVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet, dataType, storedType);
+      aggregateSVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet, storedType);
     } else {
       aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet, storedType);
     }
   }
 
   protected void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet blockValSet, DataType dataType, DataType storedType) {
+      BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
-    if (dictionary != null && dataType != DataType.BYTES) {
+    if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
         setDictIdForGroupKeys(groupByResultHolder, groupKeysArray[i], dictionary, dictIds[i]);
@@ -449,17 +466,8 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        if (dataType == DataType.BYTES) {
-          // SV logical BYTES values contain serialized HyperLogLogPlus objects.
-          for (int i = 0; i < length; i++) {
-            for (int groupKey : groupKeysArray[i]) {
-              mergeSerializedHyperLogLogPlus(groupByResultHolder, groupKey, bytesValues[i]);
-            }
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
-            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], bytesValues[i]);
-          }
+        for (int i = 0; i < length; i++) {
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], bytesValues[i]);
         }
         break;
       default:

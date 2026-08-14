@@ -140,41 +140,6 @@ public class DistinctCountThetaSketchAggregationFunctionTest {
   }
 
   @Test
-  public void testAggregateMultiValueBytesAsRawValues() {
-    // These one-byte values are not serialized sketches, so the test also verifies that MV BYTES are not deserialized.
-    byte[][][] bytesValues = {
-        {{1}, {2}},
-        {{2}, {3}},
-        {{1}},
-        {{4}}
-    };
-    BlockValSet blockValSet = mock(BlockValSet.class);
-    when(blockValSet.getValueType()).thenReturn(DataType.BYTES);
-    when(blockValSet.isSingleValue()).thenReturn(false);
-    when(blockValSet.getBytesValuesMV()).thenReturn(bytesValues);
-    DistinctCountThetaSketchAggregationFunction function =
-        new DistinctCountThetaSketchAggregationFunction(List.of(BYTES_EXPRESSION));
-
-    AggregationResultHolder aggregationResultHolder = function.createAggregationResultHolder();
-    function.aggregate(bytesValues.length, aggregationResultHolder, Map.of(BYTES_EXPRESSION, blockValSet));
-    Assert.assertEquals(extractFinalResult(function, aggregationResultHolder), 4L);
-
-    GroupByResultHolder groupBySVResultHolder = function.createGroupByResultHolder(2, 2);
-    function.aggregateGroupBySV(bytesValues.length, new int[]{0, 0, 1, 1}, groupBySVResultHolder,
-        Map.of(BYTES_EXPRESSION, blockValSet));
-    Assert.assertEquals(extractFinalResult(function, groupBySVResultHolder, 0), 3L);
-    Assert.assertEquals(extractFinalResult(function, groupBySVResultHolder, 1), 2L);
-
-    GroupByResultHolder groupByMVResultHolder = function.createGroupByResultHolder(2, 2);
-    function.aggregateGroupByMV(bytesValues.length, new int[][]{{0}, {1}, {0, 1}, {1}}, groupByMVResultHolder,
-        Map.of(BYTES_EXPRESSION, blockValSet));
-    Assert.assertEquals(extractFinalResult(function, groupByMVResultHolder, 0), 2L);
-    Assert.assertEquals(extractFinalResult(function, groupByMVResultHolder, 1), 4L);
-    verify(blockValSet, atLeastOnce()).getBytesValuesMV();
-    verify(blockValSet, never()).getBytesValuesSV();
-  }
-
-  @Test
   public void testAggregateSingleValueSerializedSketches() {
     byte[][] serializedSketches = {
         serializedSketch("a", "b"),

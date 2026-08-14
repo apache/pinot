@@ -29,6 +29,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.anyInt;
@@ -45,7 +46,7 @@ import static org.testng.Assert.assertTrue;
 /// result resolver used by the non-scan based and partial metadata based aggregation paths.
 @SuppressWarnings("rawtypes")
 public class AggregationFunctionUtilsTest {
-  private static final ExpressionContext BYTES_EXPRESSION = ExpressionContext.forIdentifier("bytesCol");
+  private static final ExpressionContext INPUT_EXPRESSION = ExpressionContext.forIdentifier("inputCol");
 
   private static AggregationFunction mockFunction(AggregationFunctionType type) {
     AggregationFunction aggregationFunction = mock(AggregationFunction.class);
@@ -96,17 +97,21 @@ public class AggregationFunctionUtilsTest {
   }
 
   @Test
-  public void testDistinctCountHllMvOffersDictionaryBytesAsRawValues()
+  public void testDistinctCountHllMvOffersUuidDictionaryBytesAsRawValues()
       throws IOException {
     DistinctCountHLLMVAggregationFunction function =
-        new DistinctCountHLLMVAggregationFunction(List.of(BYTES_EXPRESSION));
-    byte[][] bytesValues = {{1}, {2}, {3}};
+        new DistinctCountHLLMVAggregationFunction(List.of(INPUT_EXPRESSION));
+    byte[][] bytesValues = {
+        UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440000"),
+        UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440001"),
+        UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440002")
+    };
     Dictionary dictionary = mock(Dictionary.class);
     when(dictionary.length()).thenReturn(bytesValues.length);
     for (int i = 0; i < bytesValues.length; i++) {
       when(dictionary.get(i)).thenReturn(bytesValues[i]);
     }
-    DataSource dataSource = mockBytesDataSource(dictionary, false);
+    DataSource dataSource = mockDataSource(dictionary, DataType.UUID, false);
 
     HyperLogLog result = (HyperLogLog) AggregationFunctionUtils.getAggregationResult(function, dataSource, 3, "TEST");
 
@@ -123,17 +128,18 @@ public class AggregationFunctionUtilsTest {
   }
 
   @Test
-  public void testDistinctCountHllMergesSingleValueSerializedBytes()
+  public void testDistinctCountHllMergesLogicalBytesAsSerializedState()
       throws IOException {
     DistinctCountHLLAggregationFunction function =
-        new DistinctCountHLLAggregationFunction(List.of(BYTES_EXPRESSION));
+        new DistinctCountHLLAggregationFunction(List.of(INPUT_EXPRESSION));
     byte[] firstSketch = serializedHll(function, "a", "b");
     byte[] secondSketch = serializedHll(function, "b", "c");
     Dictionary dictionary = mock(Dictionary.class);
     when(dictionary.length()).thenReturn(2);
     when(dictionary.getBytesValue(0)).thenReturn(firstSketch);
     when(dictionary.getBytesValue(1)).thenReturn(secondSketch);
-    DataSource dataSource = mockBytesDataSource(dictionary, true);
+    // Logical BYTES determines serialized-state handling independently of the cardinality metadata.
+    DataSource dataSource = mockDataSource(dictionary, DataType.BYTES, false);
 
     HyperLogLog result = (HyperLogLog) AggregationFunctionUtils.getAggregationResult(function, dataSource, 2, "TEST");
 
@@ -148,9 +154,9 @@ public class AggregationFunctionUtilsTest {
     verify(dictionary, never()).get(anyInt());
   }
 
-  private static DataSource mockBytesDataSource(Dictionary dictionary, boolean singleValue) {
+  private static DataSource mockDataSource(Dictionary dictionary, DataType dataType, boolean singleValue) {
     DataSourceMetadata metadata = mock(DataSourceMetadata.class);
-    when(metadata.getDataType()).thenReturn(DataType.BYTES);
+    when(metadata.getDataType()).thenReturn(dataType);
     when(metadata.isSingleValue()).thenReturn(singleValue);
     DataSource dataSource = mock(DataSource.class);
     when(dataSource.getDictionary()).thenReturn(dictionary);

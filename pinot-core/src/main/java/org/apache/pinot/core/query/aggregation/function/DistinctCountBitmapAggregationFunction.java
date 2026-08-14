@@ -73,20 +73,31 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES values contain serialized RoaringBitmap objects.
+      // They always use the single-value representation.
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      RoaringBitmap valueBitmap = getValueBitmap(aggregationResultHolder);
+      for (int i = 0; i < length; i++) {
+        valueBitmap.or(RoaringBitmapUtils.deserialize(bytesValues[i]));
+      }
+      return;
+    }
+
     DataType storedType = dataType.getStoredType();
 
     if (blockValSet.isSingleValue()) {
-      aggregateSV(length, aggregationResultHolder, blockValSet, dataType, storedType);
+      aggregateSV(length, aggregationResultHolder, blockValSet, storedType);
     } else {
       aggregateMV(length, aggregationResultHolder, blockValSet, storedType);
     }
   }
 
   protected void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet,
-      DataType dataType, DataType storedType) {
+      DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
-    if (dictionary != null && dataType != DataType.BYTES) {
+    if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       getDictIdBitmap(aggregationResultHolder, dictionary).addN(dictIds, 0, length);
       return;
@@ -125,15 +136,8 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        if (dataType == DataType.BYTES) {
-          // SV logical BYTES values contain serialized RoaringBitmap objects.
-          for (int i = 0; i < length; i++) {
-            valueBitmap.or(RoaringBitmapUtils.deserialize(bytesValues[i]));
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
-            valueBitmap.add(Arrays.hashCode(bytesValues[i]));
-          }
+        for (int i = 0; i < length; i++) {
+          valueBitmap.add(Arrays.hashCode(bytesValues[i]));
         }
         break;
       default:
@@ -216,20 +220,30 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES values contain serialized RoaringBitmap objects.
+      // They always use the single-value representation.
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      for (int i = 0; i < length; i++) {
+        getValueBitmap(groupByResultHolder, groupKeyArray[i]).or(RoaringBitmapUtils.deserialize(bytesValues[i]));
+      }
+      return;
+    }
+
     DataType storedType = dataType.getStoredType();
 
     if (blockValSet.isSingleValue()) {
-      aggregateSVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet, dataType, storedType);
+      aggregateSVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet, storedType);
     } else {
       aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet, storedType);
     }
   }
 
   protected void aggregateSVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet blockValSet, DataType dataType, DataType storedType) {
+      BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
-    if (dictionary != null && dataType != DataType.BYTES) {
+    if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
         getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
@@ -271,16 +285,8 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        if (dataType == DataType.BYTES) {
-          // SV logical BYTES values contain serialized RoaringBitmap objects.
-          for (int i = 0; i < length; i++) {
-            getValueBitmap(groupByResultHolder, groupKeyArray[i])
-                .or(RoaringBitmapUtils.deserialize(bytesValues[i]));
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
-            getValueBitmap(groupByResultHolder, groupKeyArray[i]).add(Arrays.hashCode(bytesValues[i]));
-          }
+        for (int i = 0; i < length; i++) {
+          getValueBitmap(groupByResultHolder, groupKeyArray[i]).add(Arrays.hashCode(bytesValues[i]));
         }
         break;
       default:
@@ -366,20 +372,33 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES values contain serialized RoaringBitmap objects.
+      // They always use the single-value representation.
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      for (int i = 0; i < length; i++) {
+        RoaringBitmap value = RoaringBitmapUtils.deserialize(bytesValues[i]);
+        for (int groupKey : groupKeysArray[i]) {
+          getValueBitmap(groupByResultHolder, groupKey).or(value);
+        }
+      }
+      return;
+    }
+
     DataType storedType = dataType.getStoredType();
 
     if (blockValSet.isSingleValue()) {
-      aggregateSVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet, dataType, storedType);
+      aggregateSVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet, storedType);
     } else {
       aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet, storedType);
     }
   }
 
   protected void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet blockValSet, DataType dataType, DataType storedType) {
+      BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
-    if (dictionary != null && dataType != DataType.BYTES) {
+    if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
         setDictIdForGroupKeys(groupByResultHolder, groupKeysArray[i], dictionary, dictIds[i]);
@@ -421,18 +440,8 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        if (dataType == DataType.BYTES) {
-          // SV logical BYTES values contain serialized RoaringBitmap objects.
-          for (int i = 0; i < length; i++) {
-            RoaringBitmap value = RoaringBitmapUtils.deserialize(bytesValues[i]);
-            for (int groupKey : groupKeysArray[i]) {
-              getValueBitmap(groupByResultHolder, groupKey).or(value);
-            }
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
-            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], Arrays.hashCode(bytesValues[i]));
-          }
+        for (int i = 0; i < length; i++) {
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], Arrays.hashCode(bytesValues[i]));
         }
         break;
       default:

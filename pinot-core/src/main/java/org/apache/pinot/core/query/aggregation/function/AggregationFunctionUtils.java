@@ -69,6 +69,7 @@ import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -802,9 +803,9 @@ public class AggregationFunctionUtils {
   private static HyperLogLog getDistinctCountHLLResult(DataSource dataSource,
       DistinctCountHLLAggregationFunction function, String explainPlanName) {
     Dictionary dictionary = Objects.requireNonNull(dataSource.getDictionary());
-    if (dataSource.getDataSourceMetadata().getDataType() == FieldSpec.DataType.BYTES
-        && dataSource.getDataSourceMetadata().isSingleValue()) {
-      // SV logical BYTES dictionary values contain serialized HyperLogLog objects.
+    DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
+    if (metadata.getDataType() == FieldSpec.DataType.BYTES) {
+      // Logical BYTES dictionary values contain serialized HyperLogLog objects.
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
         HyperLogLog hll = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(0));
@@ -825,9 +826,9 @@ public class AggregationFunctionUtils {
   private static HyperLogLogPlus getDistinctCountHLLPlusResult(DataSource dataSource,
       DistinctCountHLLPlusAggregationFunction function, String explainPlanName) {
     Dictionary dictionary = Objects.requireNonNull(dataSource.getDictionary());
-    if (dataSource.getDataSourceMetadata().getDataType() == FieldSpec.DataType.BYTES
-        && dataSource.getDataSourceMetadata().isSingleValue()) {
-      // SV logical BYTES dictionary values contain serialized HyperLogLogPlus objects.
+    DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
+    if (metadata.getDataType() == FieldSpec.DataType.BYTES) {
+      // Logical BYTES dictionary values contain serialized HyperLogLogPlus objects.
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
         HyperLogLogPlus hllplus = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(dictionary.getBytesValue(0));
@@ -868,9 +869,9 @@ public class AggregationFunctionUtils {
   private static UltraLogLog getDistinctCountULLResult(DataSource dataSource,
       DistinctCountULLAggregationFunction function, String explainPlanName) {
     Dictionary dictionary = Objects.requireNonNull(dataSource.getDictionary());
-    if (dataSource.getDataSourceMetadata().getDataType() == FieldSpec.DataType.BYTES
-        && dataSource.getDataSourceMetadata().isSingleValue()) {
-      // SV logical BYTES dictionary values contain serialized UltraLogLog objects.
+    DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
+    if (metadata.getDataType() == FieldSpec.DataType.BYTES) {
+      // Logical BYTES dictionary values contain serialized UltraLogLog objects.
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
         UltraLogLog ull = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(dictionary.getBytesValue(0));
