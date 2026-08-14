@@ -189,7 +189,7 @@ public class DistinctCountThetaSketchAggregationFunction
     boolean[] singleValues = new boolean[numExpressions];
     DataType[] valueTypes = new DataType[numExpressions];
     Object[] valueArrays = new Object[numExpressions];
-    extractValues(length, blockValSetMap, singleValues, valueTypes, valueArrays);
+    extractValues(blockValSetMap, singleValues, valueTypes, valueArrays);
     int numFilters = _filterEvaluators.size();
 
     // Main expression is always index 0. A UUID column reports BYTES here because that is its stored type, but
@@ -482,7 +482,7 @@ public class DistinctCountThetaSketchAggregationFunction
     boolean[] singleValues = new boolean[numExpressions];
     DataType[] valueTypes = new DataType[numExpressions];
     Object[] valueArrays = new Object[numExpressions];
-    extractValues(length, blockValSetMap, singleValues, valueTypes, valueArrays);
+    extractValues(blockValSetMap, singleValues, valueTypes, valueArrays);
     int numFilters = _filterEvaluators.size();
 
     // Main expression is always index 0. A UUID column reports BYTES here because that is its stored type, but
@@ -746,7 +746,7 @@ public class DistinctCountThetaSketchAggregationFunction
     boolean[] singleValues = new boolean[numExpressions];
     DataType[] valueTypes = new DataType[numExpressions];
     Object[] valueArrays = new Object[numExpressions];
-    extractValues(length, blockValSetMap, singleValues, valueTypes, valueArrays);
+    extractValues(blockValSetMap, singleValues, valueTypes, valueArrays);
     int numFilters = _filterEvaluators.size();
 
     // Main expression is always index 0. A UUID column reports BYTES here because that is its stored type, but
@@ -1360,7 +1360,7 @@ public class DistinctCountThetaSketchAggregationFunction
   }
 
   /// Extracts values from the BlockValSet map.
-  private void extractValues(int length, Map<ExpressionContext, BlockValSet> blockValSetMap, boolean[] singleValues,
+  private void extractValues(Map<ExpressionContext, BlockValSet> blockValSetMap, boolean[] singleValues,
       DataType[] valueTypes, Object[] valueArrays) {
     int numExpressions = _inputExpressions.size();
     for (int i = 0; i < numExpressions; i++) {
