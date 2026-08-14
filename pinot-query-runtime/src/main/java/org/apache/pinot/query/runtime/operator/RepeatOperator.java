@@ -107,6 +107,11 @@ public class RepeatOperator extends MultiStageOperator {
     return Type.REPEAT;
   }
 
+  /// Returns the expanded schema consumed by the downstream aggregate operator.
+  public DataSchema getResultSchema() {
+    return _resultSchema;
+  }
+
   @Override
   protected Logger logger() {
     return LOGGER;

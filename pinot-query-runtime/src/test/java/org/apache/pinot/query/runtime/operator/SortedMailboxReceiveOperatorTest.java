@@ -127,6 +127,18 @@ public class SortedMailboxReceiveOperatorTest {
   }
 
   @Test
+  public void shouldNameUnsupportedNonVariantCollationType() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    DataSchema objectSchema =
+        new DataSchema(new String[]{"payload"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.OBJECT});
+
+    IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
+        () -> getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON, objectSchema, FIELD_COLLATIONS,
+            Long.MAX_VALUE));
+    assertTrue(exception.getMessage().contains("ORDER BY does not support OBJECT values"));
+  }
+
+  @Test
   public void shouldTimeout() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     try (SortedMailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON,

@@ -2049,7 +2049,9 @@ public final class TableConfigUtils {
   /// `timestampIndexColumns` holds the TIMESTAMP-index derived columns (e.g. `$ts$DAY`) declared via
   /// [TimestampConfig#getGranularities()]. These are materialized as dictionary-encoded single-value TIMESTAMP
   /// columns at segment generation time (see [TimestampIndexUtils#applyTimestampIndex(TableConfig, Schema)]), so
-  /// they are absent from the schema at config-validation time and are accepted here without a schema lookup.
+  /// they can be absent from the schema at config-validation time and are accepted without a schema lookup. When a
+  /// declared derived name is already present in the schema, it is validated normally so a user column with a
+  /// colliding name cannot bypass type, encoding, or cardinality checks.
   private static void validateStarTreeIndexConfigs(List<StarTreeIndexConfig> starTreeIndexConfigs,
       Map<String, FieldIndexConfigs> indexConfigsMap, Schema schema, Set<String> timestampIndexColumns) {
     Set<String> dimensionColumns = new HashSet<>();
@@ -2058,7 +2060,7 @@ public final class TableConfigUtils {
       List<String> dimensionsSplitOrder = starTreeIndexConfig.getDimensionsSplitOrder();
       assert CollectionUtils.isNotEmpty(dimensionsSplitOrder);
       for (String dimension : dimensionsSplitOrder) {
-        if (timestampIndexColumns.contains(dimension)) {
+        if (timestampIndexColumns.contains(dimension) && schema.getFieldSpecFor(dimension) == null) {
           dimensionColumns.add(dimension);
           continue;
         }
@@ -2148,7 +2150,7 @@ public final class TableConfigUtils {
       }
 
       for (String column : Iterables.concat(dimensionColumns, aggregatedColumns)) {
-        if (timestampIndexColumns.contains(column)) {
+        if (timestampIndexColumns.contains(column) && schema.getFieldSpecFor(column) == null) {
           continue;
         }
         FieldSpec fieldSpec = schema.getFieldSpecFor(column);
@@ -2161,7 +2163,7 @@ public final class TableConfigUtils {
       }
 
       for (String column : dimensionColumns) {
-        if (timestampIndexColumns.contains(column)) {
+        if (timestampIndexColumns.contains(column) && schema.getFieldSpecFor(column) == null) {
           continue;
         }
         FieldSpec fieldSpec = schema.getFieldSpecFor(column);
