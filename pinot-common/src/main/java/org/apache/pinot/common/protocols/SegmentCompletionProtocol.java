@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -172,6 +173,7 @@ public class SegmentCompletionProtocol {
       return this == ROW_LIMIT || this == END_OF_PARTITION_GROUP;
     }
 
+    @Nullable
     public static ReasonCode fromCode(String reasonCode) {
       if (reasonCode == null) {
         return null;
@@ -184,6 +186,7 @@ public class SegmentCompletionProtocol {
       return null;
     }
 
+    @Nullable
     public static ReasonCode fromReason(String reason) {
       if (reason == null) {
         return null;
@@ -402,6 +405,7 @@ public class SegmentCompletionProtocol {
         return _reason;
       }
 
+      @Nullable
       public ReasonCode getReasonCode() {
         return _reasonCode;
       }
