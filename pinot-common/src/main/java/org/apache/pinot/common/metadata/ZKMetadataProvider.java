@@ -987,19 +987,39 @@ public class ZKMetadataProvider {
     if (isTableDeletionMarkerValid(markerRecord)) {
       return false;
     }
-    // The marker is stale. Overwrite it in place with a version checked write instead of remove-then-create:
-    // a remove-then-create would let two controllers both observe the same stale marker, and the second one's
-    // remove would then delete the first one's freshly created marker, leaving both of them believing they hold
-    // the lock. It would also briefly leave no marker at all, during which addTable() would wrongly allow a
-    // re-create. Helix throws ZkBadVersionException when the version no longer matches, so exactly one of the
-    // racing controllers wins the takeover.
+    // The marker is stale, so reclaim it. Pass the version we just observed so the write is rejected if another
+    // controller reclaimed it first.
+    return takeoverStaleTableDeletionMarker(propertyStore, tableNameWithType, controllerId, stat.getVersion());
+  }
+
+  /// Replaces a stale deletion marker in place, but only while it still has `expectedVersion`.
+  ///
+  /// The version check is what makes the takeover safe. A remove-then-create would let two controllers both
+  /// observe the same stale marker, and the second one's remove would then delete the first one's freshly created
+  /// marker, leaving both believing they hold the lock. It would also briefly leave no marker at all, during which
+  /// addTable() would wrongly allow the table to be re-created mid-deletion.
+  ///
+  /// Exposed for testing so a caller can supply a deliberately stale version; production callers should use
+  /// [#createOrTakeoverTableDeletionMarker].
+  ///
+  /// @return true only if this caller won the takeover
+  @VisibleForTesting
+  static boolean takeoverStaleTableDeletionMarker(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableNameWithType, String controllerId, int expectedVersion) {
+    String markerPath = constructPropertyStorePathForTableDeletionMarker(tableNameWithType);
     try {
+      // On a version mismatch ZkHelixPropertyStore returns false rather than throwing, so the false branch below
+      // is the path a losing controller actually takes. ZkBadVersionException is still caught because
+      // setSegmentZKMetadata above documents Helix throwing it for the same accessor type; treat both as a loss
+      // rather than assume only one can happen.
       boolean tookOver = propertyStore.set(markerPath,
-          buildTableDeletionMarkerRecord(tableNameWithType, controllerId), stat.getVersion(),
+          buildTableDeletionMarkerRecord(tableNameWithType, controllerId), expectedVersion,
           AccessOption.PERSISTENT);
       if (tookOver) {
         LOGGER.info("Took over stale deletion marker for table: {} on behalf of controller: {}", tableNameWithType,
             controllerId);
+      } else {
+        LOGGER.info("Lost the race to take over the stale deletion marker for table: {}", tableNameWithType);
       }
       return tookOver;
     } catch (ZkBadVersionException e) {

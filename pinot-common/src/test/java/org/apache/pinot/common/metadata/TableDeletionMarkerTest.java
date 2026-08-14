@@ -32,6 +32,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.zookeeper.data.Stat;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
@@ -248,6 +249,49 @@ public class TableDeletionMarkerTest {
         "Takeover must record the new owning controller");
     assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TABLE_NAME),
         "The refreshed marker should be valid again");
+  }
+
+  /// The version check is what makes the stale-marker takeover safe, so exercise it directly: a controller that
+  /// observed the marker at one version must lose the takeover if anyone else has written to it since.
+  ///
+  /// This is the deterministic form of the two-controller race. The real interleaving (both controllers reading
+  /// the same stale version, then both writing) cannot be forced from a test, so instead the stale version is
+  /// supplied explicitly, which is exactly the state the losing controller would be in.
+  @Test
+  public void testTakeoverWithAStaleVersionLosesTheRace() {
+    writeMarkerWithAge(TABLE_NAME, "Controller_crashed", EXPIRY_MS + 60_000L);
+    Stat observed = new Stat();
+    assertNotNull(_propertyStore.get(markerPath(TABLE_NAME), observed, AccessOption.PERSISTENT));
+    int staleVersion = observed.getVersion();
+
+    // Controller 1 reclaims it first, which bumps the version.
+    assertTrue(ZKMetadataProvider.createOrTakeoverTableDeletionMarker(_propertyStore, TABLE_NAME, CONTROLLER_1));
+
+    // Controller 2 is still holding the version it read before controller 1 won, and must be rejected.
+    assertFalse(
+        ZKMetadataProvider.takeoverStaleTableDeletionMarker(_propertyStore, TABLE_NAME, CONTROLLER_2, staleVersion),
+        "A takeover based on a superseded version must fail, otherwise two controllers would both delete the table");
+
+    ZNRecord record = _propertyStore.get(markerPath(TABLE_NAME), null, AccessOption.PERSISTENT);
+    assertNotNull(record, "The winner's marker must survive a losing takeover attempt");
+    assertEquals(record.getSimpleField(CONTROLLER_ID_KEY), CONTROLLER_1,
+        "The losing controller must not overwrite the winner's ownership");
+    assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TABLE_NAME));
+  }
+
+  /// The matching success case: a takeover with the current version wins and reassigns ownership.
+  @Test
+  public void testTakeoverWithTheCurrentVersionWins() {
+    writeMarkerWithAge(TABLE_NAME, "Controller_crashed", EXPIRY_MS + 60_000L);
+    Stat observed = new Stat();
+    assertNotNull(_propertyStore.get(markerPath(TABLE_NAME), observed, AccessOption.PERSISTENT));
+
+    assertTrue(ZKMetadataProvider.takeoverStaleTableDeletionMarker(_propertyStore, TABLE_NAME, CONTROLLER_2,
+        observed.getVersion()));
+
+    ZNRecord record = _propertyStore.get(markerPath(TABLE_NAME), null, AccessOption.PERSISTENT);
+    assertNotNull(record);
+    assertEquals(record.getSimpleField(CONTROLLER_ID_KEY), CONTROLLER_2);
   }
 
   /// Two controllers must never both hold the marker for one table. Uses two independent property stores because
