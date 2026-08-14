@@ -927,6 +927,8 @@ public class IndexSizeStatsTest {
   /// `snapshotIndexTypeIds` itself is probing -- the empty-snapshot state its javadoc treats the same as a probe
   /// failure, skipping the refresh entirely rather than clearing every persisted size.
   private static final class EmptyProbeSegmentDirectory extends SegmentLocalFSDirectory {
+    private int _emptyResponseCount;
+
     EmptyProbeSegmentDirectory(File indexDir)
         throws Exception {
       super(indexDir, ReadMode.mmap);
@@ -935,9 +937,14 @@ public class IndexSizeStatsTest {
     @Override
     public Set<String> getColumnsWithIndex(IndexType<?, ?, ?> type) {
       if (calledFromSnapshotIndexTypeIds()) {
+        _emptyResponseCount++;
         return Set.of();
       }
       return super.getColumnsWithIndex(type);
+    }
+
+    private int getEmptyResponseCount() {
+      return _emptyResponseCount;
     }
   }
 
@@ -967,12 +974,16 @@ public class IndexSizeStatsTest {
     }
   }
 
-  private static void runPreProcessorWithEmptyProbe(File segmentDir, TableConfig tableConfig, Schema schema)
+  /// Runs the preprocessor with the post-reload probe rigged to report no indexes anywhere, returning how many
+  /// times that empty response actually fired -- so callers can assert it fired at all, not just that the run
+  /// completed.
+  private static int runPreProcessorWithEmptyProbe(File segmentDir, TableConfig tableConfig, Schema schema)
       throws Exception {
-    try (SegmentDirectory segmentDirectory = new EmptyProbeSegmentDirectory(segmentDir);
+    try (EmptyProbeSegmentDirectory segmentDirectory = new EmptyProbeSegmentDirectory(segmentDir);
         SegmentPreProcessor processor =
             new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(tableConfig, schema))) {
       processor.process();
+      return segmentDirectory.getEmptyResponseCount();
     }
   }
 
@@ -1065,7 +1076,9 @@ public class IndexSizeStatsTest {
 
     // Drop the inverted index on this reload, but force the post-reload snapshot to see no indexes anywhere: the
     // drop must not be observed, so every persisted size must survive exactly as if no refresh had run at all.
-    runPreProcessorWithEmptyProbe(segmentDir, tableConfig(true, List.of()), schema);
+    int emptyResponseCount = runPreProcessorWithEmptyProbe(segmentDir, tableConfig(true, List.of()), schema);
+    assertTrue(emptyResponseCount > 0,
+        "Sanity: the simulated empty probe response must actually have fired, or this test would pass vacuously");
 
     PropertiesConfiguration after = loadMetadata(segmentDir);
     assertEquals(new HashMap<>(indexSizeKeys(after).stream()
