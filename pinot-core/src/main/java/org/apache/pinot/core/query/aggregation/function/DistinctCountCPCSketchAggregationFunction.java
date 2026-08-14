@@ -138,22 +138,8 @@ public class DistinctCountCPCSketchAggregationFunction
     FieldSpec.DataType dataType = blockValSet.getValueType();
     FieldSpec.DataType storedType = dataType.getStoredType();
 
-    // UUID values are logical scalars (stored as 16-byte BYTES) — not serialized CPC Sketch state. Update
-    // the sketch with the canonical UUID string so DISTINCTCOUNTCPC(uuidCol) matches
-    // DISTINCTCOUNTCPC(CAST(uuidCol AS STRING)).
-    if (dataType == DataType.UUID) {
-      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
-      // Leave the updated CpcSketch in the holder; extractAggregationResult converts it to an accumulator.
-      // Calling getAccumulator here would read the holder slot already occupied by the sketch and fail.
-      CpcSketch cpcSketch = getCpcSketch(aggregationResultHolder);
-      for (int i = 0; i < length; i++) {
-        cpcSketch.update(uuidBytesValues[i]);
-      }
-      return;
-    }
-
     // Treat BYTES value as serialized CPC Sketch
-    if (storedType == DataType.BYTES) {
+    if (storedType == DataType.BYTES && dataType != DataType.UUID) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         CpcSketchAccumulator cpcSketchAccumulator = getAccumulator(aggregationResultHolder);
@@ -210,6 +196,13 @@ public class DistinctCountCPCSketchAggregationFunction
           cpcSketch.update(stringValues[i]);
         }
         break;
+      // Reached only by UUID: a real BYTES column is a serialized CPC sketch and is handled above.
+      case BYTES:
+        byte[][] uuidValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          cpcSketch.update(uuidValues[i]);
+        }
+        break;
       default:
         throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_CPC aggregation function: " + storedType);
     }
@@ -225,15 +218,6 @@ public class DistinctCountCPCSketchAggregationFunction
 
     DataType dataType = blockValSet.getValueType();
     DataType storedType = dataType.getStoredType();
-
-    // UUID columns: update with canonical UUID strings converted from raw bytes (see aggregate() for rationale).
-    if (dataType == DataType.UUID) {
-      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        getCpcSketch(groupByResultHolder, groupKeyArray[i]).update(uuidBytesValues[i]);
-      }
-      return;
-    }
 
     // Treat BYTES value as serialized CPC Sketch
     if (storedType == FieldSpec.DataType.BYTES) {
@@ -293,6 +277,13 @@ public class DistinctCountCPCSketchAggregationFunction
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
           getCpcSketch(groupByResultHolder, groupKeyArray[i]).update(stringValues[i]);
+        }
+        break;
+      // Reached only by UUID: a real BYTES column is a serialized CPC sketch and is handled above.
+      case BYTES:
+        byte[][] uuidValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          getCpcSketch(groupByResultHolder, groupKeyArray[i]).update(uuidValues[i]);
         }
         break;
       default:
@@ -387,6 +378,15 @@ public class DistinctCountCPCSketchAggregationFunction
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
             getCpcSketch(groupByResultHolder, groupKey).update(stringValues[i]);
+          }
+        }
+        break;
+      // Reached only by UUID: a real BYTES column is a serialized CPC sketch and is handled above.
+      case BYTES:
+        byte[][] uuidValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            getCpcSketch(groupByResultHolder, groupKey).update(uuidValues[i]);
           }
         }
         break;
