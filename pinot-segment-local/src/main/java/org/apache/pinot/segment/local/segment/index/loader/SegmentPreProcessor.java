@@ -22,14 +22,18 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.segment.index.IndexSizeUtils;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGenerator;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.segment.index.loader.defaultcolumn.DefaultColumnHandler;
@@ -56,7 +60,6 @@ import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,6 +114,11 @@ public class SegmentPreProcessor implements AutoCloseable {
 
     // This fixes the issue of temporary files not getting deleted after creating new inverted indexes.
     removeInvertedIndexTempFiles(indexDir);
+
+    boolean indexSizeStatsEnabled = _tableConfig.getIndexingConfig().isIndexSizeStatsEnabled();
+    // Starts equal to indexSizeStatsEnabled; only set to false below if the post-reload snapshot fails, to skip the
+    // refresh for this reload without altering what indexSizeStatsEnabled itself reports.
+    boolean shouldRefreshIndexSizeStats = indexSizeStatsEnabled;
 
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
       // Backward-compat shim: invalidate any legacy raw-value embedded-dictionary inverted indexes left over from
@@ -180,6 +188,7 @@ public class SegmentPreProcessor implements AutoCloseable {
 
     // Startree creation will load the segment again, so we need to close and re-open the segment writer to make sure
     // that the other required indices (e.g. forward index) are up-to-date.
+    IndexPresenceSnapshot indexPresenceSnapshot = null;
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
       if (processStarTrees(indexDir, segmentOperationsThrottlerSet)) {
         _segmentDirectory.reloadMetadata();
@@ -190,114 +199,241 @@ public class SegmentPreProcessor implements AutoCloseable {
         _segmentDirectory.reloadMetadata();
         segmentWriter.save();
       }
+
+      // Snapshot which (column, indexType) pairs exist right now, straight from this still-open writer -- not from
+      // a later independent metadata read -- so refreshPersistedIndexSizes() reconciles against the exact on-disk
+      // layout this reload just produced. See its javadoc for why a live snapshot matters here.
+      if (indexSizeStatsEnabled) {
+        try {
+          List<IndexType<?, ?, ?>> allIndexTypes = IndexService.getInstance().getAllIndexes();
+          indexPresenceSnapshot = snapshotIndexTypeIds(segmentWriter,
+              _segmentDirectory.getSegmentMetadata().getColumnMetadataMap().keySet(), allIndexTypes);
+          if (indexPresenceSnapshot.getColumnToIndexTypeIds().isEmpty()) {
+            // A non-empty segment always has a forward index or dictionary on every column, so an empty snapshot
+            // means the backing SegmentDirectory answered "no indexes anywhere" rather than reporting a genuine
+            // state -- e.g. SegmentLocalFSDirectory#getColumnsWithIndex returns Set.of() for every type while its
+            // column-index directory is not loaded. Treat it the same as a snapshot failure: skip the refresh
+            // rather than let a spurious empty answer clear every persisted size below.
+            LOGGER.warn("Post-reload index snapshot for segment: {} was unexpectedly empty; skipping index size "
+                + "stats refresh for this reload", segmentName);
+            shouldRefreshIndexSizeStats = false;
+          }
+        } catch (Exception e) {
+          // Advisory stats must never fail a segment load: skip the size refresh for this reload entirely rather
+          // than let the whole process() call fail. Per-index-type probe failures are handled inside
+          // snapshotIndexTypeIds() itself and do not reach this catch; this remains as a backstop for anything
+          // else unexpected (e.g. IndexService.getAllIndexes() itself misbehaving).
+          LOGGER.warn("Failed to snapshot post-reload index sizes for segment: {}; skipping index size stats "
+              + "refresh for this reload", segmentName, e);
+          shouldRefreshIndexSizeStats = false;
+        }
+      }
     }
 
     // Every index handler has finished, so the on-disk layout is final: refresh the persisted per-index sizes.
-    refreshPersistedIndexSizes(indexDir);
+    // This is opportunistic only: it rides along with whatever reload just ran for some other reason, and never
+    // itself decides that a reload is needed. See needProcess() javadoc for why index size stats are excluded from
+    // that decision entirely.
+    if (shouldRefreshIndexSizeStats) {
+      refreshPersistedIndexSizes(indexDir, indexPresenceSnapshot);
+    }
   }
 
-  /// Rewrites the `column.<column>.indexSizeInBytes.<indexTypeId>` entries in `metadata.properties` to match the
-  /// layout the handlers have just produced, and clears entries for indexes that no longer exist.
+  /// Result of [#snapshotIndexTypeIds]: for every column with at least one index, the set of [IndexType#getId]
+  /// values present on it right now, plus the set of index type ids that were actually, successfully probed while
+  /// building that map. The two are not redundant: a probe failure for one index type (see
+  /// [#snapshotIndexTypeIds]'s javadoc) makes that type's presence unknown for this reload, not absent, so
+  /// [#refreshPersistedIndexSizes] must be able to tell "probed and confirmed absent" apart from "never probed."
+  private static final class IndexPresenceSnapshot {
+    private final Map<String, Set<String>> _columnToIndexTypeIds;
+    private final Set<String> _probedIndexTypeIds;
+
+    private IndexPresenceSnapshot(Map<String, Set<String>> columnToIndexTypeIds, Set<String> probedIndexTypeIds) {
+      _columnToIndexTypeIds = columnToIndexTypeIds;
+      _probedIndexTypeIds = probedIndexTypeIds;
+    }
+
+    private Map<String, Set<String>> getColumnToIndexTypeIds() {
+      return _columnToIndexTypeIds;
+    }
+
+    private Set<String> getPresentIndexTypeIds(String column) {
+      return _columnToIndexTypeIds.getOrDefault(column, Set.of());
+    }
+
+    private boolean wasProbed(String indexTypeId) {
+      return _probedIndexTypeIds.contains(indexTypeId);
+    }
+  }
+
+  /// Returns, for every column in `columnsToInclude` that currently has at least one index, the set of
+  /// [IndexType#getId] values present on it right now. Always read from a live [SegmentDirectory.Reader] (a
+  /// [SegmentDirectory.Writer] qualifies too), never from an independent `SegmentMetadataImpl` re-read of
+  /// `metadata.properties` or `v3/index_map` -- see [#refreshPersistedIndexSizes] for why that distinction matters.
+  ///
+  /// Loops index types in the outer loop and calls `SegmentDirectory#getColumnsWithIndex` per type rather than
+  /// looping columns and calling `hasIndexFor` per (column, indexType) pair, but this does not make the call cheap:
+  /// depending on the backing store, `getColumnsWithIndex` itself may scan every column for every call
+  /// (`FilePerIndexDirectory`) or every entry for every call (`SingleFileIndexDirectory`), so total cost still scales
+  /// with `allIndexTypes.size()` times the backing store's per-call cost, not with the number of present indexes.
+  ///
+  /// A per-index-type probe failure (e.g. `FilePerIndexDirectory#getColumnsWithIndex` throwing because a registered
+  /// [IndexType#getFileExtensions] returns an empty list) is caught here and only drops that one index type from the
+  /// snapshot; it does not fail the whole call. This matters because that failure mode recurs on every future reload
+  /// for the same segment and index type, so treating it as "snapshot failed, skip the whole refresh" would
+  /// permanently stop refreshing every other index type on this segment too, not just this one.
+  private static IndexPresenceSnapshot snapshotIndexTypeIds(SegmentDirectory.Reader reader,
+      Set<String> columnsToInclude, List<IndexType<?, ?, ?>> allIndexTypes) {
+    Map<String, Set<String>> columnToIndexTypeIds = new HashMap<>();
+    Set<String> probedIndexTypeIds = new HashSet<>();
+    SegmentDirectory segmentDirectory = reader.toSegmentDirectory();
+    for (IndexType<?, ?, ?> indexType : allIndexTypes) {
+      Set<String> columnsWithIndex;
+      try {
+        columnsWithIndex = segmentDirectory.getColumnsWithIndex(indexType);
+      } catch (Exception e) {
+        LOGGER.warn("Failed to probe index type: {} while snapshotting post-reload index presence; treating its "
+            + "presence as unknown for this reload rather than absent", indexType.getId(), e);
+        continue;
+      }
+      probedIndexTypeIds.add(indexType.getId());
+      for (String column : columnsWithIndex) {
+        if (columnsToInclude.contains(column)) {
+          columnToIndexTypeIds.computeIfAbsent(column, c -> new HashSet<>()).add(indexType.getId());
+        }
+      }
+    }
+    return new IndexPresenceSnapshot(columnToIndexTypeIds, probedIndexTypeIds);
+  }
+
+  /// Updates the `column.<column>.indexSizeInBytes.<indexTypeId>` entries in `metadata.properties` to match
+  /// `indexTypeIdsAfterReload`, the live post-reload index presence for every column, and leaves every other entry
+  /// untouched.
   ///
   /// Without this the values would stay a build-time snapshot: reload can add, drop or re-compress an index, and a
   /// stale size is indistinguishable from a current one. This is the only hook, deliberately: index sizes span every
   /// index type, so updating them per handler -- as `compressionStatsEnabled` does in `ForwardIndexHandler`, where a
   /// single index is involved -- would require every future handler to remember to participate.
   ///
-  /// The current sizes come from different places by format, because a V3 segment has no per-index files left to
-  /// measure: the converter packs them into `columns.psf` and deletes the originals.
-  /// - **V3**: [ColumnMetadata#getIndexSize] positions, which `SegmentMetadataImpl` has already populated from
-  ///   `v3/index_map`. Used only as the input for this write; readers still consult `metadata.properties` alone, so
-  ///   there remains a single source of truth on the read path.
-  /// - **V1/V2**: the individual index files, measured the same way segment creation does.
+  /// For every column and every currently-registered [IndexType]:
+  /// - Present (per `indexTypeIdsAfterReload`): (re)sized the same way segment creation would size it -- from the
+  ///   packed [ColumnMetadata#getIndexSize] position if there is one, else from the index's own file/directory --
+  ///   which is reliable here specifically because this reload just wrote the current layout, locally, moments ago.
+  ///   The size is only written if it differs from what is already persisted, so a reload that left an index
+  ///   untouched writes nothing. Refreshing every present index rather than only newly-added ones is deliberate: a
+  ///   handler can remove and recreate an index of the same type within one reload -- e.g.
+  ///   `LegacyRawValueInvertedIndexCleanup` dropping a legacy-format inverted index for `InvertedIndexHandler` to
+  ///   rebuild, or `ForwardIndexHandler` changing a raw column's compression codec -- which leaves presence
+  ///   unchanged across the reload while the actual size changes. Presence alone cannot see that; comparing the
+  ///   freshly computed size against the persisted one can.
+  /// - Absent (per `indexPresenceSnapshot`) among the index types that were actually, successfully probed while
+  ///   building that snapshot: its persisted key, if any, is cleared. This intentionally does not require having
+  ///   observed the index as present on some earlier reload: a successfully probed index type reports every column
+  ///   with at least one index, live, right now, so that index type being absent from a column's present set is
+  ///   confirmed absent for that column, not merely unobserved. Clearing unconditionally on that basis is what
+  ///   reconciles a phantom size left behind by, for example, a reload that dropped an index while
+  ///   `indexSizeStatsEnabled` was off (which skips this method entirely) followed by a later reload with the flag
+  ///   back on. An index type that failed to probe (see [#snapshotIndexTypeIds]) is excluded from this clearing:
+  ///   its absence from a column's present set means "unknown," not "confirmed absent," so its persisted entry, if
+  ///   any, is left alone -- the same "leave unchanged" treatment as an unmeasurable present index below. This also
+  ///   covers an index type this node has no plugin for at all: such an id can never appear as probed, since probing
+  ///   only iterates locally-registered [IndexType]s, so a size persisted by a node or version with a plugin this
+  ///   node lacks survives reload here rather than being wiped by a node that cannot even see it exists.
+  /// No tier logic anywhere here: the same rule applies to every segment format and every storage tier.
   ///
-  /// No-op unless `indexSizeStatsEnabled` is set. Failures are logged and swallowed: these statistics are advisory and
-  /// must never fail a segment load.
-  private void refreshPersistedIndexSizes(File indexDir) {
-    if (!_tableConfig.getIndexingConfig().isIndexSizeStatsEnabled()) {
-      return;
-    }
+  /// Only called by [#process] when `indexSizeStatsEnabled` is set, so this method does not re-check it. Failures
+  /// are logged and swallowed: these statistics are advisory and must never fail a segment load, and -- because
+  /// nothing outside this method ever asks "are the persisted sizes still accurate," see [#needProcess] -- must
+  /// never force one either. Refreshing only happens as a side effect of a reload that some other check already
+  /// decided was needed.
+  ///
+  /// Runs after `process()`'s own [SegmentDirectory.Writer] has already closed, and reads `indexDir` directly off
+  /// disk rather than through the writer, so it relies on the same invariant every other unguarded step of
+  /// `process()` does: the caller holds the per-segment lock (see `BaseTableDataManager`'s segment locks) for the
+  /// duration of this call, so nothing else concurrently mutates this segment directory.
+  private void refreshPersistedIndexSizes(File indexDir, IndexPresenceSnapshot indexPresenceSnapshot) {
     try {
-      // Read the metadata fresh off disk rather than using _segmentDirectory.getSegmentMetadata(). That returns a
-      // cached instance describing the layout as it was before the handlers ran, so a removed index would still be
-      // listed and its size re-recorded -- exactly the phantom entry this refresh exists to prevent. Calling
-      // reloadMetadata() is not an option here either: it also touches _columnIndexDirectory, which is null once the
-      // reader and writer scopes above have closed.
+      // Read the metadata fresh off disk rather than using _segmentDirectory.getSegmentMetadata(): that returns a
+      // cached instance describing the layout as it was before the handlers ran. Only used below to size present
+      // indexes, never to decide what is present -- that comes from indexPresenceSnapshot.
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
       if (segmentMetadata.getTotalDocs() == 0) {
         return;
       }
       IndexService indexService = IndexService.getInstance();
       PropertiesConfiguration properties = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
-      String infix = "." + V1Constants.MetadataKeys.Column.INDEX_SIZE_IN_BYTES + ".";
-
-      // Drop every existing entry first so an index removed at reload does not leave a phantom size behind.
-      for (String key : CommonsConfigurationUtils.getKeys(properties)) {
-        if (key.contains(infix)) {
-          properties.clearProperty(key);
-        }
-      }
-
       File segmentContentDir = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
-      List<IndexType<?, ?, ?>> allIndexTypes = indexService.getAllIndexes();
-      for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
-        String column = entry.getKey();
-        ColumnMetadata columnMetadata = entry.getValue();
+      Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
 
-        // 1. Indexes packed into columns.psf. Their individual files were deleted by the converter, so index_map --
-        //    already parsed into these positions by SegmentMetadataImpl -- is the only description of them.
-        for (int i = 0, numIndexes = columnMetadata.getNumIndexes(); i < numIndexes; i++) {
-          long size = columnMetadata.getIndexSize(i);
-          if (size < 0) {
-            continue;
+      boolean propertiesChanged = false;
+      for (Map.Entry<String, ColumnMetadata> columnEntry : columnMetadataMap.entrySet()) {
+        String column = columnEntry.getKey();
+        ColumnMetadata columnMetadata = columnEntry.getValue();
+        Set<String> presentIndexTypeIds = indexPresenceSnapshot.getPresentIndexTypeIds(column);
+
+        // Clear the persisted size for every previously-persisted index type confirmed absent on this column --
+        // successfully probed but not present -- regardless of whether this particular reload is the one that
+        // removed it; see the javadoc above for why this is safe and why it is also what reconciles a
+        // flag-off/flag-on toggle. An index type that was never successfully probed (unregistered on this node, or a
+        // probe failure) is left untouched instead: see the javadoc above. Walking only the keys already on disk,
+        // rather than every registered index type, keeps this proportional to what is actually persisted.
+        for (String indexTypeId : columnMetadata.getPersistedIndexSizesInBytes().keySet()) {
+          if (indexPresenceSnapshot.wasProbed(indexTypeId) && !presentIndexTypeIds.contains(indexTypeId)) {
+            properties.clearProperty(V1Constants.MetadataKeys.Column.getIndexSizeKeyFor(column, indexTypeId));
+            propertiesChanged = true;
           }
-          String indexTypeId;
-          try {
-            indexTypeId = indexService.get(columnMetadata.getIndexType(i)).getId();
-          } catch (Exception e) {
-            // An index type this node does not have registered; nothing useful to record for it.
-            continue;
-          }
-          properties.setProperty(V1Constants.MetadataKeys.Column.getIndexSizeKeyFor(column, indexTypeId),
-              String.valueOf(size));
         }
 
-        // 2. Anything still present as its own file or directory. This covers two cases index_map cannot describe:
-        //    external text and vector directories, which are copied alongside columns.psf and never packed into it,
-        //    and every index of a V1/V2 segment, which has no index map at all. Without this the refresh would clear
-        //    those keys and never restore them, deleting sizes rather than refreshing them.
-        for (IndexType<?, ?, ?> indexType : allIndexTypes) {
-          String indexTypeId = indexType.getId();
-          String key = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor(column, indexTypeId);
-          if (properties.containsKey(key)) {
-            // Already described by the packed entry above, which reflects the live layout.
-            continue;
-          }
-          long size = 0;
-          boolean found = false;
-          for (String extension : indexType.getFileExtensions(null)) {
-            File indexFile = new File(segmentContentDir, column + extension);
-            if (!indexFile.exists()) {
+        for (String indexTypeId : presentIndexTypeIds) {
+          // Scoped per (column, index type): a misbehaving index type must only drop its own entry, not the rest
+          // of this column or segment's refresh.
+          try {
+            // presentIndexTypeIds only ever contains ids produced by iterating IndexService.getAllIndexes() (see
+            // snapshotIndexTypeIds), so this lookup is expected to always succeed; kept defensive rather than
+            // orElseThrow() so a future change to that invariant degrades to skipping this one entry, inside this
+            // method's per-(column, index type) failure scope, rather than aborting the whole refresh.
+            IndexType<?, ?, ?> indexType = indexService.getOptional(indexTypeId).orElse(null);
+            if (indexType == null) {
               continue;
             }
-            if (indexFile.isDirectory()) {
-              try {
-                size += org.apache.commons.io.FileUtils.sizeOfDirectory(indexFile);
-                found = true;
-              } catch (Exception e) {
-                LOGGER.debug("Could not size index directory: {}", indexFile, e);
+            String key = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor(column, indexTypeId);
+            long size = columnMetadata.getIndexSizeFor(indexType);
+            if (size == ColumnMetadata.UNAVAILABLE) {
+              size = IndexSizeUtils.sizeOfFileOrDirIndex(indexType, segmentContentDir, column, 0, columnMetadata);
+              if (size == ColumnMetadata.UNAVAILABLE) {
+                // Present per the live post-reload snapshot but currently unmeasurable (e.g. a sizing failure):
+                // leave whatever is already persisted untouched rather than discarding a previously-good value, or
+                // pinning this column on "missing" forever if one was never successfully measured.
+                LOGGER.warn("Could not determine size of index {} on column {} in segment {}; leaving persisted "
+                    + "value, if any, unchanged", indexTypeId, column, segmentMetadata.getName());
+                continue;
               }
-            } else {
-              size += indexFile.length();
-              found = true;
             }
-          }
-          if (found) {
-            properties.setProperty(key, String.valueOf(size));
+            // Only write when the freshly computed size actually differs from what's persisted, so a reload that
+            // left this index alone does not dirty metadata.properties for no reason. A malformed persisted value
+            // (e.g. hand-edited metadata.properties) is treated as "differs" so it gets corrected rather than
+            // aborting the refresh for every other column and index type in this segment.
+            long persistedSize;
+            try {
+              persistedSize = properties.getLong(key, -1L);
+            } catch (Exception e) {
+              LOGGER.debug("Malformed persisted index size for key: {} in segment: {}; overwriting", key,
+                  segmentMetadata.getName(), e);
+              persistedSize = -1L;
+            }
+            if (persistedSize != size) {
+              properties.setProperty(key, String.valueOf(size));
+              propertiesChanged = true;
+            }
+          } catch (Exception e) {
+            LOGGER.warn("Failed to refresh persisted index size for column {}, index type {} in segment {}", column,
+                indexTypeId, segmentMetadata.getName(), e);
           }
         }
       }
-      SegmentMetadataUtils.savePropertiesConfiguration(properties, indexDir);
+      if (propertiesChanged) {
+        SegmentMetadataUtils.savePropertiesConfiguration(properties, indexDir);
+      }
     } catch (Exception e) {
       LOGGER.warn("Failed to refresh persisted index sizes for segment: {}", _segmentDirectory.getSegmentMetadata()
           .getName(), e);
@@ -353,6 +489,14 @@ public class SegmentPreProcessor implements AutoCloseable {
             segmentName);
         return true;
       }
+
+      // Deliberately no check for missing index size stats here: refreshPersistedIndexSizes() backfills them
+      // opportunistically whenever a reload runs for one of the reasons above, but a missing or stale size must
+      // never, on its own, be a reason to trigger one. needProcess() == true drives a full segment-directory copy
+      // and reprocess (see BaseTableDataManager), so treating "just turned indexSizeStatsEnabled on" as a reload
+      // reason would force that cost across every segment in the table for an advisory statistic; worse, a present
+      // index that is persistently unmeasurable (e.g. a directory FileUtils.sizeOfDirectory cannot read) would
+      // never satisfy the check, so every future load of that segment would copy and reprocess it again forever.
     }
     return false;
   }

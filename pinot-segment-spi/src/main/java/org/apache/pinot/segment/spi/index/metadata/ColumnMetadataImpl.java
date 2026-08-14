@@ -473,9 +473,10 @@ public class ColumnMetadataImpl implements ColumnMetadata {
             Column.getKeyFor(column, Column.FORWARD_INDEX_DICTIONARY_ENCODED_UNCOMPRESSED_VALUE_SIZE_IN_BYTES),
             UNAVAILABLE));
 
-    // Read the per-index on-disk sizes persisted at seal time, keyed by index type id. Kept separate from the packed
-    // sizes that [SegmentMetadataImpl] loads from `v3/index_map`: those describe the live layout, these are a
-    // build-time snapshot that is readable without the segment payload.
+    // Read the per-index on-disk sizes persisted at seal time and refreshed opportunistically on reload, keyed by
+    // index type id -- see ColumnMetadata#getPersistedIndexSizesInBytes for the exact staleness semantics. Kept
+    // separate from the packed sizes that [SegmentMetadataImpl] loads from `v3/index_map`: those describe the live
+    // layout and require the segment payload; these are readable from `metadata.properties` alone.
     builder.setPersistedIndexSizesInBytes(readPersistedIndexSizes(config, column));
 
     return builder.build();

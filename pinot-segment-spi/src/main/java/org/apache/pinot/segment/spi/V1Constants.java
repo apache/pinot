@@ -235,19 +235,24 @@ public class V1Constants {
           "forwardIndex.dictionaryEncodedUncompressedValueSizeInBytes";
 
       // Optional. NOTE: Added in release 1.6.0. Only exists in segments created after the 1.6.0 release.
-      /// Key fragment for the per-index-type on-disk size entries written at seal time when `indexSizeStatsEnabled`
-      /// is on. Full key shape is `column.<column>.indexSizeInBytes.<indexTypeId>`; build it with
-      /// [#getIndexSizeKeyFor].
+      /// Key fragment for the per-index-type on-disk size entries written at seal time, and kept up to date on
+      /// reload, when `indexSizeStatsEnabled` is on. Full key shape is
+      /// `column.<column>.indexSizeInBytes.<indexTypeId>`; build it with [#getIndexSizeKeyFor].
       ///
       /// Recorded for every segment version, covering the per-column index files plus text and vector indexes held in
       /// their own directories. Any version other than `v1` is packed into `columns.psf`, so for those the value
       /// includes the magic marker prefixed to each packed entry and therefore matches the corresponding
       /// `v3/index_map` entry. Externally stored index directories are copied rather than packed and carry no marker.
       ///
-      /// Star-tree and multi-column text indexes are not covered, and segments built before this flag existed carry
-      /// no entries at all. A missing entry means "not measured" and must not be read as zero bytes. A present value
-      /// is a creation-time snapshot: reload-time index handlers can add, drop or rewrite indexes without updating
-      /// these keys, so readers should prefer `v3/index_map` when it is available.
+      /// Star-tree and multi-column text indexes are not covered. Segments built before this flag existed carry no
+      /// entries. A segment reloaded while the flag is off, or where an index could not be measured (e.g. a
+      /// transient filesystem error), can carry a stale entry for whatever changed in that window: entries are only
+      /// ever refreshed, never proactively cleared for that reason, so an existing value is left as-is rather than
+      /// removed. Disabling the flag does not clean up entries a prior reload already wrote. A missing entry means
+      /// "not measured" and must not be read as zero bytes. This is the only source that can describe a V1/V2 index
+      /// or an externally stored text/vector directory, neither of which `v3/index_map` ever covers -- prefer this
+      /// over `v3/index_map` for exactly those cases, not as a general replacement, since `v3/index_map` remains the
+      /// authoritative, always-current source for a V3-packed index.
       public static final String INDEX_SIZE_IN_BYTES = "indexSizeInBytes";
 
       public static String getKeyFor(String column, String key) {

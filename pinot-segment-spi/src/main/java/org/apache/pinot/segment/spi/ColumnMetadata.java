@@ -78,15 +78,18 @@ public interface ColumnMetadata extends ColumnShape {
   }
 
   /// On-disk size in bytes of each index of this column, keyed by [IndexType#getId()], as recorded in
-  /// `metadata.properties` when the table had `indexSizeStatsEnabled` set at segment build time.
+  /// `metadata.properties`. Populated at segment creation when `indexSizeStatsEnabled` is on, and kept up to date
+  /// opportunistically thereafter: whenever a reload runs for any reason, `SegmentPreProcessor` refreshes the
+  /// entries for the index types present afterward as a side effect, once that reload's index handlers have
+  /// finished. Turning the flag on does not by itself force a reload of existing segments.
   ///
-  /// Empty when the flag was off, on segments built before it existed, and for indexes built after the sizes are
-  /// taken (star-tree, multi-column text) -- these are not per-column, so the reload refresh described below has
-  /// no per-column entry to rewrite for them either. Otherwise kept current: `SegmentPreProcessor` rewrites these
-  /// entries once every reload's index handlers have finished, so a value here does not go stale the way a
-  /// build-time-only snapshot would. Distinct from [#getIndexSizeFor] because this one is read straight from
-  /// `metadata.properties` without needing the segment loaded or `v3/index_map` parsed, which is what lets
-  /// cold-tier segments be reported.
+  /// Empty when the flag was off at both creation and every reload since, on segments built before it existed, and
+  /// for indexes built after the sizes are taken (star-tree, multi-column text) -- these are not per-column, so the
+  /// reload refresh has no per-column entry to rewrite for them either. Otherwise, an entry can still be stale: a
+  /// reload while the flag was off, or one where an index was present but could not be measured (e.g. a transient
+  /// filesystem error), leaves an existing value as-is rather than clearing it, so a present value can lag what is
+  /// actually on disk. Distinct from [#getIndexSizeFor] because this one is read straight from `metadata.properties`
+  /// without needing the segment loaded or `v3/index_map` parsed, which is what lets cold-tier segments be reported.
   ///
   /// Not serialized: [SegmentMetadataImpl#toJson] writes every `ColumnMetadata` through a mapper with no
   /// non-empty inclusion rule, so without this the field would appear on every column of every segment even with
