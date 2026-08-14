@@ -194,6 +194,7 @@ public class DistinctCountCPCSketchAggregationFunction
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         if (dataType == DataType.BYTES) {
+          // SV logical BYTES values contain serialized CpcSketch objects.
           mergeSerializedSketches(aggregationResultHolder, bytesValues, length);
         } else {
           CpcSketch cpcSketch = getCpcSketch(aggregationResultHolder);
@@ -342,6 +343,7 @@ public class DistinctCountCPCSketchAggregationFunction
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         if (dataType == DataType.BYTES) {
+          // SV logical BYTES values contain serialized CpcSketch objects.
           CpcSketch[] sketches = deserializeSketches(bytesValues, length);
           for (int i = 0; i < length; i++) {
             CpcSketch sketch = sketches[i];
@@ -504,6 +506,7 @@ public class DistinctCountCPCSketchAggregationFunction
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         if (dataType == DataType.BYTES) {
+          // SV logical BYTES values contain serialized CpcSketch objects.
           CpcSketch[] sketches = deserializeSketches(bytesValues, length);
           for (int i = 0; i < length; i++) {
             CpcSketch sketch = sketches[i];

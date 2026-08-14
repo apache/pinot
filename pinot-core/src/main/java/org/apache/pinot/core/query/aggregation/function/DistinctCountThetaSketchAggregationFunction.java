@@ -454,6 +454,7 @@ public class DistinctCountThetaSketchAggregationFunction
         }
       }
     } else {
+      // SV logical BYTES values contain serialized ThetaSketch objects.
       List<ThetaSketchAccumulator> thetaSketchAccumulators = getUnions(aggregationResultHolder);
       ThetaSketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       if (_includeDefaultSketch) {
@@ -721,6 +722,7 @@ public class DistinctCountThetaSketchAggregationFunction
         }
       }
     } else {
+      // SV logical BYTES values contain serialized ThetaSketch objects.
       ThetaSketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       for (int i = 0; i < length; i++) {
         List<ThetaSketchAccumulator> thetaSketchAccumulators =
@@ -1044,6 +1046,7 @@ public class DistinctCountThetaSketchAggregationFunction
         }
       }
     } else {
+      // SV logical BYTES values contain serialized ThetaSketch objects.
       ThetaSketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       if (_includeDefaultSketch) {
         for (int i = 0; i < length; i++) {

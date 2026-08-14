@@ -126,6 +126,7 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         if (dataType == DataType.BYTES) {
+          // SV logical BYTES values contain serialized RoaringBitmap objects.
           for (int i = 0; i < length; i++) {
             valueBitmap.or(RoaringBitmapUtils.deserialize(bytesValues[i]));
           }
@@ -271,6 +272,7 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         if (dataType == DataType.BYTES) {
+          // SV logical BYTES values contain serialized RoaringBitmap objects.
           for (int i = 0; i < length; i++) {
             getValueBitmap(groupByResultHolder, groupKeyArray[i])
                 .or(RoaringBitmapUtils.deserialize(bytesValues[i]));
@@ -420,6 +422,7 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         if (dataType == DataType.BYTES) {
+          // SV logical BYTES values contain serialized RoaringBitmap objects.
           for (int i = 0; i < length; i++) {
             RoaringBitmap value = RoaringBitmapUtils.deserialize(bytesValues[i]);
             for (int groupKey : groupKeysArray[i]) {

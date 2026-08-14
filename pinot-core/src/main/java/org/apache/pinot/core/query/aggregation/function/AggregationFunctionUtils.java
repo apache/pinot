@@ -804,7 +804,7 @@ public class AggregationFunctionUtils {
     Dictionary dictionary = Objects.requireNonNull(dataSource.getDictionary());
     if (dataSource.getDataSourceMetadata().getDataType() == FieldSpec.DataType.BYTES
         && dataSource.getDataSourceMetadata().isSingleValue()) {
-      // Treat BYTES value as serialized HyperLogLog
+      // SV logical BYTES dictionary values contain serialized HyperLogLog objects.
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
         HyperLogLog hll = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(0));
@@ -827,7 +827,7 @@ public class AggregationFunctionUtils {
     Dictionary dictionary = Objects.requireNonNull(dataSource.getDictionary());
     if (dataSource.getDataSourceMetadata().getDataType() == FieldSpec.DataType.BYTES
         && dataSource.getDataSourceMetadata().isSingleValue()) {
-      // Treat BYTES value as serialized HyperLogLogPlus
+      // SV logical BYTES dictionary values contain serialized HyperLogLogPlus objects.
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
         HyperLogLogPlus hllplus = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(dictionary.getBytesValue(0));
@@ -870,7 +870,7 @@ public class AggregationFunctionUtils {
     Dictionary dictionary = Objects.requireNonNull(dataSource.getDictionary());
     if (dataSource.getDataSourceMetadata().getDataType() == FieldSpec.DataType.BYTES
         && dataSource.getDataSourceMetadata().isSingleValue()) {
-      // Treat BYTES value as serialized UltraLogLog and merge
+      // SV logical BYTES dictionary values contain serialized UltraLogLog objects.
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
         UltraLogLog ull = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(dictionary.getBytesValue(0));

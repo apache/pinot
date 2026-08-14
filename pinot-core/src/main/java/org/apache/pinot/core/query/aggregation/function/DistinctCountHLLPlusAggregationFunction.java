@@ -150,6 +150,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         if (dataType == DataType.BYTES) {
+          // SV logical BYTES values contain serialized HyperLogLogPlus objects.
           for (int i = 0; i < length; i++) {
             mergeSerializedHyperLogLogPlus(aggregationResultHolder, bytesValues[i]);
           }
@@ -297,6 +298,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         if (dataType == DataType.BYTES) {
+          // SV logical BYTES values contain serialized HyperLogLogPlus objects.
           for (int i = 0; i < length; i++) {
             mergeSerializedHyperLogLogPlus(groupByResultHolder, groupKeyArray[i], bytesValues[i]);
           }
@@ -448,6 +450,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         if (dataType == DataType.BYTES) {
+          // SV logical BYTES values contain serialized HyperLogLogPlus objects.
           for (int i = 0; i < length; i++) {
             for (int groupKey : groupKeysArray[i]) {
               mergeSerializedHyperLogLogPlus(groupByResultHolder, groupKey, bytesValues[i]);

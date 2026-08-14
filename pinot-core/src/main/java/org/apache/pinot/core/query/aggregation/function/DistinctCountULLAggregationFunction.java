@@ -129,6 +129,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         if (dataType == DataType.BYTES) {
+          // SV logical BYTES values contain serialized UltraLogLog objects.
           try {
             UltraLogLog serializedUll = aggregationResultHolder.getResult();
             if (serializedUll == null) {
@@ -213,6 +214,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         if (dataType == DataType.BYTES) {
+          // SV logical BYTES values contain serialized UltraLogLog objects.
           try {
             for (int i = 0; i < length; i++) {
               UltraLogLog value = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[i]);
@@ -293,6 +295,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         if (dataType == DataType.BYTES) {
+          // SV logical BYTES values contain serialized UltraLogLog objects.
           try {
             for (int i = 0; i < length; i++) {
               UltraLogLog value = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[i]);
