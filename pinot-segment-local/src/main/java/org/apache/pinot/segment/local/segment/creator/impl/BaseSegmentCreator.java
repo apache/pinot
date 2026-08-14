@@ -44,6 +44,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
+import org.apache.pinot.segment.local.segment.index.IndexSizeUtils;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
@@ -52,6 +53,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.MultiColumnTextIndexHandler;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.utils.CrcUtils;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
@@ -921,30 +923,11 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       for (IndexType<?, ?, ?> indexType : allIndexTypes) {
         // Scoped per (column, index type) so a plugin index type that throws only drops its own entry.
         try {
-          long size = 0;
-          boolean anyFile = false;
-          boolean anyDirectory = false;
-          for (String extension : indexType.getFileExtensions(null)) {
-            File indexFile = new File(_indexDir, column + extension);
-            if (!indexFile.exists()) {
-              continue;
-            }
-            if (indexFile.isDirectory()) {
-              // Text and vector indexes built with `storeInSegmentFile=false` live in their own directory, which the
-              // converter copies alongside `columns.psf` rather than packing into it, so no marker applies.
-              long directorySize = sizeOfDirectoryQuietly(indexFile);
-              if (directorySize < 0) {
-                continue;
-              }
-              anyDirectory = true;
-              size += directorySize;
-            } else {
-              anyFile = true;
-              size += indexFile.length();
-            }
-          }
-          if (anyFile || anyDirectory) {
-            columnSizes.put(indexType.getId(), size + (anyFile ? packedIndexOverhead : 0));
+          // No ColumnMetadata exists yet at creation time (that is built from the segment just being written), so
+          // the index type resolves its file extensions without the narrowing it would apply once one is available.
+          long size = IndexSizeUtils.sizeOfFileOrDirIndex(indexType, _indexDir, column, packedIndexOverhead, null);
+          if (size != ColumnMetadata.UNAVAILABLE) {
+            columnSizes.put(indexType.getId(), size);
           }
         } catch (Exception e) {
           LOGGER.warn("Failed to measure index size for column: {}, index type: {} in segment: {}", column,
@@ -956,19 +939,6 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       }
     }
     return indexSizes;
-  }
-
-  /// Recursive size of `directory`, or `-1` if it could not be measured. Callers must skip the entry on `-1` rather
-  /// than record `0`, which a consumer would read as "this index costs nothing".
-  private long sizeOfDirectoryQuietly(File directory) {
-    try {
-      // Fully qualified: `org.apache.pinot.common.utils.FileUtils` is already imported here, and checkstyle
-      // forbids static imports (AvoidStaticImport).
-      return org.apache.commons.io.FileUtils.sizeOfDirectory(directory);
-    } catch (Exception e) {
-      LOGGER.warn("Failed to size index directory: {} for segment: {}", directory, _segmentName, e);
-      return -1;
-    }
   }
 
   /// Closes the index creators. Safe to call twice: [#flushColIndexes()] closes them as soon as the index files are
