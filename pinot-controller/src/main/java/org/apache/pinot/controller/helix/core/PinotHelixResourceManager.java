@@ -1948,13 +1948,15 @@ public class PinotHelixResourceManager {
     // This prevents recreation of a table while deletion is still in progress, which would
     // otherwise lead to a corrupted state where the new table gets deleted by the in-flight deletion
     if (ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, tableNameWithType)) {
-      throw new IllegalStateException(String.format(
+      // CONFLICT rather than a generic failure: this is an expected, retryable race against an in-flight delete,
+      // not a server fault, and callers should not see it as a 500.
+      throw new ControllerApplicationException(LOGGER, String.format(
           "Cannot create table '%s': a deletion is currently in progress. "
               + "Please wait for the deletion to complete before attempting to recreate the table. "
               + "If the deletion appears stuck, the deletion marker will expire after 24 hours, "
               + "or you can manually clean up the deletion marker from ZK at path: %s/%s",
-          tableNameWithType, ZKMetadataProvider.getPropertyStoreTableDeletionInProgressPrefix(),
-          tableNameWithType));
+          tableNameWithType, ZKMetadataProvider.getPropertyStoreTableDeletionInProgressPrefix(), tableNameWithType),
+          Response.Status.CONFLICT);
     }
 
     LOGGER.info("Adding table {}: Validate table configs", tableNameWithType);
@@ -2572,12 +2574,13 @@ public class PinotHelixResourceManager {
     // Acquire the deletion marker. It gives concurrent deletes mutual exclusion and makes addTable() refuse to
     // re-create the table while this deletion is still tearing its metadata down.
     if (!ZKMetadataProvider.createOrTakeoverTableDeletionMarker(_propertyStore, tableNameWithType, _controllerId)) {
-      throw new IllegalStateException(String.format(
+      // CONFLICT rather than a generic failure: a concurrent delete is an expected, retryable condition.
+      throw new ControllerApplicationException(LOGGER, String.format(
           "Cannot delete table '%s': a deletion is already in progress. "
               + "If the previous deletion failed, wait for the deletion marker to expire (24 hours) "
               + "or manually clean up the deletion marker from ZK at path: %s/%s",
-          tableNameWithType, ZKMetadataProvider.getPropertyStoreTableDeletionInProgressPrefix(),
-          tableNameWithType));
+          tableNameWithType, ZKMetadataProvider.getPropertyStoreTableDeletionInProgressPrefix(), tableNameWithType),
+          Response.Status.CONFLICT);
     }
     boolean deletionMarkerCreated = true;
 

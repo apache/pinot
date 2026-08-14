@@ -653,6 +653,10 @@ public class PinotTableRestletResource {
         tablesDeleted.forEach(deletedTableName -> LOGGER.info("Successfully deleted table: {}", deletedTableName));
         return new SuccessResponse("Tables: " + tablesDeleted + " deleted");
       }
+    } catch (ControllerApplicationException e) {
+      // Already carries a deliberate status (e.g. CONFLICT when a deletion is already in progress); do not
+      // downgrade it to a 500.
+      throw e;
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
