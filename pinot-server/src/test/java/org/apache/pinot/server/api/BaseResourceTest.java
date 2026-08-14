@@ -208,12 +208,19 @@ public abstract class BaseResourceTest {
   protected ImmutableSegment setUpSegment(String tableNameWithType, String segmentName, String segmentNamePostfix,
       List<ImmutableSegment> segments, boolean compressionStatsEnabled)
       throws Exception {
+    return setUpSegment(tableNameWithType, segmentName, segmentNamePostfix, segments, compressionStatsEnabled, false);
+  }
+
+  protected ImmutableSegment setUpSegment(String tableNameWithType, String segmentName, String segmentNamePostfix,
+      List<ImmutableSegment> segments, boolean compressionStatsEnabled, boolean indexSizeStatsEnabled)
+      throws Exception {
     File tableDataDir = new File(_tempDir, tableNameWithType);
     SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, tableDataDir, tableNameWithType);
     config.setSegmentName(segmentName);
     config.setSegmentNamePostfix(segmentNamePostfix);
     config.setCompressionStatsEnabled(compressionStatsEnabled);
+    config.setIndexSizeStatsEnabled(indexSizeStatsEnabled);
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     driver.build();

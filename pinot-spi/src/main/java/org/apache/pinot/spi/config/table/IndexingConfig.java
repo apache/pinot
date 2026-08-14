@@ -108,6 +108,33 @@ public class IndexingConfig extends BaseJsonConfig {
   /// default.
   private boolean _compressionStatsEnabled;
 
+  /// When true, segment creation records the on-disk size of each index, per column and per index type, into
+  /// `metadata.properties` under `column.<column>.indexSizeInBytes.<indexTypeId>`, where `indexTypeId` is
+  /// `IndexType#getId()`. Reload keeps these entries up to date opportunistically: whenever a reload runs for any
+  /// reason, the index types present afterward have their entries refreshed as a side effect, but turning the flag
+  /// on does not by itself force a reload of existing segments.
+  ///
+  /// Sizes are measured after the index creators (at creation) or index handlers (at reload) are closed and before
+  /// the V1-to-V3 format conversion, from the V1 on-disk layout, so they are recorded for every segment version. Any
+  /// version other than `v1` is packed into `columns.psf`, and for those the magic marker prefixed to each packed
+  /// entry is included so a value matches the corresponding `v3/index_map` entry exactly. Externally stored text and
+  /// vector directories are copied rather than packed and carry no marker.
+  ///
+  /// Covers the per-column index files plus text and vector indexes held in their own directories. Does not cover
+  /// star-tree or multi-column text indexes. A missing entry means "not measured" and must not be read as zero
+  /// bytes. If an index is present but could not be measured during a reload (e.g. a transient filesystem error),
+  /// its existing entry, if any, is left as-is rather than cleared, so a present value can lag what is actually on
+  /// disk for a present-but-currently-unmeasurable index.
+  ///
+  /// This is the only source that can describe a V1/V2 index or an externally stored text/vector directory, neither
+  /// of which `v3/index_map` ever covers; prefer this over `v3/index_map` for that reason. Enabling the flag also
+  /// changes the segment CRC, because the keys live in `metadata.properties`.
+  ///
+  /// Existing segments are not backfilled by turning the flag on alone; a segment only gains entries once it is
+  /// created or reloaded while the flag is on. Enabling this adds roughly one property per column per index type,
+  /// which is re-parsed on every segment load, so the cost is not build-time only. Disabled by default.
+  private boolean _indexSizeStatsEnabled;
+
   @Nullable
   public List<String> getInvertedIndexColumns() {
     return _invertedIndexColumns;
@@ -420,6 +447,16 @@ public class IndexingConfig extends BaseJsonConfig {
   /// Enables or disables compression-statistics collection for newly built or rewritten indexes.
   public void setCompressionStatsEnabled(boolean compressionStatsEnabled) {
     _compressionStatsEnabled = compressionStatsEnabled;
+  }
+
+  /// Returns whether per-index-type storage sizes are persisted at segment creation and kept up to date on reload.
+  public boolean isIndexSizeStatsEnabled() {
+    return _indexSizeStatsEnabled;
+  }
+
+  /// Enables or disables per-index-type size collection at segment creation and reload.
+  public void setIndexSizeStatsEnabled(boolean indexSizeStatsEnabled) {
+    _indexSizeStatsEnabled = indexSizeStatsEnabled;
   }
 
   /// Returns all columns referenced in the indexing config. This is useful to construct FieldIndexConfigs in

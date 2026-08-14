@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.index.metadata;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.Map;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
@@ -213,5 +214,53 @@ public class ColumnMetadataImplTest {
     config.setProperty(Column.getKeyFor(column, Column.IS_SINGLE_VALUED), true);
     config.setProperty(Column.getKeyFor(column, Column.CARDINALITY), 1);
     return config;
+  }
+
+  /// The persisted index-size reader must survive malformed input: these statistics are advisory and a bad value in
+  /// `metadata.properties` must never stop a segment from loading. Every rejection branch is exercised here, since a
+  /// well-formed segment build cannot reach them.
+  @Test
+  public void testPersistedIndexSizesSkipsMalformedValues() {
+    PropertiesConfiguration config = baseConfig("col");
+    String prefix = Column.getKeyFor("col", Column.INDEX_SIZE_IN_BYTES) + ".";
+    config.setProperty(prefix + "dictionary", 123L);
+    config.setProperty(prefix + "forward", "not-a-number");
+    config.setProperty(prefix + "inverted", -1L);
+    config.setProperty(Column.getKeyFor("col", Column.INDEX_SIZE_IN_BYTES), 7L);
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
+
+    assertEquals(metadata.getPersistedIndexSizesInBytes(), Map.of("dictionary", 123L),
+        "Only the well-formed non-negative entry should survive");
+  }
+
+  /// Nothing persisted means an empty map, not null, so callers can iterate unconditionally.
+  @Test
+  public void testPersistedIndexSizesEmptyWhenAbsent() {
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(baseConfig("col"), 1, "col");
+    assertTrue(metadata.getPersistedIndexSizesInBytes().isEmpty());
+  }
+
+  /// The returned map must not be mutable by callers.
+  @Test(expectedExceptions = UnsupportedOperationException.class)
+  public void testPersistedIndexSizesUnmodifiable() {
+    PropertiesConfiguration config = baseConfig("col");
+    config.setProperty(Column.getKeyFor("col", Column.INDEX_SIZE_IN_BYTES) + ".dictionary", 123L);
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
+    metadata.getPersistedIndexSizesInBytes().put("forward", 1L);
+  }
+
+  /// Pins that the new accessor stays out of the column-metadata JSON payload. Without @JsonIgnore it would add a
+  /// field to every column of every segment, even with the feature disabled.
+  @Test
+  public void testPersistedIndexSizesNotSerialized()
+      throws Exception {
+    PropertiesConfiguration config = baseConfig("col");
+    config.setProperty(Column.getKeyFor("col", Column.INDEX_SIZE_IN_BYTES) + ".dictionary", 123L);
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
+
+    JsonNode json = JsonUtils.objectToJsonNode(metadata);
+    assertFalse(json.has("persistedIndexSizesInBytes"),
+        "getPersistedIndexSizesInBytes must be @JsonIgnore, like the other size accessors; payload was: " + json);
   }
 }

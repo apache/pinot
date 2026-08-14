@@ -41,8 +41,20 @@ public class SegmentSizeInfo {
   private final Long _compressionStatsForwardIndexAndDictionaryStorageSizeInBytes;
   private final Map<String, ColumnCompressionStatsInfo> _columnCompressionStats;
 
+  /// Per-index-type on-disk sizes for this segment, keyed by `IndexType#getId()`. An index type absent from the map
+  /// means no size was recorded for it, not that it occupies no space. Never empty: an empty input map is folded to
+  /// null, so "did not report per-index-type sizes" and "reported and found none" are one observable state rather
+  /// than two a consumer would otherwise have to distinguish.
+  @JsonProperty("indexSizeInBytes")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private final Map<String, Long> _indexSizeInBytes;
+
   public SegmentSizeInfo(String segmentName, long sizeBytes) {
-    this(segmentName, sizeBytes, (Long) null, null, null);
+    this(segmentName, sizeBytes, (Long) null, null, null, null);
+  }
+
+  public SegmentSizeInfo(String segmentName, long sizeBytes, @Nullable Map<String, Long> indexSizeInBytes) {
+    this(segmentName, sizeBytes, (Long) null, null, null, indexSizeInBytes);
   }
 
   public SegmentSizeInfo(String segmentName, long sizeBytes, long compressionStatsUncompressedValueSizeInBytes,
@@ -54,8 +66,17 @@ public class SegmentSizeInfo {
   public SegmentSizeInfo(String segmentName, long sizeBytes, long compressionStatsUncompressedValueSizeInBytes,
       long compressionStatsForwardIndexAndDictionaryStorageSizeInBytes,
       @Nullable Map<String, ColumnCompressionStatsInfo> columnCompressionStats) {
+    this(segmentName, sizeBytes, compressionStatsUncompressedValueSizeInBytes,
+        compressionStatsForwardIndexAndDictionaryStorageSizeInBytes, columnCompressionStats, null);
+  }
+
+  public SegmentSizeInfo(String segmentName, long sizeBytes, long compressionStatsUncompressedValueSizeInBytes,
+      long compressionStatsForwardIndexAndDictionaryStorageSizeInBytes,
+      @Nullable Map<String, ColumnCompressionStatsInfo> columnCompressionStats,
+      @Nullable Map<String, Long> indexSizeInBytes) {
     this(segmentName, sizeBytes, availableValue(compressionStatsUncompressedValueSizeInBytes),
-        availableValue(compressionStatsForwardIndexAndDictionaryStorageSizeInBytes), columnCompressionStats);
+        availableValue(compressionStatsForwardIndexAndDictionaryStorageSizeInBytes), columnCompressionStats,
+        indexSizeInBytes);
   }
 
   @JsonCreator
@@ -66,13 +87,27 @@ public class SegmentSizeInfo {
       @JsonProperty("compressionStatsForwardIndexAndDictionaryStorageSizeInBytes") @Nullable
       Long compressionStatsForwardIndexAndDictionaryStorageSizeInBytes,
       @JsonProperty("columnCompressionStats") @Nullable Map<String, ColumnCompressionStatsInfo>
-          columnCompressionStats) {
+          columnCompressionStats,
+      @JsonProperty("indexSizeInBytes") @Nullable Map<String, Long> indexSizeInBytes) {
     _segmentName = segmentName;
     _diskSizeInBytes = sizeBytes;
     _compressionStatsUncompressedValueSizeInBytes = compressionStatsUncompressedValueSizeInBytes;
     _compressionStatsForwardIndexAndDictionaryStorageSizeInBytes =
         compressionStatsForwardIndexAndDictionaryStorageSizeInBytes;
+    // Unlike _indexSizeInBytes below, an empty (non-null) map here is left as-is rather than folded into null:
+    // _columnCompressionStats doesn't drive any selection logic, so the null/empty distinction is harmless.
     _columnCompressionStats = columnCompressionStats != null ? Map.copyOf(columnCompressionStats) : null;
+    // An empty map is treated the same as null: a replica that reports no per-index-type sizes did not opt into
+    // the flag, and must not be mistaken for one that reported zero indexes.
+    _indexSizeInBytes = indexSizeInBytes != null && !indexSizeInBytes.isEmpty() ? Map.copyOf(indexSizeInBytes) : null;
+  }
+
+  /// Returns the per-index-type sizes for this segment, or null when the caller did not request them, or when it
+  /// requested them and this replica recorded none. Never returns an empty map.
+  @Nullable
+  @JsonIgnore
+  public Map<String, Long> getIndexSizeInBytes() {
+    return _indexSizeInBytes;
   }
 
   public String getSegmentName() {
@@ -96,7 +131,8 @@ public class SegmentSizeInfo {
         ? _compressionStatsForwardIndexAndDictionaryStorageSizeInBytes : -1;
   }
 
-  /// Returns public per-column compression statistics, or null when details were not requested.
+  /// Returns public per-column compression statistics, or null when details were not requested. Unlike
+  /// [#getIndexSizeInBytes], an empty (non-null) map is a possible, distinct return value here.
   @Nullable
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public Map<String, ColumnCompressionStatsInfo> getColumnCompressionStats() {

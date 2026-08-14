@@ -72,18 +72,25 @@ public class ServerTableSizeReader {
   /// Reads versioned server table-size responses without compression statistics.
   public Map<String, TableSizeInfo> getTableSizeInfoFromServers(BiMap<String, String> serverEndPoints,
       String tableNameWithType, int timeoutMs) {
-    return getTableSizeInfoFromServers(serverEndPoints, tableNameWithType, timeoutMs, false, false);
+    return getTableSizeInfoFromServers(serverEndPoints, tableNameWithType, timeoutMs, false, false, false);
   }
 
   /// Reads versioned server table-size responses with compression summaries and optional per-column details.
   public Map<String, TableSizeInfo> getTableSizeInfoFromServers(BiMap<String, String> serverEndPoints,
       String tableNameWithType, int timeoutMs, boolean includeColumnCompressionStats) {
     return getTableSizeInfoFromServers(serverEndPoints, tableNameWithType, timeoutMs, true,
-        includeColumnCompressionStats);
+        includeColumnCompressionStats, false);
   }
 
-  private Map<String, TableSizeInfo> getTableSizeInfoFromServers(BiMap<String, String> serverEndPoints,
-      String tableNameWithType, int timeoutMs, boolean includeCompressionStats, boolean includeColumnCompressionStats) {
+  /// Reads versioned server table-size responses with explicit control over compression statistics, per-column
+  /// compression statistics, and per-index-type size totals.
+  ///
+  /// NOTE: the 4th parameter here is `includeCompressionStats`, unlike the single-boolean overload above where the
+  /// 4th parameter is `includeColumnCompressionStats` (which also forces `includeCompressionStats` on). Prefer
+  /// naming booleans at the call site (e.g. via a comment) to avoid mixing the two up.
+  public Map<String, TableSizeInfo> getTableSizeInfoFromServers(BiMap<String, String> serverEndPoints,
+      String tableNameWithType, int timeoutMs, boolean includeCompressionStats, boolean includeColumnCompressionStats,
+      boolean includeIndexSizeStats) {
     int numServers = serverEndPoints.size();
     LOGGER.info("Reading segment sizes from {} servers for table: {} with timeout: {}ms", numServers, tableNameWithType,
         timeoutMs);
@@ -91,10 +98,19 @@ public class ServerTableSizeReader {
     List<String> serverUrls = new ArrayList<>(numServers);
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     boolean requestCompressionStats = includeCompressionStats || includeColumnCompressionStats;
+    List<String> queryParams = new ArrayList<>();
+    if (requestCompressionStats) {
+      queryParams.add("includeCompressionStats=true");
+    }
+    if (includeColumnCompressionStats) {
+      queryParams.add("includeColumnCompressionStats=true");
+    }
+    if (includeIndexSizeStats) {
+      queryParams.add("includeIndexSizeStats=true");
+    }
+    String queryString = queryParams.isEmpty() ? "" : "?" + String.join("&", queryParams);
     for (String endpoint : endpointsToServers.keySet()) {
-      String tableSizeUri = endpoint + "/tables/" + tableNameWithType + "/size"
-          + (requestCompressionStats ? "?includeCompressionStats=true" : "")
-          + (includeColumnCompressionStats ? "&includeColumnCompressionStats=true" : "");
+      String tableSizeUri = endpoint + "/tables/" + tableNameWithType + "/size" + queryString;
       serverUrls.add(tableSizeUri);
     }
 
