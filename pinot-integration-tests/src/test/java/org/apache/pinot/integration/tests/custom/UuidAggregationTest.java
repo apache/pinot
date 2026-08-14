@@ -194,8 +194,8 @@ public class UuidAggregationTest extends CustomDataQueryClusterIntegrationTest {
   public void testDistinctCountOnUuidColumn()
       throws Exception {
     setUseMultiStageQueryEngine(false);
-    for (String function : List.of("DISTINCTCOUNT", "DISTINCTCOUNTHLL", "DISTINCTCOUNTBITMAP",
-        "DISTINCTCOUNTTHETASKETCH", "DISTINCTCOUNTCPCSKETCH")) {
+    for (String function : List.of("DISTINCTCOUNT", "DISTINCTCOUNTHLL", "DISTINCTCOUNTHLLPLUS", "DISTINCTCOUNTULL",
+        "DISTINCTCOUNTBITMAP", "DISTINCTCOUNTTHETASKETCH", "DISTINCTCOUNTCPCSKETCH")) {
       JsonNode rows = query(String.format("SELECT %s(%s) FROM %s", function, UUID_COLUMN, getTableName()));
       assertEquals(rows.get(0).get(0).asLong(), NUM_DISTINCT, function + ": " + rows.toPrettyString());
     }

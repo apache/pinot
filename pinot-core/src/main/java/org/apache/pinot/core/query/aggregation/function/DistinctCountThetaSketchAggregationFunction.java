@@ -194,10 +194,9 @@ public class DistinctCountThetaSketchAggregationFunction
     extractValues(blockValSetMap, singleValues, valueTypes, valueArrays);
     int numFilters = _filterEvaluators.size();
 
-    // Main expression is always index 0. Logical BYTES values contain serialized sketches; all other logical types,
-    // including UUID, use the raw-value path and are handled by their stored-type switch branch.
+    // Main expression is always index 0
     DataType dataType = valueTypes[0];
-    if (dataType != DataType.BYTES) {
+    if (dataType != DataType.BYTES || !singleValues[0]) {
       List<UpdatableThetaSketch> updateSketches = getUpdateSketches(aggregationResultHolder);
       if (singleValues[0]) {
         switch (valueTypes[0].getStoredType()) {
@@ -292,11 +291,11 @@ public class DistinctCountThetaSketchAggregationFunction
             }
             break;
           case BYTES:
-            byte[][] uuidValues = (byte[][]) valueArrays[0];
+            byte[][] bytesValues = (byte[][]) valueArrays[0];
             if (_includeDefaultSketch) {
               UpdatableThetaSketch defaultSketch = updateSketches.get(0);
               for (int i = 0; i < length; i++) {
-                defaultSketch.update(uuidValues[i]);
+                defaultSketch.update(bytesValues[i]);
               }
             }
             for (int i = 0; i < numFilters; i++) {
@@ -304,7 +303,7 @@ public class DistinctCountThetaSketchAggregationFunction
               UpdatableThetaSketch updateSketch = updateSketches.get(i + 1);
               for (int j = 0; j < length; j++) {
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
-                  updateSketch.update(uuidValues[j]);
+                  updateSketch.update(bytesValues[j]);
                 }
               }
             }
@@ -427,11 +426,11 @@ public class DistinctCountThetaSketchAggregationFunction
             }
             break;
           case BYTES:
-            byte[][][] uuidValues = (byte[][][]) valueArrays[0];
+            byte[][][] bytesValues = (byte[][][]) valueArrays[0];
             if (_includeDefaultSketch) {
               UpdatableThetaSketch defaultSketch = updateSketches.get(0);
               for (int i = 0; i < length; i++) {
-                for (byte[] value : uuidValues[i]) {
+                for (byte[] value : bytesValues[i]) {
                   defaultSketch.update(value);
                 }
               }
@@ -441,7 +440,7 @@ public class DistinctCountThetaSketchAggregationFunction
               UpdatableThetaSketch updateSketch = updateSketches.get(i + 1);
               for (int j = 0; j < length; j++) {
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
-                  for (byte[] value : uuidValues[j]) {
+                  for (byte[] value : bytesValues[j]) {
                     updateSketch.update(value);
                   }
                 }
@@ -454,7 +453,7 @@ public class DistinctCountThetaSketchAggregationFunction
                     + valueTypes[0]);
         }
       }
-    } else if (singleValues[0]) {
+    } else {
       List<ThetaSketchAccumulator> thetaSketchAccumulators = getUnions(aggregationResultHolder);
       ThetaSketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       if (_includeDefaultSketch) {
@@ -472,28 +471,6 @@ public class DistinctCountThetaSketchAggregationFunction
           }
         }
       }
-    } else {
-      List<ThetaSketchAccumulator> thetaSketchAccumulators = getUnions(aggregationResultHolder);
-      ThetaSketch[][] sketches = deserializeSketches((byte[][][]) valueArrays[0], length);
-      if (_includeDefaultSketch) {
-        ThetaSketchAccumulator defaultThetaAccumulator = thetaSketchAccumulators.get(0);
-        for (int i = 0; i < length; i++) {
-          for (ThetaSketch sketch : sketches[i]) {
-            defaultThetaAccumulator.apply(sketch);
-          }
-        }
-      }
-      for (int i = 0; i < numFilters; i++) {
-        FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
-        ThetaSketchAccumulator thetaSketchAccumulator = thetaSketchAccumulators.get(i + 1);
-        for (int j = 0; j < length; j++) {
-          if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
-            for (ThetaSketch sketch : sketches[j]) {
-              thetaSketchAccumulator.apply(sketch);
-            }
-          }
-        }
-      }
     }
   }
 
@@ -507,10 +484,9 @@ public class DistinctCountThetaSketchAggregationFunction
     extractValues(blockValSetMap, singleValues, valueTypes, valueArrays);
     int numFilters = _filterEvaluators.size();
 
-    // Main expression is always index 0. Logical BYTES values contain serialized sketches; all other logical types,
-    // including UUID, use the raw-value path and are handled by their stored-type switch branch.
+    // Main expression is always index 0
     DataType dataType = valueTypes[0];
-    if (dataType != DataType.BYTES) {
+    if (dataType != DataType.BYTES || !singleValues[0]) {
       if (singleValues[0]) {
         switch (valueTypes[0].getStoredType()) {
           case INT:
@@ -589,11 +565,11 @@ public class DistinctCountThetaSketchAggregationFunction
             }
             break;
           case BYTES:
-            byte[][] uuidValues = (byte[][]) valueArrays[0];
+            byte[][] bytesValues = (byte[][]) valueArrays[0];
             for (int i = 0; i < length; i++) {
               List<UpdatableThetaSketch> updateSketches =
                   getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
-              byte[] value = uuidValues[i];
+              byte[] value = bytesValues[i];
               if (_includeDefaultSketch) {
                 updateSketches.get(0).update(value);
               }
@@ -717,11 +693,11 @@ public class DistinctCountThetaSketchAggregationFunction
             }
             break;
           case BYTES:
-            byte[][][] uuidValues = (byte[][][]) valueArrays[0];
+            byte[][][] bytesValues = (byte[][][]) valueArrays[0];
             for (int i = 0; i < length; i++) {
               List<UpdatableThetaSketch> updateSketches =
                   getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
-              byte[][] values = uuidValues[i];
+              byte[][] values = bytesValues[i];
               if (_includeDefaultSketch) {
                 UpdatableThetaSketch defaultSketch = updateSketches.get(0);
                 for (byte[] value : values) {
@@ -744,7 +720,7 @@ public class DistinctCountThetaSketchAggregationFunction
                     + valueTypes[0]);
         }
       }
-    } else if (singleValues[0]) {
+    } else {
       ThetaSketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       for (int i = 0; i < length; i++) {
         List<ThetaSketchAccumulator> thetaSketchAccumulators =
@@ -756,26 +732,6 @@ public class DistinctCountThetaSketchAggregationFunction
         for (int j = 0; j < numFilters; j++) {
           if (_filterEvaluators.get(j).evaluate(singleValues, valueTypes, valueArrays, i)) {
             thetaSketchAccumulators.get(j + 1).apply(sketch);
-          }
-        }
-      }
-    } else {
-      ThetaSketch[][] sketches = deserializeSketches((byte[][][]) valueArrays[0], length);
-      for (int i = 0; i < length; i++) {
-        List<ThetaSketchAccumulator> thetaSketchAccumulators =
-            getUnions(groupByResultHolder, groupKeyArray[i]);
-        if (_includeDefaultSketch) {
-          ThetaSketchAccumulator defaultThetaAccumulator = thetaSketchAccumulators.get(0);
-          for (ThetaSketch sketch : sketches[i]) {
-            defaultThetaAccumulator.apply(sketch);
-          }
-        }
-        for (int j = 0; j < numFilters; j++) {
-          if (_filterEvaluators.get(j).evaluate(singleValues, valueTypes, valueArrays, i)) {
-            ThetaSketchAccumulator thetaSketchAccumulator = thetaSketchAccumulators.get(j + 1);
-            for (ThetaSketch sketch : sketches[i]) {
-              thetaSketchAccumulator.apply(sketch);
-            }
           }
         }
       }
@@ -792,10 +748,9 @@ public class DistinctCountThetaSketchAggregationFunction
     extractValues(blockValSetMap, singleValues, valueTypes, valueArrays);
     int numFilters = _filterEvaluators.size();
 
-    // Main expression is always index 0. Logical BYTES values contain serialized sketches; all other logical types,
-    // including UUID, use the raw-value path and are handled by their stored-type switch branch.
+    // Main expression is always index 0
     DataType dataType = valueTypes[0];
-    if (dataType != DataType.BYTES) {
+    if (dataType != DataType.BYTES || !singleValues[0]) {
       if (singleValues[0]) {
         switch (valueTypes[0].getStoredType()) {
           case INT:
@@ -899,11 +854,11 @@ public class DistinctCountThetaSketchAggregationFunction
             }
             break;
           case BYTES:
-            byte[][] uuidValues = (byte[][]) valueArrays[0];
+            byte[][] bytesValues = (byte[][]) valueArrays[0];
             if (_includeDefaultSketch) {
               for (int i = 0; i < length; i++) {
                 for (int groupKey : groupKeysArray[i]) {
-                  getUpdateSketches(groupByResultHolder, groupKey).get(0).update(uuidValues[i]);
+                  getUpdateSketches(groupByResultHolder, groupKey).get(0).update(bytesValues[i]);
                 }
               }
             }
@@ -912,7 +867,7 @@ public class DistinctCountThetaSketchAggregationFunction
               for (int j = 0; j < length; j++) {
                 if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
                   for (int groupKey : groupKeysArray[j]) {
-                    getUpdateSketches(groupByResultHolder, groupKey).get(i + 1).update(uuidValues[j]);
+                    getUpdateSketches(groupByResultHolder, groupKey).get(i + 1).update(bytesValues[j]);
                   }
                 }
               }
@@ -1056,12 +1011,12 @@ public class DistinctCountThetaSketchAggregationFunction
             }
             break;
           case BYTES:
-            byte[][][] uuidValues = (byte[][][]) valueArrays[0];
+            byte[][][] bytesValues = (byte[][][]) valueArrays[0];
             if (_includeDefaultSketch) {
               for (int i = 0; i < length; i++) {
                 for (int groupKey : groupKeysArray[i]) {
                   UpdatableThetaSketch defaultSketch = getUpdateSketches(groupByResultHolder, groupKey).get(0);
-                  for (byte[] value : uuidValues[i]) {
+                  for (byte[] value : bytesValues[i]) {
                     defaultSketch.update(value);
                   }
                 }
@@ -1074,7 +1029,7 @@ public class DistinctCountThetaSketchAggregationFunction
                   for (int groupKey : groupKeysArray[j]) {
                     UpdatableThetaSketch updateSketch =
                         getUpdateSketches(groupByResultHolder, groupKey).get(i + 1);
-                    for (byte[] value : uuidValues[j]) {
+                    for (byte[] value : bytesValues[j]) {
                       updateSketch.update(value);
                     }
                   }
@@ -1088,7 +1043,7 @@ public class DistinctCountThetaSketchAggregationFunction
                     + valueTypes[0]);
         }
       }
-    } else if (singleValues[0]) {
+    } else {
       ThetaSketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       if (_includeDefaultSketch) {
         for (int i = 0; i < length; i++) {
@@ -1103,31 +1058,6 @@ public class DistinctCountThetaSketchAggregationFunction
           if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
             for (int groupKey : groupKeysArray[j]) {
               getUnions(groupByResultHolder, groupKey).get(i + 1).apply(sketches[j]);
-            }
-          }
-        }
-      }
-    } else {
-      ThetaSketch[][] sketches = deserializeSketches((byte[][][]) valueArrays[0], length);
-      if (_includeDefaultSketch) {
-        for (int i = 0; i < length; i++) {
-          for (int groupKey : groupKeysArray[i]) {
-            ThetaSketchAccumulator defaultThetaAccumulator = getUnions(groupByResultHolder, groupKey).get(0);
-            for (ThetaSketch sketch : sketches[i]) {
-              defaultThetaAccumulator.apply(sketch);
-            }
-          }
-        }
-      }
-      for (int i = 0; i < numFilters; i++) {
-        FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
-        for (int j = 0; j < length; j++) {
-          if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
-            for (int groupKey : groupKeysArray[j]) {
-              ThetaSketchAccumulator thetaSketchAccumulator = getUnions(groupByResultHolder, groupKey).get(i + 1);
-              for (ThetaSketch sketch : sketches[j]) {
-                thetaSketchAccumulator.apply(sketch);
-              }
             }
           }
         }
@@ -1554,14 +1484,6 @@ public class DistinctCountThetaSketchAggregationFunction
     ThetaSketch[] sketches = new ThetaSketch[length];
     for (int i = 0; i < length; i++) {
       sketches[i] = deserializeSketch(serializedSketches[i]);
-    }
-    return sketches;
-  }
-
-  private ThetaSketch[][] deserializeSketches(byte[][][] serializedSketches, int length) {
-    ThetaSketch[][] sketches = new ThetaSketch[length][];
-    for (int i = 0; i < length; i++) {
-      sketches[i] = deserializeSketches(serializedSketches[i], serializedSketches[i].length);
     }
     return sketches;
   }

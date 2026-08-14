@@ -64,10 +64,10 @@ public class DistinctCountHLLAggregationFunctionTest {
   }
 
   /// Regression: UUID columns have storedType=BYTES, but a UUID value is a logical scalar, not a serialized
-  /// HyperLogLog. The aggregator must route UUID columns through the same content-hash path as STRING (offering
-  /// canonical UUID strings) instead of trying to deserialize each 16-byte value as an HLL.
+  /// HyperLogLog. The aggregator must offer the stored bytes as values instead of trying to deserialize each
+  /// 16-byte value as an HLL.
   @Test
-  public void testAggregateOnUuidColumnOffersCanonicalStringsAndProducesExactDistinctCount() {
+  public void testAggregateOnUuidColumnOffersStoredBytesAndProducesExactDistinctCount() {
     ExpressionContext expression = RequestContextUtils.getExpression("uuidCol");
     DistinctCountHLLAggregationFunction function = new DistinctCountHLLAggregationFunction(List.of(expression));
 
@@ -81,8 +81,7 @@ public class DistinctCountHLLAggregationFunctionTest {
         "9c5e1f24-0b8e-4c9d-87f1-0aa64a3b9d12"
     };
 
-    // Stub the BYTES fetch (raw 16-byte values) — the production path converts bytes to canonical strings
-    // itself because ProjectionBlockValSet.getStringValuesSV() would render stored BYTES as bare hex.
+    // Stub the BYTES fetch with the raw 16-byte stored values offered by the production path.
     byte[][] uuidBytes = new byte[uuidStrings.length][];
     for (int i = 0; i < uuidStrings.length; i++) {
       uuidBytes[i] = UuidUtils.toBytes(uuidStrings[i]);
@@ -144,7 +143,7 @@ public class DistinctCountHLLAggregationFunctionTest {
     BlockValSet blockValSet = mock(BlockValSet.class);
     when(blockValSet.getValueType()).thenReturn(valueType);
     if (valueType == DataType.UUID) {
-      // UUID path fetches raw bytes and converts to canonical form itself (projection string fetch returns hex)
+      // UUID path fetches and offers the raw stored bytes.
       byte[][] uuidBytes = new byte[values.length][];
       for (int i = 0; i < values.length; i++) {
         uuidBytes[i] = UuidUtils.toBytes(values[i]);

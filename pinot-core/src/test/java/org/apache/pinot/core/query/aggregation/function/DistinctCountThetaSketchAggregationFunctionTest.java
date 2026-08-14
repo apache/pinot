@@ -43,6 +43,7 @@ import static org.mockito.Mockito.when;
 
 public class DistinctCountThetaSketchAggregationFunctionTest {
   private static final ExpressionContext UUID_EXPRESSION = ExpressionContext.forIdentifier("uuidCol");
+  private static final ExpressionContext BYTES_EXPRESSION = ExpressionContext.forIdentifier("bytesCol");
   private static final byte[] UUID_0 = UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440000");
   private static final byte[] UUID_1 = UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440001");
   private static final byte[] UUID_2 = UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440002");
@@ -139,37 +140,72 @@ public class DistinctCountThetaSketchAggregationFunctionTest {
   }
 
   @Test
-  public void testAggregateMultiValueSerializedSketches() {
-    byte[][][] serializedSketches = {
-        {serializedSketch("a"), serializedSketch("b")},
-        {serializedSketch("b"), serializedSketch("c")},
-        {new byte[0]},
-        {serializedSketch("d")}
+  public void testAggregateMultiValueBytesAsRawValues() {
+    // These one-byte values are not serialized sketches, so the test also verifies that MV BYTES are not deserialized.
+    byte[][][] bytesValues = {
+        {{1}, {2}},
+        {{2}, {3}},
+        {{1}},
+        {{4}}
     };
     BlockValSet blockValSet = mock(BlockValSet.class);
     when(blockValSet.getValueType()).thenReturn(DataType.BYTES);
     when(blockValSet.isSingleValue()).thenReturn(false);
-    when(blockValSet.getBytesValuesMV()).thenReturn(serializedSketches);
+    when(blockValSet.getBytesValuesMV()).thenReturn(bytesValues);
     DistinctCountThetaSketchAggregationFunction function =
-        new DistinctCountThetaSketchAggregationFunction(List.of(UUID_EXPRESSION));
+        new DistinctCountThetaSketchAggregationFunction(List.of(BYTES_EXPRESSION));
 
     AggregationResultHolder aggregationResultHolder = function.createAggregationResultHolder();
-    function.aggregate(serializedSketches.length, aggregationResultHolder, Map.of(UUID_EXPRESSION, blockValSet));
+    function.aggregate(bytesValues.length, aggregationResultHolder, Map.of(BYTES_EXPRESSION, blockValSet));
+    Assert.assertEquals(extractFinalResult(function, aggregationResultHolder), 4L);
+
+    GroupByResultHolder groupBySVResultHolder = function.createGroupByResultHolder(2, 2);
+    function.aggregateGroupBySV(bytesValues.length, new int[]{0, 0, 1, 1}, groupBySVResultHolder,
+        Map.of(BYTES_EXPRESSION, blockValSet));
+    Assert.assertEquals(extractFinalResult(function, groupBySVResultHolder, 0), 3L);
+    Assert.assertEquals(extractFinalResult(function, groupBySVResultHolder, 1), 2L);
+
+    GroupByResultHolder groupByMVResultHolder = function.createGroupByResultHolder(2, 2);
+    function.aggregateGroupByMV(bytesValues.length, new int[][]{{0}, {1}, {0, 1}, {1}}, groupByMVResultHolder,
+        Map.of(BYTES_EXPRESSION, blockValSet));
+    Assert.assertEquals(extractFinalResult(function, groupByMVResultHolder, 0), 2L);
+    Assert.assertEquals(extractFinalResult(function, groupByMVResultHolder, 1), 4L);
+    verify(blockValSet, atLeastOnce()).getBytesValuesMV();
+    verify(blockValSet, never()).getBytesValuesSV();
+  }
+
+  @Test
+  public void testAggregateSingleValueSerializedSketches() {
+    byte[][] serializedSketches = {
+        serializedSketch("a", "b"),
+        serializedSketch("b", "c"),
+        new byte[0],
+        serializedSketch("d")
+    };
+    BlockValSet blockValSet = mock(BlockValSet.class);
+    when(blockValSet.getValueType()).thenReturn(DataType.BYTES);
+    when(blockValSet.isSingleValue()).thenReturn(true);
+    when(blockValSet.getBytesValuesSV()).thenReturn(serializedSketches);
+    DistinctCountThetaSketchAggregationFunction function =
+        new DistinctCountThetaSketchAggregationFunction(List.of(BYTES_EXPRESSION));
+
+    AggregationResultHolder aggregationResultHolder = function.createAggregationResultHolder();
+    function.aggregate(serializedSketches.length, aggregationResultHolder, Map.of(BYTES_EXPRESSION, blockValSet));
     Assert.assertEquals(extractFinalResult(function, aggregationResultHolder), 4L);
 
     GroupByResultHolder groupBySVResultHolder = function.createGroupByResultHolder(2, 2);
     function.aggregateGroupBySV(serializedSketches.length, new int[]{0, 0, 1, 1}, groupBySVResultHolder,
-        Map.of(UUID_EXPRESSION, blockValSet));
+        Map.of(BYTES_EXPRESSION, blockValSet));
     Assert.assertEquals(extractFinalResult(function, groupBySVResultHolder, 0), 3L);
     Assert.assertEquals(extractFinalResult(function, groupBySVResultHolder, 1), 1L);
 
     GroupByResultHolder groupByMVResultHolder = function.createGroupByResultHolder(2, 2);
     function.aggregateGroupByMV(serializedSketches.length, new int[][]{{0}, {1}, {0, 1}, {1}},
-        groupByMVResultHolder, Map.of(UUID_EXPRESSION, blockValSet));
+        groupByMVResultHolder, Map.of(BYTES_EXPRESSION, blockValSet));
     Assert.assertEquals(extractFinalResult(function, groupByMVResultHolder, 0), 2L);
     Assert.assertEquals(extractFinalResult(function, groupByMVResultHolder, 1), 3L);
-    verify(blockValSet, atLeastOnce()).getBytesValuesMV();
-    verify(blockValSet, never()).getBytesValuesSV();
+    verify(blockValSet, atLeastOnce()).getBytesValuesSV();
+    verify(blockValSet, never()).getBytesValuesMV();
   }
 
   private static BlockValSet mockUuidBlockValSet(boolean singleValue) {
@@ -194,9 +230,11 @@ public class DistinctCountThetaSketchAggregationFunctionTest {
     }
   }
 
-  private static byte[] serializedSketch(String value) {
+  private static byte[] serializedSketch(String... values) {
     UpdatableThetaSketch sketch = new UpdatableThetaSketchBuilder().build();
-    sketch.update(value);
+    for (String value : values) {
+      sketch.update(value);
+    }
     return sketch.compact().toByteArray();
   }
 

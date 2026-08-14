@@ -85,36 +85,16 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     DataType dataType = blockValSet.getValueType();
     DataType storedType = dataType.getStoredType();
 
-    // Treat BYTES value as serialized UltraLogLog
-    if (storedType == DataType.BYTES && dataType != DataType.UUID) {
-      byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      try {
-        UltraLogLog ull = aggregationResultHolder.getResult();
-        if (ull == null) {
-          ull = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[0]);
-          aggregationResultHolder.setValue(ull);
-        } else {
-          ull.add(ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[0]));
-        }
-        for (int i = 1; i < length; i++) {
-          ull.add(ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[i]));
-        }
-      } catch (Exception e) {
-        throw new RuntimeException("Caught exception while merging UltraLogLogs", e);
-      }
-      return;
-    }
-
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
-    if (dictionary != null) {
+    if (dictionary != null && dataType != DataType.BYTES) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       getDictIdBitmap(aggregationResultHolder, dictionary).addN(dictIds, 0, length);
       return;
     }
 
     // For non-dictionary-encoded expression, store values into the UltraLogLog
-    UltraLogLog ull = getULL(aggregationResultHolder);
+    UltraLogLog ull = dataType == DataType.BYTES ? null : getULL(aggregationResultHolder);
     switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
@@ -146,11 +126,27 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
           UltraLogLogUtils.hashObject(stringValues[i]).ifPresent(ull::add);
         }
         break;
-      // Reached only by UUID: a real BYTES column is serialized ULL state and is handled above.
       case BYTES:
-        byte[][] uuidValues = blockValSet.getBytesValuesSV();
-        for (int i = 0; i < length; i++) {
-          UltraLogLogUtils.hashObject(uuidValues[i]).ifPresent(ull::add);
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        if (dataType == DataType.BYTES) {
+          try {
+            UltraLogLog serializedUll = aggregationResultHolder.getResult();
+            if (serializedUll == null) {
+              serializedUll = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[0]);
+              aggregationResultHolder.setValue(serializedUll);
+            } else {
+              serializedUll.add(ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[0]));
+            }
+            for (int i = 1; i < length; i++) {
+              serializedUll.add(ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[i]));
+            }
+          } catch (Exception e) {
+            throw new RuntimeException("Caught exception while merging UltraLogLogs", e);
+          }
+        } else {
+          for (int i = 0; i < length; i++) {
+            UltraLogLogUtils.hashObject(bytesValues[i]).ifPresent(ull::add);
+          }
         }
         break;
       default:
@@ -167,29 +163,9 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     DataType dataType = blockValSet.getValueType();
     DataType storedType = dataType.getStoredType();
 
-    // Treat BYTES value as serialized UltraLogLogs
-    if (storedType == DataType.BYTES && dataType != DataType.UUID) {
-      byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      try {
-        for (int i = 0; i < length; i++) {
-          UltraLogLog value = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[i]);
-          int groupKey = groupKeyArray[i];
-          UltraLogLog ull = groupByResultHolder.getResult(groupKey);
-          if (ull != null) {
-            ull.add(value);
-          } else {
-            groupByResultHolder.setValueForKey(groupKey, value);
-          }
-        }
-      } catch (Exception e) {
-        throw new RuntimeException("Caught exception while merging UltraLogLog", e);
-      }
-      return;
-    }
-
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
-    if (dictionary != null) {
+    if (dictionary != null && dataType != DataType.BYTES) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
         getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
@@ -234,12 +210,28 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
               .ifPresent(getULL(groupByResultHolder, groupKeyArray[i])::add);
         }
         break;
-      // Reached only by UUID: a real BYTES column is serialized ULL state and is handled above.
       case BYTES:
-        byte[][] uuidValues = blockValSet.getBytesValuesSV();
-        for (int i = 0; i < length; i++) {
-          UltraLogLogUtils.hashObject(uuidValues[i])
-              .ifPresent(getULL(groupByResultHolder, groupKeyArray[i])::add);
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        if (dataType == DataType.BYTES) {
+          try {
+            for (int i = 0; i < length; i++) {
+              UltraLogLog value = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[i]);
+              int groupKey = groupKeyArray[i];
+              UltraLogLog ull = groupByResultHolder.getResult(groupKey);
+              if (ull != null) {
+                ull.add(value);
+              } else {
+                groupByResultHolder.setValueForKey(groupKey, value);
+              }
+            }
+          } catch (Exception e) {
+            throw new RuntimeException("Caught exception while merging UltraLogLog", e);
+          }
+        } else {
+          for (int i = 0; i < length; i++) {
+            UltraLogLogUtils.hashObject(bytesValues[i])
+                .ifPresent(getULL(groupByResultHolder, groupKeyArray[i])::add);
+          }
         }
         break;
       default:
@@ -256,32 +248,9 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     DataType dataType = blockValSet.getValueType();
     DataType storedType = dataType.getStoredType();
 
-    // Treat BYTES value as serialized UltraLogLogs
-    if (storedType == DataType.BYTES && dataType != DataType.UUID) {
-      byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      try {
-        for (int i = 0; i < length; i++) {
-          UltraLogLog value = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[i]);
-          for (int groupKey : groupKeysArray[i]) {
-            UltraLogLog ull = groupByResultHolder.getResult(groupKey);
-            if (ull != null) {
-              ull.add(value);
-            } else {
-              // Create a new HyperLogLogPlus for the group
-              groupByResultHolder.setValueForKey(groupKey,
-                  ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[i]));
-            }
-          }
-        }
-      } catch (Exception e) {
-        throw new RuntimeException("Caught exception while merging UltraLogLog", e);
-      }
-      return;
-    }
-
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
-    if (dictionary != null) {
+    if (dictionary != null && dataType != DataType.BYTES) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
         setDictIdForGroupKeys(groupByResultHolder, groupKeysArray[i], dictionary, dictIds[i]);
@@ -321,11 +290,29 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], stringValues[i]);
         }
         break;
-      // Reached only by UUID: a real BYTES column is serialized ULL state and is handled above.
       case BYTES:
-        byte[][] uuidValues = blockValSet.getBytesValuesSV();
-        for (int i = 0; i < length; i++) {
-          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], uuidValues[i]);
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        if (dataType == DataType.BYTES) {
+          try {
+            for (int i = 0; i < length; i++) {
+              UltraLogLog value = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[i]);
+              for (int groupKey : groupKeysArray[i]) {
+                UltraLogLog ull = groupByResultHolder.getResult(groupKey);
+                if (ull != null) {
+                  ull.add(value);
+                } else {
+                  groupByResultHolder.setValueForKey(groupKey,
+                      ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[i]));
+                }
+              }
+            }
+          } catch (Exception e) {
+            throw new RuntimeException("Caught exception while merging UltraLogLog", e);
+          }
+        } else {
+          for (int i = 0; i < length; i++) {
+            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], bytesValues[i]);
+          }
         }
         break;
       default:

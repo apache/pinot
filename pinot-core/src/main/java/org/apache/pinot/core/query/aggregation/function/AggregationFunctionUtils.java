@@ -802,11 +802,8 @@ public class AggregationFunctionUtils {
   private static HyperLogLog getDistinctCountHLLResult(DataSource dataSource,
       DistinctCountHLLAggregationFunction function, String explainPlanName) {
     Dictionary dictionary = Objects.requireNonNull(dataSource.getDictionary());
-    // A UUID column's dictionary reports BYTES (it is a plain BytesDictionary), but its entries are logical
-    // scalars, not serialized sketch state. Excluding it here lets it fall through to the scalar path
-    // below, which offers dictionary.get(i) -- the stored byte[] -- exactly as the scan path does.
-    if (dataSource.getDataSourceMetadata().getDataType() != FieldSpec.DataType.UUID
-        && dictionary.getValueType() == FieldSpec.DataType.BYTES) {
+    if (dataSource.getDataSourceMetadata().getDataType() == FieldSpec.DataType.BYTES
+        && dataSource.getDataSourceMetadata().isSingleValue()) {
       // Treat BYTES value as serialized HyperLogLog
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
@@ -828,11 +825,8 @@ public class AggregationFunctionUtils {
   private static HyperLogLogPlus getDistinctCountHLLPlusResult(DataSource dataSource,
       DistinctCountHLLPlusAggregationFunction function, String explainPlanName) {
     Dictionary dictionary = Objects.requireNonNull(dataSource.getDictionary());
-    // A UUID column's dictionary reports BYTES (it is a plain BytesDictionary), but its entries are logical
-    // scalars, not serialized sketch state. Excluding it here lets it fall through to the scalar path
-    // below, which offers dictionary.get(i) -- the stored byte[] -- exactly as the scan path does.
-    if (dataSource.getDataSourceMetadata().getDataType() != FieldSpec.DataType.UUID
-        && dictionary.getValueType() == FieldSpec.DataType.BYTES) {
+    if (dataSource.getDataSourceMetadata().getDataType() == FieldSpec.DataType.BYTES
+        && dataSource.getDataSourceMetadata().isSingleValue()) {
       // Treat BYTES value as serialized HyperLogLogPlus
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
@@ -874,11 +868,8 @@ public class AggregationFunctionUtils {
   private static UltraLogLog getDistinctCountULLResult(DataSource dataSource,
       DistinctCountULLAggregationFunction function, String explainPlanName) {
     Dictionary dictionary = Objects.requireNonNull(dataSource.getDictionary());
-    // A UUID column's dictionary reports BYTES (it is a plain BytesDictionary), but its entries are logical
-    // scalars, not serialized sketch state. Excluding it here lets it fall through to the scalar path
-    // below, which offers dictionary.get(i) -- the stored byte[] -- exactly as the scan path does.
-    if (dataSource.getDataSourceMetadata().getDataType() != FieldSpec.DataType.UUID
-        && dictionary.getValueType() == FieldSpec.DataType.BYTES) {
+    if (dataSource.getDataSourceMetadata().getDataType() == FieldSpec.DataType.BYTES
+        && dataSource.getDataSourceMetadata().isSingleValue()) {
       // Treat BYTES value as serialized UltraLogLog and merge
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);

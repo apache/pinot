@@ -18,13 +18,28 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
+import java.util.Map;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 
 public class DistinctCountHLLMVAggregationFunctionTest extends AbstractAggregationFunctionTest {
+  private static final ExpressionContext BYTES_EXPRESSION = ExpressionContext.forIdentifier("bytesCol");
 
   @Test
   public void testAggregationMV() {
@@ -91,5 +106,51 @@ public class DistinctCountHLLMVAggregationFunctionTest extends AbstractAggregati
         .thenResultIs("STRING | LONG",
             "tag1 | 3",   // distinct: 1, 2, 3
             "tag2 | 3");  // distinct: 1, 2, 3
+  }
+
+  @Test
+  public void testMultiValueBytesUseMultiValueAccessor() {
+    DistinctCountHLLAggregationFunction function =
+        new DistinctCountHLLAggregationFunction(List.of(BYTES_EXPRESSION));
+    byte[][][] bytesValues = {
+        {{1}, {2}},
+        {{2}, {3}},
+        {{1}},
+        {{4}}
+    };
+    BlockValSet blockValSet = mock(BlockValSet.class);
+    when(blockValSet.getValueType()).thenReturn(DataType.BYTES);
+    when(blockValSet.isSingleValue()).thenReturn(false);
+    when(blockValSet.isDictionaryEncoded()).thenReturn(false);
+    when(blockValSet.getBytesValuesMV()).thenReturn(bytesValues);
+
+    AggregationResultHolder aggregationResultHolder = function.createAggregationResultHolder();
+    function.aggregate(bytesValues.length, aggregationResultHolder, Map.of(BYTES_EXPRESSION, blockValSet));
+    Assert.assertEquals(extractFinalResult(function, aggregationResultHolder), 4L);
+
+    GroupByResultHolder groupBySVResultHolder = function.createGroupByResultHolder(2, 2);
+    function.aggregateGroupBySV(bytesValues.length, new int[]{0, 0, 1, 1}, groupBySVResultHolder,
+        Map.of(BYTES_EXPRESSION, blockValSet));
+    Assert.assertEquals(extractFinalResult(function, groupBySVResultHolder, 0), 3L);
+    Assert.assertEquals(extractFinalResult(function, groupBySVResultHolder, 1), 2L);
+
+    GroupByResultHolder groupByMVResultHolder = function.createGroupByResultHolder(2, 2);
+    function.aggregateGroupByMV(bytesValues.length, new int[][]{{0}, {1}, {0, 1}, {1}},
+        groupByMVResultHolder, Map.of(BYTES_EXPRESSION, blockValSet));
+    Assert.assertEquals(extractFinalResult(function, groupByMVResultHolder, 0), 2L);
+    Assert.assertEquals(extractFinalResult(function, groupByMVResultHolder, 1), 4L);
+
+    verify(blockValSet, atLeastOnce()).getBytesValuesMV();
+    verify(blockValSet, never()).getBytesValuesSV();
+  }
+
+  private static long extractFinalResult(DistinctCountHLLAggregationFunction function,
+      AggregationResultHolder resultHolder) {
+    return function.extractFinalResult(function.extractAggregationResult(resultHolder));
+  }
+
+  private static long extractFinalResult(DistinctCountHLLAggregationFunction function,
+      GroupByResultHolder resultHolder, int groupKey) {
+    return function.extractFinalResult(function.extractGroupByResult(resultHolder, groupKey));
   }
 }
