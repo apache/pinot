@@ -19,10 +19,15 @@
 package org.apache.pinot.segment.local.segment.index;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
@@ -41,6 +46,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -59,13 +65,19 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Point;
+import org.mockito.MockedStatic;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
@@ -426,9 +438,10 @@ public class IndexSizeStatsTest {
   /// Specs 3/4: a text index held in its own directory is measured recursively and gets **no** magic marker, because
   /// the converter copies such directories alongside `columns.psf` rather than packing them into it.
   ///
-  /// This is the only coverage of the directory branch and of `sizeOfDirectoryQuietly`. It also pins the marker rule:
-  /// applying the marker here would over-report by 8 bytes, and adding it to a directory is the mistake the
-  /// file-versus-directory split exists to prevent.
+  /// This is the happy-path coverage of the directory branch of [IndexSizeUtils#sizeOfFileOrDirIndex]; see
+  /// [#testDirectorySizingFailureReturnsNull] for its failure path. It also pins the marker rule: applying the marker
+  /// here would over-report by 8 bytes, and adding it to a directory is the mistake the file-versus-directory split
+  /// exists to prevent.
   @Test
   public void testTextIndexDirectorySizedWithoutMarker()
       throws Exception {
@@ -469,6 +482,29 @@ public class IndexSizeStatsTest {
     for (String key : CommonsConfigurationUtils.getKeys(indexMap)) {
       assertFalse(key.startsWith("column4.text_index"),
           "An externally stored text index must not appear in index_map, but found: " + key);
+    }
+  }
+
+  /// When the directory branch of [IndexSizeUtils#sizeOfFileOrDirIndex] fails to size an existing index directory,
+  /// the method must report the index as unmeasurable ([ColumnMetadata#UNAVAILABLE]) rather than a partial sum.
+  /// `FileUtils.sizeOfDirectory` is mocked to throw so the failure is deterministic and does not depend on
+  /// filesystem permissions.
+  @Test
+  public void testDirectorySizingFailureReturnsNull()
+      throws Exception {
+    File contentDir = new File(INDEX_DIR, "sizing-failure");
+    File indexDir = new File(contentDir, "column4.dir.idx");
+    assertTrue(indexDir.mkdirs());
+
+    IndexType<?, ?, ?> indexType = mock(IndexType.class);
+    when(indexType.getFileExtensions(null)).thenReturn(List.of(".dir.idx"));
+
+    try (MockedStatic<FileUtils> mockedFileUtils = mockStatic(FileUtils.class, CALLS_REAL_METHODS)) {
+      mockedFileUtils.when(() -> FileUtils.sizeOfDirectory(indexDir))
+          .thenThrow(new UncheckedIOException(new IOException("Simulated directory sizing failure")));
+      assertEquals(IndexSizeUtils.sizeOfFileOrDirIndex(indexType, contentDir, "column4", 8L, null),
+          ColumnMetadata.UNAVAILABLE, "A directory that cannot be sized must be reported as unmeasurable, not a "
+              + "partial sum");
     }
   }
 
@@ -515,6 +551,58 @@ public class IndexSizeStatsTest {
         "The external directory size should be re-measured to the same value");
   }
 
+  /// A present index that becomes transiently unmeasurable during a refresh (e.g. `FileUtils.sizeOfDirectory`
+  /// throwing) must leave its existing persisted value untouched rather than clearing it. Clearing it would make
+  /// the key permanently missing whenever the same failure recurs, which is exactly the condition that used to pin
+  /// `needProcess()` at `true` forever; see [#testNeedProcessFalseWhenOnlyIndexSizeStatsAreMissing]. Every other
+  /// column's keys, and this same column's other index keys, must be unaffected.
+  @Test
+  public void testReloadLeavesSizeUnchangedForPresentButUnmeasurableIndex()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(List.of("column4"))
+        .setIndexSizeStatsEnabled(true)
+        .addFieldConfig(
+            new FieldConfig("column4", FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT), null, null))
+        .build();
+    URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
+    assertNotNull(resource);
+    SegmentGeneratorConfig config =
+        SegmentTestUtils.getSegmentGeneratorConfig(new File(TestUtils.getFileFromResourceUrl(resource)),
+            FileFormat.AVRO, INDEX_DIR, RAW_TABLE_NAME, tableConfig, schema());
+    config.setSegmentNamePostfix("1");
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config);
+    driver.build();
+    File segmentDir = segmentDirectory();
+
+    PropertiesConfiguration atSeal = loadMetadata(segmentDir);
+    String textKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column4", StandardIndexes.text().getId());
+    String forwardKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+        StandardIndexes.forward().getId());
+    assertTrue(indexSizeKeys(atSeal).contains(textKey), "Sanity: seal recorded the text index size");
+    long textAtSeal = atSeal.getLong(textKey);
+    long forwardAtSeal = atSeal.getLong(forwardKey);
+
+    File textIndexDir = findTextIndexDirectory(new File(segmentDir, "v3"));
+    assertNotNull(textIndexDir, "The text index should be a directory copied alongside columns.psf");
+
+    try (MockedStatic<FileUtils> mockedFileUtils = mockStatic(FileUtils.class, CALLS_REAL_METHODS)) {
+      mockedFileUtils.when(() -> FileUtils.sizeOfDirectory(textIndexDir))
+          .thenThrow(new UncheckedIOException(new IOException("Simulated directory sizing failure")));
+      runPreProcessor(segmentDir, tableConfig, schema());
+    }
+
+    PropertiesConfiguration afterReload = loadMetadata(segmentDir);
+    assertTrue(indexSizeKeys(afterReload).contains(textKey),
+        "A sizing failure must leave the existing persisted value in place, not clear it; keys were: "
+            + indexSizeKeys(afterReload));
+    assertEquals(afterReload.getLong(textKey), textAtSeal,
+        "The stale-but-not-wrong value from seal time must survive a failed refresh attempt unchanged");
+    assertEquals(afterReload.getLong(forwardKey), forwardAtSeal,
+        "A sizing failure for one column's index must not affect another column's persisted size");
+  }
+
   /// The other half of the data-loss bug: a V1 segment has no `v3/index_map` at all, so `getNumIndexes()` is 0 for
   /// every column and a refresh driven only by source 1 would restore nothing on reload -- wiping every persisted
   /// size, not just the ones the index_map-only view of the previous test covers.
@@ -557,6 +645,325 @@ public class IndexSizeStatsTest {
             "The new inverted index size must equal the actual V1 file length");
       }
     }
+  }
+
+  /// Scopes the refresh to "did this reload add an index" rather than "does the final layout look non-empty":
+  /// adding one index must leave every other already-persisted key exactly as it was, not just present.
+  @Test
+  public void testReloadAddedOnlyLeavesOtherSizesUnchanged()
+      throws Exception {
+    Schema schema = schema();
+    File segmentDir = buildSegmentWithoutInvertedIndex();
+    String forwardKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+        StandardIndexes.forward().getId());
+    String dictionaryKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+        StandardIndexes.dictionary().getId());
+    long forwardBefore = loadMetadata(segmentDir).getLong(forwardKey);
+    long dictionaryBefore = loadMetadata(segmentDir).getLong(dictionaryKey);
+
+    runPreProcessor(segmentDir, tableConfig(true, List.of("column3")), schema);
+
+    PropertiesConfiguration afterAdd = loadMetadata(segmentDir);
+    String invertedKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+        StandardIndexes.inverted().getId());
+    assertTrue(indexSizeKeys(afterAdd).contains(invertedKey),
+        "Reload added an inverted index, so its size must appear; keys were: " + indexSizeKeys(afterAdd));
+    assertEquals(afterAdd.getLong(forwardKey), forwardBefore,
+        "An index untouched by this reload must keep its exact previous value, not just remain present");
+    assertEquals(afterAdd.getLong(dictionaryKey), dictionaryBefore,
+        "An index untouched by this reload must keep its exact previous value, not just remain present");
+  }
+
+  /// The mirror of [#testReloadAddedOnlyLeavesOtherSizesUnchanged]: removing one index must clear only that key and
+  /// leave every other one exactly as it was.
+  @Test
+  public void testReloadRemovedOnlyLeavesOtherSizesUnchanged()
+      throws Exception {
+    Schema schema = schema();
+    File segmentDir = buildSegment(true);
+    String forwardKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+        StandardIndexes.forward().getId());
+    String dictionaryKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+        StandardIndexes.dictionary().getId());
+    String invertedKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+        StandardIndexes.inverted().getId());
+    assertTrue(indexSizeKeys(loadMetadata(segmentDir)).contains(invertedKey), "Sanity: seal recorded the "
+        + "inverted index size");
+    long forwardBefore = loadMetadata(segmentDir).getLong(forwardKey);
+    long dictionaryBefore = loadMetadata(segmentDir).getLong(dictionaryKey);
+
+    runPreProcessor(segmentDir, tableConfig(true, List.of()), schema);
+
+    PropertiesConfiguration afterDrop = loadMetadata(segmentDir);
+    assertFalse(indexSizeKeys(afterDrop).contains(invertedKey),
+        "The inverted index was dropped, so its stale size must be cleared; keys were: "
+            + indexSizeKeys(afterDrop));
+    assertEquals(afterDrop.getLong(forwardKey), forwardBefore,
+        "An index untouched by this reload must keep its exact previous value, not just remain present");
+    assertEquals(afterDrop.getLong(dictionaryKey), dictionaryBefore,
+        "An index untouched by this reload must keep its exact previous value, not just remain present");
+  }
+
+  /// One reload can add one index and remove another at the same time (e.g. swapping which index type is
+  /// configured on a column). Both transitions must be observed independently rather than one masking the other.
+  @Test
+  public void testReloadAddedAndRemovedInSameReload()
+      throws Exception {
+    File segmentDir = buildSegment(true);
+    String invertedKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+        StandardIndexes.inverted().getId());
+    String rangeKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3", StandardIndexes.range().getId());
+    assertTrue(indexSizeKeys(loadMetadata(segmentDir)).contains(invertedKey), "Sanity: seal recorded the "
+        + "inverted index size");
+    assertFalse(indexSizeKeys(loadMetadata(segmentDir)).contains(rangeKey), "Sanity: no range index was built");
+
+    TableConfig reloadConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(List.of("column4"))
+        .setIndexSizeStatsEnabled(true)
+        .setRangeIndexColumns(List.of("column3"))
+        .build();
+    runPreProcessor(segmentDir, reloadConfig, schema());
+
+    PropertiesConfiguration afterReload = loadMetadata(segmentDir);
+    assertFalse(indexSizeKeys(afterReload).contains(invertedKey),
+        "The inverted index was dropped by this reload, so its stale size must be cleared; keys were: "
+            + indexSizeKeys(afterReload));
+    assertTrue(indexSizeKeys(afterReload).contains(rangeKey),
+        "The range index was added by this reload, so its size must appear; keys were: "
+            + indexSizeKeys(afterReload));
+    assertTrue(afterReload.getLong(rangeKey) > 0, "A newly created index must have a positive recorded size");
+  }
+
+  /// A reload that requests no index changes at all -- e.g. a pure tier-migration move -- must leave every
+  /// persisted size at exactly its previous value rather than re-deriving (and potentially drifting) any of them.
+  @Test
+  public void testReloadWithNoIndexChangesLeavesEverySizeUnchanged()
+      throws Exception {
+    Schema schema = schema();
+    File segmentDir = buildSegment(true);
+    PropertiesConfiguration before = loadMetadata(segmentDir);
+    Map<String, Long> beforeValues = new HashMap<>();
+    for (String key : indexSizeKeys(before)) {
+      beforeValues.put(key, before.getLong(key));
+    }
+    assertFalse(beforeValues.isEmpty(), "Sanity: seal recorded at least one index size");
+
+    runPreProcessor(segmentDir, tableConfig(true, List.of("column3")), schema);
+
+    PropertiesConfiguration after = loadMetadata(segmentDir);
+    assertEquals(new HashMap<>(indexSizeKeys(after).stream()
+            .collect(Collectors.toMap(k -> k, after::getLong))), beforeValues,
+        "A reload with no index changes must not add, remove, or change the value of any persisted size");
+  }
+
+  /// A handler can remove and recreate an index of the same type within one reload, leaving presence unchanged
+  /// (true before and after) while the underlying bytes differ -- e.g. `ForwardIndexHandler` rewriting a raw
+  /// column's forward index under a new compression codec. A refresh scoped only to "added" (present after but not
+  /// before) would keep the stale pre-reload size forever in this case; the size must be recomputed for every index
+  /// present after the reload, not just newly-added ones.
+  @Test
+  public void testReloadRecomputesSizeForIndexRebuiltInPlace()
+      throws Exception {
+    File segmentDir = buildSegment(true);
+    String forwardKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column4",
+        StandardIndexes.forward().getId());
+    long beforeSize = loadMetadata(segmentDir).getLong(forwardKey);
+    assertTrue(beforeSize > 0, "Sanity: seal recorded the raw forward index size for column4");
+
+    TableConfig reloadConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(List.of("column4"))
+        .setIndexSizeStatsEnabled(true)
+        .addFieldConfig(new FieldConfig("column4", FieldConfig.EncodingType.RAW, List.of(),
+            FieldConfig.CompressionCodec.ZSTANDARD, null))
+        .build();
+    runPreProcessor(segmentDir, reloadConfig, schema());
+
+    PropertiesConfiguration afterReload = loadMetadata(segmentDir);
+    long afterSize = afterReload.getLong(forwardKey);
+    assertNotEquals(afterSize, beforeSize,
+        "ForwardIndexHandler rewrote column4's forward index in place under a new compression codec, so its "
+            + "persisted size must be recomputed even though the index was present both before and after this "
+            + "reload");
+
+    PropertiesConfiguration indexMap = CommonsConfigurationUtils.fromFile(
+        new File(SegmentDirectoryPaths.findSegmentDirectory(segmentDir), V1Constants.INDEX_MAP_FILE_NAME));
+    long packed = indexMap.getLong("column4." + StandardIndexes.forward().getId() + ".size");
+    assertEquals(afterSize, packed,
+        "The recomputed size must match the freshly packed extent, not the stale build-time value");
+  }
+
+  // Note: V1 segments never have a v3/index_map at all, which is the closest reproducible analog of it being
+  // unreadable at reload time: see testReloadRestoresSizesForV1Segment() for that coverage. A literal
+  // "delete v3/index_map out from under an open V3 segment" is not a usable test here -- doing so makes the
+  // packed columns.psf layout entirely unaddressable, which breaks every handler that reads existing packed data
+  // (e.g. InvertedIndexHandler needs the forward index to build a new inverted index), not just this refresh.
+  // That failure mode is a pre-existing constraint of the V3 format, not something this refresh could paper over.
+
+  /// A column's index can be physically present on disk (so it appears in the live "before" snapshot) while
+  /// `indexSizeStatsEnabled` was off at creation time, so no size was ever persisted for it. Removing that index on
+  /// a reload that also turns the flag on must not fail or spuriously dirty `metadata.properties` for a key that
+  /// was never there -- it must simply leave the never-persisted, now-removed key absent, and correctly persist
+  /// sizes for whatever indexes the reload leaves present instead.
+  @Test
+  public void testReloadRemovingNeverPersistedIndexDoesNotFail()
+      throws Exception {
+    Schema schema = schema();
+    File segmentDir = buildSegment(false);
+    assertTrue(indexSizeKeys(loadMetadata(segmentDir)).isEmpty(),
+        "Sanity: the flag was off at seal time, so no index size key should have been persisted");
+
+    String invertedKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+        StandardIndexes.inverted().getId());
+    String forwardKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+        StandardIndexes.forward().getId());
+
+    runPreProcessor(segmentDir, tableConfig(true, List.of()), schema);
+
+    PropertiesConfiguration afterReload = loadMetadata(segmentDir);
+    assertFalse(indexSizeKeys(afterReload).contains(invertedKey),
+        "The inverted index was both never persisted and dropped by this reload, so its key must stay absent; "
+            + "keys were: " + indexSizeKeys(afterReload));
+    assertTrue(indexSizeKeys(afterReload).contains(forwardKey),
+        "The flag is now on and the forward index is still present after this reload, so its size must be "
+            + "persisted; keys were: " + indexSizeKeys(afterReload));
+    assertTrue(afterReload.getLong(forwardKey) > 0, "A freshly persisted index size must be positive");
+  }
+
+  /// A column's index can be physically present while `indexSizeStatsEnabled` is off, so no size is ever persisted
+  /// for it; a reload with the flag off must not touch `metadata.properties` at all, so a size dropped in that
+  /// window is left stale. Turning the flag back on afterward, with the index still absent, must reconcile that
+  /// phantom rather than serve it forever -- it was never observed as "removed" by any reload, since the reload
+  /// that actually removed it skipped the refresh entirely.
+  @Test
+  public void testReloadReconcilesPhantomLeftByFlagOffToggle()
+      throws Exception {
+    Schema schema = schema();
+    File segmentDir = buildSegment(true);
+    String invertedKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+        StandardIndexes.inverted().getId());
+    assertTrue(indexSizeKeys(loadMetadata(segmentDir)).contains(invertedKey),
+        "Sanity: seal recorded the inverted index size");
+
+    // Flag off: the inverted index is dropped, but the refresh is skipped entirely, so the stale size survives.
+    runPreProcessor(segmentDir, tableConfig(false, List.of()), schema);
+    assertTrue(indexSizeKeys(loadMetadata(segmentDir)).contains(invertedKey),
+        "Sanity: a flag-off reload must not touch persisted sizes at all, leaving this one stale");
+
+    // Flag back on, index still absent: the phantom left behind above must now be cleared.
+    runPreProcessor(segmentDir, tableConfig(true, List.of()), schema);
+    assertFalse(indexSizeKeys(loadMetadata(segmentDir)).contains(invertedKey),
+        "Turning the flag back on must reconcile a phantom size left behind while it was off; keys were: "
+            + indexSizeKeys(loadMetadata(segmentDir)));
+  }
+
+  /// Missing index size stats must never make `needProcess()` return `true`, whether the flag is off or was just
+  /// turned on for a table whose segment already has indexes with no persisted size. `needProcess() == true` drives
+  /// a full segment-directory copy and reprocess (see `BaseTableDataManager`), and a present index that is
+  /// persistently unmeasurable could never satisfy a check based on presence of a size, so every future load of
+  /// that segment would copy and reprocess it again forever. Missing sizes are instead backfilled opportunistically
+  /// as a side effect whenever a reload runs for some other reason -- verified here by triggering one (dropping the
+  /// inverted index) and confirming the backfill happens without `needProcess()` having asked for it.
+  @Test
+  public void testNeedProcessFalseWhenOnlyIndexSizeStatsAreMissing()
+      throws Exception {
+    Schema schema = schema();
+    File segmentDir = buildSegment(false);
+    assertTrue(indexSizeKeys(loadMetadata(segmentDir)).isEmpty(),
+        "Sanity: the flag was off at seal time, so no index size key should have been persisted");
+
+    assertFalse(needProcess(segmentDir, tableConfig(false, List.of("column3")), schema),
+        "A table with the flag off must never be reprocessed just because sizes are unpersisted");
+    assertFalse(needProcess(segmentDir, tableConfig(true, List.of("column3")), schema),
+        "Turning the flag on must not by itself trigger reprocessing; missing sizes are backfilled opportunistically");
+
+    // Trigger a real reload for an unrelated reason (dropping the inverted index) and confirm sizes are backfilled
+    // as a side effect, without needProcess() ever having asked for a reload on their account.
+    runPreProcessor(segmentDir, tableConfig(true, List.of()), schema);
+    assertFalse(indexSizeKeys(loadMetadata(segmentDir)).isEmpty(),
+        "A reload triggered for any other reason must still backfill missing index size stats as a side effect");
+  }
+
+  private static boolean needProcess(File segmentDir, TableConfig tableConfig, Schema schema)
+      throws Exception {
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(segmentDir, ReadMode.mmap);
+        SegmentPreProcessor processor =
+            new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(tableConfig, schema))) {
+      return processor.needProcess();
+    }
+  }
+
+  /// A probe failure for one index type (e.g. `getColumnsWithIndex` throwing) must make that type's post-reload
+  /// presence unknown for this reload rather than absent, so its existing persisted size is left untouched -- not
+  /// cleared as if the index had disappeared. Every other index type's refresh must be unaffected by the failure.
+  private static final class ThrowingIndexTypeSegmentDirectory extends SegmentLocalFSDirectory {
+    private final IndexType<?, ?, ?> _throwingIndexType;
+
+    ThrowingIndexTypeSegmentDirectory(File indexDir, IndexType<?, ?, ?> throwingIndexType)
+        throws Exception {
+      super(indexDir, ReadMode.mmap);
+      _throwingIndexType = throwingIndexType;
+    }
+
+    @Override
+    public java.util.Set<String> getColumnsWithIndex(IndexType<?, ?, ?> type) {
+      // Index handlers call this same method for their own purposes while computing operations, before the
+      // post-reload snapshot ever runs; only the snapshot's own probe -- not those handler calls -- should fail.
+      if (type == _throwingIndexType && calledFromSnapshotIndexTypeIds()) {
+        throw new RuntimeException("Simulated probe failure for " + type.getId());
+      }
+      return super.getColumnsWithIndex(type);
+    }
+
+    private static boolean calledFromSnapshotIndexTypeIds() {
+      for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
+        if (element.getMethodName().equals("snapshotIndexTypeIds")) {
+          return true;
+        }
+      }
+      return false;
+    }
+  }
+
+  private static void runPreProcessorWithThrowingProbe(File segmentDir, TableConfig tableConfig, Schema schema,
+      IndexType<?, ?, ?> throwingIndexType)
+      throws Exception {
+    try (SegmentDirectory segmentDirectory = new ThrowingIndexTypeSegmentDirectory(segmentDir, throwingIndexType);
+        SegmentPreProcessor processor =
+            new SegmentPreProcessor(segmentDirectory, new IndexLoadingConfig(tableConfig, schema))) {
+      processor.process();
+    }
+  }
+
+  @Test
+  public void testReloadLeavesSizeUnchangedWhenIndexTypeProbeThrows()
+      throws Exception {
+    Schema schema = schema();
+    File segmentDir = buildSegment(true);
+    String invertedKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+        StandardIndexes.inverted().getId());
+    String forwardKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+        StandardIndexes.forward().getId());
+    String dictionaryKey = V1Constants.MetadataKeys.Column.getIndexSizeKeyFor("column3",
+        StandardIndexes.dictionary().getId());
+    PropertiesConfiguration before = loadMetadata(segmentDir);
+    assertTrue(indexSizeKeys(before).contains(invertedKey), "Sanity: seal recorded the inverted index size");
+    long invertedBefore = before.getLong(invertedKey);
+    long dictionaryBefore = before.getLong(dictionaryKey);
+
+    // Drop the inverted index on this reload, but force its probe to throw: the drop must not be observed, so the
+    // stale size must survive exactly as if the probe had never run, while unrelated indexes still refresh normally.
+    runPreProcessorWithThrowingProbe(segmentDir, tableConfig(true, List.of()), schema, StandardIndexes.inverted());
+
+    PropertiesConfiguration afterReload = loadMetadata(segmentDir);
+    assertTrue(indexSizeKeys(afterReload).contains(invertedKey),
+        "A probe failure must leave the existing persisted value in place, not clear it, even though the index "
+            + "handler dropped the index; keys were: " + indexSizeKeys(afterReload));
+    assertEquals(afterReload.getLong(invertedKey), invertedBefore,
+        "The stale value from before this reload must survive a failed probe unchanged");
+    assertEquals(afterReload.getLong(dictionaryKey), dictionaryBefore,
+        "A probe failure for one index type must not affect another index type's persisted size");
+    assertTrue(indexSizeKeys(afterReload).contains(forwardKey),
+        "An index type whose probe did not throw must still be refreshed normally");
   }
 
   /// Shared assertion for a file-backed (packed) index: the persisted `metadata.properties` size for
@@ -781,6 +1188,56 @@ public class IndexSizeStatsTest {
       assertFalse(key.startsWith(column + ".vector_index"),
           "An externally stored vector index must not appear in index_map, but found: " + key);
     }
+  }
+
+  /// IVF_FLAT vector index with `storeInSegmentFile=true`: unlike the HNSW directory case above, this backend
+  /// writes a single file that the V1-to-V3 converter packs into `columns.psf` like any other file-backed index --
+  /// this is Spec 4's other half, proving the generic file/directory check in `collectIndexSizes()` routes a
+  /// file-backed vector backend through the packed `index_map` path with no double-count and no directory-sizing
+  /// attempted on it, exactly like [#testVectorIndexDirectorySizedWithoutMarker] proves for the directory-backed
+  /// HNSW case.
+  @Test
+  public void testIvfFlatVectorIndexSizeMatchesPackedExtent()
+      throws Exception {
+    String column = "vectorColumn";
+    int dimension = 4;
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addMultiValueDimension(column, DataType.FLOAT)
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setIndexSizeStatsEnabled(true)
+        .setFieldConfigList(List.of(new FieldConfig.Builder(column)
+            .withEncodingType(FieldConfig.EncodingType.RAW)
+            .withIndexTypes(List.of(FieldConfig.IndexType.VECTOR))
+            .withProperties(Map.of(
+                "vectorIndexType", "IVF_FLAT",
+                "vectorDimension", String.valueOf(dimension),
+                "vectorDistanceFunction", "COSINE",
+                "version", "1",
+                "storeInSegmentFile", "true",
+                "nlist", "2",
+                "trainSampleSize", "20",
+                "minRowsForIndex", "1"))
+            .build()))
+        .build();
+    List<GenericRow> rows = new ArrayList<>();
+    for (int i = 0; i < 20; i++) {
+      Object[] vector = new Object[dimension];
+      for (int d = 0; d < dimension; d++) {
+        vector[d] = (float) (i + d);
+      }
+      GenericRow row = new GenericRow();
+      row.putValue(column, vector);
+      rows.add(row);
+    }
+    File segmentDir = buildCustomSegment(tableConfig, schema, rows);
+    assertPackedIndexSizeMatchesIndexMap(segmentDir, column, StandardIndexes.vector().getId());
+
+    File v3Dir = new File(segmentDir, "v3");
+    File[] directoryEntries = v3Dir.listFiles(File::isDirectory);
+    assertTrue(directoryEntries == null || directoryEntries.length == 0,
+        "A storeInSegmentFile=true vector index must not leave a directory alongside columns.psf, found: "
+            + (directoryEntries == null ? "null" : Arrays.toString(directoryEntries)));
   }
 
   @Nullable

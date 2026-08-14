@@ -28,6 +28,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -128,5 +129,51 @@ public class IndexSizeBreakdownOfflineIngestionIntegrationTest extends CustomDat
     assertNotNull(offlineSegments, "offlineSegments should be present");
     assertFalse(offlineSegments.has("indexSizeBreakdown"),
         "indexSizeBreakdown should be absent when includeIndexSizeStats is not requested");
+  }
+
+  /// Spec 13 end-to-end: the breakdown must track a reload, not stay frozen at ingestion time. The base table config
+  /// configures no inverted index columns, so `DivActualElapsedTime` starts with none; adding one via table config
+  /// and reloading must make `inverted_index` appear in the aggregated breakdown with a positive size, proving
+  /// `SegmentPreProcessor`'s opportunistic refresh (unit-tested in `IndexSizeStatsTest`) also works end-to-end
+  /// through the real reload API and the controller's size-aggregation path.
+  @Test
+  public void testIndexSizeBreakdownReflectsReload()
+      throws Exception {
+    JsonNode breakdownBeforeReload = getIndexSizeBreakdown();
+    assertFalse(breakdownBeforeReload.has("inverted_index"),
+        "Sanity: no inverted index column is configured yet, so inverted_index must not appear in the breakdown");
+
+    TableConfig tableConfig = createOfflineTableConfig();
+    tableConfig.getIndexingConfig().setInvertedIndexColumns(List.of("DivActualElapsedTime"));
+    updateTableConfig(tableConfig);
+    reloadOfflineTable(getTableName());
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode breakdown = getIndexSizeBreakdown();
+        return breakdown.has("inverted_index")
+            && breakdown.get("inverted_index").get("sizePerReplicaInBytes").asLong() > 0;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 60_000L, "Reload did not refresh the index size breakdown with the newly added inverted index");
+
+    JsonNode breakdownAfterReload = getIndexSizeBreakdown();
+    assertTrue(breakdownAfterReload.has("forward_index"),
+        "forward_index must still appear in the breakdown after a reload that only adds an inverted index");
+    assertTrue(breakdownAfterReload.get("forward_index").get("sizePerReplicaInBytes").asLong() > 0,
+        "forward_index size must still be positive after a reload that only adds an inverted index");
+  }
+
+  private JsonNode getIndexSizeBreakdown()
+      throws IOException {
+    String response = sendGetRequest(
+        "http://localhost:" + getControllerPort() + "/tables/" + getTableName()
+            + "/size?includeIndexSizeStats=true");
+    JsonNode offlineSegments = JsonUtils.stringToJsonNode(response).get("offlineSegments");
+    assertNotNull(offlineSegments, "offlineSegments should be present");
+    JsonNode breakdown = offlineSegments.get("indexSizeBreakdown");
+    assertNotNull(breakdown, "indexSizeBreakdown should be present when includeIndexSizeStats=true");
+    return breakdown;
   }
 }
