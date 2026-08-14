@@ -52,6 +52,10 @@ public class SegmentSizeInfo {
     this(segmentName, sizeBytes, (Long) null, null, null, null);
   }
 
+  public SegmentSizeInfo(String segmentName, long sizeBytes, @Nullable Map<String, Long> indexSizeInBytes) {
+    this(segmentName, sizeBytes, (Long) null, null, null, indexSizeInBytes);
+  }
+
   public SegmentSizeInfo(String segmentName, long sizeBytes, long compressionStatsUncompressedValueSizeInBytes,
       long compressionStatsForwardIndexAndDictionaryStorageSizeInBytes) {
     this(segmentName, sizeBytes, compressionStatsUncompressedValueSizeInBytes,
@@ -61,8 +65,17 @@ public class SegmentSizeInfo {
   public SegmentSizeInfo(String segmentName, long sizeBytes, long compressionStatsUncompressedValueSizeInBytes,
       long compressionStatsForwardIndexAndDictionaryStorageSizeInBytes,
       @Nullable Map<String, ColumnCompressionStatsInfo> columnCompressionStats) {
+    this(segmentName, sizeBytes, compressionStatsUncompressedValueSizeInBytes,
+        compressionStatsForwardIndexAndDictionaryStorageSizeInBytes, columnCompressionStats, null);
+  }
+
+  public SegmentSizeInfo(String segmentName, long sizeBytes, long compressionStatsUncompressedValueSizeInBytes,
+      long compressionStatsForwardIndexAndDictionaryStorageSizeInBytes,
+      @Nullable Map<String, ColumnCompressionStatsInfo> columnCompressionStats,
+      @Nullable Map<String, Long> indexSizeInBytes) {
     this(segmentName, sizeBytes, availableValue(compressionStatsUncompressedValueSizeInBytes),
-        availableValue(compressionStatsForwardIndexAndDictionaryStorageSizeInBytes), columnCompressionStats, null);
+        availableValue(compressionStatsForwardIndexAndDictionaryStorageSizeInBytes), columnCompressionStats,
+        indexSizeInBytes);
   }
 
   @JsonCreator

@@ -89,13 +89,16 @@ public class TableSize {
       @QueryParam("includeReplacedSegments") boolean includeReplacedSegments,
       @ApiParam(value = "Include per-column compression stats in response (default false to avoid large responses)")
       @DefaultValue("false") @QueryParam("includeColumnCompressionStats") boolean includeColumnCompressionStats,
+      @ApiParam(value = "Include per-index-type size totals in response, from sizes persisted for segments built "
+          + "while tableIndexConfig.indexSizeStatsEnabled was set")
+      @DefaultValue("false") @QueryParam("includeIndexSizeStats") boolean includeIndexSizeStats,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableSizeReader.TableSizeDetails tableSizeDetails = null;
     try {
       tableSizeDetails =
           _tableSizeReader.getTableSizeDetails(tableName, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000,
-              includeReplacedSegments, includeColumnCompressionStats);
+              includeReplacedSegments, includeColumnCompressionStats, includeIndexSizeStats);
       if (!verbose) {
         if (tableSizeDetails._offlineSegments != null) {
           tableSizeDetails._offlineSegments._segments = new HashMap<>();

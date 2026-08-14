@@ -72,18 +72,21 @@ public class ServerTableSizeReader {
   /// Reads versioned server table-size responses without compression statistics.
   public Map<String, TableSizeInfo> getTableSizeInfoFromServers(BiMap<String, String> serverEndPoints,
       String tableNameWithType, int timeoutMs) {
-    return getTableSizeInfoFromServers(serverEndPoints, tableNameWithType, timeoutMs, false, false);
+    return getTableSizeInfoFromServers(serverEndPoints, tableNameWithType, timeoutMs, false, false, false);
   }
 
   /// Reads versioned server table-size responses with compression summaries and optional per-column details.
   public Map<String, TableSizeInfo> getTableSizeInfoFromServers(BiMap<String, String> serverEndPoints,
       String tableNameWithType, int timeoutMs, boolean includeColumnCompressionStats) {
     return getTableSizeInfoFromServers(serverEndPoints, tableNameWithType, timeoutMs, true,
-        includeColumnCompressionStats);
+        includeColumnCompressionStats, false);
   }
 
-  private Map<String, TableSizeInfo> getTableSizeInfoFromServers(BiMap<String, String> serverEndPoints,
-      String tableNameWithType, int timeoutMs, boolean includeCompressionStats, boolean includeColumnCompressionStats) {
+  /// Reads versioned server table-size responses with explicit control over compression statistics, per-column
+  /// compression statistics, and per-index-type size totals.
+  public Map<String, TableSizeInfo> getTableSizeInfoFromServers(BiMap<String, String> serverEndPoints,
+      String tableNameWithType, int timeoutMs, boolean includeCompressionStats, boolean includeColumnCompressionStats,
+      boolean includeIndexSizeStats) {
     int numServers = serverEndPoints.size();
     LOGGER.info("Reading segment sizes from {} servers for table: {} with timeout: {}ms", numServers, tableNameWithType,
         timeoutMs);
@@ -91,10 +94,21 @@ public class ServerTableSizeReader {
     List<String> serverUrls = new ArrayList<>(numServers);
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     boolean requestCompressionStats = includeCompressionStats || includeColumnCompressionStats;
+    StringBuilder queryString = new StringBuilder();
+    if (requestCompressionStats) {
+      queryString.append("&includeCompressionStats=true");
+    }
+    if (includeColumnCompressionStats) {
+      queryString.append("&includeColumnCompressionStats=true");
+    }
+    if (includeIndexSizeStats) {
+      queryString.append("&includeIndexSizeStats=true");
+    }
+    if (queryString.length() > 0) {
+      queryString.setCharAt(0, '?');
+    }
     for (String endpoint : endpointsToServers.keySet()) {
-      String tableSizeUri = endpoint + "/tables/" + tableNameWithType + "/size"
-          + (requestCompressionStats ? "?includeCompressionStats=true" : "")
-          + (includeColumnCompressionStats ? "&includeColumnCompressionStats=true" : "");
+      String tableSizeUri = endpoint + "/tables/" + tableNameWithType + "/size" + queryString;
       serverUrls.add(tableSizeUri);
     }
 
