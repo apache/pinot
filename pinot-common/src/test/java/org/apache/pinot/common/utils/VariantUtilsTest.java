@@ -20,6 +20,7 @@ package org.apache.pinot.common.utils;
 
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -31,6 +32,7 @@ import java.util.function.Consumer;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.parquet.variant.Variant;
 import org.apache.parquet.variant.VariantBuilder;
+import org.apache.parquet.variant.VariantObjectBuilder;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.VariantUtils.ResultType;
 import org.apache.pinot.common.utils.VariantUtils.ReusableResult;
@@ -326,6 +328,202 @@ public class VariantUtilsTest {
     assertNull(VariantUtils.variantTypeOf(new byte[0], valuePath, result));
   }
 
+  @DataProvider(name = "wideObjectSizes")
+  public Object[][] wideObjectSizes() {
+    return new Object[][]{{8}, {31}, {32}, {33}, {100}};
+  }
+
+  @Test(dataProvider = "wideObjectSizes")
+  public void testWideObjectLookupMatchesParquetJava(int numFields) {
+    VariantBuilder builder = new VariantBuilder();
+    VariantObjectBuilder objectBuilder = builder.startObject();
+    // Append in reverse order so the test relies on the encoded object's lexicographic field ordering, not insertion
+    // order. Parquet switches from linear to binary lookup at 32 fields, which Pinot deliberately mirrors.
+    for (int i = numFields - 1; i >= 0; i--) {
+      objectBuilder.appendKey(wideField(i));
+      objectBuilder.appendInt(i);
+    }
+    builder.endObject();
+    Variant variant = builder.build();
+    byte[] envelope = encode(variant);
+
+    for (String key : List.of(wideField(0), wideField(numFields / 2), wideField(numFields - 1), "missing")) {
+      Variant parquetValue = variant.getFieldByKey(key);
+      Object expected = parquetValue != null ? parquetValue.getInt() : null;
+      assertEquals(VariantUtils.variantGet(envelope, "$." + key, "INT"), expected);
+      assertEquals(VariantUtils.tryVariantGet(envelope, "$." + key, "INT"), expected);
+    }
+  }
+
+  @Test
+  public void testWideObjectLookupUsesJavaUtf16Ordering() {
+    String supplementary = "\uD800\uDC00";
+    String supplementarySuccessor = "\uD800\uDC01";
+    String privateUse = "\uE000";
+    VariantBuilder builder = new VariantBuilder();
+    VariantObjectBuilder objectBuilder = builder.startObject();
+    for (int i = 29; i >= 0; i--) {
+      objectBuilder.appendKey(wideField(i));
+      objectBuilder.appendInt(i);
+    }
+    objectBuilder.appendKey(privateUse);
+    objectBuilder.appendInt(2_000);
+    objectBuilder.appendKey(supplementary);
+    objectBuilder.appendInt(1_000);
+    builder.endObject();
+    Variant variant = builder.build();
+    byte[] envelope = encode(variant);
+
+    // Java String order places the supplementary key before U+E000, while unsigned UTF-8 byte order does the
+    // opposite. Cross-checking parquet-java prevents an allocation-free byte comparator from changing semantics.
+    for (String key : List.of(supplementary, supplementarySuccessor, privateUse)) {
+      Variant parquetValue = variant.getFieldByKey(key);
+      Object expected = parquetValue != null ? parquetValue.getInt() : null;
+      assertEquals(VariantUtils.variantGet(envelope, "$." + key, "INT"), expected);
+    }
+  }
+
+  @Test
+  public void testWideObjectLookupSupportsArrowRustOrdering() {
+    byte[] envelope = arrowRustOrderedWideObjectEnvelope();
+    String supplementary = "\uD800\uDC00";
+    String privateUse = "\uE000";
+
+    assertEquals(VariantUtils.variantGet(envelope, "$." + supplementary, "INT"), 1_000);
+    assertEquals(VariantUtils.tryVariantGet(envelope, "$." + supplementary, "INT"), 1_000);
+    assertTrue(VariantUtils.variantExists(envelope, "$." + supplementary));
+    assertEquals(VariantUtils.variantGet(envelope, "$." + privateUse, "INT"), 2_000);
+    assertEquals(VariantUtils.tryVariantGet(envelope, "$." + privateUse, "INT"), 2_000);
+    assertTrue(VariantUtils.variantExists(envelope, "$." + privateUse));
+    assertNull(VariantUtils.variantGet(envelope, "$.missing", "INT"));
+    assertNull(VariantUtils.tryVariantGet(envelope, "$.missing", "INT"));
+    assertFalse(VariantUtils.variantExists(envelope, "$.missing"));
+  }
+
+  @Test
+  public void testNonMonotonicObjectOffsets() {
+    byte[] envelope = nonMonotonicObjectEnvelope();
+    VariantEnvelope.Decoded decoded = VariantEnvelope.decode(envelope);
+    Variant parquetVariant = new Variant(decoded.getValue(), decoded.getMetadata());
+
+    for (int i = 0; i < 3; i++) {
+      String key = String.valueOf((char) ('a' + i));
+      int expected = i + 1;
+      assertEquals(parquetVariant.getFieldByKey(key).getInt(), expected);
+      assertEquals(VariantUtils.variantGet(envelope, "$." + key, "INT"), expected);
+      assertEquals(VariantUtils.tryVariantGet(envelope, "$." + key, "INT"), expected);
+
+      byte[] subtree = VariantUtils.variantGet(envelope, "$." + key);
+      VariantEnvelope.Decoded decodedSubtree = VariantEnvelope.decode(subtree);
+      assertEquals(decodedSubtree.getValue().remaining(), 2);
+      assertEquals(new Variant(decodedSubtree.getValue(), decodedSubtree.getMetadata()).getInt(), expected);
+      assertEquals(VariantUtils.variantToJson(subtree), Integer.toString(expected));
+    }
+    assertEquals(VariantUtils.variantToJson(envelope), "{\"a\":1,\"b\":2,\"c\":3}");
+    assertFalse(VariantUtils.variantExists(envelope, "$.missing"));
+  }
+
+  @DataProvider(name = "nonMonotonicSubtreeEncodingCases")
+  public Object[][] nonMonotonicSubtreeEncodingCases() {
+    return new Object[][]{
+        nonMonotonicSubtreeEncodingCase("object", Variant.Type.OBJECT, builder -> {
+          VariantObjectBuilder nested = builder.startObject();
+          nested.appendKey("inner");
+          nested.appendInt(7);
+          builder.endObject();
+        }),
+        nonMonotonicSubtreeEncodingCase("array", Variant.Type.ARRAY, builder -> {
+          VariantBuilder nested = builder.startArray();
+          nested.appendInt(7);
+          nested.appendBoolean(true);
+          builder.endArray();
+        }),
+        nonMonotonicSubtreeEncodingCase("null", Variant.Type.NULL, VariantBuilder::appendNull),
+        nonMonotonicSubtreeEncodingCase("true", Variant.Type.BOOLEAN, builder -> builder.appendBoolean(true)),
+        nonMonotonicSubtreeEncodingCase("false", Variant.Type.BOOLEAN, builder -> builder.appendBoolean(false)),
+        nonMonotonicSubtreeEncodingCase("int8", Variant.Type.BYTE, builder -> builder.appendByte((byte) -8)),
+        nonMonotonicSubtreeEncodingCase("int16", Variant.Type.SHORT,
+            builder -> builder.appendShort((short) 32_000)),
+        nonMonotonicSubtreeEncodingCase("int32", Variant.Type.INT, builder -> builder.appendInt(-123_456)),
+        nonMonotonicSubtreeEncodingCase("int64", Variant.Type.LONG,
+            builder -> builder.appendLong(9_876_543_210L)),
+        nonMonotonicSubtreeEncodingCase("short-string", Variant.Type.STRING,
+            builder -> builder.appendString("short")),
+        nonMonotonicSubtreeEncodingCase("long-string", Variant.Type.STRING,
+            builder -> builder.appendString("x".repeat(128))),
+        nonMonotonicSubtreeEncodingCase("double", Variant.Type.DOUBLE,
+            builder -> builder.appendDouble(-123.5D)),
+        nonMonotonicSubtreeEncodingCase("decimal4", Variant.Type.DECIMAL4,
+            builder -> builder.appendDecimal(new BigDecimal("12.34"))),
+        nonMonotonicSubtreeEncodingCase("decimal8", Variant.Type.DECIMAL8,
+            builder -> builder.appendDecimal(new BigDecimal("1234567890.12"))),
+        nonMonotonicSubtreeEncodingCase("decimal16", Variant.Type.DECIMAL16,
+            builder -> builder.appendDecimal(new BigDecimal("12345678901234567890.1234"))),
+        nonMonotonicSubtreeEncodingCase("date", Variant.Type.DATE, builder -> builder.appendDate(1)),
+        nonMonotonicSubtreeEncodingCase("timestamp-tz", Variant.Type.TIMESTAMP_TZ,
+            builder -> builder.appendTimestampTz(1_234_567L)),
+        nonMonotonicSubtreeEncodingCase("timestamp-ntz", Variant.Type.TIMESTAMP_NTZ,
+            builder -> builder.appendTimestampNtz(1_234_567L)),
+        nonMonotonicSubtreeEncodingCase("float", Variant.Type.FLOAT, builder -> builder.appendFloat(1.25F)),
+        nonMonotonicSubtreeEncodingCase("binary", Variant.Type.BINARY,
+            builder -> builder.appendBinary(ByteBuffer.wrap(new byte[]{0, 1, -1, 42}))),
+        nonMonotonicSubtreeEncodingCase("time", Variant.Type.TIME,
+            builder -> builder.appendTime(3_723_004_005L)),
+        nonMonotonicSubtreeEncodingCase("timestamp-nanos-tz", Variant.Type.TIMESTAMP_NANOS_TZ,
+            builder -> builder.appendTimestampNanosTz(1_234_567_891L)),
+        nonMonotonicSubtreeEncodingCase("timestamp-nanos-ntz", Variant.Type.TIMESTAMP_NANOS_NTZ,
+            builder -> builder.appendTimestampNanosNtz(1_234_567_891L)),
+        nonMonotonicSubtreeEncodingCase("uuid", Variant.Type.UUID,
+            builder -> builder.appendUUID(UUID.fromString("00112233-4455-6677-8899-aabbccddeeff")))
+    };
+  }
+
+  @Test(dataProvider = "nonMonotonicSubtreeEncodingCases")
+  public void testNonMonotonicSubtreeForEveryEncoding(String description, Variant.Type expectedType,
+      int expectedLength, byte[] envelope) {
+    assertTrue(hasNonMonotonicObjectOffsets(envelope), description);
+    VariantEnvelope.Decoded decoded = VariantEnvelope.decode(envelope);
+    Variant expected = new Variant(decoded.getValue(), decoded.getMetadata()).getFieldByKey("a");
+    assertEquals(expected.getType(), expectedType, description);
+
+    byte[] subtree = VariantUtils.variantGet(envelope, "$.a");
+    byte[] tolerantSubtree = VariantUtils.tryVariantGet(envelope, "$.a");
+    VariantEnvelope.Decoded decodedSubtree = VariantEnvelope.decode(subtree);
+    byte[] actualValue = toByteArray(decodedSubtree.getValue());
+    byte[] parquetValueAndTrailingData = toByteArray(expected.getValueBuffer());
+    assertEquals(actualValue.length, expectedLength, description);
+    assertTrue(Arrays.equals(actualValue, Arrays.copyOf(parquetValueAndTrailingData, expectedLength)), description);
+    assertTrue(Arrays.equals(tolerantSubtree, subtree), description);
+
+    byte[] expectedEnvelope = VariantEnvelope.encode(expected.getMetadataBuffer(), expected.getValueBuffer());
+    assertEquals(VariantUtils.variantToJson(subtree), VariantUtils.variantToJson(expectedEnvelope), description);
+  }
+
+  @Test
+  public void testNonMonotonicSubtreeRejectsTruncatedVariableLengthValue() {
+    byte[] envelope = nonMonotonicSubtreeEnvelope(
+        builder -> builder.appendBinary(ByteBuffer.wrap(new byte[]{1, 2, 3})));
+    int metadataLength = readBigEndianInt(envelope, 8);
+    int valueStart = VariantEnvelope.HEADER_SIZE + metadataLength;
+    int valueHeader = Byte.toUnsignedInt(envelope[valueStart]);
+    int typeInfo = valueHeader >>> 2 & 0x3F;
+    int sizeBytes = ((typeInfo >>> 4) & 1) == 0 ? 1 : Integer.BYTES;
+    int numElements = readUnsignedLittleEndian(envelope, valueStart + 1, sizeBytes);
+    int idSize = ((typeInfo >>> 2) & 3) + 1;
+    int offsetSize = (typeInfo & 3) + 1;
+    int offsetStart = valueStart + 1 + sizeBytes + numElements * idSize;
+    int dataStart = offsetStart + (numElements + 1) * offsetSize;
+    int targetOffset = readUnsignedLittleEndian(envelope, offsetStart, offsetSize);
+    int targetStart = dataStart + targetOffset;
+    envelope[targetStart + 1] = 0x7F;
+    envelope[targetStart + 2] = 0;
+    envelope[targetStart + 3] = 0;
+    envelope[targetStart + 4] = 0;
+
+    assertThrows(IllegalArgumentException.class, () -> VariantUtils.variantGet(envelope, "$.a"));
+    assertNull(VariantUtils.tryVariantGet(envelope, "$.a"));
+  }
+
   @Test
   public void testReusableResultMalformedInputAndReuse() {
     VariantPath path = VariantUtils.compilePath("$.items[0]");
@@ -541,8 +739,8 @@ public class VariantUtilsTest {
     ReusableResult result = new ReusableResult();
     assertTrue(VariantUtils.extractInto(envelope, path, resultType, result));
     assertTrue(VariantUtils.tryExtractInto(envelope, path, resultType, result));
-    Object externalValue = result.getExternalValue(resultType);
-    Object internalValue = result.getInternalValue(resultType);
+    Object externalValue = result.toExternalValue(resultType);
+    Object internalValue = result.toInternalValue(resultType);
     switch (resultType) {
       case BOOLEAN:
         assertEquals(result.getIntValue() != 0, expected);
@@ -610,8 +808,181 @@ public class VariantUtilsTest {
   }
 
   private static byte[] encode(VariantBuilder builder) {
-    Variant variant = builder.build();
+    return encode(builder.build());
+  }
+
+  private static byte[] encode(Variant variant) {
     return VariantEnvelope.encode(variant.getMetadataBuffer(), variant.getValueBuffer());
+  }
+
+  private static String wideField(int index) {
+    return String.format("field%03d", index);
+  }
+
+  /// Reorders a parquet-java object into Arrow Rust's Unicode scalar/UTF-8 key order while preserving each field's
+  /// dictionary id, physical value offset, and shared metadata. The resulting 32-field envelope exercises a valid
+  /// external ordering for which Java UTF-16 binary search alone is not authoritative.
+  private static byte[] arrowRustOrderedWideObjectEnvelope() {
+    String supplementary = "\uD800\uDC00";
+    String privateUse = "\uE000";
+    VariantBuilder builder = new VariantBuilder();
+    VariantObjectBuilder objectBuilder = builder.startObject();
+    for (int i = 0; i < 30; i++) {
+      objectBuilder.appendKey(wideField(i));
+      objectBuilder.appendInt(i);
+    }
+    objectBuilder.appendKey(supplementary);
+    objectBuilder.appendInt(1_000);
+    objectBuilder.appendKey(privateUse);
+    objectBuilder.appendInt(2_000);
+    builder.endObject();
+
+    byte[] envelope = encode(builder);
+    VariantEnvelope.Decoded decoded = VariantEnvelope.decode(envelope);
+    Variant variant = new Variant(decoded.getValue(), decoded.getMetadata());
+    byte[] value = toByteArray(decoded.getValue());
+    int typeInfo = Byte.toUnsignedInt(value[0]) >>> 2 & 0x3F;
+    int sizeBytes = ((typeInfo >>> 4) & 1) == 0 ? 1 : Integer.BYTES;
+    int numElements = readUnsignedLittleEndian(value, 1, sizeBytes);
+    int idSize = ((typeInfo >>> 2) & 3) + 1;
+    int offsetSize = (typeInfo & 3) + 1;
+    int idStart = 1 + sizeBytes;
+    int offsetStart = idStart + numElements * idSize;
+
+    String[] keys = new String[numElements];
+    Integer[] arrowOrder = new Integer[numElements];
+    for (int i = 0; i < numElements; i++) {
+      keys[i] = variant.getFieldAtIndex(i).key;
+      arrowOrder[i] = i;
+    }
+    Arrays.sort(arrowOrder, (left, right) -> compareUnsignedUtf8(keys[left], keys[right]));
+
+    byte[] reorderedValue = Arrays.copyOf(value, value.length);
+    for (int i = 0; i < numElements; i++) {
+      int sourceIndex = arrowOrder[i];
+      System.arraycopy(value, idStart + sourceIndex * idSize, reorderedValue, idStart + i * idSize, idSize);
+      System.arraycopy(value, offsetStart + sourceIndex * offsetSize, reorderedValue,
+          offsetStart + i * offsetSize, offsetSize);
+    }
+    return VariantEnvelope.encode(decoded.getMetadata(), ByteBuffer.wrap(reorderedValue));
+  }
+
+  private static int compareUnsignedUtf8(String left, String right) {
+    byte[] leftBytes = left.getBytes(StandardCharsets.UTF_8);
+    byte[] rightBytes = right.getBytes(StandardCharsets.UTF_8);
+    int length = Math.min(leftBytes.length, rightBytes.length);
+    for (int i = 0; i < length; i++) {
+      int comparison = Integer.compare(Byte.toUnsignedInt(leftBytes[i]), Byte.toUnsignedInt(rightBytes[i]));
+      if (comparison != 0) {
+        return comparison;
+      }
+    }
+    return Integer.compare(leftBytes.length, rightBytes.length);
+  }
+
+  private static Object[] nonMonotonicSubtreeEncodingCase(String description, Variant.Type expectedType,
+      Consumer<VariantBuilder> appender) {
+    VariantBuilder standaloneBuilder = new VariantBuilder();
+    appender.accept(standaloneBuilder);
+    int expectedLength = standaloneBuilder.build().getValueBuffer().remaining();
+    return new Object[]{description, expectedType, expectedLength, nonMonotonicSubtreeEnvelope(appender)};
+  }
+
+  private static byte[] nonMonotonicSubtreeEnvelope(Consumer<VariantBuilder> appender) {
+    VariantBuilder builder = new VariantBuilder();
+    VariantObjectBuilder objectBuilder = builder.startObject();
+    // Write z first and a second. The object index is key-sorted as a/z, while their physical values remain z/a.
+    objectBuilder.appendKey("z");
+    objectBuilder.appendByte((byte) 42);
+    objectBuilder.appendKey("a");
+    appender.accept(objectBuilder);
+    builder.endObject();
+    return reverseObjectPhysicalValues(encode(builder));
+  }
+
+  /// Reverses the physical value region of a canonical object while retaining its key-sorted ids and offset entries.
+  /// This models conforming producers that choose a physical value order independent of the logical key order.
+  private static byte[] reverseObjectPhysicalValues(byte[] envelope) {
+    VariantEnvelope.Decoded decoded = VariantEnvelope.decode(envelope);
+    byte[] value = toByteArray(decoded.getValue());
+    int typeInfo = Byte.toUnsignedInt(value[0]) >>> 2 & 0x3F;
+    int sizeBytes = ((typeInfo >>> 4) & 1) == 0 ? 1 : Integer.BYTES;
+    int numElements = readUnsignedLittleEndian(value, 1, sizeBytes);
+    int idSize = ((typeInfo >>> 2) & 3) + 1;
+    int offsetSize = (typeInfo & 3) + 1;
+    int offsetStart = 1 + sizeBytes + numElements * idSize;
+    int dataStart = offsetStart + (numElements + 1) * offsetSize;
+    int totalDataLength = readUnsignedLittleEndian(value, offsetStart + numElements * offsetSize, offsetSize);
+
+    int[] offsets = new int[numElements + 1];
+    for (int i = 0; i <= numElements; i++) {
+      offsets[i] = readUnsignedLittleEndian(value, offsetStart + i * offsetSize, offsetSize);
+    }
+    byte[] reversedData = new byte[totalDataLength];
+    int writeOffset = 0;
+    for (int i = numElements - 1; i >= 0; i--) {
+      int length = offsets[i + 1] - offsets[i];
+      System.arraycopy(value, dataStart + offsets[i], reversedData, writeOffset, length);
+      writeUnsignedLittleEndian(value, offsetStart + i * offsetSize, offsetSize, writeOffset);
+      writeOffset += length;
+    }
+    System.arraycopy(reversedData, 0, value, dataStart, totalDataLength);
+    return VariantEnvelope.encode(decoded.getMetadata(), ByteBuffer.wrap(value));
+  }
+
+  private static boolean hasNonMonotonicObjectOffsets(byte[] envelope) {
+    byte[] value = toByteArray(VariantEnvelope.decode(envelope).getValue());
+    int typeInfo = Byte.toUnsignedInt(value[0]) >>> 2 & 0x3F;
+    int sizeBytes = ((typeInfo >>> 4) & 1) == 0 ? 1 : Integer.BYTES;
+    int numElements = readUnsignedLittleEndian(value, 1, sizeBytes);
+    int idSize = ((typeInfo >>> 2) & 3) + 1;
+    int offsetSize = (typeInfo & 3) + 1;
+    int offsetStart = 1 + sizeBytes + numElements * idSize;
+    int previous = readUnsignedLittleEndian(value, offsetStart, offsetSize);
+    for (int i = 1; i < numElements; i++) {
+      int current = readUnsignedLittleEndian(value, offsetStart + i * offsetSize, offsetSize);
+      if (current < previous) {
+        return true;
+      }
+      previous = current;
+    }
+    return false;
+  }
+
+  private static byte[] toByteArray(ByteBuffer buffer) {
+    ByteBuffer copy = buffer.duplicate();
+    byte[] bytes = new byte[copy.remaining()];
+    copy.get(bytes);
+    return bytes;
+  }
+
+  private static int readUnsignedLittleEndian(byte[] bytes, int offset, int numBytes) {
+    int value = 0;
+    for (int i = 0; i < numBytes; i++) {
+      value |= Byte.toUnsignedInt(bytes[offset + i]) << Byte.SIZE * i;
+    }
+    return value;
+  }
+
+  private static void writeUnsignedLittleEndian(byte[] bytes, int offset, int numBytes, int value) {
+    for (int i = 0; i < numBytes; i++) {
+      bytes[offset + i] = (byte) (value >>> Byte.SIZE * i);
+    }
+  }
+
+  /// Returns a valid Variant object whose lexicographic fields a/b/c point to physically reversed int8 values.
+  /// Object offsets are `[4, 2, 0, 6]`, which the Variant specification explicitly permits.
+  private static byte[] nonMonotonicObjectEnvelope() {
+    byte[] metadata = {0x11, 0x03, 0x00, 0x01, 0x02, 0x03, 'a', 'b', 'c'};
+    byte[] value = {
+        0x02, 0x03,             // object header, three fields
+        0x00, 0x01, 0x02,       // metadata dictionary ids for a, b, c
+        0x04, 0x02, 0x00, 0x06, // physical offsets for a, b, c, then total data length
+        0x0C, 0x03,             // c = int8(3), at physical offset 0
+        0x0C, 0x02,             // b = int8(2), at physical offset 2
+        0x0C, 0x01              // a = int8(1), at physical offset 4
+    };
+    return VariantEnvelope.encode(metadata, 0, metadata.length, value, 0, value.length);
   }
 
   private static Object[] jsonRenderingCase(Variant.Type type, String expectedJson,
