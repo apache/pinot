@@ -928,9 +928,9 @@ public class ZKMetadataProvider {
     if (markerRecord == null) {
       return false;
     }
-    Long startTimeMs = markerRecord.getLongField(DELETION_MARKER_START_TIME_KEY);
-    if (startTimeMs == null) {
-      // Marker exists but has no start time, consider it invalid
+    long startTimeMs = markerRecord.getLongField(DELETION_MARKER_START_TIME_KEY, -1L);
+    if (startTimeMs < 0) {
+      // Marker exists but has no (or an unparseable) start time, consider it invalid
       return false;
     }
     // Check if marker has expired
@@ -971,9 +971,9 @@ public class ZKMetadataProvider {
       propertyStore.remove(markerPath, AccessOption.PERSISTENT);
       return createTableDeletionMarker(propertyStore, tableNameWithType, controllerId);
     }
-    Long startTimeMs = markerRecord.getLongField(DELETION_MARKER_START_TIME_KEY);
-    if (startTimeMs == null) {
-      // Marker has no start time, consider it stale and remove
+    long startTimeMs = markerRecord.getLongField(DELETION_MARKER_START_TIME_KEY, -1L);
+    if (startTimeMs < 0) {
+      // Marker has no (or an unparseable) start time, consider it stale and remove
       propertyStore.remove(markerPath, AccessOption.PERSISTENT);
       return createTableDeletionMarker(propertyStore, tableNameWithType, controllerId);
     }

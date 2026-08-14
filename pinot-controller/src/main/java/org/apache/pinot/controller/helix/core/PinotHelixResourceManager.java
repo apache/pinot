@@ -308,7 +308,7 @@ public class PinotHelixResourceManager {
   /// reminder to clean up old Zk nodes when the controller starts up.
   public synchronized void start(HelixManager helixZkManager, @Nullable ControllerMetrics controllerMetrics) {
     _helixZkManager = helixZkManager;
-    _controllerId = _helixZkManager.getInstanceId();
+    _controllerId = _helixZkManager.getInstanceName();
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     _propertyStore = _helixZkManager.getHelixPropertyStore();
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
@@ -2679,8 +2679,8 @@ public class PinotHelixResourceManager {
       ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, tableNameWithType);
       LOGGER.info("Deleting table {}: Removed table config", tableNameWithType);
 
-      // Validate that all table-related znodes have been successfully removed
-      validateTableDeletionCompleteness(tableNameWithType, tableType);
+      // Audit the property store for metadata that should now be gone, and warn about anything left behind
+      auditTableDeletionCompleteness(tableNameWithType, tableType);
 
       LOGGER.info("Deleting table {}: Finish", tableNameWithType);
     } finally {
@@ -2692,81 +2692,64 @@ public class PinotHelixResourceManager {
     }
   }
 
-  /// Validates that all table-related znodes have been successfully removed after deletion.
-  /// This ensures data consistency and helps detect partial deletions.
+  /// Audits the property store for table metadata that [#deleteTable] should have removed, and logs a warning
+  /// listing anything left behind so that an operator can clean it up.
+  ///
+  /// This deliberately only covers artifacts that `deleteTable` removes with a synchronous ZK write, so a
+  /// leftover here is a real leak rather than a timing artifact. In particular the ExternalView is NOT checked:
+  /// Helix removes it asynchronously via the controller pipeline after the IdealState is dropped, so it is
+  /// routinely still present at this point.
+  ///
+  /// This only warns and never throws. By the time it runs the table config is already gone, so the delete has
+  /// succeeded from the caller's point of view; failing the request here would report a misleading error for a
+  /// table that no longer exists, and would not make the leftovers go away.
+  ///
+  /// ponytail: tier instance partitions, minion task metadata and materialized view metadata are not audited.
+  /// Tier partitions are named per tier and minion metadata is keyed per task type, so covering them means
+  /// scanning every instance partitions / task znode in the cluster on every delete. If leaks are observed in
+  /// practice, add a targeted child listing for the specific parent path rather than a cluster-wide scan.
   ///
   /// @param tableNameWithType The table name with type suffix
   /// @param tableType The table type
-  private void validateTableDeletionCompleteness(String tableNameWithType, TableType tableType) {
+  private void auditTableDeletionCompleteness(String tableNameWithType, TableType tableType) {
     List<String> remainingArtifacts = new ArrayList<>();
 
-    // Check Helix resources
     if (_helixDataAccessor.getProperty(_keyBuilder.idealStates(tableNameWithType)) != null) {
       remainingArtifacts.add("IdealState");
     }
-    if (_helixDataAccessor.getProperty(_keyBuilder.externalView(tableNameWithType)) != null) {
-      remainingArtifacts.add("ExternalView");
-    }
-
-    // Check property store resources
-    // Note: ResourceConfig and TableConfig are stored at the same path in Pinot
     if (ZKMetadataProvider.isTableConfigExists(_propertyStore, tableNameWithType)) {
       remainingArtifacts.add("TableConfig");
     }
     List<String> segments = ZKMetadataProvider.getSegments(_propertyStore, tableNameWithType);
     if (segments != null && !segments.isEmpty()) {
-      remainingArtifacts.add("SegmentMetadata");
+      remainingArtifacts.add(segments.size() + " segment(s) of metadata");
     }
-
-    // Check instance partitions
-    if (tableType == TableType.OFFLINE) {
-      if (InstancePartitionsUtils.getInstancePartitions(_propertyStore, tableNameWithType) != null) {
-        remainingArtifacts.add("InstancePartitions");
-      }
-    } else {
-      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      if (InstancePartitionsUtils.getInstancePartitions(_propertyStore,
-          InstancePartitionsType.CONSUMING.getInstancePartitionsName(rawTableName)) != null) {
-        remainingArtifacts.add("ConsumingInstancePartitions");
-      }
-      if (InstancePartitionsUtils.getInstancePartitions(_propertyStore,
-          InstancePartitionsType.COMPLETED.getInstancePartitionsName(rawTableName)) != null) {
-        remainingArtifacts.add("CompletedInstancePartitions");
-      }
-    }
-
-    // Check tier instance partitions
-    if (InstancePartitionsUtils.getTierInstancePartitions(_propertyStore, tableNameWithType) != null) {
-      remainingArtifacts.add("TierInstancePartitions");
-    }
-
-    // Check segment lineage
     if (SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType) != null) {
       remainingArtifacts.add("SegmentLineage");
     }
 
-    // Check minion task metadata
-    if (MinionTaskMetadataUtils.getTaskMetadata(_propertyStore, tableNameWithType) != null) {
-      remainingArtifacts.add("MinionTaskMetadata");
-    }
-
-    // Check materialized view metadata
-    if (MaterializedViewDefinitionMetadataUtils.get(_propertyStore, tableNameWithType) != null) {
-      remainingArtifacts.add("MVDefinitionMetadata");
-    }
-    if (MaterializedViewRuntimeMetadataUtils.get(_propertyStore, tableNameWithType) != null) {
-      remainingArtifacts.add("MVRuntimeMetadata");
-    }
-
-    if (!remainingArtifacts.isEmpty()) {
-      String errorMsg = String.format(
-          "Table deletion validation failed for '%s': %d artifact(s) still remain: %s. "
-              + "This may indicate a partial deletion or concurrent modification.",
-          tableNameWithType, remainingArtifacts.size(), remainingArtifacts);
-      LOGGER.error(errorMsg);
-      throw new IllegalStateException(errorMsg);
+    // Mirror the instance partitions names that deleteTable removes.
+    if (tableType == TableType.OFFLINE) {
+      if (InstancePartitionsUtils.fetchInstancePartitions(_propertyStore, tableNameWithType) != null) {
+        remainingArtifacts.add("InstancePartitions");
+      }
     } else {
-      LOGGER.info("Table deletion validation successful for '{}': all artifacts removed", tableNameWithType);
+      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+      for (InstancePartitionsType type : List.of(InstancePartitionsType.CONSUMING,
+          InstancePartitionsType.COMPLETED)) {
+        String instancePartitionsName = type.getInstancePartitionsName(rawTableName);
+        if (InstancePartitionsUtils.fetchInstancePartitions(_propertyStore, instancePartitionsName) != null) {
+          remainingArtifacts.add(instancePartitionsName);
+        }
+      }
+    }
+
+    if (remainingArtifacts.isEmpty()) {
+      LOGGER.info("Deleting table {}: Verified all audited metadata was removed", tableNameWithType);
+    } else {
+      LOGGER.warn("Deleting table {}: Finished but left {} metadata artifact(s) behind: {}. "
+              + "These need to be cleaned up manually before the table is re-created.", tableNameWithType,
+          remainingArtifacts.size(), remainingArtifacts);
     }
   }
 

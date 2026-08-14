@@ -18,187 +18,216 @@
  */
 package org.apache.pinot.common.metadata;
 
+import java.util.concurrent.TimeUnit;
+import org.apache.helix.AccessOption;
+import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
+import org.apache.pinot.common.utils.ZkStarter;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
-/// Unit tests for table deletion marker functionality in ZKMetadataProvider.
-/// Tests cover creation, validation, expiry, and cleanup of deletion markers.
+/// Unit tests for the table deletion marker functionality in [ZKMetadataProvider].
+/// The marker provides mutual exclusion between concurrent table deletions and blocks table
+/// re-creation while a deletion is in flight, so these tests cover creation, duplicate
+/// rejection, removal, expiry and takeover.
 public class TableDeletionMarkerTest {
+  private static final String PROPERTY_STORE_ROOT = "/TableDeletionMarkerTest/PROPERTYSTORE";
+  private static final String MARKER_PREFIX = "/TABLE_DELETION_IN_PROGRESS";
+  private static final String START_TIME_KEY = "startTimeMs";
+  private static final String CONTROLLER_ID_KEY = "controllerId";
+  private static final long EXPIRY_MS = 24 * 60 * 60 * 1000L;
 
+  private static final String TABLE_NAME = "testTable_REALTIME";
+  private static final String CONTROLLER_1 = "Controller_localhost_9000";
+  private static final String CONTROLLER_2 = "Controller_localhost_9001";
+
+  private ZkStarter.ZookeeperInstance _zk;
   private ZkClient _zkClient;
-  private String _zkPath;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  private static final String TEST_TABLE_NAME = "testTable_REALTIME";
-  private static final String CONTROLLER_ID_1 = "controller_1";
-  private static final String CONTROLLER_ID_2 = "controller_2";
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
-    _zkPath = "/tmp/TableDeletionMarkerTest_" + System.currentTimeMillis();
-    _zkClient = new ZkClient("localhost:2181", 10000, 10000);
-    _propertyStore = new ZkHelixPropertyStore<>("localhost:2181", _zkPath, _zkClient);
+  public void beforeClass() {
+    _zk = ZkStarter.startLocalZkServer();
+    _zkClient = new ZkClient.Builder().setZkServer(_zk.getZkUrl()).setZkSerializer(new ZNRecordSerializer()).build();
+    assertTrue(_zkClient.waitUntilConnected(10_000, TimeUnit.MILLISECONDS));
+    _propertyStore = new ZkHelixPropertyStore<>(new ZkBaseDataAccessor<>(_zkClient), PROPERTY_STORE_ROOT, null);
   }
 
   @AfterClass
-  public void tearDown() {
-    try {
-      if (_propertyStore != null) {
-        _propertyStore.stop();
-      }
-      if (_zkClient != null) {
-        _zkClient.close();
-      }
-    } catch (Exception e) {
-      // Ignore cleanup errors
+  public void afterClass() {
+    if (_propertyStore != null) {
+      _propertyStore.stop();
+    }
+    if (_zkClient != null) {
+      _zkClient.close();
+    }
+    if (_zk != null) {
+      ZkStarter.stopLocalZkServer(_zk);
     }
   }
 
-  @Test
-  public void testCreateDeletionMarker() {
-    // Test successful creation of a deletion marker
-    boolean created = ZKMetadataProvider.createTableDeletionMarker(_propertyStore, TEST_TABLE_NAME, CONTROLLER_ID_1);
-    assertTrue(created, "Deletion marker should be created successfully");
+  /// Each test starts from a clean marker tree so the tests are order independent.
+  @BeforeMethod
+  public void cleanMarkers() {
+    if (_zkClient.exists(PROPERTY_STORE_ROOT + MARKER_PREFIX)) {
+      _zkClient.deleteRecursively(PROPERTY_STORE_ROOT + MARKER_PREFIX);
+    }
+  }
 
-    // Verify the marker exists
-    boolean exists = ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TEST_TABLE_NAME);
-    assertTrue(exists, "Deletion marker should exist after creation");
+  private static String markerPath(String tableNameWithType) {
+    return MARKER_PREFIX + "/" + tableNameWithType;
+  }
 
-    // Cleanup
-    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, TEST_TABLE_NAME);
+  /// Writes a marker whose start time is `ageMs` in the past, to simulate a marker left behind by
+  /// a controller that crashed mid-deletion.
+  private void writeMarkerWithAge(String tableNameWithType, String controllerId, long ageMs) {
+    ZNRecord record = new ZNRecord(tableNameWithType);
+    record.setSimpleField(CONTROLLER_ID_KEY, controllerId);
+    record.setLongField(START_TIME_KEY, System.currentTimeMillis() - ageMs);
+    assertTrue(_propertyStore.set(markerPath(tableNameWithType), record, AccessOption.PERSISTENT));
   }
 
   @Test
-  public void testCreateDuplicateDeletionMarker() {
-    // Create first marker
-    boolean firstCreated = ZKMetadataProvider.createTableDeletionMarker(_propertyStore, TEST_TABLE_NAME,
-        CONTROLLER_ID_1);
-    assertTrue(firstCreated, "First deletion marker should be created successfully");
-
-    // Try to create duplicate marker
-    boolean secondCreated = ZKMetadataProvider.createTableDeletionMarker(_propertyStore, TEST_TABLE_NAME,
-        CONTROLLER_ID_2);
-    assertFalse(secondCreated, "Duplicate deletion marker should not be created");
-
-    // Cleanup
-    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, TEST_TABLE_NAME);
+  public void testCreateMarker() {
+    assertTrue(ZKMetadataProvider.createTableDeletionMarker(_propertyStore, TABLE_NAME, CONTROLLER_1));
+    assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TABLE_NAME));
   }
 
   @Test
-  public void testIsValidDeletionMarkerExists() {
-    // Test when marker does not exist
-    boolean exists = ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TEST_TABLE_NAME);
-    assertFalse(exists, "Deletion marker should not exist when not created");
+  public void testMarkerRecordsControllerIdAndStartTime() {
+    long before = System.currentTimeMillis();
+    assertTrue(ZKMetadataProvider.createTableDeletionMarker(_propertyStore, TABLE_NAME, CONTROLLER_1));
 
-    // Create marker
-    ZKMetadataProvider.createTableDeletionMarker(_propertyStore, TEST_TABLE_NAME, CONTROLLER_ID_1);
-
-    // Test when marker exists and is valid
-    exists = ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TEST_TABLE_NAME);
-    assertTrue(exists, "Deletion marker should exist when created");
-
-    // Cleanup
-    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, TEST_TABLE_NAME);
+    ZNRecord record = _propertyStore.get(markerPath(TABLE_NAME), null, AccessOption.PERSISTENT);
+    assertNotNull(record, "Marker znode should be readable after creation");
+    assertEquals(record.getSimpleField(CONTROLLER_ID_KEY), CONTROLLER_1,
+        "Marker must record the owning controller so a stale marker can be attributed");
+    long startTimeMs = record.getLongField(START_TIME_KEY, -1L);
+    assertTrue(startTimeMs >= before && startTimeMs <= System.currentTimeMillis(),
+        "Marker start time should be the wall clock time at creation, got: " + startTimeMs);
   }
 
   @Test
-  public void testRemoveDeletionMarker() {
-    // Create marker
-    ZKMetadataProvider.createTableDeletionMarker(_propertyStore, TEST_TABLE_NAME, CONTROLLER_ID_1);
+  public void testDuplicateMarkerIsRejected() {
+    assertTrue(ZKMetadataProvider.createTableDeletionMarker(_propertyStore, TABLE_NAME, CONTROLLER_1));
+    assertFalse(ZKMetadataProvider.createTableDeletionMarker(_propertyStore, TABLE_NAME, CONTROLLER_2),
+        "A second controller must not be able to create a marker for a table already being deleted");
 
-    // Verify it exists
-    assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TEST_TABLE_NAME));
-
-    // Remove marker
-    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, TEST_TABLE_NAME);
-
-    // Verify it's removed
-    assertFalse(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TEST_TABLE_NAME));
+    // The original owner must be preserved.
+    ZNRecord record = _propertyStore.get(markerPath(TABLE_NAME), null, AccessOption.PERSISTENT);
+    assertNotNull(record);
+    assertEquals(record.getSimpleField(CONTROLLER_ID_KEY), CONTROLLER_1);
   }
 
   @Test
-  public void testRemoveNonExistentDeletionMarker() {
-    // Should not throw exception when removing non-existent marker
-    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, TEST_TABLE_NAME);
-    // Test passes if no exception is thrown
+  public void testNoMarkerWhenNotCreated() {
+    assertFalse(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TABLE_NAME));
   }
 
   @Test
-  public void testCreateOrTakeoverDeletionMarkerNew() {
-    // Test takeover when no marker exists
-    boolean result = ZKMetadataProvider.createOrTakeoverTableDeletionMarker(_propertyStore, TEST_TABLE_NAME,
-        CONTROLLER_ID_1);
-    assertTrue(result, "Should create new marker when none exists");
+  public void testRemoveMarker() {
+    assertTrue(ZKMetadataProvider.createTableDeletionMarker(_propertyStore, TABLE_NAME, CONTROLLER_1));
+    assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TABLE_NAME));
 
-    // Cleanup
-    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, TEST_TABLE_NAME);
+    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, TABLE_NAME);
+    assertFalse(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TABLE_NAME));
+
+    // A fresh deletion of the same table must be possible once the marker is gone.
+    assertTrue(ZKMetadataProvider.createTableDeletionMarker(_propertyStore, TABLE_NAME, CONTROLLER_2));
   }
 
   @Test
-  public void testCreateOrTakeoverDeletionMarkerExistingValid() {
-    // Create initial marker
-    ZKMetadataProvider.createTableDeletionMarker(_propertyStore, TEST_TABLE_NAME, CONTROLLER_ID_1);
-
-    // Try to takeover with different controller while marker is still valid
-    boolean result = ZKMetadataProvider.createOrTakeoverTableDeletionMarker(_propertyStore, TEST_TABLE_NAME,
-        CONTROLLER_ID_2);
-    assertFalse(result, "Should not takeover valid deletion marker");
-
-    // Cleanup
-    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, TEST_TABLE_NAME);
+  public void testRemoveNonExistentMarkerIsNoOp() {
+    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, TABLE_NAME);
+    assertFalse(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TABLE_NAME));
   }
 
   @Test
-  public void testGetPropertyStoreTableDeletionInProgressPrefix() {
-    String prefix = ZKMetadataProvider.getPropertyStoreTableDeletionInProgressPrefix();
-    assertNotNull(prefix, "Prefix should not be null");
-    assertEquals(prefix, "/TABLE_DELETION_IN_PROGRESS", "Prefix should match expected value");
+  public void testExpiredMarkerIsNotValid() {
+    writeMarkerWithAge(TABLE_NAME, CONTROLLER_1, EXPIRY_MS + 60_000L);
+    assertFalse(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TABLE_NAME),
+        "A marker older than the expiry window must not block progress forever");
   }
 
   @Test
-  public void testDeletionMarkerContent() {
-    // Create marker
-    ZKMetadataProvider.createTableDeletionMarker(_propertyStore, TEST_TABLE_NAME, CONTROLLER_ID_1);
-
-    // Verify marker content by checking it exists (detailed content verification would
-    // require internal access)
-    assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TEST_TABLE_NAME));
-
-    // Cleanup
-    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, TEST_TABLE_NAME);
+  public void testMarkerJustInsideExpiryWindowIsStillValid() {
+    writeMarkerWithAge(TABLE_NAME, CONTROLLER_1, EXPIRY_MS - 60_000L);
+    assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TABLE_NAME),
+        "A marker inside the expiry window must still provide mutual exclusion");
   }
 
   @Test
-  public void testMultipleTableMarkers() {
-    String table1 = "table1_REALTIME";
-    String table2 = "table2_OFFLINE";
+  public void testMarkerWithoutStartTimeIsNotValid() {
+    ZNRecord record = new ZNRecord(TABLE_NAME);
+    record.setSimpleField(CONTROLLER_ID_KEY, CONTROLLER_1);
+    assertTrue(_propertyStore.set(markerPath(TABLE_NAME), record, AccessOption.PERSISTENT));
 
-    // Create markers for different tables
-    boolean created1 = ZKMetadataProvider.createTableDeletionMarker(_propertyStore, table1, CONTROLLER_ID_1);
-    boolean created2 = ZKMetadataProvider.createTableDeletionMarker(_propertyStore, table2, CONTROLLER_ID_2);
+    assertFalse(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TABLE_NAME),
+        "A malformed marker must not permanently block deletion or re-creation");
+  }
 
-    assertTrue(created1, "Marker for table1 should be created");
-    assertTrue(created2, "Marker for table2 should be created");
+  @Test
+  public void testTakeoverCreatesMarkerWhenNoneExists() {
+    assertTrue(ZKMetadataProvider.createOrTakeoverTableDeletionMarker(_propertyStore, TABLE_NAME, CONTROLLER_1));
+    assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TABLE_NAME));
+  }
 
-    // Verify both exist independently
-    assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, table1));
-    assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, table2));
+  @Test
+  public void testTakeoverRejectedWhenValidMarkerExists() {
+    assertTrue(ZKMetadataProvider.createTableDeletionMarker(_propertyStore, TABLE_NAME, CONTROLLER_1));
+    assertFalse(ZKMetadataProvider.createOrTakeoverTableDeletionMarker(_propertyStore, TABLE_NAME, CONTROLLER_2),
+        "A live deletion must not be stolen by another controller");
 
-    // Remove one marker
-    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, table1);
+    ZNRecord record = _propertyStore.get(markerPath(TABLE_NAME), null, AccessOption.PERSISTENT);
+    assertNotNull(record);
+    assertEquals(record.getSimpleField(CONTROLLER_ID_KEY), CONTROLLER_1);
+  }
 
-    // Verify only one remains
-    assertFalse(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, table1));
-    assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, table2));
+  @Test
+  public void testTakeoverOfExpiredMarkerSucceedsAndReassignsOwner() {
+    writeMarkerWithAge(TABLE_NAME, CONTROLLER_1, EXPIRY_MS + 60_000L);
 
-    // Cleanup
-    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, table2);
+    assertTrue(ZKMetadataProvider.createOrTakeoverTableDeletionMarker(_propertyStore, TABLE_NAME, CONTROLLER_2),
+        "An expired marker should be reclaimable so a crashed deletion can be retried");
+
+    ZNRecord record = _propertyStore.get(markerPath(TABLE_NAME), null, AccessOption.PERSISTENT);
+    assertNotNull(record);
+    assertEquals(record.getSimpleField(CONTROLLER_ID_KEY), CONTROLLER_2,
+        "Takeover must record the new owning controller");
+    assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, TABLE_NAME),
+        "The refreshed marker should be valid again");
+  }
+
+  @Test
+  public void testMarkersForDifferentTablesAreIndependent() {
+    String realtimeTable = "table1_REALTIME";
+    String offlineTable = "table2_OFFLINE";
+
+    assertTrue(ZKMetadataProvider.createTableDeletionMarker(_propertyStore, realtimeTable, CONTROLLER_1));
+    assertTrue(ZKMetadataProvider.createTableDeletionMarker(_propertyStore, offlineTable, CONTROLLER_2));
+    assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, realtimeTable));
+    assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, offlineTable));
+
+    ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, realtimeTable);
+
+    assertFalse(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, realtimeTable));
+    assertTrue(ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, offlineTable),
+        "Deleting one table must not clear another table's marker");
+  }
+
+  @Test
+  public void testDeletionInProgressPrefixIsExposedForManualCleanup() {
+    assertEquals(ZKMetadataProvider.getPropertyStoreTableDeletionInProgressPrefix(), MARKER_PREFIX);
   }
 }
