@@ -374,12 +374,12 @@ public class TableSizeReader {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public List<ColumnCompressionStatsInfo> _columnCompressionStats;
 
-    /// Per-index-type size totals, one reporting server's contribution per segment summed across segments. Null
-    /// unless the caller asked with `includeIndexSizeStats=true`. Deliberately not divided by `numReplica` and not
-    /// all-or-nothing on partial server failure, unlike the sibling breakdown on `/tables/{t}/metadata`
-    /// ([org.apache.pinot.controller.util.ServerSegmentMetadataReader]): a segment simply contributes nothing to
-    /// this map if no server reported sizes for it, which the `missingSegments`/`segmentsWithStats` fields make
-    /// observable, so a partial answer here is still informative.
+    /// Per-index-type size totals, summed across segments from the max-disk-size replica among those reporting
+    /// index sizes for each segment. Null unless the caller asked with `includeIndexSizeStats=true`. Deliberately
+    /// not divided by `numReplica` and not all-or-nothing on partial server failure, unlike the sibling breakdown
+    /// on `/tables/{t}/metadata` ([ServerSegmentMetadataReader]): a segment simply contributes nothing to this map
+    /// if no server reported sizes for it, which the `missingSegments`/`segmentsWithStats` fields make observable,
+    /// so a partial answer here is still informative.
     @Nullable
     @JsonProperty("indexSizeBreakdown")
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -493,19 +493,17 @@ public class TableSizeReader {
       SegmentSizeDetails sizeDetails = entry.getValue();
       // Iterate over all segment size info: update reported size, track max segment size and count errored servers.
       sizeDetails._maxReportedSizePerReplicaInBytes = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
-      SegmentSizeInfo maxSizeInfo = null;
-      SegmentSizeInfo maxIndexSizeInfo = null;
+      SegmentSizeInfo indexSizeDonor = null;
       int errors = 0;
       for (SegmentSizeInfo sizeInfo : sizeDetails._serverInfo.values()) {
         if (sizeInfo.getDiskSizeInBytes() != DEFAULT_SIZE_WHEN_MISSING_OR_ERROR) {
           sizeDetails._reportedSizeInBytes += sizeInfo.getDiskSizeInBytes();
           if (sizeInfo.getDiskSizeInBytes() >= sizeDetails._maxReportedSizePerReplicaInBytes) {
             sizeDetails._maxReportedSizePerReplicaInBytes = sizeInfo.getDiskSizeInBytes();
-            maxSizeInfo = sizeInfo;
           }
-          if (sizeInfo.getIndexSizeInBytes() != null && (maxIndexSizeInfo == null
-              || sizeInfo.getDiskSizeInBytes() >= maxIndexSizeInfo.getDiskSizeInBytes())) {
-            maxIndexSizeInfo = sizeInfo;
+          if (sizeInfo.getIndexSizeInBytes() != null && (indexSizeDonor == null
+              || sizeInfo.getDiskSizeInBytes() >= indexSizeDonor.getDiskSizeInBytes())) {
+            indexSizeDonor = sizeInfo;
           }
         } else {
           errors++;
@@ -520,13 +518,15 @@ public class TableSizeReader {
         subTypeSizeDetails._reportedSizeInBytes += sizeDetails._reportedSizeInBytes;
         subTypeSizeDetails._estimatedSizeInBytes += sizeDetails._estimatedSizeInBytes;
         subTypeSizeDetails._reportedSizePerReplicaInBytes += sizeDetails._maxReportedSizePerReplicaInBytes;
-        // Use the max-disk-size replica that actually reports index sizes as the donor -- consistent with the
-        // disk-size representative above, and correct even when that representative (maxSizeInfo) is an old
-        // server that predates indexSizeStatsEnabled and so reports no index sizes at all. Without this, such
-        // a segment would silently drop out of the breakdown despite a same-size or smaller replica having the
-        // data.
-        if (indexSizeTotals != null && maxIndexSizeInfo != null) {
-          for (Map.Entry<String, Long> indexSize : maxIndexSizeInfo.getIndexSizeInBytes().entrySet()) {
+        // Use the max-disk-size replica that actually reports index sizes as the donor -- consistent with how
+        // _maxReportedSizePerReplicaInBytes is chosen above, and correct even when the largest replica overall
+        // is an old server that predates indexSizeStatsEnabled and so reports no index sizes at all. Without
+        // this, such a segment would silently drop out of the breakdown despite a same-size or smaller replica
+        // having the data. On a disk-size tie among reporting replicas, the donor is whichever one _serverInfo
+        // (a HashMap) iterates last -- unspecified but harmless, since exactly one replica's map is ever summed
+        // per segment regardless of which one wins.
+        if (indexSizeTotals != null && indexSizeDonor != null) {
+          for (Map.Entry<String, Long> indexSize : indexSizeDonor.getIndexSizeInBytes().entrySet()) {
             long size = indexSize.getValue();
             if (size >= 0) {
               long[] total = indexSizeTotals.computeIfAbsent(indexSize.getKey(), k -> new long[2]);
