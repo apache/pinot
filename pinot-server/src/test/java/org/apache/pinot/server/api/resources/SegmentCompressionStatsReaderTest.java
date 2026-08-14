@@ -33,6 +33,7 @@ import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -108,13 +109,21 @@ public class SegmentCompressionStatsReaderTest {
       driver.init(config, new GenericRowRecordReader(rows));
       driver.build();
 
-      SegmentMetadata metadata = new SegmentMetadataImpl(new File(outputDir, segmentName));
+      File segmentDir = new File(outputDir, segmentName);
+      SegmentMetadata metadata = new SegmentMetadataImpl(segmentDir);
       SegmentCompressionStatsContribution contribution = SegmentCompressionStatsReader.read(metadata, true);
       assertTrue(contribution.isComplete());
       assertTrue(contribution.getUncompressedValueSizeInBytes() > 0);
       assertTrue(contribution.getForwardIndexAndDictionaryStorageSizeInBytes() > 0);
       assertEquals(contribution.getColumnCompressionStats().get("value").getEncodingBreakdown().get(0)
           .getChunkCompressionType(), ChunkCompressionType.LZ4);
+      // Pins the delegation to IndexSizeUtils (shared with segment creation and reload) to the exact sidecar file
+      // size, since a single-extension RAW SV forward index makes the sum-vs-first-match and directory-vs-file
+      // semantic differences between the old and new sizing code unreachable here, but nothing was asserting that.
+      File rawForwardIndexFile =
+          new File(segmentDir, "value" + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+      assertTrue(rawForwardIndexFile.isFile());
+      assertEquals(contribution.getForwardIndexAndDictionaryStorageSizeInBytes(), rawForwardIndexFile.length());
     } finally {
       FileUtils.deleteQuietly(outputDir);
     }
