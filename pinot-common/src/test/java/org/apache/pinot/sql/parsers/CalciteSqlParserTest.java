@@ -56,6 +56,39 @@ public class CalciteSqlParserTest {
   }
 
   @Test
+  public void testPostgreSqlByteaHexLiterals() {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT '\\x0102'::bytea");
+    assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getBinaryValue(), new byte[]{1, 2});
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT CAST('\\xDe Ad Be Ef' AS BYTEA)");
+    assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getBinaryValue(),
+        new byte[]{(byte) 0xde, (byte) 0xad, (byte) 0xbe, (byte) 0xef});
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT '\\x'::ByTeA");
+    assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getBinaryValue(), new byte[0]);
+
+    Expression expression = CalciteSqlParser.compileToExpression("'\\x0102'::bytea");
+    assertEquals(expression.getLiteral().getBinaryValue(), new byte[]{1, 2});
+  }
+
+  @Test(dataProvider = "invalidPostgreSqlByteaLiterals")
+  public void testInvalidPostgreSqlByteaHexLiterals(String sql) {
+    assertThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToPinotQuery(sql));
+  }
+
+  @DataProvider
+  public static Object[][] invalidPostgreSqlByteaLiterals() {
+    return new Object[][]{
+        {"SELECT '\\x0'::bytea"},
+        {"SELECT '\\x0g'::bytea"},
+        {"SELECT '\\x0 1'::bytea"},
+        {"SELECT '0102'::bytea"},
+        {"SELECT bytesColumn::bytea FROM myTable"},
+        {"SELECT 1::int"}
+    };
+  }
+
+  @Test
   public void testIdentifierLength() {
     String tableName = extendIdentifierToMaxLength("exampleTable");
     String columnName = extendIdentifierToMaxLength("exampleColumn");
@@ -100,6 +133,7 @@ public class CalciteSqlParserTest {
         new Object[]{"string"},
         new Object[]{"varchar"},
         new Object[]{"bytes"},
+        new Object[]{"bytea"},
         new Object[]{"binary"},
         new Object[]{"varbinary"},
         new Object[]{"variant"},

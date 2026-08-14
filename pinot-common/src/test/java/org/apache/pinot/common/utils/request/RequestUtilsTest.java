@@ -131,6 +131,14 @@ public class RequestUtilsTest {
     assertEquals(operands.get(1).getLiteral().getBinaryValue(), expected[1]);
 
     expression = CalciteSqlParser.compileToPinotQuery(
+        "SELECT ARRAY['\\x00'::bytea, CAST('\\xDEADBEEF' AS BYTEA)] FROM myTable").getSelectList().get(0);
+    assertTrue(expression.isSetFunctionCall());
+    operands = expression.getFunctionCall().getOperands();
+    assertEquals(operands.size(), 2);
+    assertEquals(operands.get(0).getLiteral().getBinaryValue(), expected[0]);
+    assertEquals(operands.get(1).getLiteral().getBinaryValue(), expected[1]);
+
+    expression = CalciteSqlParser.compileToPinotQuery(
         "SELECT ARRAYS_OVERLAP(ARRAY[X'00', X'0102'], ARRAY[X'03', X'0102'])").getSelectList().get(0);
     assertTrue(expression.isSetLiteral());
     assertTrue(expression.getLiteral().getBoolValue());

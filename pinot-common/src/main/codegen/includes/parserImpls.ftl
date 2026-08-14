@@ -88,6 +88,39 @@ void SqlAtTimeZone(List<Object> list, ExprContext exprContext, Span s) :
     }
 }
 
+/// Parses the PostgreSQL infix `::` cast operator. PostgreSQL BYTEA literals are normalized after parsing so both
+/// query engines receive the same binary literal representation as SQL `X'...'`.
+void InfixCast(List<Object> list, ExprContext exprContext, Span s) :
+{
+    final SqlDataTypeSpec dataType;
+    SqlNode expression;
+    SqlNode identifier;
+}
+{
+    <INFIX_CAST> {
+        checkNonQueryExpression(exprContext);
+    }
+    dataType = DataType() {
+        SqlNode leftOperand = SqlParserUtil.toTree(list);
+        list.clear();
+        list.add(SqlLibraryOperators.INFIX_CAST.createCall(s.pos(), leftOperand, dataType));
+    }
+    (
+        <LBRACKET>
+        expression = Expression(ExprContext.ACCEPT_SUB_QUERY)
+        <RBRACKET> {
+            SqlNode current = (SqlNode) list.remove(list.size() - 1);
+            list.add(SqlStdOperatorTable.ITEM.createCall(getPos(), current, expression));
+        }
+    |
+        <DOT>
+        identifier = SimpleIdentifier() {
+            SqlNode current = (SqlNode) list.remove(list.size() - 1);
+            list.add(SqlStdOperatorTable.DOT.createCall(getPos(), current, identifier));
+        }
+    )*
+}
+
 SqlNode SqlPhysicalExplain() :
 {
     SqlNode stmt;

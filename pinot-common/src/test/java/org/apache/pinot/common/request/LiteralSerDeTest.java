@@ -125,7 +125,8 @@ public class LiteralSerDeTest {
   public void testSingleStageQueryUsesLegacyCompatibleLiteralArms()
       throws TException {
     PinotQuery query = CalciteSqlParser.compileToPinotQuery(
-        "SELECT ARRAY[X'00', X'0102'] FROM myTable WHERE ARRAYS_OVERLAP(bytesMV, ARRAY[X'01'])");
+        "SELECT ARRAY['\\x00'::bytea, CAST('\\x0102' AS BYTEA)] FROM myTable "
+            + "WHERE ARRAYS_OVERLAP(bytesMV, ARRAY['\\x01'::bytea])");
     assertUsesOnlyLegacyLiteralArms(query.getSelectList().get(0));
     assertUsesOnlyLegacyLiteralArms(query.getFilterExpression());
 
