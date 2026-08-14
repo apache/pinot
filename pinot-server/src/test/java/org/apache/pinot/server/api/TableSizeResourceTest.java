@@ -171,4 +171,57 @@ public class TableSizeResourceTest extends BaseResourceTest {
       _tableDataManagerMap.remove(tableName);
     }
   }
+
+  @Test
+  public void testTableSizeIndexSizeStats()
+      throws Exception {
+    String tableName = "indexSizeStats_OFFLINE";
+    List<ImmutableSegment> segments = new ArrayList<>();
+    addTable(tableName);
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableName);
+    ImmutableSegment trackedSegment = setUpSegment(tableName, null, "tracked", segments, false, true);
+
+    try {
+      TableSizeInfo tableSizeInfo = _webTarget.path("/tables/" + tableName + "/size")
+          .queryParam("includeIndexSizeStats", "true")
+          .request().get(TableSizeInfo.class);
+
+      Assert.assertEquals(tableSizeInfo.getSegments().size(), 1);
+      SegmentSizeInfo segmentSizeInfo = tableSizeInfo.getSegments().get(0);
+      Assert.assertEquals(segmentSizeInfo.getSegmentName(), trackedSegment.getSegmentName());
+      Assert.assertNotNull(segmentSizeInfo.getIndexSizeInBytes(),
+          "The flag was requested and the segment was built with indexSizeStatsEnabled, so a breakdown must appear");
+      Assert.assertFalse(segmentSizeInfo.getIndexSizeInBytes().isEmpty());
+      Assert.assertTrue(segmentSizeInfo.getIndexSizeInBytes().values().stream().allMatch(size -> size > 0));
+    } finally {
+      tableDataManager.offloadSegment(trackedSegment.getSegmentName());
+      tableDataManager.shutDown();
+      _tableDataManagerMap.remove(tableName);
+    }
+  }
+
+  @Test
+  public void testTableSizeIndexSizeStatsOmittedWhenFlagOff()
+      throws Exception {
+    String tableName = "indexSizeStatsOff_OFFLINE";
+    List<ImmutableSegment> segments = new ArrayList<>();
+    addTable(tableName);
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableName);
+    ImmutableSegment trackedSegment = setUpSegment(tableName, null, "tracked", segments, false, true);
+
+    try {
+      String response = _webTarget.path("/tables/" + tableName + "/size").request().get(String.class);
+      TableSizeInfo tableSizeInfo = JsonUtils.stringToObject(response, TableSizeInfo.class);
+
+      Assert.assertEquals(tableSizeInfo.getSegments().size(), 1);
+      Assert.assertNull(tableSizeInfo.getSegments().get(0).getIndexSizeInBytes(),
+          "The flag was not requested, so no breakdown must appear even though the segment carries one");
+      JsonNode segment = JsonUtils.stringToJsonNode(response).get("segments").get(0);
+      Assert.assertFalse(segment.has("indexSizeInBytes"));
+    } finally {
+      tableDataManager.offloadSegment(trackedSegment.getSegmentName());
+      tableDataManager.shutDown();
+      _tableDataManagerMap.remove(tableName);
+    }
+  }
 }

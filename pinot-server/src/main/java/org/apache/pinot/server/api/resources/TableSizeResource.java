@@ -55,6 +55,7 @@ import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.server.starter.ServerInstance;
@@ -98,6 +99,9 @@ public class TableSizeResource {
       @ApiParam(value = "Include per-column compression statistics when detailed=true and the table enables "
           + "tableIndexConfig.compressionStatsEnabled; this also populates segment summary fields")
       @DefaultValue("false") @QueryParam("includeColumnCompressionStats") boolean includeColumnCompressionStats,
+      @ApiParam(value = "Include per-index-type size totals when detailed=true, from sizes persisted for segments "
+          + "built while tableIndexConfig.indexSizeStatsEnabled was set")
+      @DefaultValue("false") @QueryParam("includeIndexSizeStats") boolean includeIndexSizeStats,
       @Context HttpHeaders headers)
       throws WebApplicationException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
@@ -117,6 +121,7 @@ public class TableSizeResource {
         && cachedPair != null && cachedPair.getLeft() != null
         && cachedPair.getLeft().getIndexingConfig() != null
         && cachedPair.getLeft().getIndexingConfig().isCompressionStatsEnabled();
+    boolean indexSizeStatsRequested = detailed && includeIndexSizeStats;
 
     long tableSizeInBytes = 0L;
     int columnContributions = 0;
@@ -131,9 +136,21 @@ public class TableSizeResource {
         long compressionForwardIndexAndDictionaryStorageSizeInBytes = 0;
         Map<String, ColumnCompressionStatsAccumulator> columnAccumulators =
             compressionStatsEnabled && includeColumnCompressionStats ? new HashMap<>() : null;
+        Map<String, Long> indexSizeTotals = indexSizeStatsRequested ? new HashMap<>() : null;
         for (IndexSegment segment : segmentDataManager.getReportableSegments()) {
           if (segment instanceof ImmutableSegment immutableSegment) {
             segmentSizeBytes += immutableSegment.getSegmentSizeBytes();
+            if (indexSizeTotals != null) {
+              for (ColumnMetadata columnMetadata : immutableSegment.getSegmentMetadata().getColumnMetadataMap()
+                  .values()) {
+                for (Map.Entry<String, Long> entry : columnMetadata.getPersistedIndexSizesInBytes().entrySet()) {
+                  long size = entry.getValue();
+                  if (size >= 0) {
+                    indexSizeTotals.merge(entry.getKey(), size, Long::sum);
+                  }
+                }
+              }
+            }
             if (compressionStatsEnabled) {
               if (includeColumnCompressionStats) {
                 columnContributions = TablesResource.addColumnContributions(columnContributions, immutableSegment,
@@ -175,7 +192,10 @@ public class TableSizeResource {
               segmentSizeInfos.add(new SegmentSizeInfo(segmentDataManager.getSegmentName(), segmentSizeBytes,
                   compressionStatsComplete ? uncompressedValueSizeInBytes : -1,
                   compressionStatsComplete ? compressionForwardIndexAndDictionaryStorageSizeInBytes : -1,
-                  columnCompressionStats));
+                  columnCompressionStats, indexSizeTotals));
+            } else if (indexSizeTotals != null) {
+              segmentSizeInfos.add(
+                  new SegmentSizeInfo(segmentDataManager.getSegmentName(), segmentSizeBytes, indexSizeTotals));
             } else {
               segmentSizeInfos.add(new SegmentSizeInfo(segmentDataManager.getSegmentName(), segmentSizeBytes));
             }
@@ -221,6 +241,7 @@ public class TableSizeResource {
       @DefaultValue("false") @QueryParam("includeColumnCompressionStats") boolean includeColumnCompressionStats,
       @Context HttpHeaders headers)
       throws WebApplicationException {
-    return this.getTableSize(tableName, detailed, includeCompressionStats, includeColumnCompressionStats, headers);
+    return this.getTableSize(tableName, detailed, includeCompressionStats, includeColumnCompressionStats, false,
+        headers);
   }
 }
