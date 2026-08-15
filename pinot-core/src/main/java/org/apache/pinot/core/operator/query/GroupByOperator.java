@@ -167,6 +167,13 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     /// the final ORDER BY + LIMIT across all sets.
     if (_queryContext.isGroupingSets()) {
       /// The $groupingId discriminator is the key column immediately after the union group-by columns.
+      if (groupByExecutor.isGroupingSetsBaseAggregation()) {
+        /// Base aggregation: the executor grouped only the base (union) grouping like a plain GROUP BY; derive
+        /// the individual grouping-set records from those base groups.
+        return GroupByUtils.buildGroupingSetsResultsBlockFromBaseGroups(_queryContext, _dataSchema,
+            groupByExecutor.getResult(), _groupByExpressions.length, numGroupsLimitReached,
+            numGroupsWarningLimitReached);
+      }
       return GroupByUtils.buildGroupingSetsResultsBlock(_queryContext, _dataSchema,
           groupByExecutor.getGroupKeyGenerator(), groupByExecutor.getGroupByResultHolders(),
           groupByExecutor.getNumGroups(), _groupByExpressions.length, numGroupsLimitReached,
