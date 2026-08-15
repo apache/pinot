@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.transform.function;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
@@ -47,6 +46,7 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.spi.plugin.ChildFirstClassLoader;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
@@ -389,7 +389,7 @@ public class TransformFunctionFactoryTest extends BaseTransformFunctionTest {
       throws Exception {
     // The context classloader defines its own copy of PluginServiceTransformFunction (child-first) while the
     // plugin realm resolves the test-classpath copy through parent delegation: same class name, different Class
-    // objects. The first sighting (context classloader) must win and the skewed duplicate must be skipped
+    // objects. End to end, the duplicate registration must be skipped, keeping the first discovered copy
     initWithContextClassLoader(
         createChildFirstDescriptorClassLoader(PluginServiceTransformFunction.class.getName()), Set.of());
     Class<? extends TransformFunction> registered =
@@ -397,6 +397,17 @@ public class TransformFunctionFactoryTest extends BaseTransformFunctionTest {
     assertNotNull(registered);
     assertEquals(registered.getName(), PluginServiceTransformFunction.class.getName());
     assertNotSame(registered, PluginServiceTransformFunction.class);
+  }
+
+  @Test
+  public void testVersionSkewedCopyOfBuiltInIsIgnored()
+      throws Exception {
+    // A discovered provider that is a different-classloader copy of an already-registered built-in class (e.g. a
+    // fat plugin jar bundling pinot-core classes) must be skipped with a WARN — neither a collision failure nor an
+    // override — keeping the built-in registration
+    initWithContextClassLoader(
+        createChildFirstDescriptorClassLoader(AdditionTransformFunction.class.getName()), Set.of());
+    assertSame(TransformFunctionFactory.getAllFunctions().get("add"), AdditionTransformFunction.class);
   }
 
   @Test
@@ -482,8 +493,9 @@ public class TransformFunctionFactoryTest extends BaseTransformFunctionTest {
   }
 
   /// Like [#createDescriptorClassLoader(String...)], but the returned loader additionally defines its own copy of
-  /// the provider class from the test-classpath bytes instead of delegating to the parent, simulating a
-  /// classloader shipping its own (version-skewed) copy of the class.
+  /// the provider class from the test-classpath bytes instead of delegating to the parent (via the shared
+  /// [ChildFirstClassLoader] test utility), simulating a classloader shipping its own (version-skewed) copy of the
+  /// class.
   private static ClassLoader createChildFirstDescriptorClassLoader(String providerClassName)
       throws IOException {
     Path tempDir = Files.createTempDirectory("transform-function-descriptor");
@@ -495,41 +507,6 @@ public class TransformFunctionFactoryTest extends BaseTransformFunctionTest {
         TransformFunctionFactoryTest.class.getClassLoader(), providerClassName);
     DESCRIPTOR_CLASS_LOADERS.add(descriptorClassLoader);
     return descriptorClassLoader;
-  }
-
-  /// Classloader that defines its own copy of one class from the parent's class-file bytes instead of delegating,
-  /// producing a Class object with the same name but a different defining classloader. Everything else (including
-  /// the [TransformFunction] interface) is delegated to the parent so the copy remains a valid provider.
-  private static class ChildFirstClassLoader extends URLClassLoader {
-    private final String _childFirstClassName;
-
-    ChildFirstClassLoader(URL[] urls, ClassLoader parent, String childFirstClassName) {
-      super(urls, parent);
-      _childFirstClassName = childFirstClassName;
-    }
-
-    @Override
-    protected Class<?> loadClass(String name, boolean resolve)
-        throws ClassNotFoundException {
-      if (!name.equals(_childFirstClassName)) {
-        return super.loadClass(name, resolve);
-      }
-      synchronized (getClassLoadingLock(name)) {
-        Class<?> loaded = findLoadedClass(name);
-        if (loaded == null) {
-          try (InputStream inputStream = getParent().getResourceAsStream(name.replace('.', '/') + ".class")) {
-            byte[] classBytes = inputStream.readAllBytes();
-            loaded = defineClass(name, classBytes, 0, classBytes.length);
-          } catch (IOException e) {
-            throw new ClassNotFoundException(name, e);
-          }
-        }
-        if (resolve) {
-          resolveClass(loaded);
-        }
-        return loaded;
-      }
-    }
   }
 
   /// Runs [TransformFunctionFactory#init(Set)] with the given thread context classloader installed,
