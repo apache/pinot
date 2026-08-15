@@ -76,9 +76,11 @@ public class BenchmarkMapKeyAccess {
   @Param({"first", "last"})
   private String _targetPosition;
 
-  /// `flat` models scalar attribute maps (the common ingestion shape); `nested` models maps whose values are
-  /// themselves objects, where the full-map path pays to materialize a container per value.
-  @Param({"flat", "nested"})
+  /// `flat` models scalar string attribute maps (the common ingestion shape); `numeric` models a STRING-valued MAP
+  /// carrying integer entries, which `MapFieldTypeMixedValueIngestingIntegrationTest` shows is supported and
+  /// projected through the same accessor; `nested` models object-valued entries, the shape that still has to go
+  /// through Jackson.
+  @Param({"flat", "numeric", "nested"})
   private String _valueShape;
 
   private String _targetKey;
@@ -88,11 +90,24 @@ public class BenchmarkMapKeyAccess {
 
   @Setup(Level.Trial)
   public void setUp() {
-    boolean nested = "nested".equals(_valueShape);
     Map<String, Object> map = new LinkedHashMap<>();
     for (int i = 0; i < _numEntries; i++) {
       String value = "value-with-enough-bytes-to-exercise-json-parsing-" + i;
-      map.put(key(i), nested ? Map.of("value", value) : value);
+      Object stored;
+      switch (_valueShape) {
+        // A STRING-valued MAP carrying numeric entries, the shape
+        // MapFieldTypeMixedValueIngestingIntegrationTest ingests.
+        case "numeric":
+          stored = 9007199254740990L + i;
+          break;
+        case "nested":
+          stored = Map.of("value", value);
+          break;
+        default:
+          stored = value;
+          break;
+      }
+      map.put(key(i), stored);
     }
     _targetKey = key("first".equals(_targetPosition) ? 0 : _numEntries - 1);
     _targetMapKey = new PreparedMapKey(_targetKey);
@@ -128,5 +143,21 @@ public class BenchmarkMapKeyAccess {
   @Benchmark
   public Object selectiveMapValue() {
     return _forwardIndex.getMapEntryValue(0, null, _targetMapKey);
+  }
+
+  /// The string baseline: what `MapKeyIndexReader#getString` did - deserialize to an object, then `toString()` it.
+  @Benchmark
+  public Object selectiveMapValueToString() {
+    Object value = _forwardIndex.getMapEntryValue(0, null, _targetMapKey);
+    return value == null ? null : value.toString();
+  }
+
+  /// Same scan, but decoding the value without handing it to Jackson - what a `STRING`-valued MAP column resolves
+  /// to when projected. Plain strings, canonical integers and booleans take that path; object and array values, and
+  /// non-integral numbers, still fall back, so `nested` should land on top of [#selectiveMapValueToString] rather
+  /// than beating it.
+  @Benchmark
+  public Object selectiveMapValueAsString() {
+    return _forwardIndex.getMapEntryValueAsString(0, null, _targetMapKey);
   }
 }

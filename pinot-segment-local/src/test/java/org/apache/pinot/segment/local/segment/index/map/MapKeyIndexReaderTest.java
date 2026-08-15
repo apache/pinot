@@ -29,6 +29,7 @@ import org.apache.pinot.spi.utils.MapUtils.PreparedMapKey;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 
 
 /// Covers [MapKeyIndexReader] over both shapes of underlying reader: one that implements the selective
@@ -36,7 +37,8 @@ import static org.testng.Assert.assertEquals;
 /// [ForwardIndexReader#getMap] and therefore falls through to the default. Both must agree.
 public class MapKeyIndexReaderTest {
   private static final Map<String, Object> MAP =
-      Map.of("k8s.workload.name", "pinot-server", "k8s.workload.replicas", 3);
+      Map.of("k8s.workload.name", "pinot-server", "k8s.workload.replicas", 3,
+          "longValue", 9999999999L, "doubleValue", 1.5d);
 
   @Test
   public void testSelectiveReader() {
@@ -54,6 +56,31 @@ public class MapKeyIndexReaderTest {
     assertEquals(new SelectiveReader().getMapEntryValue(0, null, "k8s.workload.name"), "pinot-server");
   }
 
+  /// The numeric accessors fast-path only the exact boxed type Jackson yields for that JSON shape, and fall back to
+  /// the string round trip otherwise. Pinning both halves stops a future broadening to `Number#intValue()` from
+  /// silently truncating a decimal that currently throws.
+  @Test
+  public void testNumericAccessorsAcrossBoxedTypes() {
+    ForwardIndexReader<ForwardIndexReaderContext> reader = new SelectiveReader();
+    FieldSpec longSpec = new DimensionFieldSpec("value", DataType.LONG, true);
+    FieldSpec intSpec = new DimensionFieldSpec("value", DataType.INT, true);
+    FieldSpec doubleSpec = new DimensionFieldSpec("value", DataType.DOUBLE, true);
+    FieldSpec floatSpec = new DimensionFieldSpec("value", DataType.FLOAT, true);
+
+    // Long value through the Long branch, and an Integer widened through the Integer branch.
+    assertEquals(new MapKeyIndexReader(reader, "longValue", longSpec).getLong(0, null), 9999999999L);
+    assertEquals(new MapKeyIndexReader(reader, "k8s.workload.replicas", longSpec).getLong(0, null), 3L);
+    assertEquals(new MapKeyIndexReader(reader, "doubleValue", doubleSpec).getDouble(0, null), 1.5d);
+    // getFloat has no exact-type fast path; it still parses the rendered string.
+    assertEquals(new MapKeyIndexReader(reader, "doubleValue", floatSpec).getFloat(0, null), 1.5f);
+
+    // A decimal read as INT or LONG must keep failing rather than being silently truncated.
+    assertThrows(NumberFormatException.class,
+        () -> new MapKeyIndexReader(reader, "doubleValue", intSpec).getInt(0, null));
+    assertThrows(NumberFormatException.class,
+        () -> new MapKeyIndexReader(reader, "doubleValue", longSpec).getLong(0, null));
+  }
+
   private static void assertReaderBehavior(ForwardIndexReader<ForwardIndexReaderContext> reader) {
     FieldSpec stringSpec = new DimensionFieldSpec("value", DataType.STRING, true);
     assertEquals(new MapKeyIndexReader(reader, "k8s.workload.name", stringSpec).getString(0, null), "pinot-server");
@@ -64,6 +91,9 @@ public class MapKeyIndexReaderTest {
 
     FieldSpec intSpec = new DimensionFieldSpec("value", DataType.INT, true);
     assertEquals(new MapKeyIndexReader(reader, "k8s.workload.replicas", intSpec).getInt(0, null), 3);
+
+    // A STRING-valued MAP may still carry numeric entries; those must render as their canonical text.
+    assertEquals(new MapKeyIndexReader(reader, "longValue", stringSpec).getString(0, null), "9999999999");
   }
 
   /// Mirrors the mutable forward index: answers a single key without materializing the map.

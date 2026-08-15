@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.utils;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -119,6 +121,72 @@ public class MapUtilsTest {
           "Value should match for key: " + entry.getKey());
     }
     assertNull(MapUtils.deserializeMapEntryValue(serialized, "命名"));
+  }
+
+  /// The string accessor must agree with `deserializeMapValue(...).toString()` for every value shape, since the only
+  /// difference is meant to be whether Jackson was involved. Escaped and multi-byte strings take the Jackson
+  /// fallback and must come out identical to the plain ones.
+  @Test
+  void testDeserializeMapValueAsStringMatchesToString() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("plain", "pinot-server");
+    map.put("empty", "");
+    map.put("quoted", "has \"quotes\" inside");
+    map.put("backslash", "has \\ backslash");
+    map.put("newline", "has \n newline");
+    map.put("unicode", "çöğüşÇÖĞÜŞéÉ");
+    map.put("int", 42);
+    map.put("long", 9999999999L);
+    map.put("double", 1.5);
+    map.put("bool", true);
+    map.put("list", List.of(1, 2));
+    map.put("nested", Map.of("a", 1));
+    byte[] serialized = MapUtils.serializeMap(map, false);
+
+    for (String key : map.keySet()) {
+      Object asObject = MapUtils.deserializeMapEntryValue(serialized, key);
+      assertEquals(MapUtils.deserializeMapEntryValueAsString(ByteBuffer.wrap(serialized), key), asObject.toString(),
+          "String rendering should match toString() for key: " + key);
+    }
+  }
+
+  /// Mixed-type MAP columns are a supported shape - a STRING-valued MAP can carry numeric entries, as
+  /// `MapFieldTypeMixedValueIngestingIntegrationTest` ingests - so the non-string shapes have to render exactly as
+  /// `toString()` on the parsed value, whether or not they take a Jackson-free path.
+  @Test
+  void testDeserializeMapValueAsStringMatchesToStringForNonStringShapes() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("zero", 0);
+    map.put("negative", -42);
+    map.put("intMax", Integer.MAX_VALUE);
+    map.put("longMin", Long.MIN_VALUE);
+    map.put("bigInteger", new BigInteger("123456789012345678901234567890"));
+    map.put("boolTrue", true);
+    map.put("boolFalse", false);
+    // Renders as "1.50" in the frame but binds to a Double, so it must come back re-normalized as "1.5".
+    map.put("trailingZeroDecimal", new BigDecimal("1.50"));
+    map.put("exponent", 1.0E300);
+    map.put("negativeZeroDouble", -0.0d);
+    byte[] serialized = MapUtils.serializeMap(map, false);
+
+    for (String key : map.keySet()) {
+      Object asObject = MapUtils.deserializeMapEntryValue(serialized, key);
+      assertEquals(MapUtils.deserializeMapEntryValueAsString(ByteBuffer.wrap(serialized), key), asObject.toString(),
+          "String rendering should match toString() for key: " + key);
+    }
+    assertEquals(MapUtils.deserializeMapEntryValueAsString(ByteBuffer.wrap(serialized), "trailingZeroDecimal"), "1.5");
+  }
+
+  @Test
+  void testDeserializeMapValueAsStringHandlesMissingAndNull() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("present", "value");
+    map.put("nullValue", null);
+    byte[] serialized = MapUtils.serializeMap(map, false);
+
+    assertNull(MapUtils.deserializeMapEntryValueAsString(ByteBuffer.wrap(serialized), "missing"));
+    assertNull(MapUtils.deserializeMapEntryValueAsString(ByteBuffer.wrap(serialized), "nullValue"));
+    assertEquals(MapUtils.deserializeMapEntryValueAsString(ByteBuffer.wrap(serialized), "present"), "value");
   }
 
   /// An off-heap forward-index view inherits the platform's native byte order, while the frame is always written

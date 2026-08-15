@@ -58,14 +58,24 @@ public class MapKeyIndexReader implements ForwardIndexReader {
 
   @Override
   public int getInt(int docId, ForwardIndexReaderContext context) {
-    return Integer.parseInt(extractMapValue(docId, context).toString());
+    Object value = extractMapValue(docId, context);
+    return value instanceof Integer ? (Integer) value : Integer.parseInt(value.toString());
   }
 
   @Override
   public long getLong(int docId, ForwardIndexReaderContext context) {
-    return Long.parseLong(extractMapValue(docId, context).toString());
+    Object value = extractMapValue(docId, context);
+    if (value instanceof Long) {
+      return (Long) value;
+    }
+    return value instanceof Integer ? (Integer) value : Long.parseLong(value.toString());
   }
 
+  /// No fast path here: Jackson's untyped binding never yields a `Float` - a JSON decimal comes back as `Double` -
+  /// so a `Float` check would be dead code. Narrowing the `Double` instead is not equivalent: for a double sitting
+  /// near the midpoint between two floats the two conversions differ by an ulp, because one rounds the double
+  /// directly while the other rounds its shortest decimal. `-1.340092769725468E-17` narrows to `-1.3400928E-17`
+  /// but parses to `-1.3400927E-17`. This method has always produced the parsed value, so it keeps doing that.
   @Override
   public float getFloat(int docId, ForwardIndexReaderContext context) {
     return Float.parseFloat(extractMapValue(docId, context).toString());
@@ -73,12 +83,14 @@ public class MapKeyIndexReader implements ForwardIndexReader {
 
   @Override
   public double getDouble(int docId, ForwardIndexReaderContext context) {
-    return Double.parseDouble(extractMapValue(docId, context).toString());
+    Object value = extractMapValue(docId, context);
+    return value instanceof Double ? (Double) value : Double.parseDouble(value.toString());
   }
 
   @Override
   public String getString(int docId, ForwardIndexReaderContext context) {
-    return extractMapValue(docId, context).toString();
+    String value = _forwardIndexReader.getMapEntryValueAsString(docId, context, _mapKey);
+    return value != null ? value : _defaultNullValue.toString();
   }
 
   @Override
