@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.transform.function;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
@@ -40,6 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.operator.ColumnContext;
@@ -52,6 +54,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
@@ -361,6 +365,41 @@ public class TransformFunctionFactoryTest extends BaseTransformFunctionTest {
   }
 
   @Test
+  public void testScalarFunctionNameShadowingAllowed()
+      throws Exception {
+    // Precondition: "reverse" is an existing scalar function
+    assertTrue(FunctionRegistry.contains(FunctionRegistry.canonicalize("reverse")));
+    // Shadowing a scalar function name is allowed (WARN only, not a collision): providing a block-oriented
+    // implementation of a scalar function is the same pattern the built-ins use
+    initWithContextClassLoader(createDescriptorClassLoader(ScalarShadowTransformFunction.class.getName()), Set.of());
+    assertSame(TransformFunctionFactory.getAllFunctions().get("reverse"), ScalarShadowTransformFunction.class);
+  }
+
+  @Test
+  public void testServiceRegisteredBuiltInClassIsNoOp()
+      throws Exception {
+    // A descriptor shipping a class that is already registered under the same canonical name (here: the built-in
+    // itself) is a no-op rather than a collision
+    initWithContextClassLoader(createDescriptorClassLoader(AdditionTransformFunction.class.getName()), Set.of());
+    assertSame(TransformFunctionFactory.getAllFunctions().get("add"), AdditionTransformFunction.class);
+  }
+
+  @Test
+  public void testVersionSkewedDuplicateKeepsFirstDiscoveredCopy()
+      throws Exception {
+    // The context classloader defines its own copy of PluginServiceTransformFunction (child-first) while the
+    // plugin realm resolves the test-classpath copy through parent delegation: same class name, different Class
+    // objects. The first sighting (context classloader) must win and the skewed duplicate must be skipped
+    initWithContextClassLoader(
+        createChildFirstDescriptorClassLoader(PluginServiceTransformFunction.class.getName()), Set.of());
+    Class<? extends TransformFunction> registered =
+        TransformFunctionFactory.getAllFunctions().get("pluginrealmservicetransform");
+    assertNotNull(registered);
+    assertEquals(registered.getName(), PluginServiceTransformFunction.class.getName());
+    assertNotSame(registered, PluginServiceTransformFunction.class);
+  }
+
+  @Test
   public void testRegistrationDoesNotInitOrEvaluateFunction()
       throws Exception {
     int constructionsBefore = DiscoveredServiceTransformFunction.CONSTRUCTION_COUNT.get();
@@ -440,6 +479,57 @@ public class TransformFunctionFactoryTest extends BaseTransformFunctionTest {
         TransformFunctionFactoryTest.class.getClassLoader());
     DESCRIPTOR_CLASS_LOADERS.add(descriptorClassLoader);
     return descriptorClassLoader;
+  }
+
+  /// Like [#createDescriptorClassLoader(String...)], but the returned loader additionally defines its own copy of
+  /// the provider class from the test-classpath bytes instead of delegating to the parent, simulating a
+  /// classloader shipping its own (version-skewed) copy of the class.
+  private static ClassLoader createChildFirstDescriptorClassLoader(String providerClassName)
+      throws IOException {
+    Path tempDir = Files.createTempDirectory("transform-function-descriptor");
+    TEMP_DIRS.add(tempDir);
+    Path descriptorFile = tempDir.resolve(SERVICE_DESCRIPTOR_PATH);
+    Files.createDirectories(descriptorFile.getParent());
+    Files.write(descriptorFile, List.of(providerClassName), StandardCharsets.UTF_8);
+    URLClassLoader descriptorClassLoader = new ChildFirstClassLoader(new URL[]{tempDir.toUri().toURL()},
+        TransformFunctionFactoryTest.class.getClassLoader(), providerClassName);
+    DESCRIPTOR_CLASS_LOADERS.add(descriptorClassLoader);
+    return descriptorClassLoader;
+  }
+
+  /// Classloader that defines its own copy of one class from the parent's class-file bytes instead of delegating,
+  /// producing a Class object with the same name but a different defining classloader. Everything else (including
+  /// the [TransformFunction] interface) is delegated to the parent so the copy remains a valid provider.
+  private static class ChildFirstClassLoader extends URLClassLoader {
+    private final String _childFirstClassName;
+
+    ChildFirstClassLoader(URL[] urls, ClassLoader parent, String childFirstClassName) {
+      super(urls, parent);
+      _childFirstClassName = childFirstClassName;
+    }
+
+    @Override
+    protected Class<?> loadClass(String name, boolean resolve)
+        throws ClassNotFoundException {
+      if (!name.equals(_childFirstClassName)) {
+        return super.loadClass(name, resolve);
+      }
+      synchronized (getClassLoadingLock(name)) {
+        Class<?> loaded = findLoadedClass(name);
+        if (loaded == null) {
+          try (InputStream inputStream = getParent().getResourceAsStream(name.replace('.', '/') + ".class")) {
+            byte[] classBytes = inputStream.readAllBytes();
+            loaded = defineClass(name, classBytes, 0, classBytes.length);
+          } catch (IOException e) {
+            throw new ClassNotFoundException(name, e);
+          }
+        }
+        if (resolve) {
+          resolveClass(loaded);
+        }
+        return loaded;
+      }
+    }
   }
 
   /// Runs [TransformFunctionFactory#init(Set)] with the given thread context classloader installed,
@@ -654,6 +744,19 @@ public class TransformFunctionFactoryTest extends BaseTransformFunctionTest {
 
   /// Listed in a descriptor but does not implement [TransformFunction].
   public static class NotATransformFunction {
+  }
+
+  /// Provider whose name shadows the `reverse` scalar function.
+  public static class ScalarShadowTransformFunction extends BaseTransformFunction {
+    @Override
+    public String getName() {
+      return "reverse";
+    }
+
+    @Override
+    public TransformResultMetadata getResultMetadata() {
+      return INT_SV_NO_DICTIONARY_METADATA;
+    }
   }
 
   /// Listed in a descriptor but violates the concrete-class requirement of the provider contract.
