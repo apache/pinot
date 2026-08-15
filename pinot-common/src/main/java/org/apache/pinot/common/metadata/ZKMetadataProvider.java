@@ -495,10 +495,24 @@ public class ZKMetadataProvider {
   @Nullable
   public static ImmutablePair<TableConfig, Integer> getTableConfigWithVersion(
       ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
+    return getTableConfigWithVersion(propertyStore, tableNameWithType, true, true);
+  }
+
+  /// @param replaceVariables Whether to replace environment variables and system properties with their actual values
+  /// @param applyDecorator Whether to apply the registered [TableConfigDecoratorRegistry] decorator
+  /// @return a pair of table config and current version from znRecord, null if table config does not exist.
+  ///
+  /// Pass {@code replaceVariables=false, applyDecorator=false} to read the config exactly as stored — needed when the
+  /// config will be transformed and written back (e.g. config migration), so that resolved env vars / decorations are
+  /// not accidentally persisted.
+  @Nullable
+  public static ImmutablePair<TableConfig, Integer> getTableConfigWithVersion(
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType, boolean replaceVariables,
+      boolean applyDecorator) {
     Stat tableConfigStat = new Stat();
     TableConfig tableConfig = toTableConfig(
         propertyStore.get(constructPropertyStorePathForResourceConfig(tableNameWithType), tableConfigStat,
-            AccessOption.PERSISTENT));
+            AccessOption.PERSISTENT), replaceVariables, applyDecorator);
     if (tableConfig == null) {
       return null;
     }
@@ -587,7 +601,7 @@ public class ZKMetadataProvider {
       TableConfig tableConfig = TableConfigSerDeUtils.fromZNRecord(znRecord);
       TableConfig processedTableConfig = replaceVariables
           ? ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(tableConfig) : tableConfig;
-      return applyDecorator ? TableConfigDecoratorRegistry.applyDecorator(processedTableConfig) : tableConfig;
+      return applyDecorator ? TableConfigDecoratorRegistry.applyDecorator(processedTableConfig) : processedTableConfig;
     } catch (Exception e) {
       LOGGER.error("Caught exception while creating table config from ZNRecord: {}", znRecord.getId(), e);
       return null;
