@@ -44,6 +44,8 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.util.Timeout;
+import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,17 +119,22 @@ public class MultiHttpRequest {
   public <T extends HttpUriRequestBase> CompletionService<MultiHttpRequestResponse> execute(
       List<Pair<String, String>> urlsAndRequestBodies, @Nullable Map<String, String> requestHeaders, int timeoutMs,
       String httpMethodName, Function<String, T> httpRequestBaseSupplier) {
+    return execute(urlsAndRequestBodies, requestHeaders, null, timeoutMs, httpMethodName, httpRequestBaseSupplier);
+  }
+
+  /// Executes HTTP requests and resolves authentication headers from the provider separately for every request.
+  /// Provider headers take precedence over the caller-supplied functional headers.
+  public <T extends HttpUriRequestBase> CompletionService<MultiHttpRequestResponse> execute(
+      List<Pair<String, String>> urlsAndRequestBodies, @Nullable Map<String, String> requestHeaders,
+      @Nullable AuthProvider authProvider, int timeoutMs, String httpMethodName,
+      Function<String, T> httpRequestBaseSupplier) {
     // Create global request configuration
     Timeout timeout = Timeout.of(timeoutMs, TimeUnit.MILLISECONDS);
     RequestConfig defaultRequestConfig =
         RequestConfig.custom().setConnectionRequestTimeout(timeout).setResponseTimeout(timeout)
             .build(); // setting the socket
 
-    HttpClientBuilder httpClientBuilder =
-        HttpClients.custom().setConnectionManager(_connectionManager).setDefaultRequestConfig(defaultRequestConfig);
-
-    CompletionService<MultiHttpRequestResponse> completionService = new ExecutorCompletionService<>(_executor);
-    CloseableHttpClient client = httpClientBuilder.build();
+    List<HttpUriRequestBase> requests = new ArrayList<>(urlsAndRequestBodies.size());
     for (Pair<String, String> pair : urlsAndRequestBodies) {
       String url = pair.getLeft();
       String body = pair.getRight();
@@ -139,6 +146,15 @@ public class MultiHttpRequest {
       if (requestHeaders != null) {
         requestHeaders.forEach(httpMethod::setHeader);
       }
+      AuthProviderUtils.makeAuthHeadersMap(authProvider).forEach(httpMethod::setHeader);
+      requests.add(httpMethod);
+    }
+
+    HttpClientBuilder httpClientBuilder =
+        HttpClients.custom().setConnectionManager(_connectionManager).setDefaultRequestConfig(defaultRequestConfig);
+    CompletionService<MultiHttpRequestResponse> completionService = new ExecutorCompletionService<>(_executor);
+    CloseableHttpClient client = httpClientBuilder.build();
+    for (HttpUriRequestBase httpMethod : requests) {
       completionService.submit(() -> {
         CloseableHttpResponse response = null;
         boolean responseHandedOff = false;
