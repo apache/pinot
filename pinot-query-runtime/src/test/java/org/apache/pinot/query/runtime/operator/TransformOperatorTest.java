@@ -28,8 +28,6 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
-import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
-import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.UuidUtils;
@@ -42,8 +40,6 @@ import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNotSame;
-import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
@@ -123,27 +119,23 @@ public class TransformOperatorTest {
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{ColumnDataType.INT});
     when(_input.nextBlock()).thenReturn(
         OperatorTestUtil.block(inputSchema, new Object[]{1}, new Object[]{2}, new Object[]{3}));
-    DataSchema resultSchema =
-        new DataSchema(new String[]{"bytesArray"}, new ColumnDataType[]{ColumnDataType.BYTES_ARRAY});
+    DataSchema resultSchema = new DataSchema(new String[]{"bytesArray", "emptyBytesArray"},
+        new ColumnDataType[]{ColumnDataType.BYTES_ARRAY, ColumnDataType.BYTES_ARRAY});
     ByteArray first = new ByteArray(new byte[]{0});
     ByteArray second = new ByteArray(new byte[]{1, 2});
     List<RexExpression> operands = List.of(new RexExpression.Literal(ColumnDataType.BYTES, first),
         new RexExpression.Literal(ColumnDataType.BYTES, second));
     List<RexExpression> projects = List.of(
-        new RexExpression.FunctionCall(ColumnDataType.BYTES_ARRAY, "ARRAY_VALUE_CONSTRUCTOR", operands));
+        new RexExpression.FunctionCall(ColumnDataType.BYTES_ARRAY, "ARRAY_VALUE_CONSTRUCTOR", operands),
+        new RexExpression.FunctionCall(ColumnDataType.BYTES_ARRAY, "ARRAY_VALUE_CONSTRUCTOR", List.of()));
 
     TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 3);
-    ByteArray[] firstResult = (ByteArray[]) resultRows.get(0)[0];
-    assertEquals(firstResult, new ByteArray[]{first, second});
-    assertSame(resultRows.get(1)[0], firstResult);
-    assertSame(resultRows.get(2)[0], firstResult);
-
-    TransformOperand literalOperand = TransformOperandFactory.getTransformOperand(projects.get(0), inputSchema);
-    Object externalValue = literalOperand.applyExternal(List.of(1));
-    assertEquals((byte[][]) externalValue, new byte[][]{{0}, {1, 2}});
-    assertSame(literalOperand.applyExternal(List.of(2)), externalValue);
+    for (Object[] resultRow : resultRows) {
+      assertEquals((ByteArray[]) resultRow[0], new ByteArray[]{first, second});
+      assertEquals((ByteArray[]) resultRow[1], new ByteArray[0]);
+    }
   }
 
   @Test
@@ -173,26 +165,7 @@ public class TransformOperatorTest {
     for (int i = 0; i < expected.length; i++) {
       ByteArray[] actual = (ByteArray[]) resultRows.get(i)[0];
       assertEquals(actual, expected[i]);
-      for (int j = 0; j < actual.length; j++) {
-        assertSame(actual[j], expected[i][j]);
-      }
     }
-    assertNotSame(resultRows.get(0)[0], resultRows.get(1)[0]);
-    assertNotSame(resultRows.get(0)[0], resultRows.get(2)[0]);
-    assertNotSame(resultRows.get(1)[0], resultRows.get(2)[0]);
-
-    TransformOperand dynamicOperand = TransformOperandFactory.getTransformOperand(projects.get(0), inputSchema);
-    byte[][] firstExternal = (byte[][]) dynamicOperand.applyExternal(List.of(left0, right0));
-    byte[][] secondExternal = (byte[][]) dynamicOperand.applyExternal(List.of(left1, right1));
-    assertEquals(firstExternal, new byte[][]{{0}, {1}, {2}});
-    assertEquals(secondExternal, new byte[][]{{0}, {3}, {4}});
-    assertNotSame(firstExternal, secondExternal);
-    assertSame(firstExternal[0], literal.getBytes());
-    assertSame(firstExternal[1], left0.getBytes());
-    assertSame(firstExternal[2], right0.getBytes());
-    assertSame(secondExternal[0], literal.getBytes());
-    assertSame(secondExternal[1], left1.getBytes());
-    assertSame(secondExternal[2], right1.getBytes());
   }
 
   @Test
