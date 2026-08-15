@@ -22,10 +22,8 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -62,8 +60,9 @@ public class RecordTransformerUtils {
   /// - (Optional) [ComplexTypeTransformer] to flatten map/unnest list.
   /// - (Optional) Custom [RecordTransformer]s
   /// - (Optional) [DataTypeTransformer] to fix the data types of the source fields configured with
-  /// `preComplexTypeTransform = false` in `IngestionConfig#getSourceFieldConfigs()`, plus aggregation source columns
-  /// that are not in the schema (see [#addAggregationSourceDataTypes]). It precedes the post-complex-type
+  /// `preComplexTypeTransform = false` in `IngestionConfig#getSourceFieldConfigs()`, plus (when
+  /// `IngestionConfig#isConvertAggregationSourceTypes` is true) aggregation source columns that are not in the
+  /// schema (see [#addAggregationSourceDataTypes]). It precedes the post-complex-type
   /// [RecordEnricher]s and [ExpressionTransformer] so that they consume the source fields with the corrected types.
   /// - (Optional) [RecordEnricher]s to enrich the records before other transformations.
   /// - (Optional) [ExpressionTransformer] to evaluate expressions and fill the values.
@@ -168,28 +167,24 @@ public class RecordTransformerUtils {
         }
       }
     }
-    // Auto-register aggregation source columns not in the schema so mistyped JSON/Avro string numbers are converted
-    // before MutableSegmentImpl indexes them. Explicit SourceFieldConfig wins (already in dataTypes). Only runs in the
-    // post-complex-type phase so flattened/unnested fields are available. Auto-derived columns are converted lazily
-    // (only when the incoming value is incompatible with the aggregators) to avoid per-record conversion overhead on
-    // the common correctly-typed path.
-    Set<String> lazyColumns = new HashSet<>();
-    if (!preComplexTypeTransform && schema != null) {
-      addAggregationSourceDataTypes(tableConfig, schema, dataTypes, lazyColumns);
+    // Opt-in: convert aggregation source columns that are not in the schema (and not already covered by an explicit
+    // SourceFieldConfig) so mistyped JSON/Avro string numbers are converted before MutableSegmentImpl indexes them.
+    // Off by default; uses the stock DataTypeTransformer (no lazy compatibility short-circuit).
+    if (!preComplexTypeTransform && schema != null && ingestionConfig != null
+        && ingestionConfig.isConvertAggregationSourceTypes()) {
+      addAggregationSourceDataTypes(tableConfig, schema, dataTypes);
     }
     if (!dataTypes.isEmpty()) {
-      transformers.add(new DataTypeTransformer(tableConfig, dataTypes, lazyColumns));
+      transformers.add(new DataTypeTransformer(tableConfig, dataTypes));
     }
   }
 
   /// Derives [PinotDataType]s for ingestion-aggregation source columns that are absent from the schema (and not already
   /// covered by an explicit [SourceFieldConfig]). Types are inferred from the aggregation function and destination
-  /// metric, and recorded in `lazyColumns` so that [DataTypeTransformer] only converts values the aggregators cannot
-  /// consume directly. Sketch/HLL/COUNT sources are left unconverted so offering semantics (e.g. hashing a string vs a
-  /// number) are preserved. [org.apache.pinot.segment.local.aggregator.ValueAggregatorUtils#toDouble] remains a safety
-  /// net.
+  /// metric. Sketch/HLL/COUNT sources are left unconverted so offering semantics (e.g. hashing a string vs a number)
+  /// are preserved. [org.apache.pinot.segment.local.aggregator.ValueAggregatorUtils#toDouble] remains a safety net.
   static void addAggregationSourceDataTypes(TableConfig tableConfig, Schema schema,
-      Map<String, PinotDataType> dataTypes, Set<String> lazyColumns) {
+      Map<String, PinotDataType> dataTypes) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     if (ingestionConfig == null) {
       return;
@@ -239,7 +234,6 @@ public class RecordTransformerUtils {
       PinotDataType inferredType = inferAggregationSourceDataType(functionType, destFieldSpec);
       if (inferredType != null) {
         dataTypes.put(sourceColumn, inferredType);
-        lazyColumns.add(sourceColumn);
       }
     }
   }

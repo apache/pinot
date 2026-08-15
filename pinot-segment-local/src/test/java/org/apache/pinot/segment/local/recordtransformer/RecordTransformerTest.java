@@ -617,6 +617,37 @@ public class RecordTransformerTest {
   }
 
   @Test
+  public void testAggregationSourceConversionOffByDefault() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("aggSrcSchema")
+        .addSingleValueDimension("dim", DataType.STRING)
+        .addMetric("sumMetric", DataType.DOUBLE)
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig("sumMetric", "SUM(metric)")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("aggSrcTable")
+        .setTimeColumnName("ts")
+        .setNoDictionaryColumns(List.of("sumMetric"))
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    List<RecordTransformer> transformers = RecordTransformerUtils.getDefaultTransformers(tableConfig, schema);
+    for (RecordTransformer transformer : transformers) {
+      if (transformer instanceof DataTypeTransformer) {
+        assertFalse(transformer.getInputColumns().contains("metric"),
+            "Aggregation source conversion must be opt-in");
+      }
+    }
+
+    TransformPipeline pipeline = new TransformPipeline(tableConfig, schema);
+    GenericRow row = new GenericRow();
+    row.putValue("dim", "a");
+    row.putValue("ts", 1L);
+    row.putValue("metric", "123");
+    assertEquals(pipeline.processRow(row).getTransformedRows().get(0).getValue("metric"), "123");
+  }
+
+  @Test
   public void testAggregationSourceAutoDataTypeConversion() {
     // Aggregation source "metric" is not in the schema; TransformPipeline should still convert string "123" before
     // indexing (issue #16317).
@@ -628,6 +659,7 @@ public class RecordTransformerTest {
         .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
     IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setConvertAggregationSourceTypes(true);
     ingestionConfig.setAggregationConfigs(List.of(
         new AggregationConfig("sumMetric", "SUM(metric)"),
         new AggregationConfig("minMetric", "MIN(metric)"),
@@ -652,23 +684,18 @@ public class RecordTransformerTest {
     assertEquals(result.getTransformedRows().size(), 1);
     assertEquals(result.getTransformedRows().get(0).getValue("metric"), 123.0);
 
-    // Lazy conversion: an already-typed value passes through as the same object reference (no conversion, no
-    // allocation).
-    Double typedValue = 42.5;
+    // Stock DataTypeTransformer converts already-typed numbers to the inferred DOUBLE dest type.
     GenericRow typedRow = new GenericRow();
     typedRow.putValue("dim", "a");
     typedRow.putValue("ts", 1L);
-    typedRow.putValue("metric", typedValue);
-    assertSame(pipeline.processRow(typedRow).getTransformedRows().get(0).getValue("metric"), typedValue);
+    typedRow.putValue("metric", 42.5);
+    assertEquals(pipeline.processRow(typedRow).getTransformedRows().get(0).getValue("metric"), 42.5);
 
-    // Lazy conversion: a compatible Number of a different box (Integer for DOUBLE target) is also passed through
-    // untouched; ValueAggregatorUtils.toDouble accepts any Number.
-    Integer intBoxValue = 7;
     GenericRow intBoxRow = new GenericRow();
     intBoxRow.putValue("dim", "a");
     intBoxRow.putValue("ts", 1L);
-    intBoxRow.putValue("metric", intBoxValue);
-    assertSame(pipeline.processRow(intBoxRow).getTransformedRows().get(0).getValue("metric"), intBoxValue);
+    intBoxRow.putValue("metric", 7);
+    assertEquals(pipeline.processRow(intBoxRow).getTransformedRows().get(0).getValue("metric"), 7.0);
 
     // Non-numeric string fails before indexing when continueOnError is false.
     GenericRow bad = new GenericRow();
@@ -706,6 +733,7 @@ public class RecordTransformerTest {
         .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
     IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setConvertAggregationSourceTypes(true);
     ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig("summvMetric", "SUMMV(metricMv)")));
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("aggMvSrcTable")
         .setTimeColumnName("ts")
@@ -726,7 +754,7 @@ public class RecordTransformerTest {
     typedRow.putValue("dim", "a");
     typedRow.putValue("ts", 1L);
     typedRow.putValue("metricMv", typedValues);
-    assertSame(pipeline.processRow(typedRow).getTransformedRows().get(0).getValue("metricMv"), typedValues);
+    assertEquals(pipeline.processRow(typedRow).getTransformedRows().get(0).getValue("metricMv"), typedValues);
 
     // Unparsable element fails in the transformer, before MutableSegmentImpl mutates the row.
     GenericRow bad = new GenericRow();
@@ -780,6 +808,7 @@ public class RecordTransformerTest {
         .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
     IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setConvertAggregationSourceTypes(true);
     ingestionConfig.setAggregationConfigs(List.of(new AggregationConfig("hllMetric", "DISTINCTCOUNTHLL(metric, 12)")));
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("hllTable")
         .setTimeColumnName("ts")

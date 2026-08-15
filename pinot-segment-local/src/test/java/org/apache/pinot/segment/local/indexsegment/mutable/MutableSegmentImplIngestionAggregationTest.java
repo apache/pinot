@@ -395,6 +395,7 @@ public class MutableSegmentImplIngestionAggregationTest {
     Schema schema = getSchemaBuilder().addMetric(m1, DataType.DOUBLE).build();
     List<AggregationConfig> aggregationConfigs = List.of(new AggregationConfig(m1, "SUM(metric)"));
     IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setConvertAggregationSourceTypes(true);
     ingestionConfig.setAggregationConfigs(aggregationConfigs);
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testSchema")
         .setTimeColumnName(TIME_COLUMN1)
@@ -440,6 +441,7 @@ public class MutableSegmentImplIngestionAggregationTest {
     Schema schema = getSchemaBuilder().addMetric(m1, DataType.DOUBLE).build();
     List<AggregationConfig> aggregationConfigs = List.of(new AggregationConfig(m1, "SUM(metric)"));
     IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setConvertAggregationSourceTypes(true);
     ingestionConfig.setAggregationConfigs(aggregationConfigs);
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testSchema")
         .setTimeColumnName(TIME_COLUMN1)
