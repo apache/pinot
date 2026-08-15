@@ -20,6 +20,7 @@ package org.apache.pinot.query.mailbox;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -28,6 +29,7 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
@@ -36,6 +38,7 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -545,9 +548,12 @@ public class MailboxServiceTest {
   public void testRemoteBufferFull()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    // The deadline is the budget for both delivering the first blocks and the buffer-full park that follows, and the
+    // test runs for roughly the full deadline, so it balances delivery headroom under load (e.g. parallel test forks
+    // on CI) against test run time.
+    long deadlineMs = System.currentTimeMillis() + 5000;
     SendingMailbox sendingMailbox =
-        _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId,
-            System.currentTimeMillis() + 1000, _stats);
+        _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, deadlineMs, _stats);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
     AtomicInteger numCallbacks = new AtomicInteger();
     CountDownLatch receiveMailLatch = new CountDownLatch(ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS + 1);
@@ -560,6 +566,11 @@ public class MailboxServiceTest {
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS; i++) {
       sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
     }
+    // Wait until the buffer is full before sending the next block, so that the remaining deadline is spent parked on
+    // the full buffer instead of racing the block delivery.
+    TestUtils.waitForCondition(
+        aVoid -> receivingMailbox.getNumPendingBlocks() == ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS, 10L, 10000L,
+        "Failed to deliver mails");
 
     // Next send will be blocked on the receiver side and cause exception after timeout
     // We need to send a data block, given we don't block on EOS
@@ -572,6 +583,9 @@ public class MailboxServiceTest {
     MseBlock block = readBlock(receivingMailbox);
     assertNotNull(block);
     assertTrue(block.isError());
+    // The error must come from the buffer-full timeout on the receiver side, not from the deadline cancelling the
+    // stream before the overflowing block is parked, which reports INTERNAL instead
+    assertEquals(((ErrorMseBlock) block).getErrorMessages().keySet(), Set.of(QueryErrorCode.EXECUTION_TIMEOUT));
 
     // Cancel is idempotent for both sending and receiving mailbox, so safe to call multiple times
     sendingMailbox.cancel(new Exception("TEST ERROR"));
