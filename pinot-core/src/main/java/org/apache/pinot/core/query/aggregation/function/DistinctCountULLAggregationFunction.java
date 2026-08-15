@@ -84,8 +84,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
 
     DataType dataType = blockValSet.getValueType();
     if (dataType == DataType.BYTES) {
-      // Logical BYTES values contain serialized UltraLogLog objects.
-      // They always use the single-value representation.
+      // Logical BYTES is a serialized UltraLogLog and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         UltraLogLog ull = aggregationResultHolder.getResult();
@@ -166,8 +165,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
 
     DataType dataType = blockValSet.getValueType();
     if (dataType == DataType.BYTES) {
-      // Logical BYTES values contain serialized UltraLogLog objects.
-      // They always use the single-value representation.
+      // Logical BYTES is a serialized UltraLogLog and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         for (int i = 0; i < length; i++) {
@@ -255,8 +253,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
 
     DataType dataType = blockValSet.getValueType();
     if (dataType == DataType.BYTES) {
-      // Logical BYTES values contain serialized UltraLogLog objects.
-      // They always use the single-value representation.
+      // Logical BYTES is a serialized UltraLogLog and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         for (int i = 0; i < length; i++) {

@@ -74,12 +74,19 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
 
     DataType dataType = blockValSet.getValueType();
     if (dataType == DataType.BYTES) {
-      // Logical BYTES values contain serialized RoaringBitmap objects.
-      // They always use the single-value representation.
+      // Logical BYTES is a serialized RoaringBitmap and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      RoaringBitmap valueBitmap = getValueBitmap(aggregationResultHolder);
-      for (int i = 0; i < length; i++) {
-        valueBitmap.or(RoaringBitmapUtils.deserialize(bytesValues[i]));
+      RoaringBitmap valueBitmap = aggregationResultHolder.getResult();
+      if (valueBitmap != null) {
+        for (int i = 0; i < length; i++) {
+          valueBitmap.or(RoaringBitmapUtils.deserialize(bytesValues[i]));
+        }
+      } else {
+        valueBitmap = RoaringBitmapUtils.deserialize(bytesValues[0]);
+        aggregationResultHolder.setValue(valueBitmap);
+        for (int i = 1; i < length; i++) {
+          valueBitmap.or(RoaringBitmapUtils.deserialize(bytesValues[i]));
+        }
       }
       return;
     }
@@ -221,11 +228,17 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
 
     DataType dataType = blockValSet.getValueType();
     if (dataType == DataType.BYTES) {
-      // Logical BYTES values contain serialized RoaringBitmap objects.
-      // They always use the single-value representation.
+      // Logical BYTES is a serialized RoaringBitmap and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
-        getValueBitmap(groupByResultHolder, groupKeyArray[i]).or(RoaringBitmapUtils.deserialize(bytesValues[i]));
+        RoaringBitmap value = RoaringBitmapUtils.deserialize(bytesValues[i]);
+        int groupKey = groupKeyArray[i];
+        RoaringBitmap valueBitmap = groupByResultHolder.getResult(groupKey);
+        if (valueBitmap != null) {
+          valueBitmap.or(value);
+        } else {
+          groupByResultHolder.setValueForKey(groupKey, value);
+        }
       }
       return;
     }
@@ -373,13 +386,18 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
 
     DataType dataType = blockValSet.getValueType();
     if (dataType == DataType.BYTES) {
-      // Logical BYTES values contain serialized RoaringBitmap objects.
-      // They always use the single-value representation.
+      // Logical BYTES is a serialized RoaringBitmap and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
         RoaringBitmap value = RoaringBitmapUtils.deserialize(bytesValues[i]);
         for (int groupKey : groupKeysArray[i]) {
-          getValueBitmap(groupByResultHolder, groupKey).or(value);
+          RoaringBitmap bitmap = groupByResultHolder.getResult(groupKey);
+          if (bitmap != null) {
+            bitmap.or(value);
+          } else {
+            // Clone a bitmap for the group
+            groupByResultHolder.setValueForKey(groupKey, value.clone());
+          }
         }
       }
       return;

@@ -83,11 +83,23 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
     DataType dataType = blockValSet.getValueType();
     if (dataType == DataType.BYTES) {
-      // Logical BYTES values contain serialized HyperLogLog objects.
-      // They always use the single-value representation.
+      // Logical BYTES is a serialized HyperLogLog and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        mergeSerializedHyperLogLog(aggregationResultHolder, bytesValues[i]);
+      try {
+        HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
+        if (hyperLogLog != null) {
+          for (int i = 0; i < length; i++) {
+            hyperLogLog.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
+          }
+        } else {
+          hyperLogLog = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[0]);
+          aggregationResultHolder.setValue(hyperLogLog);
+          for (int i = 1; i < length; i++) {
+            hyperLogLog.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
+          }
+        }
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
       }
       return;
     }
@@ -238,11 +250,21 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
     DataType dataType = blockValSet.getValueType();
     if (dataType == DataType.BYTES) {
-      // Logical BYTES values contain serialized HyperLogLog objects.
-      // They always use the single-value representation.
+      // Logical BYTES is a serialized HyperLogLog and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        mergeSerializedHyperLogLog(groupByResultHolder, groupKeyArray[i], bytesValues[i]);
+      try {
+        for (int i = 0; i < length; i++) {
+          HyperLogLog value = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]);
+          int groupKey = groupKeyArray[i];
+          HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
+          if (hyperLogLog != null) {
+            hyperLogLog.addAll(value);
+          } else {
+            groupByResultHolder.setValueForKey(groupKey, value);
+          }
+        }
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
       }
       return;
     }
@@ -394,13 +416,24 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
     DataType dataType = blockValSet.getValueType();
     if (dataType == DataType.BYTES) {
-      // Logical BYTES values contain serialized HyperLogLog objects.
-      // They always use the single-value representation.
+      // Logical BYTES is a serialized HyperLogLog and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        for (int groupKey : groupKeysArray[i]) {
-          mergeSerializedHyperLogLog(groupByResultHolder, groupKey, bytesValues[i]);
+      try {
+        for (int i = 0; i < length; i++) {
+          HyperLogLog value = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]);
+          for (int groupKey : groupKeysArray[i]) {
+            HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
+            if (hyperLogLog != null) {
+              hyperLogLog.addAll(value);
+            } else {
+              // Create a new HyperLogLog for the group
+              groupByResultHolder.setValueForKey(groupKey,
+                  ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
+            }
+          }
         }
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
       }
       return;
     }
@@ -682,26 +715,6 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       aggregationResultHolder.setValue(dictIdsWrapper);
     }
     return dictIdsWrapper._bitSet;
-  }
-
-  private void mergeSerializedHyperLogLog(AggregationResultHolder aggregationResultHolder, byte[] bytes) {
-    HyperLogLog value = deserializeHyperLogLog(bytes);
-    HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
-    aggregationResultHolder.setValue(hyperLogLog == null ? value : merge(hyperLogLog, value));
-  }
-
-  private void mergeSerializedHyperLogLog(GroupByResultHolder groupByResultHolder, int groupKey, byte[] bytes) {
-    HyperLogLog value = deserializeHyperLogLog(bytes);
-    HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
-    groupByResultHolder.setValueForKey(groupKey, hyperLogLog == null ? value : merge(hyperLogLog, value));
-  }
-
-  private static HyperLogLog deserializeHyperLogLog(byte[] bytes) {
-    try {
-      return ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytes);
-    } catch (Exception e) {
-      throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
-    }
   }
 
   /// Returns the HyperLogLog from the result holder or creates a new one if it does not exist.

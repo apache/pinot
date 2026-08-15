@@ -91,7 +91,6 @@ public class DistinctCountThetaSketchAggregationFunction
   private final List<FilterEvaluator> _filterEvaluators;
   private final ExpressionContext _postAggregationExpression;
   private final UpdatableThetaSketchBuilder _updateSketchBuilder = new UpdatableThetaSketchBuilder();
-  private final ThetaSketch _emptySketch;
   private int _nominalEntries = ThetaUtil.DEFAULT_NOMINAL_ENTRIES;
   protected final ThetaSetOperationBuilder _setOperationBuilder = new ThetaSetOperationBuilder();
   protected int _accumulatorThreshold = DEFAULT_ACCUMULATOR_THRESHOLD;
@@ -117,7 +116,6 @@ public class DistinctCountThetaSketchAggregationFunction
       _setOperationBuilder.setP(p);
       _updateSketchBuilder.setP(p);
     }
-    _emptySketch = _updateSketchBuilder.build().compact();
 
     if (numArguments < 4) {
       // Simple union without post-aggregation
@@ -195,8 +193,7 @@ public class DistinctCountThetaSketchAggregationFunction
     int numFilters = _filterEvaluators.size();
 
     // Main expression is always index 0
-    DataType dataType = valueTypes[0];
-    if (dataType != DataType.BYTES) {
+    if (valueTypes[0] != DataType.BYTES) {
       List<UpdatableThetaSketch> updateSketches = getUpdateSketches(aggregationResultHolder);
       if (singleValues[0]) {
         switch (valueTypes[0].getStoredType()) {
@@ -449,13 +446,11 @@ public class DistinctCountThetaSketchAggregationFunction
             break;
           default:
             throw new IllegalStateException(
-                "Illegal multi-value data type for DISTINCT_COUNT_THETA_SKETCH aggregation function: "
-                    + valueTypes[0]);
+                "Illegal multi-value data type for DISTINCT_COUNT_THETA_SKETCH aggregation function: " + valueTypes[0]);
         }
       }
     } else {
-      // Logical BYTES values contain serialized ThetaSketch objects.
-      // They always use the single-value representation.
+      // Logical BYTES stores serialized ThetaSketch objects in the single-value representation.
       List<ThetaSketchAccumulator> thetaSketchAccumulators = getUnions(aggregationResultHolder);
       ThetaSketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       if (_includeDefaultSketch) {
@@ -487,8 +482,7 @@ public class DistinctCountThetaSketchAggregationFunction
     int numFilters = _filterEvaluators.size();
 
     // Main expression is always index 0
-    DataType dataType = valueTypes[0];
-    if (dataType != DataType.BYTES) {
+    if (valueTypes[0] != DataType.BYTES) {
       if (singleValues[0]) {
         switch (valueTypes[0].getStoredType()) {
           case INT:
@@ -718,17 +712,14 @@ public class DistinctCountThetaSketchAggregationFunction
             break;
           default:
             throw new IllegalStateException(
-                "Illegal multi-value data type for DISTINCT_COUNT_THETA_SKETCH aggregation function: "
-                    + valueTypes[0]);
+                "Illegal multi-value data type for DISTINCT_COUNT_THETA_SKETCH aggregation function: " + valueTypes[0]);
         }
       }
     } else {
-      // Logical BYTES values contain serialized ThetaSketch objects.
-      // They always use the single-value representation.
+      // Logical BYTES stores serialized ThetaSketch objects in the single-value representation.
       ThetaSketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       for (int i = 0; i < length; i++) {
-        List<ThetaSketchAccumulator> thetaSketchAccumulators =
-            getUnions(groupByResultHolder, groupKeyArray[i]);
+        List<ThetaSketchAccumulator> thetaSketchAccumulators = getUnions(groupByResultHolder, groupKeyArray[i]);
         ThetaSketch sketch = sketches[i];
         if (_includeDefaultSketch) {
           thetaSketchAccumulators.get(0).apply(sketch);
@@ -753,8 +744,7 @@ public class DistinctCountThetaSketchAggregationFunction
     int numFilters = _filterEvaluators.size();
 
     // Main expression is always index 0
-    DataType dataType = valueTypes[0];
-    if (dataType != DataType.BYTES) {
+    if (valueTypes[0] != DataType.BYTES) {
       if (singleValues[0]) {
         switch (valueTypes[0].getStoredType()) {
           case INT:
@@ -1043,13 +1033,11 @@ public class DistinctCountThetaSketchAggregationFunction
             break;
           default:
             throw new IllegalStateException(
-                "Illegal multi-value data type for DISTINCT_COUNT_THETA_SKETCH aggregation function: "
-                    + valueTypes[0]);
+                "Illegal multi-value data type for DISTINCT_COUNT_THETA_SKETCH aggregation function: " + valueTypes[0]);
         }
       }
     } else {
-      // Logical BYTES values contain serialized ThetaSketch objects.
-      // They always use the single-value representation.
+      // Logical BYTES stores serialized ThetaSketch objects in the single-value representation.
       ThetaSketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       if (_includeDefaultSketch) {
         for (int i = 0; i < length; i++) {
@@ -1062,8 +1050,8 @@ public class DistinctCountThetaSketchAggregationFunction
         FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
         for (int j = 0; j < length; j++) {
           if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
-            for (int groupKey : groupKeysArray[j]) {
-              getUnions(groupByResultHolder, groupKey).get(i + 1).apply(sketches[j]);
+            for (int groupKey : groupKeysArray[i]) {
+              getUnions(groupByResultHolder, groupKey).get(i + 1).apply(sketches[i]);
             }
           }
         }
@@ -1489,14 +1477,9 @@ public class DistinctCountThetaSketchAggregationFunction
   private ThetaSketch[] deserializeSketches(byte[][] serializedSketches, int length) {
     ThetaSketch[] sketches = new ThetaSketch[length];
     for (int i = 0; i < length; i++) {
-      sketches[i] = deserializeSketch(serializedSketches[i]);
+      sketches[i] = ThetaSketch.wrap(MemorySegment.ofArray(serializedSketches[i]).asReadOnly());
     }
     return sketches;
-  }
-
-  private ThetaSketch deserializeSketch(byte[] serializedSketch) {
-    return serializedSketch.length == 0 ? _emptySketch
-        : ThetaSketch.wrap(MemorySegment.ofArray(serializedSketch).asReadOnly());
   }
 
   /// Evaluates the post-aggregation expression.

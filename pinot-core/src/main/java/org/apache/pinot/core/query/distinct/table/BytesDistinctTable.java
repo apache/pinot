@@ -264,35 +264,35 @@ public class BytesDistinctTable extends DistinctTable {
     }
     int numValues = sortedValues.length;
     assert numValues <= _limit;
-    ColumnDataType columnDataType = _dataSchema.getColumnDataType(0);
     List<Object[]> rows;
     if (_hasNull) {
       if (numValues == _limit) {
         rows = new ArrayList<>(_limit);
         if (_orderByExpression.isNullsLast()) {
-          addRows(columnDataType, sortedValues, numValues, rows);
+          addRows(sortedValues, numValues, rows);
         } else {
           rows.add(new Object[]{null});
-          addRows(columnDataType, sortedValues, numValues - 1, rows);
+          addRows(sortedValues, numValues - 1, rows);
         }
       } else {
         rows = new ArrayList<>(numValues + 1);
         if (_orderByExpression.isNullsLast()) {
-          addRows(columnDataType, sortedValues, numValues, rows);
+          addRows(sortedValues, numValues, rows);
           rows.add(new Object[]{null});
         } else {
           rows.add(new Object[]{null});
-          addRows(columnDataType, sortedValues, numValues, rows);
+          addRows(sortedValues, numValues, rows);
         }
       }
     } else {
       rows = new ArrayList<>(numValues);
-      addRows(columnDataType, sortedValues, numValues, rows);
+      addRows(sortedValues, numValues, rows);
     }
     return new ResultTable(_dataSchema, rows);
   }
 
-  private static void addRows(ColumnDataType columnDataType, ByteArray[] values, int length, List<Object[]> rows) {
+  private void addRows(ByteArray[] values, int length, List<Object[]> rows) {
+    ColumnDataType columnDataType = _dataSchema.getColumnDataType(0);
     for (int i = 0; i < length; i++) {
       rows.add(new Object[]{columnDataType.convertAndFormat(values[i])});
     }
@@ -301,20 +301,20 @@ public class BytesDistinctTable extends DistinctTable {
   private ResultTable toResultTableWithoutOrderBy() {
     int numValues = _valueSet.size();
     assert numValues <= _limit;
-    ColumnDataType columnDataType = _dataSchema.getColumnDataType(0);
     List<Object[]> rows;
     if (_hasNull && numValues < _limit) {
       rows = new ArrayList<>(numValues + 1);
-      addRows(columnDataType, _valueSet, rows);
+      addRows(_valueSet, rows);
       rows.add(new Object[]{null});
     } else {
       rows = new ArrayList<>(numValues);
-      addRows(columnDataType, _valueSet, rows);
+      addRows(_valueSet, rows);
     }
     return new ResultTable(_dataSchema, rows);
   }
 
-  private static void addRows(ColumnDataType columnDataType, HashSet<ByteArray> values, List<Object[]> rows) {
+  private void addRows(HashSet<ByteArray> values, List<Object[]> rows) {
+    ColumnDataType columnDataType = _dataSchema.getColumnDataType(0);
     for (ByteArray value : values) {
       rows.add(new Object[]{columnDataType.convertAndFormat(value)});
     }

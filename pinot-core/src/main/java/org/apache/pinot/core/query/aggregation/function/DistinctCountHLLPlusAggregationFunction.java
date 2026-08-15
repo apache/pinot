@@ -95,11 +95,21 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
 
     DataType dataType = blockValSet.getValueType();
     if (dataType == DataType.BYTES) {
-      // Logical BYTES values contain serialized HyperLogLogPlus objects.
-      // They always use the single-value representation.
+      // Logical BYTES is a serialized HyperLogLogPlus and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        mergeSerializedHyperLogLogPlus(aggregationResultHolder, bytesValues[i]);
+      try {
+        HyperLogLogPlus hyperLogLogPlus = aggregationResultHolder.getResult();
+        if (hyperLogLogPlus == null) {
+          hyperLogLogPlus = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(bytesValues[0]);
+          aggregationResultHolder.setValue(hyperLogLogPlus);
+        } else {
+          hyperLogLogPlus.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(bytesValues[0]));
+        }
+        for (int i = 1; i < length; i++) {
+          hyperLogLogPlus.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(bytesValues[i]));
+        }
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while merging HyperLogLogPlus", e);
       }
       return;
     }
@@ -245,11 +255,21 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
 
     DataType dataType = blockValSet.getValueType();
     if (dataType == DataType.BYTES) {
-      // Logical BYTES values contain serialized HyperLogLogPlus objects.
-      // They always use the single-value representation.
+      // Logical BYTES is a serialized HyperLogLogPlus and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        mergeSerializedHyperLogLogPlus(groupByResultHolder, groupKeyArray[i], bytesValues[i]);
+      try {
+        for (int i = 0; i < length; i++) {
+          HyperLogLogPlus value = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(bytesValues[i]);
+          int groupKey = groupKeyArray[i];
+          HyperLogLogPlus hyperLogLogPlus = groupByResultHolder.getResult(groupKey);
+          if (hyperLogLogPlus != null) {
+            hyperLogLogPlus.addAll(value);
+          } else {
+            groupByResultHolder.setValueForKey(groupKey, value);
+          }
+        }
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while merging HyperLogLogPlus", e);
       }
       return;
     }
@@ -400,13 +420,24 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
 
     DataType dataType = blockValSet.getValueType();
     if (dataType == DataType.BYTES) {
-      // Logical BYTES values contain serialized HyperLogLogPlus objects.
-      // They always use the single-value representation.
+      // Logical BYTES is a serialized HyperLogLogPlus and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        for (int groupKey : groupKeysArray[i]) {
-          mergeSerializedHyperLogLogPlus(groupByResultHolder, groupKey, bytesValues[i]);
+      try {
+        for (int i = 0; i < length; i++) {
+          HyperLogLogPlus value = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(bytesValues[i]);
+          for (int groupKey : groupKeysArray[i]) {
+            HyperLogLogPlus hyperLogLogPlus = groupByResultHolder.getResult(groupKey);
+            if (hyperLogLogPlus != null) {
+              hyperLogLogPlus.addAll(value);
+            } else {
+              // Create a new HyperLogLogPlus for the group
+              groupByResultHolder.setValueForKey(groupKey,
+                  ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(bytesValues[i]));
+            }
+          }
         }
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while merging HyperLogLogPlus", e);
       }
       return;
     }
@@ -675,27 +706,6 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
       aggregationResultHolder.setValue(dictIdsWrapper);
     }
     return dictIdsWrapper._dictIdBitmap;
-  }
-
-  private void mergeSerializedHyperLogLogPlus(AggregationResultHolder aggregationResultHolder, byte[] bytes) {
-    HyperLogLogPlus value = deserializeHyperLogLogPlus(bytes);
-    HyperLogLogPlus hyperLogLogPlus = aggregationResultHolder.getResult();
-    aggregationResultHolder.setValue(hyperLogLogPlus == null ? value : merge(hyperLogLogPlus, value));
-  }
-
-  private void mergeSerializedHyperLogLogPlus(GroupByResultHolder groupByResultHolder, int groupKey, byte[] bytes) {
-    HyperLogLogPlus value = deserializeHyperLogLogPlus(bytes);
-    HyperLogLogPlus hyperLogLogPlus = groupByResultHolder.getResult(groupKey);
-    groupByResultHolder.setValueForKey(groupKey,
-        hyperLogLogPlus == null ? value : merge(hyperLogLogPlus, value));
-  }
-
-  private static HyperLogLogPlus deserializeHyperLogLogPlus(byte[] bytes) {
-    try {
-      return ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(bytes);
-    } catch (Exception e) {
-      throw new RuntimeException("Caught exception while merging HyperLogLogPlus", e);
-    }
   }
 
   /// Returns the HyperLogLogPlus from the result holder or creates a new one if it does not exist.

@@ -19,22 +19,14 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import java.util.Arrays;
 import java.util.BitSet;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.RequestContextUtils;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -61,107 +53,6 @@ public class DistinctCountHLLAggregationFunctionTest {
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, "8")));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, 8)));
     Assert.assertFalse(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, "16")));
-  }
-
-  /// Regression: UUID columns have storedType=BYTES, but a UUID value is a logical scalar, not a serialized
-  /// HyperLogLog. The aggregator must offer the stored bytes as values instead of trying to deserialize each
-  /// 16-byte value as an HLL.
-  @Test
-  public void testAggregateOnUuidColumnOffersStoredBytesAndProducesExactDistinctCount() {
-    ExpressionContext expression = RequestContextUtils.getExpression("uuidCol");
-    DistinctCountHLLAggregationFunction function = new DistinctCountHLLAggregationFunction(List.of(expression));
-
-    // Three distinct UUIDs across six rows; the same UUID repeats twice on rows 0/3, 1/4, 2/5.
-    String[] uuidStrings = new String[]{
-        "550e8400-e29b-41d4-a716-446655440000",
-        "12345678-1234-1234-1234-1234567890ab",
-        "9c5e1f24-0b8e-4c9d-87f1-0aa64a3b9d12",
-        "550e8400-e29b-41d4-a716-446655440000",
-        "12345678-1234-1234-1234-1234567890ab",
-        "9c5e1f24-0b8e-4c9d-87f1-0aa64a3b9d12"
-    };
-
-    // Stub the BYTES fetch with the raw 16-byte stored values offered by the production path.
-    byte[][] uuidBytes = new byte[uuidStrings.length][];
-    for (int i = 0; i < uuidStrings.length; i++) {
-      uuidBytes[i] = UuidUtils.toBytes(uuidStrings[i]);
-    }
-    BlockValSet uuidBlockValSet = mock(BlockValSet.class);
-    when(uuidBlockValSet.getValueType()).thenReturn(DataType.UUID);
-    when(uuidBlockValSet.getBytesValuesSV()).thenReturn(uuidBytes);
-    when(uuidBlockValSet.isSingleValue()).thenReturn(true);
-    when(uuidBlockValSet.getDictionary()).thenReturn(null);
-
-    Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
-    blockValSetMap.put(expression, uuidBlockValSet);
-
-    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
-    function.aggregate(uuidStrings.length, resultHolder, blockValSetMap);
-
-    Object intermediate = function.extractAggregationResult(resultHolder);
-    Assert.assertTrue(intermediate instanceof HyperLogLog,
-        "Intermediate result must be a HyperLogLog, not a dictionary bitmap");
-    long cardinality = ((HyperLogLog) intermediate).cardinality();
-    Assert.assertEquals(cardinality, 3L,
-        "HLL cardinality must equal the 3 distinct UUIDs; got " + cardinality);
-  }
-
-  /// UUID columns hash their **stored bytes**, exactly as TIMESTAMP hashes its stored millis rather than a
-  /// formatted string. Consequence: DISTINCTCOUNTHLL(uuidCol) does NOT equal
-  /// DISTINCTCOUNTHLL(CAST(uuidCol AS STRING)) -- and neither does it for TIMESTAMP, so this is the consistent
-  /// behaviour for a logical type, not a gap. Pinned here so nobody "fixes" it back into a canonical-string
-  /// rendering, which would reintroduce a per-row String allocation in the aggregation loop.
-  @Test
-  public void testUuidDistinctCountHllHashesStoredBytesNotCanonicalString()
-      throws java.io.IOException {
-    String[] uuidStrings = new String[]{
-        "550e8400-e29b-41d4-a716-446655440000",
-        "12345678-1234-1234-1234-1234567890ab",
-        "9c5e1f24-0b8e-4c9d-87f1-0aa64a3b9d12"
-    };
-
-    // Cardinality is still exact for a small distinct set...
-    Assert.assertEquals(computeHllCardinality(uuidStrings, DataType.UUID), 3L);
-
-    // ...but the sketch is built over the 16 stored bytes, so a HyperLogLog fed the canonical strings differs.
-    HyperLogLog fromCanonicalStrings = new HyperLogLog(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
-    for (String uuid : uuidStrings) {
-      fromCanonicalStrings.offer(uuid);
-    }
-    HyperLogLog fromStoredBytes = new HyperLogLog(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
-    for (String uuid : uuidStrings) {
-      fromStoredBytes.offer(UuidUtils.toBytes(uuid));
-    }
-    Assert.assertFalse(Arrays.equals(fromCanonicalStrings.getBytes(), fromStoredBytes.getBytes()),
-        "stored-bytes and canonical-string sketches are expected to differ");
-  }
-
-  private long computeHllCardinality(String[] values, DataType valueType) {
-    ExpressionContext expression = RequestContextUtils.getExpression("col");
-    DistinctCountHLLAggregationFunction function = new DistinctCountHLLAggregationFunction(List.of(expression));
-
-    BlockValSet blockValSet = mock(BlockValSet.class);
-    when(blockValSet.getValueType()).thenReturn(valueType);
-    if (valueType == DataType.UUID) {
-      // UUID path fetches and offers the raw stored bytes.
-      byte[][] uuidBytes = new byte[values.length][];
-      for (int i = 0; i < values.length; i++) {
-        uuidBytes[i] = UuidUtils.toBytes(values[i]);
-      }
-      when(blockValSet.getBytesValuesSV()).thenReturn(uuidBytes);
-    } else {
-      when(blockValSet.getStringValuesSV()).thenReturn(values);
-    }
-    when(blockValSet.isSingleValue()).thenReturn(true);
-    when(blockValSet.getDictionary()).thenReturn(null);
-
-    Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
-    blockValSetMap.put(expression, blockValSet);
-
-    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
-    function.aggregate(values.length, resultHolder, blockValSetMap);
-    Object intermediate = function.extractAggregationResult(resultHolder);
-    return ((HyperLogLog) intermediate).cardinality();
   }
 
   @Test

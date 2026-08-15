@@ -18,33 +18,13 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.util.List;
-import java.util.Map;
-import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.UuidUtils;
-import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 
 public class DistinctCountBitmapMVAggregationFunctionTest extends AbstractAggregationFunctionTest {
-  private static final ExpressionContext UUID_EXPRESSION = ExpressionContext.forIdentifier("uuidCol");
-  private static final byte[] UUID_0 = UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440000");
-  private static final byte[] UUID_1 = UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440001");
-  private static final byte[] UUID_2 = UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440002");
-  private static final byte[] UUID_3 = UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440003");
 
   @Test
   public void testAggregationMV() {
@@ -111,51 +91,5 @@ public class DistinctCountBitmapMVAggregationFunctionTest extends AbstractAggreg
         .thenResultIs("STRING | INT",
             "tag1 | 3",   // distinct: 1, 2, 3
             "tag2 | 3");  // distinct: 1, 2, 3
-  }
-
-  @Test
-  public void testMultiValueUuidUsesMultiValueAccessor() {
-    byte[][][] uuidValues = {
-        {UUID_0, UUID_1},
-        {UUID_1, UUID_2},
-        {UUID_0},
-        {UUID_3}
-    };
-    BlockValSet blockValSet = mock(BlockValSet.class);
-    when(blockValSet.getValueType()).thenReturn(DataType.UUID);
-    when(blockValSet.isSingleValue()).thenReturn(false);
-    when(blockValSet.isDictionaryEncoded()).thenReturn(false);
-    when(blockValSet.getBytesValuesMV()).thenReturn(uuidValues);
-    DistinctCountBitmapAggregationFunction function =
-        new DistinctCountBitmapAggregationFunction(List.of(UUID_EXPRESSION));
-
-    AggregationResultHolder aggregationResultHolder = function.createAggregationResultHolder();
-    function.aggregate(uuidValues.length, aggregationResultHolder, Map.of(UUID_EXPRESSION, blockValSet));
-    Assert.assertEquals(extractFinalResult(function, aggregationResultHolder), 4);
-
-    GroupByResultHolder groupBySVResultHolder = function.createGroupByResultHolder(2, 2);
-    function.aggregateGroupBySV(uuidValues.length, new int[]{0, 0, 1, 1}, groupBySVResultHolder,
-        Map.of(UUID_EXPRESSION, blockValSet));
-    Assert.assertEquals(extractFinalResult(function, groupBySVResultHolder, 0), 3);
-    Assert.assertEquals(extractFinalResult(function, groupBySVResultHolder, 1), 2);
-
-    GroupByResultHolder groupByMVResultHolder = function.createGroupByResultHolder(2, 2);
-    function.aggregateGroupByMV(uuidValues.length, new int[][]{{0}, {1}, {0, 1}, {1}},
-        groupByMVResultHolder, Map.of(UUID_EXPRESSION, blockValSet));
-    Assert.assertEquals(extractFinalResult(function, groupByMVResultHolder, 0), 2);
-    Assert.assertEquals(extractFinalResult(function, groupByMVResultHolder, 1), 4);
-
-    verify(blockValSet, atLeastOnce()).getBytesValuesMV();
-    verify(blockValSet, never()).getBytesValuesSV();
-  }
-
-  private static int extractFinalResult(DistinctCountBitmapAggregationFunction function,
-      AggregationResultHolder resultHolder) {
-    return function.extractFinalResult(function.extractAggregationResult(resultHolder));
-  }
-
-  private static int extractFinalResult(DistinctCountBitmapAggregationFunction function,
-      GroupByResultHolder resultHolder, int groupKey) {
-    return function.extractFinalResult(function.extractGroupByResult(resultHolder, groupKey));
   }
 }
