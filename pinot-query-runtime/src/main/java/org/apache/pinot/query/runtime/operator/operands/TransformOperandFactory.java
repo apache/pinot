@@ -91,10 +91,12 @@ public class TransformOperandFactory {
     if (functionCall.getDataType() == ColumnDataType.BYTES_ARRAY) {
       List<RexExpression> operands = functionCall.getFunctionOperands();
       ByteArray[] values = new ByteArray[operands.size()];
+      boolean allLiterals = true;
       for (int i = 0; i < operands.size(); i++) {
         RexExpression operand = operands.get(i);
         if (!(operand instanceof RexExpression.Literal)) {
-          return new FunctionOperand(functionCall, dataSchema);
+          allLiterals = false;
+          continue;
         }
         RexExpression.Literal literal = (RexExpression.Literal) operand;
         if (literal.getDataType() != ColumnDataType.BYTES || !(literal.getValue() instanceof ByteArray)) {
@@ -102,11 +104,59 @@ public class TransformOperandFactory {
         }
         values[i] = (ByteArray) literal.getValue();
       }
-      // ARRAY literals are constant for the operator. Store the internal and external values once instead of
-      // allocating byte[][], ByteArray[], and ByteArray wrappers for every input row in FunctionOperand.
-      return new BytesArrayLiteralOperand(values);
+      if (allLiterals) {
+        // ARRAY literals are constant for the operator. Store the internal and external values once instead of
+        // allocating byte[][], ByteArray[], and ByteArray wrappers for every input row in FunctionOperand.
+        return new BytesArrayLiteralOperand(values);
+      }
+      return new BytesArrayDynamicOperand(operands, dataSchema);
     }
     return new FunctionOperand(functionCall, dataSchema);
+  }
+
+  private static final class BytesArrayDynamicOperand implements TransformOperand {
+    private final TransformOperand[] _operands;
+
+    private BytesArrayDynamicOperand(List<RexExpression> operands, DataSchema dataSchema) {
+      int numOperands = operands.size();
+      _operands = new TransformOperand[numOperands];
+      for (int i = 0; i < numOperands; i++) {
+        TransformOperand operand = getTransformOperand(operands.get(i), dataSchema);
+        Preconditions.checkState(operand.getResultType() == ColumnDataType.BYTES,
+            "Expected BYTES operand at index %s, got: %s", i, operand.getResultType());
+        _operands[i] = operand;
+      }
+    }
+
+    @Override
+    public ColumnDataType getResultType() {
+      return ColumnDataType.BYTES_ARRAY;
+    }
+
+    @Override
+    public ByteArray[] apply(List<Object> row) {
+      ByteArray[] values = new ByteArray[_operands.length];
+      for (int i = 0; i < _operands.length; i++) {
+        values[i] = getValue(i, row);
+      }
+      return values;
+    }
+
+    @Override
+    public byte[][] applyExternal(List<Object> row) {
+      byte[][] values = new byte[_operands.length][];
+      for (int i = 0; i < _operands.length; i++) {
+        values[i] = getValue(i, row).getBytes();
+      }
+      return values;
+    }
+
+    private ByteArray getValue(int index, List<Object> row) {
+      Object value = _operands[index].apply(row);
+      Preconditions.checkState(value instanceof ByteArray,
+          "Expected BYTES operand at index %s to produce ByteArray, got: %s", index, value);
+      return (ByteArray) value;
+    }
   }
 
   private static final class BytesArrayLiteralOperand implements TransformOperand {
