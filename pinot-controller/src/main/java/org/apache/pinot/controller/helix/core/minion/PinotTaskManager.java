@@ -1068,6 +1068,26 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
   }
 
+  /// Shuts down the cron scheduler started by [#init()], its counterpart in the controller shutdown sequence.
+  ///
+  /// Must be called before the controller tears down Helix. The scheduler's worker threads are not daemons and keep
+  /// firing jobs until it is shut down, so otherwise the cron jobs keep running against a closed `ZkClient` and the
+  /// threads outlive the controller.
+  ///
+  /// Waits for the jobs already in flight, so a task generation in progress is not cut off midway. Safe to call more
+  /// than once, and a no-op when the scheduler is disabled.
+  public void stopScheduler() {
+    if (_scheduler == null) {
+      return;
+    }
+    try {
+      LOGGER.info("Shutting down the task scheduler");
+      _scheduler.shutdown(true);
+    } catch (SchedulerException e) {
+      LOGGER.error("Caught exception while shutting down the task scheduler", e);
+    }
+  }
+
   @Override
   protected void nonLeaderCleanup(List<String> tableNamesWithType) {
     LOGGER.info(
