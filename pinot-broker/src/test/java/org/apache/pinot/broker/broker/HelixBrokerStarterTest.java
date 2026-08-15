@@ -153,21 +153,21 @@ public class HelixBrokerStarterTest extends ControllerTest {
   }
 
   @Test
-  public void testServerRoutingHealthCheck() {
+  public void testServerRoutingStatus() {
     BrokerRoutingManager routingManager = _brokerStarter.getRoutingManager();
     TestUtils.waitForCondition(aVoid -> !routingManager.getEnabledServerInstanceMap().isEmpty(), 30_000L,
         "Failed to find an enabled server");
     String serverInstance = routingManager.getEnabledServerInstanceMap().keySet().iterator().next();
-    assertTrue(routingManager.isServerRoutable(serverInstance));
+    assertTrue(routingManager.isServerEnabled(serverInstance));
 
     Client client = ClientBuilder.newClient();
     try {
-      WebTarget healthTarget = client.target("http://localhost:18099/health");
-      try (Response response = healthTarget.queryParam("serverInstance", serverInstance).request().get()) {
+      WebTarget routingTarget = client.target("http://localhost:18099/routing/server");
+      try (Response response = routingTarget.path(serverInstance).request().get()) {
         assertEquals(response.getStatus(), 200);
         assertEquals(response.readEntity(String.class), CommonConstants.Broker.SERVER_ROUTING_READY_RESPONSE);
       }
-      try (Response response = healthTarget.queryParam("serverInstance", "Server_unknown_8098").request().get()) {
+      try (Response response = routingTarget.path("Server_unknown_8098").request().get()) {
         assertEquals(response.getStatus(), 503);
       }
     } finally {

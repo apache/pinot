@@ -34,20 +34,17 @@ import javax.inject.Named;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
-import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
-import org.apache.pinot.spi.utils.CommonConstants;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -66,9 +63,6 @@ public class PinotBrokerHealthCheck {
   private BrokerMetrics _brokerMetrics;
 
   @Inject
-  private BrokerRoutingManager _routingManager;
-
-  @Inject
   @Named(BrokerAdminApiApplication.START_TIME)
   private Instant _startTime;
 
@@ -81,18 +75,9 @@ public class PinotBrokerHealthCheck {
       @ApiResponse(code = 200, message = "Broker is healthy"),
       @ApiResponse(code = 503, message = "Broker is not healthy")
   })
-  public String getBrokerHealth(@QueryParam("serverInstance") String serverInstance) {
+  public String getBrokerHealth() {
     ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
     if (status == ServiceStatus.Status.GOOD) {
-      if (serverInstance != null) {
-        if (!_routingManager.isServerRoutable(serverInstance)) {
-          String errMessage = String.format("Server %s is not available for routing", serverInstance);
-          throw new WebApplicationException(errMessage,
-              Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build());
-        }
-        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_OK_CALLS, 1);
-        return CommonConstants.Broker.SERVER_ROUTING_READY_RESPONSE;
-      }
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_OK_CALLS, 1);
       return "OK";
     }

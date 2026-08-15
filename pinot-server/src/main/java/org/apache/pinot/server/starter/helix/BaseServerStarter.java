@@ -59,6 +59,7 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -121,6 +122,7 @@ import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -986,7 +988,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
         Server.DEFAULT_STARTUP_BROKER_ROUTING_CHECK_TIMEOUT_MS);
     boolean failOpen = _serverConf.getProperty(Server.CONFIG_OF_STARTUP_BROKER_ROUTING_CHECK_FAIL_OPEN,
         Server.DEFAULT_STARTUP_BROKER_ROUTING_CHECK_FAIL_OPEN);
-    return new BrokerRoutingReadyChecker(_helixManager, _instanceId, timeoutMs, failOpen);
+    AuthProvider authProvider = AuthProviderUtils.extractAuthProvider(_serverConf,
+        Server.CONFIG_OF_STARTUP_BROKER_ROUTING_CHECK_AUTH_PREFIX);
+    return new BrokerRoutingReadyChecker(_helixManager, _instanceId, timeoutMs, failOpen, authProvider);
   }
 
   protected SegmentOperationsThrottler createMultiColumnIndexPreprocessThrottler() {

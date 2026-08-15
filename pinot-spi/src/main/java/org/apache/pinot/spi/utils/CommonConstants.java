@@ -1618,6 +1618,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_STARTUP_BROKER_ROUTING_CHECK_FAIL_OPEN =
         "pinot.server.startup.brokerRoutingCheckFailOpen";
     public static final boolean DEFAULT_STARTUP_BROKER_ROUTING_CHECK_FAIL_OPEN = true;
+    // Authentication used by the server when it queries the broker routing-readiness endpoint.
+    public static final String CONFIG_OF_STARTUP_BROKER_ROUTING_CHECK_AUTH_PREFIX =
+        "pinot.server.startup.brokerRoutingCheck.auth";
     // Shutdown: timeout for the shutdown checks
     public static final String CONFIG_OF_SHUTDOWN_TIMEOUT_MS = "pinot.server.shutdown.timeoutMs";
     public static final long DEFAULT_SHUTDOWN_TIMEOUT_MS = 600_000L;

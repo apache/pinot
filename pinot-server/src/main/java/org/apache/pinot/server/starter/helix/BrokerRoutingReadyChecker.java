@@ -20,9 +20,8 @@ package org.apache.pinot.server.starter.helix;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.IOException;
 import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -38,10 +37,12 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.auth.NullAuthProvider;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,11 +66,20 @@ public class BrokerRoutingReadyChecker implements AutoCloseable {
   private final LongSupplier _currentTimeMs;
   private final long _deadlineMs;
   private final boolean _failOpen;
+  private final AuthProvider _authProvider;
+  private final RoutingStatusClient _routingStatusClient;
   private volatile boolean _ready;
   private boolean _timeoutLogged;
 
   public BrokerRoutingReadyChecker(HelixManager helixManager, String serverInstanceId, long timeoutMs,
-      boolean failOpen) {
+      boolean failOpen, AuthProvider authProvider) {
+    this(helixManager, serverInstanceId, timeoutMs, failOpen, authProvider,
+        (uri, provider) -> HttpClient.getInstance().sendGetRequest(uri, null, provider));
+  }
+
+  @VisibleForTesting
+  BrokerRoutingReadyChecker(HelixManager helixManager, String serverInstanceId, long timeoutMs,
+      boolean failOpen, AuthProvider authProvider, RoutingStatusClient routingStatusClient) {
     _serverInstanceId = serverInstanceId;
     HelixAdmin helixAdmin = helixManager.getClusterManagmentTool();
     String clusterName = helixManager.getClusterName();
@@ -86,6 +96,8 @@ public class BrokerRoutingReadyChecker implements AutoCloseable {
     _currentTimeMs = System::currentTimeMillis;
     _deadlineMs = _currentTimeMs.getAsLong() + timeoutMs;
     _failOpen = failOpen;
+    _authProvider = authProvider;
+    _routingStatusClient = routingStatusClient;
   }
 
   @VisibleForTesting
@@ -105,6 +117,8 @@ public class BrokerRoutingReadyChecker implements AutoCloseable {
     _currentTimeMs = currentTimeMs;
     _deadlineMs = currentTimeMs.getAsLong() + timeoutMs;
     _failOpen = failOpen;
+    _authProvider = new NullAuthProvider();
+    _routingStatusClient = null;
   }
 
   public void start() {
@@ -113,6 +127,11 @@ public class BrokerRoutingReadyChecker implements AutoCloseable {
 
   public boolean isReady() {
     return _ready;
+  }
+
+  @VisibleForTesting
+  AuthProvider getAuthProvider() {
+    return _authProvider;
   }
 
   @VisibleForTesting
@@ -167,10 +186,8 @@ public class BrokerRoutingReadyChecker implements AutoCloseable {
       if (instanceConfig == null) {
         return false;
       }
-      String serverInstance = URLEncoder.encode(_serverInstanceId, StandardCharsets.UTF_8);
-      URI uri = URI.create(InstanceUtils.getInstanceBaseUri(instanceConfig) + "/health?serverInstance="
-          + serverInstance);
-      SimpleHttpResponse response = HttpClient.getInstance().sendGetRequest(uri);
+      URI uri = URI.create(InstanceUtils.getInstanceBaseUri(instanceConfig) + "/routing/server/" + _serverInstanceId);
+      SimpleHttpResponse response = _routingStatusClient.get(uri, _authProvider);
       return response.getStatusCode() == 200
           && CommonConstants.Broker.SERVER_ROUTING_READY_RESPONSE.equals(response.getResponse());
     } catch (Exception e) {
@@ -187,5 +204,10 @@ public class BrokerRoutingReadyChecker implements AutoCloseable {
     if (_requestExecutor != null) {
       _requestExecutor.shutdownNow();
     }
+  }
+
+  @VisibleForTesting
+  interface RoutingStatusClient {
+    SimpleHttpResponse get(URI uri, AuthProvider authProvider) throws IOException;
   }
 }

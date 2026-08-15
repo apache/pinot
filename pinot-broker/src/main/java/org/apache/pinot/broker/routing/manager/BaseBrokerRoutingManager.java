@@ -1331,17 +1331,9 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     return routingEntry._instanceSelector.getServingInstances();
   }
 
-  /// Returns whether the server is currently available to the broker routing entries.
-  ///
-  /// The read lock ensures this method cannot observe `_routableServerInstanceMap` while an instance-config callback
-  /// is still applying the corresponding change to individual routing entries.
-  public boolean isServerRoutable(String instanceId) {
-    _globalLock.readLock().lock();
-    try {
-      return _routableServerInstanceMap.containsKey(instanceId);
-    } finally {
-      _globalLock.readLock().unlock();
-    }
+  /// Returns whether the broker sees the server as enabled.
+  public boolean isServerEnabled(String instanceId) {
+    return _enabledServerInstanceMap.containsKey(instanceId);
   }
 
   /// Returns the table-level query timeout in milliseconds for the given table, or `null` if the timeout is not

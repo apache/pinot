@@ -18,18 +18,69 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import java.net.URI;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.spi.auth.AuthProvider;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
 public class BrokerRoutingReadyCheckerTest {
   private static final String SERVER_INSTANCE = "Server_localhost_8098";
+  private static final String BROKER_INSTANCE = "Broker_localhost_8099";
+
+  @Test
+  public void testBrokerRequestUsesAuthProvider() throws Exception {
+    HelixManager helixManager = mock(HelixManager.class);
+    HelixAdmin helixAdmin = mock(HelixAdmin.class);
+    when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
+    when(helixManager.getClusterName()).thenReturn("testCluster");
+
+    ExternalView brokerResource = new ExternalView(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    brokerResource.setStateMap("0", Map.of(BROKER_INSTANCE, "ONLINE"));
+    when(helixAdmin.getResourceExternalView("testCluster", CommonConstants.Helix.BROKER_RESOURCE_INSTANCE))
+        .thenReturn(brokerResource);
+    InstanceConfig instanceConfig = new InstanceConfig(BROKER_INSTANCE);
+    instanceConfig.setHostName("localhost");
+    instanceConfig.setPort("8099");
+    when(helixAdmin.getInstanceConfig("testCluster", BROKER_INSTANCE)).thenReturn(instanceConfig);
+
+    URI expectedUri = URI.create("http://localhost:8099/routing/server/" + SERVER_INSTANCE);
+    AuthProvider authProvider = mock(AuthProvider.class);
+    AtomicReference<URI> requestedUri = new AtomicReference<>();
+    AtomicReference<AuthProvider> requestedAuthProvider = new AtomicReference<>();
+    BrokerRoutingReadyChecker.RoutingStatusClient routingStatusClient = (uri, provider) -> {
+      requestedUri.set(uri);
+      requestedAuthProvider.set(provider);
+      return new SimpleHttpResponse(200, CommonConstants.Broker.SERVER_ROUTING_READY_RESPONSE);
+    };
+
+    try (BrokerRoutingReadyChecker checker =
+        new BrokerRoutingReadyChecker(helixManager, SERVER_INSTANCE, 5_000L, false, authProvider,
+            routingStatusClient)) {
+      checker.check();
+      assertTrue(checker.isReady());
+    }
+
+    assertEquals(requestedUri.get(), expectedUri);
+    assertSame(requestedAuthProvider.get(), authProvider);
+  }
 
   @Test
   public void testWaitsForOnlineBrokers() {

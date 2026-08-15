@@ -183,20 +183,22 @@ public class BrokerRoutingManagerTest {
   }
 
   @Test
-  public void testServerRoutableState() {
-    assertFalse(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
+  public void testServerEnabledState() {
+    assertFalse(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
 
     List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
         anyInt(), anyInt())).thenReturn(instanceConfigs);
     _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
-    assertTrue(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
+    assertTrue(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
 
     _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
-    assertFalse(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
+    assertTrue(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
 
-    _routingManager.includeServerToRouting(SERVER_INSTANCE_ID);
-    assertTrue(_routingManager.isServerRoutable(SERVER_INSTANCE_ID));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of());
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertFalse(_routingManager.isServerEnabled(SERVER_INSTANCE_ID));
   }
 
   @Test
