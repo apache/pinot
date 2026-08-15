@@ -411,8 +411,8 @@ public class DefaultColumnHandlerTest {
   private static boolean isTransformFunctionBackfilled(File indexDir, String column)
       throws Exception {
     PropertiesConfiguration segmentProperties = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
-    return segmentProperties.getBoolean(
-        V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.TRANSFORM_FUNCTION_BACKFILLED),
-        false);
+    String backfilledKey =
+        V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.TRANSFORM_FUNCTION_BACKFILLED);
+    return segmentProperties.getBoolean(backfilledKey, false);
   }
 }
