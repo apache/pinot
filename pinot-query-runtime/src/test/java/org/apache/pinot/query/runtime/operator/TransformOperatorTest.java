@@ -42,6 +42,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -143,6 +144,55 @@ public class TransformOperatorTest {
     Object externalValue = literalOperand.applyExternal(List.of(1));
     assertEquals((byte[][]) externalValue, new byte[][]{{0}, {1, 2}});
     assertSame(literalOperand.applyExternal(List.of(2)), externalValue);
+  }
+
+  @Test
+  public void shouldHandleDynamicBytesArrayTransform() {
+    DataSchema inputSchema =
+        new DataSchema(new String[]{"left", "right"}, new ColumnDataType[]{ColumnDataType.BYTES, ColumnDataType.BYTES});
+    ByteArray literal = new ByteArray(new byte[]{0});
+    ByteArray left0 = new ByteArray(new byte[]{1});
+    ByteArray right0 = new ByteArray(new byte[]{2});
+    ByteArray left1 = new ByteArray(new byte[]{3});
+    ByteArray right1 = new ByteArray(new byte[]{4});
+    ByteArray left2 = new ByteArray(new byte[]{5});
+    ByteArray right2 = new ByteArray(new byte[]{6});
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{left0, right0},
+        new Object[]{left1, right1}, new Object[]{left2, right2}));
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"bytesArray"}, new ColumnDataType[]{ColumnDataType.BYTES_ARRAY});
+    List<RexExpression> operands = List.of(new RexExpression.Literal(ColumnDataType.BYTES, literal),
+        new RexExpression.InputRef(0), new RexExpression.InputRef(1));
+    List<RexExpression> projects = List.of(
+        new RexExpression.FunctionCall(ColumnDataType.BYTES_ARRAY, "ARRAY_VALUE_CONSTRUCTOR", operands));
+
+    TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(resultRows.size(), 3);
+    ByteArray[][] expected = {{literal, left0, right0}, {literal, left1, right1}, {literal, left2, right2}};
+    for (int i = 0; i < expected.length; i++) {
+      ByteArray[] actual = (ByteArray[]) resultRows.get(i)[0];
+      assertEquals(actual, expected[i]);
+      for (int j = 0; j < actual.length; j++) {
+        assertSame(actual[j], expected[i][j]);
+      }
+    }
+    assertNotSame(resultRows.get(0)[0], resultRows.get(1)[0]);
+    assertNotSame(resultRows.get(0)[0], resultRows.get(2)[0]);
+    assertNotSame(resultRows.get(1)[0], resultRows.get(2)[0]);
+
+    TransformOperand dynamicOperand = TransformOperandFactory.getTransformOperand(projects.get(0), inputSchema);
+    byte[][] firstExternal = (byte[][]) dynamicOperand.applyExternal(List.of(left0, right0));
+    byte[][] secondExternal = (byte[][]) dynamicOperand.applyExternal(List.of(left1, right1));
+    assertEquals(firstExternal, new byte[][]{{0}, {1}, {2}});
+    assertEquals(secondExternal, new byte[][]{{0}, {3}, {4}});
+    assertNotSame(firstExternal, secondExternal);
+    assertSame(firstExternal[0], literal.getBytes());
+    assertSame(firstExternal[1], left0.getBytes());
+    assertSame(firstExternal[2], right0.getBytes());
+    assertSame(secondExternal[0], literal.getBytes());
+    assertSame(secondExternal[1], left1.getBytes());
+    assertSame(secondExternal[2], right1.getBytes());
   }
 
   @Test
