@@ -726,7 +726,7 @@ public class RecordTransformerTest {
   @Test
   public void testAggregationSourceMultiValueAutoDataTypeConversion() {
     // SUMMV source is multi-value: string elements must convert to Double[] (not throw on multi-element arrays), and
-    // an already-typed Double[] must pass through as the same object reference.
+    // an already-typed Double[] must convert to an equivalent Double[].
     Schema schema = new Schema.SchemaBuilder().setSchemaName("aggMvSrcSchema")
         .addSingleValueDimension("dim", DataType.STRING)
         .addMetric("summvMetric", DataType.DOUBLE)
