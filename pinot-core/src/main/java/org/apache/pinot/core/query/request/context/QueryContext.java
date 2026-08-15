@@ -44,6 +44,7 @@ import org.apache.pinot.core.util.MemoizedClassAssociation;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
@@ -248,6 +249,22 @@ public class QueryContext {
   /// grouping-set query (the `$groupingId` discriminator column), 0 otherwise.
   public int getNumExtraGroupByKeyColumns() {
     return isGroupingSets() ? 1 : 0;
+  }
+
+  /// Returns whether grouping-set queries should aggregate the base grouping (union columns) once per segment
+  /// and derive the individual grouping-set records from those base groups, instead of expanding every input
+  /// row into one group per grouping set. Enabled by default; the `groupingSetsBaseAggregation=false` query
+  /// option forces the legacy per-row expansion path. See [CommonConstants.Broker.Request.QueryOptionKey].
+  ///
+  /// Not applied to filtered aggregations: those share a single group-key generator across aggregation groups
+  /// and go through a distinct segment path, so grouping-set queries with filtered aggregations always use the
+  /// per-row expansion path.
+  public boolean isGroupingSetsBaseAggregation() {
+    if (_hasFilteredAggregations) {
+      return false;
+    }
+    String option = _queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION);
+    return option == null || Boolean.parseBoolean(option);
   }
 
   /// Returns the total number of group-by key columns in the server result / reducer row layout: the union

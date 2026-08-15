@@ -781,6 +781,13 @@ public class CommonConstants {
         /// with group by and limit but  without order by
         public static final String ACCURATE_GROUP_BY_WITHOUT_ORDER_BY = "accurateGroupByWithoutOrderBy";
 
+        /// For GROUP BY GROUPING SETS / ROLLUP / CUBE: when enabled (default), each segment aggregates only the
+        /// base grouping (the union of all grouping-set columns) using the regular group-by path, then derives
+        /// the individual grouping-set records from those base groups. This replaces expanding every input row
+        /// into one group per grouping set, moving the per-set fan-out from O(rows) to O(base groups). Set to
+        /// `false` to fall back to the legacy per-row expansion path.
+        public static final String GROUPING_SETS_BASE_AGGREGATION = "groupingSetsBaseAggregation";
+
         /// Number of threads used in the final reduce.
         /// This is useful for expensive aggregation functions. E.g. Funnel queries are considered as expensive
         /// aggregation functions.
