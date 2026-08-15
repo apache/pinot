@@ -59,9 +59,7 @@ public interface ColumnMetadata extends ColumnShape {
 
   /// Returns the transform function expression used to generate the column, if persisted in the segment metadata.
   @Nullable
-  default String getTransformFunction() {
-    return null;
-  }
+  String getTransformFunction();
 
   /// Returns the total number of indexes for the column.
   @JsonIgnore

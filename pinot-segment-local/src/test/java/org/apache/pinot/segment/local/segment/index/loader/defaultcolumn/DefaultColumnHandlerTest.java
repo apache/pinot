@@ -54,8 +54,10 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class DefaultColumnHandlerTest {
@@ -151,6 +153,7 @@ public class DefaultColumnHandlerTest {
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
     assertEquals(segmentMetadata.getColumnMetadataFor(DERIVED_COLUMN).getTransformFunction(),
         ORIGINAL_TRANSFORM_FUNCTION);
+    assertFalse(isTransformFunctionBackfilled(indexDir, DERIVED_COLUMN));
   }
 
   /// Legacy segments carry no transform function in their metadata. Reloading them must NOT regenerate the derived
@@ -180,6 +183,7 @@ public class DefaultColumnHandlerTest {
     ColumnMetadata backfilledColumnMetadata =
         new SegmentMetadataImpl(indexDir).getColumnMetadataFor(DERIVED_COLUMN);
     assertEquals(backfilledColumnMetadata.getTransformFunction(), UPDATED_TRANSFORM_FUNCTION);
+    assertTrue(isTransformFunctionBackfilled(indexDir, DERIVED_COLUMN));
     assertEquals(backfilledColumnMetadata.getMinValue(), legacyMinValue);
     assertEquals(backfilledColumnMetadata.getMaxValue(), legacyMaxValue);
 
@@ -194,6 +198,7 @@ public class DefaultColumnHandlerTest {
 
     ColumnMetadata derivedColumnMetadata = new SegmentMetadataImpl(indexDir).getColumnMetadataFor(DERIVED_COLUMN);
     assertEquals(derivedColumnMetadata.getTransformFunction(), FINAL_TRANSFORM_FUNCTION);
+    assertFalse(isTransformFunctionBackfilled(indexDir, DERIVED_COLUMN));
     assertEquals(derivedColumnMetadata.getMinValue(), (Integer) sourceColumnMetadata.getMinValue() + 3);
     assertEquals(derivedColumnMetadata.getMaxValue(), (Integer) sourceColumnMetadata.getMaxValue() + 3);
   }
@@ -237,6 +242,7 @@ public class DefaultColumnHandlerTest {
 
     assertEquals(new SegmentMetadataImpl(indexDir).getColumnMetadataFor(DERIVED_COLUMN).getTransformFunction(),
         transformFunction);
+    assertTrue(isTransformFunctionBackfilled(indexDir, DERIVED_COLUMN));
     // The recovered value must compare equal to the config, otherwise the next reload would rebuild the column.
     assertEquals(computeDefaultColumnActionMap(indexDir, tableConfig, schema), Map.of());
   }
@@ -400,5 +406,13 @@ public class DefaultColumnHandlerTest {
     segmentProperties.clearProperty(
         V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.TRANSFORM_FUNCTION));
     SegmentMetadataUtils.savePropertiesConfiguration(segmentProperties, indexDir);
+  }
+
+  private static boolean isTransformFunctionBackfilled(File indexDir, String column)
+      throws Exception {
+    PropertiesConfiguration segmentProperties = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
+    return segmentProperties.getBoolean(
+        V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.TRANSFORM_FUNCTION_BACKFILLED),
+        false);
   }
 }

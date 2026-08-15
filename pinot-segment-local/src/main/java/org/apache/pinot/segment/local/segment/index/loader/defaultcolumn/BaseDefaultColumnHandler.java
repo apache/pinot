@@ -78,12 +78,11 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
-import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.function.FunctionEvaluator;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -147,6 +146,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   protected final TableConfig _tableConfig;
   protected final Schema _schema;
   protected final SegmentDirectory.Writer _segmentWriter;
+  private final Map<String, String> _transformFunctionByColumn;
 
   // NOTE: _segmentProperties shouldn't be used when checking whether default column need to be created because at that
   //       time _segmentMetadata might not be loaded from a local file
@@ -162,6 +162,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     _schema = _indexLoadingConfig.getSchema();
     Preconditions.checkArgument(_schema != null, "Schema must be provided");
     _segmentWriter = segmentWriter;
+    _transformFunctionByColumn = IngestionConfigUtils.getTransformFunctionByColumn(_tableConfig, _schema);
   }
 
   @Override
@@ -196,7 +197,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         // Metadata-only: record the configured transform function without touching the column values.
         LOGGER.info("Backfilling transform function for auto-generated column: {} in segment: {}", column,
             _segmentMetadata.getName());
-        BaseSegmentCreator.addTransformFunction(_segmentProperties, column, getTransformFunctionForColumn(column));
+        BaseSegmentCreator.addTransformFunction(_segmentProperties, column, getTransformFunctionForColumn(column),
+            true);
         continue;
       }
       // This method updates the metadata properties, need to save it later. Remove the entry if the update failed.
@@ -482,19 +484,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   }
 
   @Nullable
-  @SuppressWarnings("deprecation")
   private String getTransformFunctionForColumn(String column) {
-    IngestionConfig ingestionConfig = _tableConfig.getIngestionConfig();
-    if (ingestionConfig != null && ingestionConfig.getTransformConfigs() != null) {
-      for (TransformConfig transformConfig : ingestionConfig.getTransformConfigs()) {
-        if (column.equals(transformConfig.getColumnName())) {
-          return transformConfig.getTransformFunction();
-        }
-      }
-    }
-    FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
-    // Keep the schema-level transform fallback for legacy configs.
-    return fieldSpec != null ? fieldSpec.getTransformFunction() : null;
+    return _transformFunctionByColumn.get(column);
   }
 
   /// Check and return whether the forward index is disabled for a given column
