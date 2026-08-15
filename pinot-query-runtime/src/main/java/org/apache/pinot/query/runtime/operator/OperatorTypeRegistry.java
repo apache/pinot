@@ -53,7 +53,8 @@ public final class OperatorTypeRegistry {
     ID_TO_DESCRIPTOR = Collections.unmodifiableMap(map);
   }
 
-  private static void registerPlugin(OperatorTypeDescriptor plugin, Map<Integer, OperatorTypeDescriptor> map) {
+  @VisibleForTesting
+  static void registerPlugin(OperatorTypeDescriptor plugin, Map<Integer, OperatorTypeDescriptor> map) {
     // Enforce the documented id contract: ids below PLUGIN_ID_FLOOR are reserved for built-ins (current and
     // future). Without this check a plugin could squat on a reserved id and work until a built-in claims it —
     // and ids that fit in the legacy single-byte stat format would be silently emitted there, defeating the

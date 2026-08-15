@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -56,5 +60,56 @@ public class OperatorTypeRegistryTest {
     Assert.assertEquals(descriptor.getId(), aggregate.getId());
     Assert.assertEquals(descriptor.name(), aggregate.name());
     Assert.assertEquals(descriptor.getStatKeyClass(), aggregate.getStatKeyClass());
+  }
+
+  @Test
+  public void testRegisterPluginRejectsReservedId() {
+    Map<Integer, OperatorTypeDescriptor> map = new HashMap<>();
+    IllegalStateException exception = Assert.expectThrows(IllegalStateException.class,
+        () -> OperatorTypeRegistry.registerPlugin(
+            descriptor(OperatorTypeDescriptor.PLUGIN_ID_FLOOR - 1, "reservedId"), map));
+    Assert.assertTrue(exception.getMessage().contains("reserved"), exception.getMessage());
+    Assert.assertTrue(map.isEmpty(), "Rejected descriptor must not be registered");
+  }
+
+  @Test
+  public void testRegisterPluginRejectsDuplicateId() {
+    Map<Integer, OperatorTypeDescriptor> map = new HashMap<>();
+    OperatorTypeRegistry.registerPlugin(descriptor(OperatorTypeDescriptor.PLUGIN_ID_FLOOR, "first"), map);
+    IllegalStateException exception = Assert.expectThrows(IllegalStateException.class,
+        () -> OperatorTypeRegistry.registerPlugin(descriptor(OperatorTypeDescriptor.PLUGIN_ID_FLOOR, "second"), map));
+    Assert.assertTrue(exception.getMessage().contains("Duplicate operator type id"), exception.getMessage());
+  }
+
+  @Test
+  public void testRegisterPluginAcceptsPluginId() {
+    Map<Integer, OperatorTypeDescriptor> map = new HashMap<>();
+    OperatorTypeDescriptor descriptor = descriptor(OperatorTypeDescriptor.PLUGIN_ID_FLOOR, "validPluginType");
+    OperatorTypeRegistry.registerPlugin(descriptor, map);
+    Assert.assertSame(map.get(OperatorTypeDescriptor.PLUGIN_ID_FLOOR), descriptor);
+  }
+
+  private static OperatorTypeDescriptor descriptor(int id, String name) {
+    return new OperatorTypeDescriptor() {
+      @Override
+      public int getId() {
+        return id;
+      }
+
+      @Override
+      public String name() {
+        return name;
+      }
+
+      @SuppressWarnings("rawtypes")
+      @Override
+      public Class getStatKeyClass() {
+        return MultiStageOperator.Type.AGGREGATE.getStatKeyClass();
+      }
+
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+      }
+    };
   }
 }

@@ -21,6 +21,7 @@ package org.apache.pinot.spi.plugin;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
@@ -37,6 +38,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -48,11 +50,6 @@ import static org.testng.Assert.expectThrows;
 /// Service descriptors are generated into temporary directories exposed through isolated [URLClassLoader]s
 /// (installed as the thread context classloader) or plugin realms of a fresh [PluginManager] instance, so no
 /// `META-INF/services` fixture leaks into the test classpath.
-///
-/// Note: the version-skew WARN branch (same provider class name resolving to different `Class` objects in
-/// different classloaders) is intentionally uncovered — it would require a self-first realm carrying its own copy
-/// of the provider's class bytes; the observable skip-duplicate outcome is asserted through the same-`Class`
-/// dedup test instead.
 public class PluginManagerServiceProviderTest {
   private static final String SERVICE_DESCRIPTOR_PATH = "META-INF/services/" + TestDiscoveryService.class.getName();
   private static final List<Path> TEMP_DIRS = new ArrayList<>();
@@ -122,6 +119,24 @@ public class PluginManagerServiceProviderTest {
   }
 
   @Test
+  public void testVersionSkewedDuplicateKeepsFirstDiscoveredCopy()
+      throws Exception {
+    // The context classloader defines its own copy of ImplA (child-first) while the plugin realm resolves the
+    // test-classpath copy through parent delegation: same class name, different Class objects. The first sighting
+    // (context classloader) must win and the skewed duplicate must be skipped with a WARN
+    PluginManager pluginManager = new PluginManager();
+    loadDescriptorOnlyPlugin(pluginManager, "spi-service-provider-skew-plugin", ImplA.class.getName());
+    List<PluginManager.ServiceProvider<TestDiscoveryService>> providers =
+        withContextClassLoader(createChildFirstDescriptorClassLoader(ImplA.class.getName()),
+            () -> pluginManager.loadServiceProviders(TestDiscoveryService.class));
+    assertEquals(providers.size(), 1);
+    Class<?> providerClass = providers.get(0).getProvider().getClass();
+    assertEquals(providerClass.getName(), ImplA.class.getName());
+    assertNotSame(providerClass, ImplA.class);
+    assertTrue(providers.get(0).getSource().contains("thread context classloader"), providers.get(0).getSource());
+  }
+
+  @Test
   public void testMalformedDescriptorFailsWithSourceAndCause()
       throws Exception {
     PluginManager pluginManager = new PluginManager();
@@ -178,6 +193,57 @@ public class PluginManagerServiceProviderTest {
         PluginManagerServiceProviderTest.class.getClassLoader());
     DESCRIPTOR_CLASS_LOADERS.add(descriptorClassLoader);
     return descriptorClassLoader;
+  }
+
+  /// Like [#createDescriptorClassLoader(String...)], but the returned loader additionally defines its own copy of
+  /// the provider class from the test-classpath bytes instead of delegating to the parent, simulating a
+  /// classloader shipping its own (version-skewed) copy of the class.
+  private static ClassLoader createChildFirstDescriptorClassLoader(String providerClassName)
+      throws IOException {
+    Path tempDir = Files.createTempDirectory("spi-service-provider-descriptor");
+    TEMP_DIRS.add(tempDir);
+    Path descriptorFile = tempDir.resolve(SERVICE_DESCRIPTOR_PATH);
+    Files.createDirectories(descriptorFile.getParent());
+    Files.write(descriptorFile, List.of(providerClassName), StandardCharsets.UTF_8);
+    URLClassLoader descriptorClassLoader = new ChildFirstClassLoader(new URL[]{tempDir.toUri().toURL()},
+        PluginManagerServiceProviderTest.class.getClassLoader(), providerClassName);
+    DESCRIPTOR_CLASS_LOADERS.add(descriptorClassLoader);
+    return descriptorClassLoader;
+  }
+
+  /// Classloader that defines its own copy of one class from the parent's class-file bytes instead of delegating,
+  /// producing a Class object with the same name but a different defining classloader. Everything else (including
+  /// the service interface) is delegated to the parent so the copy remains a valid provider.
+  private static class ChildFirstClassLoader extends URLClassLoader {
+    private final String _childFirstClassName;
+
+    ChildFirstClassLoader(URL[] urls, ClassLoader parent, String childFirstClassName) {
+      super(urls, parent);
+      _childFirstClassName = childFirstClassName;
+    }
+
+    @Override
+    protected Class<?> loadClass(String name, boolean resolve)
+        throws ClassNotFoundException {
+      if (!name.equals(_childFirstClassName)) {
+        return super.loadClass(name, resolve);
+      }
+      synchronized (getClassLoadingLock(name)) {
+        Class<?> loaded = findLoadedClass(name);
+        if (loaded == null) {
+          try (InputStream inputStream = getParent().getResourceAsStream(name.replace('.', '/') + ".class")) {
+            byte[] classBytes = inputStream.readAllBytes();
+            loaded = defineClass(name, classBytes, 0, classBytes.length);
+          } catch (IOException e) {
+            throw new ClassNotFoundException(name, e);
+          }
+        }
+        if (resolve) {
+          resolveClass(loaded);
+        }
+        return loaded;
+      }
+    }
   }
 
   private static <T> T withContextClassLoader(ClassLoader classLoader, Callable<T> callable)
