@@ -25,11 +25,8 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceConfigurationError;
-import java.util.ServiceLoader;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FunctionInfo;
@@ -325,8 +322,8 @@ public class TransformFunctionFactory {
   }
 
   /// Initializes the factory with the explicitly configured transform function classes (`pinot.server.transforms`)
-  /// and the [TransformFunction] service providers discovered via [ServiceLoader] (see the class documentation for
-  /// the provider contract).
+  /// and the [TransformFunction] service providers discovered via [PluginManager#loadServiceProviders(Class)] (see
+  /// the class documentation for the provider contract).
   ///
   /// Should be called during server startup, after all plugins have been loaded and before serving queries. The
   /// registry is built and validated locally and published atomically, so concurrent readers never observe a
@@ -347,15 +344,11 @@ public class TransformFunctionFactory {
     }
 
     // Discover service providers from the thread context classloader (the application classpath in a standard
-    // server deployment), then from every plugin classloader. Dedup by class name: the context classloader and a
-    // plugin classloader may both see the same META-INF/services file if their classpaths overlap (e.g. fat-jar +
-    // plugin realm).
-    Map<String, Class<? extends TransformFunction>> seenProviderClasses = new HashMap<>();
-    registerServiceProviders(ServiceLoader.load(TransformFunction.class), "thread context classloader", registry,
-        seenProviderClasses, explicitClassNames);
-    for (ClassLoader pluginClassLoader : PluginManager.get().getPluginClassLoaders()) {
-      registerServiceProviders(ServiceLoader.load(TransformFunction.class, pluginClassLoader),
-          "plugin classloader: " + pluginClassLoader, registry, seenProviderClasses, explicitClassNames);
+    // server deployment) and from every plugin classloader, de-duplicated by implementation class name (see
+    // PluginManager#loadServiceProviders)
+    for (PluginManager.ServiceProvider<TransformFunction> discovered : PluginManager.get()
+        .loadServiceProviders(TransformFunction.class)) {
+      registerServiceProvider(discovered.getProvider(), discovered.getSource(), registry, explicitClassNames);
     }
 
     // Register the explicitly configured classes last: explicit configuration keeps its historical override
@@ -385,81 +378,56 @@ public class TransformFunctionFactory {
     _transformFunctionMap = Collections.unmodifiableMap(registry);
   }
 
-  /// Registers the [TransformFunction] service providers visible through the given [ServiceLoader] into the local
-  /// registry being built. The provider instance is only used to obtain the implementation class and validate its
-  /// name; it is never initialized or evaluated. Fails fast (preserving the original cause) on malformed service
-  /// descriptors, providers that cannot be constructed, null/blank function names, and canonical name collisions.
-  private static void registerServiceProviders(ServiceLoader<TransformFunction> serviceLoader, String source,
-      Map<String, Class<? extends TransformFunction>> registry,
-      Map<String, Class<? extends TransformFunction>> seenProviderClasses, Set<String> explicitClassNames) {
-    Iterator<TransformFunction> iterator = serviceLoader.iterator();
-    while (true) {
-      TransformFunction provider;
-      try {
-        if (!iterator.hasNext()) {
-          return;
-        }
-        provider = iterator.next();
-      } catch (ServiceConfigurationError e) {
-        throw new IllegalStateException("Failed to load a TransformFunction service provider from: " + source, e);
-      }
-      Class<? extends TransformFunction> providerClass = provider.getClass();
-      String providerClassName = providerClass.getName();
-      if (explicitClassNames.contains(providerClassName)) {
-        LOGGER.info("Skipping service provider: {} (from: {}) which is also explicitly configured", providerClassName,
-            source);
-        continue;
-      }
-      Class<? extends TransformFunction> seenClass = seenProviderClasses.putIfAbsent(providerClassName, providerClass);
-      if (seenClass != null) {
-        // Same implementation already discovered through an overlapping classloader. A different Class object with
-        // the same name indicates version skew between classloaders; the first discovered copy wins.
-        if (seenClass != providerClass) {
-          LOGGER.warn("Ignoring duplicate service provider class: {} (classloader: {}, discovered from: {}); keeping "
-                  + "the copy from classloader: {}", providerClassName, providerClass.getClassLoader(), source,
-              seenClass.getClassLoader());
-        }
-        continue;
-      }
-      String name = provider.getName();
-      if (StringUtils.isBlank(name)) {
-        throw new IllegalStateException("TransformFunction service provider: " + providerClassName + " (classloader: "
-            + providerClass.getClassLoader() + ", discovered from: " + source + ") returned a "
-            + (name == null ? "null" : "blank") + " name from getName()");
-      }
-      String canonicalName = canonicalize(name);
-      Class<? extends TransformFunction> existing = registry.get(canonicalName);
-      if (existing != null) {
-        if (existing.getName().equals(providerClassName)) {
-          // Repeated registration of the identical implementation is a no-op. A different Class object with the same
-          // name indicates version skew between classloaders; the registered copy wins.
-          if (existing != providerClass) {
-            LOGGER.warn("Function: {} is already registered with class: {} from classloader: {}; ignoring the copy "
-                    + "from classloader: {} (discovered from: {})", canonicalName, existing.getName(),
-                existing.getClassLoader(), providerClass.getClassLoader(), source);
-          }
-          continue;
-        }
-        String existingDescription = BUILT_IN_TRANSFORM_FUNCTIONS.get(canonicalName) == existing
-            ? "built-in transform function class: " + existing.getName()
-            : "discovered transform function class: " + existing.getName();
-        throw new IllegalStateException(
-            "Transform function name collision on: " + canonicalName + ". Service provider class: "
-                + providerClassName + " (classloader: " + providerClass.getClassLoader() + ", discovered from: "
-                + source + ") collides with " + existingDescription + " (classloader: " + existing.getClassLoader()
-                + ")");
-      }
-      if (FunctionRegistry.contains(FunctionRegistry.canonicalize(name))) {
-        // Not a failure: providing a block-oriented implementation of an existing scalar function is the same
-        // pattern the built-ins use — but for an independently owned scalar function the semantics may diverge
-        // (e.g. literal-only invocations still constant-fold through the scalar implementation at compile time).
-        LOGGER.warn("Service-discovered transform function: {} with class: {} (from: {}) shadows a scalar function "
-            + "with the same name for single-stage server-side execution", canonicalName, providerClassName, source);
-      }
-      registry.put(canonicalName, providerClass);
-      LOGGER.info("Registering service-discovered function: {} with class: {} (from: {})", canonicalName,
-          providerClassName, source);
+  /// Registers a discovered [TransformFunction] service provider into the local registry being built. The provider
+  /// instance is only used to obtain the implementation class and validate its name; it is never initialized or
+  /// evaluated. Fails fast on null/blank function names and canonical name collisions.
+  private static void registerServiceProvider(TransformFunction provider, String source,
+      Map<String, Class<? extends TransformFunction>> registry, Set<String> explicitClassNames) {
+    Class<? extends TransformFunction> providerClass = provider.getClass();
+    String providerClassName = providerClass.getName();
+    if (explicitClassNames.contains(providerClassName)) {
+      LOGGER.info("Skipping service provider: {} (from: {}) which is also explicitly configured", providerClassName,
+          source);
+      return;
     }
+    String name = provider.getName();
+    if (StringUtils.isBlank(name)) {
+      throw new IllegalStateException("TransformFunction service provider: " + providerClassName + " (classloader: "
+          + providerClass.getClassLoader() + ", discovered from: " + source + ") returned a "
+          + (name == null ? "null" : "blank") + " name from getName()");
+    }
+    String canonicalName = canonicalize(name);
+    Class<? extends TransformFunction> existing = registry.get(canonicalName);
+    if (existing != null) {
+      if (existing.getName().equals(providerClassName)) {
+        // Repeated registration of the identical implementation is a no-op. A different Class object with the same
+        // name indicates version skew between classloaders; the registered copy wins.
+        if (existing != providerClass) {
+          LOGGER.warn("Function: {} is already registered with class: {} from classloader: {}; ignoring the copy "
+                  + "from classloader: {} (discovered from: {})", canonicalName, existing.getName(),
+              existing.getClassLoader(), providerClass.getClassLoader(), source);
+        }
+        return;
+      }
+      String existingDescription = BUILT_IN_TRANSFORM_FUNCTIONS.get(canonicalName) == existing
+          ? "built-in transform function class: " + existing.getName()
+          : "discovered transform function class: " + existing.getName();
+      throw new IllegalStateException(
+          "Transform function name collision on: " + canonicalName + ". Service provider class: "
+              + providerClassName + " (classloader: " + providerClass.getClassLoader() + ", discovered from: "
+              + source + ") collides with " + existingDescription + " (classloader: " + existing.getClassLoader()
+              + ")");
+    }
+    if (FunctionRegistry.contains(FunctionRegistry.canonicalize(name))) {
+      // Not a failure: providing a block-oriented implementation of an existing scalar function is the same
+      // pattern the built-ins use — but for an independently owned scalar function the semantics may diverge
+      // (e.g. literal-only invocations still constant-fold through the scalar implementation at compile time).
+      LOGGER.warn("Service-discovered transform function: {} with class: {} (from: {}) shadows a scalar function "
+          + "with the same name for single-stage server-side execution", canonicalName, providerClassName, source);
+    }
+    registry.put(canonicalName, providerClass);
+    LOGGER.info("Registering service-discovered function: {} with class: {} (from: {})", canonicalName,
+        providerClassName, source);
   }
 
   /// Returns an instance of transform function for the given expression.
