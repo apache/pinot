@@ -106,8 +106,10 @@ public class BenchmarkGroupingSetsQueriesSSE {
     new Runner(opt.build()).run();
   }
 
-  // use 8 threads to test combine parallelism
-  private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(8);
+  // Per-trial executor (8 threads to test combine parallelism). Created in @Setup and shut down in @TearDown so
+  // its lifecycle matches each JMH trial -- a static executor shut down after the first @Param combination would
+  // reject task submissions in subsequent trials within the same JVM.
+  private ExecutorService _executorService;
 
   @Param({"50", "200"})
   private int _numSegments;
@@ -179,6 +181,7 @@ public class BenchmarkGroupingSetsQueriesSSE {
   @Setup
   public void setUp()
       throws Exception {
+    _executorService = Executors.newFixedThreadPool(8);
     _supplier = Distribution.createSupplier(42, _scenario);
     FileUtils.deleteQuietly(INDEX_DIR);
 
@@ -197,7 +200,7 @@ public class BenchmarkGroupingSetsQueriesSSE {
       indexSegment.destroy();
     }
     FileUtils.deleteQuietly(INDEX_DIR);
-    EXECUTOR_SERVICE.shutdownNow();
+    _executorService.shutdownNow();
   }
 
   private LazyDataGenerator createTestData(int numRows, Distribution.DataSupplier supplier) {
@@ -264,7 +267,7 @@ public class BenchmarkGroupingSetsQueriesSSE {
     serverQueryContext.setEndTimeMs(
         System.currentTimeMillis() + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     Plan plan =
-        PLAN_MAKER.makeInstancePlan(getSegmentContexts(_indexSegments), serverQueryContext, EXECUTOR_SERVICE);
+        PLAN_MAKER.makeInstancePlan(getSegmentContexts(_indexSegments), serverQueryContext, _executorService);
     InstanceResponseBlock instanceResponse;
     try {
       instanceResponse = plan.execute();

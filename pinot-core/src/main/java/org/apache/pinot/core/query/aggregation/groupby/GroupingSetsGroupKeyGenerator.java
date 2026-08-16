@@ -183,8 +183,13 @@ public class GroupingSetsGroupKeyGenerator implements GroupKeyGenerator {
     }
     if (longPacking) {
       _bitShifts[_numGroupByExpressions] = totalBits;
-      totalBits += bitsRequired(_numSets);
-      longPacking = totalBits <= 64;
+      int ordinalBits = bitsRequired(_numSets);
+      totalBits += ordinalBits;
+      // The ordinal shift must be strictly < 64: Java masks long shift distances mod 64, so a shift of exactly
+      // 64 (union columns already consume all 64 bits) would silently become a shift of 0 and corrupt both the
+      // packed ordinal and its extraction. Require room for at least one ordinal bit above the union columns,
+      // even for a single grouping set (ordinalBits == 0), so the shift stays well-defined.
+      longPacking = _bitShifts[_numGroupByExpressions] < 64 && totalBits <= 64;
     }
     _longPacking = longPacking;
 

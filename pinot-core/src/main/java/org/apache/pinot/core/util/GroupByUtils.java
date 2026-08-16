@@ -130,7 +130,13 @@ public final class GroupByUtils {
     }
 
     // Derived group table keyed on (projected union values..., $groupingId). Values layout mirrors the record
-    // schema: key columns first, then the aggregation intermediates.
+    // schema: key columns first, then the aggregation intermediates. Bound the number of DERIVED groups by the
+    // query's numGroupsLimit, mirroring the generator's per-segment cap: the fan-out over grouping sets can
+    // multiply base groups by up to numSets, so without this bound the derive map (built before any trim) could
+    // exhaust heap. Once the limit is reached, no new derived group is created, but existing ones keep merging
+    // (so results stay a stable superset, exactly like the generator dropping brand-new keys past the limit).
+    int numGroupsLimit = queryContext.getNumGroupsLimit();
+    boolean derivedLimitReached = false;
     Map<Key, Record> derived = new HashMap<>();
     try {
       Iterator<GroupKeyGenerator.GroupKey> baseGroups = baseResult.getGroupKeyIterator();
@@ -152,6 +158,11 @@ public final class GroupByUtils {
           Key key = new Key(keyValues);
           Record existing = derived.get(key);
           if (existing == null) {
+            if (derived.size() >= numGroupsLimit) {
+              // At the group limit: skip brand-new derived keys (existing groups above still accumulate).
+              derivedLimitReached = true;
+              continue;
+            }
             Object[] values = new Object[numUnionColumns + 1 + numAggregationFunctions];
             System.arraycopy(keyValues, 0, values, 0, numUnionColumns + 1);
             for (int i = 0; i < numAggregationFunctions; i++) {
@@ -176,6 +187,9 @@ public final class GroupByUtils {
     } finally {
       baseResult.closeGroupKeyGenerator();
     }
+    // The derived fan-out can hit the group limit even when the base grouping did not.
+    numGroupsLimitReached |= derivedLimitReached;
+    numGroupsWarningLimitReached |= derived.size() >= queryContext.getNumGroupsWarningLimit();
 
     List<IntermediateRecord> intermediateRecords = new ArrayList<>(derived.size());
     for (Map.Entry<Key, Record> entry : derived.entrySet()) {
