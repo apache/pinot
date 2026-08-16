@@ -30,6 +30,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.server.access.BasicAuthAccessFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.BootstrapTableTool;
@@ -78,16 +79,25 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
     BasicAuthTestUtils.addControllerConfiguration(properties);
+    properties.put("controller.server.admin.auth.token", AUTH_TOKEN);
   }
 
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     BasicAuthTestUtils.addBrokerConfiguration(brokerConf);
+    brokerConf.setProperty("pinot.broker.server.admin.auth.token", AUTH_TOKEN);
   }
 
   @Override
   protected void overrideServerConf(PinotConfiguration serverConf) {
     BasicAuthTestUtils.addServerConfiguration(serverConf);
+    serverConf.setProperty("pinot.server.admin.access.control.factory.class", BasicAuthAccessFactory.class.getName());
+    serverConf.setProperty("pinot.server.admin.access.control.principals", "admin,user");
+    serverConf.setProperty("pinot.server.admin.access.control.principals.admin.password", "verysecret");
+    serverConf.setProperty("pinot.server.admin.access.control.principals.admin.permissions", "admin");
+    serverConf.setProperty("pinot.server.admin.access.control.principals.user.password", "secret");
+    serverConf.setProperty("pinot.server.admin.access.control.principals.user.tables", "userTableOnly");
+    serverConf.setProperty("pinot.server.admin.access.control.principals.user.permissions", "read");
   }
 
   @Override
@@ -174,6 +184,12 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
     Assert.assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), 97889,
         "must return row count 97889");
     Assert.assertTrue(response.get("exceptions").isEmpty(), "must not return exception");
+
+    // The Controller fans this request out to the protected Server admin API with its configured service identity.
+    JsonNode tableSizeResponse = JsonUtils.stringToJsonNode(
+        sendGetRequest("http://localhost:" + getControllerPort() + "/tables/baseballStats/size", AUTH_HEADER));
+    Assert.assertTrue(tableSizeResponse.get("reportedSizeInBytes").asLong() > 0,
+        "must return the size reported by the Server");
 
     // user with valid auth but no table access - must return 403
     try {

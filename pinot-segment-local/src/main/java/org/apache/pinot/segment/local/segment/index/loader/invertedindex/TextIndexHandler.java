@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -379,21 +380,24 @@ public class TextIndexHandler extends BaseIndexHandler {
   }
 
   private Set<String> getColumnsWithLegacyNativeTextIndex() {
+    // Legacy native text indexes are sidecar files that older segment formats wrote into the segment's local
+    // directory. A SegmentDirectory that is not backed by a local directory reports a null index dir and cannot
+    // hold such files, so there is nothing to look for. Returning early also keeps the version sub-directory
+    // resolution below from being handed a null parent, which yields a path relative to the working directory
+    // for v3 and another null for v1/v2.
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    if (indexDir == null) {
+      return Set.of();
+    }
     File segmentDirectory =
         SegmentDirectoryPaths.segmentDirectoryFor(indexDir, _segmentDirectory.getSegmentMetadata().getVersion());
-    Set<String> columns = new HashSet<>();
-    for (String column : _segmentDirectory.getSegmentMetadata().getAllColumns()) {
-      if (hasLegacyNativeTextIndex(indexDir, segmentDirectory, column)) {
-        columns.add(column);
-      }
+    Collection<String> allColumns = _segmentDirectory.getSegmentMetadata().getAllColumns();
+    Set<String> columns = new HashSet<>(TextIndexUtils.getColumnsWithLegacyNativeTextIndex(indexDir, allColumns));
+    // Preserves the original short-circuit: the version subdirectory is only consulted when it is a
+    // different directory from the segment root.
+    if (!segmentDirectory.equals(indexDir)) {
+      columns.addAll(TextIndexUtils.getColumnsWithLegacyNativeTextIndex(segmentDirectory, allColumns));
     }
     return columns;
-  }
-
-  private boolean hasLegacyNativeTextIndex(File indexDir, File segmentDirectory, String column) {
-    String legacyNativeTextIndexFile = column + V1Constants.Indexes.DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION;
-    return new File(indexDir, legacyNativeTextIndexFile).exists()
-        || (!segmentDirectory.equals(indexDir) && new File(segmentDirectory, legacyNativeTextIndexFile).exists());
   }
 }

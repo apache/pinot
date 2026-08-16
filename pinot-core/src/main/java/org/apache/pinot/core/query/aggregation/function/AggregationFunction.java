@@ -100,12 +100,11 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 ///      null rows and fold the column's default value into the aggregate whatever the query asked for: the
 ///      sketch-backed distinct counts (`DISTINCTCOUNTBITMAP`, `DISTINCTCOUNTHLL`, `DISTINCTCOUNTTHETASKETCH`,
 ///      `DISTINCTCOUNTCPCSKETCH`, `FASTHLL`, `SEGMENTPARTITIONEDDISTINCTCOUNT` and the raw and smart variants of
-///      each), the tuple and frequency sketches, the covariance functions, `HISTOGRAM`, `IDSET`, `STUNION`, the
-///      array sums, and the funnel family. Whether a function takes the option is visible at its construction site,
-///      which is the reliable way to tell.
+///      each), `HISTOGRAM`, `IDSET`, `STUNION`, the array sums, and the funnel family. Whether a function takes the
+///      option is visible at its construction site, which is the reliable way to tell.
 ///      The family names are not a safe shorthand for this, in either direction. The exact distinct functions
 ///      (`DISTINCTCOUNT`, `DISTINCTSUM`, `DISTINCTAVG`, `DISTINCTCOUNTOFFHEAP`) do take the option and skip null
-///      rows through their shared base, as do the variance and standard-deviation functions and the
+///      rows through their shared base, as do the variance, standard-deviation and covariance functions and the
 ///      first/last-with-time functions, so "the distinct-count family" and "the statistical functions" both include
 ///      members that honour the option and members that cannot.
 ///      These same functions also substitute an empty accumulator in [#extractAggregationResult],

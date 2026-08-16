@@ -37,6 +37,9 @@ public class ParserUtils {
       case "jsonextractscalarfirstmatch":
         validateJsonExtractScalarFunction("jsonExtractScalarFirstMatch", operands);
         break;
+      case "jsonextractscalarfory":
+        validateJsonExtractScalarFunction("jsonExtractScalarFory", operands);
+        break;
       case "jsonextractkey":
         validateJsonExtractKeyFunction(operands);
         break;

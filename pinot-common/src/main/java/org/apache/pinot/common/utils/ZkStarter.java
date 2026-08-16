@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -41,6 +42,33 @@ public class ZkStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZkStarter.class);
   public static final int DEFAULT_ZK_TEST_PORT = 2191;
   private static final int DEFAULT_ZK_CLIENT_RETRIES = 10;
+
+  /// Per-fork offset applied to the default test port so that concurrent surefire forks
+  /// (forkCount > 1, reuseForks=false) do not scan from the same base port and collide.
+  ///
+  /// This is purely a test-harness hook: the offset is derived from the `surefire.forkNumber`
+  /// system property, which surefire injects only inside a forked test JVM (1-based, so it is 1
+  /// even at forkCount=1, and 1..N under parallel forks). In any production process that property
+  /// is absent, so `forkNumber()` returns 0 and the no-arg {@link #startLocalZkServer()} scans
+  /// from the historical {@link #DEFAULT_ZK_TEST_PORT}. Under tests each fork scans from a distinct
+  /// base ({@code DEFAULT_ZK_TEST_PORT + forkNumber*1000}); the exact port is still chosen by
+  /// findOpenPort and read back via {@code getZkUrl()}, so no caller depends on the literal base.
+  /// The stride (1000) is large enough that a fork exhausting ports below the next boundary
+  /// (findOpenPort scans upward) does not spill into the neighboring fork's band.
+  ///
+  /// The offset is deliberately centralized on the no-arg entry point rather than pushed into each
+  /// test: several tests across different modules call {@link #startLocalZkServer()} directly, and
+  /// duplicating the fork math into each caller (or introducing a parallel test-only start helper)
+  /// is more surface and more error-prone than one guarded, production-inert read here.
+  private static final int FORK_PORT_OFFSET = forkNumber() * 1000;
+
+  private static int forkNumber() {
+    try {
+      return Integer.parseInt(System.getProperty("surefire.forkNumber", "0"));
+    } catch (NumberFormatException e) {
+      return 0;
+    }
+  }
 
   public static class ZookeeperInstance {
     private PublicZooKeeperServerMain _serverMain;
@@ -135,9 +163,10 @@ public class ZkStarter {
     }
   }
 
-  /// Starts an empty local Zk instance on the default port
+  /// Starts an empty local Zk instance on the default port (offset per surefire fork so that
+  /// concurrent forks bind disjoint port ranges).
   public static ZookeeperInstance startLocalZkServer() {
-    return startLocalZkServer(NetUtils.findOpenPort(DEFAULT_ZK_TEST_PORT));
+    return startLocalZkServer(NetUtils.findOpenPort(DEFAULT_ZK_TEST_PORT + FORK_PORT_OFFSET));
   }
 
   public static String getDefaultZkStr() {
@@ -147,8 +176,10 @@ public class ZkStarter {
   /// Starts a local Zk instance with a generated empty data directory
   /// @param port The port to listen on
   public static ZookeeperInstance startLocalZkServer(final int port) {
+    // Use a random UUID rather than a timestamp so that concurrent forks/threads never share a
+    // ZK data directory (System.currentTimeMillis() collides when two instances start in the same ms).
     return startLocalZkServer(port,
-        org.apache.commons.io.FileUtils.getTempDirectoryPath() + File.separator + "test-" + System.currentTimeMillis());
+        org.apache.commons.io.FileUtils.getTempDirectoryPath() + File.separator + "test-" + UUID.randomUUID());
   }
 
   /// Starts a local Zk instance

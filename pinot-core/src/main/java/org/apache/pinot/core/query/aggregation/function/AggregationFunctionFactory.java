@@ -458,9 +458,9 @@ public class AggregationFunctionFactory {
           case HISTOGRAM:
             return new HistogramAggregationFunction(arguments);
           case COVARPOP:
-            return new CovarianceAggregationFunction(arguments, false);
+            return new CovarianceAggregationFunction(arguments, false, nullHandlingEnabled);
           case COVARSAMP:
-            return new CovarianceAggregationFunction(arguments, true);
+            return new CovarianceAggregationFunction(arguments, true, nullHandlingEnabled);
           case BOOLAND:
             return new BooleanAndAggregationFunction(arguments, nullHandlingEnabled);
           case BOOLOR:
@@ -481,13 +481,16 @@ public class AggregationFunctionFactory {
             return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.MOMENT);
           case DISTINCTCOUNTTUPLESKETCH:
             // mode actually doesn't matter here because we only care about keys, not values
-            return new DistinctCountIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+            return new DistinctCountIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum,
+                nullHandlingEnabled);
           case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
-            return new IntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+            return new IntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum, nullHandlingEnabled);
           case SUMVALUESINTEGERSUMTUPLESKETCH:
-            return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+            return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum,
+                nullHandlingEnabled);
           case AVGVALUEINTEGERSUMTUPLESKETCH:
-            return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+            return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum,
+                nullHandlingEnabled);
           case PINOTPARENTAGGEXPRMAX:
             return new ParentExprMinMaxAggregationFunction(arguments, true);
           case PINOTPARENTAGGEXPRMIN:
@@ -513,9 +516,9 @@ public class AggregationFunctionFactory {
           case FUNNELEVENTSFUNCTIONEVAL:
             return new FunnelEventsFunctionEvalAggregationFunction(arguments);
           case FREQUENTSTRINGSSKETCH:
-            return new FrequentStringsSketchAggregationFunction(arguments);
+            return new FrequentStringsSketchAggregationFunction(arguments, nullHandlingEnabled);
           case FREQUENTLONGSSKETCH:
-            return new FrequentLongsSketchAggregationFunction(arguments);
+            return new FrequentLongsSketchAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTCPCSKETCH:
             return new DistinctCountCPCSketchAggregationFunction(arguments);
           case DISTINCTCOUNTRAWCPCSKETCH:

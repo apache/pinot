@@ -341,6 +341,8 @@ public class CommonConstants {
   public static class Broker {
     public static final String ROUTING_TABLE_CONFIG_PREFIX = "pinot.broker.routing.table";
     public static final String ACCESS_CONTROL_CONFIG_PREFIX = "pinot.broker.access.control";
+    /// Namespace for service credentials used by the broker when invoking Server admin APIs.
+    public static final String SERVER_ADMIN_AUTH_PREFIX = "pinot.broker.server.admin.auth";
     /// Config prefix for the broker-side MaterializedViewHandler.  Implementation class is
     /// loaded from `pinot.broker.materialized.view.handler.class`; other settings sit
     /// under the same prefix and are passed through to the handler's `init`. Default

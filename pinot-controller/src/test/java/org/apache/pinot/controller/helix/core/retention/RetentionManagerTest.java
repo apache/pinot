@@ -967,6 +967,12 @@ public class RetentionManagerTest {
   public static class FakePinotFs extends LocalPinotFS {
 
     @Override
+    public boolean exists(URI fileUri) {
+      // The fake deep store is not backed by a real directory, but always has the segments listed below
+      return true;
+    }
+
+    @Override
     public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
         throws IOException {
 

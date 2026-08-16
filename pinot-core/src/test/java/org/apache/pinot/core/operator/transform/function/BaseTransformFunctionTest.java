@@ -123,7 +123,8 @@ public abstract class BaseTransformFunctionTest {
   /// index sitting on the column doesn't perturb the predicate evaluator's path selection.
   protected static final String INT_MV_DICT_RAW_INV_COLUMN = "intMVDictRawInv";
   private static final String SEGMENT_NAME = "testSegment";
-  private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME;
+  private static final String INDEX_DIR_PATH =
+      FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME + "-" + UUID.randomUUID();
   private static final Random RANDOM = new Random();
   protected final int[] _intSVValues = new int[NUM_ROWS];
   protected final long[] _longSVValues = new long[NUM_ROWS];

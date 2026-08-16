@@ -59,7 +59,8 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
-          <forkCount>1</forkCount>
+          <!-- Keep this module's historical fork reuse, but honor the root parallel-fork knob. -->
+          <forkCount>${unit.test.fork.count}</forkCount>
           <reuseForks>true</reuseForks>
           <properties>
             <property>
@@ -95,6 +96,19 @@
               <exclude>src/main/java/org/apache/pinot/common/response/ProcessingException.java</exclude>
             </excludes>
           </java>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <configuration>
+          <artifactSet>
+            <excludes>
+              <!-- Experimental Fory support is activated only when applications add Fory to their classpath. -->
+              <exclude>org.apache.fory:fory-json</exclude>
+              <exclude>org.apache.fory:fory-core</exclude>
+            </excludes>
+          </artifactSet>
         </configuration>
       </plugin>
       <!-- Stage 1 of SQL parser codegen: FMPP plugs Pinot's custom grammar (config.fmpp +
@@ -278,6 +292,11 @@
     <dependency>
       <groupId>com.jayway.jsonpath</groupId>
       <artifactId>json-path</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.fory</groupId>
+      <artifactId>fory-json</artifactId>
+      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>org.apache.zookeeper</groupId>
