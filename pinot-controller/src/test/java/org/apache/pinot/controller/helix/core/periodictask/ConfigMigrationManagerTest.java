@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.controller.helix.core.periodictask;
 
+import java.util.List;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
@@ -61,6 +63,7 @@ public class ConfigMigrationManagerTest {
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
   private static final String CONFIG_PATH = "/CONFIGS/TABLE/" + OFFLINE_TABLE_NAME;
+  private static final String SCHEMA_PATH = "/SCHEMAS/" + RAW_TABLE_NAME;
 
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private PinotHelixResourceManager _resourceManager;
@@ -174,21 +177,42 @@ public class ConfigMigrationManagerTest {
   }
 
   @Test
-  public void testSchemaMigratedOnlyOncePerRunAcrossHybridHalves()
+  public void testSchemaMigratedOnceAndMarkerPersistedAcrossHybridHalves()
       throws Exception {
-    // Register a real (identity) schema migrator so "migrated once" is a non-vacuous assertion.
+    // Register a real (identity) schema migrator so the schema path runs and "migrated once" is non-vacuous.
     ConfigMigrationRegistry registry = new ConfigMigrationRegistry();
     registry.registerSchemaMigrator(new IdentitySchemaMigrator());
     stubStoredTableConfig(currentOfflineConfig(), 1);
     when(_resourceManager.getSchema(RAW_TABLE_NAME)).thenReturn(validSchema());
+    when(_resourceManager.getExistingTableNamesWithType(RAW_TABLE_NAME, null)).thenReturn(List.of(OFFLINE_TABLE_NAME));
 
     ConfigMigrationManager manager = newManager(registry);
     ConfigMigrationManager.Context context = new ConfigMigrationManager.Context();
     manager.processTable(OFFLINE_TABLE_NAME, context);
     manager.processTable(REALTIME_TABLE_NAME, context);
 
-    // The shared schema is migrated exactly once across both hybrid halves.
-    verify(_resourceManager, times(1)).updateSchema(any(), eq(false), eq(true));
+    // The shared schema is written to ZK exactly once across both hybrid halves, with the version marker stamped.
+    // Direct ZKMetadataProvider write (not updateSchema) is required so the marker persists despite Schema.equals()
+    // excluding it — otherwise a marker-only migration would loop forever.
+    ArgumentCaptor<ZNRecord> captor = ArgumentCaptor.forClass(ZNRecord.class);
+    verify(_propertyStore, times(1)).set(eq(SCHEMA_PATH), captor.capture(), eq(AccessOption.PERSISTENT));
+    Schema persisted = SchemaSerDeUtils.fromZNRecord(captor.getValue());
+    assertEquals(persisted.getConfigMigrationVersion(), 1);
+    // A refresh message is sent so broker/server caches converge.
+    verify(_resourceManager).sendTableConfigSchemaRefreshMessage(OFFLINE_TABLE_NAME);
+  }
+
+  @Test
+  public void testEmptySchemaChainSkipsSchemaRead()
+      throws Exception {
+    // The shipped registry has an empty schema chain: schema migration must not touch ZK at all (no wasted reads).
+    stubStoredTableConfig(currentOfflineConfig(), 1);
+
+    newManager(DefaultConfigMigrationRegistry.create())
+        .processTable(OFFLINE_TABLE_NAME, new ConfigMigrationManager.Context());
+
+    verify(_propertyStore, never()).set(eq(SCHEMA_PATH), any(), anyInt());
+    verify(_propertyStore, never()).set(eq(SCHEMA_PATH), any(), eq(AccessOption.PERSISTENT));
   }
 
   private static TableConfig currentOfflineConfig() {

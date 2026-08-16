@@ -331,10 +331,11 @@ public class ControllerConf extends PinotConfiguration {
     public static final String DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_PERIOD = "24h";
     public static final String DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_PERIOD = "1h";
 
-    // Config migration is enabled by default so upgraded clusters transparently upgrade stored table configs and
-    // schemas to the current version. It runs on a long cycle (effectively once) because once every config is at the
-    // current version each subsequent run is a cheap no-op.
-    public static final boolean DEFAULT_CONFIG_MIGRATION_ENABLED = true;
+    // Config migration transparently upgrades stored table configs and schemas to the current version on an upgraded
+    // cluster. It is disabled by default for the first release: it rewrites stored ZK configs cluster-wide, which has
+    // rolling-upgrade / rollback implications, so operators opt in explicitly after upgrading all nodes. Once every
+    // config is at the current version each subsequent run is a cheap no-op.
+    public static final boolean DEFAULT_CONFIG_MIGRATION_ENABLED = false;
     public static final String DEFAULT_CONFIG_MIGRATION_FREQUENCY_PERIOD = "1h";
 
     // Realtime Consumer Monitor

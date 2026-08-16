@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.periodictask;
 import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -90,17 +91,31 @@ public class ConfigMigrationManager extends ControllerPeriodicTask<ConfigMigrati
 
   @Override
   protected void processTable(String tableNameWithType, Context context) {
-    ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
-    migrateTableConfig(propertyStore, tableNameWithType);
+    boolean hasTableConfigMigrators = _migrationRegistry.getCurrentTableConfigVersion() > 0;
+    boolean hasSchemaMigrators = _migrationRegistry.getCurrentSchemaVersion() > 0;
+    // Short-circuit entirely when both migration chains are empty (avoids all ZK reads for the common no-op case).
+    if (!hasTableConfigMigrators && !hasSchemaMigrators) {
+      return;
+    }
 
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+
+    // Fetch the schema at most once per table and reuse it for both table-config validation and schema migration.
+    // Null is an expected transient state (schema not created yet), not a failure.
+    Schema schema = _pinotHelixResourceManager.getSchema(rawTableName);
+
+    if (hasTableConfigMigrators) {
+      migrateTableConfig(propertyStore, tableNameWithType, schema);
+    }
     // Schema is shared between the OFFLINE and REALTIME halves of a table; migrate it at most once per run.
-    if (context._processedSchemas.add(rawTableName)) {
-      migrateSchema(rawTableName);
+    if (hasSchemaMigrators && schema != null && context._processedSchemas.add(rawTableName)) {
+      migrateSchema(propertyStore, schema);
     }
   }
 
-  private void migrateTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
+  private void migrateTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType,
+      @Nullable Schema schema) {
     // Read the config as stored (no variable substitution, no decorator) together with its ZK version, so we never
     // persist resolved env-var values and can perform a version-checked write.
     ImmutablePair<TableConfig, Integer> configAndVersion =
@@ -119,7 +134,6 @@ public class ConfigMigrationManager extends ControllerPeriodicTask<ConfigMigrati
 
     // Validate before persisting so a buggy migrator can never write an invalid config into ZK. A missing schema is
     // an expected transient state (e.g. schema not yet created), not a migration failure — skip quietly and retry.
-    Schema schema = _pinotHelixResourceManager.getSchema(TableNameBuilder.extractRawTableName(tableNameWithType));
     if (schema == null) {
       LOGGER.info("Skipping table config migration for table: {}; schema not found yet, will retry", tableNameWithType);
       return;
@@ -145,27 +159,39 @@ public class ConfigMigrationManager extends ControllerPeriodicTask<ConfigMigrati
     }
   }
 
-  private void migrateSchema(String schemaName) {
-    Schema schema = _pinotHelixResourceManager.getSchema(schemaName);
-    if (schema == null) {
-      return;
-    }
-
+  private void migrateSchema(ZkHelixPropertyStore<ZNRecord> propertyStore, Schema schema) {
+    String schemaName = schema.getSchemaName();
     MigrationResult<Schema> result = _migrationRegistry.migrateSchema(schema);
     if (!result.isChanged()) {
       return;
     }
     Schema migrated = result.getConfig();
 
-    // Persist through the standard resource-manager path, which validates, writes, and sends schema-refresh messages.
-    // reload=false: a version-marker bump does not change any field, so segments do not need reloading.
+    // NOTE: We persist directly via ZKMetadataProvider rather than PinotHelixResourceManager.updateSchema because
+    // updateSchema short-circuits when schema.equals(oldSchema) is true, and Schema.equals() intentionally excludes the
+    // migration-version marker. A migration that only bumps the marker would therefore never persist and would re-run
+    // every cycle. The direct write always persists the marker; we then send the schema-refresh message so
+    // broker/server caches converge. Segments are not reloaded: a version-marker bump changes no queryable field.
     try {
-      _pinotHelixResourceManager.updateSchema(migrated, false, true);
+      migrated.validate();
+      ZKMetadataProvider.setSchema(propertyStore, migrated);
       LOGGER.info("Migrated schema: {} to version: {}", schemaName, result.getVersion());
       _controllerMetrics.addMeteredTableValue(schemaName, ControllerMeter.CONFIG_MIGRATION_SUCCESS, 1L);
     } catch (Exception e) {
       LOGGER.warn("Failed to persist migrated schema: {}; will retry", schemaName, e);
       _controllerMetrics.addMeteredTableValue(schemaName, ControllerMeter.CONFIG_MIGRATION_FAILURE, 1L);
+      return;
+    }
+
+    // Best-effort cache refresh for tables using this schema; a refresh failure does not undo the successful write
+    // (the persisted marker prevents re-migration next cycle).
+    try {
+      for (String tableNameWithType : _pinotHelixResourceManager.getExistingTableNamesWithType(schemaName, null)) {
+        _pinotHelixResourceManager.sendTableConfigSchemaRefreshMessage(tableNameWithType);
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Migrated schema: {} persisted, but failed to send refresh messages; caches will converge on the "
+          + "next schema update or controller restart", schemaName, e);
     }
   }
 }
