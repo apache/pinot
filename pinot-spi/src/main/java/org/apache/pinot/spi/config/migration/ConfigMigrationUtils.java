@@ -30,7 +30,7 @@ import org.apache.pinot.spi.data.Schema;
 /// The marker records the highest migration version that has been applied to a stored config, so
 /// the migration chain can resume from the right step and skip configs that are already current.
 ///
-/// - **TableConfig**: the marker lives under [#MIGRATION_VERSION_KEY] in
+/// - **TableConfig**: the marker lives under [#CONFIG_MIGRATION_VERSION_KEY] in
 ///   [TableCustomConfig#getCustomConfigs()]. Storing it in the free-form custom-config map avoids
 ///   adding a first-class SPI field and keeps mixed-version rollback safe (older controllers simply
 ///   preserve the unknown key).
@@ -48,7 +48,7 @@ public class ConfigMigrationUtils {
   /// This key is **controller-managed**: it is written by the config-migration task and is visible in the table
   /// config's `metadata.customConfigs` in REST responses. Operators should not set or edit it; a user-provided value
   /// is overwritten on the next migration. Other custom-config entries are preserved untouched.
-  public static final String MIGRATION_VERSION_KEY = "config.migration.version";
+  public static final String CONFIG_MIGRATION_VERSION_KEY = "config.migration.version";
 
   /// The version assigned to configs written before the migration framework existed.
   public static final int INITIAL_VERSION = 0;
@@ -61,7 +61,7 @@ public class ConfigMigrationUtils {
     if (customConfigs == null) {
       return INITIAL_VERSION;
     }
-    return parseVersion(customConfigs.get(MIGRATION_VERSION_KEY));
+    return parseVersion(customConfigs.get(CONFIG_MIGRATION_VERSION_KEY));
   }
 
   /// Stamps the given migration version onto the table config's custom-config map in place, creating
@@ -71,7 +71,7 @@ public class ConfigMigrationUtils {
     // getCustomConfig() never returns null, but the backing map may be immutable, so always copy.
     Map<String, String> customConfigs =
         existing.getCustomConfigs() != null ? new LinkedHashMap<>(existing.getCustomConfigs()) : new LinkedHashMap<>();
-    customConfigs.put(MIGRATION_VERSION_KEY, Integer.toString(version));
+    customConfigs.put(CONFIG_MIGRATION_VERSION_KEY, Integer.toString(version));
     tableConfig.setCustomConfig(new TableCustomConfig(customConfigs));
   }
 

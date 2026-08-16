@@ -848,12 +848,15 @@ public class SchemaTest {
     Schema schema = new Schema.SchemaBuilder().setSchemaName("test")
         .addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
         .build();
-    // Default marker is 0 and is not emitted, so schemas that predate the framework serialize unchanged.
+    // Default marker is 0 and is not emitted, so schemas that predate the framework serialize unchanged. Assert via
+    // both toJsonObject() and the full objectToString() path (Schema uses @JsonValue, so both go through toJsonObject).
     Assert.assertEquals(schema.getConfigMigrationVersion(), 0);
     Assert.assertFalse(schema.toJsonObject().has("configMigrationVersion"));
+    Assert.assertFalse(JsonUtils.objectToString(schema).contains("configMigrationVersion"));
 
     schema.setConfigMigrationVersion(2);
     Assert.assertTrue(schema.toJsonObject().has("configMigrationVersion"));
+    Assert.assertTrue(JsonUtils.objectToString(schema).contains("configMigrationVersion"));
 
     // The marker survives a JSON round-trip.
     Schema deserialized = JsonUtils.stringToObject(JsonUtils.objectToString(schema), Schema.class);

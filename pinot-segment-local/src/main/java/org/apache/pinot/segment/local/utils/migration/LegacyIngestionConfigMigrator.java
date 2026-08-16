@@ -32,6 +32,12 @@ import org.apache.pinot.spi.config.table.TableConfig;
 /// The transform delegates to [TableConfigUtils#convertFromLegacyTableConfig(TableConfig)], which
 /// mutates the config in place and clears the deprecated fields. Configs that already use the
 /// current ingestion shape are left effectively unchanged (the deprecated fields are simply null).
+///
+/// Rolling-upgrade note: this migration **clears** the deprecated fields once folded. Current readers resolve stream
+/// config via `IngestionConfigUtils`, which prefers `ingestionConfig` and treats the deprecated fields only as a
+/// fallback, so a same-version reader is unaffected. However, rolling this back to a binary old enough to read the
+/// deprecated fields *without* that fallback would see them missing. This is why config migration is opt-in and
+/// intended to be enabled only after every node in the cluster has been upgraded.
 public class LegacyIngestionConfigMigrator implements TableConfigMigrator {
 
   @Override

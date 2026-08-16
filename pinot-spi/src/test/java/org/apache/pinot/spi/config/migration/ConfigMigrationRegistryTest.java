@@ -168,8 +168,9 @@ public class ConfigMigrationRegistryTest {
     ConfigMigrationUtils.setTableConfigVersion(tableConfig, 3);
     assertEquals(ConfigMigrationUtils.getTableConfigVersion(tableConfig), 3);
     // Stamping the marker preserves the user's existing custom config.
-    assertEquals(tableConfig.getCustomConfig().getCustomConfigs().get("userKey"), "userValue");
-    assertEquals(tableConfig.getCustomConfig().getCustomConfigs().get(ConfigMigrationUtils.MIGRATION_VERSION_KEY), "3");
+    Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
+    assertEquals(customConfigs.get("userKey"), "userValue");
+    assertEquals(customConfigs.get(ConfigMigrationUtils.CONFIG_MIGRATION_VERSION_KEY), "3");
 
     // The marker (and the user config) survive a full JSON round-trip.
     TableConfig deserialized = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);

@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.utils.migration;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.spi.config.migration.ConfigMigrationRegistry;
@@ -28,6 +29,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
@@ -147,6 +149,31 @@ public class LegacyIngestionConfigMigratorTest {
     assertNotNull(persisted.getIngestionConfig().getBatchIngestionConfig());
     assertNull(persisted.getIndexingConfig().getStreamConfigs());
     assertNull(persisted.getValidationConfig().getSegmentPushType());
+  }
+
+  @Test
+  public void testExistingIngestionConfigWinsOverDeprecatedFields() {
+    // A v0 config that has BOTH a modern ingestionConfig.streamIngestionConfig AND deprecated streamConfigs: the
+    // existing modern config must win and the deprecated field must be cleared (no data loss / double-fold).
+    Map<String, String> deprecatedStreamConfigs = streamConfigs();
+    Map<String, String> modernStreamConfigs = new HashMap<>(streamConfigs());
+    modernStreamConfigs.put(StreamConfigProperties.STREAM_TOPIC_NAME, "modernTopic");
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(modernStreamConfigs)));
+    TableConfig config = new TableConfigBuilder(TableType.REALTIME).setTableName("collision")
+        .setStreamConfigs(deprecatedStreamConfigs)
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    MigrationResult<TableConfig> result = DefaultConfigMigrationRegistry.create().migrateTableConfig(config);
+    assertTrue(result.isChanged());
+    TableConfig migrated = result.getConfig();
+    // Modern config is retained; deprecated field is cleared.
+    assertEquals(migrated.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps().get(0),
+        modernStreamConfigs);
+    assertNull(migrated.getIndexingConfig().getStreamConfigs());
+    assertEquals(ConfigMigrationUtils.getTableConfigVersion(migrated), 1);
   }
 
   @Test
