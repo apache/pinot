@@ -114,15 +114,12 @@ public class BrokerResponseNativeTest {
     Assert.assertNull(new BrokerResponseNative().getServerStats());
   }
 
-  /**
-   * Regression test for backward-compatible deserialization: {@link BrokerResponseNative} does not
-   * override {@code getResponseMetadata()}, so the interface default (marked {@code @JsonIgnore})
-   * must keep {@code responseMetadata} an unknown property. Otherwise Jackson would treat it as a
-   * known setterless Map property and try to populate the immutable {@code Map.of()} default via
-   * USE_GETTERS_AS_SETTERS, failing with an {@link UnsupportedOperationException} when a response
-   * produced by a newer broker (e.g. {@code BrokerResponseNativeV2}) carries a non-empty
-   * {@code responseMetadata}.
-   */
+  /// Regression test for backward-compatible deserialization: [BrokerResponseNative] does not
+  /// override `getResponseMetadata()`, so the interface default (marked `@JsonIgnore`) must keep
+  /// `responseMetadata` an unknown property. Otherwise Jackson would treat it as a known setterless
+  /// Map property and try to populate the immutable `Map.of()` default via USE_GETTERS_AS_SETTERS,
+  /// failing with an [UnsupportedOperationException] when a response produced by a newer broker
+  /// (e.g. `BrokerResponseNativeV2`) carries a non-empty `responseMetadata`.
   @Test
   public void testResponseMetadataDeserializationCompatibility()
       throws IOException {
