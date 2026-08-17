@@ -302,7 +302,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private volatile boolean _shouldStop = false;
   /// Set when [#stop()] is invoked and never cleared, unlike [#_shouldStop] which
   /// [#catchupToFinalOffset(StreamPartitionMsgOffset, long)] resets so that the consume loop can run once more.
-  /// Records that this consumer is being torn down deliberately, for the whole remaining life of the consumer.
   private volatile boolean _stopping = false;
 
   // It takes 30s to locate controller leader, and more if there are multiple controller failures.
@@ -458,12 +457,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// Returns `true` if the consumer is being torn down by [#stop()] and the interrupt it delivered has landed on this
   /// thread.
   ///
-  /// The thread's interrupt status is the signal rather than the type of the exception the stream client raised,
-  /// because clients surface an interrupt in too many shapes to enumerate: Kafka wraps it in an unchecked
-  /// `InterruptException`, NIO channels throw `ClosedByInterruptException`, and the AWS SDK aborts the call with no
-  /// [InterruptedException] anywhere in the cause chain. All of them leave the interrupt status set, so checking the
-  /// status covers every client and, unlike inspecting the cause chain, does not mistake an [InterruptedException]
-  /// that was raised on some other thread and wrapped for us as an interrupt of our own.
+  /// The interrupt status is the signal rather than the type of the exception the client raised, because clients
+  /// surface an interrupt in too many shapes to enumerate: Kafka wraps it in an unchecked `InterruptException`, NIO
+  /// channels throw `ClosedByInterruptException`, and the AWS SDK aborts with no [InterruptedException] in the cause
+  /// chain at all. All of them leave the status set.
   ///
   /// This is checked against [#_stopping] rather than [#_shouldStop] because
   /// [#catchupToFinalOffset(StreamPartitionMsgOffset, long)] clears the latter before consuming once more.
@@ -471,16 +468,20 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return _stopping && Thread.currentThread().isInterrupted();
   }
 
+  /// TODO: Key the table meter on `_clientId` instead of `_tableStreamName` so that it carries table, topic and
+  ///       partition labels, and keep the global meter for backward compatibility.
+  private void meterConsumptionException() {
+    _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
+    _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
+  }
+
   private void handleTransientStreamErrors(Exception e)
       throws Exception {
     _consecutiveErrorCount++;
-
-    // TODO: Alerting on every transient error is noisy. Consider counting them separately and only alerting once the
-    //       retries below are exhausted.
-    _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
-    _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS,
-        1L);
+    meterConsumptionException();
     if (_consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_RETRIES_EXHAUSTED, 1L);
+      _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_RETRIES_EXHAUSTED, 1L);
       _segmentLogger.warn("Stream transient exception when fetching messages, stopping consumption after {} attempts",
           _consecutiveErrorCount, e);
       throw e;
@@ -538,20 +539,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _endOfPartitionGroup = messageBatch.getMessageCount() == 0 && messageBatch.isEndOfPartitionGroup();
         _consecutiveErrorCount = 0;
       } catch (PermanentConsumerException e) {
-        // TODO: Key this meter on _clientId instead of _tableStreamName so that it carries table, topic and partition
-        //       labels, and keep the global meter for backward compatibility.
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
-        _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
+        meterConsumptionException();
         _segmentLogger.warn("Permanent exception from stream when fetching messages, stopping consumption", e);
         throw e;
       } catch (Exception e) {
         if (isDeliberateStopInterrupt()) {
-          // stop() interrupts the consumer thread to tear it down, and the interrupt typically lands inside the
-          // fetch. That is a deliberate shutdown rather than a stream fault, so it must not be counted as a
-          // consumption error, slept on, or answered by building a replacement consumer for a segment that is
-          // going away. It is still counted on its own meter, so that a teardown remains visible and the two
-          // cases can be told apart when consumption stops unexpectedly. Exit the loop instead: on the offload
-          // path the thread winds down, and on the catch-up path the caller falls back to downloading the segment.
+          // A teardown rather than a stream fault, so it must not be slept on or answered by building a replacement
+          // consumer for a segment that is going away. Exit the loop instead: on the offload path the thread winds
+          // down, and on the catch-up path the caller falls back to downloading the segment.
           _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_STOPPED_BY_INTERRUPT, 1L);
           _serverMetrics.addMeteredTableValue(_tableStreamName,
               ServerMeter.REALTIME_CONSUMPTION_STOPPED_BY_INTERRUPT, 1L);
@@ -567,7 +562,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         continue;
       } catch (Throwable t) {
         //track realtime rows fetched on a table level. This included valid + invalid rows
-        // TODO: This path is not counted by any meter today.
+        // An Error aborts consumption just as the cases above do, so it is counted the same way
+        meterConsumptionException();
         _segmentLogger.warn("Stream error when fetching messages, stopping consumption", t);
         throw t;
       }

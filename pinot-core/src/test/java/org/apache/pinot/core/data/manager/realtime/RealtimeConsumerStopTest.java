@@ -65,20 +65,15 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/// Verifies how a consuming segment reacts to being stopped while its consumer is blocked in the stream fetch.
+/// Verifies how a consuming segment reacts to being stopped while its consumer is blocked in the stream fetch. This
+/// is the shape of every deliberate teardown: Helix `CONSUMING -> OFFLINE` and `CONSUMING -> DROPPED` both land on
+/// `offloadSegment`, which interrupts the consumer thread while it is parked inside the stream client, so the
+/// interrupt surfaces as a fetch failure — and must not be mistaken for one.
 ///
-/// This is the shape of every deliberate teardown: Helix `CONSUMING -> OFFLINE` and `CONSUMING -> DROPPED` both land
-/// on `offloadSegment`, which reaches [RealtimeSegmentDataManager#doOffload()] and interrupts the consumer thread.
-/// The interrupt almost always arrives while that thread is parked inside the stream client, so it surfaces as a
-/// fetch failure — and must not be mistaken for one.
-///
-/// The table data manager, the consumer thread, the stop/interrupt/join handshake, the consume loop and its error
-/// handling are all real; the segment is offloaded through the same `offloadSegment` call the Helix state model
-/// makes. Only the stream is supplied by the test, through the [StreamConsumerFactory] extension point named in the
-/// table config, which is what makes the timing deterministic: the consumer is guaranteed to be inside
-/// `fetchMessages` when the interrupt lands. [TestStreamConsumerFactory] reproduces the Kafka client contract — a
-/// blocking fetch that, on interrupt, re-arms the thread interrupt flag and rethrows wrapped in an unchecked
-/// exception.
+/// The table data manager, the consumer thread, the stop/interrupt/join handshake, and the consume loop are all real.
+/// Only the stream is supplied by the test, through the [StreamConsumerFactory] extension point named in the table
+/// config, which is what makes the timing deterministic: the consumer is guaranteed to be inside `fetchMessages` when
+/// the interrupt lands.
 public class RealtimeConsumerStopTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "RealtimeConsumerStopTest");
   private static final String RAW_TABLE_NAME = "Coffee";
@@ -86,6 +81,8 @@ public class RealtimeConsumerStopTest {
   private static final LLCSegmentName SEGMENT_NAME = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, 1600000000000L);
   private static final String SEGMENT_NAME_STR = SEGMENT_NAME.getSegmentName();
   private static final LongMsgOffset START_OFFSET = new LongMsgOffset(0L);
+  /// `MAX_CONSECUTIVE_ERROR_COUNT` retries, plus the attempt that takes the count past the limit.
+  private static final int ATTEMPTS_BEFORE_GIVING_UP = 6;
 
   @BeforeClass
   public void setUp() {
@@ -105,8 +102,7 @@ public class RealtimeConsumerStopTest {
   }
 
   /// Offloading a consuming segment interrupts its consumer mid-fetch. Nothing is wrong with the stream, so the
-  /// interrupt must not be metered as a consumption exception, and no replacement consumer may be built for a
-  /// segment that is going away.
+  /// interrupt must not be metered as a consumption exception, and no replacement consumer may be built.
   @Test
   public void testOffloadingAConsumingSegmentIsNotCountedAsAStreamError()
       throws Exception {
@@ -137,8 +133,6 @@ public class RealtimeConsumerStopTest {
   /// reach the committed end offset, clearing the stop flag so that loop is allowed to run. An interrupt arriving
   /// there — the state transition thread itself being interrupted, as happens when a server shuts down mid
   /// transition — is still part of the teardown, which is why the stop has to be remembered across that reset.
-  /// Catch-up then gives up at once and the replica falls back to downloading the segment, instead of booking a
-  /// stream error and rebuilding a consumer on each of five retries on the way out.
   @Test
   public void testInterruptWhileCatchingUpIsNotCountedAsAStreamError()
       throws Exception {
@@ -187,6 +181,7 @@ public class RealtimeConsumerStopTest {
       TestStreamConsumerFactory.fetchesBehaveAs(TestStreamConsumerFactory.FetchBehaviour.FAIL);
       long consumptionExceptions = consumptionExceptions(serverMetrics);
       long stoppedByInterrupt = stoppedByInterrupt(serverMetrics);
+      long retriesExhausted = retriesExhausted(serverMetrics);
       startConsumingSegment(tableDataManager, serverMetrics);
 
       // The transient handler sleeps and rebuilds the consumer, so a second consumer proves the retry happened
@@ -197,6 +192,35 @@ public class RealtimeConsumerStopTest {
           "A stream failure must be counted as a consumption exception");
       assertEquals(stoppedByInterrupt(serverMetrics), stoppedByInterrupt,
           "A stream failure must not be counted as a deliberate stop");
+      assertEquals(retriesExhausted(serverMetrics), retriesExhausted,
+          "A failure that still has retries left must not be counted as an exhausted retry budget");
+    } finally {
+      tableDataManager.shutDown();
+    }
+  }
+
+  /// A stream that keeps failing eventually runs the retry budget out, which is the point at which the segment is
+  /// abandoned. `realtimeConsumptionExceptions` moves on every attempt, including ones that would have self-healed,
+  /// so the exhaustion is what alerts hang on and it has to be counted exactly once per abandoned segment.
+  @Test
+  public void testExhaustingTheRetryBudgetIsCountedOnce()
+      throws Exception {
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    RealtimeTableDataManager tableDataManager = createTableDataManager();
+    try {
+      TestStreamConsumerFactory.fetchesBehaveAs(TestStreamConsumerFactory.FetchBehaviour.FAIL);
+      long consumptionExceptions = consumptionExceptions(serverMetrics);
+      long retriesExhausted = retriesExhausted(serverMetrics);
+      startConsumingSegment(tableDataManager, serverMetrics);
+
+      // Each attempt backs off for a second before the next, so the budget takes a few seconds to run out
+      TestUtils.waitForCondition(aVoid -> retriesExhausted(serverMetrics) > retriesExhausted, 60_000L,
+          "Retry budget was never reported as exhausted");
+
+      assertEquals(retriesExhausted(serverMetrics), retriesExhausted + 1,
+          "Exhausting the retry budget should be counted once, not once per attempt");
+      assertEquals(consumptionExceptions(serverMetrics), consumptionExceptions + ATTEMPTS_BEFORE_GIVING_UP,
+          "Every failed attempt should be counted as a consumption exception");
     } finally {
       tableDataManager.shutDown();
     }
@@ -204,6 +228,10 @@ public class RealtimeConsumerStopTest {
 
   private static long consumptionExceptions(ServerMetrics serverMetrics) {
     return serverMetrics.getMeteredValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS).count();
+  }
+
+  private static long retriesExhausted(ServerMetrics serverMetrics) {
+    return serverMetrics.getMeteredValue(ServerMeter.REALTIME_CONSUMPTION_RETRIES_EXHAUSTED).count();
   }
 
   private static long stoppedByInterrupt(ServerMetrics serverMetrics) {
@@ -265,8 +293,8 @@ public class RealtimeConsumerStopTest {
   /// test. Registered through the table config, so the segment data manager builds it exactly as it builds a Kafka
   /// or Kinesis consumer.
   public static class TestStreamConsumerFactory extends StreamConsumerFactory {
-    /// How the next fetch behaves: park like a caught-up client, fail like an unreachable broker, or fail the way a
-    /// client does when the thread calling it is interrupted.
+    /// Park like a caught-up client, fail like an unreachable broker, or fail the way a client does when the thread
+    /// calling it is interrupted.
     enum FetchBehaviour {
       BLOCK, FAIL, INTERRUPT
     }
@@ -312,11 +340,9 @@ public class RealtimeConsumerStopTest {
     }
 
     private static class TestConsumer implements PartitionGroupConsumer {
-      /// Never counted down. A [FetchBehaviour#BLOCK] fetch waits on this instead of sleeping for `timeoutMs`, so the
-      /// only way out of the fetch is the interrupt under test. An unbounded wait is what makes the timing
-      /// deterministic: a fetch that timed out on its own could return and start a second fetch while a test was
-      /// still arranging the stop, and that second fetch would then observe the arranged behaviour before `stop()`
-      /// had been called at all.
+      /// Never counted down, so the only way out of a [FetchBehaviour#BLOCK] fetch is the interrupt under test. A
+      /// fetch bounded by `timeoutMs` could instead return and start a second fetch while a test was still arranging
+      /// the stop, and that second fetch would observe the arranged behaviour before `stop()` had been called at all.
       private static final CountDownLatch RECORDS_NEVER_ARRIVE = new CountDownLatch(1);
 
       @Override
@@ -332,7 +358,6 @@ public class RealtimeConsumerStopTest {
             break;
         }
         try {
-          // A caught-up client parks here until records arrive
           RECORDS_NEVER_ARRIVE.await();
         } catch (InterruptedException e) {
           throw interrupted();
@@ -340,9 +365,8 @@ public class RealtimeConsumerStopTest {
         return new EmptyMessageBatch(startOffset);
       }
 
-      /// Mirrors `org.apache.kafka.common.errors.InterruptException`: re-arm the thread interrupt flag and rethrow
-      /// the interrupt wrapped in an unchecked exception. Re-arming is the part the consumer relies on to tell a
-      /// deliberate stop from a stream fault, and every client it supports does it.
+      /// Mirrors `org.apache.kafka.common.errors.InterruptException`: re-arm the thread interrupt flag and rethrow the
+      /// interrupt wrapped in an unchecked exception. The re-arm is what the consumer reads to recognize a stop.
       private static RuntimeException interrupted() {
         Thread.currentThread().interrupt();
         return new RuntimeException("Interrupted while polling the stream", new InterruptedException());
@@ -354,7 +378,7 @@ public class RealtimeConsumerStopTest {
       }
     }
 
-    /// What a caught-up client returns when the poll times out with no records.
+    /// What a caught-up client returns when a poll yields no records.
     private record EmptyMessageBatch(StreamPartitionMsgOffset _offsetOfNextBatch) implements MessageBatch<byte[]> {
       @Override
       public int getMessageCount() {
