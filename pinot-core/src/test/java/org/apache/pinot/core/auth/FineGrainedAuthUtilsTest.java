@@ -21,14 +21,38 @@ package org.apache.pinot.core.auth;
 import java.lang.reflect.Method;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+
 
 public class FineGrainedAuthUtilsTest {
+
+  @Test
+  public void testFindRawTargetId() throws Exception {
+    MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
+    MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
+    Authorize tableAuth = TestResource.class.getDeclaredMethod("getTable").getAnnotation(Authorize.class);
+    Authorize clusterAuth = getAnnotatedMethod().getAnnotation(Authorize.class);
+
+    pathParams.putSingle("tableName", "pathTable");
+    assertEquals(FineGrainedAuthUtils.findRawTargetId(tableAuth, pathParams, queryParams), "pathTable");
+
+    pathParams.clear();
+    queryParams.putSingle("tableName", "queryTable");
+    assertEquals(FineGrainedAuthUtils.findRawTargetId(tableAuth, pathParams, queryParams), "queryTable");
+    assertNull(FineGrainedAuthUtils.findRawTargetId(clusterAuth, pathParams, queryParams));
+
+    queryParams.clear();
+    assertNull(FineGrainedAuthUtils.findRawTargetId(tableAuth, pathParams, queryParams));
+  }
 
   @Test
   public void testValidateFineGrainedAuthAllowed() {
@@ -81,6 +105,10 @@ public class FineGrainedAuthUtilsTest {
   static class TestResource {
     @Authorize(targetType = TargetType.CLUSTER, action = "getCluster")
     void getCluster() {
+    }
+
+    @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "getTable")
+    void getTable() {
     }
   }
 
