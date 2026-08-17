@@ -81,9 +81,9 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized HyperLogLog
-    DataType storedType = blockValSet.getValueType().getStoredType();
-    if (storedType == DataType.BYTES) {
+    DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES is a serialized HyperLogLog and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
@@ -103,6 +103,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       }
       return;
     }
+
+    DataType storedType = dataType.getStoredType();
 
     if (blockValSet.isSingleValue()) {
       aggregateSV(length, aggregationResultHolder, blockValSet, storedType);
@@ -157,6 +159,12 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
           hyperLogLog.offer(stringValues[i]);
+        }
+        break;
+      case BYTES:
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          hyperLogLog.offer(bytesValues[i]);
         }
         break;
       default:
@@ -222,6 +230,14 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
           }
         }
         break;
+      case BYTES:
+        byte[][][] bytesValuesArray = blockValSet.getBytesValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (byte[] value : bytesValuesArray[i]) {
+            hyperLogLog.offer(value);
+          }
+        }
+        break;
       default:
         throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_HLL aggregation function: " + storedType);
     }
@@ -232,9 +248,9 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized HyperLogLog
-    DataType storedType = blockValSet.getValueType().getStoredType();
-    if (storedType == DataType.BYTES) {
+    DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES is a serialized HyperLogLog and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         for (int i = 0; i < length; i++) {
@@ -252,6 +268,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       }
       return;
     }
+
+    DataType storedType = dataType.getStoredType();
 
     if (blockValSet.isSingleValue()) {
       aggregateSVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet, storedType);
@@ -305,6 +323,12 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
           getHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(stringValues[i]);
+        }
+        break;
+      case BYTES:
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          getHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(bytesValues[i]);
         }
         break;
       default:
@@ -371,6 +395,15 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
           }
         }
         break;
+      case BYTES:
+        byte[][][] bytesValuesArray = blockValSet.getBytesValuesMV();
+        for (int i = 0; i < length; i++) {
+          HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKeyArray[i]);
+          for (byte[] value : bytesValuesArray[i]) {
+            hyperLogLog.offer(value);
+          }
+        }
+        break;
       default:
         throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_HLL aggregation function: " + storedType);
     }
@@ -381,9 +414,9 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized HyperLogLog
-    DataType storedType = blockValSet.getValueType().getStoredType();
-    if (storedType == DataType.BYTES) {
+    DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES is a serialized HyperLogLog and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         for (int i = 0; i < length; i++) {
@@ -404,6 +437,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       }
       return;
     }
+
+    DataType storedType = dataType.getStoredType();
 
     if (blockValSet.isSingleValue()) {
       aggregateSVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet, storedType);
@@ -457,6 +492,12 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], stringValues[i]);
+        }
+        break;
+      case BYTES:
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], bytesValues[i]);
         }
         break;
       default:
@@ -536,6 +577,18 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
           for (int groupKey : groupKeysArray[i]) {
             HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
             for (String value : stringValues) {
+              hyperLogLog.offer(value);
+            }
+          }
+        }
+        break;
+      case BYTES:
+        byte[][][] bytesValuesArray = blockValSet.getBytesValuesMV();
+        for (int i = 0; i < length; i++) {
+          byte[][] bytesValues = bytesValuesArray[i];
+          for (int groupKey : groupKeysArray[i]) {
+            HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
+            for (byte[] value : bytesValues) {
               hyperLogLog.offer(value);
             }
           }

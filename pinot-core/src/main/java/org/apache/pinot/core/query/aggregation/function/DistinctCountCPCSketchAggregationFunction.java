@@ -135,9 +135,9 @@ public class DistinctCountCPCSketchAggregationFunction
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized CPC Sketch
-    FieldSpec.DataType storedType = blockValSet.getValueType().getStoredType();
-    if (storedType == DataType.BYTES) {
+    DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES stores serialized CpcSketch objects in the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         CpcSketchAccumulator cpcSketchAccumulator = getAccumulator(aggregationResultHolder);
@@ -153,6 +153,16 @@ public class DistinctCountCPCSketchAggregationFunction
       return;
     }
 
+    DataType storedType = dataType.getStoredType();
+    if (blockValSet.isSingleValue()) {
+      aggregateSV(length, aggregationResultHolder, blockValSet, storedType);
+    } else {
+      aggregateMV(length, aggregationResultHolder, blockValSet, storedType);
+    }
+  }
+
+  protected void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet,
+      DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
@@ -194,11 +204,44 @@ public class DistinctCountCPCSketchAggregationFunction
           cpcSketch.update(stringValues[i]);
         }
         break;
+      case BYTES:
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          cpcSketch.update(bytesValues[i]);
+        }
+        break;
       default:
         throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_CPC aggregation function: " + storedType);
     }
-    CpcSketchAccumulator cpcSketchAccumulator = getAccumulator(aggregationResultHolder);
-    cpcSketchAccumulator.apply(cpcSketch);
+  }
+
+  protected void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet,
+      DataType storedType) {
+    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
+    if (dictionary != null) {
+      int[][] dictIds = blockValSet.getDictionaryIdsMV();
+      RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
+      for (int i = 0; i < length; i++) {
+        dictIdBitmap.add(dictIds[i]);
+      }
+      return;
+    }
+
+    // For non-dictionary-encoded expression, store values into the CpcSketch
+    switch (storedType) {
+      case BYTES:
+        byte[][][] bytesValues = blockValSet.getBytesValuesMV();
+        CpcSketch cpcSketch = getCpcSketch(aggregationResultHolder);
+        for (int i = 0; i < length; i++) {
+          for (byte[] value : bytesValues[i]) {
+            cpcSketch.update(value);
+          }
+        }
+        break;
+      default:
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_CPC aggregation function: " + storedType);
+    }
   }
 
   @Override
@@ -206,9 +249,9 @@ public class DistinctCountCPCSketchAggregationFunction
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized CPC Sketch
-    DataType storedType = blockValSet.getValueType().getStoredType();
-    if (storedType == FieldSpec.DataType.BYTES) {
+    DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES stores serialized CpcSketch objects in the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         CpcSketch[] sketches = deserializeSketches(bytesValues, length);
@@ -225,6 +268,16 @@ public class DistinctCountCPCSketchAggregationFunction
       return;
     }
 
+    DataType storedType = dataType.getStoredType();
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet, storedType);
+    } else {
+      aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet, storedType);
+    }
+  }
+
+  protected void aggregateSVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
@@ -267,6 +320,40 @@ public class DistinctCountCPCSketchAggregationFunction
           getCpcSketch(groupByResultHolder, groupKeyArray[i]).update(stringValues[i]);
         }
         break;
+      case BYTES:
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          getCpcSketch(groupByResultHolder, groupKeyArray[i]).update(bytesValues[i]);
+        }
+        break;
+      default:
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_CPC aggregation function: " + storedType);
+    }
+  }
+
+  protected void aggregateMVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet, DataType storedType) {
+    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
+    if (dictionary != null) {
+      int[][] dictIds = blockValSet.getDictionaryIdsMV();
+      for (int i = 0; i < length; i++) {
+        getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
+      }
+      return;
+    }
+
+    // For non-dictionary-encoded expression, store values into the CpcSketch
+    switch (storedType) {
+      case BYTES:
+        byte[][][] bytesValues = blockValSet.getBytesValuesMV();
+        for (int i = 0; i < length; i++) {
+          CpcSketch cpcSketch = getCpcSketch(groupByResultHolder, groupKeyArray[i]);
+          for (byte[] value : bytesValues[i]) {
+            cpcSketch.update(value);
+          }
+        }
+        break;
       default:
         throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_CPC aggregation function: " + storedType);
     }
@@ -277,11 +364,9 @@ public class DistinctCountCPCSketchAggregationFunction
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized CPC Sketch
-    DataType storedType = blockValSet.getValueType().getStoredType();
-    boolean singleValue = blockValSet.isSingleValue();
-
-    if (singleValue && storedType == DataType.BYTES) {
+    DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES stores serialized CpcSketch objects in the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         CpcSketch[] sketches = deserializeSketches(bytesValues, length);
@@ -298,6 +383,16 @@ public class DistinctCountCPCSketchAggregationFunction
       return;
     }
 
+    DataType storedType = dataType.getStoredType();
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet, storedType);
+    } else {
+      aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet, storedType);
+    }
+  }
+
+  protected void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
@@ -347,6 +442,47 @@ public class DistinctCountCPCSketchAggregationFunction
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
             getCpcSketch(groupByResultHolder, groupKey).update(stringValues[i]);
+          }
+        }
+        break;
+      case BYTES:
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            getCpcSketch(groupByResultHolder, groupKey).update(bytesValues[i]);
+          }
+        }
+        break;
+      default:
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_CPC aggregation function: " + storedType);
+    }
+  }
+
+  protected void aggregateMVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet, DataType storedType) {
+    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
+    if (dictionary != null) {
+      int[][] dictIds = blockValSet.getDictionaryIdsMV();
+      for (int i = 0; i < length; i++) {
+        int[] rowDictIds = dictIds[i];
+        for (int groupKey : groupKeysArray[i]) {
+          getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(rowDictIds);
+        }
+      }
+      return;
+    }
+
+    // For non-dictionary-encoded expression, store values into the CpcSketch
+    switch (storedType) {
+      case BYTES:
+        byte[][][] bytesValues = blockValSet.getBytesValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            CpcSketch cpcSketch = getCpcSketch(groupByResultHolder, groupKey);
+            for (byte[] value : bytesValues[i]) {
+              cpcSketch.update(value);
+            }
           }
         }
         break;
@@ -524,6 +660,8 @@ public class DistinctCountCPCSketchAggregationFunction
   private void addObjectToSketch(Object rawValue, CpcSketch sketch) {
     if (rawValue instanceof String) {
       sketch.update((String) rawValue);
+    } else if (rawValue instanceof byte[]) {
+      sketch.update((byte[]) rawValue);
     } else if (rawValue instanceof Integer) {
       sketch.update((Integer) rawValue);
     } else if (rawValue instanceof Long) {

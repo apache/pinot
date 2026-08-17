@@ -93,9 +93,9 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized HyperLogLogPlus
-    DataType storedType = blockValSet.getValueType().getStoredType();
-    if (storedType == DataType.BYTES) {
+    DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES is a serialized HyperLogLogPlus and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         HyperLogLogPlus hyperLogLogPlus = aggregationResultHolder.getResult();
@@ -113,6 +113,8 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
       }
       return;
     }
+
+    DataType storedType = dataType.getStoredType();
 
     if (blockValSet.isSingleValue()) {
       aggregateSV(length, aggregationResultHolder, blockValSet, storedType);
@@ -162,6 +164,12 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
           hyperLogLogPlus.offer(stringValues[i]);
+        }
+        break;
+      case BYTES:
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          hyperLogLogPlus.offer(bytesValues[i]);
         }
         break;
       default:
@@ -226,6 +234,14 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
           }
         }
         break;
+      case BYTES:
+        byte[][][] bytesValuesArray = blockValSet.getBytesValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (byte[] value : bytesValuesArray[i]) {
+            hyperLogLogPlus.offer(value);
+          }
+        }
+        break;
       default:
         throw new IllegalStateException(
             "Illegal data type for DISTINCT_COUNT_HLL_PLUS aggregation function: " + storedType);
@@ -237,9 +253,9 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized HyperLogLogPlus
-    DataType storedType = blockValSet.getValueType().getStoredType();
-    if (storedType == DataType.BYTES) {
+    DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES is a serialized HyperLogLogPlus and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         for (int i = 0; i < length; i++) {
@@ -257,6 +273,8 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
       }
       return;
     }
+
+    DataType storedType = dataType.getStoredType();
 
     if (blockValSet.isSingleValue()) {
       aggregateSVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet, storedType);
@@ -307,6 +325,12 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
           getHyperLogLogPlus(groupByResultHolder, groupKeyArray[i]).offer(stringValues[i]);
+        }
+        break;
+      case BYTES:
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          getHyperLogLogPlus(groupByResultHolder, groupKeyArray[i]).offer(bytesValues[i]);
         }
         break;
       default:
@@ -374,6 +398,15 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
           }
         }
         break;
+      case BYTES:
+        byte[][][] bytesValuesArray = blockValSet.getBytesValuesMV();
+        for (int i = 0; i < length; i++) {
+          HyperLogLogPlus hyperLogLogPlus = getHyperLogLogPlus(groupByResultHolder, groupKeyArray[i]);
+          for (byte[] value : bytesValuesArray[i]) {
+            hyperLogLogPlus.offer(value);
+          }
+        }
+        break;
       default:
         throw new IllegalStateException(
             "Illegal data type for DISTINCT_COUNT_HLL_PLUS aggregation function: " + storedType);
@@ -385,9 +418,9 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized HyperLogLogPlus
-    DataType storedType = blockValSet.getValueType().getStoredType();
-    if (storedType == DataType.BYTES) {
+    DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES is a serialized HyperLogLogPlus and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         for (int i = 0; i < length; i++) {
@@ -408,6 +441,8 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
       }
       return;
     }
+
+    DataType storedType = dataType.getStoredType();
 
     if (blockValSet.isSingleValue()) {
       aggregateSVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet, storedType);
@@ -458,6 +493,12 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], stringValues[i]);
+        }
+        break;
+      case BYTES:
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], bytesValues[i]);
         }
         break;
       default:
@@ -537,6 +578,18 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
           for (int groupKey : groupKeysArray[i]) {
             HyperLogLogPlus hyperLogLogPlus = getHyperLogLogPlus(groupByResultHolder, groupKey);
             for (String value : stringValues) {
+              hyperLogLogPlus.offer(value);
+            }
+          }
+        }
+        break;
+      case BYTES:
+        byte[][][] bytesValuesArray = blockValSet.getBytesValuesMV();
+        for (int i = 0; i < length; i++) {
+          byte[][] bytesValues = bytesValuesArray[i];
+          for (int groupKey : groupKeysArray[i]) {
+            HyperLogLogPlus hyperLogLogPlus = getHyperLogLogPlus(groupByResultHolder, groupKey);
+            for (byte[] value : bytesValues) {
               hyperLogLogPlus.offer(value);
             }
           }

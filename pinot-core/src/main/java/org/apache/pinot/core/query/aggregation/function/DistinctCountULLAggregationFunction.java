@@ -82,9 +82,9 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized HyperLogLogPlus
-    DataType storedType = blockValSet.getValueType().getStoredType();
-    if (storedType == DataType.BYTES) {
+    DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES is a serialized UltraLogLog and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         UltraLogLog ull = aggregationResultHolder.getResult();
@@ -102,6 +102,8 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       }
       return;
     }
+
+    DataType storedType = dataType.getStoredType();
 
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
@@ -144,6 +146,12 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
           UltraLogLogUtils.hashObject(stringValues[i]).ifPresent(ull::add);
         }
         break;
+      case BYTES:
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          UltraLogLogUtils.hashObject(bytesValues[i]).ifPresent(ull::add);
+        }
+        break;
       default:
         throw new IllegalStateException(
             "Illegal data type for DISTINCT_COUNT_ULL aggregation function: " + storedType);
@@ -155,9 +163,9 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized UltraLogLogs
-    DataType storedType = blockValSet.getValueType().getStoredType();
-    if (storedType == DataType.BYTES) {
+    DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES is a serialized UltraLogLog and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         for (int i = 0; i < length; i++) {
@@ -175,6 +183,8 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       }
       return;
     }
+
+    DataType storedType = dataType.getStoredType();
 
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
@@ -223,6 +233,13 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
               .ifPresent(getULL(groupByResultHolder, groupKeyArray[i])::add);
         }
         break;
+      case BYTES:
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          UltraLogLogUtils.hashObject(bytesValues[i])
+              .ifPresent(getULL(groupByResultHolder, groupKeyArray[i])::add);
+        }
+        break;
       default:
         throw new IllegalStateException(
             "Illegal data type for DISTINCT_COUNT_ULL aggregation function: " + storedType);
@@ -234,9 +251,9 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized HyperLogLogPlus
-    DataType storedType = blockValSet.getValueType().getStoredType();
-    if (storedType == DataType.BYTES) {
+    DataType dataType = blockValSet.getValueType();
+    if (dataType == DataType.BYTES) {
+      // Logical BYTES is a serialized UltraLogLog and always uses the single-value representation.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         for (int i = 0; i < length; i++) {
@@ -246,7 +263,6 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
             if (ull != null) {
               ull.add(value);
             } else {
-              // Create a new HyperLogLogPlus for the group
               groupByResultHolder.setValueForKey(groupKey,
                   ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytesValues[i]));
             }
@@ -257,6 +273,8 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       }
       return;
     }
+
+    DataType storedType = dataType.getStoredType();
 
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
@@ -298,6 +316,12 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], stringValues[i]);
+        }
+        break;
+      case BYTES:
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], bytesValues[i]);
         }
         break;
       default:

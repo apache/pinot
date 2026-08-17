@@ -196,7 +196,7 @@ public class DistinctCountThetaSketchAggregationFunction
     if (valueTypes[0] != DataType.BYTES) {
       List<UpdatableThetaSketch> updateSketches = getUpdateSketches(aggregationResultHolder);
       if (singleValues[0]) {
-        switch (valueTypes[0]) {
+        switch (valueTypes[0].getStoredType()) {
           case INT:
             int[] intValues = (int[]) valueArrays[0];
             if (_includeDefaultSketch) {
@@ -287,13 +287,31 @@ public class DistinctCountThetaSketchAggregationFunction
               }
             }
             break;
+          case BYTES:
+            byte[][] bytesValues = (byte[][]) valueArrays[0];
+            if (_includeDefaultSketch) {
+              UpdatableThetaSketch defaultSketch = updateSketches.get(0);
+              for (int i = 0; i < length; i++) {
+                defaultSketch.update(bytesValues[i]);
+              }
+            }
+            for (int i = 0; i < numFilters; i++) {
+              FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
+              UpdatableThetaSketch updateSketch = updateSketches.get(i + 1);
+              for (int j = 0; j < length; j++) {
+                if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
+                  updateSketch.update(bytesValues[j]);
+                }
+              }
+            }
+            break;
           default:
             throw new IllegalStateException(
                 "Illegal single-value data type for DISTINCT_COUNT_THETA_SKETCH aggregation function: "
                     + valueTypes[0]);
         }
       } else {
-        switch (valueTypes[0]) {
+        switch (valueTypes[0].getStoredType()) {
           case INT:
             int[][] intValues = (int[][]) valueArrays[0];
             if (_includeDefaultSketch) {
@@ -404,13 +422,35 @@ public class DistinctCountThetaSketchAggregationFunction
               }
             }
             break;
+          case BYTES:
+            byte[][][] bytesValues = (byte[][][]) valueArrays[0];
+            if (_includeDefaultSketch) {
+              UpdatableThetaSketch defaultSketch = updateSketches.get(0);
+              for (int i = 0; i < length; i++) {
+                for (byte[] value : bytesValues[i]) {
+                  defaultSketch.update(value);
+                }
+              }
+            }
+            for (int i = 0; i < numFilters; i++) {
+              FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
+              UpdatableThetaSketch updateSketch = updateSketches.get(i + 1);
+              for (int j = 0; j < length; j++) {
+                if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
+                  for (byte[] value : bytesValues[j]) {
+                    updateSketch.update(value);
+                  }
+                }
+              }
+            }
+            break;
           default:
             throw new IllegalStateException(
                 "Illegal multi-value data type for DISTINCT_COUNT_THETA_SKETCH aggregation function: " + valueTypes[0]);
         }
       }
     } else {
-      // Serialized sketch
+      // Logical BYTES stores serialized ThetaSketch objects in the single-value representation.
       List<ThetaSketchAccumulator> thetaSketchAccumulators = getUnions(aggregationResultHolder);
       ThetaSketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       if (_includeDefaultSketch) {
@@ -444,7 +484,7 @@ public class DistinctCountThetaSketchAggregationFunction
     // Main expression is always index 0
     if (valueTypes[0] != DataType.BYTES) {
       if (singleValues[0]) {
-        switch (valueTypes[0]) {
+        switch (valueTypes[0].getStoredType()) {
           case INT:
             int[] intValues = (int[]) valueArrays[0];
             for (int i = 0; i < length; i++) {
@@ -520,13 +560,29 @@ public class DistinctCountThetaSketchAggregationFunction
               }
             }
             break;
+          case BYTES:
+            byte[][] bytesValues = (byte[][]) valueArrays[0];
+            for (int i = 0; i < length; i++) {
+              List<UpdatableThetaSketch> updateSketches =
+                  getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
+              byte[] value = bytesValues[i];
+              if (_includeDefaultSketch) {
+                updateSketches.get(0).update(value);
+              }
+              for (int j = 0; j < numFilters; j++) {
+                if (_filterEvaluators.get(j).evaluate(singleValues, valueTypes, valueArrays, i)) {
+                  updateSketches.get(j + 1).update(value);
+                }
+              }
+            }
+            break;
           default:
             throw new IllegalStateException(
                 "Illegal single-value data type for DISTINCT_COUNT_THETA_SKETCH aggregation function: "
                     + valueTypes[0]);
         }
       } else {
-        switch (valueTypes[0]) {
+        switch (valueTypes[0].getStoredType()) {
           case INT:
             int[][] intValues = (int[][]) valueArrays[0];
             for (int i = 0; i < length; i++) {
@@ -632,13 +688,35 @@ public class DistinctCountThetaSketchAggregationFunction
               }
             }
             break;
+          case BYTES:
+            byte[][][] bytesValues = (byte[][][]) valueArrays[0];
+            for (int i = 0; i < length; i++) {
+              List<UpdatableThetaSketch> updateSketches =
+                  getUpdateSketches(groupByResultHolder, groupKeyArray[i]);
+              byte[][] values = bytesValues[i];
+              if (_includeDefaultSketch) {
+                UpdatableThetaSketch defaultSketch = updateSketches.get(0);
+                for (byte[] value : values) {
+                  defaultSketch.update(value);
+                }
+              }
+              for (int j = 0; j < numFilters; j++) {
+                if (_filterEvaluators.get(j).evaluate(singleValues, valueTypes, valueArrays, i)) {
+                  UpdatableThetaSketch updateSketch = updateSketches.get(j + 1);
+                  for (byte[] value : values) {
+                    updateSketch.update(value);
+                  }
+                }
+              }
+            }
+            break;
           default:
             throw new IllegalStateException(
                 "Illegal multi-value data type for DISTINCT_COUNT_THETA_SKETCH aggregation function: " + valueTypes[0]);
         }
       }
     } else {
-      // Serialized sketch
+      // Logical BYTES stores serialized ThetaSketch objects in the single-value representation.
       ThetaSketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       for (int i = 0; i < length; i++) {
         List<ThetaSketchAccumulator> thetaSketchAccumulators = getUnions(groupByResultHolder, groupKeyArray[i]);
@@ -668,7 +746,7 @@ public class DistinctCountThetaSketchAggregationFunction
     // Main expression is always index 0
     if (valueTypes[0] != DataType.BYTES) {
       if (singleValues[0]) {
-        switch (valueTypes[0]) {
+        switch (valueTypes[0].getStoredType()) {
           case INT:
             int[] intValues = (int[]) valueArrays[0];
             if (_includeDefaultSketch) {
@@ -769,13 +847,33 @@ public class DistinctCountThetaSketchAggregationFunction
               }
             }
             break;
+          case BYTES:
+            byte[][] bytesValues = (byte[][]) valueArrays[0];
+            if (_includeDefaultSketch) {
+              for (int i = 0; i < length; i++) {
+                for (int groupKey : groupKeysArray[i]) {
+                  getUpdateSketches(groupByResultHolder, groupKey).get(0).update(bytesValues[i]);
+                }
+              }
+            }
+            for (int i = 0; i < numFilters; i++) {
+              FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
+              for (int j = 0; j < length; j++) {
+                if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
+                  for (int groupKey : groupKeysArray[j]) {
+                    getUpdateSketches(groupByResultHolder, groupKey).get(i + 1).update(bytesValues[j]);
+                  }
+                }
+              }
+            }
+            break;
           default:
             throw new IllegalStateException(
                 "Illegal single-value data type for DISTINCT_COUNT_THETA_SKETCH aggregation function: "
                     + valueTypes[0]);
         }
       } else {
-        switch (valueTypes[0]) {
+        switch (valueTypes[0].getStoredType()) {
           case INT:
             int[][] intValues = (int[][]) valueArrays[0];
             if (_includeDefaultSketch) {
@@ -906,13 +1004,40 @@ public class DistinctCountThetaSketchAggregationFunction
               }
             }
             break;
+          case BYTES:
+            byte[][][] bytesValues = (byte[][][]) valueArrays[0];
+            if (_includeDefaultSketch) {
+              for (int i = 0; i < length; i++) {
+                for (int groupKey : groupKeysArray[i]) {
+                  UpdatableThetaSketch defaultSketch = getUpdateSketches(groupByResultHolder, groupKey).get(0);
+                  for (byte[] value : bytesValues[i]) {
+                    defaultSketch.update(value);
+                  }
+                }
+              }
+            }
+            for (int i = 0; i < numFilters; i++) {
+              FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
+              for (int j = 0; j < length; j++) {
+                if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
+                  for (int groupKey : groupKeysArray[j]) {
+                    UpdatableThetaSketch updateSketch =
+                        getUpdateSketches(groupByResultHolder, groupKey).get(i + 1);
+                    for (byte[] value : bytesValues[j]) {
+                      updateSketch.update(value);
+                    }
+                  }
+                }
+              }
+            }
+            break;
           default:
             throw new IllegalStateException(
                 "Illegal multi-value data type for DISTINCT_COUNT_THETA_SKETCH aggregation function: " + valueTypes[0]);
         }
       }
     } else {
-      // Serialized sketch
+      // Logical BYTES stores serialized ThetaSketch objects in the single-value representation.
       ThetaSketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       if (_includeDefaultSketch) {
         for (int i = 0; i < length; i++) {
@@ -1232,9 +1357,10 @@ public class DistinctCountThetaSketchAggregationFunction
     for (int i = 0; i < numExpressions; i++) {
       BlockValSet blockValSet = blockValSetMap.get(_inputExpressions.get(i));
       boolean singleValue = blockValSet.isSingleValue();
-      DataType storedType = blockValSet.getValueType().getStoredType();
+      DataType dataType = blockValSet.getValueType();
+      DataType storedType = dataType.getStoredType();
       singleValues[i] = singleValue;
-      valueTypes[i] = storedType;
+      valueTypes[i] = dataType;
       if (singleValue) {
         switch (storedType) {
           case INT:
@@ -1274,6 +1400,9 @@ public class DistinctCountThetaSketchAggregationFunction
             break;
           case STRING:
             valueArrays[i] = blockValSet.getStringValuesMV();
+            break;
+          case BYTES:
+            valueArrays[i] = blockValSet.getBytesValuesMV();
             break;
           default:
             throw new IllegalStateException();
@@ -1513,7 +1642,7 @@ public class DistinctCountThetaSketchAggregationFunction
         _predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(_predicate, null, valueType, null);
       }
       if (singleValue) {
-        switch (valueType) {
+        switch (valueType.getStoredType()) {
           case INT:
             return _predicateEvaluator.applySV(((int[]) valueArray)[index]);
           case LONG:
@@ -1530,7 +1659,7 @@ public class DistinctCountThetaSketchAggregationFunction
             throw new IllegalStateException();
         }
       } else {
-        switch (valueType) {
+        switch (valueType.getStoredType()) {
           case INT:
             int[] intValues = ((int[][]) valueArray)[index];
             return _predicateEvaluator.applyMV(intValues, intValues.length);
@@ -1546,6 +1675,9 @@ public class DistinctCountThetaSketchAggregationFunction
           case STRING:
             String[] stringValues = ((String[][]) valueArray)[index];
             return _predicateEvaluator.applyMV(stringValues, stringValues.length);
+          case BYTES:
+            byte[][] bytesValues = ((byte[][][]) valueArray)[index];
+            return _predicateEvaluator.applyMV(bytesValues, bytesValues.length);
           default:
             throw new IllegalStateException();
         }
