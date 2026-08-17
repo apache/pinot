@@ -181,7 +181,7 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   OPEN_STRUCT_LAST_SEGMENT_DOC_COUNT("documents", false,
       "Total docs in the most recently sealed segment for this OPEN_STRUCT column; denominator for "
           + "openStructLastSegmentKeyDocCount"),
-  /// When `perKeyDocCountEnabled` is false (default), emitted only for keys named in `denseKeys`. When
+  /// When `perKeyMetricsEnabled` is false (default), emitted only for keys named in `denseKeys`. When
   /// true, emitted for every key in the sealed segment — registry entries follow the ingested key space.
   /// See `OpenStructColumnSplitter#emitMetrics`.
   OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT("documents", false,

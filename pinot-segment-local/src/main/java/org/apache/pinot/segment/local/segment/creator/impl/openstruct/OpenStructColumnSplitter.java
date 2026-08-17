@@ -321,7 +321,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
         ServerGauge.OPEN_STRUCT_LAST_SEGMENT_DOC_COUNT, _numDocs);
 
-    if (_config.isPerKeyDocCountEnabled()) {
+    if (_config.isPerKeyMetricsEnabled()) {
       // Emit for every key in the segment. Registry entries follow the ingested key space;
       // table deletion can only sweep keys recoverable from denseKeys.
       _presenceBitmaps.forEach((key, presence) -> serverMetrics.setOrUpdateTableGauge(_tableNameWithType,

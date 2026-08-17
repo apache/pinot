@@ -238,7 +238,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
   }
 
   /// The `<column>$<key>` metric keys of the per-key OPEN_STRUCT gauges recoverable from the given
-  /// table's config — one per configured `denseKeys` entry. Complete when `perKeyDocCountEnabled` is
+  /// table's config — one per configured `denseKeys` entry. Complete when `perKeyMetricsEnabled` is
   /// off; a subset when on, since discovered keys exist only in ingested data and cannot be named at
   /// deletion time. Gauges for discovered keys survive until the server restarts.
   @VisibleForTesting

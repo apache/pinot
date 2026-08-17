@@ -62,7 +62,7 @@ public class OpenStructIndexConfig extends IndexConfig {
   private final double _denseKeyMinFillRate;
   private final List<FieldConfig> _valueFieldConfigs;
   private final boolean _sparseJsonIndex;
-  private final boolean _perKeyDocCountEnabled;
+  private final boolean _perKeyMetricsEnabled;
   // Eager lookup from key name → FieldConfig for O(1) per-key access. Built in constructor
   // so the config is fully immutable and safe to share across threads.
   private final Map<String, FieldConfig> _valueFieldConfigIndex;
@@ -80,8 +80,8 @@ public class OpenStructIndexConfig extends IndexConfig {
     this(disabled, defaultValueFieldConfig, maxDenseKeys, denseKeys, denseKeyMinFillRate, valueFieldConfigs, null);
   }
 
-  /// @deprecated Use the 8-arg constructor accepting `perKeyDocCountEnabled`. Kept for binary
-  /// compatibility with existing callers built against the pre-`perKeyDocCountEnabled` signature.
+  /// @deprecated Use the 8-arg constructor accepting `perKeyMetricsEnabled`. Kept for binary
+  /// compatibility with existing callers built against the pre-`perKeyMetricsEnabled` signature.
   @Deprecated
   public OpenStructIndexConfig(Boolean disabled, @Nullable FieldConfig defaultValueFieldConfig,
       @Nullable Integer maxDenseKeys, @Nullable Set<String> denseKeys, @Nullable Double denseKeyMinFillRate,
@@ -99,7 +99,7 @@ public class OpenStructIndexConfig extends IndexConfig {
       @JsonProperty("denseKeyMinFillRate") @Nullable Double denseKeyMinFillRate,
       @JsonProperty("valueFieldConfigs") @Nullable List<FieldConfig> valueFieldConfigs,
       @JsonProperty("sparseJsonIndex") @Nullable Boolean sparseJsonIndex,
-      @JsonProperty("perKeyDocCountEnabled") @Nullable Boolean perKeyDocCountEnabled) {
+      @JsonProperty("perKeyMetricsEnabled") @Nullable Boolean perKeyMetricsEnabled) {
     super(disabled);
     _defaultValueFieldConfig = defaultValueFieldConfig;
     _maxDenseKeys = maxDenseKeys != null ? maxDenseKeys : DEFAULT_MAX_DENSE_KEYS;
@@ -107,7 +107,7 @@ public class OpenStructIndexConfig extends IndexConfig {
     _denseKeyMinFillRate = denseKeyMinFillRate != null ? denseKeyMinFillRate : DEFAULT_DENSE_KEY_MIN_FILL_RATE;
     _valueFieldConfigs = valueFieldConfigs;
     _sparseJsonIndex = sparseJsonIndex != null && sparseJsonIndex;
-    _perKeyDocCountEnabled = perKeyDocCountEnabled != null && perKeyDocCountEnabled;
+    _perKeyMetricsEnabled = perKeyMetricsEnabled != null && perKeyMetricsEnabled;
     if (valueFieldConfigs == null || valueFieldConfigs.isEmpty()) {
       _valueFieldConfigIndex = Map.of();
     } else {
@@ -199,8 +199,8 @@ public class OpenStructIndexConfig extends IndexConfig {
   /// metrics-registry entries follows the ingested key space, and table deletion can only sweep keys
   /// recoverable from `denseKeys`. When `false` (default), the gauge fires only for keys named in
   /// `denseKeys`.
-  public boolean isPerKeyDocCountEnabled() {
-    return _perKeyDocCountEnabled;
+  public boolean isPerKeyMetricsEnabled() {
+    return _perKeyMetricsEnabled;
   }
 
   private static boolean invertedFromIndexes(FieldConfig fieldConfig, String key) {

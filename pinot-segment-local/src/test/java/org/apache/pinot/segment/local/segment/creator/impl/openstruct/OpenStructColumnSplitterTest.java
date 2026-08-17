@@ -89,9 +89,9 @@ public class OpenStructColumnSplitterTest {
   }
 
   private OpenStructIndexConfig config(double minFillRate, int maxDenseKeys, Set<String> denseKeys,
-      boolean perKeyDocCountEnabled) {
+      boolean perKeyMetricsEnabled) {
     return new OpenStructIndexConfig(false, null, maxDenseKeys, denseKeys, minFillRate, null, null,
-        perKeyDocCountEnabled);
+        perKeyMetricsEnabled);
   }
 
   @Test

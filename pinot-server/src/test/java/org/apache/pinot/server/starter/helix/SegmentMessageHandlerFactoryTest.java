@@ -99,7 +99,7 @@ public class SegmentMessageHandlerFactoryTest {
   @Test
   public void testNoKeysWithoutConfiguredDenseKeys()
       throws Exception {
-    // No configured denseKeys → nothing recoverable for removal. When perKeyDocCountEnabled is on,
+    // No configured denseKeys → nothing recoverable for removal. When perKeyMetricsEnabled is on,
     // discovered-key gauges are emitted but not reachable here; they survive until server restart.
     TableConfig tableConfig = tableConfig(List.of(openStructField("metrics", "[]")));
 
