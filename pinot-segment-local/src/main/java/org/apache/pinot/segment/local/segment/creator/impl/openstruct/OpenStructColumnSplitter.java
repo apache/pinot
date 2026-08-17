@@ -220,9 +220,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
             DataType inferred = OpenStructTypeInference.inferDataType(rawValue);
             if (inferred == null) {
               valueType = DataType.STRING;
-              if (established == null || established == DataType.STRING) {
-                _inferenceFailuresPerKey.merge(key, 1L, Long::sum);
-              }
+              _inferenceFailuresPerKey.merge(key, 1L, Long::sum);
             } else {
               // established is STRING here (or null): once a key falls back to STRING it stays
               // STRING even if a later value would infer cleanly on its own.
