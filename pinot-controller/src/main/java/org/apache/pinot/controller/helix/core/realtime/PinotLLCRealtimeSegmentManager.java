@@ -263,25 +263,10 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       List<StreamConfig> streamConfigs) {
     List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList = new ArrayList<>();
 
-    // From all segment names in the ideal state, find unique partition group ids and their latest segment
-    Map<Integer, LLCSegmentName> partitionGroupIdToLatestSegment = new HashMap<>();
-    for (String segment : idealState.getRecord().getMapFields().keySet()) {
-      // With Pinot upsert table allowing uploads of segments, the segment name of an upsert table segment may not
-      // conform to LLCSegment format. We can skip such segments because they are NOT the consuming segments.
-      LLCSegmentName llcSegmentName = LLCSegmentName.of(segment);
-      if (llcSegmentName == null) {
-        continue;
-      }
-      int partitionGroupId = llcSegmentName.getPartitionGroupId();
-      partitionGroupIdToLatestSegment.compute(partitionGroupId, (k, latestSegment) -> {
-        if (latestSegment == null) {
-          return llcSegmentName;
-        } else {
-          return latestSegment.getSequenceNumber() > llcSegmentName.getSequenceNumber() ? latestSegment
-              : llcSegmentName;
-        }
-      });
-    }
+    // From all segment names in the ideal state, find unique partition group ids and their latest segment.
+    // Non-LLC segments (e.g. uploaded upsert segments) are skipped because they are NOT consuming segments.
+    Map<Integer, LLCSegmentName> partitionGroupIdToLatestSegment =
+        getLatestLLCSegmentPerPartition(idealState.getRecord().getMapFields().keySet());
 
     // Create a {@link PartitionGroupConsumptionStatus} for each latest segment
     String tableNameWithType = streamConfigs.get(0).getTableNameWithType();
@@ -1386,32 +1371,31 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   ///
   /// @param realtimeTableName Realtime table name
   /// @return Map from partition group id to the latest LLC realtime segment ZK metadata
-  private Map<Integer, SegmentZKMetadata> getLatestSegmentZKMetadataMap(String realtimeTableName) {
-    List<String> segments = getLLCSegments(realtimeTableName);
-
-    Map<Integer, LLCSegmentName> latestLLCSegmentNameMap = new HashMap<>();
-    for (String segmentName : segments) {
-      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-      latestLLCSegmentNameMap.compute(llcSegmentName.getPartitionGroupId(), (partitionId, latestLLCSegmentName) -> {
-        if (latestLLCSegmentName == null) {
-          return llcSegmentName;
-        } else {
-          if (llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber()) {
-            return llcSegmentName;
-          } else {
-            return latestLLCSegmentName;
-          }
-        }
-      });
+  /// Returns the latest (highest sequence number) LLC segment per partition group, parsed from the given segment
+  /// names. Non-LLC segment names (e.g. uploaded upsert segments) are ignored.
+  private static Map<Integer, LLCSegmentName> getLatestLLCSegmentPerPartition(Collection<String> segmentNames) {
+    Map<Integer, LLCSegmentName> partitionGroupIdToLatestSegment = new HashMap<>();
+    for (String segmentName : segmentNames) {
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+      if (llcSegmentName == null) {
+        continue;
+      }
+      partitionGroupIdToLatestSegment.merge(llcSegmentName.getPartitionGroupId(), llcSegmentName,
+          (existing, candidate) -> candidate.getSequenceNumber() > existing.getSequenceNumber() ? candidate
+              : existing);
     }
+    return partitionGroupIdToLatestSegment;
+  }
 
+  private Map<Integer, SegmentZKMetadata> getLatestSegmentZKMetadataMap(String realtimeTableName) {
+    Map<Integer, LLCSegmentName> latestLLCSegmentNameMap =
+        getLatestLLCSegmentPerPartition(getLLCSegments(realtimeTableName));
     Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap = new HashMap<>();
     for (Map.Entry<Integer, LLCSegmentName> entry : latestLLCSegmentNameMap.entrySet()) {
       SegmentZKMetadata latestSegmentZKMetadata =
           getSegmentZKMetadata(realtimeTableName, entry.getValue().getSegmentName());
       latestSegmentZKMetadataMap.put(entry.getKey(), latestSegmentZKMetadata);
     }
-
     return latestSegmentZKMetadataMap;
   }
 
@@ -1517,10 +1501,11 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
           getNewStreamMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, snapshotIdealState);
       Map<Integer, StreamPartitionMsgOffset> partitionIdToSmallestOffset = null;
       if (offsetCriteria == null || !offsetCriteria.equals(OffsetCriteria.SMALLEST_OFFSET_CRITERIA)) {
-        Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap = getLatestSegmentZKMetadataMap(realtimeTableName);
-        if (offsetsHaveToChange || anyPartitionNeedsSmallestOffset(snapshotIdealState, latestSegmentZKMetadataMap)) {
-          partitionIdToSmallestOffset =
-              fetchPartitionGroupIdToSmallestOffset(streamConfigs, snapshotIdealState, latestSegmentZKMetadataMap);
+        // Decide whether the smallest-offset stream fetch is needed from the snapshot ideal state alone (no ZK
+        // metadata reads); only build the latest-segment ZK metadata map when the fetch is actually required.
+        if (offsetsHaveToChange || anyPartitionNeedsSmallestOffset(snapshotIdealState)) {
+          partitionIdToSmallestOffset = fetchPartitionGroupIdToSmallestOffset(streamConfigs, snapshotIdealState,
+              getLatestSegmentZKMetadataMap(realtimeTableName));
         }
       }
       return new PreFetchedOffsets(streamMetadataList, partitionIdToSmallestOffset);
@@ -1529,14 +1514,16 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     }
   }
 
-  /// Returns true if at least one partition's latest segment is present in the ideal state but has no replica in the
-  /// CONSUMING state, i.e. it may need a new CONSUMING segment created (the only repair path that consults the
-  /// smallest stream offset). Mirrors the trigger in [#ensureAllPartitionsConsuming].
-  private boolean anyPartitionNeedsSmallestOffset(IdealState idealState,
-      Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap) {
+  /// Returns true if at least one partition's latest LLC segment in the ideal state has no replica in the CONSUMING
+  /// state, i.e. it may need a new CONSUMING segment created (the only repair path that consults the smallest stream
+  /// offset). Derived from the snapshot ideal state alone (no ZK metadata reads), picking the latest segment per
+  /// partition the same way [#getPartitionGroupConsumptionStatusList] does.
+  private boolean anyPartitionNeedsSmallestOffset(IdealState idealState) {
     Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
-    for (SegmentZKMetadata latestSegmentZKMetadata : latestSegmentZKMetadataMap.values()) {
-      Map<String, String> instanceStateMap = instanceStatesMap.get(latestSegmentZKMetadata.getSegmentName());
+    Map<Integer, LLCSegmentName> partitionGroupIdToLatestSegment =
+        getLatestLLCSegmentPerPartition(instanceStatesMap.keySet());
+    for (LLCSegmentName latestSegment : partitionGroupIdToLatestSegment.values()) {
+      Map<String, String> instanceStateMap = instanceStatesMap.get(latestSegment.getSegmentName());
       if (instanceStateMap != null && !instanceStateMap.containsValue(SegmentStateModel.CONSUMING)) {
         return true;
       }
