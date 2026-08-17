@@ -40,6 +40,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import javax.annotation.Nullable;
@@ -66,6 +67,7 @@ import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -1184,6 +1186,51 @@ public class PinotLLCRealtimeSegmentManagerTest {
       // Expected
     }
     assertEquals(segmentManager._streamConfigs.get(0).getOffsetCriteria(), originalOffsetCriteria);
+  }
+
+  /// Phase-2 core regression, exercised through the public ensureAllPartitionsConsuming path (not the package-private
+  /// helper): the stream offset fetches must happen BEFORE HelixHelper.updateIdealState (outside the updater), and a
+  /// CAS retry that re-applies the updater must NOT repeat them. A controlled static HelixHelper supplies the
+  /// snapshot ideal state and drives the updater twice (simulating a ZK version conflict).
+  @Test
+  public void testEnsureAllPartitionsConsumingFetchesOffsetsOnceOutsideIdealStateUpdate() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    setUpNewTable(segmentManager, 2, 5, 4);
+    // Make partition 0 need a new CONSUMING segment so the smallest-offset fetch is also triggered.
+    turnNewConsumingSegmentOffline(segmentManager._idealState.getRecord().getMapFields(),
+        new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName());
+    segmentManager._exceededMaxSegmentCompletionTime = true;
+
+    // Fetch counts sampled inside the (mocked) updateIdealState: when the updater is first entered, and again after
+    // it has been applied twice.
+    int[] fetchCountWhenUpdaterEntered = {-1};
+    int[] fetchCountAfterUpdaterRetries = {-1};
+
+    try (MockedStatic<HelixHelper> helixHelperMock = mockStatic(HelixHelper.class)) {
+      helixHelperMock.when(() -> HelixHelper.getTableIdealState(any(), eq(REALTIME_TABLE_NAME)))
+          .thenReturn(segmentManager._idealState);
+      helixHelperMock.when(
+              () -> HelixHelper.updateIdealState(any(), eq(REALTIME_TABLE_NAME), any(), any(), anyBoolean()))
+          .thenAnswer(invocation -> {
+            // Everything fetched so far happened before the updater ran, i.e. outside the ideal-state lock.
+            fetchCountWhenUpdaterEntered[0] = segmentManager._getNewStreamMetadataListCallCount;
+            Function<IdealState, IdealState> updater = invocation.getArgument(2);
+            // Simulate a ZK CAS conflict by applying the updater more than once.
+            IdealState result = updater.apply(segmentManager._idealState);
+            updater.apply(segmentManager._idealState);
+            fetchCountAfterUpdaterRetries[0] = segmentManager._getNewStreamMetadataListCallCount;
+            return result;
+          });
+
+      segmentManager.ensureAllPartitionsConsuming(segmentManager._tableConfig, segmentManager._streamConfigs, null);
+    }
+
+    // Stream offsets were fetched before HelixHelper.updateIdealState was invoked (outside the updater).
+    assertTrue(fetchCountWhenUpdaterEntered[0] > 0,
+        "Expected stream offsets to be fetched before updateIdealState");
+    // Re-applying the updater (CAS retry) did not trigger any additional stream fetch.
+    assertEquals(fetchCountAfterUpdaterRetries[0], fetchCountWhenUpdaterEntered[0],
+        "Updater retries must not repeat the stream offset fetch");
   }
 
   /// Removes the new CONSUMING segment and sets the latest committed (ONLINE) segment to CONSUMING if exists in the
@@ -2546,6 +2593,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     int _numPartitions;
     List<StreamMetadata> _streamMetadataList = null;
     boolean _exceededMaxSegmentCompletionTime = false;
+    // Counts every stream-metadata (offset) fetch; both getNewStreamMetadataList overloads funnel through the 3-arg
+    // one below, so this captures the streamMetadataList fetch and the fetchPartitionGroupIdToSmallestOffset fetch.
+    int _getNewStreamMetadataListCallCount = 0;
     FileUploadDownloadClient _mockedFileUploadDownloadClient;
     PinotHelixResourceManager _mockResourceManager;
 
@@ -2716,6 +2766,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     @Override
     List<StreamMetadata> getNewStreamMetadataList(List<StreamConfig> streamConfigs,
         List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, IdealState idealState) {
+      _getNewStreamMetadataListCallCount++;
       if (_streamMetadataList != null) {
         return _streamMetadataList;
       } else {
