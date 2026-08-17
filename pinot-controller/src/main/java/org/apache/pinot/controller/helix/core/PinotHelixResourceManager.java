@@ -2582,8 +2582,6 @@ public class PinotHelixResourceManager {
           tableNameWithType, ZKMetadataProvider.getPropertyStoreTableDeletionInProgressPrefix(), tableNameWithType),
           Response.Status.CONFLICT);
     }
-    boolean deletionMarkerCreated = true;
-
     try {
       // Remove the table from brokerResource
       HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, tableNameWithType);
@@ -2668,29 +2666,34 @@ public class PinotHelixResourceManager {
       LOGGER.info("Deleting table {}: Removed table config", tableNameWithType);
 
       // Audit the property store for metadata that should now be gone, and warn about anything left behind
-      auditTableDeletionCompleteness(tableNameWithType, tableType);
+      List<String> leftoverMetadata = findLeftoverTableMetadata(tableNameWithType, tableType);
+      if (leftoverMetadata.isEmpty()) {
+        LOGGER.info("Deleting table {}: Verified all audited metadata was removed", tableNameWithType);
+      } else {
+        LOGGER.warn("Deleting table {}: Finished but left {} metadata artifact(s) behind: {}. "
+                + "These need to be cleaned up manually before the table is re-created.", tableNameWithType,
+            leftoverMetadata.size(), leftoverMetadata);
+      }
 
       LOGGER.info("Deleting table {}: Finish", tableNameWithType);
     } finally {
-      // Always remove the deletion marker, even if deletion failed
-      // This allows retry of deletion or recreation of the table
-      if (deletionMarkerCreated) {
-        ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, tableNameWithType, _controllerId);
-      }
+      // Always release the marker, even if the deletion failed, so the deletion can be retried or the table
+      // re-created. Releasing is a no-op if another controller has since taken the marker over.
+      ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, tableNameWithType, _controllerId);
     }
   }
 
-  /// Audits the property store for table metadata that [#deleteTable] should have removed, and logs a warning
-  /// listing anything left behind so that an operator can clean it up.
+  /// Returns the table metadata that [#deleteTable] should have removed but which is still present, so the
+  /// caller can warn an operator about it. An empty list means the audited metadata is all gone.
   ///
   /// This deliberately only covers artifacts that `deleteTable` removes with a synchronous ZK write, so a
   /// leftover here is a real leak rather than a timing artifact. In particular the ExternalView is NOT checked:
   /// Helix removes it asynchronously via the controller pipeline after the IdealState is dropped, so it is
   /// routinely still present at this point.
   ///
-  /// This only warns and never throws. By the time it runs the table config is already gone, so the delete has
-  /// succeeded from the caller's point of view; failing the request here would report a misleading error for a
-  /// table that no longer exists, and would not make the leftovers go away.
+  /// The caller only warns and never throws. By the time this runs the table config is already gone, so the
+  /// delete has succeeded from the caller's point of view; failing the request would report a misleading error
+  /// for a table that no longer exists, and would not make the leftovers go away.
   ///
   /// ponytail: tier instance partitions, minion task metadata and materialized view metadata are not audited.
   /// Tier partitions are named per tier and minion metadata is keyed per task type, so covering them means
@@ -2699,7 +2702,9 @@ public class PinotHelixResourceManager {
   ///
   /// @param tableNameWithType The table name with type suffix
   /// @param tableType The table type
-  private void auditTableDeletionCompleteness(String tableNameWithType, TableType tableType) {
+  /// @return the names of the metadata artifacts still present, empty when nothing was left behind
+  @VisibleForTesting
+  List<String> findLeftoverTableMetadata(String tableNameWithType, TableType tableType) {
     List<String> remainingArtifacts = new ArrayList<>();
 
     if (_helixDataAccessor.getProperty(_keyBuilder.idealStates(tableNameWithType)) != null) {
@@ -2732,13 +2737,7 @@ public class PinotHelixResourceManager {
       }
     }
 
-    if (remainingArtifacts.isEmpty()) {
-      LOGGER.info("Deleting table {}: Verified all audited metadata was removed", tableNameWithType);
-    } else {
-      LOGGER.warn("Deleting table {}: Finished but left {} metadata artifact(s) behind: {}. "
-              + "These need to be cleaned up manually before the table is re-created.", tableNameWithType,
-          remainingArtifacts.size(), remainingArtifacts);
-    }
+    return remainingArtifacts;
   }
 
   /// Deletes the logical table.
