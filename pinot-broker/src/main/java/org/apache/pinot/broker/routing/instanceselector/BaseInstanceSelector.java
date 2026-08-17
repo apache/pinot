@@ -40,7 +40,6 @@ import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSele
 import org.apache.pinot.broker.routing.adaptiveserverselector.PriorityPoolInstanceSelector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -83,12 +82,13 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID
 /// TODO: refresh new/old segment state where there is no update from helix for long time.
 ///
 /// Alongside the selection state, this class maintains a [TableReplicaHealth] describing how well the
-/// table's segments are replicated across the instances it can route to, and emits it as the
-/// [BrokerGauge#PERCENT_OF_REPLICAS], [BrokerGauge#UNAVAILABLE_SEGMENTS],
-/// [BrokerGauge#SEGMENTS_WITHOUT_REDUNDANCY] and related gauges. Because it is derived from what routing
-/// can actually use, it accounts for both external view divergence and disabled instances, and for the
-/// replica groups that [ReplicaGroupInstanceSelector] takes out of service wholesale. Those gauges are
-/// removed by [#removeMetrics()] when the table's routing is torn down.
+/// table's segments are replicated across the instances it can route to, exposed through
+/// [#getReplicaHealth()]. Because it is derived from what routing can actually use, it accounts for both
+/// external view divergence and disabled instances, and for the replica groups that
+/// [ReplicaGroupInstanceSelector] takes out of service wholesale. Measuring it here and reporting it in
+/// [org.apache.pinot.broker.routing.manager.BaseBrokerRoutingManager] is deliberate: a selector cannot
+/// tell whether it covers the whole table or a sampled subset of it, and only the routing manager knows
+/// which one owns the table's gauges.
 public abstract class BaseInstanceSelector implements InstanceSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseInstanceSelector.class);
   // To prevent int overflow, reset the request id once it reaches this value
@@ -105,11 +105,7 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   protected InstanceSelectorConfig _config;
   protected long _newSegmentExpirationTimeInSeconds;
   protected boolean _emitSinglePoolSegmentsMetric;
-  protected boolean _emitReplicaHealthMetrics;
   protected int _tableNameHashForFixedReplicaRouting;
-  /// Whether the table is disabled, from the ideal state. A disabled table has all of its replicas taken
-  /// offline deliberately, so its replica health is not reported at all.
-  protected boolean _tableDisabled;
 
   // These 3 variables are the cached states to help accelerate the change processing
   protected Set<String> _enabledInstances;
@@ -126,7 +122,9 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
 
   // _segmentStates is needed for instance selection (multi-threaded), so it is made volatile.
   protected volatile SegmentStates _segmentStates;
-  // Read by the metrics registry while the change handling thread replaces it, so it is made volatile.
+  // Published together with _segmentStates and read back by the routing manager to report the table's
+  // gauges. Volatile so that a reader on another thread cannot see it lagging the segment states it was
+  // computed alongside.
   protected volatile TableReplicaHealth _replicaHealth;
   protected Map<String, ServerInstance> _enabledServerStore;
 
@@ -144,7 +142,6 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     _config = config;
     _newSegmentExpirationTimeInSeconds = config.getNewSegmentExpirationTimeInSeconds();
     _emitSinglePoolSegmentsMetric = config.shouldEmitSinglePoolSegmentsMetrics();
-    _emitReplicaHealthMetrics = config.shouldEmitReplicaHealthMetrics();
     // Using raw table name to ensure queries spanning across REALTIME and OFFLINE tables are routed to the same
     // instance
     // Math.abs(Integer.MIN_VALUE) = Integer.MIN_VALUE, so we use & 0x7FFFFFFF to get a positive value
@@ -159,34 +156,16 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     }
     _enabledInstances = enabledInstances;
     _enabledServerStore = enabledServerMap;
-    _tableDisabled = !idealState.isEnabled();
     Map<String, Long> newSegmentCreationTimeMap =
         getNewSegmentCreationTimeMapFromZK(idealState, externalView, onlineSegments);
     updateSegmentMaps(idealState, externalView, onlineSegments, newSegmentCreationTimeMap);
     refreshSegmentStates();
   }
 
-  @Override
-  public void removeMetrics() {
-    // Load bearing, not just a short circuit: a selector that never reported these gauges shares the table
-    // name with the one that did, so removing them here would take out the reporting selector's gauges
-    if (!_emitReplicaHealthMetrics) {
-      return;
-    }
-    removeReplicaHealthMetrics(_brokerMetrics, _tableNameWithType);
-  }
-
-  /// Removes the replica health gauges of the given table.
-  public static void removeReplicaHealthMetrics(BrokerMetrics brokerMetrics, String tableNameWithType) {
-    brokerMetrics.removeTableGauge(tableNameWithType, BrokerGauge.PERCENT_OF_REPLICAS);
-    brokerMetrics.removeTableGauge(tableNameWithType, BrokerGauge.UNAVAILABLE_SEGMENTS);
-    brokerMetrics.removeTableGauge(tableNameWithType, BrokerGauge.SEGMENTS_WITHOUT_REDUNDANCY);
-  }
-
   /// Returns how well the table's segments are currently replicated across the instances this selector
-  /// can route to.
-  @VisibleForTesting
-  TableReplicaHealth getReplicaHealth() {
+  /// can route to. Never null once [#init] has run.
+  @Override
+  public TableReplicaHealth getReplicaHealth() {
     return _replicaHealth;
   }
 
@@ -202,9 +181,6 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   protected void putOldSegment(String segment, List<SegmentInstanceCandidate> candidates,
       Map<String, String> idealStateInstanceStateMap) {
     _oldSegmentCandidatesMap.put(segment, candidates);
-    if (!_emitReplicaHealthMetrics) {
-      return;
-    }
     // Stored only when it differs from the candidate count, see _oldSegmentExpectedReplicasMap
     int numIdealStateReplicas = getNumInstancesOnlineForRouting(idealStateInstanceStateMap);
     if (numIdealStateReplicas > candidates.size()) {
@@ -415,15 +391,13 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
       List<SegmentInstanceCandidate> candidates = entry.getValue();
       List<SegmentInstanceCandidate> enabledCandidates =
           getEnabledCandidatesAndAddToServingInstances(candidates, servingInstances);
-      if (_emitReplicaHealthMetrics) {
-        int expectedReplicas = getExpectedReplicas(segment, candidates.size());
-        int servingReplicas = enabledCandidates.size();
-        if (TableReplicaHealth.shouldMeasure(expectedReplicas)) {
-          minPercentOfReplicas = Math.min(minPercentOfReplicas,
-              TableReplicaHealth.toPercent(servingReplicas, expectedReplicas));
-          if (TableReplicaHealth.isWithoutRedundancy(servingReplicas)) {
-            numSegmentsWithoutRedundancy++;
-          }
+      int expectedReplicas = getExpectedReplicas(segment, candidates.size());
+      int servingReplicas = enabledCandidates.size();
+      if (TableReplicaHealth.shouldMeasure(expectedReplicas)) {
+        minPercentOfReplicas =
+            Math.min(minPercentOfReplicas, TableReplicaHealth.toPercent(servingReplicas, expectedReplicas));
+        if (TableReplicaHealth.isWithoutRedundancy(servingReplicas)) {
+          numSegmentsWithoutRedundancy++;
         }
       }
       if (!enabledCandidates.isEmpty()) {
@@ -464,27 +438,6 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     _segmentStates = new SegmentStates(instanceCandidatesMap, servingInstances, unavailableSegments);
     _replicaHealth =
         new TableReplicaHealth(minPercentOfReplicas, numSegmentsWithoutRedundancy, unavailableSegments.size());
-    emitReplicaHealthMetrics(_replicaHealth);
-  }
-
-  private void emitReplicaHealthMetrics(TableReplicaHealth replicaHealth) {
-    if (!_emitReplicaHealthMetrics) {
-      return;
-    }
-    if (_tableDisabled) {
-      // A disabled table has every replica driven OFFLINE on purpose, so reporting it as unavailable would
-      // be a false alarm. Drop the gauges instead, so the series disappears rather than reading as an
-      // outage, and reappears when the table is enabled again.
-      removeReplicaHealthMetrics(_brokerMetrics, _tableNameWithType);
-      return;
-    }
-    // All four are plain values: nothing here depends on the clock, so a snapshot is the whole truth
-    _brokerMetrics.setValueOfTableGauge(_tableNameWithType, BrokerGauge.PERCENT_OF_REPLICAS,
-        replicaHealth.getMinPercentOfReplicas());
-    _brokerMetrics.setValueOfTableGauge(_tableNameWithType, BrokerGauge.SEGMENTS_WITHOUT_REDUNDANCY,
-        replicaHealth.getNumSegmentsWithoutRedundancy());
-    _brokerMetrics.setValueOfTableGauge(_tableNameWithType, BrokerGauge.UNAVAILABLE_SEGMENTS,
-        replicaHealth.getNumUnavailableSegments());
   }
 
   private List<SegmentInstanceCandidate> getEnabledCandidatesAndAddToServingInstances(
@@ -515,7 +468,6 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
   /// [#_segmentStates] based on the cached states.
   @Override
   public void onAssignmentChange(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
-    _tableDisabled = !idealState.isEnabled();
     Map<String, Long> newSegmentCreationTimeMap =
         getNewSegmentCreationTimeMapFromExistingStates(idealState, externalView, onlineSegments);
     updateSegmentMaps(idealState, externalView, onlineSegments, newSegmentCreationTimeMap);

@@ -72,7 +72,6 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -2339,8 +2338,6 @@ public class InstanceSelectorTest {
     assertEquals(replicaHealth.getMinPercentOfReplicas(), 100);
     // The cached counts have to be dropped on rebuild, or the segment stays degraded forever
     assertEquals(selector._oldSegmentExpectedReplicasMap, Map.of());
-    // Re-emitted, not only reported once from init
-    verify(_brokerMetrics, atLeastOnce()).setValueOfTableGauge(TABLE_NAME, BrokerGauge.PERCENT_OF_REPLICAS, 100);
   }
 
   @Test
@@ -2362,27 +2359,9 @@ public class InstanceSelectorTest {
   }
 
   @Test
-  public void testReplicaHealthGaugesEmittedAndRemoved() {
-    createOldSegments(List.of("segment0"));
-    BaseInstanceSelector selector = createReplicaHealthSelector(BALANCED_INSTANCE_SELECTOR, REPLICA_INSTANCES,
-        Map.of("segment0", allOnline()), Map.of("segment0", partiallyOnline(2)));
-
-    // Nothing depends on the clock, so every gauge is a plain value
-    verify(_brokerMetrics).setValueOfTableGauge(TABLE_NAME, BrokerGauge.PERCENT_OF_REPLICAS, 66);
-    verify(_brokerMetrics).setValueOfTableGauge(TABLE_NAME, BrokerGauge.SEGMENTS_WITHOUT_REDUNDANCY, 0);
-    verify(_brokerMetrics).setValueOfTableGauge(TABLE_NAME, BrokerGauge.UNAVAILABLE_SEGMENTS, 0);
-
-    selector.removeMetrics();
-    for (BrokerGauge gauge : List.of(BrokerGauge.PERCENT_OF_REPLICAS, BrokerGauge.UNAVAILABLE_SEGMENTS,
-        BrokerGauge.SEGMENTS_WITHOUT_REDUNDANCY)) {
-      verify(_brokerMetrics).removeTableGauge(TABLE_NAME, gauge);
-    }
-  }
-
-  @Test
-  public void testReplicaHealthNotReportedForDisabledTable() {
-    // Disabling a table drives every replica offline on purpose, so its segments look unavailable. Reporting
-    // that would fire the alert for a table nobody expects to be queryable.
+  public void testReplicaHealthMeasuredForDisabledTable() {
+    // The selector measures a disabled table like any other - it cannot tell the difference, and it is the
+    // routing manager that decides a disabled table's gauges should be dropped rather than reported.
     createOldSegments(List.of("segment0"));
     IdealState disabledIdealState = createIdealState(Map.of("segment0", allOnline()));
     disabledIdealState.enable(false);
@@ -2391,55 +2370,9 @@ public class InstanceSelectorTest {
         REPLICA_INSTANCES, EMPTY_SERVER_MAP, disabledIdealState,
         createExternalView(Map.of("segment0", partiallyOnline(0))), Set.of("segment0"));
 
-    verify(_brokerMetrics, never()).setValueOfTableGauge(eq(TABLE_NAME), eq(BrokerGauge.PERCENT_OF_REPLICAS),
-        anyLong());
-    // Dropped rather than left at a stale value, so the series disappears instead of reading as an outage
-    verify(_brokerMetrics).removeTableGauge(TABLE_NAME, BrokerGauge.PERCENT_OF_REPLICAS);
-  }
-
-  @Test
-  public void testReplicaHealthReportedAgainWhenTableIsEnabled() {
-    createOldSegments(List.of("segment0"));
-    Map<String, List<Pair<String, String>>> idealStateAssignment = Map.of("segment0", allOnline());
-    IdealState disabledIdealState = createIdealState(idealStateAssignment);
-    disabledIdealState.enable(false);
-    BalancedInstanceSelector selector = new BalancedInstanceSelector();
-    selector.init(_tableConfig, _propertyStore, _brokerMetrics, null, _mutableClock, INSTANCE_SELECTOR_CONFIG,
-        REPLICA_INSTANCES, EMPTY_SERVER_MAP, disabledIdealState,
-        createExternalView(Map.of("segment0", partiallyOnline(0))), Set.of("segment0"));
-
-    // Enabling the table has to bring the gauges back, including the ones only set while reporting
-    selector.onAssignmentChange(createIdealState(idealStateAssignment),
-        createExternalView(Map.of("segment0", allOnline())), Set.of("segment0"));
-
-    verify(_brokerMetrics, atLeastOnce()).setValueOfTableGauge(TABLE_NAME, BrokerGauge.PERCENT_OF_REPLICAS, 100);
-    verify(_brokerMetrics, atLeastOnce())
-        .setValueOfTableGauge(TABLE_NAME, BrokerGauge.SEGMENTS_WITHOUT_REDUNDANCY, 0);
-  }
-
-  @Test
-  public void testReplicaHealthNotComputedOrEmittedForPartialSegmentView() {
-    // A selector built for a table sampler only sees a subset of the segments. It shares the table name
-    // with the selector covering the whole table, so reporting would overwrite the table's values with
-    // numbers measured over that subset.
-    createOldSegments(List.of("segment0"));
-    BalancedInstanceSelector selector = new BalancedInstanceSelector();
-    selector.init(_tableConfig, _propertyStore, _brokerMetrics, null, _mutableClock,
-        new InstanceSelectorConfig(false, NEW_SEGMENT_EXPIRATION_SECONDS, false, false), REPLICA_INSTANCES,
-        EMPTY_SERVER_MAP, createIdealState(Map.of("segment0", allOnline())),
-        createExternalView(Map.of("segment0", partiallyOnline(1))), Set.of("segment0"));
-
-    // Not measured at all, so the work is skipped rather than just the reporting
-    assertEquals(selector.getReplicaHealth().getMinPercentOfReplicas(), 100);
-    assertEquals(selector._oldSegmentExpectedReplicasMap, Map.of());
-    // Every gauge, through the setter the production path actually uses
-    for (BrokerGauge gauge : List.of(BrokerGauge.PERCENT_OF_REPLICAS, BrokerGauge.UNAVAILABLE_SEGMENTS,
-        BrokerGauge.SEGMENTS_WITHOUT_REDUNDANCY)) {
-      verify(_brokerMetrics, never()).setValueOfTableGauge(eq(TABLE_NAME), eq(gauge), anyLong());
-    }
-
-    // Must not remove the reporting selector's gauges either
-    selector.removeMetrics();
+    assertEquals(selector.getReplicaHealth().getNumUnavailableSegments(), 1);
+    // The selector never touches the replica health gauges itself
+    verify(_brokerMetrics, never()).setValueOfTableGauge(eq(TABLE_NAME), any(BrokerGauge.class), anyLong());
     verify(_brokerMetrics, never()).removeTableGauge(eq(TABLE_NAME), any(BrokerGauge.class));
   }
 }
