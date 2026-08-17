@@ -47,6 +47,8 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
+import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
+import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
 import org.apache.pinot.controller.util.BrokerServiceHelper;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
@@ -73,6 +75,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.controller.helix.core.retention.RetentionManager.DEFAULT_UNTRACKED_SEGMENTS_DELETION_BATCH_SIZE;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -473,10 +476,11 @@ public class RetentionManagerTest {
 
     CompletionServiceHelper mockServiceHelper = mock(CompletionServiceHelper.class);
 
-    // Mock responses
+    // Time boundary set well into the past but within the valid range enforced by
+    // TimeUtils.timeValueInValidRange (>= 1971-01-01).
     Map<String, String> responseMap = new HashMap<>();
     responseMap.put("http://localhost:8000/debug/timeBoundary/" + offlineTableName,
-        "{ \"timeColumn\": \"ts\", \"timeValue\": 7776000000}");
+        "{ \"timeColumn\": \"ts\", \"timeValue\": 1500000000000}");
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         new CompletionServiceHelper.CompletionServiceResponse();
     serviceResponse._httpResponses = responseMap;
@@ -490,7 +494,8 @@ public class RetentionManagerTest {
     SegmentZKMetadata realtimeSeg2 = new SegmentZKMetadata("realtime_seg2");
     realtimeSeg2.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     realtimeSeg2.setTimeUnit(TimeUnit.MILLISECONDS);
-    realtimeSeg2.setEndTime(86_400_000 * 8);
+    // endTimeMs = 2001-09-09, before the time boundary and far beyond the 7-day retention window
+    realtimeSeg2.setEndTime(1000000000000L);
 
     List<SegmentZKMetadata> realtimeSegments = Arrays.asList(realtimeSeg1, realtimeSeg2);
     when(mockPinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName)).thenReturn(realtimeSegments);
@@ -503,10 +508,187 @@ public class RetentionManagerTest {
     RetentionManager retentionManager =
         createRetentionManager(mockPinotHelixResourceManager, null, controllerConf, mock(ControllerMetrics.class),
             brokerServiceHelper);
-    retentionManager.manageRetentionForHybridTable(realtimeTableConfig, offlineTableConfig);
+    RetentionStrategy retentionStrategy = new TimeRetentionStrategy(
+            TimeUnit.DAYS, 7);
+    retentionManager.manageRetentionForHybridTable(realtimeTableConfig, offlineTableConfig, retentionStrategy);
 
     // verify
     verify(mockPinotHelixResourceManager, times(1)).deleteSegments(eq(realtimeTableName), anyList());
+  }
+
+  /**
+   * Verifies that a COMPLETED segment with invalid end time (e.g. -1, never set) is NOT deleted in the hybrid path,
+   * matching the guard already present in TimeRetentionStrategy for non-hybrid tables.
+   */
+  @Test
+  public void testManageRetentionForHybridTableSkipsSegmentWithInvalidEndTime() {
+    String tableName = "myTable";
+    String realtimeTableName = "myTable_REALTIME";
+    String offlineTableName = "myTable_OFFLINE";
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "APPEND", "DAILY", false));
+    TableConfig realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(realtimeTableName)
+        .setTimeColumnName("ms").setTimeType("MILLISECONDS").setRetentionTimeValue("7").setRetentionTimeUnit("DAYS")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(offlineTableName)
+        .setTimeColumnName("ms").setTimeType("MILLISECONDS").setRetentionTimeValue("90").setRetentionTimeUnit("DAYS")
+        .build();
+    SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
+    validationConfig.setTimeColumnName("ms");
+    offlineTableConfig.setValidationConfig(validationConfig);
+
+    PinotHelixResourceManager mockPinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    when(mockPinotHelixResourceManager.getOfflineTableConfig(offlineTableName)).thenReturn(offlineTableConfig);
+
+    ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
+    when(mockPinotHelixResourceManager.getPropertyStore()).thenReturn(mockPropertyStore);
+
+    Schema schema = new Schema();
+    schema.setSchemaName(tableName);
+    schema.addField(new DateTimeFieldSpec("ms", FieldSpec.DataType.LONG, "EPOCH|MILLISECONDS|1", "MILLISECONDS|1"));
+    ZNRecord tableZNRecord = new ZNRecord(tableName);
+    tableZNRecord.setSimpleField("schemaJSON", schema.toSingleLineJsonString());
+    when(mockPropertyStore.get("/SCHEMAS/" + tableName, null, AccessOption.PERSISTENT)).thenReturn(tableZNRecord);
+
+    InstanceConfig instanceConfig = new InstanceConfig("Broker_localhost_1234");
+    instanceConfig.setHostName("localhost");
+    instanceConfig.setPort("8000");
+
+    ControllerConf controllerConf = new ControllerConf();
+    controllerConf.setControllerBrokerProtocol("http");
+
+    PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
+    when(mockResourceManager.getBrokerInstancesConfigsFor(offlineTableConfig.getTableName()))
+        .thenReturn(Collections.singletonList(instanceConfig));
+
+    CompletionServiceHelper mockServiceHelper = mock(CompletionServiceHelper.class);
+    Map<String, String> responseMap = new HashMap<>();
+    // time boundary = 7776000000 ms ≈ 90 days from epoch
+    responseMap.put("http://localhost:8000/debug/timeBoundary/" + offlineTableName,
+        "{ \"timeColumn\": \"ts\", \"timeValue\": 7776000000}");
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        new CompletionServiceHelper.CompletionServiceResponse();
+    serviceResponse._httpResponses = responseMap;
+    when(mockServiceHelper.doMultiGetRequest(anyList(), anyString(), anyBoolean(), anyMap(), anyInt(), anyString()))
+        .thenReturn(serviceResponse);
+
+    // Segment with endTimeMs = -1 (never set / missing metadata)
+    SegmentZKMetadata segInvalidEndTime = new SegmentZKMetadata("realtime_seg_invalid_end");
+    segInvalidEndTime.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    // endTimeMs defaults to -1 when not explicitly set
+    assertEquals(segInvalidEndTime.getEndTimeMs(), -1L);
+
+    when(mockPinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName))
+        .thenReturn(Collections.singletonList(segInvalidEndTime));
+
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(mockResourceManager, controllerConf, null, null);
+    brokerServiceHelper.setCompletionServiceHelper(mockServiceHelper);
+
+    RetentionManager retentionManager =
+        new RetentionManager(mockPinotHelixResourceManager, null, controllerConf, mock(ControllerMetrics.class),
+            brokerServiceHelper);
+    RetentionStrategy retentionStrategy = new TimeRetentionStrategy(TimeUnit.DAYS, 7);
+    retentionManager.manageRetentionForHybridTable(realtimeTableConfig, offlineTableConfig, retentionStrategy);
+
+    // Segment with invalid end time must NOT be deleted
+    verify(mockPinotHelixResourceManager, never()).deleteSegments(anyString(), anyList());
+  }
+
+  /**
+   * Verifies that among segments already covered by offline data (endTimeMs < timeBoundaryMs), only those that are
+   * also beyond the configured retention window are deleted. Previously the hybrid path deleted any segment below
+   * the time boundary regardless of retention, which could prematurely delete recent data once the time boundary
+   * advanced into it.
+   */
+  @Test
+  public void testManageRetentionForHybridTableAppliesRetentionWithinTimeBoundaryCoverage() {
+    String tableName = "myTable";
+    String realtimeTableName = "myTable_REALTIME";
+    String offlineTableName = "myTable_OFFLINE";
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "APPEND", "DAILY", false));
+    // 7-day retention on the realtime table
+    TableConfig realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(realtimeTableName)
+        .setTimeColumnName("ms").setTimeType("MILLISECONDS").setRetentionTimeValue("7").setRetentionTimeUnit("DAYS")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(offlineTableName)
+        .setTimeColumnName("ms").setTimeType("MILLISECONDS").setRetentionTimeValue("90").setRetentionTimeUnit("DAYS")
+        .build();
+    SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
+    validationConfig.setTimeColumnName("ms");
+    offlineTableConfig.setValidationConfig(validationConfig);
+
+    PinotHelixResourceManager mockPinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    when(mockPinotHelixResourceManager.getOfflineTableConfig(offlineTableName)).thenReturn(offlineTableConfig);
+
+    ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
+    when(mockPinotHelixResourceManager.getPropertyStore()).thenReturn(mockPropertyStore);
+
+    Schema schema = new Schema();
+    schema.setSchemaName(tableName);
+    schema.addField(new DateTimeFieldSpec("ms", FieldSpec.DataType.LONG, "EPOCH|MILLISECONDS|1", "MILLISECONDS|1"));
+    ZNRecord tableZNRecord = new ZNRecord(tableName);
+    tableZNRecord.setSimpleField("schemaJSON", schema.toSingleLineJsonString());
+    when(mockPropertyStore.get("/SCHEMAS/" + tableName, null, AccessOption.PERSISTENT)).thenReturn(tableZNRecord);
+
+    InstanceConfig instanceConfig = new InstanceConfig("Broker_localhost_1234");
+    instanceConfig.setHostName("localhost");
+    instanceConfig.setPort("8000");
+
+    ControllerConf controllerConf = new ControllerConf();
+    controllerConf.setControllerBrokerProtocol("http");
+
+    PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
+    when(mockResourceManager.getBrokerInstancesConfigsFor(offlineTableConfig.getTableName()))
+        .thenReturn(Collections.singletonList(instanceConfig));
+
+    CompletionServiceHelper mockServiceHelper = mock(CompletionServiceHelper.class);
+    // Time boundary set to yesterday so both segments fall under it (i.e. offline data covers them). The test
+    // exercises the retention check on segments already "behind" the time boundary.
+    long yesterday = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1);
+    Map<String, String> responseMap = new HashMap<>();
+    responseMap.put("http://localhost:8000/debug/timeBoundary/" + offlineTableName,
+        "{ \"timeColumn\": \"ts\", \"timeValue\": " + yesterday + "}");
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        new CompletionServiceHelper.CompletionServiceResponse();
+    serviceResponse._httpResponses = responseMap;
+    when(mockServiceHelper.doMultiGetRequest(anyList(), anyString(), anyBoolean(), anyMap(), anyInt(), anyString()))
+        .thenReturn(serviceResponse);
+
+    long now = System.currentTimeMillis();
+    // segOld: 30 days old — behind the time boundary AND beyond the 7-day retention window → deletable
+    SegmentZKMetadata segOld = new SegmentZKMetadata("realtime_seg_old");
+    segOld.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    segOld.setTimeUnit(TimeUnit.MILLISECONDS);
+    segOld.setEndTime(now - TimeUnit.DAYS.toMillis(30));
+
+    // segRecent: 3 days old — behind the time boundary but still within 7-day retention → must NOT be deleted
+    SegmentZKMetadata segRecent = new SegmentZKMetadata("realtime_seg_recent");
+    segRecent.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    segRecent.setTimeUnit(TimeUnit.MILLISECONDS);
+    segRecent.setEndTime(now - TimeUnit.DAYS.toMillis(3));
+
+    when(mockPinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName))
+        .thenReturn(Arrays.asList(segOld, segRecent));
+
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(mockResourceManager, controllerConf, null, null);
+    brokerServiceHelper.setCompletionServiceHelper(mockServiceHelper);
+
+    RetentionManager retentionManager =
+        new RetentionManager(mockPinotHelixResourceManager, null, controllerConf, mock(ControllerMetrics.class),
+            brokerServiceHelper);
+    RetentionStrategy retentionStrategy = new TimeRetentionStrategy(TimeUnit.DAYS, 7);
+    retentionManager.manageRetentionForHybridTable(realtimeTableConfig, offlineTableConfig, retentionStrategy);
+
+    // Only the old segment (30d) should be deleted; the recent one (3d, within retention) must be kept
+    verify(mockPinotHelixResourceManager, times(1)).deleteSegments(eq(realtimeTableName),
+        argThat(list -> list.size() == 1 && list.contains("realtime_seg_old")));
   }
 
   private TableConfig createOfflineTableConfig() {
