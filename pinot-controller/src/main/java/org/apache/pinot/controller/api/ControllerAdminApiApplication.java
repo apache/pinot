@@ -39,6 +39,7 @@ import org.apache.pinot.common.swagger.SwaggerApiListingResource;
 import org.apache.pinot.common.swagger.SwaggerSetupUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AuthenticationFilter;
+import org.apache.pinot.controller.api.access.SessionAuthenticationFilter;
 import org.apache.pinot.core.api.ServiceAutoDiscoveryFeature;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
@@ -90,6 +91,9 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     register(SwaggerSerializers.class);
     register(new CorsFilter());
     register(AuthenticationFilter.class);
+    // Register session authentication filter (priority AUTHENTICATION-10, runs before AuthenticationFilter).
+    // Validates the HttpOnly session cookie for SESSION workflow. No-op when session mode is disabled.
+    register(SessionAuthenticationFilter.class);
     register(AuditLogFilter.class);
     _managedAsyncExecutor = createManagedAsyncExecutor();
     register(new ManagedAsyncExecutorServiceProvider(_managedAsyncExecutor));
@@ -147,7 +151,9 @@ public class ControllerAdminApiApplication extends ResourceConfig {
         throws IOException {
       containerResponseContext.getHeaders().add("Access-Control-Allow-Origin", "*");
       containerResponseContext.getHeaders().add("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS, DELETE");
-      containerResponseContext.getHeaders().add("Access-Control-Allow-Headers", "*");
+      containerResponseContext.getHeaders()
+          .add("Access-Control-Allow-Headers",
+              "Authorization, Content-Type, Accept, Origin, X-Requested-With, Database, If-Match");
       if (containerRequestContext.getMethod().equals("OPTIONS")) {
         containerResponseContext.setStatus(HttpServletResponse.SC_OK);
       }

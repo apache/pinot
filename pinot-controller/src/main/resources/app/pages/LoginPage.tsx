@@ -24,6 +24,7 @@ import { useForm } from 'react-hook-form';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import app_state from '../app_state';
 import { AuthWorkflow } from 'Models';
+import { useAuthProvider } from '../components/auth/AuthProvider';
 
 interface FormData {
   username: string;
@@ -71,11 +72,51 @@ const useStyles = makeStyles((theme: Theme) => {
 const LoginPage = (props) => {
   const { handleSubmit, register } = useForm<FormData>();
   const [invalidToken, setInvalidToken] = React.useState(null);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const { authWorkflow } = useAuthProvider();
 
   const onSubmit = handleSubmit(async (data) => {
-    const authToken = "Basic "+btoa(data.username+":"+data.password);
+    setIsLoading(true);
+    setInvalidToken(null);
+
+    // SESSION workflow: POST credentials as form data to /auth/login.
+    // The server validates and sets an HttpOnly SameSite=Strict cookie. No Authorization header is used.
+    if (authWorkflow === AuthWorkflow.SESSION) {
+      try {
+        const formData = new URLSearchParams();
+        formData.append('username', data.username);
+        formData.append('password', data.password);
+
+        const response = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: formData.toString(),
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          // Session cookie is now set by the server (HttpOnly – JS cannot read it)
+          app_state.authWorkflow = AuthWorkflow.SESSION;
+          app_state.authToken = null; // no token stored in JS memory
+          app_state.username = data.username;
+          setInvalidToken(false);
+          props.setIsAuthenticated(true);
+          props.history.push(app_state.queryConsoleOnlyView ? '/query' : '/');
+        } else {
+          setInvalidToken(true);
+        }
+      } catch (e) {
+        setInvalidToken(true);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // BASIC workflow (legacy): build Basic auth token and verify via /auth/verify
+    const authToken = "Basic " + btoa(data.username + ":" + data.password);
     const isUserAuthenticated = await PinotMethodUtils.verifyAuth(authToken);
-    if(isUserAuthenticated){
+    if (isUserAuthenticated) {
       setInvalidToken(false);
       app_state.username = data.username;
       app_state.authWorkflow = AuthWorkflow.BASIC;
@@ -85,6 +126,7 @@ const LoginPage = (props) => {
     } else {
       setInvalidToken(true);
     }
+    setIsLoading(false);
   });
 
   const classes = useStyles();
@@ -116,8 +158,8 @@ const LoginPage = (props) => {
             </Box>
           }
           <Box paddingY={3}>
-            <Button type="submit" variant="contained" color="primary">
-              Login
+            <Button type="submit" variant="contained" color="primary" disabled={isLoading}>
+              {isLoading ? 'Signing in...' : 'Login'}
             </Button>
           </Box>
         </form>
