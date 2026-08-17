@@ -802,7 +802,8 @@ public class AggregationFunctionUtils {
 
   private static HyperLogLog getDistinctCountHLLResult(DataSource dataSource,
       DistinctCountHLLAggregationFunction function, String explainPlanName) {
-    Dictionary dictionary = Objects.requireNonNull(dataSource.getDictionary());
+    Dictionary dictionary = dataSource.getDictionary();
+    assert dictionary != null;
     DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
     if (metadata.getDataType() == FieldSpec.DataType.BYTES) {
       // Logical BYTES dictionary entries are serialized HyperLogLog objects.
@@ -825,7 +826,8 @@ public class AggregationFunctionUtils {
 
   private static HyperLogLogPlus getDistinctCountHLLPlusResult(DataSource dataSource,
       DistinctCountHLLPlusAggregationFunction function, String explainPlanName) {
-    Dictionary dictionary = Objects.requireNonNull(dataSource.getDictionary());
+    Dictionary dictionary = dataSource.getDictionary();
+    assert dictionary != null;
     DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
     if (metadata.getDataType() == FieldSpec.DataType.BYTES) {
       // Logical BYTES dictionary entries are serialized HyperLogLogPlus objects.
@@ -868,7 +870,8 @@ public class AggregationFunctionUtils {
 
   private static UltraLogLog getDistinctCountULLResult(DataSource dataSource,
       DistinctCountULLAggregationFunction function, String explainPlanName) {
-    Dictionary dictionary = Objects.requireNonNull(dataSource.getDictionary());
+    Dictionary dictionary = dataSource.getDictionary();
+    assert dictionary != null;
     DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
     if (metadata.getDataType() == FieldSpec.DataType.BYTES) {
       // Logical BYTES dictionary entries are serialized UltraLogLog objects.

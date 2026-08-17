@@ -63,6 +63,7 @@ import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -532,7 +533,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
       case BYTES:
         return dataTable.getBytes(rowId, colId).getBytes();
       case UUID:
-        return columnDataType.convert(dataTable.getBytes(rowId, colId));
+        return UuidUtils.toUUID(dataTable.getBytes(rowId, colId));
       default:
         throw new IllegalStateException("Illegal column data type in group key: " + columnDataType);
     }

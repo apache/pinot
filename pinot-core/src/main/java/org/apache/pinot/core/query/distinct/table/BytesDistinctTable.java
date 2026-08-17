@@ -38,6 +38,7 @@ import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -293,8 +294,14 @@ public class BytesDistinctTable extends DistinctTable {
 
   private void addRows(ByteArray[] values, int length, List<Object[]> rows) {
     ColumnDataType columnDataType = _dataSchema.getColumnDataType(0);
-    for (int i = 0; i < length; i++) {
-      rows.add(new Object[]{columnDataType.convertAndFormat(values[i])});
+    if (columnDataType == ColumnDataType.UUID) {
+      for (int i = 0; i < length; i++) {
+        rows.add(new Object[]{UuidUtils.toString(values[i])});
+      }
+    } else {
+      for (int i = 0; i < length; i++) {
+        rows.add(new Object[]{values[i].toHexString()});
+      }
     }
   }
 
@@ -315,8 +322,14 @@ public class BytesDistinctTable extends DistinctTable {
 
   private void addRows(HashSet<ByteArray> values, List<Object[]> rows) {
     ColumnDataType columnDataType = _dataSchema.getColumnDataType(0);
-    for (ByteArray value : values) {
-      rows.add(new Object[]{columnDataType.convertAndFormat(value)});
+    if (columnDataType == ColumnDataType.UUID) {
+      for (ByteArray value : values) {
+        rows.add(new Object[]{UuidUtils.toString(value)});
+      }
+    } else {
+      for (ByteArray value : values) {
+        rows.add(new Object[]{value.toHexString()});
+      }
     }
   }
 }
