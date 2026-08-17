@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.openstruct;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -307,6 +308,10 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         .build();
 
     boolean useDictionary = resolveUseDictionary(childFieldSpec, configsForDecision, statsCollector);
+
+    ForwardIndexConfig configuredForwardIndex = configsForDecision.getConfig(StandardIndexes.forward());
+    Preconditions.checkState(!configuredForwardIndex.hasCodecSpec(),
+        "codecSpec is not supported yet for OPEN_STRUCT key: %s", key);
 
     // Reconcile dictionary + forward encoding with the final decision (mirrors BaseSegmentCreator.adaptConfig);
     // ForwardIndexCreatorFactory selects dict-vs-raw from the forward config's EncodingType. A compression codec

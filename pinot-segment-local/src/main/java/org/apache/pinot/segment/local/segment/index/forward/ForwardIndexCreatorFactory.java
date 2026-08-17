@@ -51,6 +51,7 @@ public class ForwardIndexCreatorFactory {
     File indexDir = context.getIndexDir();
     FieldSpec fieldSpec = context.getFieldSpec();
     String columnName = fieldSpec.getName();
+    ForwardIndexType.rejectUnsupportedCodecSpec(indexConfig, columnName);
     int numTotalDocs = context.getTotalDocs();
 
     if (indexConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY) {

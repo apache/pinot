@@ -104,11 +104,17 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   @Override
   public void validate(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, TableConfig tableConfig) {
     ForwardIndexConfig forwardIndexConfig = indexConfigs.getConfig(StandardIndexes.forward());
+    rejectUnsupportedCodecSpec(forwardIndexConfig, fieldSpec.getName());
     if (forwardIndexConfig.isEnabled()) {
       validateForwardIndexEnabled(forwardIndexConfig, indexConfigs, fieldSpec);
     } else {
       validateForwardIndexDisabled(indexConfigs, fieldSpec, tableConfig);
     }
+  }
+
+  static void rejectUnsupportedCodecSpec(ForwardIndexConfig config, String column) {
+    Preconditions.checkState(!config.hasCodecSpec(),
+        "codecSpec is not supported yet for column: %s", column);
   }
 
   private void validateForwardIndexEnabled(ForwardIndexConfig forwardIndexConfig, FieldIndexConfigs indexConfigs,
@@ -204,9 +210,15 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
           // Pop processed columns so the post-loop scan only emits defaults for columns with no FieldConfig at all.
           boolean inNoDictionaryList = noDictionaryColumns.remove(column);
 
-          // `forwardIndexDisabled` short-circuits everything else.
+          JsonNode forwardIndexNode = fieldConfig.getIndexes().get(INDEX_DISPLAY_NAME);
+
+          // `forwardIndexDisabled` short-circuits everything else. Do not let that legacy flag silently discard a
+          // codecSpec from the modern forward-index config.
           Map<String, String> properties = fieldConfig.getProperties();
           if (properties != null && isDisabled(properties)) {
+            JsonNode codecSpecNode = forwardIndexNode == null ? null : forwardIndexNode.get("codecSpec");
+            Preconditions.checkState(codecSpecNode == null || codecSpecNode.isNull(),
+                "codecSpec cannot be configured when the forward index is disabled for column: %s", column);
             result.put(column, ForwardIndexConfig.getDisabled());
             continue;
           }
@@ -219,7 +231,6 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
           FieldConfig.EncodingType encodingType =
               inNoDictionaryList ? FieldConfig.EncodingType.RAW : fieldConfig.getEncodingType();
 
-          JsonNode forwardIndexNode = fieldConfig.getIndexes().get(INDEX_DISPLAY_NAME);
           if (forwardIndexNode != null) {
             Preconditions.checkState(forwardIndexNode.isObject(), "Invalid forward index config for column: %s",
                 column);
@@ -242,8 +253,14 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
                       + "but indexes.forward.compressionCodec=%s", column, fcCodec, inner);
             }
 
+            JsonNode innerCodecSpecNode = forwardIndexNode.get("codecSpec");
+            Preconditions.checkState(fcCodec == null || innerCodecSpecNode == null || innerCodecSpecNode.isNull(),
+                "Conflicting forward-index config for column: %s — FieldConfig.compressionCodec=%s but "
+                    + "indexes.forward.codecSpec is also set", column, fcCodec);
+
             // Inject the resolved encodingType / compressionCodec into the JSON when absent so the resulting
-            // ForwardIndexConfig always matches the column-level signals.
+            // ForwardIndexConfig always matches the column-level signals. codecSpec is configured only within the
+            // indexes.forward block and is parsed directly from this JSON.
             ObjectNode configNode = (ObjectNode) forwardIndexNode.deepCopy();
             if (innerEncodingNode == null || innerEncodingNode.isNull()) {
               configNode.put("encodingType", encodingType.name());
@@ -297,6 +314,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
 
   @Override
   public boolean shouldCreateIndex(IndexCreationContext context, ForwardIndexConfig indexConfig) {
+    rejectUnsupportedCodecSpec(indexConfig, context.getFieldSpec().getName());
     return context.getFieldSpec().getDataType() != FieldSpec.DataType.OPEN_STRUCT;
   }
 
@@ -359,6 +377,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   @Nullable
   @Override
   public MutableIndex createMutableIndex(MutableIndexContext context, ForwardIndexConfig config) {
+    rejectUnsupportedCodecSpec(config, context.getFieldSpec().getName());
     if (config.isDisabled()) {
       return null;
     }

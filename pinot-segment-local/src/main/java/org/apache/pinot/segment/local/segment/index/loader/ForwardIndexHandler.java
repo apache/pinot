@@ -240,6 +240,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   @VisibleForTesting
   Map<String, List<Operation>> computeOperations(SegmentDirectory.Reader segmentReader)
       throws Exception {
+    rejectUnsupportedCodecSpecs();
     SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
 
     // Does not work for segment versions < V3.
@@ -287,6 +288,14 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           segmentName);
     }
     return columnOperationsMap;
+  }
+
+  private void rejectUnsupportedCodecSpecs() {
+    for (Map.Entry<String, FieldIndexConfigs> entry : _fieldIndexConfigs.entrySet()) {
+      ForwardIndexConfig config = entry.getValue().getConfig(StandardIndexes.forward());
+      Preconditions.checkState(!config.hasCodecSpec(),
+          "codecSpec is not supported yet for column: %s", entry.getKey());
+    }
   }
 
   /// Compute the operations needed to bring one column from its existing on-disk state to the desired state in

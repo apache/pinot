@@ -604,6 +604,27 @@ public class ForwardIndexHandlerTest {
     }
   }
 
+  @Test
+  public void testCodecSpecIsRejectedBeforePreprocessing()
+      throws Exception {
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+      ObjectNode forward = JsonUtils.newObjectNode();
+      forward.put("codecSpec", "LZ4");
+      ObjectNode indexes = JsonUtils.newObjectNode();
+      indexes.set("forward", forward);
+      _fieldConfigMap.put(DIM_LZ4_INTEGER, new FieldConfig.Builder(DIM_LZ4_INTEGER)
+          .withEncodingType(FieldConfig.EncodingType.RAW)
+          .withIndexes(indexes)
+          .build());
+
+      IllegalStateException exception = expectThrows(IllegalStateException.class, this::computeOperations);
+      assertEquals(exception.getMessage(), "codecSpec is not supported yet for column: " + DIM_LZ4_INTEGER);
+    }
+  }
+
   private IndexLoadingConfig createIndexLoadingConfig() {
     return new IndexLoadingConfig(createTableConfig(), SCHEMA);
   }

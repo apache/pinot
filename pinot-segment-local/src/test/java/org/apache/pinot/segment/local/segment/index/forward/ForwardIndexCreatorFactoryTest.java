@@ -26,6 +26,7 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -40,6 +41,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// Tests [ForwardIndexCreatorFactory]'s forward-index encoding branch selection. Each test uses an isolated
@@ -100,6 +102,28 @@ public class ForwardIndexCreatorFactoryTest {
       TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
       tableConfig.getIndexingConfig().setCompressionStatsEnabled(true);
       assertTrue(newContext(indexDir, true, tableConfig).isCompressionStatsEnabled());
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  @Test
+  public void testCodecSpecIsRejectedBeforeCreatingAnIndex()
+      throws Exception {
+    File indexDir = Files.createTempDirectory("ForwardIndexCreatorFactoryTest").toFile();
+    try {
+      ForwardIndexConfig config = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+          .withCodecSpec("LZ4")
+          .build();
+      IndexCreationContext context = newContext(indexDir, false);
+
+      IllegalStateException shouldCreateException = expectThrows(IllegalStateException.class,
+          () -> StandardIndexes.forward().shouldCreateIndex(context, config));
+      assertEquals(shouldCreateException.getMessage(), "codecSpec is not supported yet for column: testCol");
+      IllegalStateException exception = expectThrows(IllegalStateException.class,
+          () -> ForwardIndexCreatorFactory.createIndexCreator(context, config));
+      assertEquals(exception.getMessage(), "codecSpec is not supported yet for column: testCol");
+      assertEquals(indexDir.list().length, 0);
     } finally {
       FileUtils.deleteQuietly(indexDir);
     }

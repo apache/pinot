@@ -30,8 +30,12 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -303,6 +307,79 @@ public class ForwardIndexTypeTest {
     }
 
     @Test
+    public void newRawConfigWithCodecSpecInheritsFieldEncoding()
+        throws IOException {
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"encodingType\": \"RAW\","
+          + "    \"indexes\" : {"
+          + "      \"forward\": { \"codecSpec\": \"delta, zstd(3)\" }"
+          + "    }\n"
+          + " }");
+
+      assertEquals(new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+          .withCodecSpec("DELTA,ZSTD(3)")
+          .build());
+    }
+
+    @Test
+    public void newCodecSpecUsesLegacyNoDictionaryEncoding()
+        throws IOException {
+      _tableConfig.getIndexingConfig().setNoDictionaryColumns(
+          JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"indexes\" : {"
+          + "      \"forward\": { \"codecSpec\": \"LZ4\" }"
+          + "    }\n"
+          + " }");
+
+      assertEquals(new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+          .withCodecSpec("LZ4")
+          .build());
+    }
+
+    @Test
+    public void fieldCompressionCodecConflictsWithNestedCodecSpec()
+        throws IOException {
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"encodingType\": \"RAW\","
+          + "    \"compressionCodec\": \"SNAPPY\","
+          + "    \"indexes\" : {"
+          + "      \"forward\": { \"codecSpec\": \"ZSTD(3)\" }"
+          + "    }\n"
+          + " }");
+
+      IllegalStateException exception = expectThrows(IllegalStateException.class,
+          () -> getActualConfig("dimInt", StandardIndexes.forward()));
+      assertTrue(exception.getMessage().contains("compressionCodec"));
+      assertTrue(exception.getMessage().contains("codecSpec"));
+    }
+
+    @Test
+    public void disabledForwardIndexCannotDiscardNestedCodecSpec()
+        throws IOException {
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"encodingType\": \"RAW\","
+          + "    \"properties\": { \"forwardIndexDisabled\": \"true\" },"
+          + "    \"indexes\" : {"
+          + "      \"forward\": { \"codecSpec\": \"LZ4\" }"
+          + "    }\n"
+          + " }");
+
+      IllegalStateException exception = expectThrows(IllegalStateException.class,
+          () -> getActualConfig("dimInt", StandardIndexes.forward()));
+      assertTrue(exception.getMessage().contains("forward index is disabled"));
+      assertTrue(exception.getMessage().contains("dimInt"));
+    }
+
+    @Test
     public void newConfigMVEntryDictFormat()
         throws IOException {
       addFieldIndexConfig(""
@@ -494,5 +571,19 @@ public class ForwardIndexTypeTest {
   public void testStandardIndex() {
     assertSame(StandardIndexes.forward(), StandardIndexes.forward(), "Standard index should use the same as "
         + "the ForwardIndexType static instance");
+  }
+
+  @Test
+  public void testCodecSpecIsRejectedForRealtimeMutableIndex() {
+    MutableIndexContext context = Mockito.mock(MutableIndexContext.class);
+    Mockito.when(context.getFieldSpec()).thenReturn(
+        new DimensionFieldSpec("dimInt", FieldSpec.DataType.INT, true));
+    ForwardIndexConfig config = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCodecSpec("LZ4")
+        .build();
+
+    IllegalStateException exception = expectThrows(IllegalStateException.class,
+        () -> StandardIndexes.forward().createMutableIndex(context, config));
+    Assert.assertEquals(exception.getMessage(), "codecSpec is not supported yet for column: dimInt");
   }
 }

@@ -101,6 +101,9 @@ public class OpenStructIndexType
       if (indexes == null) {
         continue;
       }
+      JsonNode forwardIndex = indexes.get(StandardIndexes.forward().getPrettyName());
+      Preconditions.checkState(forwardIndex == null || !forwardIndex.hasNonNull("codecSpec"),
+          "codecSpec is not supported yet for OPEN_STRUCT key: %s", fieldConfig.getName());
       Iterator<String> indexNames = indexes.fieldNames();
       while (indexNames.hasNext()) {
         String indexName = indexNames.next();

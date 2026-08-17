@@ -1798,6 +1798,29 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void testCodecSpecIsRejectedUntilRuntimeSupportLands() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("intCol", DataType.INT)
+        .build();
+    ObjectNode forward = JsonUtils.newObjectNode();
+    forward.put("codecSpec", "DELTA,ZSTD(3)");
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("forward", forward);
+    FieldConfig fieldConfig = new FieldConfig.Builder("intCol")
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(indexes)
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
+        .setFieldConfigList(List.of(fieldConfig))
+        .build();
+
+    IllegalStateException exception = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validate(tableConfig, schema));
+    assertEquals(exception.getMessage(), "codecSpec is not supported yet for column: intCol");
+  }
+
+  @Test
   public void testValidateFieldConfigDuplicateColumnName() {
     final Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol1", DataType.STRING)
