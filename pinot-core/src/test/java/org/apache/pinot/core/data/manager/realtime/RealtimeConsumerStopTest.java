@@ -116,12 +116,15 @@ public class RealtimeConsumerStopTest {
       startConsumingSegment(tableDataManager, serverMetrics);
       assertTrue(TestStreamConsumerFactory.awaitFetch(), "Consumer never reached the stream fetch");
       long consumptionExceptions = consumptionExceptions(serverMetrics);
+      long stoppedByInterrupt = stoppedByInterrupt(serverMetrics);
 
       // The call the Helix CONSUMING -> OFFLINE and CONSUMING -> DROPPED transitions make on the server
       tableDataManager.offloadSegment(SEGMENT_NAME_STR);
 
       assertEquals(consumptionExceptions(serverMetrics), consumptionExceptions,
           "Stopping a consumer must not be counted as a stream error");
+      assertEquals(stoppedByInterrupt(serverMetrics), stoppedByInterrupt + 1,
+          "Stopping a consumer must be counted on the deliberate stop meter");
       assertEquals(TestStreamConsumerFactory.CONSUMERS_CREATED.get(), 1,
           "No replacement consumer should be built for a segment being offloaded");
       assertEquals(TestStreamConsumerFactory.CONSUMERS_CLOSED.get(), 1, "The stream consumer should be closed");
@@ -145,6 +148,7 @@ public class RealtimeConsumerStopTest {
       RealtimeSegmentDataManager segmentDataManager = startConsumingSegment(tableDataManager, serverMetrics);
       assertTrue(TestStreamConsumerFactory.awaitFetch(), "Consumer never reached the stream fetch");
       long consumptionExceptions = consumptionExceptions(serverMetrics);
+      long stoppedByInterrupt = stoppedByInterrupt(serverMetrics);
       TestStreamConsumerFactory.fetchesBehaveAs(TestStreamConsumerFactory.FetchBehaviour.INTERRUPT);
       // Count only the fetches the catch-up loop makes, not the ones the consumer thread already made
       TestStreamConsumerFactory.FETCHES.set(0);
@@ -160,6 +164,9 @@ public class RealtimeConsumerStopTest {
 
       assertEquals(consumptionExceptions(serverMetrics), consumptionExceptions,
           "An interrupt on the catch-up path must not be counted as a stream error");
+      // Once for the consumer thread that stop() interrupted, once for the catch-up loop on this thread
+      assertEquals(stoppedByInterrupt(serverMetrics), stoppedByInterrupt + 2,
+          "Both the consumer thread and the catch-up loop should be counted on the deliberate stop meter");
       assertEquals(TestStreamConsumerFactory.FETCHES.get(), 1, "Catch-up should give up on the first interrupt");
       assertEquals(TestStreamConsumerFactory.CONSUMERS_CREATED.get(), 1,
           "No replacement consumer should be built while stopping");
@@ -168,9 +175,9 @@ public class RealtimeConsumerStopTest {
     }
   }
 
-  /// The counterpart of the case above, and the reason the distinction has to be drawn on the exception rather than
-  /// on the fact that a stop is in flight: a real fetch failure is still metered and still retried behind a fresh
-  /// consumer, even though it surfaces from the same catch block.
+  /// The counterpart of the cases above, and the reason the distinction has to be drawn on the thread's interrupt
+  /// status rather than on the fact that a stop is in flight: a real fetch failure is still metered and still retried
+  /// behind a fresh consumer, even though it surfaces from the same catch block.
   @Test
   public void testStreamFailureIsCountedAsAStreamError()
       throws Exception {
@@ -179,6 +186,7 @@ public class RealtimeConsumerStopTest {
     try {
       TestStreamConsumerFactory.fetchesBehaveAs(TestStreamConsumerFactory.FetchBehaviour.FAIL);
       long consumptionExceptions = consumptionExceptions(serverMetrics);
+      long stoppedByInterrupt = stoppedByInterrupt(serverMetrics);
       startConsumingSegment(tableDataManager, serverMetrics);
 
       // The transient handler sleeps and rebuilds the consumer, so a second consumer proves the retry happened
@@ -187,6 +195,8 @@ public class RealtimeConsumerStopTest {
 
       assertTrue(consumptionExceptions(serverMetrics) > consumptionExceptions,
           "A stream failure must be counted as a consumption exception");
+      assertEquals(stoppedByInterrupt(serverMetrics), stoppedByInterrupt,
+          "A stream failure must not be counted as a deliberate stop");
     } finally {
       tableDataManager.shutDown();
     }
@@ -194,6 +204,10 @@ public class RealtimeConsumerStopTest {
 
   private static long consumptionExceptions(ServerMetrics serverMetrics) {
     return serverMetrics.getMeteredValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS).count();
+  }
+
+  private static long stoppedByInterrupt(ServerMetrics serverMetrics) {
+    return serverMetrics.getMeteredValue(ServerMeter.REALTIME_CONSUMPTION_STOPPED_BY_INTERRUPT).count();
   }
 
   private static InstanceDataManagerConfig createInstanceDataManagerConfig() {
@@ -298,6 +312,13 @@ public class RealtimeConsumerStopTest {
     }
 
     private static class TestConsumer implements PartitionGroupConsumer {
+      /// Never counted down. A [FetchBehaviour#BLOCK] fetch waits on this instead of sleeping for `timeoutMs`, so the
+      /// only way out of the fetch is the interrupt under test. An unbounded wait is what makes the timing
+      /// deterministic: a fetch that timed out on its own could return and start a second fetch while a test was
+      /// still arranging the stop, and that second fetch would then observe the arranged behaviour before `stop()`
+      /// had been called at all.
+      private static final CountDownLatch RECORDS_NEVER_ARRIVE = new CountDownLatch(1);
+
       @Override
       public MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs) {
         FETCHES.incrementAndGet();
@@ -311,8 +332,8 @@ public class RealtimeConsumerStopTest {
             break;
         }
         try {
-          // A caught-up client parks here until records arrive or the poll times out
-          Thread.sleep(timeoutMs);
+          // A caught-up client parks here until records arrive
+          RECORDS_NEVER_ARRIVE.await();
         } catch (InterruptedException e) {
           throw interrupted();
         }
@@ -320,7 +341,8 @@ public class RealtimeConsumerStopTest {
       }
 
       /// Mirrors `org.apache.kafka.common.errors.InterruptException`: re-arm the thread interrupt flag and rethrow
-      /// the interrupt wrapped in an unchecked exception.
+      /// the interrupt wrapped in an unchecked exception. Re-arming is the part the consumer relies on to tell a
+      /// deliberate stop from a stream fault, and every client it supports does it.
       private static RuntimeException interrupted() {
         Thread.currentThread().interrupt();
         return new RuntimeException("Interrupted while polling the stream", new InterruptedException());

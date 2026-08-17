@@ -25,7 +25,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.BufferOverflowException;
-import java.nio.channels.ClosedByInterruptException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -456,28 +455,28 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         || _forceCommitMessageReceived || !canAddMore();
   }
 
-  /// Returns `true` if the consumer is being torn down by [#stop()] and the given exception is the interrupt that
-  /// [#stop()] delivered. Stream clients surface an interrupt in different shapes: Kafka wraps it in an unchecked
-  /// `InterruptException`, and NIO-based clients throw [java.nio.channels.ClosedByInterruptException], so the whole
-  /// cause chain is inspected.
+  /// Returns `true` if the consumer is being torn down by [#stop()] and the interrupt it delivered has landed on this
+  /// thread.
+  ///
+  /// The thread's interrupt status is the signal rather than the type of the exception the stream client raised,
+  /// because clients surface an interrupt in too many shapes to enumerate: Kafka wraps it in an unchecked
+  /// `InterruptException`, NIO channels throw `ClosedByInterruptException`, and the AWS SDK aborts the call with no
+  /// [InterruptedException] anywhere in the cause chain. All of them leave the interrupt status set, so checking the
+  /// status covers every client and, unlike inspecting the cause chain, does not mistake an [InterruptedException]
+  /// that was raised on some other thread and wrapped for us as an interrupt of our own.
   ///
   /// This is checked against [#_stopping] rather than [#_shouldStop] because
   /// [#catchupToFinalOffset(StreamPartitionMsgOffset, long)] clears the latter before consuming once more.
-  private boolean isDeliberateStopInterrupt(Throwable t) {
-    if (!_stopping) {
-      return false;
-    }
-    for (Throwable cause = t; cause != null; cause = cause.getCause()) {
-      if (cause instanceof InterruptedException || cause instanceof ClosedByInterruptException) {
-        return true;
-      }
-    }
-    return false;
+  private boolean isDeliberateStopInterrupt() {
+    return _stopping && Thread.currentThread().isInterrupted();
   }
 
   private void handleTransientStreamErrors(Exception e)
       throws Exception {
     _consecutiveErrorCount++;
+
+    // TODO: Alerting on every transient error is noisy. Consider counting them separately and only alerting once the
+    //       retries below are exhausted.
     _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
     _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS,
         1L);
@@ -539,17 +538,23 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _endOfPartitionGroup = messageBatch.getMessageCount() == 0 && messageBatch.isEndOfPartitionGroup();
         _consecutiveErrorCount = 0;
       } catch (PermanentConsumerException e) {
+        // TODO: Key this meter on _clientId instead of _tableStreamName so that it carries table, topic and partition
+        //       labels, and keep the global meter for backward compatibility.
         _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
         _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
         _segmentLogger.warn("Permanent exception from stream when fetching messages, stopping consumption", e);
         throw e;
       } catch (Exception e) {
-        if (isDeliberateStopInterrupt(e)) {
+        if (isDeliberateStopInterrupt()) {
           // stop() interrupts the consumer thread to tear it down, and the interrupt typically lands inside the
           // fetch. That is a deliberate shutdown rather than a stream fault, so it must not be counted as a
           // consumption error, slept on, or answered by building a replacement consumer for a segment that is
-          // going away. Exit the loop instead: on the offload path the thread winds down, and on the catch-up path
-          // the caller falls back to downloading the segment.
+          // going away. It is still counted on its own meter, so that a teardown remains visible and the two
+          // cases can be told apart when consumption stops unexpectedly. Exit the loop instead: on the offload
+          // path the thread winds down, and on the catch-up path the caller falls back to downloading the segment.
+          _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_STOPPED_BY_INTERRUPT, 1L);
+          _serverMetrics.addMeteredTableValue(_tableStreamName,
+              ServerMeter.REALTIME_CONSUMPTION_STOPPED_BY_INTERRUPT, 1L);
           _segmentLogger.info("Consumption interrupted to stop the consumer, exiting the consume loop", e);
           break;
         }
@@ -562,6 +567,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         continue;
       } catch (Throwable t) {
         //track realtime rows fetched on a table level. This included valid + invalid rows
+        // TODO: This path is not counted by any meter today.
         _segmentLogger.warn("Stream error when fetching messages, stopping consumption", t);
         throw t;
       }

@@ -50,6 +50,11 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_CLP_UNENCODABLE("rows", false),
   REALTIME_CLP_ENCODED_NON_STRINGS("rows", false),
   REALTIME_CONSUMPTION_EXCEPTIONS("exceptions", true),
+  // Number of times a consumer left its consume loop because it was interrupted to stop it, rather than because the
+  // stream failed. A rebalance, a server shutdown, a table disable or delete, and a CONSUMING -> ONLINE transition all
+  // stop consumers this way. Counted apart from realtimeConsumptionExceptions so that these deliberate teardowns stay
+  // visible without reading as stream faults.
+  REALTIME_CONSUMPTION_STOPPED_BY_INTERRUPT("stops", true),
   REALTIME_MERGED_TEXT_IDX_TRUNCATED_DOCUMENT_SIZE("bytes", false),
   REALTIME_OFFSET_COMMITS("commits", true),
   REALTIME_OFFSET_COMMIT_EXCEPTIONS("exceptions", false),
