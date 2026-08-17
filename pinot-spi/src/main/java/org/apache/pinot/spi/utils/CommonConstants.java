@@ -802,7 +802,22 @@ public class CommonConstants {
         /// the individual grouping-set records from those base groups. This replaces expanding every input row
         /// into one group per grouping set, moving the per-set fan-out from O(rows) to O(base groups). Set to
         /// `false` to fall back to the legacy per-row expansion path.
+        ///
+        /// Base aggregation only pays off when input rows collapse into far fewer base groups; when the base
+        /// grouping barely collapses the rows (high-cardinality union columns), it adds a base pass plus a
+        /// derive pass on top of the same output and can be slower. To keep the best of both, base aggregation
+        /// is used only when the estimated base-group count (the product of the union columns' dictionary
+        /// cardinalities) does not exceed [#GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS]; above that estimate the
+        /// per-row expansion path is used instead. Setting `groupingSetsBaseAggregation=false` disables base
+        /// aggregation unconditionally regardless of the estimate.
         public static final String GROUPING_SETS_BASE_AGGREGATION = "groupingSetsBaseAggregation";
+
+        /// Upper bound on the estimated base-group count (product of the union columns' dictionary
+        /// cardinalities) for which [#GROUPING_SETS_BASE_AGGREGATION] is used; above it the per-row expansion
+        /// path is used. Defaults to the query's `numGroupsLimit` when unset or non-positive: if the base
+        /// grouping alone could approach the group limit, the rows barely collapse and base aggregation offers
+        /// no benefit. Ignored when base aggregation is disabled.
+        public static final String GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS = "groupingSetsBaseAggregationMaxGroups";
 
         /// Number of threads used in the final reduce.
         /// This is useful for expensive aggregation functions. E.g. Funnel queries are considered as expensive

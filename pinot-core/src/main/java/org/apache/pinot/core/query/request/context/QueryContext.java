@@ -269,6 +269,15 @@ public class QueryContext {
     return option == null || Boolean.parseBoolean(option);
   }
 
+  /// Returns the maximum estimated base-group count for which base aggregation is used (above it the per-row
+  /// expansion path is used, since the rows barely collapse and base aggregation adds overhead without benefit).
+  /// Reads the `groupingSetsBaseAggregationMaxGroups` query option, defaulting to `numGroupsLimit` when unset or
+  /// non-positive. See [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS].
+  public int getGroupingSetsBaseAggregationMaxGroups() {
+    Integer maxGroups = QueryOptionsUtils.getGroupingSetsBaseAggregationMaxGroups(_queryOptions);
+    return maxGroups != null ? maxGroups : _numGroupsLimit;
+  }
+
   /// Returns the total number of group-by key columns in the server result / reducer row layout: the union
   /// group-by columns plus any synthetic key columns ([#getNumExtraGroupByKeyColumns()]).
   public int getNumGroupByKeyColumns() {
