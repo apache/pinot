@@ -301,12 +301,14 @@ public class QueryContext {
   }
 
   /// Returns `true` if the query is an EXPLAIN query, `false` otherwise.
-  ///
-  /// This is just an alias on top of [`!= ExplainMode.NONE`]\[#getExplain()\]
   public boolean isExplain() {
     return _explain != ExplainMode.NONE;
   }
 
+  /// Returns the explain mode of the query.
+  public ExplainMode getExplain() {
+    return _explain;
+  }
 
   public boolean isAccurateGroupByWithoutOrderBy() {
     return _accurateGroupByWithoutOrderBy;
@@ -314,11 +316,6 @@ public class QueryContext {
 
   public void setAccurateGroupByWithoutOrderBy(boolean enable) {
     _accurateGroupByWithoutOrderBy = enable;
-  }
-
-  /// Returns the explain mode of the query.
-  public ExplainMode getExplain() {
-    return _explain;
   }
 
   /// Returns the aggregation functions for the query, or `null` if the query does not have any aggregation.
