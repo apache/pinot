@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -382,29 +383,17 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     List<String> unavailableSegmentsByState = new ArrayList<>();
     List<String> unavailableSegmentsByInstance = new ArrayList<>();
 
-    // The segment ZK metadata and the znode stats are read in batched requests (one for each), because reading them one
-    // segment at a time costs two blocking ZooKeeper round trips per segment (the Helix property store is not cached),
-    // which is why the status check can take several minutes on tables with a large number of segments.
-    Map<String, SegmentZKMetadata> segmentZKMetadataMap = new HashMap<>();
-    for (SegmentZKMetadata segmentZKMetadata : _pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithType)) {
-      segmentZKMetadataMap.put(segmentZKMetadata.getSegmentName(), segmentZKMetadata);
-    }
+    // The segment ZK metadata and the znode stats are read in a single batched request
     List<String> segmentsToCheck = new ArrayList<>(segments);
-    // Index-aligned with segmentsToCheck, holding null for segments whose znode cannot be read
-    Stat[] segmentStats = null;
-    if (propertyStore != null) {
-      List<String> segmentPaths = new ArrayList<>(numSegments);
-      for (String segment : segmentsToCheck) {
-        segmentPaths.add(ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segment));
-      }
-      segmentStats = propertyStore.getStats(segmentPaths, AccessOption.PERSISTENT);
-      if (segmentStats != null && segmentStats.length != numSegments) {
-        // Should not happen, but the alignment is load bearing below, so fall back to creation times instead of
-        // pairing segments with the wrong stats
-        LOGGER.warn("Got {} znode stats for {} segments of table: {}, skipping the modification times",
-            segmentStats.length, numSegments, tableNameWithType);
-        segmentStats = null;
-      }
+    List<Stat> segmentStats = new ArrayList<>(numSegments);
+    List<SegmentZKMetadata> segmentsZKMetadata =
+        _pinotHelixResourceManager.getSegmentsZKMetadataForSegmentNames(tableNameWithType, segmentsToCheck,
+            segmentStats);
+
+    if (segmentsZKMetadata.stream().allMatch(Objects::isNull)) {
+      LOGGER.error("Failed to read the ZK metadata of all {} segments of table: {}, skipping the metric update",
+          numSegments, tableNameWithType);
+      return false;
     }
 
     for (int i = 0; i < numSegments; i++) {
@@ -424,7 +413,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       }
       maxISReplicasUp = Math.max(maxISReplicasUp, numISReplicasUp);
 
-      SegmentZKMetadata segmentZKMetadata = segmentZKMetadataMap.get(segment);
+      SegmentZKMetadata segmentZKMetadata = segmentsZKMetadata.get(i);
       // Skip the segment when it doesn't have ZK metadata. Most likely the segment is just deleted.
       if (segmentZKMetadata == null) {
         segmentsWithoutZKMetadata.add(segment);
@@ -449,7 +438,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       //       with many segments, the status check can still take a while. A segment updated after the EV snapshot was
       //       taken but before this individual segment check runs could be incorrectly flagged as OFFLINE when using
       //       current time.
-      Stat segmentStat = segmentStats != null ? segmentStats[i] : null;
+      Stat segmentStat = segmentStats.get(i);
       long refTimeMs = segmentStat != null ? segmentStat.getMtime() : segmentZKMetadata.getCreationTime();
       if (refTimeMs > evSnapshotTimestamp - _waitForPushTimeSeconds * 1000L) {
         continue;

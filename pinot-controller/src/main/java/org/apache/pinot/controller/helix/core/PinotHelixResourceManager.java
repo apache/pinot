@@ -1051,6 +1051,15 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, tableNameWithType);
   }
 
+  /// Reads the ZK metadata of the named segments in a single batched request, index-aligned with `segmentNames` and
+  /// holding `null` for segments whose znode could not be read. See
+  /// [ZKMetadataProvider#getSegmentsZKMetadata(ZkHelixPropertyStore, String, List, List)] for the full contract,
+  /// including the `stats` out-parameter that carries the znodes' modification times.
+  public List<SegmentZKMetadata> getSegmentsZKMetadataForSegmentNames(String tableNameWithType,
+      List<String> segmentNames, @Nullable List<Stat> stats) {
+    return ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, tableNameWithType, segmentNames, stats);
+  }
+
   public Collection<String> getLastLLCCompletedSegments(String tableNameWithType) {
     return getLastLLCCompletedSegments(getSegmentsZKMetadata(tableNameWithType));
   }
