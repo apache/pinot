@@ -1191,6 +1191,11 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       LOGGER.info("Stopping controller periodic tasks");
       _periodicTaskScheduler.stop();
 
+      // Also has to be done before stopping HelixResourceManager: the task manager runs its cron jobs on a
+      // scheduler of its own, which is separate from the periodic task scheduler stopped above.
+      LOGGER.info("Stopping task scheduler");
+      _taskManager.stopScheduler();
+
       LOGGER.info("Stopping lead controller manager");
       _leadControllerManager.stop();
 

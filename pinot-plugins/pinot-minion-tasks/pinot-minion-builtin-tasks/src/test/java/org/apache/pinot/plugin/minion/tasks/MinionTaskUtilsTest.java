@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.ws.rs.NotFoundException;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
@@ -394,6 +395,38 @@ public class MinionTaskUtilsTest {
     RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader("myTable_REALTIME", "seg1", "1000",
         "5000", "UNSAFE", responses, new String[]{"server1"}, this);
     assertNull(result);
+  }
+
+  @Test
+  public void testFetchFailurePreservesNotFoundException() {
+    List<Object> responses = List.of(new NotFoundException("HTTP 404 Not Found"));
+    NotFoundException e = expectThrows(NotFoundException.class,
+        () -> getValidDocIdFromServerMatchingCrcWithMockedReader("myTable_REALTIME", "seg1", "1000", "EQUAL",
+            responses, new String[]{"server1"}, this));
+    assertTrue(e.getMessage().contains("seg1"), e.getMessage());
+    assertTrue(e.getMessage().contains("localhost"), e.getMessage());
+    assertTrue(e.getCause() instanceof NotFoundException);
+  }
+
+  @Test
+  public void testFetchFailureWrapsOtherExceptions() {
+    List<Object> responses = List.of(new RuntimeException("connection reset"));
+    IllegalStateException e = expectThrows(IllegalStateException.class,
+        () -> getValidDocIdFromServerMatchingCrcWithMockedReader("myTable_REALTIME", "seg1", "1000", "EQUAL",
+            responses, new String[]{"server1"}, this));
+    assertTrue(e.getMessage().contains("seg1"), e.getMessage());
+    assertEquals(e.getCause().getMessage(), "connection reset");
+  }
+
+  @Test
+  public void testUnsafeModeSkipsFetchFailure() {
+    List<Object> responses = List.of(
+        new NotFoundException("HTTP 404 Not Found"),
+        makeResponse("seg1", "1000", "server2", makeBitmap(3)));
+    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader("myTable_REALTIME", "seg1", "1000",
+        "UNSAFE", responses, new String[]{"server1", "server2"}, this);
+    assertNotNull(result);
+    assertEquals(result.getCardinality(), 3);
   }
 
   private static RoaringBitmap makeBitmap(int numDocs) {

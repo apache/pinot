@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -333,6 +334,7 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
     }
   }
 
+  @Nullable
   @Override
   public Double extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     if (_nullHandlingEnabled) {
@@ -341,6 +343,7 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
     return aggregationResultHolder.getDoubleResult();
   }
 
+  @Nullable
   @Override
   public Double extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     if (_nullHandlingEnabled) {
@@ -351,15 +354,6 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
 
   @Override
   public Double merge(Double intermediateMaxResult1, Double intermediateMaxResult2) {
-    if (_nullHandlingEnabled) {
-      if (intermediateMaxResult1 == null) {
-        return intermediateMaxResult2;
-      }
-      if (intermediateMaxResult2 == null) {
-        return intermediateMaxResult1;
-      }
-    }
-
     if (intermediateMaxResult1 > intermediateMaxResult2) {
       return intermediateMaxResult1;
     }
@@ -376,8 +370,9 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
     return ColumnDataType.DOUBLE;
   }
 
+  @Nullable
   @Override
-  public Double extractFinalResult(Double intermediateResult) {
+  public Double extractFinalResult(@Nullable Double intermediateResult) {
     return intermediateResult;
   }
 

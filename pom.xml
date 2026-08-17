@@ -139,9 +139,36 @@
     <!-- Only unit tests are run by default. -->
     <skip.integration.tests>true</skip.integration.tests>
     <skip.unit.tests>false</skip.unit.tests>
+    <!--
+      Per-fork heap for unit tests. Defaults to 4g to preserve historical behavior. When
+      running multiple parallel forks (unit.test.fork.count > 1) CI lowers this so that
+      N forks * heap + the Maven JVM stay within the runner's memory.
+    -->
+    <unit.test.fork.heap>4g</unit.test.fork.heap>
     <!-- Sets the VM argument line used when unit tests are run. -->
-    <argLine>-Xms4g -Xmx4g</argLine>
+    <argLine>-Xms${unit.test.fork.heap} -Xmx${unit.test.fork.heap}</argLine>
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
+    <!--
+      Number of parallel JVM forks used by surefire for unit tests. Defaults to 1 to
+      preserve the historical single-fork behavior for local/dev builds. CI overrides
+      this (e.g. -Dunit.test.fork.count=3) to run test classes in parallel forks and
+      shorten the unit-test phase. Must be a positive integer.
+    -->
+    <unit.test.fork.count>1</unit.test.fork.count>
+    <!--
+      Number of times surefire retries a failing unit test before failing the build. Defaults to
+      0 (no retry) so local/dev behavior is unchanged; CI raises it to absorb a few pre-existing
+      load-sensitive flaky tests exposed by parallel forks. A test passing only on retry is
+      reported as flaky, not silently passed.
+    -->
+    <unit.test.rerun.count>0</unit.test.rerun.count>
+    <!--
+      Suffix for the JaCoCo exec file name. Empty by default so coverage writes the
+      historical target/jacoco.exec (used by report / report-aggregate everywhere). The
+      unit-test script sets this to -${surefire.forkNumber} so parallel forks each write a
+      distinct jacoco-<n>.exec instead of appending to one shared file.
+    -->
+    <jacoco.exec.suffix></jacoco.exec.suffix>
 
     <!-- Checkstyle violation prop.-->
     <checkstyle.violation.severity>warning</checkstyle.violation.severity>
@@ -158,14 +185,15 @@
     <arrow.version>19.0.0</arrow.version>
     <avro.version>1.12.1</avro.version>
     <bson.version>5.9.1</bson.version>
-    <parquet.version>1.17.1</parquet.version>
+    <parquet.version>1.18.0</parquet.version>
     <orc.version>1.9.9</orc.version>
     <hive.version>2.8.1</hive.version>
     <helix.version>2.0.1</helix.version>
     <zkclient.version>0.11</zkclient.version>
     <jackson.version>2.22.1</jackson.version>
+    <fory.version>1.6.0</fory.version>
     <zookeeper.version>3.9.5</zookeeper.version>
-    <async-http-client.version>3.0.11</async-http-client.version>
+    <async-http-client.version>3.0.13</async-http-client.version>
     <jersey.version>2.48</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.16</swagger.version>
@@ -184,12 +212,12 @@
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.39</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.8</snappy-java.version>
-    <zstd-jni.version>1.5.7-12</zstd-jni.version>
-    <lz4-java.version>1.11.1</lz4-java.version>
+    <zstd-jni.version>1.5.7-13</zstd-jni.version>
+    <lz4-java.version>1.11.2</lz4-java.version>
     <libthrift.version>0.24.0</libthrift.version>
     <log4j.version>2.26.1</log4j.version>
     <slf4j.version>2.0.18</slf4j.version>
-    <netty.version>4.1.136.Final</netty.version>
+    <netty.version>4.1.137.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.20.0</jts.version>
     <h3.version>4.4.0</h3.version>
@@ -199,7 +227,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.3.0</stax2-api.version>
-    <aws.sdk.version>2.50.3</aws.sdk.version>
+    <aws.sdk.version>2.51.4</aws.sdk.version>
     <azure.sdk.version>1.3.7</azure.sdk.version>
     <azure.msal4j.version>1.25.1</azure.msal4j.version>
     <joda-time.version>2.14.3</joda-time.version>
@@ -210,10 +238,10 @@
     <plexus-classworlds.version>2.12.0</plexus-classworlds.version>
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
-    <checker-qual.version>4.2.1</checker-qual.version>
+    <checker-qual.version>4.2.2</checker-qual.version>
     <groovy.version>3.0.25</groovy.version>
     <xml-apis.version>2.0.2</xml-apis.version>
-    <roaring-bitmap.version>1.6.19</roaring-bitmap.version>
+    <roaring-bitmap.version>1.6.20</roaring-bitmap.version>
     <prometheus.jmx-exporter.version>1.6.0</prometheus.jmx-exporter.version>
     <prometheus.metrics.version>1.8.0</prometheus.metrics.version>
     <fastutil.version>8.5.19</fastutil.version>
@@ -236,7 +264,7 @@
 
     <!-- Apache Commons Libraries -->
     <commons-lang3.version>3.20.0</commons-lang3.version>
-    <commons-collections4.version>4.5.0</commons-collections4.version>
+    <commons-collections4.version>4.6.0</commons-collections4.version>
     <commons-text.version>1.15.0</commons-text.version>
     <commons-compress.version>1.28.0</commons-compress.version>
     <commons-math3.version>3.6.1</commons-math3.version>
@@ -267,7 +295,7 @@
     <!-- HTTP Components Libraries -->
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <httpclient5.version>5.6.3</httpclient5.version>
+    <httpclient5.version>5.6.4</httpclient5.version>
     <httpcore5.version>5.4.3</httpcore5.version>
 
     <!-- Google Libraries -->
@@ -557,7 +585,9 @@
         <activeByDefault>false</activeByDefault>
       </activation>
       <properties>
-        <argLine>-Xms4g -Xmx4g -Dlog4j2.configurationFile=log4j2.xml</argLine>
+        <!-- Inherits unit.test.fork.heap from the global properties (overridable via
+             -Dunit.test.fork.heap); adds the log4j2 config used under github-actions. -->
+        <argLine>-Xms${unit.test.fork.heap} -Xmx${unit.test.fork.heap} -Dlog4j2.configurationFile=log4j2.xml</argLine>
       </properties>
     </profile>
     <profile>
@@ -578,6 +608,13 @@
                   <includes>
                     <include>org/apache/pinot/**/*</include>
                   </includes>
+                  <!-- Exec file suffix defaults to empty, keeping the historical
+                       target/jacoco.exec used by report / report-aggregate everywhere (incl.
+                       the integration lanes). The unit-test script sets jacoco.exec.suffix to
+                       -${surefire.forkNumber} so parallel forks (forkCount > 1) each write a
+                       distinct jacoco-<n>.exec instead of appending to one shared file; it
+                       then aggregates with a matching jacoco-*.exec glob. -->
+                  <destFile>${project.build.directory}/jacoco${jacoco.exec.suffix}.exec</destFile>
                 </configuration>
               </execution>
             </executions>
@@ -1397,6 +1434,11 @@
         <version>${jsonpath.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.apache.fory</groupId>
+        <artifactId>fory-json</artifactId>
+        <version>${fory.version}</version>
+      </dependency>
+      <dependency>
         <groupId>net.minidev</groupId>
         <artifactId>json-smart</artifactId>
         <version>${jsonsmart.version}</version>
@@ -2167,13 +2209,20 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
           <configuration>
-            <forkCount>1</forkCount>
+            <!-- Overridable via -Dunit.test.fork.count (defaults to 1); see the property
+                 definition for details. -->
+            <forkCount>${unit.test.fork.count}</forkCount>
             <reuseForks>false</reuseForks>
+            <!-- Retries a failing test up to N times (default 0); see property definition. -->
+            <rerunFailingTestsCount>${unit.test.rerun.count}</rerunFailingTestsCount>
             <!-- 60 minutes -->
             <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
             <!-- Disable zookeeper force sync -->
             <systemPropertyVariables>
               <zookeeper.forceSync>no</zookeeper.forceSync>
+              <!-- Expose the 1-based fork index so tests can offset port bases / temp dirs per
+                   fork (1 even at forkCount=1, 1..N under parallel forks). -->
+              <surefire.forkNumber>$${surefire.forkNumber}</surefire.forkNumber>
             </systemPropertyVariables>
             <trimStackTrace>false</trimStackTrace>
             <reportFormat>plain</reportFormat>
@@ -2513,8 +2562,32 @@
           <excludes>
             <exclude>**/*IT.java</exclude>
           </excludes>
-          <forkCount>1</forkCount>
+          <!-- forkCount is overridable via -Dunit.test.fork.count (defaults to 1). Each
+               fork runs a distinct test class (reuseForks=false), so raising the count
+               parallelizes classes across JVMs while preserving class-level isolation. -->
+          <forkCount>${unit.test.fork.count}</forkCount>
           <reuseForks>false</reuseForks>
+          <!-- Retries a failing test up to N times before marking it failed (default 0 = no
+               retry). CI sets this to tolerate a handful of pre-existing load-sensitive flaky
+               tests (Lucene NRT refresh, filesystem mtime) that surface only when many parallel
+               forks saturate the runner; a test that passes on retry is reported as flaky, not
+               green-washed. -->
+          <rerunFailingTestsCount>${unit.test.rerun.count}</rerunFailingTestsCount>
+          <properties>
+            <!-- Surefire is the default report writer; modules can explicitly opt into an isolated
+                 reporter. TestNG's native HTML/XML reporters write shared files and assets, which
+                 race when multiple forks use one module. -->
+            <property>
+              <name>usedefaultlisteners</name>
+              <value>false</value>
+            </property>
+          </properties>
+          <systemPropertyVariables>
+            <!-- Expose the 1-based fork index (1 even at forkCount=1, 1..N under parallel forks)
+                 so tests can offset port bases / temp dirs per fork (see ZkStarter.FORK_PORT_OFFSET,
+                 ControllerTest port bases). -->
+            <surefire.forkNumber>$${surefire.forkNumber}</surefire.forkNumber>
+          </systemPropertyVariables>
         </configuration>
         <executions>
           <execution>

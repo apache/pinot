@@ -331,6 +331,8 @@ public class LiteralContext {
         return "'" + Arrays.toString((float[]) _value) + "'";
       case PRIMITIVE_DOUBLE_ARRAY:
         return "'" + Arrays.toString((double[]) _value) + "'";
+      case STRING_ARRAY:
+        return "'" + Arrays.toString((String[]) _value) + "'";
       default:
         throw new IllegalStateException("Unsupported PinotDataType: " + _pinotDataType);
     }

@@ -258,6 +258,8 @@ public class QueryEnvironmentTestBase {
         new Object[]{"SELECT JSON_EXTRACT_SCALAR_FIRST_MATCH(col1, '$.foo', 'LONG', '0') FROM a"},
         new Object[]{"SELECT JSON_EXTRACT_SCALAR_FIRST_MATCH(col1, '$.foo', 'STRING_ARRAY') FROM a"},
         new Object[]{"SELECT JSON_EXTRACT_SCALAR_FIRST_MATCH(col1, '$.foo', 'TIMESTAMP_ARRAY') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR_FORY(col1, '$.foo', 'LONG', '0') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR_FORY(col1, '$.foo', 'DOUBLE_ARRAY') FROM a"},
         new Object[]{"SELECT ts_timestamp FROM a WHERE ts_timestamp BETWEEN TIMESTAMP '2016-01-01 00:00:00' AND "
               + "TIMESTAMP '2016-01-01 10:00:00'"},
         new Object[]{"SELECT ts_timestamp FROM a WHERE ts_timestamp >= CAST(1454284798000 AS TIMESTAMP)"},

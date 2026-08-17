@@ -146,7 +146,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   /// `SqlNode` in that position: operand checking runs before `PinotEvaluateLiteralRule` folds constant
   /// expressions, so an argument such as `CONCAT('$.', 'foo')` folds to a literal and plans and executes
   /// correctly. Requiring [org.apache.calcite.sql.type.OperandTypes#LITERAL] there would reject these queries,
-  /// which plan and execute successfully on master. Regression guard for all three JSON scalar transforms, which
+  /// which plan and execute successfully on master. Regression guard for all JSON scalar transforms, which
   /// share one operand checker; `QueryRunnerTest#provideTestSqlWithExecutionException` covers the end-to-end half,
   /// asserting that a folded path is actually applied on the leaf stage.
   ///
@@ -154,8 +154,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   /// for return-type inference to see it.
   @Test
   public void testJsonExtractScalarAcceptsFoldableJsonPath() {
-    List<String> functions =
-        List.of("JSON_EXTRACT_SCALAR", "JSON_EXTRACT_SCALAR_FAST", "JSON_EXTRACT_SCALAR_FIRST_MATCH");
+    List<String> functions = List.of("JSON_EXTRACT_SCALAR", "JSON_EXTRACT_SCALAR_FAST",
+        "JSON_EXTRACT_SCALAR_FIRST_MATCH", "JSON_EXTRACT_SCALAR_FORY");
     for (String function : functions) {
       for (String path : List.of("CONCAT('$.', 'foo')", "CAST('$.foo' AS VARCHAR)", "UPPER('$.foo')")) {
         String query = "SELECT " + function + "(col1, " + path + ", 'INT') FROM a";

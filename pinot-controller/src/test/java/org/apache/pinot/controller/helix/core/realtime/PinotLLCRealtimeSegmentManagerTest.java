@@ -77,6 +77,7 @@ import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.PauseState;
@@ -1669,6 +1670,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       throws HttpErrorStatusException, IOException, URISyntaxException {
     // mock the behavior for PinotHelixResourceManager
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    AuthProvider serverAdminAuthProvider = mock(AuthProvider.class);
+    when(pinotHelixResourceManager.getServerAdminAuthProvider()).thenReturn(serverAdminAuthProvider);
     HelixManager helixManager = mock(HelixManager.class);
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
     ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore =
@@ -1725,8 +1728,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // its final location. This is the expected segment location.
     String expectedSegmentLocation =
         segmentManager.createSegmentPath(RAW_TABLE_NAME, segmentsZKMetadata.get(0).getSegmentName()).toString();
-    when(segmentManager._mockedFileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl0)).thenReturn(
-        tempSegmentFileLocation.getPath());
+    when(segmentManager._mockedFileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl0,
+        serverAdminAuthProvider)).thenReturn(tempSegmentFileLocation.getPath());
 
     // Change 2nd segment status to be DONE, but with default peer download url.
     // Verify later the download url isn't fixed after upload failure.
@@ -1743,9 +1746,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     String serverUploadRequestUrl1 =
         String.format("http://%s:%d/segments/%s/%s/upload?uploadTimeoutMs=-1", instance1, adminPort,
             REALTIME_TABLE_NAME, segmentsZKMetadata.get(1).getSegmentName());
-    when(segmentManager._mockedFileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl1)).thenThrow(
-        new HttpErrorStatusException("failed to upload segment",
-            Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
+    when(segmentManager._mockedFileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl1,
+        serverAdminAuthProvider)).thenThrow(new HttpErrorStatusException("failed to upload segment",
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
 
     // Change 3rd segment status to be DONE, but with default peer download url.
     // Verify later the download url isn't fixed because no ONLINE replica found in any server.
@@ -1786,6 +1789,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(3), null).getDownloadUrl(),
         defaultDownloadUrl);
     assertNull(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(4), null).getDownloadUrl());
+    verify(segmentManager._mockedFileUploadDownloadClient).uploadToSegmentStore(serverUploadRequestUrl0,
+        serverAdminAuthProvider);
+    verify(segmentManager._mockedFileUploadDownloadClient).uploadToSegmentStore(serverUploadRequestUrl1,
+        serverAdminAuthProvider);
   }
 
   /// Test cases for fixing LLC segment by uploading to segment store if missing
@@ -1794,6 +1801,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       throws HttpErrorStatusException, IOException, URISyntaxException {
     // mock the behavior for PinotHelixResourceManager
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    AuthProvider serverAdminAuthProvider = mock(AuthProvider.class);
+    when(pinotHelixResourceManager.getServerAdminAuthProvider()).thenReturn(serverAdminAuthProvider);
     HelixManager helixManager = mock(HelixManager.class);
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
     ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore =
@@ -1853,9 +1862,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     SegmentZKMetadata segmentZKMetadataCopy =
         new SegmentZKMetadata(new ZNRecord(segmentsZKMetadata.get(0).toZNRecord()));
 
-    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl0)).thenReturn(
-        new TableLLCSegmentUploadResponse(segmentsZKMetadata.get(0).getSegmentName(), 12345678L, 43210L,
-            tempSegmentFileLocation.getPath()));
+    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl0,
+        serverAdminAuthProvider))
+        .thenReturn(
+          new TableLLCSegmentUploadResponse(segmentsZKMetadata.get(0).getSegmentName(), 12345678L, 43210L,
+              tempSegmentFileLocation.getPath()));
 
     // Change 2nd segment status to be DONE, but with default peer download url.
     // Verify later the download url isn't fixed after upload failure.
@@ -1872,9 +1883,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     String serverUploadRequestUrl1 =
         String.format("http://%s:%d/segments/%s/%s/uploadLLCSegment?uploadTimeoutMs=-1", instance1, adminPort,
             REALTIME_TABLE_NAME, segmentsZKMetadata.get(1).getSegmentName());
-    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl1)).thenThrow(
-        new HttpErrorStatusException("failed to upload segment",
-            Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
+    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl1,
+        serverAdminAuthProvider))
+        .thenThrow(
+          new HttpErrorStatusException("failed to upload segment",
+              Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
 
     // Change 3rd segment status to be DONE, but with default peer download url.
     // Verify later the download url isn't fixed because no ONLINE replica found in any server.
@@ -1915,6 +1928,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(3), null).getDownloadUrl(),
         defaultDownloadUrl);
     assertNull(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(4), null).getDownloadUrl());
+    verify(segmentManager._mockedFileUploadDownloadClient).uploadLLCToSegmentStore(serverUploadRequestUrl0,
+        serverAdminAuthProvider);
+    verify(segmentManager._mockedFileUploadDownloadClient).uploadLLCToSegmentStore(serverUploadRequestUrl1,
+        serverAdminAuthProvider);
   }
 
   @Test
@@ -1922,6 +1939,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       throws HttpErrorStatusException, IOException, URISyntaxException {
     // mock the behavior for PinotHelixResourceManager
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    AuthProvider serverAdminAuthProvider = mock(AuthProvider.class);
+    when(pinotHelixResourceManager.getServerAdminAuthProvider()).thenReturn(serverAdminAuthProvider);
     HelixManager helixManager = mock(HelixManager.class);
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
     ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore =
@@ -1994,7 +2013,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     uploadedCustomMap.put("segmentFileKey", "segmentFileValue");
     segmentZKMetadataCopy.setCustomMap(uploadedCustomMap);
     when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStoreWithZKMetadata(
-        serverUploadRequestUrl0)).thenReturn(segmentZKMetadataCopy);
+        serverUploadRequestUrl0, serverAdminAuthProvider)).thenReturn(segmentZKMetadataCopy);
 
     // Change 2nd segment status to be DONE, but with default peer download url.
     // Verify later the download url isn't fixed after upload failure.
@@ -2011,9 +2030,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     String serverUploadRequestUrl1 =
         String.format("http://%s:%d/segments/%s/%s/uploadCommittedSegment?uploadTimeoutMs=-1", instance1, adminPort,
             REALTIME_TABLE_NAME, segmentsZKMetadata.get(1).getSegmentName());
-    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl1)).thenThrow(
-        new HttpErrorStatusException("failed to upload segment",
-            Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
+    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStoreWithZKMetadata(
+        serverUploadRequestUrl1, serverAdminAuthProvider))
+        .thenThrow(
+          new HttpErrorStatusException("failed to upload segment",
+              Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
 
     // Change 3rd segment status to be DONE, but with default peer download url.
     // Verify later the download url isn't fixed because no ONLINE replica found in any server.
@@ -2059,6 +2080,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(3), null).getDownloadUrl(),
         defaultDownloadUrl);
     assertNull(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(4), null).getDownloadUrl());
+    verify(segmentManager._mockedFileUploadDownloadClient).uploadLLCToSegmentStoreWithZKMetadata(
+        serverUploadRequestUrl0, serverAdminAuthProvider);
+    verify(segmentManager._mockedFileUploadDownloadClient).uploadLLCToSegmentStoreWithZKMetadata(
+        serverUploadRequestUrl1, serverAdminAuthProvider);
   }
 
   @Test

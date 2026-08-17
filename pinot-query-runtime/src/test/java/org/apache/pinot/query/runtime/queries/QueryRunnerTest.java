@@ -330,9 +330,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     testCases.add(new Object[]{
         "SELECT CAST(jsonExtractScalar(col1, CONCAT('pa', 'th'), 'INT') AS INT) FROM a", "Cannot resolve JSON path"});
     //    - the flip side: a jsonPath that cannot fold to a literal is still rejected, on the leaf stage rather than
-    //      during validation. Covers all three variants, which share the operand type checker.
+    //      during validation. Covers all four variants, which share the operand type checker.
     for (String jsonExtractScalar : new String[]{
-        "jsonExtractScalar", "jsonExtractScalarFast", "jsonExtractScalarFirstMatch"
+        "jsonExtractScalar", "jsonExtractScalarFast", "jsonExtractScalarFirstMatch", "jsonExtractScalarFory"
     }) {
       testCases.add(new Object[]{
           "SELECT " + jsonExtractScalar + "(col1, col2, 'INT') FROM a",

@@ -21,6 +21,7 @@ package org.apache.pinot.server.api;
 import java.io.File;
 import java.io.InputStream;
 import java.net.URI;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -71,11 +72,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
 
 
 public abstract class BaseResourceTest {
-  protected static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "BaseResourceTest");
   protected static final String RAW_TABLE_NAME = "testTable";
   protected static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
   protected static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
@@ -89,6 +88,7 @@ public abstract class BaseResourceTest {
   protected final Map<String, TableDataManager> _tableDataManagerMap = new HashMap<>();
   protected final List<ImmutableSegment> _realtimeIndexSegments = new ArrayList<>();
   protected final List<ImmutableSegment> _offlineIndexSegments = new ArrayList<>();
+  protected File _tempDir;
   protected File _avroFile;
   protected AdminApiApplication _adminApiApplication;
   protected WebTarget _webTarget;
@@ -105,13 +105,12 @@ public abstract class BaseResourceTest {
       throws Exception {
     ServerMetrics.register(mock(ServerMetrics.class));
 
-    FileUtils.deleteQuietly(TEMP_DIR);
-    assertTrue(TEMP_DIR.mkdirs());
-    // Copy the Avro fixture out of the classpath into TEMP_DIR so it is always backed by a real file.
+    _tempDir = Files.createTempDirectory(getClass().getSimpleName() + "-").toFile();
+    // Copy the Avro fixture out of the classpath into the temp directory so it is always backed by a real file.
     // The fixture may be served from a packaged test-jar when this base class is reused from another
     // module, in which case it cannot be opened as a plain File via the resource URL.
     String avroFileName = getAvroFileName();
-    _avroFile = new File(TEMP_DIR, new File(avroFileName).getName());
+    _avroFile = new File(_tempDir, new File(avroFileName).getName());
     try (InputStream avroStream = getClass().getClassLoader().getResourceAsStream(avroFileName)) {
       assertNotNull(avroStream);
       FileUtils.copyInputStreamToFile(avroStream, _avroFile);
@@ -128,7 +127,7 @@ public abstract class BaseResourceTest {
     when(_serverInstance.getServerMetrics()).thenReturn(mock(ServerMetrics.class));
     when(_serverInstance.getInstanceDataManager()).thenReturn(instanceDataManager);
     when(_serverInstance.getInstanceDataManager().getSegmentFileDirectory()).thenReturn(
-        FileUtils.getTempDirectoryPath());
+        _tempDir.getAbsolutePath());
 
     // Create a single HelixManager mock with proper segment data
     HelixManager helixManager = mock(HelixManager.class);
@@ -165,11 +164,12 @@ public abstract class BaseResourceTest {
         mock(ServerReloadJobStatusCache.class),
         serverConf);
     _adminApiApplication.start(List.of(
-        new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0", CommonConstants.Server.DEFAULT_ADMIN_API_PORT,
+        new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0", 0,
             CommonConstants.HTTP_PROTOCOL, new TlsConfig(), HttpServerThreadPoolConfig.defaultInstance())));
 
+    int adminApiPort = _adminApiApplication.getHttpServer().getListeners().iterator().next().getPort();
     _webTarget = ClientBuilder.newClient().target(
-        String.format("http://%s:%d", NetUtils.getHostAddress(), CommonConstants.Server.DEFAULT_ADMIN_API_PORT));
+        String.format("http://%s:%d", NetUtils.getHostAddress(), adminApiPort));
   }
 
   protected void configureServerConf(PinotConfiguration serverConf) {
@@ -186,7 +186,7 @@ public abstract class BaseResourceTest {
       immutableSegment.offload();
       immutableSegment.destroy();
     }
-    FileUtils.deleteQuietly(TEMP_DIR);
+    FileUtils.deleteQuietly(_tempDir);
   }
 
   protected List<ImmutableSegment> setUpSegments(String tableNameWithType, int numSegments,
@@ -208,7 +208,7 @@ public abstract class BaseResourceTest {
   protected ImmutableSegment setUpSegment(String tableNameWithType, String segmentName, String segmentNamePostfix,
       List<ImmutableSegment> segments, boolean compressionStatsEnabled)
       throws Exception {
-    File tableDataDir = new File(TEMP_DIR, tableNameWithType);
+    File tableDataDir = new File(_tempDir, tableNameWithType);
     SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, tableDataDir, tableNameWithType);
     config.setSegmentName(segmentName);
@@ -226,7 +226,7 @@ public abstract class BaseResourceTest {
 
   protected void addTable(String tableNameWithType) {
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
-    when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
+    when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(_tempDir.getAbsolutePath());
     when(instanceDataManagerConfig.getInstanceId()).thenReturn("Server_1_100.89.121.12");
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     assertNotNull(tableType);

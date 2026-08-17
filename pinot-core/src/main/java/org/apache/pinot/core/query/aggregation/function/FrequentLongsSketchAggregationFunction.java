@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.lang.foreign.MemorySegment;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.datasketches.frequencies.FrequentLongsSketch;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -60,13 +61,13 @@ import org.apache.pinot.spi.data.FieldSpec;
 ///
 ///   There is a variation of the function (**FREQUENT_STRINGS_SKETCH**) which accepts STRING type input columns.
 public class FrequentLongsSketchAggregationFunction
-    extends BaseSingleInputAggregationFunction<FrequentLongsSketch, Comparable<?>> {
+    extends NullableSingleInputAggregationFunction<FrequentLongsSketch, Comparable<?>> {
   protected static final int DEFAULT_MAX_MAP_SIZE = 256;
 
   protected int _maxMapSize;
 
-  public FrequentLongsSketchAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments.get(0));
+  public FrequentLongsSketchAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments.get(0), nullHandlingEnabled);
     int numArguments = arguments.size();
     Preconditions.checkArgument(numArguments == 1 || numArguments == 2,
         "Expecting 1 or 2 arguments for FrequentLongsSketch function: FREQUENTITEMSSKETCH(column, maxMapSize");
@@ -94,24 +95,34 @@ public class FrequentLongsSketchAggregationFunction
     BlockValSet valueSet = blockValSetMap.get(_expression);
     FieldSpec.DataType valueType = valueSet.getValueType();
 
-    FrequentLongsSketch sketch = getOrCreateSketch(aggregationResultHolder);
-
     switch (valueType) {
       case BYTES:
         // Assuming the column contains serialized data sketch
-        FrequentLongsSketch[] deserializedSketches =
-            deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
-        sketch = getOrCreateSketch(aggregationResultHolder);
-
-        for (FrequentLongsSketch colSketch : deserializedSketches) {
-          sketch.merge(colSketch);
-        }
+        byte[][] bytesValues = valueSet.getBytesValuesSV();
+        // The sketch is created inside the range, so a block with no non-null row leaves the holder untouched and
+        // extractFinalResult sees the null that means nothing was aggregated
+        forEachNotNull(length, valueSet, (from, to) -> {
+          if (to == from) {
+            return;
+          }
+          FrequentLongsSketch sketch = getOrCreateSketch(aggregationResultHolder);
+          for (int i = from; i < to; i++) {
+            sketch.merge(deserializeSketch(bytesValues[i]));
+          }
+        });
         break;
       case INT:
       case LONG:
-        for (Long val : valueSet.getLongValuesSV()) {
-          sketch.update(val);
-        }
+        long[] longValues = valueSet.getLongValuesSV();
+        forEachNotNull(length, valueSet, (from, to) -> {
+          if (to == from) {
+            return;
+          }
+          FrequentLongsSketch sketch = getOrCreateSketch(aggregationResultHolder);
+          for (int i = from; i < to; i++) {
+            sketch.update(longValues[i]);
+          }
+        });
         break;
       default:
         throw new UnsupportedOperationException("Cannot aggregate on non int/long types");
@@ -127,20 +138,21 @@ public class FrequentLongsSketchAggregationFunction
     switch (valueType) {
       case BYTES:
         // serialized sketch
-        FrequentLongsSketch[] deserializedSketches =
-            deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
-        for (int i = 0; i < length; i++) {
-          FrequentLongsSketch sketch = getOrCreateSketch(groupByResultHolder, groupKeyArray[i]);
-          sketch.merge(deserializedSketches[i]);
-        }
+        byte[][] bytesValues = valueSet.getBytesValuesSV();
+        forEachNotNull(length, valueSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            getOrCreateSketch(groupByResultHolder, groupKeyArray[i]).merge(deserializeSketch(bytesValues[i]));
+          }
+        });
         break;
       case INT:
       case LONG:
         long[] values = valueSet.getLongValuesSV();
-        for (int i = 0; i < length; i++) {
-          FrequentLongsSketch sketch = getOrCreateSketch(groupByResultHolder, groupKeyArray[i]);
-          sketch.update(values[i]);
-        }
+        forEachNotNull(length, valueSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            getOrCreateSketch(groupByResultHolder, groupKeyArray[i]).update(values[i]);
+          }
+        });
         break;
       default:
         throw new UnsupportedOperationException("Cannot aggregate on non int/long types");
@@ -156,24 +168,27 @@ public class FrequentLongsSketchAggregationFunction
     switch (valueType) {
       case BYTES:
         // serialized sketch
-        FrequentLongsSketch[] deserializedSketches =
-            deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
-        for (int i = 0; i < length; i++) {
-          for (int groupKey : groupKeysArray[i]) {
-            FrequentLongsSketch sketch = getOrCreateSketch(groupByResultHolder, groupKey);
-            sketch.merge(deserializedSketches[i]);
+        byte[][] bytesValues = valueSet.getBytesValuesSV();
+        forEachNotNull(length, valueSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            // Deserialized once per row, not once per group key the row belongs to
+            FrequentLongsSketch rowSketch = deserializeSketch(bytesValues[i]);
+            for (int groupKey : groupKeysArray[i]) {
+              getOrCreateSketch(groupByResultHolder, groupKey).merge(rowSketch);
+            }
           }
-        }
+        });
         break;
       case INT:
       case LONG:
         long[] values = valueSet.getLongValuesSV();
-        for (int i = 0; i < length; i++) {
-          for (int groupKey : groupKeysArray[i]) {
-            FrequentLongsSketch sketch = getOrCreateSketch(groupByResultHolder, groupKey);
-            sketch.update(values[i]);
+        forEachNotNull(length, valueSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (int groupKey : groupKeysArray[i]) {
+              getOrCreateSketch(groupByResultHolder, groupKey).update(values[i]);
+            }
           }
-        }
+        });
         break;
       default:
         throw new UnsupportedOperationException("Cannot aggregate on non int/long types");
@@ -201,20 +216,18 @@ public class FrequentLongsSketchAggregationFunction
     return sketch;
   }
 
-  /// Deserializes the sketches from the bytes.
-  protected FrequentLongsSketch[] deserializeSketches(byte[][] serializedSketches) {
-    FrequentLongsSketch[] sketches = new FrequentLongsSketch[serializedSketches.length];
-    for (int i = 0; i < serializedSketches.length; i++) {
-      sketches[i] = FrequentLongsSketch.getInstance(MemorySegment.ofArray(serializedSketches[i]));
-    }
-    return sketches;
+  /// Deserializes a single serialized sketch, so a row that is skipped as null is never deserialized.
+  protected FrequentLongsSketch deserializeSketch(byte[] serializedSketch) {
+    return FrequentLongsSketch.getInstance(MemorySegment.ofArray(serializedSketch));
   }
 
+  @Nullable
   @Override
   public FrequentLongsSketch extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public FrequentLongsSketch extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
@@ -223,12 +236,8 @@ public class FrequentLongsSketchAggregationFunction
   @Override
   public FrequentLongsSketch merge(FrequentLongsSketch sketch1, FrequentLongsSketch sketch2) {
     FrequentLongsSketch union = new FrequentLongsSketch(_maxMapSize);
-    if (sketch1 != null) {
-      union.merge(sketch1);
-    }
-    if (sketch2 != null) {
-      union.merge(sketch2);
-    }
+    union.merge(sketch1);
+    union.merge(sketch2);
     return union;
   }
 
@@ -259,8 +268,12 @@ public class FrequentLongsSketchAggregationFunction
         + "(" + _expression + ")";
   }
 
+  @Nullable
   @Override
-  public Comparable<?> extractFinalResult(FrequentLongsSketch sketch) {
-    return new SerializedFrequentLongsSketch(sketch);
+  public Comparable<?> extractFinalResult(@Nullable FrequentLongsSketch sketch) {
+    // A null intermediate result means nothing was aggregated, and there is no sketch to serialize. This function
+    // has never substituted an empty accumulator during extraction, so NULL is the answer in both modes and there is
+    // no disabled-mode identity to preserve here.
+    return sketch != null ? new SerializedFrequentLongsSketch(sketch) : null;
   }
 }

@@ -28,6 +28,7 @@ import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.restlet.resources.TableTierInfo;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,10 +41,18 @@ public class ServerTableTierReader {
 
   private final Executor _executor;
   private final HttpClientConnectionManager _connectionManager;
+  @Nullable
+  private final AuthProvider _authProvider;
 
   public ServerTableTierReader(Executor executor, HttpClientConnectionManager connectionManager) {
+    this(executor, connectionManager, null);
+  }
+
+  public ServerTableTierReader(Executor executor, HttpClientConnectionManager connectionManager,
+      @Nullable AuthProvider authProvider) {
     _executor = executor;
     _connectionManager = connectionManager;
+    _authProvider = authProvider;
   }
 
   public Map<String, TableTierInfo> getTableTierInfoFromServers(BiMap<String, String> serverEndPoints,
@@ -64,7 +73,7 @@ public class ServerTableTierReader {
     }
     LOGGER.debug("Getting table tier info with serverUrls: {}", serverUrls);
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers, _authProvider);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs);
     Map<String, TableTierInfo> serverToTableTierInfoMap = new HashMap<>();

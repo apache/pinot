@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.io.writer.impl;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -142,6 +143,17 @@ public class MutableOffHeapByteArrayStore implements Closeable {
       return value;
     }
 
+    private ByteBuffer getByteBuffer(int index) {
+      int startOffset = _pinotDataBuffer.getInt(index * Integer.BYTES);
+      int endOffset;
+      if (index != 0) {
+        endOffset = _pinotDataBuffer.getInt((index - 1) * Integer.BYTES);
+      } else {
+        endOffset = _size;
+      }
+      return _pinotDataBuffer.toDirectByteBuffer(startOffset, endOffset - startOffset);
+    }
+
     private int getValueSize(int index) {
       int startOffset = _pinotDataBuffer.getInt(index * Integer.BYTES);
       int endOffset;
@@ -218,6 +230,19 @@ public class MutableOffHeapByteArrayStore implements Closeable {
       }
     }
     // Assumed that we will never ask for an index that does not exist.
+    throw new RuntimeException("dictionary ID '" + index + "' too low");
+  }
+
+  /// Returns a read-only view of the value at the given index without copying it.
+  /// The returned buffer must not be used after this store is closed.
+  public ByteBuffer getByteBuffer(int index) {
+    List<Buffer> bufList = _buffers;
+    for (int x = bufList.size() - 1; x >= 0; x--) {
+      Buffer buffer = bufList.get(x);
+      if (index >= buffer.getStartIndex()) {
+        return buffer.getByteBuffer(index - buffer.getStartIndex()).asReadOnlyBuffer();
+      }
+    }
     throw new RuntimeException("dictionary ID '" + index + "' too low");
   }
 

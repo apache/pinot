@@ -231,7 +231,8 @@ public class PinotTableInstances {
     SimpleHttpResponse simpleHttpResponse;
     try {
       simpleHttpResponse =
-          HttpClient.wrapAndThrowHttpException(HttpClient.getInstance().sendDeleteRequest(URI.create(fullUrl)));
+          HttpClient.wrapAndThrowHttpException(HttpClient.getInstance().sendDeleteRequest(URI.create(fullUrl), Map.of(),
+              _pinotHelixResourceManager.getServerAdminAuthProvider()));
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
     }

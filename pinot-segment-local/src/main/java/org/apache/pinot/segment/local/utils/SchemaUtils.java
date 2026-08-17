@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.utils;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -31,6 +30,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.BuiltInVirtualColumnDefinitions;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
@@ -162,6 +162,12 @@ public class SchemaUtils {
       String column = fieldSpec.getName();
       Preconditions.checkState(!StringUtils.containsWhitespace(column),
           "The column name \"%s\" should not contain blank space.", column);
+      // A user column of the same name would be shadowed at query time: the built-in virtual column is filtered out
+      // of the segment's physical columns when the segment metadata is read, and the virtual provider then takes over
+      // the name, so queries would silently return segment metadata instead of the user's data.
+      Preconditions.checkState(
+          fieldSpec.isVirtualColumn() || !BuiltInVirtualColumnDefinitions.NAMES.contains(column),
+          "The column name \"%s\" is reserved for a built-in virtual column.", column);
       if (!fieldSpec.isVirtualColumn()) {
         primaryKeyColumnCandidates.add(column);
       }
@@ -194,9 +200,14 @@ public class SchemaUtils {
         validateMultiValueCompatibility(fieldSpec);
       }
     }
-    Preconditions.checkState(Collections.disjoint(transformedColumns, argumentColumns),
+    // Compute the intersection in a fresh set so the error message lists the actual conflicting columns and we do not
+    // mutate transformedColumns. Previously, Set#retainAll's boolean return value was passed as the format argument,
+    // producing a useless "Columns: true ..." message.
+    Set<String> chainedTransformColumns = new HashSet<>(transformedColumns);
+    chainedTransformColumns.retainAll(argumentColumns);
+    Preconditions.checkState(chainedTransformColumns.isEmpty(),
         "Columns: %s are a result of transformations, and cannot be used as arguments to other transform functions",
-        transformedColumns.retainAll(argumentColumns));
+        chainedTransformColumns);
     if (schema.getPrimaryKeyColumns() != null) {
       for (String primaryKeyColumn : schema.getPrimaryKeyColumns()) {
         Preconditions.checkState(primaryKeyColumnCandidates.contains(primaryKeyColumn),
