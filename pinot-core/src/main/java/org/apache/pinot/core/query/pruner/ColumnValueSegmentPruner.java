@@ -48,7 +48,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 @SuppressWarnings({"rawtypes", "unchecked", "RedundantIfStatement"})
 public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
   @Override
-  protected boolean isApplicableToPredicate(Predicate predicate) {
+  protected boolean isApplicableToPredicate(Predicate predicate, boolean forceInPredicatePruning) {
     // Only prune columns
     if (predicate.getLhs().getType() != ExpressionContext.Type.IDENTIFIER) {
       return false;
@@ -59,8 +59,8 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
     }
     if (predicateType == Predicate.Type.IN) {
       List<String> values = ((InPredicate) predicate).getValues();
-      // Skip pruning when there are too many values in the IN predicate
-      if (values.size() <= _inPredicateThreshold) {
+      // Skip pruning when there are too many values in the IN predicate, unless pruning is forced for this query
+      if (shouldPruneInPredicate(values.size(), forceInPredicatePruning)) {
         return true;
       }
     }
@@ -118,8 +118,8 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
   private boolean pruneInPredicate(IndexSegment segment, InPredicate inPredicate,
       Map<String, DataSource> dataSourceCache, ValueCache valueCache, QueryContext query) {
     List<String> values = inPredicate.getValues();
-    // Skip pruning when there are too many values in the IN predicate
-    if (values.size() > _inPredicateThreshold) {
+    // Skip pruning when there are too many values in the IN predicate, unless pruning is forced for this query
+    if (!shouldPruneInPredicate(values.size(), isInPredicatePruningForced(query))) {
       return false;
     }
     String column = inPredicate.getLhs().getIdentifier();

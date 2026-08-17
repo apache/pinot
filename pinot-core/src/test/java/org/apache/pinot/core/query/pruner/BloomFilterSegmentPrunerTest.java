@@ -256,8 +256,13 @@ public class BloomFilterSegmentPrunerTest {
     assertFalse(PRUNER.isApplicableTo(queryContext));
     // Too many values for IN clause
     queryContext = QueryContextConverterUtils.getQueryContext(
-        "SELECT COUNT(*) FROM testTable WHERE column IN (1, 2, 3, 4, 5, 6, 7)");
+        "SELECT COUNT(*) FROM testTable WHERE column IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)");
     assertFalse(PRUNER.isApplicableTo(queryContext));
+    // ... but applicable when pruning is forced for the query
+    queryContext = QueryContextConverterUtils.getQueryContext(
+        "SET forceInPredicatePruning=true; SELECT COUNT(*) FROM testTable WHERE column IN "
+            + "(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)");
+    assertTrue(PRUNER.isApplicableTo(queryContext));
     // Other predicate types are not applicable
     queryContext = QueryContextConverterUtils.getQueryContext("SELECT COUNT(*) FROM testTable WHERE column LIKE 5");
     assertFalse(PRUNER.isApplicableTo(queryContext));
@@ -276,6 +281,22 @@ public class BloomFilterSegmentPrunerTest {
     queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT COUNT(*) FROM testTable WHERE column = 3 OR (column NOT IN (1, 2) AND column = 4)");
     assertTrue(PRUNER.isApplicableTo(queryContext));
+  }
+
+  @Test
+  public void testForcedInPredicatePruning()
+      throws IOException {
+    IndexSegment indexSegment = mockIndexSegment(new String[]{"1.0", "2.0", "3.0", "5.0", "7.0", "21.0"});
+
+    // Without the option, a large IN list (more than the default threshold of 10) is not pruned even though all
+    // values are absent from the bloom filter
+    assertFalse(runPruner(indexSegment,
+        "SELECT COUNT(*) FROM testTable WHERE column IN "
+            + "(30.0, 31.0, 32.0, 33.0, 34.0, 35.0, 36.0, 37.0, 38.0, 39.0, 40.0)"));
+    // With the option, the same IN list is pruned as all values are absent from the bloom filter
+    assertTrue(runPruner(indexSegment,
+        "SET forceInPredicatePruning=true; SELECT COUNT(*) FROM testTable WHERE column IN "
+            + "(30.0, 31.0, 32.0, 33.0, 34.0, 35.0, 36.0, 37.0, 38.0, 39.0, 40.0)"));
   }
 
   private IndexSegment mockIndexSegment(String[] values)

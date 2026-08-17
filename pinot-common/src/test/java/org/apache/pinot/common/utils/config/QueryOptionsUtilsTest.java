@@ -110,6 +110,17 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
+  public void shouldReadForceInPredicatePruningOption() {
+    Map<String, String> optsTrue = Map.of(FORCE_IN_PREDICATE_PRUNING, "true");
+    Map<String, String> optsFalse = Map.of(FORCE_IN_PREDICATE_PRUNING, "false");
+    Map<String, String> optsMissing = Map.of();
+
+    assertTrue(QueryOptionsUtils.isForceInPredicatePruning(optsTrue));
+    assertFalse(QueryOptionsUtils.isForceInPredicatePruning(optsFalse));
+    assertFalse(QueryOptionsUtils.isForceInPredicatePruning(optsMissing));
+  }
+
+  @Test
   public void testSkipIndexesParsing() {
     String skipIndexesStr = "col1=inverted,range&col2=sorted";
     Map<String, String> queryOptions = Map.of(SKIP_INDEXES, skipIndexesStr);

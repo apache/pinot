@@ -113,6 +113,28 @@ public class ColumnValueSegmentPrunerTest {
   }
 
   @Test
+  public void testForcedInPredicatePruning() {
+    IndexSegment indexSegment = mockIndexSegment();
+
+    DataSource dataSource = mock(DataSource.class);
+    when(indexSegment.getDataSource(eq("column"), any(Schema.class))).thenReturn(dataSource);
+    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
+    when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
+    when(dataSourceMetadata.getMinValue()).thenReturn(10);
+    when(dataSourceMetadata.getMaxValue()).thenReturn(20);
+    when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
+
+    // Without the option, a large IN list (more than the default threshold of 10) is not pruned even though all
+    // values are out of min/max range
+    assertFalse(runPruner(indexSegment,
+        "SELECT COUNT(*) FROM testTable WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 21)"));
+    // With the option, the same IN list is pruned as all values are out of min/max range
+    assertTrue(runPruner(indexSegment,
+        "SET forceInPredicatePruning=true; "
+            + "SELECT COUNT(*) FROM testTable WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 21)"));
+  }
+
+  @Test
   public void testPartitionPruning() {
     IndexSegment indexSegment = mockIndexSegment();
 
@@ -159,8 +181,13 @@ public class ColumnValueSegmentPrunerTest {
     assertFalse(PRUNER.isApplicableTo(queryContext));
     // Too many values for IN clause
     queryContext = QueryContextConverterUtils.getQueryContext(
-        "SELECT COUNT(*) FROM testTable WHERE column IN (1, 2, 3, 4, 5, 6, 7)");
+        "SELECT COUNT(*) FROM testTable WHERE column IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)");
     assertFalse(PRUNER.isApplicableTo(queryContext));
+    // ... but applicable when pruning is forced for the query
+    queryContext = QueryContextConverterUtils.getQueryContext(
+        "SET forceInPredicatePruning=true; SELECT COUNT(*) FROM testTable WHERE column IN "
+            + "(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)");
+    assertTrue(PRUNER.isApplicableTo(queryContext));
     // Other predicate types are not applicable
     queryContext = QueryContextConverterUtils.getQueryContext("SELECT COUNT(*) FROM testTable WHERE column LIKE 5");
     assertFalse(PRUNER.isApplicableTo(queryContext));

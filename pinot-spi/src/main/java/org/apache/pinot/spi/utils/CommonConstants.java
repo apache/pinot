@@ -860,6 +860,10 @@ public class CommonConstants {
 
         public static final String IN_PREDICATE_PRE_SORTED = "inPredicatePreSorted";
         public static final String IN_PREDICATE_LOOKUP_ALGORITHM = "inPredicateLookupAlgorithm";
+        /// When true, the column-value and bloom-filter segment pruners always attempt to prune segments for
+        /// IN predicates, regardless of the number of values in the IN clause (i.e. the server-configured
+        /// `inpredicate.threshold` is ignored for this query). Defaults to false.
+        public static final String FORCE_IN_PREDICATE_PRUNING = "forceInPredicatePruning";
 
         // When evaluating REGEXP_LIKE predicate on a dictionary encoded column:
         // - If dictionary size is smaller than this threshold, scan the dictionary to get the matching dictionary ids
