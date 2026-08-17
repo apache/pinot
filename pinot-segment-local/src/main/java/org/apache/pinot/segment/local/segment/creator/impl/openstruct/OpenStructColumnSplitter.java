@@ -205,20 +205,31 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         if (keySpec != null) {
           valueType = keySpec.getDataType();
         } else {
-          // Resolve per value rather than only on first sighting: the key's inferred type is cached,
-          // so folding the counter into a computeIfAbsent would record one failure per key no matter
-          // how many values actually took the STRING fallback.
           DataType established = _inferredTypes.get(key);
-          DataType inferred = OpenStructTypeInference.inferDataType(rawValue);
-          if (inferred == null) {
-            valueType = DataType.STRING;
-            if (established == null || established == DataType.STRING) {
-              _inferenceFailuresPerKey.merge(key, 1L, Long::sum);
-            }
+          if (established != null && established != DataType.STRING) {
+            // Sticky: a key already resolved to a non-STRING type can't flip later, so skip
+            // inference entirely -- matches MutableOpenStructIndex's fast path. An unmappable
+            // value here is a coercion failure below, not a fresh inference decision; overriding
+            // valueType to STRING per-row would desync it from _inferredTypes and corrupt _values
+            // with a mix of types for one key.
+            valueType = established;
           } else {
-            valueType = established != null ? established : inferred;
+            // Resolve per value rather than only on first sighting: the key's inferred type is
+            // cached, so folding the counter into a computeIfAbsent would record one failure per
+            // key no matter how many values actually took the STRING fallback.
+            DataType inferred = OpenStructTypeInference.inferDataType(rawValue);
+            if (inferred == null) {
+              valueType = DataType.STRING;
+              if (established == null || established == DataType.STRING) {
+                _inferenceFailuresPerKey.merge(key, 1L, Long::sum);
+              }
+            } else {
+              // established is STRING here (or null): once a key falls back to STRING it stays
+              // STRING even if a later value would infer cleanly on its own.
+              valueType = established != null ? established : inferred;
+            }
+            _inferredTypes.putIfAbsent(key, valueType);
           }
-          _inferredTypes.putIfAbsent(key, valueType);
         }
         if (!_presenceBitmaps.containsKey(key)) {
           _presenceBitmaps.put(key, new RoaringBitmap());
