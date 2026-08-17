@@ -749,8 +749,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     // All three are plain values: nothing here depends on the clock, so a snapshot is the whole truth
     _brokerMetrics.setValueOfTableGauge(tableNameWithType, BrokerGauge.PERCENT_OF_REPLICAS,
         replicaHealth.getMinPercentOfReplicas());
-    _brokerMetrics.setValueOfTableGauge(tableNameWithType, BrokerGauge.SEGMENTS_WITHOUT_REDUNDANCY,
-        replicaHealth.getNumSegmentsWithoutRedundancy());
+    _brokerMetrics.setValueOfTableGauge(tableNameWithType, BrokerGauge.SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS,
+        replicaHealth.getNumSegmentsAtMinPercentOfReplicas());
     _brokerMetrics.setValueOfTableGauge(tableNameWithType, BrokerGauge.UNAVAILABLE_SEGMENTS,
         replicaHealth.getNumUnavailableSegments());
   }
@@ -760,7 +760,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   private void removeReplicaHealthMetrics(String tableNameWithType) {
     _brokerMetrics.removeTableGauge(tableNameWithType, BrokerGauge.PERCENT_OF_REPLICAS);
     _brokerMetrics.removeTableGauge(tableNameWithType, BrokerGauge.UNAVAILABLE_SEGMENTS);
-    _brokerMetrics.removeTableGauge(tableNameWithType, BrokerGauge.SEGMENTS_WITHOUT_REDUNDANCY);
+    _brokerMetrics.removeTableGauge(tableNameWithType, BrokerGauge.SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS);
   }
 
   private void buildRoutingInternal(String tableNameWithType) {

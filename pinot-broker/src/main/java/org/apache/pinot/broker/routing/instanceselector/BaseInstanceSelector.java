@@ -384,7 +384,9 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     Set<String> servingInstances = new HashSet<>();
     Set<String> unavailableSegments = new HashSet<>();
     int minPercentOfReplicas = TableReplicaHealth.FULLY_REPLICATED_PERCENT;
-    int numSegmentsWithoutRedundancy = 0;
+    // Segments seen at exactly minPercentOfReplicas so far. Reset whenever a lower percentage displaces the
+    // minimum, so that the pair published below always describes the same population.
+    int numSegmentsAtMinPercentOfReplicas = 0;
 
     for (Map.Entry<String, List<SegmentInstanceCandidate>> entry : _oldSegmentCandidatesMap.entrySet()) {
       String segment = entry.getKey();
@@ -394,10 +396,12 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
       int expectedReplicas = getExpectedReplicas(segment, candidates.size());
       int servingReplicas = enabledCandidates.size();
       if (TableReplicaHealth.shouldMeasure(expectedReplicas)) {
-        minPercentOfReplicas =
-            Math.min(minPercentOfReplicas, TableReplicaHealth.toPercent(servingReplicas, expectedReplicas));
-        if (TableReplicaHealth.isWithoutRedundancy(servingReplicas)) {
-          numSegmentsWithoutRedundancy++;
+        int percentOfReplicas = TableReplicaHealth.toPercent(servingReplicas, expectedReplicas);
+        if (percentOfReplicas < minPercentOfReplicas) {
+          minPercentOfReplicas = percentOfReplicas;
+          numSegmentsAtMinPercentOfReplicas = 1;
+        } else if (percentOfReplicas == minPercentOfReplicas) {
+          numSegmentsAtMinPercentOfReplicas++;
         }
       }
       if (!enabledCandidates.isEmpty()) {
@@ -436,8 +440,8 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     }
 
     _segmentStates = new SegmentStates(instanceCandidatesMap, servingInstances, unavailableSegments);
-    _replicaHealth =
-        new TableReplicaHealth(minPercentOfReplicas, numSegmentsWithoutRedundancy, unavailableSegments.size());
+    _replicaHealth = new TableReplicaHealth(minPercentOfReplicas, numSegmentsAtMinPercentOfReplicas,
+        unavailableSegments.size());
   }
 
   private List<SegmentInstanceCandidate> getEnabledCandidatesAndAddToServingInstances(

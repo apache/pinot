@@ -88,7 +88,7 @@ public class BrokerRoutingManagerTest {
   private static final String TEST_TABLE = "testTable_OFFLINE";
   private static final List<BrokerGauge> REPLICA_HEALTH_GAUGES =
       List.of(BrokerGauge.PERCENT_OF_REPLICAS, BrokerGauge.UNAVAILABLE_SEGMENTS,
-          BrokerGauge.SEGMENTS_WITHOUT_REDUNDANCY);
+          BrokerGauge.SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS);
 
   private AutoCloseable _mocks;
 
@@ -335,7 +335,7 @@ public class BrokerRoutingManagerTest {
     _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
 
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.PERCENT_OF_REPLICAS, 33);
-    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.SEGMENTS_WITHOUT_REDUNDANCY, 2);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS, 2);
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.UNAVAILABLE_SEGMENTS, 1);
   }
 
@@ -403,7 +403,7 @@ public class BrokerRoutingManagerTest {
     // A table with no segments has nothing to measure, so it reads as fully replicated rather than as an
     // outage - see TableReplicaHealth
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.PERCENT_OF_REPLICAS, 100);
-    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.SEGMENTS_WITHOUT_REDUNDANCY, 0);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS, 0);
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.UNAVAILABLE_SEGMENTS, 0);
   }
 
@@ -429,7 +429,7 @@ public class BrokerRoutingManagerTest {
     _routingManager.processSegmentAssignmentChangeInternal();
 
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.PERCENT_OF_REPLICAS, 100);
-    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.SEGMENTS_WITHOUT_REDUNDANCY, 0);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS, 0);
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.UNAVAILABLE_SEGMENTS, 0);
   }
 
@@ -497,7 +497,7 @@ public class BrokerRoutingManagerTest {
     _routingManager.processSegmentAssignmentChangeInternal();
 
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.PERCENT_OF_REPLICAS, 0);
-    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.SEGMENTS_WITHOUT_REDUNDANCY, 4);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS, 4);
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.UNAVAILABLE_SEGMENTS, 4);
   }
 
@@ -520,7 +520,7 @@ public class BrokerRoutingManagerTest {
     _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
 
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.PERCENT_OF_REPLICAS, 0);
-    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.SEGMENTS_WITHOUT_REDUNDANCY, 3);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS, 3);
     verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.UNAVAILABLE_SEGMENTS, 3);
   }
 

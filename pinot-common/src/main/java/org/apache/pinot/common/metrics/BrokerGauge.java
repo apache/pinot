@@ -127,10 +127,10 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   /// single replica are included
   UNAVAILABLE_SEGMENTS("segments", false),
 
-  /// Number of the table's segments that are down to their last routable replica, or have none left.
-  /// Segments assigned a single replica are excluded, since they never had redundancy to lose. Recently created
-  /// segments are excluded on the same terms as [#PERCENT_OF_REPLICAS].
-  SEGMENTS_WITHOUT_REDUNDANCY("segments", false);
+  /// Number of the table's measured segments that are replicated as poorly as [#PERCENT_OF_REPLICAS] reports,
+  /// i.e. how many segments that percentage speaks for. The same populations are excluded, so this reads `0`
+  /// exactly when the table has nothing to measure.
+  SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS("segments", false);
 
   private final String _brokerGaugeName;
   private final String _unit;
