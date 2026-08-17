@@ -18,44 +18,52 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionContext;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+
 
 /// Instance selector for strict replica-group routing strategy.
 ///
-/// ```
-/// The strict replica-group routing strategy always routes the query to the instances within the same replica-group.
-/// (Note that the replica-group information is derived from the ideal state of the table, where the instances are
-/// sorted alphabetically in the instance state map, so the replica-groups in the instance selector might not match the
-/// replica-groups in the instance partitions). The goal of this algorithm is to ensure that segments from the same
-/// partition are never served from multiple different instances. The instances in a replica-group should have all the
-/// online segments (segments with ONLINE/CONSUMING instances in the ideal state and selected by the pre-selector)
-/// available (ONLINE/CONSUMING in the external view) in order to serve queries. If any segment is unavailable in the
-/// replica-group, we mark the whole replica-group down and not serve queries with this replica-group.
+/// The strict replica-group routing strategy always routes same-partition segments to the same instance. During
+/// routing state construction, [#updateSegmentMapsForUpsertTable(IdealState, ExternalView, Set, Map)] removes from
+/// every segment in a partition any replica that is unavailable for any old segment in that partition. Consequently,
+/// all same-partition segments have identical, ordered candidate identities.
 ///
-/// The selection algorithm is the same as {@link ReplicaGroupInstanceSelector}, and will always evenly distribute the
-/// traffic to all replica-groups that have all online segments available.
+/// Adaptive routing preserves that guarantee without explicit partition or mirror-set metadata. The inherited
+/// selector takes one ranking snapshot for the query and deterministically chooses the best candidate from each
+/// segment's ordered list. Identical filtered candidate lists, the same ranking snapshot, and deterministic list-order
+/// tie-breaking therefore produce identical selections for every segment in a partition. Different partitions may
+/// independently choose different replicas.
 ///
-/// The algorithm relies on the mirror segment assignment from replica-group segment assignment strategy. With mirror
-/// segment assignment, any server in one replica-group will always have a corresponding server in other replica-groups
-/// that have the same segments assigned. For example, if S1 is a server in replica-group 1, and it has mirror server S2
-/// in replica-group 2 and S3 in replica-group 3. All segments assigned to S1 will also be assigned to S2 and S3. In
-/// stable scenario (external view matches ideal state), all segments assigned to S1 will have the same enabled
-/// instances of [S1, S2, S3] sorted (in alphabetical order). If we always pick the same index of enabled instances for
-/// all segments, only one of S1, S2, S3 will be picked, and all the segments are processed by the same server. In
-/// transitioning/error scenario (external view does not match ideal state), if a segment is down on S1, we mark all
-/// segments with the same assignment ([S1, S2, S3]) down on S1 to ensure that we always route the segments to the same
-/// replica-group.
-///
-/// Note that new segments won't be used to exclude instances from serving when the segment is unavailable.
-/// ```
+/// New segments do not exclude a candidate when that segment is unavailable; they remain optional so that the broker or
+/// server can skip them if necessary.
 public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSelector {
 
   @Override
   void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
       Map<String, Long> newSegmentCreationTimeMap) {
     super.updateSegmentMapsForUpsertTable(idealState, externalView, onlineSegments, newSegmentCreationTimeMap);
+  }
+
+  @Override
+  public InstanceMapping select(List<String> segments, int requestId,
+      SegmentStates segmentStates, Map<String, String> queryOptions) {
+    ServerSelectionContext ctx = new ServerSelectionContext(queryOptions, _config);
+    if (_adaptiveServerSelector != null && _priorityPoolInstanceSelector != null) {
+      if (ctx.isUseFixedReplica()) {
+        throw new IllegalArgumentException(
+            "useFixedReplica cannot be used when adaptive routing is enabled for StrictReplicaGroupInstanceSelector");
+      }
+      if (QueryOptionsUtils.getNumReplicaGroupsToQuery(ctx.getQueryOptions()) != null) {
+        // This option intentionally fans segments across replica groups, so preserve the non-adaptive behavior.
+        return selectServers(segments, requestId, segmentStates, null, ctx);
+      }
+    }
+    return selectWithContext(segments, requestId, segmentStates, ctx);
   }
 }
