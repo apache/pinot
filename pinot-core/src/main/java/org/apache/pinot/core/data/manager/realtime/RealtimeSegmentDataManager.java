@@ -470,18 +470,17 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   /// TODO: Key the table meter on `_clientId` instead of `_tableStreamName` so that it carries table, topic and
   ///       partition labels, and keep the global meter for backward compatibility.
-  private void meterConsumptionException() {
-    _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
-    _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
+  private void meterGlobalAndTable(ServerMeter meter) {
+    _serverMetrics.addMeteredGlobalValue(meter, 1L);
+    _serverMetrics.addMeteredTableValue(_tableStreamName, meter, 1L);
   }
 
   private void handleTransientStreamErrors(Exception e)
       throws Exception {
     _consecutiveErrorCount++;
-    meterConsumptionException();
+    meterGlobalAndTable(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS);
     if (_consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_RETRIES_EXHAUSTED, 1L);
-      _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_RETRIES_EXHAUSTED, 1L);
+      meterGlobalAndTable(ServerMeter.REALTIME_CONSUMPTION_STOPPED_BY_STREAM_ERROR);
       _segmentLogger.warn("Stream transient exception when fetching messages, stopping consumption after {} attempts",
           _consecutiveErrorCount, e);
       throw e;
@@ -539,7 +538,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _endOfPartitionGroup = messageBatch.getMessageCount() == 0 && messageBatch.isEndOfPartitionGroup();
         _consecutiveErrorCount = 0;
       } catch (PermanentConsumerException e) {
-        meterConsumptionException();
+        meterGlobalAndTable(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS);
+        meterGlobalAndTable(ServerMeter.REALTIME_CONSUMPTION_STOPPED_BY_STREAM_ERROR);
         _segmentLogger.warn("Permanent exception from stream when fetching messages, stopping consumption", e);
         throw e;
       } catch (Exception e) {
@@ -547,9 +547,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           // A teardown rather than a stream fault, so it must not be slept on or answered by building a replacement
           // consumer for a segment that is going away. Exit the loop instead: on the offload path the thread winds
           // down, and on the catch-up path the caller falls back to downloading the segment.
-          _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_STOPPED_BY_INTERRUPT, 1L);
-          _serverMetrics.addMeteredTableValue(_tableStreamName,
-              ServerMeter.REALTIME_CONSUMPTION_STOPPED_BY_INTERRUPT, 1L);
+          meterGlobalAndTable(ServerMeter.REALTIME_CONSUMPTION_STOPPED_BY_INTERRUPT);
           _segmentLogger.info("Consumption interrupted to stop the consumer, exiting the consume loop", e);
           break;
         }
@@ -563,7 +561,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       } catch (Throwable t) {
         //track realtime rows fetched on a table level. This included valid + invalid rows
         // An Error aborts consumption just as the cases above do, so it is counted the same way
-        meterConsumptionException();
+        meterGlobalAndTable(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS);
+        meterGlobalAndTable(ServerMeter.REALTIME_CONSUMPTION_STOPPED_BY_STREAM_ERROR);
         _segmentLogger.warn("Stream error when fetching messages, stopping consumption", t);
         throw t;
       }

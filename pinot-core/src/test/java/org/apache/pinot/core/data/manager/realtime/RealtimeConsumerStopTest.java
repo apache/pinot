@@ -46,6 +46,7 @@ import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
+import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
@@ -57,6 +58,7 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -181,7 +183,7 @@ public class RealtimeConsumerStopTest {
       TestStreamConsumerFactory.fetchesBehaveAs(TestStreamConsumerFactory.FetchBehaviour.FAIL);
       long consumptionExceptions = consumptionExceptions(serverMetrics);
       long stoppedByInterrupt = stoppedByInterrupt(serverMetrics);
-      long retriesExhausted = retriesExhausted(serverMetrics);
+      long stoppedByStreamError = stoppedByStreamError(serverMetrics);
       startConsumingSegment(tableDataManager, serverMetrics);
 
       // The transient handler sleeps and rebuilds the consumer, so a second consumer proves the retry happened
@@ -192,8 +194,8 @@ public class RealtimeConsumerStopTest {
           "A stream failure must be counted as a consumption exception");
       assertEquals(stoppedByInterrupt(serverMetrics), stoppedByInterrupt,
           "A stream failure must not be counted as a deliberate stop");
-      assertEquals(retriesExhausted(serverMetrics), retriesExhausted,
-          "A failure that still has retries left must not be counted as an exhausted retry budget");
+      assertEquals(stoppedByStreamError(serverMetrics), stoppedByStreamError,
+          "A failure with retries left has not stopped consumption yet");
     } finally {
       tableDataManager.shutDown();
     }
@@ -201,7 +203,7 @@ public class RealtimeConsumerStopTest {
 
   /// A stream that keeps failing eventually runs the retry budget out, which is the point at which the segment is
   /// abandoned. `realtimeConsumptionExceptions` moves on every attempt, including ones that would have self-healed,
-  /// so the exhaustion is what alerts hang on and it has to be counted exactly once per abandoned segment.
+  /// so the abandonment is what alerts hang on and it has to be counted exactly once per abandoned segment.
   @Test
   public void testExhaustingTheRetryBudgetIsCountedOnce()
       throws Exception {
@@ -210,15 +212,15 @@ public class RealtimeConsumerStopTest {
     try {
       TestStreamConsumerFactory.fetchesBehaveAs(TestStreamConsumerFactory.FetchBehaviour.FAIL);
       long consumptionExceptions = consumptionExceptions(serverMetrics);
-      long retriesExhausted = retriesExhausted(serverMetrics);
+      long stoppedByStreamError = stoppedByStreamError(serverMetrics);
       startConsumingSegment(tableDataManager, serverMetrics);
 
       // Each attempt backs off for a second before the next, so the budget takes a few seconds to run out
-      TestUtils.waitForCondition(aVoid -> retriesExhausted(serverMetrics) > retriesExhausted, 60_000L,
-          "Retry budget was never reported as exhausted");
+      TestUtils.waitForCondition(aVoid -> stoppedByStreamError(serverMetrics) > stoppedByStreamError, 60_000L,
+          "Consumption was never reported as stopped by a stream error");
 
-      assertEquals(retriesExhausted(serverMetrics), retriesExhausted + 1,
-          "Exhausting the retry budget should be counted once, not once per attempt");
+      assertEquals(stoppedByStreamError(serverMetrics), stoppedByStreamError + 1,
+          "Abandoning the segment should be counted once, not once per attempt");
       assertEquals(consumptionExceptions(serverMetrics), consumptionExceptions + ATTEMPTS_BEFORE_GIVING_UP,
           "Every failed attempt should be counted as a consumption exception");
     } finally {
@@ -226,12 +228,47 @@ public class RealtimeConsumerStopTest {
     }
   }
 
+  /// A permanent stream error and an [Error] both abandon the segment on the spot, with no retry to wait out. They
+  /// leave the consume loop through catch blocks of their own, so each has to reach the same meter as the exhausted
+  /// retry budget above — that meter is what says ingestion stopped, whatever the reason.
+  @Test(dataProvider = "failuresThatAbandonAtOnce")
+  public void testAFailureThatAbandonsTheSegmentAtOnceIsCountedOnce(
+      TestStreamConsumerFactory.FetchBehaviour fetchBehaviour)
+      throws Exception {
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    RealtimeTableDataManager tableDataManager = createTableDataManager();
+    try {
+      TestStreamConsumerFactory.fetchesBehaveAs(fetchBehaviour);
+      long consumptionExceptions = consumptionExceptions(serverMetrics);
+      long stoppedByStreamError = stoppedByStreamError(serverMetrics);
+      startConsumingSegment(tableDataManager, serverMetrics);
+
+      TestUtils.waitForCondition(aVoid -> stoppedByStreamError(serverMetrics) > stoppedByStreamError, 30_000L,
+          "Consumption was never reported as stopped by a stream error");
+
+      assertEquals(stoppedByStreamError(serverMetrics), stoppedByStreamError + 1,
+          "Abandoning the segment should be counted once");
+      assertEquals(consumptionExceptions(serverMetrics), consumptionExceptions + 1,
+          "The failure should also be counted as a consumption exception");
+      assertEquals(TestStreamConsumerFactory.FETCHES.get(), 1, "Neither failure should be retried");
+    } finally {
+      tableDataManager.shutDown();
+    }
+  }
+
+  @DataProvider(name = "failuresThatAbandonAtOnce")
+  public Object[][] failuresThatAbandonAtOnce() {
+    return new Object[][]{
+        {TestStreamConsumerFactory.FetchBehaviour.PERMANENT}, {TestStreamConsumerFactory.FetchBehaviour.ERROR}
+    };
+  }
+
   private static long consumptionExceptions(ServerMetrics serverMetrics) {
     return serverMetrics.getMeteredValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS).count();
   }
 
-  private static long retriesExhausted(ServerMetrics serverMetrics) {
-    return serverMetrics.getMeteredValue(ServerMeter.REALTIME_CONSUMPTION_RETRIES_EXHAUSTED).count();
+  private static long stoppedByStreamError(ServerMetrics serverMetrics) {
+    return serverMetrics.getMeteredValue(ServerMeter.REALTIME_CONSUMPTION_STOPPED_BY_STREAM_ERROR).count();
   }
 
   private static long stoppedByInterrupt(ServerMetrics serverMetrics) {
@@ -293,10 +330,10 @@ public class RealtimeConsumerStopTest {
   /// test. Registered through the table config, so the segment data manager builds it exactly as it builds a Kafka
   /// or Kinesis consumer.
   public static class TestStreamConsumerFactory extends StreamConsumerFactory {
-    /// Park like a caught-up client, fail like an unreachable broker, or fail the way a client does when the thread
-    /// calling it is interrupted.
+    /// Park like a caught-up client, fail like an unreachable broker, fail the way a client does when the thread
+    /// calling it is interrupted, fail in a way no retry can clear, or break below the [Exception] hierarchy.
     enum FetchBehaviour {
-      BLOCK, FAIL, INTERRUPT
+      BLOCK, FAIL, INTERRUPT, PERMANENT, ERROR
     }
 
     static final AtomicInteger CONSUMERS_CREATED = new AtomicInteger();
@@ -354,6 +391,10 @@ public class RealtimeConsumerStopTest {
             throw new RuntimeException("Stream is unreachable", new SocketTimeoutException());
           case INTERRUPT:
             throw interrupted();
+          case PERMANENT:
+            throw new PermanentConsumerException(new IllegalStateException("No such topic"));
+          case ERROR:
+            throw new StreamClientError();
           default:
             break;
         }
@@ -375,6 +416,14 @@ public class RealtimeConsumerStopTest {
       @Override
       public void close() {
         CONSUMERS_CLOSED.incrementAndGet();
+      }
+    }
+
+    /// Stands in for whatever a client can throw from below [Exception], such as a [LinkageError] from a broken
+    /// plugin classpath or an [OutOfMemoryError] while buffering a batch.
+    private static class StreamClientError extends Error {
+      StreamClientError() {
+        super("Stream client broke below the Exception hierarchy");
       }
     }
 
