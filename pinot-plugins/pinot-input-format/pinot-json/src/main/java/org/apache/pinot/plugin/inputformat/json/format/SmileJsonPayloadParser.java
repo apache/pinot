@@ -23,8 +23,9 @@ import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 
 
 /// Parses [Smile](https://github.com/FasterXML/smile-format-specification), Jackson's own binary
-/// JSON encoding. Values decode to the same Java types Jackson produces for text JSON (Smile may additionally
-/// emit `Float` and `byte[]` scalars, which Pinot handles downstream).
+/// JSON encoding. Numeric values stay as native IEEE `Float` / `Double` because Smile encodes floats
+/// in binary, not as decimal text. Smile may additionally emit `byte[]` scalars, which Pinot handles
+/// downstream.
 ///
 /// Detection relies on the 3-byte Smile header `:)\n` (`0x3A 0x29 0x0A`) that Jackson writes by default;
 /// header-less Smile payloads must select the format explicitly rather than via AUTO detection.

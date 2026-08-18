@@ -183,7 +183,7 @@ public class JSONMessageDecoderTest {
   }
 
   @Test
-  public void testCustomRecordExtractorKeepsLegacyDoubleParsingByDefault()
+  public void testCustomRecordExtractorAlsoPreservesBigDecimal()
       throws Exception {
     JSONMessageDecoder decoder = new JSONMessageDecoder();
     decoder.init(Map.of(StreamMessageDecoder.RECORD_EXTRACTOR_CONFIG_KEY, DecimalTypeRecordExtractor.class.getName()),
@@ -191,23 +191,36 @@ public class JSONMessageDecoderTest {
 
     GenericRow row = decoder.decode("{\"decimalMetric\":1.25}".getBytes(StandardCharsets.UTF_8), new GenericRow());
 
-    assertEquals(row.getValue("decimalMetricType"), Double.class.getName());
-    assertEquals(row.getValue("decimalMetric"), 1.25d);
+    assertEquals(row.getValue("decimalMetricType"), BigDecimal.class.getName());
+    assertEquals(row.getValue("decimalMetric"), new BigDecimal("1.25"));
   }
 
   @Test
-  public void testCustomRecordExtractorCanOptIntoBigDecimalParsing()
+  public void testAutoDetectedTextPreservesBigDecimalPrecision()
       throws Exception {
     JSONMessageDecoder decoder = new JSONMessageDecoder();
-    decoder.init(Map.of(
-            StreamMessageDecoder.RECORD_EXTRACTOR_CONFIG_KEY, DecimalTypeRecordExtractor.class.getName(),
-            "preserveDecimalPrecision", "true"),
-        Set.of("decimalMetric"), "testTopic");
+    decoder.init(Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "AUTO"), Set.of("decimalMetric"), "testTopic");
 
-    GenericRow row = decoder.decode("{\"decimalMetric\":1.25}".getBytes(StandardCharsets.UTF_8), new GenericRow());
+    byte[] payload = ("{\"decimalMetric\":" + PRECISE_DECIMAL + "}").getBytes(StandardCharsets.UTF_8);
+    GenericRow row = decoder.decode(payload, new GenericRow());
 
-    assertEquals(row.getValue("decimalMetricType"), BigDecimal.class.getName());
-    assertEquals(row.getValue("decimalMetric"), new BigDecimal("1.25"));
+    assertEquals(row.getValue("decimalMetric"), new BigDecimal(PRECISE_DECIMAL));
+  }
+
+  @Test
+  public void testPostgresJsonbPreservesBigDecimalPrecision()
+      throws Exception {
+    JSONMessageDecoder decoder = new JSONMessageDecoder();
+    decoder.init(Map.of(JSONMessageDecoder.JSON_FORMAT_CONFIG_KEY, "POSTGRES_JSONB"), Set.of("decimalMetric"),
+        "testTopic");
+
+    byte[] body = ("{\"decimalMetric\":" + PRECISE_DECIMAL + "}").getBytes(StandardCharsets.UTF_8);
+    byte[] payload = new byte[body.length + 1];
+    payload[0] = 1;
+    System.arraycopy(body, 0, payload, 1, body.length);
+    GenericRow row = decoder.decode(payload, new GenericRow());
+
+    assertEquals(row.getValue("decimalMetric"), new BigDecimal(PRECISE_DECIMAL));
   }
 
   public static class DecimalTypeRecordExtractor implements RecordExtractor<Map<String, Object>> {
