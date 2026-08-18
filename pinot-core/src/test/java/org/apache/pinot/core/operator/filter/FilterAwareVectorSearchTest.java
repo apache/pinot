@@ -22,7 +22,12 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.FilterAwareVectorIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
@@ -34,6 +39,7 @@ import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 
@@ -249,6 +255,133 @@ public class FilterAwareVectorSearchTest {
   }
 
   @Test
+  public void testRequiredUpsertFilterAlwaysUsesFilteredReader() {
+    FilterAwareVectorIndexReader mockReader = mock(FilterAwareVectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    MutableRoaringBitmap requiredSnapshot = bitmapOf(2, 3);
+    MutableRoaringBitmap expectedResult = bitmapOf(2, 3);
+    when(mockReader.supportsPreFilter()).thenReturn(true);
+    when(mockReader.getDocIds(eq(queryVector), eq(2), any(ImmutableRoaringBitmap.class)))
+        .thenReturn(expectedResult);
+
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), queryVector, 2);
+    VectorCandidateScope candidateScope = VectorCandidateScope.forUpsertSnapshot(requiredSnapshot,
+        "vector_index_not_filter_aware_for_upsert");
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate, 4,
+        VectorSearchParams.DEFAULT, null, null, false, candidateScope);
+
+    requiredSnapshot.clear();
+    Assert.assertFalse(candidateScope.getRequiredDocIds() instanceof MutableRoaringBitmap,
+        "The candidate scope must not expose a mutable bitmap implementation");
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result, expectedResult);
+
+    ArgumentCaptor<ImmutableRoaringBitmap> filterCaptor = ArgumentCaptor.forClass(ImmutableRoaringBitmap.class);
+    verify(mockReader).getDocIds(eq(queryVector), eq(2), filterCaptor.capture());
+    Assert.assertEquals(filterCaptor.getValue(), bitmapOf(2, 3));
+    verify(mockReader, never()).getDocIds(queryVector, 2);
+    Assert.assertTrue(operator.toExplainString().contains("upsertCandidateFilterApplied:true"));
+    Assert.assertTrue(operator.toExplainString().contains("upsertCandidateFilterCardinality:2"));
+    Assert.assertTrue(operator.toExplainString().contains("searchMode:FILTER_THEN_ANN"));
+    Assert.assertTrue(operator.getExplainInfo().getAttributes().get("upsertCandidateFilterApplied").getBool());
+    Assert.assertEquals(
+        operator.getExplainInfo().getAttributes().get("upsertCandidateFilterCardinality").getLong(), 2L);
+    Assert.assertEquals(operator.getExplainInfo().getAttributes().get("searchMode").getString(),
+        "FILTER_THEN_ANN");
+  }
+
+  @Test
+  public void testEmptyRequiredUpsertFilterSkipsReader() {
+    FilterAwareVectorIndexReader mockReader = mock(FilterAwareVectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), queryVector, 2);
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate, 4,
+        VectorSearchParams.DEFAULT, null, null, false, VectorCandidateScope.forUpsertSnapshot(
+            new MutableRoaringBitmap(), "vector_index_not_filter_aware_for_upsert"));
+
+    Assert.assertTrue(operator.getBitmaps().reduce().isEmpty());
+    verifyNoInteractions(mockReader);
+    Assert.assertTrue(operator.toExplainString().contains("candidateGenerationSkipped:true"));
+    Assert.assertEquals(operator.getExplainInfo().getAttributes().get("candidateGenerationSkipReason").getString(),
+        "empty_upsert_candidate_filter");
+  }
+
+  @Test
+  public void testRequiredAndOptionalFiltersAreIntersected() {
+    FilterAwareVectorIndexReader mockReader = mock(FilterAwareVectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    MutableRoaringBitmap requiredSnapshot = bitmapOf(2, 3);
+    MutableRoaringBitmap optionalMetadata = bitmapOf(1, 3);
+    when(mockReader.supportsPreFilter()).thenReturn(true);
+    when(mockReader.getDocIds(eq(queryVector), eq(2), any(ImmutableRoaringBitmap.class)))
+        .thenReturn(bitmapOf(3));
+
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), queryVector, 2);
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate, 4,
+        VectorSearchParams.DEFAULT, null, null, true,
+        VectorCandidateScope.forUpsertSnapshot(requiredSnapshot, "vector_index_not_filter_aware_for_upsert"));
+    operator.setPreFilterBitmap(optionalMetadata);
+
+    optionalMetadata.add(2);
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result, bitmapOf(3));
+    Assert.assertEquals(requiredSnapshot, bitmapOf(2, 3), "Required snapshot must not be mutated");
+
+    ArgumentCaptor<ImmutableRoaringBitmap> filterCaptor = ArgumentCaptor.forClass(ImmutableRoaringBitmap.class);
+    verify(mockReader).getDocIds(eq(queryVector), eq(2), filterCaptor.capture());
+    Assert.assertEquals(filterCaptor.getValue(), bitmapOf(3));
+    verify(mockReader, never()).getDocIds(queryVector, 2);
+  }
+
+  @Test
+  public void testRequiredFilterFallsBackToExactAllowedDocScan() {
+    VectorIndexReader mockReader = mock(VectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    ForwardIndexReader<?> forwardIndexReader = createMockForwardIndexReader(new float[][]{
+        {1.0f, 0.0f},
+        {1.0f, 0.0f},
+        {0.0f, 1.0f},
+        {0.0f, -1.0f}
+    });
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), queryVector, 2);
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate, 4,
+        VectorSearchParams.DEFAULT, forwardIndexReader,
+        createVectorIndexConfig(VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN), false,
+        VectorCandidateScope.forUpsertSnapshot(bitmapOf(2, 3),
+            "mutable_vector_index_not_filter_aware_for_upsert"));
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result, bitmapOf(2, 3));
+    verify(mockReader, never()).getDocIds(any(float[].class), anyInt());
+    verify((ForwardIndexReader<?>) forwardIndexReader, never()).getFloatMV(eq(0), any());
+    verify((ForwardIndexReader<?>) forwardIndexReader, never()).getFloatMV(eq(1), any());
+    verify((ForwardIndexReader<?>) forwardIndexReader).getFloatMV(eq(2), any());
+    verify((ForwardIndexReader<?>) forwardIndexReader).getFloatMV(eq(3), any());
+    String explain = operator.toExplainString();
+    Assert.assertTrue(explain.contains("executionMode:EXACT_SCAN"), explain);
+    Assert.assertTrue(explain.contains("searchMode:EXACT_SCAN"), explain);
+    Assert.assertTrue(explain.contains("fallbackReason:mutable_vector_index_not_filter_aware_for_upsert"), explain);
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class,
+      expectedExceptionsMessageRegExp = ".*mandatory vector candidate scope.*no forward index.*")
+  public void testRequiredFilterFailsClearlyWithoutExactFallback() {
+    VectorIndexReader mockReader = mock(VectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), queryVector, 2);
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate, 4,
+        VectorSearchParams.DEFAULT, null, null, false,
+        VectorCandidateScope.forUpsertSnapshot(bitmapOf(2, 3), "vector_index_not_filter_aware_for_upsert"));
+
+    operator.getBitmaps();
+  }
+
+  @Test
   public void testExplainStringIncludesSearchMode() {
     FilterAwareVectorIndexReader mockReader = mock(FilterAwareVectorIndexReader.class);
     float[] queryVector = {1.0f, 2.0f};
@@ -288,5 +421,30 @@ public class FilterAwareVectorSearchTest {
 
     Assert.assertEquals(context.getVectorSearchMode(), VectorSearchMode.POST_FILTER_ANN);
     Assert.assertEquals(context.getFilterSelectivity(), -1.0, 0.001);
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private static ForwardIndexReader<?> createMockForwardIndexReader(float[][] vectors) {
+    ForwardIndexReader mockReader = mock(ForwardIndexReader.class);
+    ForwardIndexReaderContext mockContext = mock(ForwardIndexReaderContext.class);
+    when(mockReader.createContext()).thenReturn(mockContext);
+    when(mockReader.isSingleValue()).thenReturn(false);
+    when(mockReader.isDictionaryEncoded()).thenReturn(false);
+    when(mockReader.getStoredType()).thenReturn(DataType.FLOAT);
+    for (int i = 0; i < vectors.length; i++) {
+      when(mockReader.getFloatMV(Mockito.eq(i), Mockito.any())).thenReturn(vectors[i]);
+    }
+    return mockReader;
+  }
+
+  private static VectorIndexConfig createVectorIndexConfig(
+      VectorIndexConfig.VectorDistanceFunction distanceFunction) {
+    return new VectorIndexConfig(false, "HNSW", 2, 1, distanceFunction, java.util.Map.of());
+  }
+
+  private static MutableRoaringBitmap bitmapOf(int... docIds) {
+    MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+    bitmap.add(docIds);
+    return bitmap;
   }
 }
