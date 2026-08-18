@@ -50,6 +50,13 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_CLP_UNENCODABLE("rows", false),
   REALTIME_CLP_ENCODED_NON_STRINGS("rows", false),
   REALTIME_CONSUMPTION_EXCEPTIONS("exceptions", true),
+  // A consumer abandoned a segment because the stream fetch failed: a permanent error, an Error, or transient errors
+  // that outlasted the retries. realtimeConsumptionExceptions moves on every attempt, including ones the next retry
+  // cleared, so this is the meter to alert on.
+  REALTIME_CONSUMPTION_STOPPED_BY_STREAM_ERROR("stops", true),
+  // A consumer left the consume loop because stop() interrupted it -- a rebalance, a shutdown, a table disable or
+  // delete, or a CONSUMING -> ONLINE transition -- rather than because the stream failed.
+  REALTIME_CONSUMPTION_STOPPED_BY_INTERRUPT("stops", true),
   REALTIME_MERGED_TEXT_IDX_TRUNCATED_DOCUMENT_SIZE("bytes", false),
   REALTIME_OFFSET_COMMITS("commits", true),
   REALTIME_OFFSET_COMMIT_EXCEPTIONS("exceptions", false),

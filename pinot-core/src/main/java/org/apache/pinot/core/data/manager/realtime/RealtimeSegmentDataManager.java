@@ -300,6 +300,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private volatile boolean _forceCommitMessageReceived = false;
   private volatile StreamPartitionMsgOffset _finalOffset; // Exclusive, used when we want to catch up to this one
   private volatile boolean _shouldStop = false;
+  /// Set when [#stop()] is invoked and never cleared, unlike [#_shouldStop] which
+  /// [#catchupToFinalOffset(StreamPartitionMsgOffset, long)] resets so that the consume loop can run once more.
+  private volatile boolean _stopping = false;
 
   // It takes 30s to locate controller leader, and more if there are multiple controller failures.
   // For now, we let 31s pass for this state transition.
@@ -451,26 +454,41 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         || _forceCommitMessageReceived || !canAddMore();
   }
 
+  /// Returns `true` if the consumer is being torn down by [#stop()] and the interrupt it delivered has landed on this
+  /// thread.
+  ///
+  /// The interrupt status is the signal rather than the type of the exception the client raised, because clients
+  /// surface an interrupt in too many shapes to enumerate: Kafka wraps it in an unchecked `InterruptException`, NIO
+  /// channels throw `ClosedByInterruptException`, and the AWS SDK aborts with no [InterruptedException] in the cause
+  /// chain at all. All of them leave the status set.
+  ///
+  /// This is checked against [#_stopping] rather than [#_shouldStop] because
+  /// [#catchupToFinalOffset(StreamPartitionMsgOffset, long)] clears the latter before consuming once more.
+  private boolean isDeliberateStopInterrupt() {
+    return _stopping && Thread.currentThread().isInterrupted();
+  }
+
+  /// TODO: Key the table meter on `_clientId` instead of `_tableStreamName` so that it carries table, topic and
+  ///       partition labels, and keep the global meter for backward compatibility.
+  private void meterGlobalAndTable(ServerMeter meter) {
+    _serverMetrics.addMeteredGlobalValue(meter, 1L);
+    _serverMetrics.addMeteredTableValue(_tableStreamName, meter, 1L);
+  }
+
   private void handleTransientStreamErrors(Exception e)
       throws Exception {
     _consecutiveErrorCount++;
-    _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
-    _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS,
-        1L);
+    meterGlobalAndTable(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS);
     if (_consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
+      meterGlobalAndTable(ServerMeter.REALTIME_CONSUMPTION_STOPPED_BY_STREAM_ERROR);
       _segmentLogger.warn("Stream transient exception when fetching messages, stopping consumption after {} attempts",
           _consecutiveErrorCount, e);
       throw e;
-    } else {
-      if (_shouldStop && (e instanceof InterruptedException || e.getCause() instanceof InterruptedException)) {
-        _segmentLogger.debug("Interrupted to stop consumption", e);
-      } else {
-        _segmentLogger.warn("Stream transient exception when fetching messages, retrying (count={})",
-            _consecutiveErrorCount, e);
-      }
-      Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
-      recreateStreamConsumer("Too many transient errors");
     }
+    _segmentLogger.warn("Stream transient exception when fetching messages, retrying (count={})",
+        _consecutiveErrorCount, e);
+    Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
+    recreateStreamConsumer("Too many transient errors");
   }
 
   protected boolean consumeLoop()
@@ -520,11 +538,19 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _endOfPartitionGroup = messageBatch.getMessageCount() == 0 && messageBatch.isEndOfPartitionGroup();
         _consecutiveErrorCount = 0;
       } catch (PermanentConsumerException e) {
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
-        _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
+        meterGlobalAndTable(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS);
+        meterGlobalAndTable(ServerMeter.REALTIME_CONSUMPTION_STOPPED_BY_STREAM_ERROR);
         _segmentLogger.warn("Permanent exception from stream when fetching messages, stopping consumption", e);
         throw e;
       } catch (Exception e) {
+        if (isDeliberateStopInterrupt()) {
+          // A teardown rather than a stream fault, so it must not be slept on or answered by building a replacement
+          // consumer for a segment that is going away. Exit the loop instead: on the offload path the thread winds
+          // down, and on the catch-up path the caller falls back to downloading the segment.
+          meterGlobalAndTable(ServerMeter.REALTIME_CONSUMPTION_STOPPED_BY_INTERRUPT);
+          _segmentLogger.info("Consumption interrupted to stop the consumer, exiting the consume loop", e);
+          break;
+        }
         //track realtime rows fetched on a table level. This included valid + invalid rows
         // all exceptions but PermanentConsumerException are handled the same way
         // can be a TimeoutException or TransientConsumerException routinely
@@ -534,6 +560,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         continue;
       } catch (Throwable t) {
         //track realtime rows fetched on a table level. This included valid + invalid rows
+        // An Error aborts consumption just as the cases above do, so it is counted the same way
+        meterGlobalAndTable(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS);
+        meterGlobalAndTable(ServerMeter.REALTIME_CONSUMPTION_STOPPED_BY_STREAM_ERROR);
         _segmentLogger.warn("Stream error when fetching messages, stopping consumption", t);
         throw t;
       }
@@ -1786,6 +1815,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   ///    interrupt the consumer thread because there is no need to build the segment.
   public void stop()
       throws InterruptedException {
+    _stopping = true;
     _shouldStop = true;
     if (Thread.currentThread() != _consumerThread && _consumerThread.isAlive()) {
       _segmentLogger.info("Interrupting the consumer thread and waiting for it to join");
