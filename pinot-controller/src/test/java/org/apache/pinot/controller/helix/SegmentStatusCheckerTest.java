@@ -71,10 +71,12 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 @SuppressWarnings("unchecked")
@@ -165,13 +167,10 @@ public class SegmentStatusCheckerTest {
 
   private void runSegmentStatusChecker(PinotHelixResourceManager resourceManager, int waitForPushTimeInSeconds,
       TableSizeReader tableSizeReader) {
-    LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
-    when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
-    ControllerConf controllerConf = mock(ControllerConf.class);
-    when(controllerConf.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(waitForPushTimeInSeconds);
-    SegmentStatusChecker segmentStatusChecker =
-        new SegmentStatusChecker(resourceManager, leadControllerManager, controllerConf, _controllerMetrics,
-            tableSizeReader);
+    runSegmentStatusChecker(buildSegmentStatusChecker(resourceManager, waitForPushTimeInSeconds, tableSizeReader));
+  }
+
+  private void runSegmentStatusChecker(SegmentStatusChecker segmentStatusChecker) {
     segmentStatusChecker.start();
     segmentStatusChecker.run();
   }
@@ -719,20 +718,31 @@ public class SegmentStatusCheckerTest {
         ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS), 0);
   }
 
-  /// The whole table's metadata and znode stats come back from batched reads, so each segment must be matched to its
-  /// own metadata (by name) and its own stat (by position) rather than to whichever entry happens to sit at its index.
-  /// Every segment is under-replicated and carries a distinct size, exactly one segment was pushed recently enough to
-  /// be graced, and the last segment is the only one with 4 replicas so it alone determines PERCENT_OF_REPLICAS.
-  /// Together the gauges pin that every segment was examined under its own name, that the grace window applied to
-  /// exactly the segment whose znode stat is recent, and that the sizes accumulate. One segment has no ZK metadata,
-  /// which shifts the alignment if the pairing gets it wrong.
-  @Test
-  public void segmentsStayAlignedWithTheirBatchedMetadata() {
+  @DataProvider(name = "segmentMetadataBatchSizes")
+  public Object[][] segmentMetadataBatchSizes() {
+    // Batch size (null leaves the production default, under which the whole table fits in one batch) and the number of
+    // reads the 7 segments must then take. 3 does not divide 7 evenly, so the last batch is a partial one.
+    return new Object[][]{
+        {null, 1},
+        {3, 3}
+    };
+  }
+
+  /// The metadata and znode stats come back from batched reads, so each segment must be matched to its own metadata
+  /// (by name) and its own stat (by position) rather than to whichever entry happens to sit at its index, whether the
+  /// table is read in one batch or in several. Every segment is under-replicated and carries a distinct size, exactly
+  /// one segment was pushed recently enough to be graced, and the last segment is the only one with 4 replicas so it
+  /// alone determines PERCENT_OF_REPLICAS. Together the gauges pin that every segment was examined under its own name,
+  /// that the grace window applied to exactly the segment whose znode stat is recent, and that the sizes accumulate.
+  /// One segment has no ZK metadata, which shifts the alignment if the pairing gets it wrong.
+  @Test(dataProvider = "segmentMetadataBatchSizes")
+  public void segmentsStayAlignedWithTheirBatchedMetadata(Integer segmentMetadataBatchSize, int expectedNumBatches) {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(2).build();
 
     int numSegments = 7;
-    // Distinct positions, none of them the last segment, which carries its own marker below
+    // Distinct positions, none of them the last segment, which carries its own marker below. With a batch size of 3 the
+    // segment without ZK metadata also starts a batch, so a boundary that shifted the pairing drops the wrong segment.
     int segmentWithoutZKMetadata = 3;
     int recentlyPushedSegment = 1;
     // The last segment is the marker that pins name-to-metadata pairing: it is the only one whose replica ratio is 1/4
@@ -777,7 +787,12 @@ public class SegmentStatusCheckerTest {
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
 
     // 10min grace window, so only the recently pushed segment is skipped
-    runSegmentStatusChecker(resourceManager, 600, mock(TableSizeReader.class));
+    SegmentStatusChecker segmentStatusChecker =
+        buildSegmentStatusChecker(resourceManager, 600, mock(TableSizeReader.class));
+    if (segmentMetadataBatchSize != null) {
+      segmentStatusChecker._segmentMetadataBatchSize = segmentMetadataBatchSize;
+    }
+    runSegmentStatusChecker(segmentStatusChecker);
 
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, OFFLINE_TABLE_NAME,
         ControllerGauge.SEGMENT_COUNT), numSegments);
@@ -793,20 +808,27 @@ public class SegmentStatusCheckerTest {
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, OFFLINE_TABLE_NAME,
         ControllerGauge.TABLE_COMPRESSED_SIZE), expectedTableCompressedSize);
 
-    // A single batched read must cover the whole table, metadata and znode stats together: more than one call means the
+    // The reads must be batched, metadata and znode stats together: one request per batch and no more, otherwise the
     // per-segment reads crept back in some form
     ArgumentCaptor<List<String>> segmentNamesCaptor = ArgumentCaptor.forClass(List.class);
-    verify(resourceManager).getSegmentsZKMetadataForSegmentNames(eq(OFFLINE_TABLE_NAME), segmentNamesCaptor.capture(),
-        any());
+    verify(resourceManager, times(expectedNumBatches)).getSegmentsZKMetadataForSegmentNames(eq(OFFLINE_TABLE_NAME),
+        segmentNamesCaptor.capture(), any());
     verify(propertyStore, never()).getStats(any(), anyInt());
-    List<String> requestedSegments = segmentNamesCaptor.getValue();
+    // Every segment is requested exactly once, in batches of at most the batch size
+    List<String> requestedSegments = new ArrayList<>();
+    for (List<String> batch : segmentNamesCaptor.getAllValues()) {
+      assertTrue(segmentMetadataBatchSize == null || batch.size() <= segmentMetadataBatchSize,
+          "batch of " + batch.size() + " segments");
+      requestedSegments.addAll(batch);
+    }
     assertEquals(requestedSegments.size(), numSegments);
     assertEquals(new HashSet<>(requestedSegments), idealState.getPartitionSet());
   }
 
   /// When not a single segment's ZK metadata can be read the table's gauges must be left alone rather than reset to
   /// all-green values, because an all-green gauge silences the alerts that a stale one would still fire. Regression
-  /// test for a whole-table ZK read failure being reported as a perfectly healthy table.
+  /// test for a whole-table ZK read failure being reported as a perfectly healthy table. This supersedes the former
+  /// `noSegmentZKMetadataTest`, which expected the all-green gauges for the same scenario.
   @Test
   public void tableWithoutAnyReadableSegmentZKMetadataKeepsItsGauges() {
     TableConfig tableConfig =
@@ -1086,26 +1108,6 @@ public class SegmentStatusCheckerTest {
 
     runSegmentStatusChecker(resourceManager, 0);
     verifyControllerMetrics(REALTIME_TABLE_NAME, 0, 1, 1, 1, 100, 0, 100, 0, 0);
-  }
-
-  @Test
-  public void noSegmentZKMetadataTest() {
-    IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
-    idealState.setPartitionState("myTable_0", "pinot1", "ONLINE");
-    idealState.setReplicas("1");
-    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
-
-    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
-    when(resourceManager.getAllTables()).thenReturn(List.of(OFFLINE_TABLE_NAME));
-    when(resourceManager.getTableIdealState(OFFLINE_TABLE_NAME)).thenReturn(idealState);
-    // The segment is in the ideal state but has no ZK metadata at all
-    mockSegmentsZKMetadata(resourceManager, OFFLINE_TABLE_NAME, Map.of());
-
-    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
-    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
-
-    runSegmentStatusChecker(resourceManager, 0);
-    verifyControllerMetrics(OFFLINE_TABLE_NAME, 0, 1, 1, 1, 100, 0, 100, 0, 0);
   }
 
   @Test
@@ -1570,11 +1572,15 @@ public class SegmentStatusCheckerTest {
 
   private SegmentStatusChecker buildSegmentStatusChecker(PinotHelixResourceManager resourceManager,
       int waitForPushTimeInSeconds) {
+    return buildSegmentStatusChecker(resourceManager, waitForPushTimeInSeconds, mock(TableSizeReader.class));
+  }
+
+  private SegmentStatusChecker buildSegmentStatusChecker(PinotHelixResourceManager resourceManager,
+      int waitForPushTimeInSeconds, TableSizeReader tableSizeReader) {
     LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
     when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     ControllerConf controllerConf = mock(ControllerConf.class);
     when(controllerConf.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(waitForPushTimeInSeconds);
-    TableSizeReader tableSizeReader = mock(TableSizeReader.class);
     return new SegmentStatusChecker(resourceManager, leadControllerManager, controllerConf, _controllerMetrics,
         tableSizeReader);
   }
