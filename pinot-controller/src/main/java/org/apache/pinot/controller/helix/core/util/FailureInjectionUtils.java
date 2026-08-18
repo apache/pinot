@@ -32,7 +32,16 @@ public class FailureInjectionUtils {
   public static void injectFailure(String faultTypeKey, Map<String, String> managerConfigs) {
     String faultTypeConfig = managerConfigs.getOrDefault(faultTypeKey, "false");
     if (Boolean.parseBoolean(faultTypeConfig)) {
-      throw new RuntimeException("Injecting failure: " + faultTypeKey);
+      throw new InjectedFailureException("Injecting failure: " + faultTypeKey);
+    }
+  }
+
+  /// Thrown at a configured fault point. Carries no stack trace: these failures are thrown by design, often for
+  /// dozens of segments per test, and the catch sites log them in full — the fault point in the message is the only
+  /// meaningful context, so stack traces would just flood the test logs.
+  public static class InjectedFailureException extends RuntimeException {
+    public InjectedFailureException(String message) {
+      super(message, null, false, false);
     }
   }
 }
