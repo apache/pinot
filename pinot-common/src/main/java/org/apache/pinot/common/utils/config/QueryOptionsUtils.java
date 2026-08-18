@@ -147,10 +147,11 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT));
   }
 
-  /// Returns whether the column-value and bloom-filter segment pruners should always attempt to prune segments
-  /// for IN predicates, regardless of the number of values in the IN clause. Defaults to `false`.
-  public static boolean isForceInPredicatePruning(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.FORCE_IN_PREDICATE_PRUNING));
+  /// Query-level IN-pruning threshold override. Negative means always prune.
+  @Nullable
+  public static Integer getInPredicatePruningThreshold(Map<String, String> queryOptions) {
+    return uncheckedParseInt(QueryOptionKey.IN_PREDICATE_PRUNING_THRESHOLD,
+        queryOptions.get(QueryOptionKey.IN_PREDICATE_PRUNING_THRESHOLD));
   }
 
   /// Returns whether materialized-view rewrite is allowed for this query. Defaults to `true`

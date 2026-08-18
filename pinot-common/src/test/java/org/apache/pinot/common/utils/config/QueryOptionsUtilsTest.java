@@ -110,14 +110,16 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
-  public void shouldReadForceInPredicatePruningOption() {
-    Map<String, String> optsTrue = Map.of(FORCE_IN_PREDICATE_PRUNING, "true");
-    Map<String, String> optsFalse = Map.of(FORCE_IN_PREDICATE_PRUNING, "false");
-    Map<String, String> optsMissing = Map.of();
+  public void shouldReadInPredicatePruningThresholdOption() {
+    // Any integer is accepted; a negative value means always attempt IN-predicate pruning
+    assertEquals(QueryOptionsUtils.getInPredicatePruningThreshold(Map.of(IN_PREDICATE_PRUNING_THRESHOLD, "20")), 20);
+    assertEquals(QueryOptionsUtils.getInPredicatePruningThreshold(Map.of(IN_PREDICATE_PRUNING_THRESHOLD, "-1")), -1);
+    assertNull(QueryOptionsUtils.getInPredicatePruningThreshold(Map.of()));
+  }
 
-    assertTrue(QueryOptionsUtils.isForceInPredicatePruning(optsTrue));
-    assertFalse(QueryOptionsUtils.isForceInPredicatePruning(optsFalse));
-    assertFalse(QueryOptionsUtils.isForceInPredicatePruning(optsMissing));
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void shouldRejectInvalidInPredicatePruningThreshold() {
+    QueryOptionsUtils.getInPredicatePruningThreshold(Map.of(IN_PREDICATE_PRUNING_THRESHOLD, "invalid"));
   }
 
   @Test

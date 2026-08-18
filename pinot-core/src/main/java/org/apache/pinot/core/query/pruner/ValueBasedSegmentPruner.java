@@ -58,7 +58,7 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
     if (query.getFilter() == null) {
       return false;
     }
-    return isApplicableToFilter(query.getFilter(), isInPredicatePruningForced(query));
+    return isApplicableToFilter(query.getFilter(), query.getQueryOptions());
   }
 
   /// 1. NOT is not applicable for segment pruning;
@@ -66,12 +66,12 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
   /// 3. For AND, if one of the child filter is applicable for pruning, the parent filter is applicable, but it
   ///    doesn't mean this child filter can prune the segment.
   /// 4. The specific pruners decide their own applicable predicate types.
-  private boolean isApplicableToFilter(FilterContext filter, boolean forceInPredicatePruning) {
+  private boolean isApplicableToFilter(FilterContext filter, Map<String, String> queryOptions) {
     switch (filter.getType()) {
       case AND:
         assert filter.getChildren() != null;
         for (FilterContext child : filter.getChildren()) {
-          if (isApplicableToFilter(child, forceInPredicatePruning)) {
+          if (isApplicableToFilter(child, queryOptions)) {
             return true;
           }
         }
@@ -79,7 +79,7 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
       case OR:
         assert filter.getChildren() != null;
         for (FilterContext child : filter.getChildren()) {
-          if (!isApplicableToFilter(child, forceInPredicatePruning)) {
+          if (!isApplicableToFilter(child, queryOptions)) {
             return false;
           }
         }
@@ -88,26 +88,25 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
         // Do not prune NOT filter
         return false;
       case PREDICATE:
-        return isApplicableToPredicate(filter.getPredicate(), forceInPredicatePruning);
+        return isApplicableToPredicate(filter.getPredicate(), queryOptions);
       default:
         throw new IllegalStateException();
     }
   }
 
-  /// Returns whether IN-predicate pruning should be attempted for a clause with the given number of values.
-  /// Pruning is attempted when it is forced for this query, or the clause has at most the configured
-  /// number of values.
-  protected boolean shouldPruneInPredicate(int numValues, boolean forceInPredicatePruning) {
-    return forceInPredicatePruning || numValues <= _inPredicateThreshold;
+  /// Returns whether IN-pruning should run. Negative threshold means always prune.
+  protected boolean shouldPruneInPredicate(int numValues, Map<String, String> queryOptions) {
+    int threshold = getEffectiveInPredicateThreshold(queryOptions);
+    return threshold < 0 || numValues <= threshold;
   }
 
-  /// Returns whether IN-predicate pruning should be attempted regardless of the IN clause size for this query.
-  /// The flag is read from the query options, so the shared pruner instance can serve concurrent queries safely.
-  protected boolean isInPredicatePruningForced(QueryContext query) {
-    return QueryOptionsUtils.isForceInPredicatePruning(query.getQueryOptions());
+  /// Returns the query override when set, otherwise the server threshold.
+  protected int getEffectiveInPredicateThreshold(Map<String, String> queryOptions) {
+    Integer threshold = QueryOptionsUtils.getInPredicatePruningThreshold(queryOptions);
+    return threshold != null ? threshold : _inPredicateThreshold;
   }
 
-  abstract boolean isApplicableToPredicate(Predicate predicate, boolean forceInPredicatePruning);
+  abstract boolean isApplicableToPredicate(Predicate predicate, Map<String, String> queryOptions);
 
   @Override
   public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {

@@ -113,7 +113,7 @@ public class ColumnValueSegmentPrunerTest {
   }
 
   @Test
-  public void testForcedInPredicatePruning() {
+  public void testInPredicatePruningThresholdOverride() {
     IndexSegment indexSegment = mockIndexSegment();
 
     DataSource dataSource = mock(DataSource.class);
@@ -128,10 +128,35 @@ public class ColumnValueSegmentPrunerTest {
     // values are out of min/max range
     assertFalse(runPruner(indexSegment,
         "SELECT COUNT(*) FROM testTable WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 21)"));
-    // With the option, the same IN list is pruned as all values are out of min/max range
+    // A negative query threshold always prunes, regardless of the IN clause size
     assertTrue(runPruner(indexSegment,
-        "SET forceInPredicatePruning=true; "
+        "SET inPredicatePruningThreshold=-1; "
             + "SELECT COUNT(*) FROM testTable WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 21)"));
+    // A positive query threshold above the clause size also prunes
+    assertTrue(runPruner(indexSegment,
+        "SET inPredicatePruningThreshold=20; "
+            + "SELECT COUNT(*) FROM testTable WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 21)"));
+  }
+
+  @Test
+  public void testNegativeServerThresholdAlwaysPrunes() {
+    // The server config follows the same convention: a negative `inpredicate.threshold` always prunes
+    ColumnValueSegmentPruner pruner = new ColumnValueSegmentPruner();
+    pruner.init(new PinotConfiguration(Map.of(ColumnValueSegmentPruner.IN_PREDICATE_THRESHOLD, -1)));
+
+    IndexSegment indexSegment = mockIndexSegment();
+
+    DataSource dataSource = mock(DataSource.class);
+    when(indexSegment.getDataSource(eq("column"), any(Schema.class))).thenReturn(dataSource);
+    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
+    when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
+    when(dataSourceMetadata.getMinValue()).thenReturn(10);
+    when(dataSourceMetadata.getMaxValue()).thenReturn(20);
+    when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
+
+    // 11 values, all out of min/max range, pruned without any query option
+    assertTrue(runPruner(pruner, indexSegment,
+        "SELECT COUNT(*) FROM testTable WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 21)"));
   }
 
   @Test
@@ -183,9 +208,9 @@ public class ColumnValueSegmentPrunerTest {
     queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT COUNT(*) FROM testTable WHERE column IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)");
     assertFalse(PRUNER.isApplicableTo(queryContext));
-    // ... but applicable when pruning is forced for the query
+    // ... but applicable when the query threshold is negative
     queryContext = QueryContextConverterUtils.getQueryContext(
-        "SET forceInPredicatePruning=true; SELECT COUNT(*) FROM testTable WHERE column IN "
+        "SET inPredicatePruningThreshold=-1; SELECT COUNT(*) FROM testTable WHERE column IN "
             + "(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)");
     assertTrue(PRUNER.isApplicableTo(queryContext));
     // Other predicate types are not applicable
@@ -218,8 +243,12 @@ public class ColumnValueSegmentPrunerTest {
   }
 
   private boolean runPruner(IndexSegment indexSegment, String query) {
+    return runPruner(PRUNER, indexSegment, query);
+  }
+
+  private boolean runPruner(ColumnValueSegmentPruner pruner, IndexSegment indexSegment, String query) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     queryContext.setSchema(mock(Schema.class));
-    return PRUNER.prune(Arrays.asList(indexSegment), queryContext).isEmpty();
+    return pruner.prune(Arrays.asList(indexSegment), queryContext).isEmpty();
   }
 }

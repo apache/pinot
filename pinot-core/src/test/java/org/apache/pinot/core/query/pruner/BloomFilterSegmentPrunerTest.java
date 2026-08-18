@@ -258,9 +258,9 @@ public class BloomFilterSegmentPrunerTest {
     queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT COUNT(*) FROM testTable WHERE column IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)");
     assertFalse(PRUNER.isApplicableTo(queryContext));
-    // ... but applicable when pruning is forced for the query
+    // ... but applicable when the query threshold is negative
     queryContext = QueryContextConverterUtils.getQueryContext(
-        "SET forceInPredicatePruning=true; SELECT COUNT(*) FROM testTable WHERE column IN "
+        "SET inPredicatePruningThreshold=-1; SELECT COUNT(*) FROM testTable WHERE column IN "
             + "(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)");
     assertTrue(PRUNER.isApplicableTo(queryContext));
     // Other predicate types are not applicable
@@ -284,7 +284,7 @@ public class BloomFilterSegmentPrunerTest {
   }
 
   @Test
-  public void testForcedInPredicatePruning()
+  public void testInPredicatePruningThresholdOverride()
       throws IOException {
     IndexSegment indexSegment = mockIndexSegment(new String[]{"1.0", "2.0", "3.0", "5.0", "7.0", "21.0"});
 
@@ -293,9 +293,27 @@ public class BloomFilterSegmentPrunerTest {
     assertFalse(runPruner(indexSegment,
         "SELECT COUNT(*) FROM testTable WHERE column IN "
             + "(30.0, 31.0, 32.0, 33.0, 34.0, 35.0, 36.0, 37.0, 38.0, 39.0, 40.0)"));
-    // With the option, the same IN list is pruned as all values are absent from the bloom filter
+    // A negative query threshold always prunes, regardless of the IN clause size
     assertTrue(runPruner(indexSegment,
-        "SET forceInPredicatePruning=true; SELECT COUNT(*) FROM testTable WHERE column IN "
+        "SET inPredicatePruningThreshold=-1; SELECT COUNT(*) FROM testTable WHERE column IN "
+            + "(30.0, 31.0, 32.0, 33.0, 34.0, 35.0, 36.0, 37.0, 38.0, 39.0, 40.0)"));
+    // A positive query threshold above the clause size also prunes
+    assertTrue(runPruner(indexSegment,
+        "SET inPredicatePruningThreshold=20; SELECT COUNT(*) FROM testTable WHERE column IN "
+            + "(30.0, 31.0, 32.0, 33.0, 34.0, 35.0, 36.0, 37.0, 38.0, 39.0, 40.0)"));
+  }
+
+  @Test
+  public void testNegativeServerThresholdAlwaysPrunes()
+      throws IOException {
+    // The server config follows the same convention: a negative `inpredicate.threshold` always prunes
+    BloomFilterSegmentPruner pruner = new BloomFilterSegmentPruner();
+    pruner.init(new PinotConfiguration(Map.of(ColumnValueSegmentPruner.IN_PREDICATE_THRESHOLD, -1)));
+
+    IndexSegment indexSegment = mockIndexSegment(new String[]{"1.0", "2.0", "3.0", "5.0", "7.0", "21.0"});
+    // 11 values, all absent from the bloom filter, pruned without any query option
+    assertTrue(runPruner(pruner, indexSegment,
+        "SELECT COUNT(*) FROM testTable WHERE column IN "
             + "(30.0, 31.0, 32.0, 33.0, 34.0, 35.0, 36.0, 37.0, 38.0, 39.0, 40.0)"));
   }
 
@@ -324,6 +342,12 @@ public class BloomFilterSegmentPrunerTest {
 
   private boolean runPruner(IndexSegment segment, String query) {
     return runPruner(List.of(segment), query, 5000).isEmpty();
+  }
+
+  private boolean runPruner(BloomFilterSegmentPruner pruner, IndexSegment segment, String query) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+    queryContext.setEndTimeMs(System.currentTimeMillis() + 5000);
+    return pruner.prune(List.of(segment), queryContext, Executors.newCachedThreadPool()).isEmpty();
   }
 
   private List<IndexSegment> runPruner(List<IndexSegment> segments, String query, long queryTimeout) {
