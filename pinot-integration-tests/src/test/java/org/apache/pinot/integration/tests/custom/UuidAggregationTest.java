@@ -138,6 +138,16 @@ public class UuidAggregationTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testMultiStageUuidLiteralPredicate(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    JsonNode rows = query(String.format(
+        "SELECT COUNT(*) FROM %1$s WHERE %2$s = CAST('%3$s' AS UUID)",
+        getTableName(), UUID_RAW_SV_COLUMN, UUID_0));
+    assertCounts(rows.get(0), 2L);
+  }
+
   @Test
   public void testDistinctCountOnUuidColumns()
       throws Exception {
