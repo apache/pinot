@@ -28,14 +28,14 @@ import org.apache.calcite.sql.type.SqlReturnTypeInference;
 /// Pinot custom SqlFunction to be registered into SqlOperatorTable.
 public class PinotSqlFunction extends SqlFunction {
   private final boolean _deterministic;
-  private final boolean _volatile;
+  private final boolean _isVolatile;
 
   public PinotSqlFunction(String name, SqlReturnTypeInference returnTypeInference,
       SqlOperandTypeChecker operandTypeChecker, boolean deterministic, boolean isVolatile) {
     super(name.toUpperCase(), SqlKind.OTHER_FUNCTION, returnTypeInference, null, operandTypeChecker,
         SqlFunctionCategory.USER_DEFINED_FUNCTION);
     _deterministic = deterministic;
-    _volatile = isVolatile;
+    _isVolatile = isVolatile;
   }
 
   /// Derives volatility from determinism: a non-deterministic function is always volatile, and a deterministic one is
@@ -67,6 +67,6 @@ public class PinotSqlFunction extends SqlFunction {
   /// different point in the plan). `FunctionVolatility.STABLE` is not reported here, since a stable function is
   /// constant within a single query and is therefore safe to relocate.
   public boolean isVolatile() {
-    return _volatile;
+    return _isVolatile;
   }
 }
