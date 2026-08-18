@@ -36,6 +36,7 @@ import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -180,6 +181,22 @@ public class JSONMessageDecoderTest {
 
     assertEquals(row.getValue("decimalMetric"), new BigDecimal(PRECISE_DECIMAL));
     assertEquals(((BigDecimal) row.getValue("doubleMetric")).doubleValue(), 1.25d);
+    assertSchemaConversion(row.getValue("decimalMetric"), PRECISE_DECIMAL);
+  }
+
+  @Test
+  public void testJsonDecoderPreservesScientificNotation()
+      throws Exception {
+    JSONMessageDecoder decoder = new JSONMessageDecoder();
+    decoder.init(Map.of(), Set.of("large", "tiny"), "testTopic");
+
+    GenericRow row = decoder.decode("{\"large\":1.23e10,\"tiny\":1.23e-10}".getBytes(StandardCharsets.UTF_8),
+        new GenericRow());
+
+    assertEquals(((BigDecimal) row.getValue("large")).toPlainString(), "12300000000");
+    assertEquals(((BigDecimal) row.getValue("tiny")).toPlainString(), "0.000000000123");
+    assertEquals(PinotDataType.DOUBLE.convert(row.getValue("large"), PinotDataType.BIG_DECIMAL), 1.23e10);
+    assertEquals(PinotDataType.STRING.convert(row.getValue("large"), PinotDataType.BIG_DECIMAL), "12300000000");
   }
 
   @Test
@@ -235,6 +252,18 @@ public class JSONMessageDecoderTest {
       to.putValue("decimalMetricType", value.getClass().getName());
       return to;
     }
+  }
+
+  /// Schema conversion uses the decoded Java type, not the JSON token. Floating literals are BigDecimal
+  /// until PinotDataType maps them onto the target column.
+  private static void assertSchemaConversion(Object decoded, String expectedPlain) {
+    assertEquals(PinotDataType.getSingleValueType(decoded), PinotDataType.BIG_DECIMAL);
+    assertEquals(PinotDataType.BIG_DECIMAL.convert(decoded, PinotDataType.BIG_DECIMAL), new BigDecimal(expectedPlain));
+    assertEquals(PinotDataType.DOUBLE.convert(decoded, PinotDataType.BIG_DECIMAL),
+        new BigDecimal(expectedPlain).doubleValue());
+    assertEquals(PinotDataType.FLOAT.convert(decoded, PinotDataType.BIG_DECIMAL),
+        new BigDecimal(expectedPlain).floatValue());
+    assertEquals(PinotDataType.STRING.convert(decoded, PinotDataType.BIG_DECIMAL), expectedPlain);
   }
 
   private Schema loadSchema(String resourcePath)

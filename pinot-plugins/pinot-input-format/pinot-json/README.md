@@ -33,9 +33,18 @@ decoder can additionally decode several **binary** JSON encodings, selected with
 property described below.
 
 This precision-preserving parse applies only to **JSON text** (and PostgreSQL `jsonb`, whose wire body is
-text JSON). Avro and Protobuf extractors already carry typed numeric values — Avro's `decimal` logical type
-is already `BigDecimal` — so they do not need a JSON-style flag. Smile and CBOR keep native IEEE floats.
-SQLite JSONB still decodes its ASCII floats as `DOUBLE` (including JSON5 `Infinity` / `NaN`).
+text JSON). Avro and Protobuf extractors already carry typed numeric values; Avro's `decimal` logical type
+is already `BigDecimal`. Smile and CBOR keep native IEEE floats. SQLite JSONB still decodes its ASCII floats
+as `DOUBLE` (including JSON5 `Infinity` / `NaN`).
+
+Batch `JSONRecordReader` uses the same BigDecimal-aware reader, so stream and batch text JSON now agree.
+
+**Upgrade note.** Floating JSON literals that previously became `java.lang.Double` are now
+`java.math.BigDecimal` until schema conversion. Typed `DOUBLE` / `FLOAT` / `BIG_DECIMAL` columns still
+convert through `PinotDataType`. Custom `recordExtractorClass` implementations and Groovy transforms that
+do `instanceof Double` (or otherwise assume Jackson's default `Double`) must accept `BigDecimal`. A
+`STRING` column stores `BigDecimal.toPlainString()` rather than `Double.toString()` (so `1.23e10` becomes
+`12300000000` instead of `1.23E10`). There is no opt-out flag.
 
 > The `jsonFormat` property applies to the **stream decoder** (`JSONMessageDecoder`) only. Batch ingestion via
 > `JSONRecordReader` always reads text JSON.
