@@ -157,6 +157,14 @@ public class JsonPayloadFormatTest {
     assertEquals(((Map<?, ?>) map.get("nested")).get("value"), new BigDecimal(precise));
   }
 
+  @Test
+  public void testTextScientificNotationIsBigDecimal()
+      throws Exception {
+    Map<String, Object> map = parse(JsonPayloadFormat.TEXT.getParser(), utf8("{\"large\":1.23e10,\"tiny\":1.23e-10}"));
+    assertEquals(((BigDecimal) map.get("large")).toPlainString(), "12300000000");
+    assertEquals(((BigDecimal) map.get("tiny")).toPlainString(), "0.000000000123");
+  }
+
   // ------------------------------------------------------------------------------------------------------
   // Smile / CBOR (round-tripped through Jackson)
   // ------------------------------------------------------------------------------------------------------
