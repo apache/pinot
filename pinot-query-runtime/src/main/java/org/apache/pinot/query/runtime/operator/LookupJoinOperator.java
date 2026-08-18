@@ -20,7 +20,9 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
@@ -71,6 +73,13 @@ public class LookupJoinOperator extends MultiStageOperator {
   private final List<TransformOperand> _nonEquiEvaluators;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
+  /// Number of columns in the dimension table's primary key.
+  private final int _keyColumnCount;
+  /// For each PK column position: the index into the left row, or -1 if the value comes from a literal.
+  private final int[] _keyColumnLeftIds;
+  /// For each PK column position: the literal value when [_keyColumnLeftIds] is -1, or null otherwise.
+  private final Object[] _keyColumnLiteralValues;
+
   public LookupJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
       MultiStageOperator rightInput, JoinNode node) {
     super(context);
@@ -100,6 +109,75 @@ public class LookupJoinOperator extends MultiStageOperator {
     _nonEquiEvaluators = new ArrayList<>(nonEquiConditions.size());
     for (RexExpression nonEquiCondition : nonEquiConditions) {
       _nonEquiEvaluators.add(TransformOperandFactory.getTransformOperand(nonEquiCondition, _resultSchema));
+    }
+
+    // Build the key assembly plan for the dimension table's primary key.
+    // When a join condition includes a literal (e.g. dim.currency = 'gbp'), the literal value must be used as a
+    // key component rather than treated as a non-equi post-filter only. Without this, the lookup key would be
+    // incomplete (missing the literal-matched PK column) and the lookup would return null.
+    List<String> rightPkColumns = _rightTable.getPrimaryKeyColumns();
+    _keyColumnCount = rightPkColumns.size();
+    _keyColumnLeftIds = new int[_keyColumnCount];
+    _keyColumnLiteralValues = new Object[_keyColumnCount];
+
+    // Initialize all PK columns as unmatched (placeholder -1, null literal)
+    for (int i = 0; i < _keyColumnCount; i++) {
+      _keyColumnLeftIds[i] = -1;
+      _keyColumnLiteralValues[i] = null;
+    }
+
+    // Build a map from right column name to its index in the right schema
+    Map<String, Integer> rightColIndex = new HashMap<>();
+    for (int i = 0; i < _rightColumns.length; i++) {
+      rightColIndex.put(_rightColumns[i], i);
+    }
+
+    // Map the equi-join left keys to PK columns via the right-side column indices
+    List<Integer> rightKeys = node.getRightKeys();
+    for (int i = 0; i < _leftKeyIds.length && i < rightKeys.size(); i++) {
+      int rightKeyIdx = rightKeys.get(i);
+      if (rightKeyIdx >= 0 && rightKeyIdx < _rightColumns.length) {
+        String rightColName = _rightColumns[rightKeyIdx];
+        int pkPos = rightPkColumns.indexOf(rightColName);
+        if (pkPos >= 0) {
+          _keyColumnLeftIds[pkPos] = _leftKeyIds[i];
+          // _keyColumnLiteralValues[pkPos] stays null (left-key mode)
+        }
+      }
+    }
+
+    // Map literal-based equality conditions (e.g. dim.currency = 'gbp') to PK columns
+    for (RexExpression nonEquiCondition : nonEquiConditions) {
+      if (nonEquiCondition instanceof RexExpression.FunctionCall) {
+        RexExpression.FunctionCall func = (RexExpression.FunctionCall) nonEquiCondition;
+        if (("EQUALS".equals(func.getFunctionName()) || "=".equals(func.getFunctionName()))
+            && func.getFunctionOperands().size() == 2) {
+          RexExpression op1 = func.getFunctionOperands().get(0);
+          RexExpression op2 = func.getFunctionOperands().get(1);
+          RexExpression.InputRef inputRef = null;
+          RexExpression.Literal literal = null;
+          if (op1 instanceof RexExpression.InputRef && op2 instanceof RexExpression.Literal) {
+            inputRef = (RexExpression.InputRef) op1;
+            literal = (RexExpression.Literal) op2;
+          } else if (op2 instanceof RexExpression.InputRef && op1 instanceof RexExpression.Literal) {
+            inputRef = (RexExpression.InputRef) op2;
+            literal = (RexExpression.Literal) op1;
+          }
+          if (inputRef != null && literal != null) {
+            // The InputRef index is in the result schema (left + right columns concatenated).
+            // Subtract _leftColumnSize to get the index into the right schema.
+            int rightIdx = inputRef.getIndex() - _leftColumnSize;
+            if (rightIdx >= 0 && rightIdx < _rightColumns.length) {
+              String rightColName = _rightColumns[rightIdx];
+              int pkPos = rightPkColumns.indexOf(rightColName);
+              if (pkPos >= 0) {
+                _keyColumnLeftIds[pkPos] = -1; // literal mode
+                _keyColumnLiteralValues[pkPos] = literal.getValue();
+              }
+            }
+          }
+        }
+      }
     }
   }
 
@@ -192,7 +270,7 @@ public class LookupJoinOperator extends MultiStageOperator {
   private List<Object[]> buildJoinedDataBlockSemi(MseBlock.Data leftBlock) {
     List<Object[]> container = leftBlock.asRowHeap().getRows();
     List<Object[]> rows = new ArrayList<>(container.size());
-    PrimaryKey key = new PrimaryKey(new Object[_leftKeyIds.length]);
+    PrimaryKey key = new PrimaryKey(new Object[_keyColumnCount]);
 
     for (Object[] leftRow : container) {
       fillKey(leftRow, key);
@@ -206,7 +284,7 @@ public class LookupJoinOperator extends MultiStageOperator {
   private List<Object[]> buildJoinedDataBlockAnti(MseBlock.Data leftBlock) {
     List<Object[]> container = leftBlock.asRowHeap().getRows();
     List<Object[]> rows = new ArrayList<>(container.size());
-    PrimaryKey key = new PrimaryKey(new Object[_leftKeyIds.length]);
+    PrimaryKey key = new PrimaryKey(new Object[_keyColumnCount]);
 
     for (Object[] leftRow : container) {
       fillKey(leftRow, key);
@@ -218,17 +296,25 @@ public class LookupJoinOperator extends MultiStageOperator {
   }
 
   private PrimaryKey getKey(Object[] row) {
-    Object[] values = new Object[_leftKeyIds.length];
-    for (int i = 0; i < _leftKeyIds.length; i++) {
-      values[i] = row[_leftKeyIds[i]];
+    Object[] values = new Object[_keyColumnCount];
+    for (int i = 0; i < _keyColumnCount; i++) {
+      if (_keyColumnLeftIds[i] >= 0) {
+        values[i] = row[_keyColumnLeftIds[i]];
+      } else {
+        values[i] = _keyColumnLiteralValues[i];
+      }
     }
     return new PrimaryKey(values);
   }
 
   private void fillKey(Object[] row, PrimaryKey key) {
     Object[] values = key.getValues();
-    for (int i = 0; i < _leftKeyIds.length; i++) {
-      values[i] = row[_leftKeyIds[i]];
+    for (int i = 0; i < _keyColumnCount; i++) {
+      if (_keyColumnLeftIds[i] >= 0) {
+        values[i] = row[_keyColumnLeftIds[i]];
+      } else {
+        values[i] = _keyColumnLiteralValues[i];
+      }
     }
   }
 
