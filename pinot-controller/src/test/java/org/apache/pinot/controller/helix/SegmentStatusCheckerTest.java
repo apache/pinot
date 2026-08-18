@@ -587,7 +587,7 @@ public class SegmentStatusCheckerTest {
   /// with no znode stat, which makes the checker fall back to the metadata's creation time.
   private void mockSegmentsZKMetadata(PinotHelixResourceManager resourceManager, String tableNameWithType,
       Map<String, SegmentZKMetadata> segmentZKMetadataMap, Map<String, Long> segmentZNodeMTimesMs) {
-    when(resourceManager.getSegmentsZKMetadataForSegmentNames(eq(tableNameWithType), any(), any())).thenAnswer(
+    when(resourceManager.getSegmentsZKMetadata(eq(tableNameWithType), any(), any())).thenAnswer(
         invocation -> {
           List<String> segmentNames = invocation.getArgument(1);
           List<Stat> stats = invocation.getArgument(2);
@@ -811,7 +811,7 @@ public class SegmentStatusCheckerTest {
     // The reads must be batched, metadata and znode stats together: one request per batch and no more, otherwise the
     // per-segment reads crept back in some form
     ArgumentCaptor<List<String>> segmentNamesCaptor = ArgumentCaptor.forClass(List.class);
-    verify(resourceManager, times(expectedNumBatches)).getSegmentsZKMetadataForSegmentNames(eq(OFFLINE_TABLE_NAME),
+    verify(resourceManager, times(expectedNumBatches)).getSegmentsZKMetadata(eq(OFFLINE_TABLE_NAME),
         segmentNamesCaptor.capture(), any());
     verify(propertyStore, never()).getStats(any(), anyInt());
     // Every segment is requested exactly once, in batches of at most the batch size

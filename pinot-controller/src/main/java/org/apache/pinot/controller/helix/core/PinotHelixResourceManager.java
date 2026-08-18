@@ -1055,7 +1055,7 @@ public class PinotHelixResourceManager {
   /// holding `null` for segments whose znode could not be read. See
   /// [ZKMetadataProvider#getSegmentsZKMetadata(ZkHelixPropertyStore, String, List, List)] for the full contract,
   /// including the `stats` out-parameter that carries the znodes' modification times.
-  public List<SegmentZKMetadata> getSegmentsZKMetadataForSegmentNames(String tableNameWithType,
+  public List<SegmentZKMetadata> getSegmentsZKMetadata(String tableNameWithType,
       List<String> segmentNames, @Nullable List<Stat> stats) {
     return ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, tableNameWithType, segmentNames, stats);
   }

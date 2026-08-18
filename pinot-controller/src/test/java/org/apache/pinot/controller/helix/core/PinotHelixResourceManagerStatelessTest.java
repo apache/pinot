@@ -606,7 +606,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     try {
       List<Stat> stats = new ArrayList<>();
       List<SegmentZKMetadata> segmentsZKMetadata =
-          _helixResourceManager.getSegmentsZKMetadataForSegmentNames(OFFLINE_TABLE_NAME, segmentNames, stats);
+          _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME, segmentNames, stats);
 
       // Both lists must line up with the requested names, so that the gap does not shift the entries after it
       assertEquals(segmentsZKMetadata.size(), 3);
@@ -626,7 +626,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
       // The stats are optional
       assertEquals(
-          _helixResourceManager.getSegmentsZKMetadataForSegmentNames(OFFLINE_TABLE_NAME, segmentNames, null).size(), 3);
+          _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME, segmentNames, null).size(), 3);
     } finally {
       for (String segmentName : List.of("testSegment0", "testSegment2")) {
         ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segmentName);

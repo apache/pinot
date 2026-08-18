@@ -405,7 +405,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         batchStartIndex = i;
         int batchEndIndex = Math.min(i + _segmentMetadataBatchSize, numSegments);
         batchSegmentStats = new ArrayList<>(batchEndIndex - batchStartIndex);
-        batchSegmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadataForSegmentNames(tableNameWithType,
+        batchSegmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithType,
             segmentsToCheck.subList(batchStartIndex, batchEndIndex), batchSegmentStats);
         for (SegmentZKMetadata segmentZKMetadata : batchSegmentsZKMetadata) {
           if (segmentZKMetadata != null) {
