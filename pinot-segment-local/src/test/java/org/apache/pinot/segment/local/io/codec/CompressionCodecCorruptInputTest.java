@@ -193,10 +193,9 @@ public class CompressionCodecCorruptInputTest {
 
   @Test
   public void testMultiStageDecodeBoundsInnerSnappyOutput() throws Exception {
-    // A valid Snappy frame that expands to 1 MiB is far larger than the LZ4-encoded intermediate
-    // for the four-byte final chunk declared by the outer format. The executor must use
-    // Snappy.decodeInto() with scratch derived from LZ4's bound instead of allocating from the
-    // inner Snappy header.
+    // A valid Snappy frame that expands to 1 MiB is far larger than the four-byte final INT
+    // chunk declared by the outer format. The executor must use Snappy.decodeInto() with a
+    // four-byte scratch bound instead of letting Snappy.decode() allocate from its inner header.
     byte[] compressed = Snappy.compress(new byte[1024 * 1024]);
     // Keep only a small prefix: it contains Snappy's claimed decoded length and stays below the
     // executor's outer encoded-size bound, so this specifically exercises the inner-frame guard.
@@ -204,7 +203,7 @@ public class CompressionCodecCorruptInputTest {
     encoded.put(compressed, 0, encoded.capacity()).flip();
     ByteBuffer decoded = ByteBuffer.allocateDirect(Integer.BYTES);
     CodecPipelineExecutor executor = CodecPipelineExecutor.create(
-        "LZ4,SNAPPY", CTX, CodecRegistry.DEFAULT);
+        "DELTA,SNAPPY", CTX, CodecRegistry.DEFAULT);
 
     IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
         () -> executor.decode(encoded, decoded, Integer.BYTES));
