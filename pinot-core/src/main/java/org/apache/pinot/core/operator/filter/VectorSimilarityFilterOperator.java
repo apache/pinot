@@ -305,8 +305,12 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
     String column = _predicate.getLhs().getIdentifier();
     float[] queryVector = _predicate.getValue();
     VectorExplainContext explainContext = _vectorExplainContext;
+    boolean backendParamsNeedCleanup = false;
+    boolean searchExecuted = false;
     try {
       // 1. Configure backend-specific parameters via interfaces
+      // Claim cleanup before the first setter because configuration can fail after partially updating reader state.
+      backendParamsNeedCleanup = true;
       configureBackendParams(column);
       refreshExplainContext(null);
       explainContext = _vectorExplainContext;
@@ -317,6 +321,7 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
       // 3. Execute ANN search (with pre-filter if available)
       ImmutableRoaringBitmap preFilter = _preFilterBitmap;
       ImmutableRoaringBitmap annResults;
+      searchExecuted = true;
       if (preFilter != null && _vectorIndexReader instanceof FilterAwareVectorIndexReader) {
         FilterAwareVectorIndexReader filterAwareReader = (FilterAwareVectorIndexReader) _vectorIndexReader;
         if (filterAwareReader.supportsPreFilter()) {
@@ -381,11 +386,17 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
 
       return annResults;
     } finally {
-      // Record search metrics for observability — always, regardless of which path was taken
-      VectorSearchMetrics.getInstance().recordSearch(_vectorSearchMode, _backendType);
-      // Refresh explain context with the final search mode decided during execution
-      refreshExplainContext(null);
-      clearBackendParams(column);
+      try {
+        if (searchExecuted) {
+          VectorSearchMetrics.getInstance().recordSearch(_vectorSearchMode, _backendType);
+        }
+        // Refresh explain context with the final search mode decided during execution
+        refreshExplainContext(null);
+      } finally {
+        if (backendParamsNeedCleanup) {
+          clearBackendParams(column);
+        }
+      }
     }
   }
 
