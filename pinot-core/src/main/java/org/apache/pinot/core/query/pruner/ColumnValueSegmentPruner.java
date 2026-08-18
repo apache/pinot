@@ -113,7 +113,6 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
   ///
   /// - Column min/max value
   ///
-  /// NOTE: Negative threshold means always attempt pruning.
   private boolean pruneInPredicate(IndexSegment segment, InPredicate inPredicate,
       Map<String, DataSource> dataSourceCache, ValueCache valueCache, QueryContext query) {
     List<String> values = inPredicate.getValues();

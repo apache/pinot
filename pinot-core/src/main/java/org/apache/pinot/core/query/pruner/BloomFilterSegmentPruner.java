@@ -229,7 +229,6 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
   }
 
   /// For IN predicate, prune the segments based on column bloom filter.
-  /// NOTE: Negative threshold means always attempt pruning.
   private boolean pruneInPredicate(IndexSegment segment, InPredicate inPredicate,
       Map<String, DataSource> dataSourceCache, ValueCache valueCache, QueryContext query) {
     List<String> values = inPredicate.getValues();
