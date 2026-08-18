@@ -35,7 +35,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 /// - int that fits in 32 bits → `Integer` → `Integer`
 /// - int that overflows 32 bits but fits in 64 → `Long` → `Long`
 /// - int that overflows 64 bits → `BigInteger` → `BigDecimal` (Pinot has no `BigInteger` data type)
-/// - decimal → `BigDecimal` → `BigDecimal` when parsed with Pinot's BigDecimal-aware JSON readers
+/// - decimal → `BigDecimal` → `BigDecimal` from Pinot's text JSON / PostgreSQL jsonb parsers
 /// - decimal → `Double` → `Double` for callers that still provide default Jackson-decoded maps
 /// - string → `String` → `String`
 /// - `null` → `null` → `null`
