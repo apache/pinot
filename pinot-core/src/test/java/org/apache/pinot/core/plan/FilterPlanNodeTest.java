@@ -19,12 +19,15 @@
 package org.apache.pinot.core.plan;
 
 import java.lang.reflect.Method;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.predicate.IsNullPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
@@ -42,8 +45,10 @@ import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.FilterAwareVectorIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -51,9 +56,16 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -61,6 +73,103 @@ import static org.testng.Assert.assertTrue;
 
 
 public class FilterPlanNodeTest {
+
+  @DataProvider(name = "nestedVectorSubtreeShapes")
+  public Object[][] nestedVectorSubtreeShapes() {
+    return new Object[][]{{"AND"}, {"OR"}, {"NOT_OR"}};
+  }
+
+  @Test(dataProvider = "nestedVectorSubtreeShapes")
+  public void testNestedVectorSimilaritySubtreeIsNeverMaterializedAsMetadata(String shape) {
+    FilterAwareVectorIndexReader directVectorReader = mock(FilterAwareVectorIndexReader.class);
+    FilterAwareVectorIndexReader nestedVectorReader = mock(FilterAwareVectorIndexReader.class);
+    when(directVectorReader.supportsPreFilter()).thenReturn(true);
+    when(nestedVectorReader.supportsPreFilter()).thenReturn(true);
+    when(nestedVectorReader.getDocIds(Mockito.any(float[].class), Mockito.anyInt(),
+        any(ImmutableRoaringBitmap.class))).thenReturn(bitmapOf(1));
+    DataSource directVectorDataSource = mock(DataSource.class);
+    DataSource nestedVectorDataSource = mock(DataSource.class);
+    when(directVectorDataSource.getVectorIndex()).thenReturn(directVectorReader);
+    when(nestedVectorDataSource.getVectorIndex()).thenReturn(nestedVectorReader);
+    DataSource metadataDataSource = mock(DataSource.class);
+    NullValueVectorReader nullValueVectorReader = mock(NullValueVectorReader.class);
+    when(nullValueVectorReader.getNullBitmap()).thenReturn(bitmapOf(1));
+    when(metadataDataSource.getNullValueVector()).thenReturn(nullValueVectorReader);
+
+    IndexSegment segment = mock(IndexSegment.class);
+    SegmentMetadata metadata = mock(SegmentMetadata.class);
+    when(metadata.getTotalDocs()).thenReturn(1_000);
+    when(segment.getSegmentMetadata()).thenReturn(metadata);
+    when(segment.getDataSource("embeddingA", null)).thenReturn(directVectorDataSource);
+    when(segment.getDataSource("embeddingB", null)).thenReturn(nestedVectorDataSource);
+    when(segment.getDataSource("tenant", null)).thenReturn(metadataDataSource);
+
+    FilterContext directVector = FilterContext.forPredicate(new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embeddingA"), new float[]{1.0f, 0.0f}, 2));
+    FilterContext nestedVector = FilterContext.forPredicate(new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embeddingB"), new float[]{1.0f, 0.0f}, 2));
+    FilterContext metadataFilter = FilterContext.forPredicate(
+        new IsNullPredicate(ExpressionContext.forIdentifier("tenant")));
+    FilterContext nestedSubtree;
+    switch (shape) {
+      case "AND":
+        nestedSubtree = FilterContext.forAnd(List.of(nestedVector, metadataFilter));
+        break;
+      case "OR":
+        nestedSubtree = FilterContext.forOr(List.of(nestedVector, metadataFilter));
+        break;
+      case "NOT_OR":
+        nestedSubtree = FilterContext.forNot(FilterContext.forOr(List.of(nestedVector, metadataFilter)));
+        break;
+      default:
+        throw new IllegalStateException("Unexpected shape: " + shape);
+    }
+    QueryContext queryContext = mock(QueryContext.class);
+    when(queryContext.getFilter()).thenReturn(FilterContext.forAnd(List.of(directVector, nestedSubtree)));
+
+    SegmentContext segmentContext = new SegmentContext(segment);
+    segmentContext.setDocIdsSnapshot(bitmapOf(0, 1, 2, 3));
+    new FilterPlanNode(segmentContext, queryContext).run();
+
+    verify(nestedVectorReader, never()).getDocIds(Mockito.any(float[].class), Mockito.anyInt());
+    verify(nestedVectorReader, never()).getDocIds(Mockito.any(float[].class), Mockito.anyInt(),
+        any(ImmutableRoaringBitmap.class));
+    verify(directVectorReader, never()).getDocIds(Mockito.any(float[].class), Mockito.anyInt(),
+        any(ImmutableRoaringBitmap.class));
+  }
+
+  @Test
+  public void testNonRestrictedMetadataScopePreservesAdaptivePostFilterBehavior() {
+    float[] queryVector = {1.0f, 0.0f};
+    FilterAwareVectorIndexReader vectorReader = mock(FilterAwareVectorIndexReader.class);
+    when(vectorReader.supportsPreFilter()).thenReturn(true);
+    when(vectorReader.getDocIds(queryVector, 2)).thenReturn(bitmapOf(0, 1));
+
+    DataSource vectorDataSource = mock(DataSource.class);
+    when(vectorDataSource.getVectorIndex()).thenReturn(vectorReader);
+    DataSource metadataDataSource = mock(DataSource.class);
+    NullValueVectorReader nullValueVectorReader = mock(NullValueVectorReader.class);
+    when(nullValueVectorReader.getNullBitmap()).thenReturn(bitmapOf(2, 3));
+    when(metadataDataSource.getNullValueVector()).thenReturn(nullValueVectorReader);
+
+    IndexSegment segment = mock(IndexSegment.class);
+    SegmentMetadata metadata = mock(SegmentMetadata.class);
+    when(metadata.getTotalDocs()).thenReturn(4);
+    when(segment.getSegmentMetadata()).thenReturn(metadata);
+    when(segment.getDataSource("embedding", null)).thenReturn(vectorDataSource);
+    when(segment.getDataSource("tenant", null)).thenReturn(metadataDataSource);
+
+    FilterContext vectorFilter = FilterContext.forPredicate(new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), queryVector, 2));
+    FilterContext metadataFilter = FilterContext.forPredicate(
+        new IsNullPredicate(ExpressionContext.forIdentifier("tenant")));
+    QueryContext queryContext = mock(QueryContext.class);
+    when(queryContext.getFilter()).thenReturn(FilterContext.forAnd(List.of(vectorFilter, metadataFilter)));
+
+    Assert.assertTrue(getFilteredDocIds(new FilterPlanNode(new SegmentContext(segment), queryContext).run()).isEmpty());
+    verify(vectorReader).getDocIds(queryVector, 2);
+    verify(vectorReader, never()).getDocIds(eq(queryVector), eq(2), any(ImmutableRoaringBitmap.class));
+  }
 
   @Test
   public void testConsistentSnapshot()
@@ -152,6 +261,22 @@ public class FilterPlanNodeTest {
       numDocsFiltered++;
     }
     return numDocsFiltered;
+  }
+
+  private static MutableRoaringBitmap getFilteredDocIds(BaseFilterOperator operator) {
+    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
+    BlockDocIdIterator iterator = operator.nextBlock().getBlockDocIdSet().iterator();
+    int docId;
+    while ((docId = iterator.next()) != Constants.EOF) {
+      docIds.add(docId);
+    }
+    return docIds;
+  }
+
+  private static MutableRoaringBitmap bitmapOf(int... docIds) {
+    MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+    bitmap.add(docIds);
+    return bitmap;
   }
 
   @Test
