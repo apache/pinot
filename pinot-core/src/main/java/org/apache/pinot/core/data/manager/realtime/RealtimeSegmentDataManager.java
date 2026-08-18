@@ -1257,7 +1257,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       FileUtils.deleteQuietly(indexDir);
 
       File[] tempFiles = tempSegmentFolder.listFiles();
-      assert tempFiles != null;
+      if (tempFiles == null || tempFiles.length == 0) {
+        String errorMessage = "Temp segment folder is empty or unreadable: " + tempSegmentFolder;
+        reportSegmentBuildFailure(errorMessage, null);
+        throw new SegmentBuildFailureException(errorMessage);
+      }
       File tempIndexDir = tempFiles[0];
       try {
         FileUtils.moveDirectory(tempIndexDir, indexDir);
