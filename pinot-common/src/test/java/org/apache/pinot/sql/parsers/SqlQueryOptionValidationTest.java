@@ -209,6 +209,12 @@ public class SqlQueryOptionValidationTest {
     void detach() {
       _logger.removeAppender(this);
       stop();
+      // The captured logger is never declared in log4j2.xml, so attaching the appender implicitly registered a
+      // LoggerConfig for it. Remove it to leave the shared configuration as found — test classes share the JVM in
+      // this module, and other tests assert on the set of configured loggers.
+      LoggerContext context = _logger.getContext();
+      context.getConfiguration().removeLogger(_logger.getName());
+      context.updateLoggers();
     }
 
     List<String> messagesContaining(String substring) {
