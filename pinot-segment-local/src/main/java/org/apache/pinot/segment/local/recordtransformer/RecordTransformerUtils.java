@@ -22,8 +22,10 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -83,7 +85,7 @@ public class RecordTransformerUtils {
       boolean skipPostComplexTypeTransformers, boolean skipFilterTransformer) {
     List<RecordTransformer> transformers = new ArrayList<>();
     if (!skipPreComplexTypeTransformers) {
-      addSourceFieldDataTypeTransformer(tableConfig, null, transformers, true);
+      addSourceFieldDataTypeTransformer(tableConfig, schema, transformers, true);
       addRecordEnricherTransformers(tableConfig, transformers, true);
     }
     if (!skipComplexTypeTransformer) {
@@ -180,9 +182,11 @@ public class RecordTransformerUtils {
   }
 
   /// Derives [PinotDataType]s for ingestion-aggregation source columns that are absent from the schema (and not already
-  /// covered by an explicit [SourceFieldConfig]). Types are inferred from the aggregation function and destination
-  /// metric. Sketch/HLL/COUNT sources are left unconverted so offering semantics (e.g. hashing a string vs a number)
-  /// are preserved. [org.apache.pinot.segment.local.aggregator.ValueAggregatorUtils#toDouble] remains a safety net.
+  /// covered by an explicit [SourceFieldConfig] in either phase). Types are inferred from the aggregation function and
+  /// destination metric. When one source feeds multiple aggregations, inferred numeric types are merged by keeping the
+  /// wider type so config order cannot drop precision. Sketch/HLL/COUNT sources are left unconverted so offering
+  /// semantics (e.g. hashing a string vs a number) are preserved.
+  /// [org.apache.pinot.segment.local.aggregator.ValueAggregatorUtils#toDouble] remains a safety net.
   static void addAggregationSourceDataTypes(TableConfig tableConfig, Schema schema,
       Map<String, PinotDataType> dataTypes) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
@@ -193,6 +197,7 @@ public class RecordTransformerUtils {
     if (CollectionUtils.isEmpty(aggregationConfigs)) {
       return;
     }
+    Set<String> explicitSourceFields = getExplicitSourceFieldNames(ingestionConfig);
     for (AggregationConfig aggregationConfig : aggregationConfigs) {
       String destColumn = aggregationConfig.getColumnName();
       String aggregationFunction = aggregationConfig.getAggregationFunction();
@@ -226,15 +231,68 @@ public class RecordTransformerUtils {
       }
       String sourceColumn = firstArgument.getIdentifier();
       if (AggregationFunctionColumnPair.STAR.equals(sourceColumn) || schema.hasColumn(sourceColumn)
-          || dataTypes.containsKey(sourceColumn)) {
-        // Explicit SourceFieldConfig or schema column already covers conversion; COUNT(*) has no source value.
+          || explicitSourceFields.contains(sourceColumn)) {
+        // Any explicit SourceFieldConfig (including pre-complex-type) or schema column already covers conversion;
+        // COUNT(*) has no source value.
         continue;
       }
       FieldSpec destFieldSpec = schema.getFieldSpecFor(destColumn);
       PinotDataType inferredType = inferAggregationSourceDataType(functionType, destFieldSpec);
       if (inferredType != null) {
-        dataTypes.put(sourceColumn, inferredType);
+        PinotDataType existing = dataTypes.get(sourceColumn);
+        dataTypes.put(sourceColumn,
+            existing == null ? inferredType : mergeInferredAggregationSourceTypes(existing, inferredType));
       }
+    }
+  }
+
+  /// Returns source field names configured in either transformer phase. Used so a pre-complex-type
+  /// [SourceFieldConfig] is not overwritten by post-phase aggregation-source inference.
+  private static Set<String> getExplicitSourceFieldNames(IngestionConfig ingestionConfig) {
+    List<SourceFieldConfig> sourceFieldConfigs = ingestionConfig.getSourceFieldConfigs();
+    if (CollectionUtils.isEmpty(sourceFieldConfigs)) {
+      return Set.of();
+    }
+    Set<String> names = new HashSet<>(sourceFieldConfigs.size());
+    for (SourceFieldConfig sourceFieldConfig : sourceFieldConfigs) {
+      names.add(sourceFieldConfig.getName());
+    }
+    return names;
+  }
+
+  /// When one raw source feeds multiple aggregations, keep the type that loses less information. Numeric scalars
+  /// widen `INT < LONG < FLOAT < DOUBLE < BIG_DECIMAL`. A scalar vs multi-value conflict keeps the type already
+  /// recorded so conversion does not flip shape based on config order.
+  static PinotDataType mergeInferredAggregationSourceTypes(PinotDataType existing, PinotDataType incoming) {
+    if (existing == incoming) {
+      return existing;
+    }
+    if (existing.isSingleValue() != incoming.isSingleValue()) {
+      return existing;
+    }
+    int existingWidth = numericWidth(existing);
+    int incomingWidth = numericWidth(incoming);
+    if (existingWidth < 0 || incomingWidth < 0) {
+      return existing;
+    }
+    return incomingWidth > existingWidth ? incoming : existing;
+  }
+
+  /// Width for inferred numeric conversion targets. Non-numeric types return `-1`.
+  private static int numericWidth(PinotDataType type) {
+    switch (type) {
+      case INT:
+        return 1;
+      case LONG:
+        return 2;
+      case FLOAT:
+        return 3;
+      case DOUBLE:
+        return 4;
+      case BIG_DECIMAL:
+        return 5;
+      default:
+        return -1;
     }
   }
 
