@@ -58,9 +58,9 @@ import org.slf4j.LoggerFactory;
 ///      using exact distance from the forward index and re-sorted before final top-K selection.
 /// - **maxCandidates:** Controls how many ANN candidates are retrieved before rerank. Only
 ///      meaningful when rerank is enabled.
-/// - **Pre-filter:** For backends that implement FilterAwareVectorIndexReader, a pre-filter
-///      bitmap from sibling filter operators can be passed in to improve search quality under
-///      highly selective filters.
+/// - **Pre-filter:** For backends that implement FilterAwareVectorIndexReader, an optimizer-selected metadata bitmap
+///      can improve search quality under highly selective filters. FULL-upsert queries additionally apply their
+///      query-scoped valid-document snapshot before candidate selection.
 ///
 /// When no query options are specified, behavior is identical to the previous HNSW-only path
 /// (full backward compatibility).
@@ -84,13 +84,22 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
   private final boolean _hasThresholdPredicate;
   private final float _distanceThreshold;
   private final int _effectiveSearchCount;
+  @Nullable
+  private final ImmutableRoaringBitmap _requiredUpsertCandidateBitmap;
+  @Nullable
+  private final String _requiredCandidateFallbackReason;
   private volatile VectorExplainContext _vectorExplainContext;
   private volatile int _annCandidateCount;
   private volatile int _rerankedCandidateCount;
   private ImmutableRoaringBitmap _matches;
   @Nullable
-  private volatile ImmutableRoaringBitmap _preFilterBitmap;
+  private volatile ImmutableRoaringBitmap _optionalPreFilterBitmap;
+  @Nullable
+  private volatile ImmutableRoaringBitmap _effectiveAllowedDocIds;
   private volatile VectorSearchMode _vectorSearchMode;
+  @Nullable
+  private volatile String _runtimeFallbackReason;
+  private volatile boolean _candidateGenerationSkipped;
 
   /// Backward-compatible constructor that uses default search params and no forward index.
   /// Existing callers that do not pass query options continue to work unchanged.
@@ -129,6 +138,15 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
   public VectorSimilarityFilterOperator(VectorIndexReader vectorIndexReader, VectorSimilarityPredicate predicate,
       int numDocs, VectorSearchParams searchParams, @Nullable ForwardIndexReader<?> forwardIndexReader,
       @Nullable VectorIndexConfig vectorIndexConfig, boolean hasMetadataFilter) {
+    this(vectorIndexReader, predicate, numDocs, searchParams, forwardIndexReader, vectorIndexConfig,
+        hasMetadataFilter, null);
+  }
+
+  /// Full constructor with a mandatory query-owned scope and optional optimizer-selected metadata.
+  public VectorSimilarityFilterOperator(VectorIndexReader vectorIndexReader, VectorSimilarityPredicate predicate,
+      int numDocs, VectorSearchParams searchParams, @Nullable ForwardIndexReader<?> forwardIndexReader,
+      @Nullable VectorIndexConfig vectorIndexConfig, boolean hasMetadataFilter,
+      @Nullable VectorCandidateScope candidateScope) {
     super(numDocs, false);
     _vectorIndexReader = vectorIndexReader;
     _predicate = predicate;
@@ -142,9 +160,9 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
     _hasMetadataFilter = hasMetadataFilter;
     _hasThresholdPredicate = searchParams.hasDistanceThreshold();
     _distanceThreshold = searchParams.getDistanceThreshold();
-    // When metadata filter is present, over-fetch ANN candidates to compensate for filter loss.
-    // Default over-fetch factor is 2x topK for filtered queries without explicit maxCandidates.
-    // For threshold queries, use a larger candidate pool since we need distance refinement.
+    _requiredUpsertCandidateBitmap = candidateScope != null ? candidateScope.getRequiredDocIds() : null;
+    _requiredCandidateFallbackReason = candidateScope != null ? candidateScope.getFallbackReason() : null;
+    // Threshold and exact-rerank queries use a larger candidate pool for refinement.
     int baseSearchCount;
     if (_hasThresholdPredicate) {
       // Threshold queries need a larger candidate pool for exact distance refinement.
@@ -156,27 +174,45 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
       // For plain top-K and filtered queries (no rerank, no threshold), always ask
       // the ANN index for exactly topK candidates. Over-fetching would change the
       // predicate semantics: vectorSimilarity(col, q, 10) must return at most 10 docs.
-      // The metadata filter (bitmap AND) reduces this set further, which is correct.
+      // Adaptive metadata that remains post-filtered may reduce this set further. Required upsert candidates are
+      // instead applied before this top-K selection.
       baseSearchCount = predicate.getTopK();
     }
     _effectiveSearchCount = baseSearchCount;
-    refreshExplainContext(null);
     _annCandidateCount = -1;
     _rerankedCandidateCount = -1;
     _matches = null;
-    _preFilterBitmap = null;
-    _vectorSearchMode = VectorSearchMode.POST_FILTER_ANN;
+    _optionalPreFilterBitmap = null;
+    recomputeEffectiveAllowedDocIds();
+    if (!hasMandatoryCandidateScope()) {
+      _vectorSearchMode = VectorSearchMode.POST_FILTER_ANN;
+      _runtimeFallbackReason = null;
+    } else if (_effectiveAllowedDocIds.isEmpty()) {
+      _vectorSearchMode = VectorSearchMode.FILTER_THEN_ANN;
+      _runtimeFallbackReason = null;
+    } else if (readerSupportsPreFilter()) {
+      _vectorSearchMode = VectorSearchMode.FILTER_THEN_ANN;
+      _runtimeFallbackReason = null;
+    } else {
+      _vectorSearchMode = VectorSearchMode.EXACT_SCAN;
+      _runtimeFallbackReason = _requiredCandidateFallbackReason;
+    }
+    _candidateGenerationSkipped = hasMandatoryCandidateScope() && _effectiveAllowedDocIds.isEmpty();
+    refreshExplainContext();
   }
 
-  /// Sets a pre-filter bitmap to restrict the ANN search to a subset of documents.
-  /// When set, the operator will use FILTER_THEN_ANN mode if the underlying reader
-  /// supports [FilterAwareVectorIndexReader].
+  /// Sets an optimizer-selected optional metadata bitmap. When a mandatory upsert bitmap is also present, the
+  /// operator intersects private copies of the two bitmaps before candidate generation. When no mandatory bitmap is
+  /// present, readers that cannot pre-filter retain the existing unfiltered ANN behavior.
   ///
   /// This method must be called before any search execution (getTrues, getBitmaps, etc.).
   ///
   /// @param preFilterBitmap the bitmap of document IDs to restrict the search to
   public void setPreFilterBitmap(@Nullable ImmutableRoaringBitmap preFilterBitmap) {
-    _preFilterBitmap = preFilterBitmap;
+    _optionalPreFilterBitmap = copyBitmap(preFilterBitmap);
+    recomputeEffectiveAllowedDocIds();
+    _candidateGenerationSkipped = hasMandatoryCandidateScope() && _effectiveAllowedDocIds.isEmpty();
+    refreshExplainContext();
   }
 
   @Override
@@ -244,6 +280,16 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
     if (explainContext.getFilterSelectivity() >= 0) {
       sb.append(", filterSelectivity:").append(String.format("%.4f", explainContext.getFilterSelectivity()));
     }
+    sb.append(", upsertCandidateFilterApplied:").append(_requiredUpsertCandidateBitmap != null)
+        .append(", upsertCandidateFilterCardinality:").append(getRequiredUpsertCandidateCardinality())
+        .append(", effectiveAllowedDocIdsCardinality:").append(getEffectiveAllowedDocIdsCardinality())
+        .append(", candidateGenerationSkipped:").append(_candidateGenerationSkipped);
+    if (_candidateGenerationSkipped) {
+      sb.append(", candidateGenerationSkipReason:").append(getCandidateGenerationSkipReason());
+    }
+    if (_runtimeFallbackReason != null) {
+      sb.append(", fallbackReason:").append(_runtimeFallbackReason);
+    }
     sb.append(')');
     return sb.toString();
   }
@@ -292,12 +338,22 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
     if (explainContext.getFilterSelectivity() >= 0) {
       attributeBuilder.putString("filterSelectivity", String.format("%.4f", explainContext.getFilterSelectivity()));
     }
+    attributeBuilder.putBool("upsertCandidateFilterApplied", _requiredUpsertCandidateBitmap != null);
+    attributeBuilder.putLongIdempotent("upsertCandidateFilterCardinality", getRequiredUpsertCandidateCardinality());
+    attributeBuilder.putLongIdempotent("effectiveAllowedDocIdsCardinality",
+        getEffectiveAllowedDocIdsCardinality());
+    attributeBuilder.putBool("candidateGenerationSkipped", _candidateGenerationSkipped);
+    if (_candidateGenerationSkipped) {
+      attributeBuilder.putString("candidateGenerationSkipReason", getCandidateGenerationSkipReason());
+    }
+    if (_runtimeFallbackReason != null) {
+      attributeBuilder.putString("fallbackReason", _runtimeFallbackReason);
+    }
   }
 
   /// Returns true if the underlying vector index reader supports pre-filter ANN search.
   public boolean supportsPreFilter() {
-    return _vectorIndexReader instanceof FilterAwareVectorIndexReader
-        && ((FilterAwareVectorIndexReader) _vectorIndexReader).supportsPreFilter();
+    return readerSupportsPreFilter();
   }
 
   /// Executes the vector search with backend-specific parameter dispatch and optional rerank.
@@ -305,18 +361,53 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
     String column = _predicate.getLhs().getIdentifier();
     float[] queryVector = _predicate.getValue();
     VectorExplainContext explainContext = _vectorExplainContext;
+    boolean backendParamsNeedCleanup = false;
+    boolean searchExecuted = false;
     try {
+      ImmutableRoaringBitmap effectiveAllowedDocIds = _effectiveAllowedDocIds;
+      if (hasMandatoryCandidateScope() && effectiveAllowedDocIds.isEmpty()) {
+        _candidateGenerationSkipped = true;
+        _annCandidateCount = 0;
+        _rerankedCandidateCount = 0;
+        return new MutableRoaringBitmap();
+      }
+      _candidateGenerationSkipped = false;
+
+      if (hasMandatoryCandidateScope() && !readerSupportsPreFilter()) {
+        if (_forwardIndexReader == null) {
+          throw new IllegalStateException("Cannot honor mandatory vector candidate scope on vector column: "
+              + column + " -- vector index reader does not support filtered search and no forward index is available");
+        }
+        _vectorSearchMode = VectorSearchMode.EXACT_SCAN;
+        _runtimeFallbackReason = _requiredCandidateFallbackReason != null ? _requiredCandidateFallbackReason
+            : "vector_index_not_filter_aware_for_mandatory_scope";
+        VectorSearchMetrics.getInstance().recordFallback(_runtimeFallbackReason);
+        LOGGER.warn("Performing exact allowed-document vector scan on column: {} because {}. allowedDocs={}",
+            column, _runtimeFallbackReason, effectiveAllowedDocIds.getCardinality());
+        Float threshold = _hasThresholdPredicate ? _distanceThreshold : null;
+        searchExecuted = true;
+        ImmutableRoaringBitmap exactResults = ExactVectorScanFilterOperator.computeExactMatches(
+            _forwardIndexReader, queryVector, _predicate.getTopK(), _numDocs, _distanceFunction, threshold,
+            effectiveAllowedDocIds, column);
+        _annCandidateCount = -1;
+        _rerankedCandidateCount = exactResults.getCardinality();
+        return exactResults;
+      }
+
       // 1. Configure backend-specific parameters via interfaces
+      // Claim cleanup before the first setter because configuration can fail after partially updating reader state.
+      backendParamsNeedCleanup = true;
       configureBackendParams(column);
-      refreshExplainContext(null);
+      refreshExplainContext();
       explainContext = _vectorExplainContext;
 
       // 2. Determine effective search count (higher if rerank is enabled)
       int searchCount = explainContext.getEffectiveSearchCount();
 
       // 3. Execute ANN search (with pre-filter if available)
-      ImmutableRoaringBitmap preFilter = _preFilterBitmap;
+      ImmutableRoaringBitmap preFilter = effectiveAllowedDocIds;
       ImmutableRoaringBitmap annResults;
+      searchExecuted = true;
       if (preFilter != null && _vectorIndexReader instanceof FilterAwareVectorIndexReader) {
         FilterAwareVectorIndexReader filterAwareReader = (FilterAwareVectorIndexReader) _vectorIndexReader;
         if (filterAwareReader.supportsPreFilter()) {
@@ -326,6 +417,10 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
               column, preFilter.getCardinality(),
               _numDocs > 0 ? (double) preFilter.getCardinality() / _numDocs : 0.0);
         } else {
+          if (hasMandatoryCandidateScope()) {
+            throw new IllegalStateException("Cannot honor mandatory vector candidate scope on vector column: "
+                + column + " -- vector index reader stopped supporting filtered search");
+          }
           _vectorSearchMode = VectorSearchMode.POST_FILTER_ANN;
           annResults = _vectorIndexReader.getDocIds(queryVector, searchCount);
         }
@@ -381,11 +476,17 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
 
       return annResults;
     } finally {
-      // Record search metrics for observability — always, regardless of which path was taken
-      VectorSearchMetrics.getInstance().recordSearch(_vectorSearchMode, _backendType);
-      // Refresh explain context with the final search mode decided during execution
-      refreshExplainContext(null);
-      clearBackendParams(column);
+      try {
+        if (searchExecuted) {
+          VectorSearchMetrics.getInstance().recordSearch(_vectorSearchMode, _backendType);
+        }
+        // Refresh explain context with the final search mode decided during execution
+        refreshExplainContext();
+      } finally {
+        if (backendParamsNeedCleanup) {
+          clearBackendParams(column);
+        }
+      }
     }
   }
 
@@ -510,14 +611,21 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
     return _backendType.name();
   }
 
-  private void refreshExplainContext(@Nullable String fallbackReason) {
-    VectorExecutionMode executionMode = VectorQueryExecutionContext.selectExecutionMode(
-        true, _hasMetadataFilter, _hasThresholdPredicate, _effectiveExactRerank);
-    ImmutableRoaringBitmap preFilter = _preFilterBitmap;
+  private void refreshExplainContext() {
+    VectorExecutionMode executionMode;
+    if (_vectorSearchMode == VectorSearchMode.EXACT_SCAN) {
+      executionMode = VectorExecutionMode.EXACT_SCAN;
+    } else if (_vectorSearchMode == VectorSearchMode.FILTER_THEN_ANN) {
+      executionMode = VectorExecutionMode.FILTER_THEN_ANN;
+    } else {
+      executionMode = VectorQueryExecutionContext.selectExecutionMode(
+          true, _hasMetadataFilter, _hasThresholdPredicate, _effectiveExactRerank);
+    }
+    ImmutableRoaringBitmap preFilter = _effectiveAllowedDocIds;
     double filterSelectivity = (preFilter != null && _numDocs > 0)
         ? (double) preFilter.getCardinality() / _numDocs : -1.0;
-    Map<String, Object> indexDebugInfo =
-        _backendType.supportsNprobe() ? _vectorIndexReader.getIndexDebugInfo() : Map.of();
+    Map<String, Object> indexDebugInfo = !_candidateGenerationSkipped && _backendType.supportsNprobe()
+        ? _vectorIndexReader.getIndexDebugInfo() : Map.of();
     int effectiveEfSearch =
         resolveEffectiveEfSearch(_backendType, _searchParams);
     Boolean effectiveHnswUseRelativeDistance =
@@ -528,9 +636,55 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
     float effectiveThreshold = threshold != null ? threshold : -1f;
     _vectorExplainContext = new VectorExplainContext(_backendType, _distanceFunction, executionMode,
         resolveEffectiveNprobe(_backendType, _searchParams, indexDebugInfo),
-        _effectiveExactRerank, _effectiveSearchCount, fallbackReason, null,
+        _effectiveExactRerank, _effectiveSearchCount, _runtimeFallbackReason, null,
         effectiveEfSearch, effectiveThreshold, _vectorSearchMode, filterSelectivity,
         effectiveHnswUseRelativeDistance, effectiveHnswUseBoundedQueue);
+  }
+
+  private boolean readerSupportsPreFilter() {
+    return _vectorIndexReader instanceof FilterAwareVectorIndexReader
+        && ((FilterAwareVectorIndexReader) _vectorIndexReader).supportsPreFilter();
+  }
+
+  private boolean hasMandatoryCandidateScope() {
+    return _requiredUpsertCandidateBitmap != null;
+  }
+
+  private void recomputeEffectiveAllowedDocIds() {
+    if (_requiredUpsertCandidateBitmap == null) {
+      _effectiveAllowedDocIds = _optionalPreFilterBitmap;
+      return;
+    }
+    if (_optionalPreFilterBitmap == null) {
+      _effectiveAllowedDocIds = _requiredUpsertCandidateBitmap;
+      return;
+    }
+    MutableRoaringBitmap effective = _requiredUpsertCandidateBitmap.toMutableRoaringBitmap();
+    effective.and(_optionalPreFilterBitmap);
+    _effectiveAllowedDocIds = effective.toImmutableRoaringBitmap();
+  }
+
+  private int getRequiredUpsertCandidateCardinality() {
+    return _requiredUpsertCandidateBitmap != null ? _requiredUpsertCandidateBitmap.getCardinality() : -1;
+  }
+
+  private int getEffectiveAllowedDocIdsCardinality() {
+    return _effectiveAllowedDocIds != null ? _effectiveAllowedDocIds.getCardinality() : -1;
+  }
+
+  private String getCandidateGenerationSkipReason() {
+    if (_requiredUpsertCandidateBitmap != null && _requiredUpsertCandidateBitmap.isEmpty()) {
+      return "empty_upsert_candidate_filter";
+    }
+    return "empty_effective_candidate_filter";
+  }
+
+  @Nullable
+  private static ImmutableRoaringBitmap copyBitmap(@Nullable ImmutableRoaringBitmap bitmap) {
+    if (bitmap == null) {
+      return null;
+    }
+    return bitmap.toMutableRoaringBitmap().toImmutableRoaringBitmap();
   }
 
   private static int resolveEffectiveNprobe(VectorBackendType backendType, VectorSearchParams searchParams,
