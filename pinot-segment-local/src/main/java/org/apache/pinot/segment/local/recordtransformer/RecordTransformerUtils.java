@@ -261,8 +261,8 @@ public class RecordTransformerUtils {
   }
 
   /// When one raw source feeds multiple aggregations, keep the type that loses less information. Numeric scalars
-  /// widen `INT < LONG < FLOAT < DOUBLE < BIG_DECIMAL`. A scalar vs multi-value conflict keeps the type already
-  /// recorded so conversion does not flip shape based on config order.
+  /// widen `INT < LONG < FLOAT < DOUBLE < BIG_DECIMAL`. A scalar vs multi-value conflict keeps the first inferred
+  /// shape so conversion does not rewrite an array to a scalar, or the reverse.
   static PinotDataType mergeInferredAggregationSourceTypes(PinotDataType existing, PinotDataType incoming) {
     if (existing == incoming) {
       return existing;

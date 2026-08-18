@@ -811,7 +811,7 @@ public class RecordTransformerTest {
   @Test
   public void testAggregationSourcePreComplexTypeSourceFieldConfigWins() {
     // A pre-complex-type SourceFieldConfig is not in the post-phase map. Auto inference must still skip that column
-    // so the explicit INT is not overwritten with DOUBLE after unnest.
+    // so the explicit INT is not overwritten with DOUBLE.
     Schema schema = new Schema.SchemaBuilder().setSchemaName("aggSrcSchema")
         .addSingleValueDimension("dim", DataType.STRING)
         .addMetric("sumMetric", DataType.DOUBLE)
