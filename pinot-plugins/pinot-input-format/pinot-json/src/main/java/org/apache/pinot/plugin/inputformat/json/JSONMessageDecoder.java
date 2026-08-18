@@ -28,18 +28,23 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
-import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /// An implementation of StreamMessageDecoder to read JSON records from a stream.
 ///
 /// Set the {@value #JSON_FORMAT_CONFIG_KEY} decoder property to pin the payload encoding to one of
 /// `TEXT`, `POSTGRES_JSONB`, `SQLITE_JSONB`, `SMILE` or `CBOR`. When unset the
-/// encoding is `TEXT`, the decoder's historical behavior.
+/// encoding is `TEXT`, the decoder's historical format selection.
 ///
-/// Set it to `AUTO` to instead detect the encoding per message from its leading magic / version bytes,
-/// falling back to text JSON. Detection is allocation-free and cannot mis-route a well-formed text JSON
-/// document: a top-level `&#123;` or `[` (optionally after whitespace) collides with none
+/// Text JSON and PostgreSQL jsonb parse floating literals as `BigDecimal` so high-precision decimals
+/// survive ingestion. That is always on: it is the correct behavior for decimal text, not an opt-in flag.
+/// Avro and Protobuf decoders are unchanged: they already deliver typed numeric values (Avro's decimal
+/// logical type is already `BigDecimal`). Smile, CBOR, and SQLite JSONB keep their native / existing
+/// numeric types.
+///
+/// Set `jsonFormat` to `AUTO` to instead detect the encoding per message from its leading magic / version
+/// bytes, falling back to text JSON. Detection is allocation-free and cannot mis-route a well-formed text
+/// JSON document: a top-level `&#123;` or `[` (optionally after whitespace) collides with none
 /// of the binary signatures. It is opt-in rather than the default because it is still a heuristic over a few
 /// leading bytes, so it may claim a corrupt message that text decoding would have rejected outright.
 /// See [JsonPayloadFormat].
@@ -53,14 +58,12 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
 
   private static final String JSON_RECORD_EXTRACTOR_CLASS =
       "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
-  private static final String PRESERVE_DECIMAL_PRECISION_CONFIG_KEY = "preserveDecimalPrecision";
 
   private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
   private Set<String> _fieldsToRead;
   private boolean _usesDefaultRecordExtractor;
   // For AUTO this resolves the concrete format per message; otherwise it is the pinned format's parser.
   private JsonPayloadParser _parser;
-  private boolean _preserveDecimalPrecision;
 
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
@@ -74,10 +77,6 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
     if (recordExtractorClass == null) {
       recordExtractorClass = JSON_RECORD_EXTRACTOR_CLASS;
     }
-    String preserveDecimalPrecision = null;
-    if (props != null) {
-      preserveDecimalPrecision = props.get(PRESERVE_DECIMAL_PRECISION_CONFIG_KEY);
-    }
 
     _jsonRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
     _jsonRecordExtractor.init(fieldsToRead, null);
@@ -85,13 +84,7 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
     // Direct parsing implements JSONRecordExtractor's conversion contract and bypasses extract(). Require the
     // exact default class so a configured extractor or subclass cannot lose custom extraction behavior.
     _usesDefaultRecordExtractor = _jsonRecordExtractor.getClass() == JSONRecordExtractor.class;
-    JsonPayloadFormat format = JsonPayloadFormat.fromConfig(jsonFormat);
-    _parser = format.getParser();
-    // BigDecimal-preserving parsing goes through Pinot's BigDecimal-aware text JSON reader, so it applies only
-    // to the TEXT format (the historical default); the binary formats encode floating point natively.
-    _preserveDecimalPrecision = format == JsonPayloadFormat.TEXT && (preserveDecimalPrecision != null
-        ? Boolean.parseBoolean(preserveDecimalPrecision)
-        : JSON_RECORD_EXTRACTOR_CLASS.equals(recordExtractorClass));
+    _parser = JsonPayloadFormat.fromConfig(jsonFormat).getParser();
   }
 
   @Override
@@ -102,11 +95,6 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
     try {
-      if (_preserveDecimalPrecision) {
-        // Parse text JSON with the BigDecimal-aware reader so high-precision decimals survive ingestion.
-        return _jsonRecordExtractor.extract(JsonUtils.bytesToMapWithBigDecimal(payload, offset, length),
-            destination);
-      }
       if (_usesDefaultRecordExtractor && _parser.parse(payload, offset, length, destination, _fieldsToRead)) {
         return destination;
       }

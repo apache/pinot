@@ -87,7 +87,8 @@ public class JSONMessageDecoderBinaryTest {
   private void assertRich(GenericRow row) {
     assertEquals(row.getValue("name"), "pinot");
     assertEquals(row.getValue("count"), 7);
-    assertEquals(row.getValue("ratio"), 2.5);
+    // Text JSON / PostgreSQL jsonb use BigDecimal; Smile / CBOR keep native Double.
+    assertEquals(((Number) row.getValue("ratio")).doubleValue(), 2.5);
   }
 
   private Map<String, Object> richDoc() {
@@ -190,7 +191,9 @@ public class JSONMessageDecoderBinaryTest {
   @Test
   public void testAutoStillDecodesText()
       throws Exception {
-    assertRich(decode(AUTO, RICH_FIELDS, TEXT_DOC));
+    GenericRow row = decode(AUTO, RICH_FIELDS, TEXT_DOC);
+    assertRich(row);
+    assertEquals(row.getValue("ratio"), new BigDecimal("2.5"));
   }
 
   @Test
