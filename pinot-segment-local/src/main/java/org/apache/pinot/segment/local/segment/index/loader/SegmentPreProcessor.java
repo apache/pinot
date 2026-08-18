@@ -109,6 +109,48 @@ public class SegmentPreProcessor implements AutoCloseable {
     // This fixes the issue of temporary files not getting deleted after creating new inverted indexes.
     removeInvertedIndexTempFiles(indexDir);
 
+    processColumnsAndIndexes(indexDir, segmentOperationsThrottlerSet);
+
+    // Startree creation will load the segment again, so we need to close and re-open the segment writer to make sure
+    // that the other required indices (e.g. forward index) are up-to-date.
+    try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
+      if (processStarTrees(indexDir, segmentOperationsThrottlerSet)) {
+        _segmentDirectory.reloadMetadata();
+        segmentWriter.save();
+      }
+      // Create/modify/remove multi-col text index if required.
+      if (processMultiColTextIndex(indexDir, segmentWriter, segmentOperationsThrottlerSet)) {
+        // NOTE: When adding new steps after this, un-comment the next line.
+        //_segmentDirectory.reloadMetadata();
+        segmentWriter.save();
+      }
+    }
+  }
+
+  /// Updates the default columns according to the schema, then all the single-column indices (inverted, range, json,
+  /// text, ...), then the column min/max values.
+  ///
+  /// This is the only step guarded by the all-index preprocess throttler. Star-tree and multi-column text indexes
+  /// have their own throttlers, so the all-index permit is released before those builds start rather than being held
+  /// for their whole (potentially very long) duration.
+  private void processColumnsAndIndexes(File indexDir,
+      @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet)
+      throws Exception {
+    if (segmentOperationsThrottlerSet != null) {
+      segmentOperationsThrottlerSet.getSegmentAllIndexPreprocessThrottler().acquire();
+    }
+    try {
+      updateColumnsAndIndexes(indexDir);
+    } finally {
+      if (segmentOperationsThrottlerSet != null) {
+        segmentOperationsThrottlerSet.getSegmentAllIndexPreprocessThrottler().release();
+      }
+    }
+  }
+
+  private void updateColumnsAndIndexes(File indexDir)
+      throws Exception {
+    SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
       // Backward-compat shim: invalidate any legacy raw-value embedded-dictionary inverted indexes left over from
       // PR #17060 (reverted by PR #18410) so the standard handlers can rebuild them in the dict-id format. Must
@@ -173,21 +215,6 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
 
       segmentWriter.save();
-    }
-
-    // Startree creation will load the segment again, so we need to close and re-open the segment writer to make sure
-    // that the other required indices (e.g. forward index) are up-to-date.
-    try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
-      if (processStarTrees(indexDir, segmentOperationsThrottlerSet)) {
-        _segmentDirectory.reloadMetadata();
-        segmentWriter.save();
-      }
-      // Create/modify/remove multi-col text index if required.
-      if (processMultiColTextIndex(indexDir, segmentWriter, segmentOperationsThrottlerSet)) {
-        // NOTE: When adding new steps after this, un-comment the next line.
-        //_segmentDirectory.reloadMetadata();
-        segmentWriter.save();
-      }
     }
   }
 
