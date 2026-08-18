@@ -183,7 +183,7 @@
     <pinot.skip.remote.resources>false</pinot.skip.remote.resources>
 
     <arrow.version>19.0.0</arrow.version>
-    <avro.version>1.12.1</avro.version>
+    <avro.version>1.12.2</avro.version>
     <bson.version>5.9.2</bson.version>
     <parquet.version>1.18.0</parquet.version>
     <orc.version>1.9.9</orc.version>
