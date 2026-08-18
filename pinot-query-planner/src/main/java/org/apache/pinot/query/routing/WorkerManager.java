@@ -1331,8 +1331,7 @@ public class WorkerManager {
           "Failed to find enabled fully replicated server for table: %s, partition: %s", tableName, partitionId);
       workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverInstance));
       // NOTE: Copy the segment lists. Unlike the multiple-partitions-per-worker path (which merges into fresh lists),
-      //       these are the broker's published metadata, shared across queries and never to be mutated (see
-      //       filterLeafStageSegments).
+      //       these are the broker's published metadata, shared across queries and never to be mutated
       workerIdToSegmentsMap.put(workerId,
           getSegmentsMap(copySegments(partitionInfo._offlineSegments), copySegments(partitionInfo._realtimeSegments)));
     }
@@ -1459,8 +1458,7 @@ public class WorkerManager {
   ///
   /// Exactly one [TableType] key is emitted: the one the chosen server provably has a table data manager for (see
   /// [#collectHostingServers]), because the server resolves one data manager per key in the map and fails the query
-  /// when it is missing. The segment list is mutable because the leaf-stage segment filters may edit the lists they are
-  /// handed (see [#filterLeafStageSegments]).
+  /// when it is missing.
   private static void assignPaddedWorker(String tableName, long requestId, int classId, PaddingInfo paddingInfo,
       Map<String, ServerInstance> enabledServerInstanceMap, int workerId,
       Map<Integer, QueryServerInstance> workerIdToServerInstanceMap,
