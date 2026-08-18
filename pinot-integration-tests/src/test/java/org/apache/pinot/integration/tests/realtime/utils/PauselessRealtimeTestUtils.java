@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests.realtime.utils;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,8 @@ import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 import static org.testng.Assert.assertEquals;
@@ -40,6 +43,29 @@ public class PauselessRealtimeTestUtils {
     IdealState idealState = HelixHelper.getTableIdealState(helixManager, tableName);
     Map<String, Map<String, String>> segmentAssignment = idealState.getRecord().getMapFields();
     assertEquals(segmentAssignment.size(), numSegmentsExpected);
+  }
+
+  /// Marks all current segments of the given table as exceeding the max segment completion time, making them
+  /// immediately eligible for repair by the next validation run while keeping their in-flight commit attempts
+  /// rejected. Segments created after this call are not affected. No-op when the cluster is not started with a
+  /// [FailureInjectingPinotLLCRealtimeSegmentManager].
+  public static void forceExpireSegments(PinotHelixResourceManager helixResourceManager, String tableNameWithType) {
+    PinotLLCRealtimeSegmentManager realtimeSegmentManager = helixResourceManager.getRealtimeSegmentManager();
+    if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
+      List<String> segmentNames = new ArrayList<>();
+      for (SegmentZKMetadata segmentZKMetadata : helixResourceManager.getSegmentsZKMetadata(tableNameWithType)) {
+        segmentNames.add(segmentZKMetadata.getSegmentName());
+      }
+      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).forceExpireSegments(segmentNames);
+    }
+  }
+
+  /// Clears the force-expired segments so that segments re-activated by the repair can complete normally.
+  public static void clearForceExpiredSegments(PinotHelixResourceManager helixResourceManager) {
+    PinotLLCRealtimeSegmentManager realtimeSegmentManager = helixResourceManager.getRealtimeSegmentManager();
+    if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
+      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).clearForceExpiredSegments();
+    }
   }
 
   public static boolean assertUrlPresent(List<SegmentZKMetadata> segmentZKMetadataList) {
