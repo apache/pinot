@@ -664,6 +664,210 @@
           "\n                  PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
+      },
+      {
+        "description": "Non-deterministic WHERE filter is not pushed below the join",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE rand() < 0.1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalFilter(condition=[<(RAND(), 0.1E0)])",
+          "\n    LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0], col2=[$1])",
+          "\n          PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Non-deterministic WHERE filter is not pushed below a left join",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a LEFT JOIN b ON a.col1 = b.col1 WHERE rand() < 0.1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalFilter(condition=[<(RAND(), 0.1E0)])",
+          "\n    LogicalJoin(condition=[=($0, $1)], joinType=[left])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0], col2=[$1])",
+          "\n          PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Non-deterministic WHERE filter on the null-generating side does not simplify the left join to inner",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a LEFT JOIN b ON a.col1 = b.col1 WHERE b.col3 > 100 * rand()",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalFilter(condition=[>(CAST($3):DOUBLE, *(100, RAND()))])",
+          "\n    LogicalJoin(condition=[=($0, $1)], joinType=[left])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Non-deterministic WHERE filter on the null-generating side does not simplify the full join",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a FULL JOIN b ON a.col1 = b.col1 WHERE b.col3 > 100 * rand()",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalFilter(condition=[>(CAST($3):DOUBLE, *(100, RAND()))])",
+          "\n    LogicalJoin(condition=[=($0, $1)], joinType=[full])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Non-deterministic ON condition is not pushed below the join",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 AND rand() < 0.1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[AND(=($0, $1), <(RAND(), 0.1E0))], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0], col2=[$1])",
+          "\n        PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Non-deterministic UUID filter is not pushed below the join",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE uuid_v4() <> 'x'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalFilter(condition=[<>(CAST(UUIDV4()):CHAR(1) CHARACTER SET \"UTF-8\" NOT NULL, _UTF-8'x')])",
+          "\n    LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0], col2=[$1])",
+          "\n          PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Non-deterministic filter blocks the semi join rewrite: the IN sub-query is planned as an inner join over a distinct aggregate, with the filter kept above the join",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1 FROM a WHERE a.col1 IN (SELECT b.col1 FROM b) AND rand() < 0.1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0])",
+          "\n  LogicalFilter(condition=[<(RAND(), 0.1E0)])",
+          "\n    LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            PinotLogicalAggregate(group=[{0}], aggType=[LEAF])",
+          "\n              PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "A non-deterministic conjunct holds the whole WHERE filter above the join",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col3 > 5 AND rand() < 0.1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$3])",
+          "\n  LogicalFilter(condition=[AND(>($1, 5), <(RAND(), 0.1E0))])",
+          "\n    LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0], col3=[$2])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0], col2=[$1])",
+          "\n          PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Volatile WHERE filter is not pushed below the join, nor duplicated onto both inputs",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE stageId(a.col1) >= 0",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalFilter(condition=[>=(STAGEID($0), 0)])",
+          "\n    LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0], col2=[$1])",
+          "\n          PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Volatile ON condition is kept in the join condition for an outer join",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a LEFT JOIN b ON a.col1 = b.col1 AND stageId(b.col3) >= 0",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[AND(=($0, $1), >=(STAGEID($3), 0))], joinType=[left])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], EXPR$0=[CAST($2):VARCHAR CHARACTER SET \"UTF-8\" NOT NULL])",
+          "\n        PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "KNOWN GAP: a volatile ON conjunct referencing one side of an INNER join is hoisted into that input by RelOptUtil.pushDownJoinConditions during sql-to-rel, before any rule runs, so the join-condition guard never sees it",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 AND stageId(a.col3) >= 0",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        LogicalFilter(condition=[>=(STAGEID(CAST($2):VARCHAR CHARACTER SET \"UTF-8\" NOT NULL), 0)])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0], col2=[$1])",
+          "\n        PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Deterministic WHERE filter is still pushed below the join",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col3 > 5",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        LogicalFilter(condition=[>($2, 5)])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0], col2=[$1])",
+          "\n        PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
       }
     ]
   },
@@ -681,6 +885,22 @@
           "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n    LogicalProject(col1=[$0], col2=[$1])",
           "\n      PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Non-deterministic WHERE filter is not pushed below a lookup join",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy = 'lookup') */ a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE rand() < 0.1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalFilter(condition=[<(RAND(), 0.1E0)])",
+          "\n    LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
+          "\n      PinotLogicalExchange(distribution=[single])",
+          "\n        LogicalProject(col1=[$0])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n      LogicalProject(col1=[$0], col2=[$1])",
+          "\n        PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
