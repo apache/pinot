@@ -19,7 +19,9 @@
 package org.apache.pinot.common.response;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.List;
@@ -319,5 +321,52 @@ public interface BrokerResponse {
   @Nullable
   default String getMaterializedViewQueried() {
     return null;
+  }
+
+  /// Returns generic, product-agnostic response metadata: a free-form string-to-[JsonNode] map that
+  /// any component can populate to surface non-fatal, informational notes about how the query was
+  /// handled (for example that it was executed with an alternate or degraded strategy). Values are
+  /// arbitrary JSON, so a note can be a scalar, an object, or an array. This is intentionally a
+  /// generic extension point: the core engine attaches no semantics to the keys or values, so
+  /// extensions can add their own entries without a dedicated typed field on this interface.
+  ///
+  /// This is distinct from [#getTraceInfo()] (per-server trace strings, only populated when tracing
+  /// is enabled) and from [#getExceptions()] (the error/warning list). The default is an empty,
+  /// unmodifiable map for implementations that do not support response metadata.
+  ///
+  /// Today entries can only be registered **on the broker**: they are collected in the broker-side
+  /// `QueryExecutionContext` while the query is being handled, and that sink is never sent over the
+  /// wire — an entry registered by a worker (server) on its own copy of the execution context is
+  /// silently dropped. So in practice this map currently carries broker metadata only.
+  ///
+  /// That is a limitation of the current implementation, not of this contract: the plumbing may
+  /// later be extended so that workers can contribute entries too, propagated back to the broker
+  /// with the rest of the per-server metadata. Hence the deliberately generic name — where an entry
+  /// was produced is an internal detail, and surfacing it in the client-facing response as a
+  /// `brokerMetadata` field that would eventually need a sibling `serverMetadata` field would only
+  /// make the response more complex for no benefit to the user. Worker entries, when supported, will
+  /// go into this same map.
+  ///
+  /// Marked [JsonIgnore] on the interface default so it does not register `responseMetadata` as a
+  /// known (setterless) property on deserializable implementations such as `BrokerResponseNative`
+  /// that do not override it. Otherwise Jackson would try to populate the immutable [Map#of()]
+  /// returned here via USE_GETTERS_AS_SETTERS and fail with an [UnsupportedOperationException] when
+  /// a legacy response carries a non-empty `responseMetadata`. Concrete implementations that support
+  /// the field re-expose it by overriding this method with an explicit [JsonProperty].
+  @JsonIgnore
+  default Map<String, JsonNode> getResponseMetadata() {
+    return Map.of();
+  }
+
+  /// Records a generic response-metadata entry (arbitrary JSON value; see [#getResponseMetadata()]).
+  /// The default is a no-op, so implementations that do not support response metadata silently
+  /// ignore it.
+  default void putResponseMetadata(String key, JsonNode value) {
+  }
+
+  /// String convenience for [#putResponseMetadata(String, JsonNode)] — the common case — wrapping the
+  /// value in a JSON string node.
+  default void putResponseMetadata(String key, String value) {
+    putResponseMetadata(key, TextNode.valueOf(value));
   }
 }
