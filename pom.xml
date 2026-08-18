@@ -220,7 +220,7 @@
     <netty.version>4.1.137.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.20.0</jts.version>
-    <h3.version>4.4.0</h3.version>
+    <h3.version>4.5.0</h3.version>
     <ipaddress.version>5.6.2</ipaddress.version>
     <openhft.chronicle-bom.version>2.27ea100</openhft.chronicle-bom.version>
     <jmh.version>1.37</jmh.version>
