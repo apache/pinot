@@ -70,11 +70,29 @@ public class CodecSpecParserTest {
   }
 
   @Test
+  public void testLeadingZeroArgumentsAreRejected() {
+    // The canonical spec is frozen into segment headers, so every argument value must have exactly one spelling:
+    // "ZSTD(03)" must not produce a different canonical string than "ZSTD(3)".
+    IllegalArgumentException exception =
+        expectThrows(IllegalArgumentException.class, () -> CodecSpecParser.parse("ZSTD(03)"));
+    assertTrue(exception.getMessage().contains("Leading zeros"));
+    assertThrows(IllegalArgumentException.class, () -> CodecSpecParser.parse("TEST(00)"));
+    assertThrows(IllegalArgumentException.class, () -> CodecSpecParser.parse("DELTA,ZSTD(01)"));
+
+    // A bare zero remains a valid argument.
+    assertEquals(CodecSpecParser.parse("TEST(0)").stages().get(0).args(), List.of("0"));
+  }
+
+  @Test
   public void testStructuralLimitsAreEnforced() {
     assertThrows(IllegalArgumentException.class,
         () -> CodecSpecParser.parse("A".repeat(CodecSpecParser.MAX_SPEC_LENGTH + 1)));
     assertThrows(IllegalArgumentException.class,
         () -> CodecSpecParser.parse(" ".repeat(CodecSpecParser.MAX_SPEC_LENGTH) + "LZ4"));
+    // Accept boundary: a spec of exactly MAX_SPEC_LENGTH characters (the length check runs before trim)
+    // still parses.
+    assertEquals(
+        CodecSpecParser.parse("LZ4" + " ".repeat(CodecSpecParser.MAX_SPEC_LENGTH - 3)).toDslString(), "LZ4");
     assertThrows(IllegalArgumentException.class,
         () -> CodecSpecParser.parse("A".repeat(CodecSpecParser.MAX_IDENTIFIER_LENGTH + 1)));
     assertThrows(IllegalArgumentException.class,

@@ -49,5 +49,6 @@ public class CodecInvocationTest {
     assertThrows(NullPointerException.class,
         () -> new CodecInvocation("ZSTD", Arrays.asList((String) null)));
     assertThrows(IllegalArgumentException.class, () -> new CodecInvocation("ZSTD", List.of("-1")));
+    assertThrows(IllegalArgumentException.class, () -> new CodecInvocation("ZSTD", List.of("03")));
   }
 }

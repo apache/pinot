@@ -106,6 +106,11 @@ public final class CodecInvocation {
           throw new IllegalArgumentException("Invalid codec argument: " + arg);
         }
       }
+      // Reject leading zeros so each argument value has exactly one spelling in the canonical form that is
+      // later frozen into segment headers.
+      if (arg.length() > 1 && arg.charAt(0) == '0') {
+        throw new IllegalArgumentException("Invalid codec argument (leading zeros): " + arg);
+      }
     }
   }
 

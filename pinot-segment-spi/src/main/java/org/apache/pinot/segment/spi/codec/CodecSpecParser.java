@@ -29,7 +29,7 @@ import java.util.List;
 /// spec       ::= invocation ("," invocation)*
 /// invocation ::= NAME | NAME "(" args ")"
 /// args       ::= ε | arg ("," arg)*
-/// arg        ::= [0-9]+
+/// arg        ::= "0" | [1-9][0-9]*
 /// NAME       ::= [A-Za-z_][A-Za-z0-9_]*
 /// ```
 ///
@@ -37,13 +37,16 @@ import java.util.List;
 /// `CODEC(...)` wrapper is deliberately not accepted. This parser validates only structure;
 /// codec names, arguments, and type compatibility are validated by the codec runtime.
 public final class CodecSpecParser {
-  public static final int MAX_SPEC_LENGTH = 64 * 1024;
+  public static final int MAX_SPEC_LENGTH = 4096;
   public static final int MAX_PIPELINE_STAGES = 32;
   public static final int MAX_IDENTIFIER_LENGTH = 128;
   public static final int MAX_ARGS_PER_INVOCATION = 16;
   public static final int MAX_ARGUMENT_LENGTH = 32;
 
-  static final String REMOVED_WRAPPER_NAME = "CODEC";
+  /// Reserved codec name from the removed `CODEC(...)` wrapper syntax. Public so every layer that
+  /// enforces the reservation (this parser, [CodecInvocation], and the codec registry) shares one
+  /// definition instead of re-spelling the literal.
+  public static final String REMOVED_WRAPPER_NAME = "CODEC";
 
   private CodecSpecParser() {
   }
@@ -173,6 +176,12 @@ public final class CodecSpecParser {
         throw new IllegalArgumentException(
             "Codec argument length " + (_pos - start) + " exceeds maximum " + MAX_ARGUMENT_LENGTH + " in: "
                 + _input);
+      }
+      // Leading zeros are rejected so that every argument value has exactly one spelling: the parsed spec is
+      // canonicalized and later frozen into segment headers, where "ZSTD(03)" and "ZSTD(3)" must not differ.
+      if (_pos - start > 1 && first == '0') {
+        throw new IllegalArgumentException(
+            "Leading zeros are not allowed in codec argument at position " + start + " in: " + _input);
       }
       return _input.substring(start, _pos);
     }
