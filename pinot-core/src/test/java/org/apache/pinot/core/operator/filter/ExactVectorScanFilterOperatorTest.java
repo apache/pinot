@@ -27,10 +27,14 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.mockito.Mockito;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 
@@ -88,6 +92,112 @@ public class ExactVectorScanFilterOperatorTest {
     Assert.assertTrue(result.contains(0));
     Assert.assertTrue(result.contains(1));
     Assert.assertTrue(result.contains(2));
+  }
+
+  @Test
+  public void testExactSearchOnlyScoresAllowedDocuments() {
+    float[][] vectors = {
+        {1.0f, 0.0f},
+        {1.0f, 0.0f},
+        {0.0f, 1.0f},
+        {0.0f, -1.0f}
+    };
+    ForwardIndexReader<?> mockReader = createMockForwardIndexReader(vectors);
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), new float[]{1.0f, 0.0f}, 2);
+    ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
+        "embedding", 4, createVectorIndexConfig("HNSW", VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN),
+        "mutable_vector_index_not_filter_aware", VectorSearchParams.DEFAULT,
+        VectorCandidateScope.of(bitmapOf(2, 3)));
+
+    Assert.assertEquals(operator.getBitmaps().reduce(), bitmapOf(2, 3));
+    ForwardIndexReader rawReader = mockReader;
+    verify(rawReader, never()).getFloatMV(Mockito.eq(0), Mockito.any());
+    verify(rawReader, never()).getFloatMV(Mockito.eq(1), Mockito.any());
+    verify(rawReader).getFloatMV(Mockito.eq(2), Mockito.any());
+    verify(rawReader).getFloatMV(Mockito.eq(3), Mockito.any());
+  }
+
+  @Test
+  public void testExactSearchWithEmptyAllowedDocumentsSkipsForwardIndex() {
+    ForwardIndexReader<?> mockReader = mock(ForwardIndexReader.class);
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), new float[]{1.0f, 0.0f}, 2);
+    ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
+        "embedding", 4, null, "vector_index_missing", VectorSearchParams.DEFAULT,
+        VectorCandidateScope.of(new MutableRoaringBitmap()));
+
+    Assert.assertTrue(operator.getBitmaps().reduce().isEmpty());
+    verifyNoInteractions(mockReader);
+  }
+
+  @Test
+  public void testExactSearchIgnoresAllowedDocumentsBeyondNumDocs() {
+    ForwardIndexReader<?> mockReader = createMockForwardIndexReader(new float[][]{
+        {1.0f, 0.0f}, {0.5f, 0.5f}, {0.0f, 1.0f}
+    });
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), new float[]{1.0f, 0.0f}, 2);
+    ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
+        "embedding", 3, null, "mandatory_scope", VectorSearchParams.DEFAULT,
+        VectorCandidateScope.of(bitmapOf(2, 99)));
+
+    Assert.assertEquals(operator.getBitmaps().reduce(), bitmapOf(2));
+    ForwardIndexReader rawReader = mockReader;
+    verify(rawReader).getFloatMV(Mockito.eq(2), Mockito.any());
+    verify(rawReader, never()).getFloatMV(Mockito.eq(99), Mockito.any());
+  }
+
+  @Test
+  public void testExactSearchWithNonPositiveTopKSkipsForwardIndex() {
+    ForwardIndexReader<?> mockReader = mock(ForwardIndexReader.class);
+
+    for (int topK : new int[]{0, -1}) {
+      VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(
+          ExpressionContext.forIdentifier("embedding"), new float[]{1.0f, 0.0f}, topK);
+      ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
+          "embedding", 4, null, "no_vector_index", VectorSearchParams.DEFAULT, null);
+      Assert.assertTrue(operator.getBitmaps().reduce().isEmpty());
+    }
+    verifyNoInteractions(mockReader);
+  }
+
+  @Test
+  public void testExactSearchTopKLargerThanAllowedCardinality() {
+    ForwardIndexReader<?> mockReader = createMockForwardIndexReader(new float[][]{
+        {1.0f, 0.0f},
+        {0.5f, 0.5f},
+        {0.0f, 1.0f},
+        {0.0f, -1.0f}
+    });
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), new float[]{1.0f, 0.0f}, 10);
+    ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
+        "embedding", 4, null, "vector_index_missing", VectorSearchParams.DEFAULT,
+        VectorCandidateScope.of(bitmapOf(2, 3)));
+
+    Assert.assertEquals(operator.getBitmaps().reduce(), bitmapOf(2, 3));
+  }
+
+  @Test
+  public void testExactThresholdSearchOnlyScoresAllowedDocuments() {
+    ForwardIndexReader<?> mockReader = createMockForwardIndexReader(new float[][]{
+        {1.0f, 0.0f},
+        {0.9f, 0.1f},
+        {0.0f, 1.0f},
+        {-1.0f, 0.0f}
+    });
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), new float[]{1.0f, 0.0f}, 10);
+    VectorSearchParams searchParams = new VectorSearchParams(null, null, null, 2.0f, null, null, null);
+    ExactVectorScanFilterOperator operator = new ExactVectorScanFilterOperator(mockReader, predicate,
+        "embedding", 4, null, "vector_index_missing", searchParams,
+        VectorCandidateScope.of(bitmapOf(2, 3)));
+
+    Assert.assertEquals(operator.getBitmaps().reduce(), bitmapOf(2));
+    ForwardIndexReader rawReader = mockReader;
+    verify(rawReader, never()).getFloatMV(Mockito.eq(0), Mockito.any());
+    verify(rawReader, never()).getFloatMV(Mockito.eq(1), Mockito.any());
   }
 
   @Test
@@ -238,5 +348,11 @@ public class ExactVectorScanFilterOperatorTest {
       VectorIndexConfig.VectorDistanceFunction distanceFunction) {
     return new VectorIndexConfig(false, backendType, 2, 1, distanceFunction,
         Map.of("nlist", "4", "pqM", "2", "pqNbits", "8", "trainSampleSize", "16"));
+  }
+
+  private static MutableRoaringBitmap bitmapOf(int... docIds) {
+    MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+    bitmap.add(docIds);
+    return bitmap;
   }
 }
