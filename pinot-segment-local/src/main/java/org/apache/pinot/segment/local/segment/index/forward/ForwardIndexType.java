@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
+import org.apache.pinot.segment.local.io.codec.CodecSpecUtils;
 import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndexV2;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex;
@@ -116,6 +118,9 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     String column = fieldSpec.getName();
     CompressionCodec compressionCodec = forwardIndexConfig.getCompressionCodec();
     DictionaryIndexConfig dictionaryConfig = indexConfigs.getConfig(StandardIndexes.dictionary());
+    if (forwardIndexConfig.getCodecSpec() != null) {
+      validateCodecSpec(forwardIndexConfig, fieldSpec);
+    }
     // Dictionary-encoded forward index requires a dictionary to translate dict ids back to values.
     if (forwardIndexConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY) {
       Preconditions.checkState(dictionaryConfig.isEnabled(),
@@ -135,6 +140,51 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
             "Compression codec: %s is not applicable to raw column: %s", compressionCodec, column);
       }
     }
+  }
+
+  /// Semantic validation for `codecSpec` at table-config time: parses and validates the pipeline
+  /// (unknown codecs, stage ordering, per-codec type compatibility) against the column's stored
+  /// type, then enforces the V7 codec-pipeline writer's shape constraints — single-value INT/LONG —
+  /// for specs that cannot be served by the legacy raw forward-index formats.
+  private void validateCodecSpec(ForwardIndexConfig forwardIndexConfig, FieldSpec fieldSpec) {
+    String column = fieldSpec.getName();
+    Preconditions.checkState(forwardIndexConfig.getEncodingType() == FieldConfig.EncodingType.RAW,
+        "codecSpec requires RAW forward-index encoding for column: %s", column);
+    FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
+
+    String codecSpec = forwardIndexConfig.getCodecSpec();
+    try {
+      // CodecPipelineExecutor.create parses the spec and runs full pipeline validation.
+      CodecPipelineExecutor.create(codecSpec, storedType);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalStateException(
+          "Codec pipeline validation failed for column '" + column + "' (codecSpec='" + codecSpec + "'): "
+              + e.getMessage(), e);
+    }
+    // Transforms, chains, and non-default options all fail the legacy ChunkCompressionType mapping, so a
+    // null mapping is exactly "needs the V7 writer".
+    if (CodecSpecUtils.toLegacyChunkCompressionType(codecSpec) == null) {
+      validateV7WriterShape(codecSpec, fieldSpec);
+    }
+  }
+
+  /// Shared V7 codec-pipeline writer shape constraints: specs that cannot be represented by a legacy
+  /// [org.apache.pinot.segment.spi.compression.ChunkCompressionType] (transform, chain, or non-default
+  /// options) require the V7 writer, which only supports single-value INT/LONG columns. Called at
+  /// table-config validation time, and again from [ForwardIndexCreatorFactory] as defense-in-depth for
+  /// direct factory calls that bypass validation.
+  static void validateV7WriterShape(String codecSpec, FieldSpec fieldSpec) {
+    String column = fieldSpec.getName();
+    Preconditions.checkArgument(fieldSpec.isSingleValueField(),
+        "codecSpec '%s' requires the V7 codec-pipeline writer (transform, chain, or non-default options), "
+            + "which only supports single-value columns. Column '%s' is multi-value; use a compression-only "
+            + "spec representable by ChunkCompressionType (LZ4, SNAPPY, GZIP, ZSTD/ZSTD(3)).",
+        codecSpec, column);
+    FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
+    Preconditions.checkArgument(storedType == FieldSpec.DataType.INT || storedType == FieldSpec.DataType.LONG,
+        "codecSpec '%s' requires the V7 codec-pipeline writer (transform, chain, or non-default options), "
+            + "which only supports INT and LONG columns. Column '%s' has type: %s.",
+        codecSpec, column, storedType);
   }
 
   private void validateForwardIndexDisabled(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec,
@@ -370,6 +420,9 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   @Nullable
   @Override
   public MutableIndex createMutableIndex(MutableIndexContext context, ForwardIndexConfig config) {
+    // Note: codecSpec applies only when an immutable segment is created (initial creation or
+    // conversion/commit of a consuming segment). The mutable (consuming) forward index always uses
+    // the standard in-memory formats below, so a configured codecSpec is intentionally ignored here.
     if (config.isDisabled()) {
       return null;
     }

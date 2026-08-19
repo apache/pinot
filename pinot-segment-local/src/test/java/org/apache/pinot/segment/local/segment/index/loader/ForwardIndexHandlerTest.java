@@ -39,12 +39,14 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
+import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriterV7;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.InvertedIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.RangeIndexHandler;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
@@ -604,6 +606,60 @@ public class ForwardIndexHandlerTest {
       // TEST1: Validate with zero changes. ForwardIndexHandler should be a No-Op.
       assertTrue(computeOperations().isEmpty());
     }
+  }
+
+  /// Regression test: switching a legacy `compressionCodec` column to an equivalent compression-only `codecSpec`
+  /// must not rewrite the segment when the on-disk [ChunkCompressionType] already matches.
+  @Test
+  public void testComputeOperationLegacyToCompressionOnlyCodecSpecSameCompressionNoRewrite()
+      throws Exception {
+    // DIM_LZ4_INTEGER is an existing SV INT RAW column compressed with legacy LZ4 (pre-V7).
+    // When the table config is updated to codecSpec="LZ4", the existing raw format is already correct.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      _fieldConfigMap.put(DIM_LZ4_INTEGER, rawFieldConfigWithCodecSpec(DIM_LZ4_INTEGER, "LZ4"));
+
+      Map<String, List<ForwardIndexHandler.Operation>> ops = computeOperations();
+      assertFalse(ops.containsKey(DIM_LZ4_INTEGER),
+          "Expected no operation when legacy LZ4 already matches codecSpec='LZ4', but got: "
+              + ops.get(DIM_LZ4_INTEGER));
+    }
+  }
+
+  /// Regression test: switching a legacy `compressionCodec` column to a different compression-only `codecSpec`
+  /// should rewrite the segment using the existing raw forward-index format, not V7.
+  @Test
+  public void testComputeOperationLegacyToCompressionOnlyCodecSpecDifferentCompressionRewrites()
+      throws Exception {
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      _fieldConfigMap.put(DIM_SNAPPY_INTEGER, rawFieldConfigWithCodecSpec(DIM_SNAPPY_INTEGER, "ZSTD(3)"));
+
+      Map<String, List<ForwardIndexHandler.Operation>> ops = computeOperations();
+      assertTrue(ops.containsKey(DIM_SNAPPY_INTEGER)
+              && ops.get(DIM_SNAPPY_INTEGER).contains(ForwardIndexHandler.Operation.CHANGE_INDEX_COMPRESSION_TYPE),
+          "Expected CHANGE_INDEX_COMPRESSION_TYPE when config switches from legacy SNAPPY to codecSpec='ZSTD(3)', "
+              + "but got: " + ops.get(DIM_SNAPPY_INTEGER));
+    }
+  }
+
+  /// Builds a RAW FieldConfig whose codecSpec is configured via the modern `indexes.forward` block
+  /// (the only supported path; there is no top-level FieldConfig.codecSpec field).
+  private static FieldConfig rawFieldConfigWithCodecSpec(String column, String codecSpec) {
+    ObjectNode forward = JsonUtils.newObjectNode();
+    forward.put("codecSpec", codecSpec);
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("forward", forward);
+    return new FieldConfig.Builder(column)
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(indexes)
+        .build();
   }
 
   private IndexLoadingConfig createIndexLoadingConfig() {
@@ -2836,11 +2892,10 @@ public class ForwardIndexHandlerTest {
     }
   }
 
-  /// Reload guard: a V7 codec-pipeline forward index reports `getCodecSpec() != null` and
-  /// `getCompressionType() == null`. `shouldChangeRawCompressionType()` must skip such columns instead of
-  /// tripping its non-null compression-type precondition, so reloading a segment that carries a V7 forward
-  /// index with an unchanged table config is a no-op. Rewrite support for codec-pipeline segments lands in a
-  /// follow-up; until then this guard keeps reload from crashing.
+  /// Reload no-op: a V7 codec-pipeline forward index reports `getCodecSpec() != null` and
+  /// `getCompressionType() == null`. When the configured `codecSpec` matches the stored canonical spec,
+  /// `shouldRewriteRawForwardIndex()` must neither throw nor schedule a rewrite, so reloading a segment that
+  /// carries a V7 forward index with an unchanged config is a no-op.
   @Test
   public void testComputeOperationNoOpForV7CodecPipelineForwardIndex()
       throws Exception {
@@ -2881,14 +2936,241 @@ public class ForwardIndexHandlerTest {
         assertNull(forwardReader.getCompressionType());
       }
 
-      // Step 3: with the table config unchanged (legacy LZ4 on DIM_LZ4_INTEGER), computing operations must
+      // Step 3: with the configured codecSpec matching the stored canonical spec, computing operations must
       // neither throw nor schedule a rewrite for the V7 column.
+      _fieldConfigMap.put(DIM_LZ4_INTEGER, rawFieldConfigWithCodecSpec(DIM_LZ4_INTEGER, "DELTA,LZ4"));
       Map<String, List<ForwardIndexHandler.Operation>> ops = computeOperations();
       assertFalse(ops.containsKey(DIM_LZ4_INTEGER),
-          "Expected no operation for V7 codec-pipeline column with unchanged config, but got: "
+          "Expected no operation for V7 codec-pipeline column with unchanged codecSpec, but got: "
               + ops.get(DIM_LZ4_INTEGER));
     }
     FileUtils.deleteQuietly(v7TempFile);
+  }
+
+  /// Rollback test: when a V7 codec-pipeline forward index exists on disk but the table config
+  /// is reverted to a legacy `compressionCodec` (no `codecSpec`), `shouldRewriteRawForwardIndex()` must schedule
+  /// [ForwardIndexHandler.Operation#CHANGE_INDEX_COMPRESSION_TYPE] so the segment is rewritten back to the legacy
+  /// format — enabling rollback to pre-V7 servers.
+  @Test
+  public void testComputeOperationChangeCompressionForV7CodecPipelineRollbackToLegacyCompressionCodec()
+      throws Exception {
+    // Step 1: write a minimal V7 forward index over the existing DIM_LZ4_INTEGER column.
+    // DIM_LZ4_INTEGER is SV INT RAW with 1000 docs — exactly what V7 supports.
+    int totalDocs = TEST_DATA.size(); // 1000
+    File v7TempFile = new File(TEMP_DIR, "v7_temp_fwd_idx");
+    FileUtils.deleteQuietly(v7TempFile);
+
+    CodecPipelineExecutor executor = CodecPipelineExecutor.create("LZ4", DataType.INT);
+    try (FixedByteChunkForwardIndexWriterV7 writer =
+        new FixedByteChunkForwardIndexWriterV7(v7TempFile, executor, totalDocs, 1024, Integer.BYTES)) {
+      for (int i = 0; i < totalDocs; i++) {
+        writer.putInt(i);
+      }
+    }
+
+    // Step 2: inject the V7 file into the segment's v3 store, replacing the legacy LZ4 index.
+    try (SegmentDirectory segDir = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer segWriter = segDir.createWriter()) {
+      segWriter.removeIndex(DIM_LZ4_INTEGER, StandardIndexes.forward());
+      LoaderUtils.writeIndexToV3Format(segWriter, DIM_LZ4_INTEGER, v7TempFile, StandardIndexes.forward());
+      segWriter.save();
+    }
+
+    // Step 3: with the V7 index in place, configure a legacy compressionCodec (no codecSpec).
+    // This represents a rollback scenario — operator removes codecSpec and reverts to a legacy
+    // compressionCodec. The handler must schedule a rewrite back to the legacy format so the
+    // segment can be read by servers that do not support the V7 codec pipeline.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      _fieldConfigMap.put(DIM_LZ4_INTEGER,
+          new FieldConfig(DIM_LZ4_INTEGER, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.SNAPPY, null));
+
+      ForwardIndexHandler handler = createForwardIndexHandler();
+      Map<String, List<ForwardIndexHandler.Operation>> ops = handler.computeOperations(writer);
+      assertTrue(ops.containsKey(DIM_LZ4_INTEGER),
+          "Expected CHANGE_INDEX_COMPRESSION_TYPE to be scheduled when config reverts from codecSpec to legacy "
+              + "compressionCodec on a V7 segment (rollback path)");
+      assertTrue(ops.get(DIM_LZ4_INTEGER).contains(ForwardIndexHandler.Operation.CHANGE_INDEX_COMPRESSION_TYPE),
+          "Expected CHANGE_INDEX_COMPRESSION_TYPE operation but got: " + ops.get(DIM_LZ4_INTEGER));
+      handler.updateIndices(writer);
+      handler.postUpdateIndicesCleanup(writer);
+    }
+
+    // Step 4: reopen the rewritten index and prove both the legacy format and every value survived.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      ColumnMetadata metadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(DIM_LZ4_INTEGER);
+      IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+      try (ForwardIndexReader<ChunkReaderContext>
+          forwardReader = readerFactory.createIndexReader(reader, createFieldIndexConfigsFromMetadata(metadata),
+              metadata);
+          ChunkReaderContext context = forwardReader.createContext()) {
+        assertNull(forwardReader.getCodecSpec());
+        assertEquals(forwardReader.getCompressionType(), ChunkCompressionType.SNAPPY);
+        for (int docId = 0; docId < totalDocs; docId++) {
+          assertEquals(forwardReader.getInt(docId, context), docId,
+              "Value changed during V7-to-legacy rollback at docId " + docId);
+        }
+      }
+    }
+    FileUtils.deleteQuietly(v7TempFile);
+  }
+
+  /// Regression test: codec-pipeline (V7) forward indexes that have a different stored codec spec than the one
+  /// currently configured in the table config MUST schedule
+  /// [ForwardIndexHandler.Operation#CHANGE_INDEX_COMPRESSION_TYPE] so that the segment is rewritten.
+  @Test
+  public void testComputeOperationChangeCompressionForV7CodecSpecChange()
+      throws Exception {
+    // Step 1: write a V7 forward index with a DELTA,LZ4 spec over DIM_LZ4_INTEGER.
+    int totalDocs = TEST_DATA.size(); // 1000
+    File v7TempFile = new File(TEMP_DIR, "v7_codecspec_change_fwd_idx");
+    FileUtils.deleteQuietly(v7TempFile);
+
+    CodecPipelineExecutor executor = CodecPipelineExecutor.create("DELTA,LZ4", DataType.INT);
+    try (FixedByteChunkForwardIndexWriterV7 writer =
+        new FixedByteChunkForwardIndexWriterV7(v7TempFile, executor, totalDocs, 1024, Integer.BYTES)) {
+      for (int i = 0; i < totalDocs; i++) {
+        writer.putInt(i);
+      }
+    }
+
+    // Step 2: inject the V7 file into the segment's v3 store.
+    try (SegmentDirectory segDir = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer segWriter = segDir.createWriter()) {
+      segWriter.removeIndex(DIM_LZ4_INTEGER, StandardIndexes.forward());
+      LoaderUtils.writeIndexToV3Format(segWriter, DIM_LZ4_INTEGER, v7TempFile, StandardIndexes.forward());
+      segWriter.save();
+    }
+
+    // Step 3: configure a different V7-requiring codecSpec and verify that a rewrite IS scheduled.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      _fieldConfigMap.put(DIM_LZ4_INTEGER, rawFieldConfigWithCodecSpec(DIM_LZ4_INTEGER, "DELTADELTA,LZ4"));
+
+      Map<String, List<ForwardIndexHandler.Operation>> ops = computeOperations();
+      assertTrue(ops.containsKey(DIM_LZ4_INTEGER),
+          "Expected CHANGE_INDEX_COMPRESSION_TYPE for V7 column with different codecSpec, but no operation scheduled");
+      assertTrue(ops.get(DIM_LZ4_INTEGER).contains(ForwardIndexHandler.Operation.CHANGE_INDEX_COMPRESSION_TYPE),
+          "Expected CHANGE_INDEX_COMPRESSION_TYPE in operations for DIM_LZ4_INTEGER, but got: "
+              + ops.get(DIM_LZ4_INTEGER));
+    }
+    FileUtils.deleteQuietly(v7TempFile);
+  }
+
+  /// Regression test: compression-only V7 forward indexes should be rewritten to the legacy-compatible raw
+  /// compression format, even when the configured codec spec is unchanged.
+  @Test
+  public void testComputeOperationCompressionOnlyV7CodecSpecRewritesToLegacyRaw()
+      throws Exception {
+    // Step 1: write a V7 forward index with ZSTD(3) spec over DIM_LZ4_INTEGER.
+    int totalDocs = TEST_DATA.size(); // 1000
+    File v7TempFile = new File(TEMP_DIR, "v7_same_codecspec_fwd_idx");
+    FileUtils.deleteQuietly(v7TempFile);
+
+    CodecPipelineExecutor executor = CodecPipelineExecutor.create("ZSTD(3)", DataType.INT);
+    try (FixedByteChunkForwardIndexWriterV7 writer =
+        new FixedByteChunkForwardIndexWriterV7(v7TempFile, executor, totalDocs, 1024, Integer.BYTES)) {
+      for (int i = 0; i < totalDocs; i++) {
+        writer.putInt(i);
+      }
+    }
+
+    // Step 2: inject the V7 file into the segment's v3 store.
+    try (SegmentDirectory segDir = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer segWriter = segDir.createWriter()) {
+      segWriter.removeIndex(DIM_LZ4_INTEGER, StandardIndexes.forward());
+      LoaderUtils.writeIndexToV3Format(segWriter, DIM_LZ4_INTEGER, v7TempFile, StandardIndexes.forward());
+      segWriter.save();
+    }
+
+    // Step 3: configure the same compression-only codecSpec and verify a rewrite is scheduled back to raw
+    // ChunkCompressionType.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      // ZSTD(3) is compression-only, so the handler should rewrite this V7 file to raw ZSTANDARD compression.
+      _fieldConfigMap.put(DIM_LZ4_INTEGER, rawFieldConfigWithCodecSpec(DIM_LZ4_INTEGER, "ZSTD(3)"));
+
+      Map<String, List<ForwardIndexHandler.Operation>> ops = computeOperations();
+      assertTrue(ops.containsKey(DIM_LZ4_INTEGER)
+              && ops.get(DIM_LZ4_INTEGER).contains(ForwardIndexHandler.Operation.CHANGE_INDEX_COMPRESSION_TYPE),
+          "Expected CHANGE_INDEX_COMPRESSION_TYPE so compression-only codecSpec is rewritten from V7 to raw "
+              + "compression, but got: " + ops.get(DIM_LZ4_INTEGER));
+    }
+    FileUtils.deleteQuietly(v7TempFile);
+  }
+
+  @DataProvider(name = "legacyTransformMigrations")
+  public static Object[][] legacyTransformMigrations() {
+    return new Object[][]{
+        {ChunkCompressionType.DELTA, "DELTA,LZ4"},
+        {ChunkCompressionType.DELTADELTA, "DELTADELTA,LZ4"},
+    };
+  }
+
+  /// Exercises the real reload rewrite from the legacy DELTA formats into V7. The legacy reader
+  /// context is intentionally reused across all documents and several chunks, matching the
+  /// production rewrite loop in [ForwardIndexHandler#forwardIndexReadRawWriteRawHelper()].
+  @Test(dataProvider = "legacyTransformMigrations")
+  public void testLegacyTransformMigrationReloadPreservesValues(ChunkCompressionType legacyCompression,
+      String codecSpec)
+      throws Exception {
+    int totalDocs = TEST_DATA.size();
+    File legacyTempFile = new File(TEMP_DIR, "legacy_" + legacyCompression + "_fwd_idx");
+    FileUtils.deleteQuietly(legacyTempFile);
+
+    try (FixedByteChunkForwardIndexWriter writer = new FixedByteChunkForwardIndexWriter(
+        legacyTempFile, legacyCompression, totalDocs, 128, Integer.BYTES, 4)) {
+      for (int i = 0; i < totalDocs; i++) {
+        writer.putInt(1001);
+      }
+    }
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      writer.removeIndex(DIM_LZ4_INTEGER, StandardIndexes.forward());
+      LoaderUtils.writeIndexToV3Format(writer, DIM_LZ4_INTEGER, legacyTempFile, StandardIndexes.forward());
+      writer.save();
+    }
+
+    _fieldConfigMap.put(DIM_LZ4_INTEGER, rawFieldConfigWithCodecSpec(DIM_LZ4_INTEGER, codecSpec));
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+      ForwardIndexHandler handler = createForwardIndexHandler();
+      assertEquals(handler.computeOperations(writer),
+          Map.of(DIM_LZ4_INTEGER, List.of(ForwardIndexHandler.Operation.CHANGE_INDEX_COMPRESSION_TYPE)));
+      handler.updateIndices(writer);
+      handler.postUpdateIndicesCleanup(writer);
+    }
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      ColumnMetadata metadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(DIM_LZ4_INTEGER);
+      IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+      try (ForwardIndexReader<ChunkReaderContext>
+          forwardReader = readerFactory.createIndexReader(reader, createFieldIndexConfigsFromMetadata(metadata),
+              metadata);
+          ChunkReaderContext context = forwardReader.createContext()) {
+        assertEquals(forwardReader.getCodecSpec(), codecSpec);
+        for (int docId = 0; docId < totalDocs; docId++) {
+          assertEquals(forwardReader.getInt(docId, context), 1001,
+              "Value changed during " + legacyCompression + " migration at docId " + docId);
+        }
+      }
+    } finally {
+      FileUtils.deleteQuietly(legacyTempFile);
+    }
   }
 
   private FieldIndexConfigs createFieldIndexConfigsFromMetadata(ColumnMetadata columnMetadata) {
