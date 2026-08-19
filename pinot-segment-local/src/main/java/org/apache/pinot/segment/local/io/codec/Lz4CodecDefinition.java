@@ -47,10 +47,6 @@ final class Lz4CodecDefinition implements ChunkCodecHandler<Lz4CodecDefinition.O
   /// Singleton options — LZ4 has no configurable parameters.
   public static final Options OPTIONS = new Options();
 
-  /// Sanity cap on decompressedLength read from the (untrusted) LZ4 length-prefix header to prevent
-  /// DoS-on-corrupt-segment via a giant pre-allocation. 1 GiB is well above any realistic chunk size.
-  private static final int MAX_REASONABLE_DECOMPRESSED_SIZE = 1 << 30;
-
   /// Lazy holder so a missing/broken LZ4 native library only fails when LZ4 is actually used,
   /// rather than at [CodecRegistry#DEFAULT] class-init time (which would break every
   /// consumer of the registry, including consumers that never use LZ4).
@@ -124,12 +120,8 @@ final class Lz4CodecDefinition implements ChunkCodecHandler<Lz4CodecDefinition.O
     ByteBuffer out = null;
     boolean succeeded = false;
     try {
-      int decompressedLength = LZ4DecompressorWithLength.getDecompressedLength(directSrc);
-      if (decompressedLength < 0 || decompressedLength > MAX_REASONABLE_DECOMPRESSED_SIZE) {
-        throw new IOException("LZ4: decompressed length " + decompressedLength
-            + " in length prefix is out of range [0, " + MAX_REASONABLE_DECOMPRESSED_SIZE
-            + "]. Segment may be corrupt.");
-      }
+      int decompressedLength = CodecBufferUtils.checkDeclaredDecompressedSize(
+          LZ4DecompressorWithLength.getDecompressedLength(directSrc), "LZ4", "length prefix");
       out = ByteBuffer.allocateDirect(decompressedLength);
       Native.DECOMPRESSOR.decompress(directSrc, out);
       if (out.position() != decompressedLength) {
@@ -152,12 +144,8 @@ final class Lz4CodecDefinition implements ChunkCodecHandler<Lz4CodecDefinition.O
     dst.clear();
     ByteBuffer directSrc = CodecBufferUtils.toDirectBuffer(src);
     try {
-      int decompressedLength = LZ4DecompressorWithLength.getDecompressedLength(directSrc);
-      if (decompressedLength < 0 || decompressedLength > MAX_REASONABLE_DECOMPRESSED_SIZE) {
-        throw new IOException("LZ4: decompressed length " + decompressedLength
-            + " in length prefix is out of range [0, " + MAX_REASONABLE_DECOMPRESSED_SIZE
-            + "]. Segment may be corrupt.");
-      }
+      int decompressedLength = CodecBufferUtils.checkDeclaredDecompressedSize(
+          LZ4DecompressorWithLength.getDecompressedLength(directSrc), "LZ4", "length prefix");
       if (decompressedLength > dst.capacity()) {
         throw new IllegalArgumentException(
             "LZ4: decompressed size " + decompressedLength + " exceeds dst capacity " + dst.capacity());
