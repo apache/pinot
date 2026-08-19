@@ -30,16 +30,12 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.search.ConstantScoreWeight;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.KnnFloatVectorQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
-import org.apache.lucene.search.ScoreMode;
-import org.apache.lucene.search.Scorer;
 import org.apache.lucene.search.TopDocs;
-import org.apache.lucene.search.Weight;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
@@ -200,7 +196,7 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
   @Override
   public ImmutableRoaringBitmap getDocIds(float[] searchQuery, int topK, ImmutableRoaringBitmap preFilterBitmap) {
     try {
-      Query filterQuery = new RoaringBitmapFilterQuery(preFilterBitmap, _docIdTranslator, _indexReader.numDocs());
+      Query filterQuery = new RoaringBitmapFilterQuery(preFilterBitmap, _docIdTranslator);
       return translateTopDocs(search(searchQuery, topK, filterQuery));
     } catch (RuntimeException e) {
       throw e;
@@ -372,81 +368,23 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
   /// Because Lucene uses its own internal doc IDs (which differ from Pinot doc IDs),
   /// this query translates Lucene doc IDs to Pinot doc IDs using the [DocIdTranslator]
   /// before checking membership in the bitmap.
-  static class RoaringBitmapFilterQuery extends Query {
-    private final ImmutableRoaringBitmap _bitmap;
+  static class RoaringBitmapFilterQuery extends BaseFilterQuery {
     private final DocIdTranslator _docIdTranslator;
-    private final int _maxDoc;
 
-    RoaringBitmapFilterQuery(ImmutableRoaringBitmap bitmap, DocIdTranslator docIdTranslator, int maxDoc) {
-      _bitmap = bitmap;
+    @Override
+    protected boolean equalsDocIdSource(BaseFilterQuery other) {
+      // Same bitmap but a different translator accepts different documents.
+      return _docIdTranslator == ((RoaringBitmapFilterQuery) other)._docIdTranslator;
+    }
+
+    RoaringBitmapFilterQuery(ImmutableRoaringBitmap bitmap, DocIdTranslator docIdTranslator) {
+      super(bitmap);
       _docIdTranslator = docIdTranslator;
-      _maxDoc = maxDoc;
     }
 
     @Override
-    public Weight createWeight(IndexSearcher searcher, ScoreMode scoreMode, float boost) {
-      return new ConstantScoreWeight(this, boost) {
-        @Override
-        public Scorer scorer(LeafReaderContext context) {
-          int docBase = context.docBase;
-          int maxDocInLeaf = context.reader().maxDoc();
-          DocIdSetIterator iterator = new BitmapDocIdSetIterator(docBase, maxDocInLeaf);
-          float constScore = score();
-          return new Scorer(this) {
-            @Override
-            public DocIdSetIterator iterator() {
-              return iterator;
-            }
-
-            @Override
-            public float getMaxScore(int upTo) {
-              return constScore;
-            }
-
-            @Override
-            public float score() {
-              return constScore;
-            }
-
-            @Override
-            public int docID() {
-              return iterator.docID();
-            }
-          };
-        }
-
-        @Override
-        public boolean isCacheable(LeafReaderContext ctx) {
-          return false;
-        }
-      };
-    }
-
-    @Override
-    public String toString(String field) {
-      return "RoaringBitmapFilterQuery(cardinality=" + _bitmap.getCardinality() + ")";
-    }
-
-    @Override
-    public boolean equals(Object other) {
-      if (this == other) {
-        return true;
-      }
-      if (!(other instanceof RoaringBitmapFilterQuery)) {
-        return false;
-      }
-      RoaringBitmapFilterQuery that = (RoaringBitmapFilterQuery) other;
-      return _bitmap == that._bitmap && _docIdTranslator == that._docIdTranslator;
-    }
-
-    @Override
-    public int hashCode() {
-      return System.identityHashCode(_bitmap) * 31 + System.identityHashCode(_docIdTranslator);
-    }
-
-    @Override
-    public void visit(org.apache.lucene.search.QueryVisitor visitor) {
-      visitor.visitLeaf(this);
+    protected DocIdSetIterator createLeafIterator(LeafReaderContext context) {
+      return new BitmapDocIdSetIterator(context.docBase, context.reader().maxDoc());
     }
 
     /// Iterates over Lucene doc IDs whose corresponding Pinot doc IDs are in the bitmap.
@@ -470,7 +408,7 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
         _doc++;
         while (_doc < _maxDocInLeaf) {
           int pinotDocId = _docIdTranslator.getPinotDocId(_docBase + _doc);
-          if (_bitmap.contains(pinotDocId)) {
+          if (_docIds.contains(pinotDocId)) {
             return _doc;
           }
           _doc++;
@@ -484,7 +422,7 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
         _doc = target;
         while (_doc < _maxDocInLeaf) {
           int pinotDocId = _docIdTranslator.getPinotDocId(_docBase + _doc);
-          if (_bitmap.contains(pinotDocId)) {
+          if (_docIds.contains(pinotDocId)) {
             return _doc;
           }
           _doc++;
@@ -495,7 +433,7 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
 
       @Override
       public long cost() {
-        return _bitmap.getLongCardinality();
+        return _docIds.getLongCardinality();
       }
     }
   }
