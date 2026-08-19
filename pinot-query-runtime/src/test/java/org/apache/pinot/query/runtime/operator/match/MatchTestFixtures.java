@@ -28,14 +28,12 @@ import org.apache.pinot.query.planner.plannode.PatternSymbol;
 import org.apache.pinot.query.planner.plannode.RowPattern;
 
 
-/**
- * Shared fixtures for the MATCH_RECOGNIZE runtime tests.
- *
- * <p>Rows use a deliberately trivial data model: column {@code label} carries the name of the pattern variable the
- * row is supposed to match, so a test can describe its input as the string {@code "AABB"} and read the expected
- * classification straight off it. Column {@code value} carries an increasing number for tests that need arithmetic or
- * navigation, and {@code pid} is the partition key.
- */
+/// Shared fixtures for the MATCH_RECOGNIZE runtime tests.
+///
+/// Rows use a deliberately trivial data model: column `label` carries the name of the pattern variable the
+/// row is supposed to match, so a test can describe its input as the string `"AABB"` and read the expected
+/// classification straight off it. Column `value` carries an increasing number for tests that need arithmetic or
+/// navigation, and `pid` is the partition key.
 public final class MatchTestFixtures {
   private MatchTestFixtures() {
   }
@@ -47,10 +45,8 @@ public final class MatchTestFixtures {
   public static final DataSchema INPUT_SCHEMA = new DataSchema(new String[]{"pid", "label", "value"},
       new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT});
 
-  /**
-   * A pattern variable whose DEFINE is {@code label = <name>}, i.e. it matches exactly the rows whose {@code label}
-   * column holds its own name.
-   */
+  /// A pattern variable whose DEFINE is `label = <name>`, i.e. it matches exactly the rows whose `label`
+  /// column holds its own name.
   public static PatternSymbol labelSymbol(String name, int ordinal) {
     RexExpression reference = new RexExpression.PatternFieldRef(LABEL_INDEX, ordinal, name);
     RexExpression literal = new RexExpression.Literal(ColumnDataType.STRING, name);
@@ -58,16 +54,12 @@ public final class MatchTestFixtures {
         new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, "EQUALS", List.of(reference, literal)));
   }
 
-  /**
-   * A pattern variable with no DEFINE clause, which matches every row per SQL:2016.
-   */
+  /// A pattern variable with no DEFINE clause, which matches every row per SQL:2016.
   public static PatternSymbol anySymbol(String name) {
     return new PatternSymbol(name, null);
   }
 
-  /**
-   * Symbol table where each name is a {@link #labelSymbol}, in the order given.
-   */
+  /// Symbol table where each name is a [#labelSymbol], in the order given.
   public static List<PatternSymbol> labelSymbols(String... names) {
     List<PatternSymbol> symbols = new ArrayList<>(names.length);
     for (int i = 0; i < names.length; i++) {
@@ -92,10 +84,8 @@ public final class MatchTestFixtures {
     return new RowPattern.Quantify(child, minRepeat, maxRepeat, greedy);
   }
 
-  /**
-   * Rows of a single partition, one per character of {@code labels}. The {@code value} column is the row index, so
-   * navigation tests can assert on a value that identifies the row.
-   */
+  /// Rows of a single partition, one per character of `labels`. The `value` column is the row index, so
+  /// navigation tests can assert on a value that identifies the row.
   public static List<Object[]> rows(String labels) {
     return rows(0, labels);
   }

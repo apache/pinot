@@ -30,39 +30,33 @@ import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
-/**
- * A leaf of a MEASURES or DEFINE expression whose value depends on the match rather than on a single row: a row
- * pattern navigation, {@code CLASSIFIER()}, {@code MATCH_NUMBER()}, or a single variable aggregate.
- *
- * <p>{@link MatchExpression} replaces every such leaf with a slot in a synthetic row, so that everything above the
- * leaves - comparisons, boolean connectives, arithmetic, scalar functions - is evaluated by Pinot's ordinary
- * {@link TransformOperand} machinery instead of a second expression interpreter.
- *
- * <p>Implementations are stateless with respect to the match: all match state is passed in through the
- * {@link MatchTape}, so one instance is reused across every match of every partition.
- */
+/// A leaf of a MEASURES or DEFINE expression whose value depends on the match rather than on a single row: a row
+/// pattern navigation, `CLASSIFIER()`, `MATCH_NUMBER()`, or a single variable aggregate.
+///
+/// [MatchExpression] replaces every such leaf with a slot in a synthetic row, so that everything above the
+/// leaves - comparisons, boolean connectives, arithmetic, scalar functions - is evaluated by Pinot's ordinary
+/// [TransformOperand] machinery instead of a second expression interpreter.
+///
+/// Implementations are stateless with respect to the match: all match state is passed in through the
+/// [MatchTape], so one instance is reused across every match of every partition.
 public interface MatchTerm {
 
-  /**
-   * The type this term reports to the enclosing expression. Values returned by {@link #evaluate} are in the
-   * corresponding {@link ColumnDataType#getStoredType() stored} representation, exactly like the values of a real
-   * input row.
-   */
+  /// The type this term reports to the enclosing expression. Values returned by [#evaluate] are in the
+  /// corresponding [stored][ColumnDataType#getStoredType()] representation, exactly like the values of a real
+  /// input row.
   ColumnDataType getResultType();
 
   @Nullable
   Object evaluate(MatchTape tape);
 
-  /**
-   * A row pattern navigation: an optional logical step ({@code FIRST} / {@code LAST}) that designates a row of the
-   * match, followed by an optional physical step ({@code PREV} / {@code NEXT}) that moves a fixed number of rows
-   * relative to it, and finally a column read.
-   *
-   * <p>Both steps are needed because SQL:2016 nests them, e.g. {@code PREV(LAST(A.price), 2)} designates the last row
-   * mapped to {@code A} and then moves two rows back. The logical step is bounded by the match; the physical step is
-   * bounded only by the partition, so it may legally read a row outside the match. Either step falling off its bound
-   * yields {@code null}, as the standard requires.
-   */
+  /// A row pattern navigation: an optional logical step (`FIRST` / `LAST`) that designates a row of the
+  /// match, followed by an optional physical step (`PREV` / `NEXT`) that moves a fixed number of rows
+  /// relative to it, and finally a column read.
+  ///
+  /// Both steps are needed because SQL:2016 nests them, e.g. `PREV(LAST(A.price), 2)` designates the last row
+  /// mapped to `A` and then moves two rows back. The logical step is bounded by the match; the physical step is
+  /// bounded only by the partition, so it may legally read a row outside the match. Either step falling off its bound
+  /// yields `null`, as the standard requires.
   final class Navigation implements MatchTerm {
     private final int _symbolOrdinal;
     private final boolean _fromEnd;
@@ -72,16 +66,14 @@ public interface MatchTerm {
     private final ColumnDataType _resultType;
     private final ColumnDataType _storedType;
 
-    /**
-     * @param symbolOrdinal pattern variable to navigate, or
-     *        {@link org.apache.pinot.query.planner.logical.RexExpression.PatternFieldRef#UNIVERSAL_SYMBOL_ORDINAL}
-     *        for an unqualified column reference, which navigates the rows of the whole match
-     * @param fromEnd {@code true} for {@code LAST}, {@code false} for {@code FIRST}
-     * @param logicalOffset how many rows back from the end (or forward from the start) of the designated variable
-     * @param physicalDelta rows to move in the partition afterwards; negative for {@code PREV}, positive for
-     *        {@code NEXT}, zero when there is no physical step
-     * @param columnIndex column to read, as an index into the input row of the MATCH_RECOGNIZE node
-     */
+    /// @param symbolOrdinal pattern variable to navigate, or
+    ///        [org.apache.pinot.query.planner.logical.RexExpression.PatternFieldRef#UNIVERSAL_SYMBOL_ORDINAL]
+    ///        for an unqualified column reference, which navigates the rows of the whole match
+    /// @param fromEnd `true` for `LAST`, `false` for `FIRST`
+    /// @param logicalOffset how many rows back from the end (or forward from the start) of the designated variable
+    /// @param physicalDelta rows to move in the partition afterwards; negative for `PREV`, positive for
+    ///        `NEXT`, zero when there is no physical step
+    /// @param columnIndex column to read, as an index into the input row of the MATCH_RECOGNIZE node
     public Navigation(int symbolOrdinal, boolean fromEnd, int logicalOffset, int physicalDelta, int columnIndex,
         ColumnDataType resultType) {
       _symbolOrdinal = symbolOrdinal;
@@ -118,11 +110,9 @@ public interface MatchTerm {
     }
   }
 
-  /**
-   * {@code CLASSIFIER()}: the name of the pattern variable the designated row is mapped to. With ONE ROW PER MATCH
-   * the designated row is the last row of the match, which is also the current row while a DEFINE predicate is being
-   * evaluated.
-   */
+  /// `CLASSIFIER()`: the name of the pattern variable the designated row is mapped to. With ONE ROW PER MATCH
+  /// the designated row is the last row of the match, which is also the current row while a DEFINE predicate is being
+  /// evaluated.
   final class Classifier implements MatchTerm {
     public static final Classifier INSTANCE = new Classifier();
 
@@ -141,9 +131,7 @@ public interface MatchTerm {
     }
   }
 
-  /**
-   * {@code MATCH_NUMBER()}: the sequential number of the match within its partition, starting at 1.
-   */
+  /// `MATCH_NUMBER()`: the sequential number of the match within its partition, starting at 1.
   final class MatchNumber implements MatchTerm {
     public static final MatchNumber INSTANCE = new MatchNumber();
 
@@ -161,14 +149,12 @@ public interface MatchTerm {
     }
   }
 
-  /**
-   * A single variable aggregate in MEASURES, e.g. {@code SUM(A.price)} or {@code COUNT(*)}: the aggregate of an
-   * expression evaluated over every row of the match that is mapped to one pattern variable.
-   *
-   * <p>The argument is evaluated by an ordinary {@link TransformOperand} against the raw input row, so any scalar
-   * expression works, e.g. {@code SUM(A.price * A.quantity)}. Nulls are skipped, as SQL requires; an aggregate over
-   * zero rows is {@code null} except for {@code COUNT}, which is {@code 0}.
-   */
+  /// A single variable aggregate in MEASURES, e.g. `SUM(A.price)` or `COUNT(*)`: the aggregate of an
+  /// expression evaluated over every row of the match that is mapped to one pattern variable.
+  ///
+  /// The argument is evaluated by an ordinary [TransformOperand] against the raw input row, so any scalar
+  /// expression works, e.g. `SUM(A.price * A.quantity)`. Nulls are skipped, as SQL requires; an aggregate over
+  /// zero rows is `null` except for `COUNT`, which is `0`.
   final class Aggregate implements MatchTerm {
     private final Kind _kind;
     private final int _symbolOrdinal;
@@ -177,10 +163,8 @@ public interface MatchTerm {
     private final ColumnDataType _resultType;
     private final ColumnDataType _storedType;
 
-    /**
-     * @param argument the aggregated expression evaluated against an input row, or {@code null} for {@code COUNT(*)},
-     *        which counts rows rather than values
-     */
+    /// @param argument the aggregated expression evaluated against an input row, or `null` for `COUNT(*)`,
+    ///        which counts rows rather than values
     public Aggregate(Kind kind, int symbolOrdinal, @Nullable TransformOperand argument, ColumnDataType resultType) {
       _kind = kind;
       _symbolOrdinal = symbolOrdinal;
@@ -244,10 +228,8 @@ public interface MatchTerm {
       return ((Comparable) left).compareTo(right);
     }
 
-    /**
-     * Accumulates without losing precision: exactly for {@code BIG_DECIMAL} and for the integral types, and in
-     * {@code double} otherwise, which is what the declared result type of the aggregate already implies.
-     */
+    /// Accumulates without losing precision: exactly for `BIG_DECIMAL` and for the integral types, and in
+    /// `double` otherwise, which is what the declared result type of the aggregate already implies.
     private Object add(@Nullable Object accumulator, Object value) {
       switch (_storedType) {
         case BIG_DECIMAL:
@@ -271,16 +253,12 @@ public interface MatchTerm {
       return ((Number) sum).doubleValue() / count;
     }
 
-    /**
-     * The aggregate functions supported inside MEASURES. Anything else is rejected at operator construction time
-     * rather than silently dropped.
-     */
+    /// The aggregate functions supported inside MEASURES. Anything else is rejected at operator construction time
+    /// rather than silently dropped.
     public enum Kind {
       COUNT, SUM, MIN, MAX, AVG;
 
-      /**
-       * Resolves {@code functionName} to a supported aggregate, or {@code null} if it is not an aggregate at all.
-       */
+      /// Resolves `functionName` to a supported aggregate, or `null` if it is not an aggregate at all.
       @Nullable
       public static Kind of(String functionName) {
         for (Kind kind : values()) {
@@ -291,10 +269,8 @@ public interface MatchTerm {
         return null;
       }
 
-      /**
-       * Throws with an actionable message for an aggregate that exists in Pinot but is not supported inside
-       * MEASURES yet.
-       */
+      /// Throws with an actionable message for an aggregate that exists in Pinot but is not supported inside
+      /// MEASURES yet.
       public static Kind resolveOrThrow(String functionName) {
         Kind kind = of(functionName);
         if (kind == null) {
