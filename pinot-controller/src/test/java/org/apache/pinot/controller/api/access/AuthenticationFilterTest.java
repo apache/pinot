@@ -22,6 +22,7 @@ package org.apache.pinot.controller.api.access;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
+import javax.ws.rs.BeanParam;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -158,6 +159,26 @@ public class AuthenticationFilterTest {
 
     pathParams.remove("materializedViewTableName");
     assertNull(AuthenticationFilter.extractTableName(customTableParamMethod, pathParams, queryParams));
+  }
+
+  /// `@BeanParam` and methods with no parameter annotations declare no query params, so `?tableName=` must not
+  /// resolve a table. That pins the fail-closed direction if someone later widens `declaredQueryParams`.
+  @Test
+  public void testBeanParamAndUnannotatedMethodsFailClosed()
+      throws Exception {
+    MultivaluedMap<String, String> pathParams = new MultivaluedHashMap<>();
+    MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
+    queryParams.putSingle("tableName", "A");
+
+    Method beanParamMethod = AuthenticationFilterTest.class.getMethod("methodWithBeanParam", Object.class);
+    assertNull(AuthenticationFilter.extractTableName(beanParamMethod, pathParams, queryParams));
+
+    Method tableBeanParamMethod =
+        AuthenticationFilterTest.class.getMethod("methodWithTableAuthorizationAndBeanParam", Object.class);
+    assertNull(AuthenticationFilter.extractTableName(tableBeanParamMethod, pathParams, queryParams));
+
+    Method unannotatedMethod = AuthenticationFilterTest.class.getMethod("methodWithNoParameterAnnotations");
+    assertNull(AuthenticationFilter.extractTableName(unannotatedMethod, pathParams, queryParams));
   }
 
   /// A caller must not be able to make a cluster endpoint look table-scoped by appending a table query parameter the
@@ -340,5 +361,17 @@ public class AuthenticationFilterTest {
   @Authorize(targetType = TargetType.TABLE, paramName = "materializedViewTableName",
       action = Actions.Table.GET_TABLE_CONFIG)
   public void methodWithCustomTableParamAuthorization() {
+  }
+
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_CLUSTER_CONFIG)
+  public void methodWithBeanParam(@BeanParam Object bean) {
+  }
+
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_CONFIG)
+  public void methodWithTableAuthorizationAndBeanParam(@BeanParam Object bean) {
+  }
+
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_CLUSTER_CONFIG)
+  public void methodWithNoParameterAnnotations() {
   }
 }
