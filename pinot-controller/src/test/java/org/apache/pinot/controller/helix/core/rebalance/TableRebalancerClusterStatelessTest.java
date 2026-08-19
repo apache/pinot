@@ -277,18 +277,11 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
       Map<String, RebalancePreCheckerResult> preCheckResult = rebalanceResult.getPreChecksResult();
       assertNotNull(preCheckResult);
-      assertEquals(preCheckResult.size(), 5);
-      assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
+      assertEquals(preCheckResult.size(), 4);
       assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
       assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION));
       assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS));
       assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO));
-      // Sending request to servers should fail for all, so needsPreprocess should be set to "error" to indicate that a
-      // manual check is needed
-      assertEquals(preCheckResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getPreCheckStatus(),
-          RebalancePreCheckerResult.PreCheckStatus.ERROR);
-      assertEquals(preCheckResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getMessage(),
-          "Could not determine needReload status, run needReload API manually");
       assertEquals(preCheckResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getPreCheckStatus(),
           RebalancePreCheckerResult.PreCheckStatus.PASS);
       assertEquals(preCheckResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
