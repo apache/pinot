@@ -21,27 +21,22 @@ package org.apache.pinot.controller.api.access;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.container.ResourceInfo;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
 import org.apache.pinot.common.auth.AuthProviderUtils;
@@ -65,8 +60,6 @@ public class AuthenticationFilter implements ContainerRequestFilter {
   /// Parameter names that identify the table an endpoint acts on, in the order they are consulted.
   private static final List<String> TABLE_NAME_KEYS =
       List.of(KEY_TABLE_NAME, KEY_TABLE_NAME_WITH_TYPE, KEY_SCHEMA_NAME);
-  /// Memoizes [#findDeclaredQueryParams(Method)]; bounded by the number of endpoints.
-  private static final Map<Method, Set<String>> DECLARED_QUERY_PARAMS = new ConcurrentHashMap<>();
 
   @Inject
   Provider<Request> _requestProvider;
@@ -150,54 +143,30 @@ public class AuthenticationFilter implements ContainerRequestFilter {
   /// parameters are caller-supplied and JAX-RS surfaces every one present on the URI, so only those the endpoint
   /// declares may name the table: otherwise a caller could append `?tableName=<a table it is scoped to>` to a cluster
   /// endpoint and have it authorized as a table-scoped request.
+  ///
+  /// Binding a table query parameter is treated as authorizing table scope. That is correct only when the endpoint
+  /// uses the parameter to scope the operation. An optional `tableName` that only filters a nested view (for example
+  /// `GET /tasks/task/{taskName}/debug`) still grants table scope for the whole request.
   @Nullable
   @VisibleForTesting
   static String extractTableName(Method endpointMethod, MultivaluedMap<String, String> pathParameters,
       MultivaluedMap<String, String> queryParameters) {
     Authorize authorize = endpointMethod.getAnnotation(Authorize.class);
     if (authorize != null && authorize.targetType() == TargetType.TABLE) {
-      // The annotation names the parameter, but it is only trustworthy where the endpoint also binds it.
-      MultivaluedMap<String, String> trustedQueryParameters =
-          declaredQueryParams(endpointMethod).contains(authorize.paramName()) ? queryParameters
-              : new MultivaluedHashMap<>();
-      return FineGrainedAuthUtils.findRawTargetId(authorize, pathParameters, trustedQueryParameters);
+      // Same primitive as FineGrainedAuthUtils.validateFineGrainedAuth: path first, then a declared query param.
+      return FineGrainedAuthUtils.findRawTargetId(authorize, endpointMethod, pathParameters, queryParameters);
     }
     String tableName = extractTableName(pathParameters);
     if (tableName != null) {
       return tableName;
     }
-    Set<String> declaredQueryParams = declaredQueryParams(endpointMethod);
+    Set<String> declaredQueryParams = FineGrainedAuthUtils.declaredQueryParams(endpointMethod);
     for (String key : TABLE_NAME_KEYS) {
       if (queryParameters.containsKey(key) && declaredQueryParams.contains(key)) {
         return queryParameters.getFirst(key);
       }
     }
     return null;
-  }
-
-  /// Returns the names `endpointMethod` binds as [QueryParam]s.
-  ///
-  /// Only method-level `@QueryParam` binding is recognized; an endpoint binding parameters through `@BeanParam` or
-  /// resource-class field injection is treated as declaring none. That direction denies table scope rather than
-  /// granting it, so it fails closed — no controller resource uses either form today.
-  ///
-  /// Results are memoized because [Method#getParameterAnnotations()] re-parses the class-file annotation bytes on
-  /// every call, and this runs on every request before authentication. The key set is bounded by the number of
-  /// endpoints.
-  private static Set<String> declaredQueryParams(Method endpointMethod) {
-    return DECLARED_QUERY_PARAMS.computeIfAbsent(endpointMethod, AuthenticationFilter::findDeclaredQueryParams);
-  }
-
-  private static Set<String> findDeclaredQueryParams(Method endpointMethod) {
-    Set<String> declared = new HashSet<>();
-    for (Annotation[] parameterAnnotations : endpointMethod.getParameterAnnotations()) {
-      for (Annotation parameterAnnotation : parameterAnnotations) {
-        if (parameterAnnotation instanceof QueryParam queryParam) {
-          declared.add(queryParam.value());
-        }
-      }
-    }
-    return Set.copyOf(declared);
   }
 
   @Nullable

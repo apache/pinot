@@ -57,7 +57,9 @@ abstract class BaseBasicAuthAccessControl<P extends BasicAuthPrincipal> implemen
 
   /// Guards endpoints that name no table. Such a request is cluster-wide, so beyond the requested permission it
   /// requires a principal whose table scope is unrestricted: a principal confined to a subset of tables must not reach
-  /// cluster state that lies outside that subset.
+  /// cluster state that lies outside that subset. That includes realtime segment-completion callbacks
+  /// (`LLCSegmentCompletionHandlers`) and minion task callbacks that carry no table name, so a table-scoped server
+  /// or minion token is denied and ingestion stalls until the token is moved to an unrestricted principal.
   @Override
   public final boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
     Optional<P> principal = getPrincipal(httpHeaders);
