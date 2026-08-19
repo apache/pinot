@@ -25,27 +25,23 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 
 
-/**
- * MatchNode models SQL:2016 MATCH_RECOGNIZE (row pattern recognition): it partitions its input, orders each
- * partition, finds the runs of rows that match a row pattern, and emits the MEASURES of every match.
- *
- * <p>The pattern is carried as a self-contained {@link RowPattern} tree over a symbol table
- * ({@link #getPatternSymbols()}), rather than as Calcite's {@code RexCall}-over-string-literals encoding. Every
- * reference to a pattern variable - {@link RowPattern.Symbol}, {@link RexExpression.PatternFieldRef} and
- * {@link #getAfterMatchSkipToSymbolOrdinal()} - is an ordinal into that table, so the operator never string-matches
- * variable names.
- *
- * <p>DataSchema on this node reflects the output schema: the PARTITION BY columns followed by the MEASURES columns
- * for {@link RowsPerMatchMode#ONE_ROW_PER_MATCH}.
- *
- * <p>Not supported in this node and rejected at planning time: {@code SUBSET}, {@code PERMUTE}, {@code {- -}}
- * exclusions, {@code WITHIN}, {@code OMIT EMPTY MATCHES}, {@code WITH UNMATCHED ROWS}, aggregates inside
- * {@code DEFINE}, and {@link RowsPerMatchMode#ALL_ROWS_PER_MATCH}.
- */
+/// MatchNode models SQL:2016 MATCH_RECOGNIZE (row pattern recognition): it partitions its input, orders each
+/// partition, finds the runs of rows that match a row pattern, and emits the MEASURES of every match.
+///
+/// The pattern is carried as a self-contained [RowPattern] tree over a symbol table
+/// ([#getPatternSymbols()]), rather than as Calcite's `RexCall`-over-string-literals encoding. Every
+/// reference to a pattern variable - [RowPattern.Symbol], [RexExpression.PatternFieldRef] and
+/// [#getAfterMatchSkipToSymbolOrdinal()] - is an ordinal into that table, so the operator never string-matches
+/// variable names.
+///
+/// DataSchema on this node reflects the output schema: the PARTITION BY columns followed by the MEASURES columns
+/// for [RowsPerMatchMode#ONE_ROW_PER_MATCH].
+///
+/// Not supported in this node and rejected at planning time: `SUBSET`, `PERMUTE`, `{- -}`
+/// exclusions, `WITHIN`, `OMIT EMPTY MATCHES`, `WITH UNMATCHED ROWS`, aggregates inside
+/// `DEFINE`, and [RowsPerMatchMode#ALL_ROWS_PER_MATCH].
 public class MatchNode extends BasePlanNode {
-  /**
-   * {@link #getAfterMatchSkipToSymbolOrdinal()} value for the skip modes that have no target variable.
-   */
+  /// [#getAfterMatchSkipToSymbolOrdinal()] value for the skip modes that have no target variable.
   public static final int NO_SKIP_TO_SYMBOL = -1;
 
   private final List<PatternSymbol> _patternSymbols;
@@ -72,37 +68,27 @@ public class MatchNode extends BasePlanNode {
     _rowsPerMatchMode = rowsPerMatchMode;
   }
 
-  /**
-   * The pattern variable symbol table. A symbol's ordinal is its index in this list.
-   */
+  /// The pattern variable symbol table. A symbol's ordinal is its index in this list.
   public List<PatternSymbol> getPatternSymbols() {
     return _patternSymbols;
   }
 
-  /**
-   * Root of the row pattern tree, i.e. the {@code PATTERN} clause.
-   */
+  /// Root of the row pattern tree, i.e. the `PATTERN` clause.
   public RowPattern getPattern() {
     return _pattern;
   }
 
-  /**
-   * The {@code MEASURES} items, in output order.
-   */
+  /// The `MEASURES` items, in output order.
   public List<Measure> getMeasures() {
     return _measures;
   }
 
-  /**
-   * {@code PARTITION BY}: column indexes into the input row. Empty means a single partition over the whole input.
-   */
+  /// `PARTITION BY`: column indexes into the input row. Empty means a single partition over the whole input.
   public List<Integer> getPartitionKeys() {
     return _partitionKeys;
   }
 
-  /**
-   * {@code ORDER BY}. Mandatory for MATCH_RECOGNIZE, so this is never empty.
-   */
+  /// `ORDER BY`. Mandatory for MATCH_RECOGNIZE, so this is never empty.
   public List<RelFieldCollation> getCollations() {
     return _collations;
   }
@@ -111,10 +97,8 @@ public class MatchNode extends BasePlanNode {
     return _afterMatchSkipMode;
   }
 
-  /**
-   * For {@link AfterMatchSkipMode#TO_FIRST} and {@link AfterMatchSkipMode#TO_LAST}, the ordinal of the target
-   * pattern variable; {@link #NO_SKIP_TO_SYMBOL} for the other skip modes.
-   */
+  /// For [AfterMatchSkipMode#TO_FIRST] and [AfterMatchSkipMode#TO_LAST], the ordinal of the target
+  /// pattern variable; [#NO_SKIP_TO_SYMBOL] for the other skip modes.
   public int getAfterMatchSkipToSymbolOrdinal() {
     return _afterMatchSkipToSymbolOrdinal;
   }
@@ -123,9 +107,7 @@ public class MatchNode extends BasePlanNode {
     return _rowsPerMatchMode;
   }
 
-  /**
-   * Renders the pattern using the symbol table, e.g. {@code (A B* | C){2,3}}, for explain plans and error messages.
-   */
+  /// Renders the pattern using the symbol table, e.g. `(A B* | C){2,3}`, for explain plans and error messages.
   public String getPatternString() {
     StringBuilder builder = new StringBuilder();
     _pattern.appendTo(builder, _patternSymbols);
@@ -173,9 +155,7 @@ public class MatchNode extends BasePlanNode {
         _afterMatchSkipMode, _afterMatchSkipToSymbolOrdinal, _rowsPerMatchMode);
   }
 
-  /**
-   * One {@code MEASURES <expression> AS <name>} item.
-   */
+  /// One `MEASURES <expression> AS <name>` item.
   public static final class Measure {
     private final String _name;
     private final RexExpression _expression;
@@ -185,9 +165,7 @@ public class MatchNode extends BasePlanNode {
       _expression = expression;
     }
 
-    /**
-     * Output column name of this measure.
-     */
+    /// Output column name of this measure.
     public String getName() {
       return _name;
     }
@@ -219,36 +197,32 @@ public class MatchNode extends BasePlanNode {
     }
   }
 
-  /**
-   * SQL:2016 {@code AFTER MATCH SKIP} clause: where pattern matching resumes after a successful match.
-   *
-   * <p>{@link #PAST_LAST_ROW} is the SQL:2016 default (and the default in Trino, Snowflake and Oracle), which
-   * produces non-overlapping matches. Calcite defaults an omitted clause to {@link #TO_NEXT_ROW} instead, which
-   * produces overlapping matches, so the default must be fixed at the {@code SqlNode} level before conversion.
-   *
-   * <p>The constant names are part of the wire protocol via {@code Plan.AfterMatchSkipMode} and must remain stable
-   * across mixed-version brokers and servers.
-   */
+  /// SQL:2016 `AFTER MATCH SKIP` clause: where pattern matching resumes after a successful match.
+  ///
+  /// [#PAST_LAST_ROW] is the SQL:2016 default (and the default in Trino, Snowflake and Oracle), which
+  /// produces non-overlapping matches. Calcite defaults an omitted clause to [#TO_NEXT_ROW] instead, which
+  /// produces overlapping matches, so the default must be fixed at the `SqlNode` level before conversion.
+  ///
+  /// The constant names are part of the wire protocol via `Plan.AfterMatchSkipMode` and must remain stable
+  /// across mixed-version brokers and servers.
   public enum AfterMatchSkipMode {
-    /** Resume at the row after the last row of the match. */
+    /// Resume at the row after the last row of the match.
     PAST_LAST_ROW,
-    /** Resume at the row after the first row of the match, so matches may overlap. */
+    /// Resume at the row after the first row of the match, so matches may overlap.
     TO_NEXT_ROW,
-    /** Resume at the first row mapped to the target pattern variable. */
+    /// Resume at the first row mapped to the target pattern variable.
     TO_FIRST,
-    /** Resume at the last row mapped to the target pattern variable. */
+    /// Resume at the last row mapped to the target pattern variable.
     TO_LAST
   }
 
-  /**
-   * SQL:2016 {@code ONE ROW PER MATCH} / {@code ALL ROWS PER MATCH}.
-   *
-   * <p>{@link #ALL_ROWS_PER_MATCH} is declared so its wire value is pinned and so the planner can reject it by
-   * name, but it is not supported yet.
-   *
-   * <p>The constant names are part of the wire protocol via {@code Plan.RowsPerMatchMode} and must remain stable
-   * across mixed-version brokers and servers.
-   */
+  /// SQL:2016 `ONE ROW PER MATCH` / `ALL ROWS PER MATCH`.
+  ///
+  /// [#ALL_ROWS_PER_MATCH] is declared so its wire value is pinned and so the planner can reject it by
+  /// name, but it is not supported yet.
+  ///
+  /// The constant names are part of the wire protocol via `Plan.RowsPerMatchMode` and must remain stable
+  /// across mixed-version brokers and servers.
   public enum RowsPerMatchMode {
     ONE_ROW_PER_MATCH, ALL_ROWS_PER_MATCH
   }
