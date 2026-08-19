@@ -27,14 +27,12 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/**
- * Tests the precedence between the three tiers that can set a MATCH_RECOGNIZE limit, and that a nonsensical value is
- * rejected rather than silently clamped.
- *
- * <p>The cluster config tier is not visible here on purpose: {@code QueryRunner} folds it into the op chain metadata
- * under the query option key, and only when the query did not set that option itself, so from this class's point of
- * view it is indistinguishable from a query option. That is exactly how {@code maxRowsInWindow} behaves.
- */
+/// Tests the precedence between the three tiers that can set a MATCH_RECOGNIZE limit, and that a nonsensical value is
+/// rejected rather than silently clamped.
+///
+/// The cluster config tier is not visible here on purpose: `QueryRunner` folds it into the op chain metadata
+/// under the query option key, and only when the query did not set that option itself, so from this class's point of
+/// view it is indistinguishable from a query option. That is exactly how `maxRowsInWindow` behaves.
 public class MatchLimitsTest {
   private static final PlanNode.NodeHint NO_HINT = PlanNode.NodeHint.EMPTY;
 

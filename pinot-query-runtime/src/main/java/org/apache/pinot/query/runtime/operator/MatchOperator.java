@@ -45,37 +45,39 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Evaluates SQL:2016 {@code MATCH_RECOGNIZE} (row pattern recognition) with {@code ONE ROW PER MATCH}.
- *
- * <h2>What it does per partition</h2>
- * For every {@code PARTITION BY} partition, in {@code ORDER BY} order, it walks a scan position from the first row to
- * the last. At each position it asks {@link PartitionMatcher} for the preferred match starting exactly there. On a
- * match it emits one row - the partition key columns followed by the {@code MEASURES} - and then moves the scan
- * position according to the {@code AFTER MATCH SKIP} mode. On no match it moves one row forward.
- *
- * <h2>What it expects from the plan</h2>
- * Like {@link WindowAggregateOperator}, this operator does not sort. {@code PinotMatchExchangeNodeInsertRule} puts a
- * sort exchange underneath that hash distributes on the partition keys and sorts the receiver side on
- * {@code (partitionKeys..., orderKeys...)}, so rows arrive grouped by partition and ordered within a partition. The
- * operator therefore buffers one partition at a time and releases it at each boundary, and never reads
- * {@link MatchNode#getCollations()}: the ordering has already been established below it.
- *
- * <p>The grouping half of that assumption is verified rather than trusted: if a partition key reappears after its
- * partition was closed, the operator fails instead of silently splitting one partition into two and reporting matches
- * that do not exist. The ordering half is not re-checked per row, because an exchange that grouped correctly but
- * sorted incorrectly is not a failure mode the exchange can produce - losing the sort loses the grouping too, which
- * the reappearance check already catches.
- *
- * <h2>Guardrails throw, they never truncate</h2>
- * {@link MatchLimits#MAX_ROWS_IN_MATCH} bounds the rows buffered for a partition and
- * {@link MatchLimits#MAX_STEPS_PER_MATCH_ATTEMPT} bounds the backtracking of one match attempt. Both raise an error,
- * because a truncated pattern result is a wrong result that nothing in the response would flag.
- *
- * <h2>Not supported yet</h2>
- * {@code ALL ROWS PER MATCH} is rejected here as well as during planning: this operator emits exactly one row per
- * match, so accepting it would silently return the wrong shape of result.
- */
+/// Evaluates SQL:2016 `MATCH_RECOGNIZE` (row pattern recognition) with `ONE ROW PER MATCH`.
+///
+/// ## What it does per partition
+///
+/// For every `PARTITION BY` partition, in `ORDER BY` order, it walks a scan position from the first row to
+/// the last. At each position it asks [PartitionMatcher] for the preferred match starting exactly there. On a
+/// match it emits one row - the partition key columns followed by the `MEASURES` - and then moves the scan
+/// position according to the `AFTER MATCH SKIP` mode. On no match it moves one row forward.
+///
+/// ## What it expects from the plan
+///
+/// Like [WindowAggregateOperator], this operator does not sort. `PinotMatchExchangeNodeInsertRule` puts a
+/// sort exchange underneath that hash distributes on the partition keys and sorts the receiver side on
+/// `(partitionKeys..., orderKeys...)`, so rows arrive grouped by partition and ordered within a partition. The
+/// operator therefore buffers one partition at a time and releases it at each boundary, and never reads
+/// [MatchNode#getCollations()]: the ordering has already been established below it.
+///
+/// The grouping half of that assumption is verified rather than trusted: if a partition key reappears after its
+/// partition was closed, the operator fails instead of silently splitting one partition into two and reporting matches
+/// that do not exist. The ordering half is not re-checked per row, because an exchange that grouped correctly but
+/// sorted incorrectly is not a failure mode the exchange can produce - losing the sort loses the grouping too, which
+/// the reappearance check already catches.
+///
+/// ## Guardrails throw, they never truncate
+///
+/// [MatchLimits#MAX_ROWS_IN_MATCH] bounds the rows buffered for a partition and
+/// [MatchLimits#MAX_STEPS_PER_MATCH_ATTEMPT] bounds the backtracking of one match attempt. Both raise an error,
+/// because a truncated pattern result is a wrong result that nothing in the response would flag.
+///
+/// ## Not supported yet
+///
+/// `ALL ROWS PER MATCH` is rejected here as well as during planning: this operator emits exactly one row per
+/// match, so accepting it would silently return the wrong shape of result.
 public class MatchOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MatchOperator.class);
   private static final String EXPLAIN_NAME = "MATCH_RECOGNIZE";
@@ -193,9 +195,7 @@ public class MatchOperator extends MultiStageOperator {
     return new RowHeapDataBlock(rows, _resultSchema);
   }
 
-  /**
-   * Buffers the rows of one input block, matching and releasing a partition as soon as its last row went by.
-   */
+  /// Buffers the rows of one input block, matching and releasing a partition as soon as its last row went by.
   private void consumeBlock(MseBlock.Data block) {
     for (Object[] row : block.asRowHeap().getRows()) {
       Key partitionKey = AggregationUtils.extractRowKey(row, _partitionKeys);
@@ -236,10 +236,8 @@ public class MatchOperator extends MultiStageOperator {
     _currentPartitionKey = null;
   }
 
-  /**
-   * Scans the buffered partition, emitting one row per match and advancing the scan position per the
-   * {@code AFTER MATCH SKIP} mode.
-   */
+  /// Scans the buffered partition, emitting one row per match and advancing the scan position per the
+  /// `AFTER MATCH SKIP` mode.
   private void matchPartition() {
     List<Object[]> rows = _partitionRows;
     int numPartitionRows = rows.size();
@@ -259,10 +257,8 @@ public class MatchOperator extends MultiStageOperator {
     }
   }
 
-  /**
-   * Builds the output row of one match: the partition key columns, which are constant across the partition, followed
-   * by the measures evaluated against the completed match.
-   */
+  /// Builds the output row of one match: the partition key columns, which are constant across the partition, followed
+  /// by the measures evaluated against the completed match.
   private Object[] buildOutputRow(List<Object[]> rows, MatchTape tape) {
     Object[] outputRow = new Object[_partitionKeys.length + _measures.length];
     Object[] anyPartitionRow = rows.get(0);
@@ -276,13 +272,11 @@ public class MatchOperator extends MultiStageOperator {
     return outputRow;
   }
 
-  /**
-   * Where pattern matching resumes after a match that covered {@code [scanStart, endPos)}.
-   *
-   * <p>An empty match always resumes at the next row: every skip mode would otherwise resume exactly where it
-   * started and loop forever. {@code SKIP TO FIRST} / {@code SKIP TO LAST} that would not make progress is an error
-   * in SQL:2016 rather than a silently adjusted position, so it is reported as one.
-   */
+  /// Where pattern matching resumes after a match that covered `[scanStart, endPos)`.
+  ///
+  /// An empty match always resumes at the next row: every skip mode would otherwise resume exactly where it
+  /// started and loop forever. `SKIP TO FIRST` / `SKIP TO LAST` that would not make progress is an error
+  /// in SQL:2016 rather than a silently adjusted position, so it is reported as one.
   private int nextScanStart(int scanStart, int endPos, MatchTape tape) {
     if (endPos == scanStart) {
       if (_skipMode == MatchNode.AfterMatchSkipMode.TO_FIRST
@@ -343,13 +337,9 @@ public class MatchOperator extends MultiStageOperator {
         return true;
       }
     },
-    /**
-     * Allocated memory in bytes for this operator or its children in the same stage.
-     */
+    /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
-    /**
-     * Time spent on GC while this operator or its children in the same stage were running.
-     */
+    /// Time spent on GC while this operator or its children in the same stage were running.
     GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;

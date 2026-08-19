@@ -233,14 +233,12 @@ public class RexExpressionUtils {
     return new RexExpression.InputRef(rexInputRef.getIndex());
   }
 
-  /**
-   * Converts a MATCH_RECOGNIZE pattern field reference (e.g. {@code UP.price} inside MEASURES or DEFINE).
-   *
-   * <p>The pattern symbol table is not known here, so the returned reference carries
-   * {@link RexExpression.PatternFieldRef#UNRESOLVED_SYMBOL_ORDINAL}. The MATCH_RECOGNIZE planning pass must bind it
-   * to the symbol ordinal before the plan is serialized; the serializer rejects unresolved ordinals rather than
-   * writing an ambiguous reference to the wire.
-   */
+  /// Converts a MATCH_RECOGNIZE pattern field reference (e.g. `UP.price` inside MEASURES or DEFINE).
+  ///
+  /// The pattern symbol table is not known here, so the returned reference carries
+  /// [RexExpression.PatternFieldRef#UNRESOLVED_SYMBOL_ORDINAL]. The MATCH_RECOGNIZE planning pass must bind it
+  /// to the symbol ordinal before the plan is serialized; the serializer rejects unresolved ordinals rather than
+  /// writing an ambiguous reference to the wire.
   public static RexExpression.PatternFieldRef fromRexPatternFieldRef(RexPatternFieldRef rexPatternFieldRef) {
     return new RexExpression.PatternFieldRef(rexPatternFieldRef.getIndex(),
         RexExpression.PatternFieldRef.UNRESOLVED_SYMBOL_ORDINAL, rexPatternFieldRef.getAlpha());
