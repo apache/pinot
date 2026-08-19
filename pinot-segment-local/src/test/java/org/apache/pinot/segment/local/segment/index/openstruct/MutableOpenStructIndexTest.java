@@ -21,15 +21,20 @@ package org.apache.pinot.segment.local.segment.index.openstruct;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
@@ -155,6 +160,48 @@ public class MutableOpenStructIndexTest {
       assertNotNull(idx.getColumnMetadata("clicks"));
       assertEquals(idx.getColumnMetadata("clicks").getColumnName(), "clicks");
       assertNull(idx.getColumnMetadata("absent"));
+    }
+  }
+
+  @Test
+  public void testIgnoredKeyNeverAllocatesColumn()
+      throws Exception {
+    OpenStructIndexConfig config = JsonUtils.stringToObject(
+        "{\"ignoredKeys\": [\"debug\"]}", OpenStructIndexConfig.class);
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex(
+        "metrics", openStructSpec(), config, _memMgr, 1000)) {
+      idx.index(0, Map.of("debug", "noise", "clicks", 5L));
+
+      assertNull(idx.getKeyColumn("debug"), "Ignored key must never allocate a column");
+      assertTrue(idx.getKeys().contains("clicks"), "Non-ignored key must still be indexed");
+      assertEquals(idx.getKeys().size(), 1);
+      assertEquals(idx.getMapValue(0), Map.of("clicks", 5L));
+    }
+  }
+
+  @Test
+  public void testIgnoredKeyMeteredOnceOnClose()
+      throws IOException {
+    OpenStructIndexConfig config = JsonUtils.stringToObject(
+        "{\"ignoredKeys\": [\"debug\"]}", OpenStructIndexConfig.class);
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      MutableOpenStructIndex idx = new MutableOpenStructIndex(
+          "metrics", openStructSpec(), config, _memMgr, 1000);
+      idx.index(0, Map.of("debug", "a"));
+      idx.index(1, Map.of("debug", "b", "clicks", 1L));
+
+      verify(metrics, org.mockito.Mockito.never())
+          .addMeteredGlobalValue(org.mockito.ArgumentMatchers.eq(ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS),
+              org.mockito.ArgumentMatchers.anyLong());
+
+      idx.close();
+
+      verify(metrics, org.mockito.Mockito.times(1))
+          .addMeteredGlobalValue(ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS, 2);
+    } finally {
+      ServerMetrics.deregister();
     }
   }
 }

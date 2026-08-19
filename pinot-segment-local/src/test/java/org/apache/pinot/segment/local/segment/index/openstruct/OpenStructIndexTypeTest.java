@@ -21,11 +21,13 @@ package org.apache.pinot.segment.local.segment.index.openstruct;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
@@ -81,6 +83,75 @@ public class OpenStructIndexTypeTest {
     FieldSpec openStructSpec = new ComplexFieldSpec("payload", FieldSpec.DataType.OPEN_STRUCT, true, Map.of());
 
     // Must not throw.
+    StandardIndexes.openStruct().validate(fieldIndexConfigs, openStructSpec, null);
+  }
+
+  @Test
+  public void testValidateRejectsIgnoredKeyAlsoDense()
+      throws Exception {
+    OpenStructIndexConfig config = JsonUtils.stringToObject(
+        "{\"denseKeys\": [\"clicks\"], \"ignoredKeys\": [\"clicks\"]}", OpenStructIndexConfig.class);
+    FieldIndexConfigs fieldIndexConfigs =
+        new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), config).build();
+    FieldSpec openStructSpec = new ComplexFieldSpec("payload", FieldSpec.DataType.OPEN_STRUCT, true, Map.of());
+
+    assertThrows(IllegalStateException.class,
+        () -> StandardIndexes.openStruct().validate(fieldIndexConfigs, openStructSpec, null));
+  }
+
+  @Test
+  public void testValidateRejectsIgnoredKeyAlsoHasValueFieldConfig()
+      throws Exception {
+    FieldConfig keyConfig = new FieldConfig.Builder("clicks").build();
+    OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(keyConfig), null,
+        Set.of("clicks"));
+    FieldIndexConfigs fieldIndexConfigs =
+        new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), config).build();
+    FieldSpec openStructSpec = new ComplexFieldSpec("payload", FieldSpec.DataType.OPEN_STRUCT, true, Map.of());
+
+    assertThrows(IllegalStateException.class,
+        () -> StandardIndexes.openStruct().validate(fieldIndexConfigs, openStructSpec, null));
+  }
+
+  @Test
+  public void testValidateRejectsIgnoredKeyAlsoDeclaredInSchema()
+      throws Exception {
+    OpenStructIndexConfig config = JsonUtils.stringToObject(
+        "{\"ignoredKeys\": [\"clicks\"]}", OpenStructIndexConfig.class);
+    FieldIndexConfigs fieldIndexConfigs =
+        new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), config).build();
+    FieldSpec openStructSpec = new ComplexFieldSpec("payload", FieldSpec.DataType.OPEN_STRUCT, true,
+        Map.of("clicks", new DimensionFieldSpec("clicks", FieldSpec.DataType.LONG, true)));
+
+    assertThrows(IllegalStateException.class,
+        () -> StandardIndexes.openStruct().validate(fieldIndexConfigs, openStructSpec, null));
+  }
+
+  @Test
+  public void testValidateAllowsNonConflictingIgnoredKeys()
+      throws Exception {
+    OpenStructIndexConfig config = JsonUtils.stringToObject(
+        "{\"denseKeys\": [\"clicks\"], \"ignoredKeys\": [\"debug\"]}", OpenStructIndexConfig.class);
+    FieldIndexConfigs fieldIndexConfigs =
+        new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), config).build();
+    FieldSpec openStructSpec = new ComplexFieldSpec("payload", FieldSpec.DataType.OPEN_STRUCT, true,
+        Map.of("clicks", new DimensionFieldSpec("clicks", FieldSpec.DataType.LONG, true)));
+
+    // Must not throw.
+    StandardIndexes.openStruct().validate(fieldIndexConfigs, openStructSpec, null);
+  }
+
+  @Test
+  public void testValidateSkipsIgnoredKeyChecksWhenIndexDisabled()
+      throws Exception {
+    OpenStructIndexConfig config = JsonUtils.stringToObject(
+        "{\"disabled\": true, \"denseKeys\": [\"clicks\"], \"ignoredKeys\": [\"clicks\"]}",
+        OpenStructIndexConfig.class);
+    FieldIndexConfigs fieldIndexConfigs =
+        new FieldIndexConfigs.Builder().add(StandardIndexes.openStruct(), config).build();
+    FieldSpec openStructSpec = new ComplexFieldSpec("payload", FieldSpec.DataType.OPEN_STRUCT, true, Map.of());
+
+    // Must not throw - validation is skipped entirely when the index is disabled.
     StandardIndexes.openStruct().validate(fieldIndexConfigs, openStructSpec, null);
   }
 }

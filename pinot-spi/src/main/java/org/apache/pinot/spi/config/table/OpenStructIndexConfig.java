@@ -62,6 +62,7 @@ public class OpenStructIndexConfig extends IndexConfig {
   private final double _denseKeyMinFillRate;
   private final List<FieldConfig> _valueFieldConfigs;
   private final boolean _sparseJsonIndex;
+  private final Set<String> _ignoredKeys;
   // Eager lookup from key name → FieldConfig for O(1) per-key access. Built in constructor
   // so the config is fully immutable and safe to share across threads.
   private final Map<String, FieldConfig> _valueFieldConfigIndex;
@@ -79,6 +80,16 @@ public class OpenStructIndexConfig extends IndexConfig {
     this(disabled, defaultValueFieldConfig, maxDenseKeys, denseKeys, denseKeyMinFillRate, valueFieldConfigs, null);
   }
 
+  /// @deprecated Use the 8-arg constructor accepting `ignoredKeys`. Kept for binary
+  /// compatibility with existing callers built against the pre-`ignoredKeys` signature.
+  @Deprecated
+  public OpenStructIndexConfig(Boolean disabled, @Nullable FieldConfig defaultValueFieldConfig,
+      @Nullable Integer maxDenseKeys, @Nullable Set<String> denseKeys, @Nullable Double denseKeyMinFillRate,
+      @Nullable List<FieldConfig> valueFieldConfigs, @Nullable Boolean sparseJsonIndex) {
+    this(disabled, defaultValueFieldConfig, maxDenseKeys, denseKeys, denseKeyMinFillRate, valueFieldConfigs,
+        sparseJsonIndex, null);
+  }
+
   @JsonCreator
   public OpenStructIndexConfig(
       @JsonProperty("disabled") Boolean disabled,
@@ -87,7 +98,8 @@ public class OpenStructIndexConfig extends IndexConfig {
       @JsonProperty("denseKeys") @Nullable Set<String> denseKeys,
       @JsonProperty("denseKeyMinFillRate") @Nullable Double denseKeyMinFillRate,
       @JsonProperty("valueFieldConfigs") @Nullable List<FieldConfig> valueFieldConfigs,
-      @JsonProperty("sparseJsonIndex") @Nullable Boolean sparseJsonIndex) {
+      @JsonProperty("sparseJsonIndex") @Nullable Boolean sparseJsonIndex,
+      @JsonProperty("ignoredKeys") @Nullable Set<String> ignoredKeys) {
     super(disabled);
     _defaultValueFieldConfig = defaultValueFieldConfig;
     _maxDenseKeys = maxDenseKeys != null ? maxDenseKeys : DEFAULT_MAX_DENSE_KEYS;
@@ -95,6 +107,7 @@ public class OpenStructIndexConfig extends IndexConfig {
     _denseKeyMinFillRate = denseKeyMinFillRate != null ? denseKeyMinFillRate : DEFAULT_DENSE_KEY_MIN_FILL_RATE;
     _valueFieldConfigs = valueFieldConfigs;
     _sparseJsonIndex = sparseJsonIndex != null && sparseJsonIndex;
+    _ignoredKeys = ignoredKeys;
     if (valueFieldConfigs == null || valueFieldConfigs.isEmpty()) {
       _valueFieldConfigIndex = Map.of();
     } else {
@@ -179,6 +192,19 @@ public class OpenStructIndexConfig extends IndexConfig {
   /// Default `false`.
   public boolean isSparseJsonIndex() {
     return _sparseJsonIndex;
+  }
+
+  /// Keys listed here are dropped entirely at ingestion for this OPEN_STRUCT column: never
+  /// materialized dense, never written to the sparse `$__sparse__` column, not queryable. Use for
+  /// keys that shouldn't be persisted at all (e.g. debug/internal fields). Not retroactive —
+  /// changing this only affects data ingested after the change; already-sealed segments are
+  /// unaffected.
+  public Set<String> getIgnoredKeys() {
+    return _ignoredKeys != null ? _ignoredKeys : Set.of();
+  }
+
+  public boolean isIgnoredKey(String key) {
+    return _ignoredKeys != null && _ignoredKeys.contains(key);
   }
 
   private static boolean invertedFromIndexes(FieldConfig fieldConfig, String key) {

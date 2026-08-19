@@ -29,6 +29,8 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
@@ -48,6 +50,12 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -547,5 +555,66 @@ public class OpenStructColumnSplitterTest {
     String sparseCol = OpenStructNaming.sparseColumnName("metrics");
     File indexFile = new File(_tempDir, sparseCol + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
     assertFalse(indexFile.exists());
+  }
+
+  @Test
+  public void testIgnoredKeyNeverMaterializedDenseOrSparse()
+      throws Exception {
+    // "debug" has a fill rate far below the default denseKeyMinFillRate (0.5), so if it were not
+    // dropped by ignoredKeys it would land in the sparse manifest (see testRareKeyDroppedFromDense).
+    // This is what makes the sparse-manifest assertion below meaningful rather than vacuous.
+    OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, -1, null, 0.5, null, null,
+        Set.of("debug"));
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(), cfg);
+    s.add(Map.of("debug", "noise", "clicks", 0L), 0);
+    for (int d = 1; d < 100; d++) {
+      s.add(Map.of("clicks", (long) d), d);
+    }
+    s.seal();
+
+    Set<String> dense = s.getResolvedDenseKeys();
+    assertFalse(dense.contains("debug"));
+    assertTrue(dense.contains("clicks"));
+
+    PropertiesConfiguration parentProps = s.getMaterializedColumnMetadata().get("metrics");
+    assertNotNull(parentProps);
+    assertFalse(parentProps.containsKey(
+        V1Constants.MetadataKeys.Column.getKeyFor("metrics", V1Constants.MetadataKeys.Column.SPARSE_KEYS)));
+  }
+
+  @Test
+  public void testIgnoredKeyMeteredOnSeal()
+      throws Exception {
+    OpenStructIndexConfig cfg = JsonUtils.stringToObject(
+        "{\"ignoredKeys\": [\"debug\"]}", OpenStructIndexConfig.class);
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(), cfg);
+      s.add(Map.of("debug", "a"), 0);
+      s.add(Map.of("debug", "b", "clicks", 1L), 1);
+      s.seal();
+
+      verify(metrics, times(1)).addMeteredGlobalValue(ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS, 2);
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  @Test
+  public void testNoIgnoredKeyDropsNotMetered()
+      throws Exception {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+          config(0.5, -1, null));
+      s.add(Map.of("clicks", 1L), 0);
+      s.seal();
+
+      verify(metrics, never()).addMeteredGlobalValue(eq(ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS), anyInt());
+    } finally {
+      ServerMetrics.deregister();
+    }
   }
 }

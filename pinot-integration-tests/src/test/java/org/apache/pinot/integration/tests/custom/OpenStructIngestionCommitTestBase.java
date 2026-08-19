@@ -116,9 +116,12 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
     FieldConfig hostCfg = new FieldConfig.Builder("host")
         .withEncodingType(FieldConfig.EncodingType.RAW)
         .build();
-    // First arg is `disabled` — false => enabled.
+    // First arg is `disabled` — false => enabled. "debug" is present in every row (100% fill
+    // rate) but maxDenseKeys=3 is already saturated by the explicit denseKeys, so absent
+    // ignoredKeys handling it would land in the sparse column instead of being dropped —
+    // that's what makes testIgnoredKeyNotQueryable below a meaningful end-to-end check.
     OpenStructIndexConfig osConfig = new OpenStructIndexConfig(false, null, 3,
-        Set.of("views", "cpu", "host"), 0.5, List.of(viewsCfg, cpuCfg, hostCfg), null);
+        Set.of("views", "cpu", "host"), 0.5, List.of(viewsCfg, cpuCfg, hostCfg), null, Set.of("debug"));
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set(OPEN_STRUCT_INDEX_NAME, JsonUtils.objectToJsonNode(osConfig));
     FieldConfig metricsCfg = new FieldConfig.Builder(METRICS).withIndexes(indexes).build();
@@ -156,6 +159,7 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
         metrics.put("host", "host-" + (i % 5));              // STRING, small set (raw forward)
         metrics.put("region", "region-" + (i % 4));          // sparse
         metrics.put("latencyMs", String.valueOf(i % 100));   // sparse
+        metrics.put("debug", "noise-" + i);                  // ignoredKeys: dropped at ingestion
         GenericData.Record record = new GenericData.Record(avroSchema);
         record.put(METRICS, metrics);
         record.put(TIMESTAMP_FIELD_NAME, tsBase + i);
@@ -215,6 +219,17 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
   }
 
   @Test
+  public void testIgnoredKeyNotQueryable()
+      throws Exception {
+    // "debug" is present in every ingested row (see createAvroFiles) but is listed in
+    // ignoredKeys, so it must be dropped at ingestion and never queryable end-to-end.
+    JsonNode response = postQuery(
+        "SELECT COUNT(*) FROM " + getTableName() + " WHERE " + METRICS + "['debug'] = 'noise-0'");
+    assertEquals(response.get("exceptions").size(), 0);
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asLong(), 0);
+  }
+
+  @Test
   public void testManifestShortCircuitNonexistentKey()
       throws Exception {
     JsonNode response = postQuery(
@@ -254,6 +269,10 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
     assertFalse(cols.containsKey(latencyMs), "metrics$latencyMs must NOT be materialized (forced sparse)");
     assertTrue(cols.containsKey(sparse), "sparse JSON column metrics$__sparse__ missing");
     assertEquals(cols.get(sparse).getDataType(), FieldSpec.DataType.STRING);
+
+    // ignoredKeys: "debug" is dropped entirely, so it's neither dense nor sparse.
+    String debug = OpenStructNaming.materializedColumnName(METRICS, "debug");
+    assertFalse(cols.containsKey(debug), "metrics$debug must NOT be materialized (ignoredKeys)");
 
     // index_map per key.
     try (SegmentDirectory dir = new SegmentLocalFSDirectory(segmentDir, ReadMode.mmap);
