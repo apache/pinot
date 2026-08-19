@@ -23,64 +23,57 @@ import javax.annotation.Nullable;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 
 
-/**
- * Resolution of the two MATCH_RECOGNIZE resource limits.
- *
- * <h2>Both limits throw, they never truncate</h2>
- * Pattern recognition has no meaningful partial answer: dropping a match, or cutting a match short, returns rows that
- * look plausible but are wrong, and nothing in the response says so. Unlike the window operator, which offers a
- * {@code BREAK} overflow mode, both limits here can only raise an error.
- *
- * <h2>Resolution order</h2>
- * Highest precedence first, mirroring {@code maxRowsInWindow}:
- * <ol>
- *   <li>the per node hint, read from the {@code matchOptions} hint of the plan node;</li>
- *   <li>the query option, e.g. {@code SET maxRowsInMatch = 50000};</li>
- *   <li>the server cluster config, e.g. {@code pinot.query.match.max.rows}, which {@code QueryRunner} folds into the
- *       op chain metadata under the query option key when the query did not set one;</li>
- *   <li>the default declared here.</li>
- * </ol>
- * The hint tier exists so a planner rule can pin a limit on an individual MATCH_RECOGNIZE node; no SQL syntax
- * attaches such a hint yet, so in practice the query option is the highest tier a user can reach today.
- */
+/// Resolution of the two MATCH_RECOGNIZE resource limits.
+///
+/// ## Both limits throw, they never truncate
+///
+/// Pattern recognition has no meaningful partial answer: dropping a match, or cutting a match short, returns rows that
+/// look plausible but are wrong, and nothing in the response says so. Unlike the window operator, which offers a
+/// `BREAK` overflow mode, both limits here can only raise an error.
+///
+/// ## Resolution order
+///
+/// Highest precedence first, mirroring `maxRowsInWindow`:
+/// 1. the per node hint, read from the `matchOptions` hint of the plan node;
+/// 2. the query option, e.g. `SET maxRowsInMatch = 50000`;
+/// 3. the server cluster config, e.g. `pinot.query.match.max.rows`, which `QueryRunner` folds into the
+///    op chain metadata under the query option key when the query did not set one;
+/// 4. the default declared here.
+///
+/// The hint tier exists so a planner rule can pin a limit on an individual MATCH_RECOGNIZE node; no SQL syntax
+/// attaches such a hint yet, so in practice the query option is the highest tier a user can reach today.
 public final class MatchLimits {
   private MatchLimits() {
   }
 
-  /** Hint namespace on the MATCH_RECOGNIZE plan node. */
+  /// Hint namespace on the MATCH_RECOGNIZE plan node.
   public static final String MATCH_HINT_OPTIONS = "matchOptions";
-  /** Hint key for {@link #MAX_ROWS_IN_MATCH}. */
+  /// Hint key for [#MAX_ROWS_IN_MATCH].
   public static final String MAX_ROWS_IN_MATCH_HINT = "max_rows_in_match";
-  /** Hint key for {@link #MAX_STEPS_PER_MATCH_ATTEMPT}. */
+  /// Hint key for [#MAX_STEPS_PER_MATCH_ATTEMPT].
   public static final String MAX_STEPS_PER_MATCH_ATTEMPT_HINT = "max_steps_per_match_attempt";
 
-  /**
-   * Query option capping the number of rows buffered for a single MATCH_RECOGNIZE partition. A match cannot span
-   * partitions, so this also caps the number of rows in one match.
-   */
+  /// Query option capping the number of rows buffered for a single MATCH_RECOGNIZE partition. A match cannot span
+  /// partitions, so this also caps the number of rows in one match.
   public static final String MAX_ROWS_IN_MATCH = "maxRowsInMatch";
-  /**
-   * Query option capping the number of automaton transitions explored while looking for a match that starts at one
-   * particular row. It bounds the backtracking of an ambiguous pattern such as {@code (A|B)*(A|B)*}.
-   */
+  /// Query option capping the number of automaton transitions explored while looking for a match that starts at one
+  /// particular row. It bounds the backtracking of an ambiguous pattern such as `(A|B)*(A|B)*`.
   public static final String MAX_STEPS_PER_MATCH_ATTEMPT = "maxStepsPerMatchAttempt";
 
-  /** Server config key backing {@link #MAX_ROWS_IN_MATCH}. */
+  /// Server config key backing [#MAX_ROWS_IN_MATCH].
   public static final String KEY_OF_MAX_ROWS_IN_MATCH = "pinot.query.match.max.rows";
-  /** Server config key backing {@link #MAX_STEPS_PER_MATCH_ATTEMPT}. */
+  /// Server config key backing [#MAX_STEPS_PER_MATCH_ATTEMPT].
   public static final String KEY_OF_MAX_STEPS_PER_MATCH_ATTEMPT = "pinot.query.match.max.steps.per.attempt";
 
   public static final int DEFAULT_MAX_ROWS_IN_MATCH = 1_000_000;
-  /**
-   * A linear, non-backtracking match costs a small constant number of automaton transitions per row - measured at 2
-   * for {@code (A A)+}, 3 for {@code A+} and 5 for {@code (A|B)+} - so this budget has to dominate that constant
-   * times {@link #DEFAULT_MAX_ROWS_IN_MATCH}, or a partition that the row limit explicitly admits would be rejected
-   * as if its PATTERN were ambiguous. At the previous value of one million steps, {@code PATTERN (A+)} could not span
-   * a partition of more than 333,332 rows even though {@link #DEFAULT_MAX_ROWS_IN_MATCH} sanctions three times that.
-   * The factor of 16 leaves headroom for realistic linear patterns while still capping a catastrophically
-   * backtracking one well below a query timeout: 16M transitions is a fraction of a second of matcher work, so
-   * cancellation latency is unchanged in practice.
-   */
+  /// A linear, non-backtracking match costs a small constant number of automaton transitions per row - measured at 2
+  /// for `(A A)+`, 3 for `A+` and 5 for `(A|B)+` - so this budget has to dominate that constant
+  /// times [#DEFAULT_MAX_ROWS_IN_MATCH], or a partition that the row limit explicitly admits would be rejected
+  /// as if its PATTERN were ambiguous. At the previous value of one million steps, `PATTERN (A+)` could not span
+  /// a partition of more than 333,332 rows even though [#DEFAULT_MAX_ROWS_IN_MATCH] sanctions three times that.
+  /// The factor of 16 leaves headroom for realistic linear patterns while still capping a catastrophically
+  /// backtracking one well below a query timeout: 16M transitions is a fraction of a second of matcher work, so
+  /// cancellation latency is unchanged in practice.
   public static final long DEFAULT_MAX_STEPS_PER_MATCH_ATTEMPT = 16L * DEFAULT_MAX_ROWS_IN_MATCH;
 
   public static int getMaxRowsInMatch(Map<String, String> opChainMetadata, PlanNode.NodeHint nodeHint) {

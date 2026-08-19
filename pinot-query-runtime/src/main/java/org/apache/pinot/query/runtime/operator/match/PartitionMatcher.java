@@ -27,31 +27,32 @@ import org.apache.pinot.query.runtime.operator.match.PatternNfa.Transition;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
-/**
- * Runs a {@link PatternNfa} over the rows of one partition and reports the SQL:2016 preferred match starting at a
- * given row.
- *
- * <h2>First match found is the preferred match</h2>
- * The search is a depth first exploration that always takes the first not-yet-tried transition of the current state.
- * {@link PatternToNfaCompiler} orders the transitions of every state by SQL:2016 preference, so this enumeration is
- * exactly the preferment order and {@link #match} can return as soon as it reaches the accepting state. No candidate
- * match is ever scored or compared against another.
- *
- * <h2>Backtracking is O(1) per step</h2>
- * The search stack is held in parallel primitive arrays rather than objects, and each frame records the single undo
- * it needs: whether it pushed a row onto the {@link MatchTape}, and which counter register it changed together with
- * that register's previous value. Popping a frame therefore costs a couple of array writes; nothing is copied or
- * rebuilt, and the classifier tape stays append only.
- *
- * <h2>Running semantics come for free</h2>
- * A candidate row is pushed onto the tape <i>before</i> its DEFINE predicate is evaluated, so the predicate sees the
- * candidate as the current row and every navigation resolves against the rows matched so far. That is precisely the
- * SQL:2016 running semantics of DEFINE. If the predicate fails, the row is popped again.
- *
- * <p>Not thread safe: one instance owns one tape and one search stack.
- */
+/// Runs a [PatternNfa] over the rows of one partition and reports the SQL:2016 preferred match starting at a
+/// given row.
+///
+/// ## First match found is the preferred match
+///
+/// The search is a depth first exploration that always takes the first not-yet-tried transition of the current state.
+/// [PatternToNfaCompiler] orders the transitions of every state by SQL:2016 preference, so this enumeration is
+/// exactly the preferment order and [#match] can return as soon as it reaches the accepting state. No candidate
+/// match is ever scored or compared against another.
+///
+/// ## Backtracking is O(1) per step
+///
+/// The search stack is held in parallel primitive arrays rather than objects, and each frame records the single undo
+/// it needs: whether it pushed a row onto the [MatchTape], and which counter register it changed together with
+/// that register's previous value. Popping a frame therefore costs a couple of array writes; nothing is copied or
+/// rebuilt, and the classifier tape stays append only.
+///
+/// ## Running semantics come for free
+///
+/// A candidate row is pushed onto the tape *before* its DEFINE predicate is evaluated, so the predicate sees the
+/// candidate as the current row and every navigation resolves against the rows matched so far. That is precisely the
+/// SQL:2016 running semantics of DEFINE. If the predicate fails, the row is popped again.
+///
+/// Not thread safe: one instance owns one tape and one search stack.
 public class PartitionMatcher {
-  /** Returned by {@link #match} when no match starts at the requested row. */
+  /// Returned by [#match] when no match starts at the requested row.
   public static final int NO_MATCH = -1;
 
   private static final int NO_COUNTER = -1;
@@ -59,7 +60,7 @@ public class PartitionMatcher {
   private static final int INITIAL_STACK_CAPACITY = 64;
 
   private final PatternNfa _nfa;
-  /** DEFINE predicate per symbol ordinal; {@code null} means the variable matches every row, per SQL:2016. */
+  /// DEFINE predicate per symbol ordinal; `null` means the variable matches every row, per SQL:2016.
   private final MatchExpression[] _definitions;
   private final MatchTape _tape;
   private final long _maxStepsPerMatchAttempt;
@@ -90,24 +91,20 @@ public class PartitionMatcher {
     _loopStartPos = new int[nfa.getNumCounters()];
   }
 
-  /**
-   * The classifier tape. After a successful {@link #match} it describes that match and stays valid until the next
-   * call, so MEASURES are evaluated through it with final semantics.
-   */
+  /// The classifier tape. After a successful [#match] it describes that match and stays valid until the next
+  /// call, so MEASURES are evaluated through it with final semantics.
   public MatchTape getTape() {
     return _tape;
   }
 
-  /**
-   * Finds the preferred match that starts exactly at {@code startPos}.
-   *
-   * @param matchNumber the value {@code MATCH_NUMBER()} reports; SQL:2016 assigns it before the match is known to
-   *        succeed, so it is passed in rather than derived
-   * @return the partition index one past the last row of the match, which equals {@code startPos} for an empty match,
-   *         or {@link #NO_MATCH} if no match starts here
-   * @throws org.apache.pinot.spi.exception.QueryException if the attempt exceeds the configured step budget. It
-   *         throws rather than giving up, because giving up would silently drop matches.
-   */
+  /// Finds the preferred match that starts exactly at `startPos`.
+  ///
+  /// @param matchNumber the value `MATCH_NUMBER()` reports; SQL:2016 assigns it before the match is known to
+  ///        succeed, so it is passed in rather than derived
+  /// @return the partition index one past the last row of the match, which equals `startPos` for an empty match,
+  ///         or [#NO_MATCH] if no match starts here
+  /// @throws org.apache.pinot.spi.exception.QueryException if the attempt exceeds the configured step budget. It
+  ///         throws rather than giving up, because giving up would silently drop matches.
   public int match(List<Object[]> partitionRows, int startPos, long matchNumber) {
     _tape.reset(partitionRows, startPos, matchNumber);
     Arrays.fill(_counters, 0);
@@ -152,11 +149,9 @@ public class PartitionMatcher {
     return NO_MATCH;
   }
 
-  /**
-   * Applies {@code transition} to the frame at {@code parent}, pushing the resulting frame if its guard holds.
-   *
-   * @return whether the transition was taken
-   */
+  /// Applies `transition` to the frame at `parent`, pushing the resulting frame if its guard holds.
+  ///
+  /// @return whether the transition was taken
   private boolean tryApply(Transition transition, int parent, int partitionSize) {
     int pos = _framePos[parent];
     int target = transition.getTarget();
@@ -228,10 +223,8 @@ public class PartitionMatcher {
     }
   }
 
-  /**
-   * Pushes a frame together with the undo of the transition that created it: at most one tape row and at most one
-   * counter register change.
-   */
+  /// Pushes a frame together with the undo of the transition that created it: at most one tape row and at most one
+  /// counter register change.
   private void pushFrame(int state, int pos, int undoCounter, int undoCount, int undoLoopStart,
       boolean undoTapePush) {
     if (_stackSize == _frameState.length) {
@@ -270,9 +263,7 @@ public class PartitionMatcher {
     _frameUndoTapePush = Arrays.copyOf(_frameUndoTapePush, capacity);
   }
 
-  /**
-   * The DEFINE predicate compiled for {@code symbolOrdinal}, or {@code null} if the variable matches every row.
-   */
+  /// The DEFINE predicate compiled for `symbolOrdinal`, or `null` if the variable matches every row.
   @Nullable
   MatchExpression getDefinition(int symbolOrdinal) {
     return _definitions[symbolOrdinal];

@@ -34,21 +34,19 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/**
- * Tests {@code maxStepsPerMatchAttempt} against the linear, zero-backtracking cost of a match rather than against the
- * backtracking it is meant to bound.
- *
- * <p>The step counter counts every automaton transition, including the ones that advance the scan position, so
- * {@code PATTERN (A+)} with {@code A} matching every row costs exactly {@code 3n + 4} steps over {@code n} rows: one
- * REPEAT, one MATCH and one EPSILON per iteration. At the old default of one million steps that capped a linear match
- * at 333,332 rows while {@link MatchLimits#DEFAULT_MAX_ROWS_IN_MATCH} explicitly admitted three times that, and the
- * failure text blamed an ambiguity that was not there.
- */
+/// Tests `maxStepsPerMatchAttempt` against the linear, zero-backtracking cost of a match rather than against the
+/// backtracking it is meant to bound.
+///
+/// The step counter counts every automaton transition, including the ones that advance the scan position, so
+/// `PATTERN (A+)` with `A` matching every row costs exactly `3n + 4` steps over `n` rows: one
+/// REPEAT, one MATCH and one EPSILON per iteration. At the old default of one million steps that capped a linear match
+/// at 333,332 rows while [MatchLimits#DEFAULT_MAX_ROWS_IN_MATCH] explicitly admitted three times that, and the
+/// failure text blamed an ambiguity that was not there.
 public class PartitionMatcherStepBudgetTest {
-  /** Comfortably past the 333,332-row cliff of the old default, but still well under a second of matcher work. */
+  /// Comfortably past the 333,332-row cliff of the old default, but still well under a second of matcher work.
   private static final int NUM_ROWS = 400_000;
 
-  /** {@code PATTERN (A+)} where {@code A} has no DEFINE, so it matches every row: no backtracking is possible. */
+  /// `PATTERN (A+)` where `A` has no DEFINE, so it matches every row: no backtracking is possible.
   private static final RowPattern A_PLUS = quantify(symbol(0), 1, RowPattern.Quantify.UNBOUNDED, true);
   private static final List<PatternSymbol> ANY_A = List.of(anySymbol("A"));
 
