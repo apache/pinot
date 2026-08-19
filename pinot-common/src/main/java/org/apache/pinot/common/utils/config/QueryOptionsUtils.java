@@ -495,14 +495,6 @@ public class QueryOptionsUtils {
     return checkedParseIntPositive(QueryOptionKey.MAX_EXECUTION_THREADS, maxExecutionThreadsString);
   }
 
-  /// Max estimated base-group count for which grouping-set base aggregation is used; `null` (unset) lets the
-  /// caller fall back to its default (`numGroupsLimit`). Must be a positive integer when set.
-  @Nullable
-  public static Integer getGroupingSetsBaseAggregationMaxGroups(Map<String, String> queryOptions) {
-    String value = queryOptions.get(QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS);
-    return checkedParseIntPositive(QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS, value);
-  }
-
   @Nullable
   public static Integer getMinSegmentGroupTrimSize(Map<String, String> queryOptions) {
     String minSegmentGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_SIZE);
