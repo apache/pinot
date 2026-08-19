@@ -162,16 +162,17 @@ public class UuidAggregationTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(false);
     for (String function : List.of("DISTINCTCOUNT", "DISTINCTCOUNTHLL", "DISTINCTCOUNTHLLPLUS",
-        "DISTINCTCOUNTBITMAP", "DISTINCTCOUNTTHETASKETCH", "DISTINCTCOUNTCPCSKETCH")) {
+        "DISTINCTCOUNTBITMAP", "DISTINCTCOUNTTHETASKETCH", "DISTINCTCOUNTCPCSKETCH", "DISTINCTCOUNTULL")) {
       JsonNode rows = query(String.format("SELECT %1$s(%2$s), %1$s(%3$s), %1$s(%4$s) FROM %5$s", function,
           UUID_DICT_SV_COLUMN, UUID_RAW_SV_COLUMN, UUID_RAW_MV_COLUMN, getTableName()));
       assertCounts(rows.get(0), 3L, 3L, 4L);
     }
 
-    // DISTINCTCOUNTULL currently supports only single-value inputs.
-    JsonNode rows = query(String.format("SELECT DISTINCTCOUNTULL(%s), DISTINCTCOUNTULL(%s) FROM %s",
-        UUID_DICT_SV_COLUMN, UUID_RAW_SV_COLUMN, getTableName()));
-    assertCounts(rows.get(0), 3L, 3L);
+    // A dictionary-encoded multi-value column collects dictionary ids rather than reading values, which is a
+    // separate path from the raw multi-value column above
+    JsonNode rows =
+        query(String.format("SELECT DISTINCTCOUNTULL(%s) FROM %s", UUID_DICT_MV_COLUMN, getTableName()));
+    assertCounts(rows.get(0), 4L);
 
     rows = query(String.format(
         "SELECT DISTINCTCOUNTTHETASKETCH(%1$s, '', '%1$s = ''%3$s''', '$1'), "
