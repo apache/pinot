@@ -871,6 +871,8 @@ public class CommonConstants {
 
         public static final String IN_PREDICATE_PRE_SORTED = "inPredicatePreSorted";
         public static final String IN_PREDICATE_LOOKUP_ALGORITHM = "inPredicateLookupAlgorithm";
+        /// Query-level override for `inpredicate.threshold`. Negative means always prune.
+        public static final String IN_PREDICATE_PRUNING_THRESHOLD = "inPredicatePruningThreshold";
 
         // When evaluating REGEXP_LIKE predicate on a dictionary encoded column:
         // - If dictionary size is smaller than this threshold, scan the dictionary to get the matching dictionary ids
@@ -1512,6 +1514,8 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.server.crypter";
     public static final String CONFIG_OF_VALUE_PRUNER_IN_PREDICATE_THRESHOLD =
         "pinot.server.query.executor.pruner.columnvaluesegmentpruner.inpredicate.threshold";
+    /// Default IN-pruning threshold. Negative means always prune.
+    /// Can be overridden per query via [Request.QueryOptionKey#IN_PREDICATE_PRUNING_THRESHOLD].
     public static final int DEFAULT_VALUE_PRUNER_IN_PREDICATE_THRESHOLD = 10;
 
     /// Service token for accessing protected controller APIs.

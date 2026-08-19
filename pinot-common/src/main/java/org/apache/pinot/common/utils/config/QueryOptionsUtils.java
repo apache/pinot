@@ -304,6 +304,13 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT));
   }
 
+  /// Query-level IN-pruning threshold override. Negative means always prune.
+  @Nullable
+  public static Integer getInPredicatePruningThreshold(Map<String, String> queryOptions) {
+    return uncheckedParseInt(QueryOptionKey.IN_PREDICATE_PRUNING_THRESHOLD,
+        queryOptions.get(QueryOptionKey.IN_PREDICATE_PRUNING_THRESHOLD));
+  }
+
   /// Returns whether materialized-view rewrite is allowed for this query. Defaults to `true`
   /// (absence ⇒ rewrite allowed) for backward compatibility with the pre-option behavior; the
   /// MV minion executor sets it to `false` so a materialization query is never rewritten back
