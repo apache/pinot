@@ -59,13 +59,11 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/**
- * Unit tests for {@link PinotMatchExchangeNodeInsertRule}, which inserts the exchange below MATCH_RECOGNIZE.
- *
- * <p>The rule is driven directly instead of through a full query so that a {@link Match} without ORDER BY - which the
- * SQL front end rejects - can still be covered. Plan-shape assertions for real queries live in
- * {@code MatchRecognizeExchangePlanTest}.
- */
+/// Unit tests for [PinotMatchExchangeNodeInsertRule], which inserts the exchange below MATCH_RECOGNIZE.
+///
+/// The rule is driven directly instead of through a full query so that a [Match] without ORDER BY - which the
+/// SQL front end rejects - can still be covered. Plan-shape assertions for real queries live in
+/// `MatchRecognizeExchangePlanTest`.
 public class PinotMatchExchangeNodeInsertRuleTest {
   private static final TypeFactory TYPE_FACTORY = new TypeFactory();
   private static final RexBuilder REX_BUILDER = new RexBuilder(TYPE_FACTORY);
@@ -201,10 +199,8 @@ public class PinotMatchExchangeNodeInsertRuleTest {
     assertTrue(PinotMatchExchangeNodeInsertRule.INSTANCE.matches(call));
   }
 
-  /**
-   * Runs the rule on the given match and returns the rewritten {@link Match}. The planner context carries the query
-   * options so the rule can read them the same way it does during real planning.
-   */
+  /// Runs the rule on the given match and returns the rewritten [Match]. The planner context carries the query
+  /// options so the rule can read them the same way it does during real planning.
   private static Match applyRule(Match match, Map<String, String> options) {
     PlannerContext plannerContext =
         PlannerContext.forTesting(options, Mockito.mock(QueryEnvironment.Config.class));
