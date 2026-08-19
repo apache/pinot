@@ -61,11 +61,9 @@ public class RexExpressionToProtoExpression {
     return Expressions.InputRef.newBuilder().setIndex(inputRef.getIndex()).build();
   }
 
-  /**
-   * Converts a MATCH_RECOGNIZE pattern field reference. Rejects an unresolved symbol ordinal rather than writing an
-   * ambiguous reference to the wire: the MATCH_RECOGNIZE planning pass must bind every reference to a pattern symbol
-   * before the plan is serialized.
-   */
+  /// Converts a MATCH_RECOGNIZE pattern field reference. Rejects an unresolved symbol ordinal rather than writing an
+  /// ambiguous reference to the wire: the MATCH_RECOGNIZE planning pass must bind every reference to a pattern symbol
+  /// before the plan is serialized.
   public static Expressions.PatternFieldRef convertPatternFieldRef(RexExpression.PatternFieldRef patternFieldRef) {
     int symbolOrdinal = patternFieldRef.getSymbolOrdinal();
     if (symbolOrdinal == RexExpression.PatternFieldRef.UNRESOLVED_SYMBOL_ORDINAL) {

@@ -27,64 +27,62 @@ import org.apache.pinot.query.runtime.operator.match.PatternNfa.TransitionKind;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
-/**
- * Compiles a MATCH_RECOGNIZE {@code PATTERN} tree into a {@link PatternNfa} whose transitions are ordered by
- * preference.
- *
- * <h2>The invariant this class exists to establish</h2>
- * <b>Every state lists its outgoing transitions in SQL:2016 preference order, so a depth first search that always
- * takes the first not-yet-tried transition of the current state enumerates candidate matches in preferment order, and
- * the <i>first</i> complete match it reaches is the preferred match.</b> {@link PartitionMatcher} relies on exactly
- * that: it never enumerates all matches and picks a best one, it stops at the first one.
- *
- * <p>The three constructs that carry a preference are encoded as follows.
- * <ul>
- *   <li><b>Alternation.</b> {@code A | B | C} emits one epsilon transition per branch, in source order, so the
- *       leftmost branch that can complete the whole pattern wins.</li>
- *   <li><b>Greedy quantifier.</b> The loop head lists the {@code REPEAT} edge before the {@code EXIT_LOOP} edge, so
- *       one more repetition is preferred over leaving the loop.</li>
- *   <li><b>Reluctant quantifier</b> ({@code *?}, {@code +?}, {@code ??}, {@code {n,m}?}). The same two edges in the
- *       opposite order, so leaving the loop is preferred over one more repetition.</li>
- * </ul>
- *
- * <h2>Quantifiers use counter registers, never state unrolling</h2>
- * A quantifier compiles to a single cycle:
- * <pre>
- *   from --START_LOOP(c)--&gt; loopHead
- *   loopHead --REPEAT(c, max)--&gt; bodyStart ... bodyEnd --EPSILON--&gt; loopHead
- *   loopHead --EXIT_LOOP(c, min)--&gt; exit
- * </pre>
- * {@code START_LOOP} resets register {@code c}, {@code REPEAT} is allowed only while {@code c &lt; max} and
- * increments it, and {@code EXIT_LOOP} is allowed only once {@code c &gt;= min}. The state count is therefore
- * independent of {@code min} and {@code max}: {@code A{1,10000}} compiles to the same automaton shape as {@code A+}.
- * Registers are per quantifier <i>instance</i> and are reset by {@code START_LOOP}, so nested and repeated
- * quantifiers such as {@code (A{2}){3}} count independently.
- *
- * <h2>Empty cycle guard</h2>
- * A quantifier whose body can match zero rows, such as {@code (A*)*} or {@code (A?)+}, would otherwise let the
- * matcher take the {@code REPEAT} edge forever without ever consuming a row. {@code REPEAT} therefore also requires
- * that the previous iteration of the same register consumed at least one row, and {@code EXIT_LOOP} is permitted
- * unconditionally right after an empty iteration - an unbounded number of empty iterations trivially satisfies any
- * minimum. Termination is guaranteed without rejecting any legal pattern.
- *
- * <h2>Anchors</h2>
- * {@code ^} and {@code $} become guard transitions that consume no row and are satisfied only at the first row of the
- * partition, and past its last row, respectively. They are relative to the partition, as SQL:2016 requires, not to
- * the input as a whole.
- *
- * <p>This class is stateless; {@link #compile} allocates its own builder state.
- */
+/// Compiles a MATCH_RECOGNIZE `PATTERN` tree into a [PatternNfa] whose transitions are ordered by
+/// preference.
+///
+/// ## The invariant this class exists to establish
+///
+/// **Every state lists its outgoing transitions in SQL:2016 preference order, so a depth first search that always
+/// takes the first not-yet-tried transition of the current state enumerates candidate matches in preferment order, and
+/// the *first* complete match it reaches is the preferred match.** [PartitionMatcher] relies on exactly
+/// that: it never enumerates all matches and picks a best one, it stops at the first one.
+///
+/// The three constructs that carry a preference are encoded as follows.
+/// - **Alternation.** `A | B | C` emits one epsilon transition per branch, in source order, so the
+///   leftmost branch that can complete the whole pattern wins.
+/// - **Greedy quantifier.** The loop head lists the `REPEAT` edge before the `EXIT_LOOP` edge, so
+///   one more repetition is preferred over leaving the loop.
+/// - **Reluctant quantifier** (`*?`, `+?`, `??`, `{n,m}?`). The same two edges in the
+///   opposite order, so leaving the loop is preferred over one more repetition.
+///
+/// ## Quantifiers use counter registers, never state unrolling
+///
+/// A quantifier compiles to a single cycle:
+/// ```
+///   from --START_LOOP(c)--> loopHead
+///   loopHead --REPEAT(c, max)--> bodyStart ... bodyEnd --EPSILON--> loopHead
+///   loopHead --EXIT_LOOP(c, min)--> exit
+/// ```
+/// `START_LOOP` resets register `c`, `REPEAT` is allowed only while `c < max` and
+/// increments it, and `EXIT_LOOP` is allowed only once `c >= min`. The state count is therefore
+/// independent of `min` and `max`: `A{1,10000}` compiles to the same automaton shape as `A+`.
+/// Registers are per quantifier *instance* and are reset by `START_LOOP`, so nested and repeated
+/// quantifiers such as `(A{2}){3}` count independently.
+///
+/// ## Empty cycle guard
+///
+/// A quantifier whose body can match zero rows, such as `(A*)*` or `(A?)+`, would otherwise let the
+/// matcher take the `REPEAT` edge forever without ever consuming a row. `REPEAT` therefore also requires
+/// that the previous iteration of the same register consumed at least one row, and `EXIT_LOOP` is permitted
+/// unconditionally right after an empty iteration - an unbounded number of empty iterations trivially satisfies any
+/// minimum. Termination is guaranteed without rejecting any legal pattern.
+///
+/// ## Anchors
+///
+/// `^` and `$` become guard transitions that consume no row and are satisfied only at the first row of the
+/// partition, and past its last row, respectively. They are relative to the partition, as SQL:2016 requires, not to
+/// the input as a whole.
+///
+/// This class is stateless; [#compile] allocates its own builder state.
 public class PatternToNfaCompiler {
   private PatternToNfaCompiler() {
   }
 
-  /**
-   * Compiles {@code pattern} into an automaton with prioritized transitions.
-   *
-   * @throws org.apache.pinot.spi.exception.QueryException if the pattern contains a construct that is not supported
-   *         yet. Every such construct is rejected here rather than approximated, because an approximated pattern
-   *         returns wrong rows rather than an error.
-   */
+  /// Compiles `pattern` into an automaton with prioritized transitions.
+  ///
+  /// @throws org.apache.pinot.spi.exception.QueryException if the pattern contains a construct that is not supported
+  ///         yet. Every such construct is rejected here rather than approximated, because an approximated pattern
+  ///         returns wrong rows rather than an error.
   public static PatternNfa compile(RowPattern pattern) {
     Builder builder = new Builder();
     int start = builder.newState();
@@ -92,10 +90,8 @@ public class PatternToNfaCompiler {
     return new PatternNfa(builder._states, start, accept, builder._numCounters);
   }
 
-  /**
-   * Mutable automaton under construction. {@link #compileInto} appends the states of one sub-pattern and returns the
-   * state the automaton is in after that sub-pattern matched.
-   */
+  /// Mutable automaton under construction. [#compileInto] appends the states of one sub-pattern and returns the
+  /// state the automaton is in after that sub-pattern matched.
   private static class Builder {
     private final List<State> _states = new ArrayList<>();
     private int _numCounters;
@@ -143,10 +139,8 @@ public class PatternToNfaCompiler {
       return current;
     }
 
-    /**
-     * Emits one epsilon transition per branch, in source order. The transition list order is the preference order, so
-     * the leftmost branch that lets the whole pattern complete wins, as SQL:2016 requires.
-     */
+    /// Emits one epsilon transition per branch, in source order. The transition list order is the preference order, so
+    /// the leftmost branch that lets the whole pattern complete wins, as SQL:2016 requires.
     private int compileAlternate(RowPattern.Alternate alternate, int from) {
       int to = newState();
       for (RowPattern child : alternate.getChildren()) {
@@ -158,11 +152,9 @@ public class PatternToNfaCompiler {
       return to;
     }
 
-    /**
-     * Emits the counter guarded cycle described in the class javadoc. The two loop head transitions are ordered
-     * {@code REPEAT} first for a greedy quantifier and {@code EXIT_LOOP} first for a reluctant one; that ordering is
-     * the only difference between the two.
-     */
+    /// Emits the counter guarded cycle described in the class javadoc. The two loop head transitions are ordered
+    /// `REPEAT` first for a greedy quantifier and `EXIT_LOOP` first for a reluctant one; that ordering is
+    /// the only difference between the two.
     private int compileQuantify(RowPattern.Quantify quantify, int from) {
       int counterId = _numCounters++;
       int loopHead = newState();
