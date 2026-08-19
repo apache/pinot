@@ -20,10 +20,12 @@ package org.apache.pinot.segment.spi.codec;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 
@@ -49,5 +51,39 @@ public class CodecPipelineTest {
     assertThrows(IllegalArgumentException.class, () -> new CodecPipeline(List.of()));
     assertThrows(NullPointerException.class,
         () -> new CodecPipeline(Arrays.asList((CodecInvocation) null)));
+  }
+
+  @Test
+  public void testEqualityFollowsTheCanonicalForm() {
+    // Rewrite detection in later layers compares canonical specs, so a parsed pipeline and the equivalent
+    // programmatically built one must be equal and agree on their hash code.
+    CodecPipeline parsed = CodecSpecParser.parse(" delta , zstd( 3 ) ");
+    CodecPipeline built = new CodecPipeline(
+        List.of(new CodecInvocation("DELTA", List.of()), new CodecInvocation("ZSTD", List.of("3"))));
+    assertEquals(built, parsed);
+    assertEquals(built.hashCode(), parsed.hashCode());
+    assertEquals(built.toDslString(), "DELTA,ZSTD(3)");
+    assertEquals(built.toString(), built.toDslString());
+
+    // Stage order is significant: a pipeline is an ordered list, not a set.
+    assertNotEquals(built, new CodecPipeline(
+        List.of(new CodecInvocation("ZSTD", List.of("3")), new CodecInvocation("DELTA", List.of()))));
+    assertNotEquals(built, CodecSpecParser.parse("DELTA"));
+    assertNotEquals(built, "DELTA,ZSTD(3)");
+  }
+
+  @Test
+  public void testStageLimitMatchesTheParser() {
+    // The parser and the constructor are independent entry points and must agree on the accept boundary.
+    List<CodecInvocation> maxStages =
+        Collections.nCopies(CodecSpecParser.MAX_PIPELINE_STAGES, new CodecInvocation("LZ4", List.of()));
+    assertEquals(new CodecPipeline(maxStages).stages().size(), CodecSpecParser.MAX_PIPELINE_STAGES);
+    assertEquals(
+        CodecSpecParser.parse(String.join(",", Collections.nCopies(CodecSpecParser.MAX_PIPELINE_STAGES, "LZ4")))
+            .stages().size(), CodecSpecParser.MAX_PIPELINE_STAGES);
+
+    List<CodecInvocation> tooManyStages =
+        Collections.nCopies(CodecSpecParser.MAX_PIPELINE_STAGES + 1, new CodecInvocation("LZ4", List.of()));
+    assertThrows(IllegalArgumentException.class, () -> new CodecPipeline(tooManyStages));
   }
 }

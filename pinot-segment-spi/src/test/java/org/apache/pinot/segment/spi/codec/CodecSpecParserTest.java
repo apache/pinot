@@ -93,10 +93,14 @@ public class CodecSpecParserTest {
     // still parses.
     assertEquals(
         CodecSpecParser.parse("LZ4" + " ".repeat(CodecSpecParser.MAX_SPEC_LENGTH - 3)).toDslString(), "LZ4");
+    String maximumName = "A".repeat(CodecSpecParser.MAX_IDENTIFIER_LENGTH);
+    assertEquals(CodecSpecParser.parse(maximumName).stages().get(0).name(), maximumName);
+    assertThrows(IllegalArgumentException.class, () -> CodecSpecParser.parse(maximumName + "A"));
+    String maximumArgument = "1".repeat(CodecSpecParser.MAX_ARGUMENT_LENGTH);
+    assertEquals(CodecSpecParser.parse("ZSTD(" + maximumArgument + ")").stages().get(0).args(),
+        List.of(maximumArgument));
     assertThrows(IllegalArgumentException.class,
-        () -> CodecSpecParser.parse("A".repeat(CodecSpecParser.MAX_IDENTIFIER_LENGTH + 1)));
-    assertThrows(IllegalArgumentException.class,
-        () -> CodecSpecParser.parse("ZSTD(" + "1".repeat(CodecSpecParser.MAX_ARGUMENT_LENGTH + 1) + ")"));
+        () -> CodecSpecParser.parse("ZSTD(" + maximumArgument + "1)"));
     String maximumArguments = String.join(",",
         Collections.nCopies(CodecSpecParser.MAX_ARGS_PER_INVOCATION, "1"));
     assertEquals(CodecSpecParser.parse("TEST(" + maximumArguments + ")").stages().get(0).args().size(),
