@@ -32,12 +32,17 @@ import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
 import org.apache.pinot.query.planner.plannode.MvAggregateNode;
+import org.apache.pinot.query.planner.plannode.PatternSymbol;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.RowPattern;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -153,5 +158,93 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
     MvAggregateNode deserializedMvAggregate = (MvAggregateNode) deserialized;
     assertEquals(deserializedMvAggregate.getMvKeyIndexes(), List.of(0, 2));
     assertEquals(deserializedMvAggregate.getFilterArgs(), List.of(-1, 4));
+  }
+
+  /// Round-trips a MATCH_RECOGNIZE node whose pattern is `^ A (B{2,3} | C+?) D $`: nested alternation, a bounded
+  /// quantifier, a reluctant quantifier and both anchors. Also covers the pattern-variable symbol table, a DEFINE
+  /// predicate carrying a {@link RexExpression.PatternFieldRef}, MEASURES and `AFTER MATCH SKIP TO LAST C`.
+  @Test
+  public void testMatchNodeSerDe() {
+    MatchNode node = buildMatchNode(MatchNode.AfterMatchSkipMode.TO_LAST, 2);
+
+    MatchNode deserialized = (MatchNode) PlanNodeDeserializer.process(PlanNodeSerializer.process(node));
+    assertEquals(deserialized, node);
+    assertEquals(deserialized.getPatternString(), "^ A (B{2,3} | C+?) D $");
+    assertEquals(deserialized.getAfterMatchSkipMode(), MatchNode.AfterMatchSkipMode.TO_LAST);
+    assertEquals(deserialized.getAfterMatchSkipToSymbolOrdinal(), 2);
+    assertEquals(deserialized.getRowsPerMatchMode(), MatchNode.RowsPerMatchMode.ONE_ROW_PER_MATCH);
+    assertEquals(deserialized.getPartitionKeys(), List.of(0));
+    assertEquals(deserialized.getCollations().size(), 1);
+
+    // The pattern variable of a DEFINE reference must survive: degrading it to a plain InputRef would silently turn
+    // `B.price` into a read of the current row.
+    RexExpression definition = deserialized.getPatternSymbols().get(1).getDefinition();
+    RexExpression.PatternFieldRef ref =
+        (RexExpression.PatternFieldRef) ((RexExpression.FunctionCall) definition).getFunctionOperands().get(0);
+    assertEquals(ref.getSymbolOrdinal(), 1);
+    assertEquals(ref.getIndex(), 1);
+    assertEquals(ref.getAlpha(), "B");
+
+    // Variables without a DEFINE entry match every row and must round-trip as "no definition", not as a default.
+    assertNull(deserialized.getPatternSymbols().get(0).getDefinition());
+  }
+
+  /// `AFTER MATCH SKIP PAST LAST ROW` has no target variable. Ordinal 0 is a valid pattern variable, so "no target"
+  /// must not be encoded as the proto3 default of the field.
+  @Test
+  public void testMatchNodeWithoutSkipToSymbolSerDe() {
+    MatchNode node = buildMatchNode(MatchNode.AfterMatchSkipMode.PAST_LAST_ROW, MatchNode.NO_SKIP_TO_SYMBOL);
+
+    MatchNode deserialized = (MatchNode) PlanNodeDeserializer.process(PlanNodeSerializer.process(node));
+    assertEquals(deserialized, node);
+    assertEquals(deserialized.getAfterMatchSkipToSymbolOrdinal(), MatchNode.NO_SKIP_TO_SYMBOL);
+  }
+
+  /// A pattern field reference that was never bound to a pattern symbol must not reach the wire: an ambiguous
+  /// reference would be resolved arbitrarily by the server and produce wrong-but-type-correct results.
+  @Test
+  public void testUnresolvedPatternFieldRefIsRejected() {
+    DataSchema dataSchema = new DataSchema(new String[]{"sym", "startPrice"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.DOUBLE});
+    RexExpression.PatternFieldRef unresolved =
+        new RexExpression.PatternFieldRef(1, RexExpression.PatternFieldRef.UNRESOLVED_SYMBOL_ORDINAL, "A");
+    MatchNode node = new MatchNode(1, dataSchema, PlanNode.NodeHint.EMPTY, new ArrayList<>(),
+        List.of(new PatternSymbol("A", null)), new RowPattern.Symbol(0),
+        List.of(new MatchNode.Measure("startPrice", unresolved)), List.of(0),
+        List.of(new RelFieldCollation(1)), MatchNode.AfterMatchSkipMode.PAST_LAST_ROW, MatchNode.NO_SKIP_TO_SYMBOL,
+        MatchNode.RowsPerMatchMode.ONE_ROW_PER_MATCH);
+
+    assertThrows(IllegalStateException.class, () -> PlanNodeSerializer.process(node));
+  }
+
+  private static MatchNode buildMatchNode(MatchNode.AfterMatchSkipMode skipMode, int skipToSymbolOrdinal) {
+    // PATTERN (^ A (B{2,3} | C+?) D $) over the symbol table [A, B, C, D].
+    List<PatternSymbol> patternSymbols = List.of(
+        new PatternSymbol("A", null),
+        new PatternSymbol("B", new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, "GREATER_THAN",
+            List.of(new RexExpression.PatternFieldRef(1, 1, "B"),
+                new RexExpression.Literal(ColumnDataType.DOUBLE, 100.0d)))),
+        new PatternSymbol("C", new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, "LESS_THAN",
+            List.of(new RexExpression.PatternFieldRef(1, 2, "C"),
+                new RexExpression.Literal(ColumnDataType.DOUBLE, 100.0d)))),
+        new PatternSymbol("D", null));
+    RowPattern pattern = new RowPattern.Concat(List.of(
+        RowPattern.AnchorStart.INSTANCE,
+        new RowPattern.Symbol(0),
+        new RowPattern.Alternate(List.of(
+            new RowPattern.Quantify(new RowPattern.Symbol(1), 2, 3, true),
+            new RowPattern.Quantify(new RowPattern.Symbol(2), 1, RowPattern.Quantify.UNBOUNDED, false))),
+        new RowPattern.Symbol(3),
+        RowPattern.AnchorEnd.INSTANCE));
+    List<MatchNode.Measure> measures = List.of(
+        new MatchNode.Measure("startPrice", new RexExpression.PatternFieldRef(1, 0, "A")),
+        new MatchNode.Measure("matchNum",
+            new RexExpression.FunctionCall(ColumnDataType.LONG, "MATCH_NUMBER", List.of())));
+    DataSchema dataSchema = new DataSchema(new String[]{"sym", "startPrice", "matchNum"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.DOUBLE, ColumnDataType.LONG});
+
+    return new MatchNode(1, dataSchema, PlanNode.NodeHint.EMPTY, new ArrayList<>(), patternSymbols, pattern, measures,
+        List.of(0), List.of(new RelFieldCollation(1)), skipMode, skipToSymbolOrdinal,
+        MatchNode.RowsPerMatchMode.ONE_ROW_PER_MATCH);
   }
 }
