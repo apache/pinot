@@ -100,6 +100,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
   private final Map<String, Long> _coercionFailuresPerKey = new HashMap<>();
   private final Map<String, Long> _inferenceFailuresPerKey = new HashMap<>();
   private int _numDocs;
+  private int _ignoredKeyDropCount;
 
   // Resolved at seal time
   @Nullable
@@ -196,6 +197,10 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     if (map != null && !map.isEmpty()) {
       for (Map.Entry<String, Object> entry : map.entrySet()) {
         String key = entry.getKey();
+        if (_config.isIgnoredKey(key)) {
+          _ignoredKeyDropCount++;
+          continue;
+        }
         Object rawValue = entry.getValue();
         if (rawValue == null) {
           continue;
@@ -286,6 +291,15 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       LOGGER.debug("OPEN_STRUCT '{}': full inference failure counts: {}", _columnName, _inferenceFailuresPerKey);
     }
     emitMetrics(sparseKeys.size(), totalCoercionFailures, totalInferenceFailures);
+
+    if (_ignoredKeyDropCount > 0) {
+      LOGGER.info("OPEN_STRUCT '{}': dropped {} entries for ignored keys", _columnName, _ignoredKeyDropCount);
+      ServerMetrics serverMetrics = ServerMetrics.get();
+      if (serverMetrics != null) {
+        serverMetrics.addMeteredTableValue(_tableNameWithType, _columnName,
+            ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS, _ignoredKeyDropCount);
+      }
+    }
 
     emitParentColumnMetadata(sparseKeys);
   }

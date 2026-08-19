@@ -28,6 +28,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -209,6 +210,46 @@ public class MutableOpenStructIndexTest {
       }
       verify(metrics, times(3)).addMeteredTableValue("testTable_REALTIME", "metrics",
           ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, 1L);
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  @Test
+  public void testIgnoredKeyNeverAllocatesColumn()
+      throws Exception {
+    OpenStructIndexConfig config = JsonUtils.stringToObject(
+        "{\"ignoredKeys\": [\"debug\"]}", OpenStructIndexConfig.class);
+    try (MutableOpenStructIndex idx = new MutableOpenStructIndex(
+        "metrics", "testTable_REALTIME", openStructSpec(), config, _memMgr, 1000)) {
+      idx.index(0, Map.of("debug", "noise", "clicks", 5L));
+
+      assertNull(idx.getKeyColumn("debug"), "Ignored key must never allocate a column");
+      assertTrue(idx.getKeys().contains("clicks"), "Non-ignored key must still be indexed");
+      assertEquals(idx.getKeys().size(), 1);
+      assertEquals(idx.getMapValue(0), Map.of("clicks", 5L));
+    }
+  }
+
+  @Test
+  public void testIgnoredKeyMeteredOnceOnClose()
+      throws IOException {
+    OpenStructIndexConfig config = JsonUtils.stringToObject(
+        "{\"ignoredKeys\": [\"debug\"]}", OpenStructIndexConfig.class);
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      try (MutableOpenStructIndex idx = new MutableOpenStructIndex(
+          "metrics", "testTable_REALTIME", openStructSpec(), config, _memMgr, 1000)) {
+        idx.index(0, Map.of("debug", "a"));
+        idx.index(1, Map.of("debug", "b", "clicks", 1L));
+
+        verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+            eq(ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS), anyLong());
+      }
+
+      verify(metrics, times(1)).addMeteredTableValue("testTable_REALTIME", "metrics",
+          ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS, 2L);
     } finally {
       ServerMetrics.deregister();
     }
