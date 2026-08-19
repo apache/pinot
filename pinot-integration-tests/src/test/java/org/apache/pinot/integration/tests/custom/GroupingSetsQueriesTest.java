@@ -462,29 +462,6 @@ public class GroupingSetsQueriesTest extends CustomDataQueryClusterIntegrationTe
     assertFalse(baseAgg.isEmpty(), "case produced no rows: " + description);
   }
 
-  @Test
-  public void testBaseAggregationCardinalityGateFallsBackToExpansion()
-      throws Exception {
-    // When the estimated base-group count exceeds groupingSetsBaseAggregationMaxGroups, the engine falls back
-    // to the per-row expansion path even though groupingSetsBaseAggregation is on. maxGroups=1 makes any
-    // multi-column base grouping estimate exceed the threshold. This asserts end-to-end result equivalence
-    // between the gated (expansion) and default (base-aggregation) runs; that the estimate actually crosses the
-    // threshold and disables base aggregation is verified directly in EstimateBaseGroupCountTest (unit).
-    setUseMultiStageQueryEngine(false);
-    String query = "SELECT " + D1 + ", " + D2 + ", DISTINCTCOUNT(" + LNG + "), COUNT(*), GROUPING(" + D1 + "), "
-        + "GROUPING(" + D2 + ") FROM " + getTableName() + " GROUP BY CUBE(" + D1 + ", " + D2 + ")";
-
-    Map<String, String> gatedToExpansion = rowsByKey(postQuery(
-        "SET enableNullHandling=true; SET groupingSetsBaseAggregation=true; "
-            + "SET groupingSetsBaseAggregationMaxGroups=1; " + query));
-    Map<String, String> baseAgg = rowsByKey(postQuery(
-        "SET enableNullHandling=true; SET groupingSetsBaseAggregation=true; " + query));
-
-    assertEquals(gatedToExpansion, baseAgg,
-        "cardinality-gated expansion must match the base-aggregation path");
-    assertFalse(baseAgg.isEmpty());
-  }
-
   @DataProvider(name = "baseAggregationEquivalenceCases")
   public Object[][] baseAggregationEquivalenceCases() {
     // description, aggregation projection, GROUP BY clause, enableNullHandling
