@@ -427,6 +427,7 @@ public class CommonConstants {
     // Comma separated list of packages that contains javax service resources.
     public static final String BROKER_RESOURCE_PACKAGES = "broker.restlet.api.resource.packages";
     public static final String DEFAULT_BROKER_RESOURCE_PACKAGES = "org.apache.pinot.broker.api.resources";
+    public static final String SERVER_ROUTING_READY_RESPONSE = "ROUTABLE";
 
     // Configuration to consider the broker ServiceStatus as being STARTED if the percent of resources (tables) that
     // are ONLINE for this broker has crossed the threshold percentage of the total number of tables
@@ -1604,6 +1605,23 @@ public class CommonConstants {
     public static final String CONFIG_OF_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS =
         "pinot.server.startup.serviceStatusCheckIntervalMs";
     public static final long DEFAULT_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS = 10_000L;
+    // Startup: wait for brokers to add the server to routing before reporting the server as ready. Disabled by default
+    // for the initial rollout so mixed-version clusters retain the existing readiness behavior. Enable only after all
+    // brokers are upgraded to a version that exposes the routing-readiness endpoint.
+    public static final String CONFIG_OF_STARTUP_ENABLE_BROKER_ROUTING_CHECK =
+        "pinot.server.startup.enableBrokerRoutingCheck";
+    public static final boolean DEFAULT_STARTUP_ENABLE_BROKER_ROUTING_CHECK = false;
+    public static final String CONFIG_OF_STARTUP_BROKER_ROUTING_CHECK_TIMEOUT_MS =
+        "pinot.server.startup.brokerRoutingCheckTimeoutMs";
+    public static final long DEFAULT_STARTUP_BROKER_ROUTING_CHECK_TIMEOUT_MS = 60_000L;
+    // When true, report ready after the timeout even if one or more brokers have not confirmed routing. When false,
+    // keep reporting unready and continue checking until the brokers recover.
+    public static final String CONFIG_OF_STARTUP_BROKER_ROUTING_CHECK_FAIL_OPEN =
+        "pinot.server.startup.brokerRoutingCheckFailOpen";
+    public static final boolean DEFAULT_STARTUP_BROKER_ROUTING_CHECK_FAIL_OPEN = false;
+    // Authentication used by the server when it queries the broker routing-readiness endpoint.
+    public static final String CONFIG_OF_STARTUP_BROKER_ROUTING_CHECK_AUTH_PREFIX =
+        "pinot.server.startup.brokerRoutingCheck.auth";
     // Shutdown: timeout for the shutdown checks
     public static final String CONFIG_OF_SHUTDOWN_TIMEOUT_MS = "pinot.server.shutdown.timeoutMs";
     public static final long DEFAULT_SHUTDOWN_TIMEOUT_MS = 600_000L;

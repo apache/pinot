@@ -1331,6 +1331,11 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     return routingEntry._instanceSelector.getServingInstances();
   }
 
+  /// Returns whether the broker sees the server as enabled.
+  public boolean isServerEnabled(String instanceId) {
+    return _enabledServerInstanceMap.containsKey(instanceId);
+  }
+
   /// Returns the table-level query timeout in milliseconds for the given table, or `null` if the timeout is not
   /// configured in the table config.
   @Nullable
