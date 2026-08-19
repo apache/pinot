@@ -40,14 +40,12 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/**
- * Tests the shape of the compiled automaton and, through {@link PartitionMatcher}, the matching semantics that the
- * transition ordering is supposed to produce.
- *
- * <p>Matching is asserted as {@code (endPosition, classification)} where the classification spells out which pattern
- * variable each matched row was mapped to, so a preference bug shows up as a different string rather than as a
- * different row count only.
- */
+/// Tests the shape of the compiled automaton and, through [PartitionMatcher], the matching semantics that the
+/// transition ordering is supposed to produce.
+///
+/// Matching is asserted as `(endPosition, classification)` where the classification spells out which pattern
+/// variable each matched row was mapped to, so a preference bug shows up as a different string rather than as a
+/// different row count only.
 public class PatternToNfaCompilerTest {
   private static final long UNLIMITED_STEPS = Long.MAX_VALUE;
 
@@ -228,16 +226,12 @@ public class PatternToNfaCompilerTest {
     assertTrue(exception.getMessage().contains("maxStepsPerMatchAttempt"), exception.getMessage());
   }
 
-  /**
-   * A second pattern variable that also matches the label {@code A}, used to observe where a greedy loop stopped.
-   */
+  /// A second pattern variable that also matches the label `A`, used to observe where a greedy loop stopped.
   private static PatternSymbol aliasOfA() {
     return labelledAs("X", "A", 1);
   }
 
-  /**
-   * A pattern variable named {@code name} whose DEFINE matches rows whose label column equals {@code label}.
-   */
+  /// A pattern variable named `name` whose DEFINE matches rows whose label column equals `label`.
   private static PatternSymbol labelledAs(String name, String label, int ordinal) {
     PatternSymbol delegate = MatchTestFixtures.labelSymbol(label, ordinal);
     return new PatternSymbol(name, delegate.getDefinition());
@@ -257,11 +251,9 @@ public class PatternToNfaCompilerTest {
     assertEquals(loopHead.get(1).getKind(), second);
   }
 
-  /**
-   * Asserts that the preferred match starting at row 0 maps exactly the rows spelled out by
-   * {@code expectedClassification}, whose i-th character is the name of the pattern variable the i-th row of the
-   * match was mapped to.
-   */
+  /// Asserts that the preferred match starting at row 0 maps exactly the rows spelled out by
+  /// `expectedClassification`, whose i-th character is the name of the pattern variable the i-th row of the
+  /// match was mapped to.
   private static void assertMatch(RowPattern pattern, List<PatternSymbol> symbols, String input,
       String expectedClassification) {
     PartitionMatcher matcher = newMatcher(pattern, symbols);

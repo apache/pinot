@@ -51,12 +51,10 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/**
- * End to end tests of {@link MatchOperator}: measures, the four AFTER MATCH SKIP modes, empty matches, partition
- * handling and both resource guardrails.
- */
+/// End to end tests of [MatchOperator]: measures, the four AFTER MATCH SKIP modes, empty matches, partition
+/// handling and both resource guardrails.
 public class MatchOperatorTest {
-  /** Two pattern variables that match every row, so only the pattern shape decides the classification. */
+  /// Two pattern variables that match every row, so only the pattern shape decides the classification.
   private static final List<PatternSymbol> ANY_A_B = List.of(anySymbol("A"), anySymbol("B"));
 
   @Test
@@ -86,11 +84,9 @@ public class MatchOperatorTest {
     assertEquals(output.get(1), new Object[]{0, 2L, "B", 3, 4, 4L, 2L});
   }
 
-  /**
-   * Every single-variable aggregate other than SUM, which is the only one the rest of this class exercises.
-   * COUNT over an explicit argument used to throw {@code Unexpected MATCH_RECOGNIZE aggregate: COUNT} because the
-   * accumulation loop ran for COUNT as well, and {@code accumulate} has no COUNT branch.
-   */
+  /// Every single-variable aggregate other than SUM, which is the only one the rest of this class exercises.
+  /// COUNT over an explicit argument used to throw `Unexpected MATCH_RECOGNIZE aggregate: COUNT` because the
+  /// accumulation loop ran for COUNT as well, and `accumulate` has no COUNT branch.
   @Test
   public void testSingleVariableAggregates() {
     // PATTERN (A B+) over A B B A B, where the value column equals the row index.
@@ -132,9 +128,7 @@ public class MatchOperatorTest {
     assertEquals(lastValues(output), expectedLastValues);
   }
 
-  /**
-   * The second column of every output row, which the skip mode tests use to identify the matches that were reported.
-   */
+  /// The second column of every output row, which the skip mode tests use to identify the matches that were reported.
   private static List<Integer> lastValues(List<Object[]> output) {
     List<Integer> values = new ArrayList<>(output.size());
     for (Object[] row : output) {
@@ -525,10 +519,8 @@ public class MatchOperatorTest {
         MatchNode.RowsPerMatchMode.ONE_ROW_PER_MATCH);
   }
 
-  /**
-   * Drains the operator and returns every output row. The operator emits a block per partition, so a test that spans
-   * partitions must not stop at the first block.
-   */
+  /// Drains the operator and returns every output row. The operator emits a block per partition, so a test that spans
+  /// partitions must not stop at the first block.
   private static List<Object[]> run(MatchNode node, List<Object[]> inputRows) {
     List<Object[]> outputRows = new ArrayList<>();
     MseBlock.Eos terminal = drain(node, inputRows, Map.of(), outputRows);
