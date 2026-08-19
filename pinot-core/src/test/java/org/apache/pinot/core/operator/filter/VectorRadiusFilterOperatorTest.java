@@ -23,10 +23,12 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityRadiusPredicate;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.ApproximateRadiusVectorIndexReader;
+import org.apache.pinot.segment.spi.index.reader.FilterAwareVectorIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -66,7 +68,7 @@ public class VectorRadiusFilterOperatorTest {
     VectorSimilarityRadiusPredicate predicate = new VectorSimilarityRadiusPredicate(lhs, queryVector, 0.5f);
 
     VectorRadiusFilterOperator operator = new VectorRadiusFilterOperator(
-        mockForward, mockVectorReader, predicate, "embedding", 4, null);
+        mockForward, mockVectorReader, predicate, "embedding", 4, VectorSearchSpec.DEFAULT);
 
     ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
     Assert.assertEquals(result.getCardinality(), 2);
@@ -99,7 +101,7 @@ public class VectorRadiusFilterOperatorTest {
     VectorSimilarityRadiusPredicate predicate = new VectorSimilarityRadiusPredicate(lhs, queryVector, 1.0f);
 
     VectorRadiusFilterOperator operator = new VectorRadiusFilterOperator(
-        mockForward, mockVectorReader, predicate, "embedding", 2, null);
+        mockForward, mockVectorReader, predicate, "embedding", 2, VectorSearchSpec.DEFAULT);
 
     ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
     Assert.assertTrue(result.contains(0), "doc at exactly the threshold should be included");
@@ -123,7 +125,7 @@ public class VectorRadiusFilterOperatorTest {
 
     // No vector index reader (null)
     VectorRadiusFilterOperator operator = new VectorRadiusFilterOperator(
-        mockForward, null, predicate, "embedding", 3, null);
+        mockForward, null, predicate, "embedding", 3, VectorSearchSpec.DEFAULT);
 
     ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
     // doc 0: distance = 0.02, doc 2: distance = 0.01 -- both within 0.1
@@ -147,7 +149,7 @@ public class VectorRadiusFilterOperatorTest {
     VectorSimilarityRadiusPredicate predicate = new VectorSimilarityRadiusPredicate(lhs, queryVector, 0.01f);
 
     VectorRadiusFilterOperator operator = new VectorRadiusFilterOperator(
-        mockForward, null, predicate, "embedding", 2, null);
+        mockForward, null, predicate, "embedding", 2, VectorSearchSpec.DEFAULT);
 
     ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
     Assert.assertEquals(result.getCardinality(), 0, "No docs within very small threshold");
@@ -160,7 +162,7 @@ public class VectorRadiusFilterOperatorTest {
     VectorSimilarityRadiusPredicate predicate = new VectorSimilarityRadiusPredicate(lhs, new float[]{1.0f}, 0.5f);
 
     VectorRadiusFilterOperator operator = new VectorRadiusFilterOperator(
-        mockForward, null, predicate, "embedding", 1, null);
+        mockForward, null, predicate, "embedding", 1, VectorSearchSpec.DEFAULT);
     Assert.assertTrue(operator.canProduceBitmaps());
   }
 
@@ -173,7 +175,7 @@ public class VectorRadiusFilterOperatorTest {
         lhs, new float[]{1.0f, 2.0f}, 0.5f);
 
     VectorRadiusFilterOperator operator = new VectorRadiusFilterOperator(
-        mockForward, mockVector, predicate, "embedding", 100, null);
+        mockForward, mockVector, predicate, "embedding", 100, VectorSearchSpec.DEFAULT);
 
     String explain = operator.toExplainString();
     Assert.assertTrue(explain.contains("VECTOR_SIMILARITY_RADIUS"));
@@ -204,7 +206,8 @@ public class VectorRadiusFilterOperatorTest {
 
     VectorIndexConfig config = createVectorIndexConfig("IVF_FLAT", VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
     VectorRadiusFilterOperator operator = new VectorRadiusFilterOperator(
-        mockForward, mockVectorReader, predicate, "embedding", 3, config);
+        mockForward, mockVectorReader, predicate, "embedding", 3,
+        new VectorSearchSpec.Builder().withVectorIndexConfig(config).build());
 
     ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
     Assert.assertEquals(result.getCardinality(), 2);
@@ -225,7 +228,7 @@ public class VectorRadiusFilterOperatorTest {
         lhs, new float[]{1.0f, 2.0f}, 0.5f);
 
     VectorRadiusFilterOperator operator = new VectorRadiusFilterOperator(
-        mockForward, null, predicate, "embedding", 100, null);
+        mockForward, null, predicate, "embedding", 100, VectorSearchSpec.DEFAULT);
 
     String explain = operator.toExplainString();
     Assert.assertTrue(explain.contains("exact_scan"));
@@ -245,7 +248,8 @@ public class VectorRadiusFilterOperatorTest {
     VectorIndexConfig config = createVectorIndexConfig("HNSW", VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN);
 
     VectorRadiusFilterOperator operator = new VectorRadiusFilterOperator(
-        mockForward, null, predicate, "embedding", 3, config);
+        mockForward, null, predicate, "embedding", 3,
+        new VectorSearchSpec.Builder().withVectorIndexConfig(config).build());
     ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
 
     Assert.assertTrue(result.contains(0));
@@ -266,11 +270,111 @@ public class VectorRadiusFilterOperatorTest {
     VectorIndexConfig config = createVectorIndexConfig("HNSW", VectorIndexConfig.VectorDistanceFunction.COSINE);
 
     VectorRadiusFilterOperator operator = new VectorRadiusFilterOperator(
-        mockForward, null, predicate, "embedding", 2, config);
+        mockForward, null, predicate, "embedding", 2,
+        new VectorSearchSpec.Builder().withVectorIndexConfig(config).build());
     ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
 
     Assert.assertTrue(result.contains(0), "cosine threshold should include same-direction vectors");
     Assert.assertFalse(result.contains(1), "cosine threshold should exclude orthogonal vectors");
+  }
+
+  // -----------------------------------------------------------------------
+  // Required doc-ids filter (upsert snapshot) tests
+  // -----------------------------------------------------------------------
+
+  /// Docs 0 and 1 are the "upsert-obsoleted" rows within the radius; docs 2 and 3 are the valid rows,
+  /// with doc 2 within the radius and doc 3 outside it.
+  private static final float[][] UPSERT_RADIUS_VECTORS = {
+      {1.0f, 0.0f},   // doc 0 - obsolete, distance 0
+      {0.9f, 0.1f},   // doc 1 - obsolete, distance 0.02
+      {0.5f, 0.5f},   // doc 2 - valid, distance 0.5
+      {0.0f, 1.0f},   // doc 3 - valid, distance 2.0
+  };
+  private static final float[] UPSERT_RADIUS_QUERY_VECTOR = {1.0f, 0.0f};
+
+  private static VectorSimilarityRadiusPredicate createUpsertRadiusPredicate(float threshold) {
+    return new VectorSimilarityRadiusPredicate(ExpressionContext.forIdentifier("embedding"),
+        UPSERT_RADIUS_QUERY_VECTOR, threshold);
+  }
+
+  @Test
+  public void testRequiredDocIdsWithFilterAwareIndexRestrictsCandidates() {
+    FilterAwareVectorIndexReader mockVectorReader =
+        mock(FilterAwareVectorIndexReader.class);
+    when(mockVectorReader.supportsPreFilter()).thenReturn(true);
+    when(mockVectorReader.getDocIds(Mockito.eq(UPSERT_RADIUS_QUERY_VECTOR), Mockito.anyInt(),
+        Mockito.any(ImmutableRoaringBitmap.class))).thenReturn(MutableRoaringBitmap.bitmapOf(2, 3));
+
+    ForwardIndexReader<?> mockForward = createMockForwardIndexReader(UPSERT_RADIUS_VECTORS);
+    ImmutableRoaringBitmap requiredDocIds = ImmutableRoaringBitmap.bitmapOf(2, 3);
+    VectorRadiusFilterOperator operator = new VectorRadiusFilterOperator(
+        mockForward, mockVectorReader, createUpsertRadiusPredicate(1.0f), "embedding",
+        UPSERT_RADIUS_VECTORS.length, null, requiredDocIds);
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result, ImmutableRoaringBitmap.bitmapOf(2),
+        "Only valid doc 2 is within the radius; obsolete docs must not appear");
+
+    ArgumentCaptor<ImmutableRoaringBitmap> bitmapCaptor =
+        ArgumentCaptor.forClass(ImmutableRoaringBitmap.class);
+    Mockito.verify(mockVectorReader)
+        .getDocIds(Mockito.eq(UPSERT_RADIUS_QUERY_VECTOR), Mockito.anyInt(), bitmapCaptor.capture());
+    Assert.assertEquals(bitmapCaptor.getValue(), requiredDocIds,
+        "The filtered ANN search must receive the required doc ids");
+    Mockito.verify(mockVectorReader, Mockito.never())
+        .getDocIds(Mockito.any(float[].class), Mockito.anyInt());
+
+    String explain = operator.toExplainString();
+    Assert.assertTrue(explain.contains("upsertRequiredDocIdsCardinality:2"),
+        "Explain should report the required doc-ids cardinality, got: " + explain);
+  }
+
+  @Test
+  public void testRequiredDocIdsWithNonFilterAwareIndexScansOnlyAllowedDocs() {
+    VectorIndexReader mockVectorReader = mock(VectorIndexReader.class);
+    ForwardIndexReader<?> mockForward = createMockForwardIndexReader(UPSERT_RADIUS_VECTORS);
+    VectorRadiusFilterOperator operator = new VectorRadiusFilterOperator(
+        mockForward, mockVectorReader, createUpsertRadiusPredicate(1.0f), "embedding",
+        UPSERT_RADIUS_VECTORS.length, null, ImmutableRoaringBitmap.bitmapOf(2, 3));
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result, ImmutableRoaringBitmap.bitmapOf(2));
+    // A reader that cannot honor the required filter must never run unfiltered candidate retrieval
+    Mockito.verifyNoInteractions(mockVectorReader);
+  }
+
+  @Test
+  public void testRequiredDocIdsEmptyReturnsEmptyWithoutAnyScan() {
+    FilterAwareVectorIndexReader mockVectorReader =
+        mock(FilterAwareVectorIndexReader.class);
+    ForwardIndexReader<?> mockForward = createMockForwardIndexReader(UPSERT_RADIUS_VECTORS);
+    VectorRadiusFilterOperator operator = new VectorRadiusFilterOperator(
+        mockForward, mockVectorReader, createUpsertRadiusPredicate(1.0f), "embedding",
+        UPSERT_RADIUS_VECTORS.length, null, ImmutableRoaringBitmap.bitmapOf());
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result.getCardinality(), 0);
+    Mockito.verifyNoInteractions(mockVectorReader);
+  }
+
+  @Test
+  public void testRequiredDocIdsSaturationFallsBackToAllowedDocScan() {
+    // numDocs = 4 makes internalLimit = 4; the filtered ANN returning 4 candidates saturates the pool, so
+    // the operator must fall back to a brute-force scan restricted to the required docs
+    FilterAwareVectorIndexReader mockVectorReader =
+        mock(FilterAwareVectorIndexReader.class);
+    when(mockVectorReader.supportsPreFilter()).thenReturn(true);
+    when(mockVectorReader.getDocIds(Mockito.eq(UPSERT_RADIUS_QUERY_VECTOR), Mockito.anyInt(),
+        Mockito.any(ImmutableRoaringBitmap.class))).thenReturn(MutableRoaringBitmap.bitmapOf(0, 1, 2, 3));
+
+    ForwardIndexReader<?> mockForward = createMockForwardIndexReader(UPSERT_RADIUS_VECTORS);
+    VectorRadiusFilterOperator operator = new VectorRadiusFilterOperator(
+        mockForward, mockVectorReader, createUpsertRadiusPredicate(1.0f), "embedding",
+        UPSERT_RADIUS_VECTORS.length, null, ImmutableRoaringBitmap.bitmapOf(0, 1, 2, 3));
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result, ImmutableRoaringBitmap.bitmapOf(0, 1, 2),
+        "Saturated candidate pool must fall back to a complete scan of the allowed docs within the radius");
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})

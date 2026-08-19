@@ -28,12 +28,22 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 /// to the default POST_FILTER_ANN approach (where ANN runs independently and results
 /// are intersected with the filter afterward).
 ///
+/// **The filter is a hard correctness contract, not a best-effort optimization.** The query engine relies
+/// on filtered search to enforce the upsert doc-ids snapshot: on upsert tables, documents outside the
+/// bitmap are obsolete row versions that must never consume top-K candidate slots. An implementation whose
+/// [#supportsPreFilter()] returns true therefore commits to returning a strict subset of the given bitmap
+/// on every filtered call -- it must never heuristically degrade to unfiltered search (e.g. above some
+/// selectivity cutoff). Implementations that can only honor the filter conditionally must return false
+/// from [#supportsPreFilter()], in which case the engine falls back to an exact scan.
+///
 /// Implementations should ensure that the unfiltered [#getDocIds(float[], int)]
 /// method continues to work unchanged for backward compatibility.
 public interface FilterAwareVectorIndexReader extends VectorIndexReader {
 
   /// Returns the bitmap of top-K closest vectors from the given vector,
   /// restricted to documents present in the preFilterBitmap.
+  ///
+  /// The result MUST be a subset of the preFilterBitmap (see the class-level contract).
   ///
   /// @param vector the query vector
   /// @param topK number of closest vectors to return
@@ -42,11 +52,12 @@ public interface FilterAwareVectorIndexReader extends VectorIndexReader {
   /// @return bitmap of top-K closest vectors from the filtered document set
   ImmutableRoaringBitmap getDocIds(float[] vector, int topK, ImmutableRoaringBitmap preFilterBitmap);
 
-  /// Returns true if this reader supports efficient pre-filter search.
-  /// Some implementations may support the interface but only for certain
-  /// filter selectivities or index configurations.
+  /// Returns true if this reader always honors the filter bitmap of
+  /// [#getDocIds(float[], int, ImmutableRoaringBitmap)] -- a hard commitment, since the engine uses
+  /// filtered search to enforce upsert correctness (see the class-level contract). Return false when the
+  /// filter can only be honored for certain filter selectivities or index configurations.
   ///
-  /// @return true if pre-filter search is supported
+  /// @return true if filtered search is unconditionally supported
   default boolean supportsPreFilter() {
     return true;
   }

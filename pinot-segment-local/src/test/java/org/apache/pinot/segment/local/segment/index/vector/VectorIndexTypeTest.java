@@ -27,6 +27,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorInde
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorIndexCombined;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
@@ -42,6 +43,35 @@ import org.testng.annotations.Test;
 
 
 public class VectorIndexTypeTest {
+
+  @Test
+  public void testValidateRejectsDictionaryEncodedVectorColumn() {
+    VectorIndexConfig vectorIndexConfig = new VectorIndexConfig(false, "HNSW", 2, 1,
+        VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, Map.of());
+    // No explicit dictionary config: the default dictionary config is enabled, matching a column that was
+    // not declared with RAW encoding
+    FieldIndexConfigs fieldIndexConfigs =
+        new FieldIndexConfigs.Builder().add(StandardIndexes.vector(), vectorIndexConfig).build();
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("embedding", FieldSpec.DataType.FLOAT, false);
+
+    IllegalStateException e = Assert.expectThrows(IllegalStateException.class,
+        () -> StandardIndexes.vector().validate(fieldIndexConfigs, fieldSpec, null));
+    Assert.assertTrue(e.getMessage().contains("dictionary-encoded"),
+        "Validation must reject dictionary-encoded vector columns, got: " + e.getMessage());
+  }
+
+  @Test
+  public void testValidateAcceptsRawEncodedVectorColumn() {
+    VectorIndexConfig vectorIndexConfig = new VectorIndexConfig(false, "HNSW", 2, 1,
+        VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN, Map.of());
+    FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder()
+        .add(StandardIndexes.vector(), vectorIndexConfig)
+        .add(StandardIndexes.dictionary(), DictionaryIndexConfig.DISABLED)
+        .build();
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("embedding", FieldSpec.DataType.FLOAT, false);
+
+    StandardIndexes.vector().validate(fieldIndexConfigs, fieldSpec, null);
+  }
 
   @Test
   public void testReaderFactoryReturnsNullWhenConfiguredBackendArtifactIsMissing()

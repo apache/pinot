@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CaseFormat;
 import java.util.Arrays;
 import java.util.List;
@@ -36,6 +37,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.trace.FilterType;
 import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.Tracing;
+import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -46,17 +48,30 @@ import org.slf4j.LoggerFactory;
 ///
 /// This operator is used when no ANN vector index exists on a segment for the target column
 /// (e.g., the segment was built before the vector index was added, or the index type is not
-/// supported). It reads all vectors from the forward index, computes exact distances to the
-/// query vector, and returns the top-K closest document IDs.
+/// supported), or when a required doc-ids filter (the upsert doc-ids snapshot) must be enforced
+/// and the vector index cannot restrict its candidate generation to it. It reads vectors from
+/// the forward index, computes exact distances to the query vector, and returns the top-K
+/// closest document IDs.
+///
+/// When a required doc-ids bitmap is present, only the documents in the bitmap are scanned and
+/// eligible for selection -- top-K is selected from the allowed set directly, never computed on
+/// all physical rows and intersected afterwards.
 ///
 /// The distance computation uses L2 (Euclidean) squared distance. For COSINE similarity,
 /// vectors should be pre-normalized. This matches the behavior of Lucene's HNSW implementation.
 ///
 /// This operator is intentionally simple and correct rather than fast -- it is a safety net.
-/// A warning is logged when this operator is used because it scans all documents in the segment.
+/// It logs when used because it linearly scans the eligible documents (all docs in the segment, or only
+/// the required doc ids when present).
 ///
 /// This class is thread-safe for single-threaded execution per query (same as other filter operators).
 public class ExactVectorScanFilterOperator extends BaseFilterOperator {
+  /// Prefix shared by every fallback reason that stems from enforcing the upsert doc-ids snapshot.
+  /// FilterPlanNode builds those reasons from this constant, and [#logScanStart()] uses it to log the
+  /// expected upsert steady-state scans at DEBUG instead of WARN -- keep the two in sync through this
+  /// constant only.
+  public static final String UPSERT_SNAPSHOT_FALLBACK_REASON_PREFIX = "upsert_snapshot";
+
   private static final Logger LOGGER = LoggerFactory.getLogger(ExactVectorScanFilterOperator.class);
   private static final String EXPLAIN_NAME = "VECTOR_SIMILARITY_EXACT_SCAN";
 
@@ -66,9 +81,12 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
   private final VectorExplainContext _vectorExplainContext;
   private final boolean _hasDistanceThreshold;
   private final float _distanceThreshold;
+  // Mandatory candidate filter (upsert doc-ids snapshot): when non-null, only these doc ids are scanned
+  @Nullable
+  private final ImmutableRoaringBitmap _requiredDocIds;
   private ImmutableRoaringBitmap _matches;
 
-  /// Creates an exact scan operator.
+  /// Creates an exact scan operator with defaults (no index config, no required filter).
   ///
   /// @param forwardIndexReader the forward index reader for the vector column
   /// @param predicate the vector similarity predicate containing query vector and top-K
@@ -76,26 +94,57 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
   /// @param numDocs the total number of documents in the segment
   public ExactVectorScanFilterOperator(ForwardIndexReader<?> forwardIndexReader,
       VectorSimilarityPredicate predicate, String column, int numDocs) {
-    this(forwardIndexReader, predicate, column, numDocs, null, "vector_index_missing",
-        VectorSearchParams.DEFAULT);
+    this(forwardIndexReader, predicate, column, numDocs, "vector_index_missing", VectorSearchSpec.DEFAULT);
   }
 
-  public ExactVectorScanFilterOperator(ForwardIndexReader<?> forwardIndexReader,
+  @VisibleForTesting
+  ExactVectorScanFilterOperator(ForwardIndexReader<?> forwardIndexReader,
       VectorSimilarityPredicate predicate, String column, int numDocs, @Nullable VectorIndexConfig vectorIndexConfig,
       String fallbackReason) {
-    this(forwardIndexReader, predicate, column, numDocs, vectorIndexConfig, fallbackReason,
-        VectorSearchParams.DEFAULT);
+    this(forwardIndexReader, predicate, column, numDocs, fallbackReason,
+        new VectorSearchSpec.Builder().withVectorIndexConfig(vectorIndexConfig).build());
   }
 
-  public ExactVectorScanFilterOperator(ForwardIndexReader<?> forwardIndexReader,
+  @VisibleForTesting
+  ExactVectorScanFilterOperator(ForwardIndexReader<?> forwardIndexReader,
       VectorSimilarityPredicate predicate, String column, int numDocs, @Nullable VectorIndexConfig vectorIndexConfig,
       String fallbackReason, VectorSearchParams searchParams) {
+    this(forwardIndexReader, predicate, column, numDocs, fallbackReason,
+        new VectorSearchSpec.Builder().withVectorIndexConfig(vectorIndexConfig).withSearchParams(searchParams)
+            .build());
+  }
+
+  @VisibleForTesting
+  ExactVectorScanFilterOperator(ForwardIndexReader<?> forwardIndexReader,
+      VectorSimilarityPredicate predicate, String column, int numDocs, @Nullable VectorIndexConfig vectorIndexConfig,
+      String fallbackReason, VectorSearchParams searchParams, @Nullable ImmutableRoaringBitmap requiredDocIds) {
+    this(forwardIndexReader, predicate, column, numDocs, fallbackReason,
+        new VectorSearchSpec.Builder().withVectorIndexConfig(vectorIndexConfig).withSearchParams(searchParams)
+            .withRequiredDocIds(requiredDocIds).build());
+  }
+
+  /// Primary constructor.
+  ///
+  /// @param forwardIndexReader the forward index reader for the vector column (the scan source)
+  /// @param predicate the vector similarity predicate containing query vector and top-K
+  /// @param column the column name (for logging and explain)
+  /// @param numDocs the total number of documents in the segment
+  /// @param fallbackReason why the exact scan was chosen (surfaced in explain output)
+  /// @param spec construction-time context: search params, vector index config and the required doc-ids
+  ///             filter (upsert doc-ids snapshot); when the required filter is non-null, only those doc ids
+  ///             are scanned and eligible for top-K / threshold selection
+  public ExactVectorScanFilterOperator(ForwardIndexReader<?> forwardIndexReader,
+      VectorSimilarityPredicate predicate, String column, int numDocs, String fallbackReason,
+      VectorSearchSpec spec) {
     super(numDocs, false);
+    VectorSearchParams searchParams = spec.getSearchParams();
+    VectorIndexConfig vectorIndexConfig = spec.getVectorIndexConfig();
     _forwardIndexReader = forwardIndexReader;
     _predicate = predicate;
     _column = column;
     _hasDistanceThreshold = searchParams.hasDistanceThreshold();
     _distanceThreshold = searchParams.getDistanceThreshold();
+    _requiredDocIds = spec.getRequiredDocIds();
     float effectiveThreshold = _hasDistanceThreshold ? _distanceThreshold : -1f;
     _vectorExplainContext = new VectorExplainContext(VectorDistanceUtils.resolveBackendType(vectorIndexConfig),
         VectorDistanceUtils.resolveDistanceFunction(vectorIndexConfig), VectorExecutionMode.EXACT_SCAN,
@@ -140,16 +189,21 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
 
   @Override
   public String toExplainString() {
-    return EXPLAIN_NAME + "(indexLookUp:exact_scan"
-        + ", operator:" + _predicate.getType()
-        + ", executionMode:" + VectorExecutionMode.EXACT_SCAN
-        + ", vector identifier:" + _column
-        + ", backend:" + _vectorExplainContext.getBackendType()
-        + ", distanceFunction:" + _vectorExplainContext.getDistanceFunction()
-        + ", vector literal:" + Arrays.toString(_predicate.getValue())
-        + ", topK to search:" + _predicate.getTopK()
-        + ", fallbackReason:" + _vectorExplainContext.getFallbackReason()
-        + ')';
+    StringBuilder sb = new StringBuilder();
+    sb.append(EXPLAIN_NAME).append("(indexLookUp:exact_scan")
+        .append(", operator:").append(_predicate.getType())
+        .append(", executionMode:").append(VectorExecutionMode.EXACT_SCAN)
+        .append(", vector identifier:").append(_column)
+        .append(", backend:").append(_vectorExplainContext.getBackendType())
+        .append(", distanceFunction:").append(_vectorExplainContext.getDistanceFunction())
+        .append(", vector literal:").append(Arrays.toString(_predicate.getValue()))
+        .append(", topK to search:").append(_predicate.getTopK())
+        .append(", fallbackReason:").append(_vectorExplainContext.getFallbackReason());
+    if (_requiredDocIds != null) {
+      sb.append(", upsertRequiredDocIdsCardinality:").append(_requiredDocIds.getCardinality());
+    }
+    sb.append(')');
+    return sb.toString();
   }
 
   @Override
@@ -169,18 +223,19 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
     attributeBuilder.putString("vectorLiteral", Arrays.toString(_predicate.getValue()));
     attributeBuilder.putString("fallbackReason", _vectorExplainContext.getFallbackReason());
     attributeBuilder.putLongIdempotent("topKtoSearch", _predicate.getTopK());
+    if (_requiredDocIds != null) {
+      attributeBuilder.putBool("upsertRequiredDocIdsApplied", true);
+      attributeBuilder.putLong("upsertRequiredDocIdsCardinality", _requiredDocIds.getCardinality());
+    }
   }
 
-  /// Performs brute-force exact search over all documents in the segment.
-  /// When a distance threshold is set, returns all vectors within the threshold.
+  /// Performs brute-force exact search over the scanned documents: all documents in the segment, or only the
+  /// required doc ids when a required filter is present.
+  /// When a distance threshold is set, returns all scanned vectors within the threshold.
   /// Otherwise uses a max-heap to maintain the top-K closest vectors.
   @SuppressWarnings("unchecked")
   private ImmutableRoaringBitmap computeExactTopK() {
-    LOGGER.warn("Performing exact vector scan fallback on column: {} for segment with {} docs. "
-            + "reason={}, distanceFunction={}, hasThreshold={}. "
-            + "This is expensive -- consider adding a vector index.",
-        _column, _numDocs, _vectorExplainContext.getFallbackReason(),
-        _vectorExplainContext.getDistanceFunction(), _hasDistanceThreshold);
+    logScanStart();
 
     float[] queryVector = _predicate.getValue();
 
@@ -196,18 +251,16 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
 
     ForwardIndexReader rawReader = _forwardIndexReader;
     try (ForwardIndexReaderContext context = rawReader.createContext()) {
-      for (int docId = 0; docId < _numDocs; docId++) {
-        float[] docVector = rawReader.getFloatMV(docId, context);
-        if (docVector == null || docVector.length == 0) {
-          continue;
+      if (_requiredDocIds == null) {
+        for (int docId = 0; docId < _numDocs; docId++) {
+          considerDocForTopK(rawReader, context, docId, queryVector, maxHeap, topK);
         }
-        float distance = VectorDistanceUtils.computeDistance(queryVector, docVector,
-            _vectorExplainContext.getDistanceFunction());
-        if (maxHeap.size() < topK) {
-          maxHeap.add(new DocDistance(docId, distance));
-        } else if (distance < maxHeap.peek()._distance) {
-          maxHeap.poll();
-          maxHeap.add(new DocDistance(docId, distance));
+      } else {
+        IntIterator docIdIterator = _requiredDocIds.getIntIterator();
+        int docId;
+        // Bitmaps iterate in ascending order, so the first out-of-range doc id ends the scan
+        while (docIdIterator.hasNext() && (docId = docIdIterator.next()) < _numDocs) {
+          considerDocForTopK(rawReader, context, docId, queryVector, maxHeap, topK);
         }
       }
     } catch (Exception e) {
@@ -225,21 +278,39 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
     return result;
   }
 
-  /// Performs brute-force threshold scan: returns all vectors within the distance threshold.
+  @SuppressWarnings("unchecked")
+  private void considerDocForTopK(ForwardIndexReader rawReader, ForwardIndexReaderContext context, int docId,
+      float[] queryVector, PriorityQueue<DocDistance> maxHeap, int topK) {
+    float[] docVector = rawReader.getFloatMV(docId, context);
+    if (docVector == null || docVector.length == 0) {
+      return;
+    }
+    float distance = VectorDistanceUtils.computeDistance(queryVector, docVector,
+        _vectorExplainContext.getDistanceFunction());
+    if (maxHeap.size() < topK) {
+      maxHeap.add(new DocDistance(docId, distance));
+    } else if (distance < maxHeap.peek()._distance) {
+      maxHeap.poll();
+      maxHeap.add(new DocDistance(docId, distance));
+    }
+  }
+
+  /// Performs brute-force threshold scan: returns all scanned vectors within the distance threshold.
   @SuppressWarnings("unchecked")
   private ImmutableRoaringBitmap computeExactThreshold(float[] queryVector) {
     MutableRoaringBitmap result = new MutableRoaringBitmap();
     ForwardIndexReader rawReader = _forwardIndexReader;
     try (ForwardIndexReaderContext context = rawReader.createContext()) {
-      for (int docId = 0; docId < _numDocs; docId++) {
-        float[] docVector = rawReader.getFloatMV(docId, context);
-        if (docVector == null || docVector.length == 0) {
-          continue;
+      if (_requiredDocIds == null) {
+        for (int docId = 0; docId < _numDocs; docId++) {
+          considerDocForThreshold(rawReader, context, docId, queryVector, result);
         }
-        float distance = VectorDistanceUtils.computeDistance(queryVector, docVector,
-            _vectorExplainContext.getDistanceFunction());
-        if (distance <= _distanceThreshold) {
-          result.add(docId);
+      } else {
+        IntIterator docIdIterator = _requiredDocIds.getIntIterator();
+        int docId;
+        // Bitmaps iterate in ascending order, so the first out-of-range doc id ends the scan
+        while (docIdIterator.hasNext() && (docId = docIdIterator.next()) < _numDocs) {
+          considerDocForThreshold(rawReader, context, docId, queryVector, result);
         }
       }
     } catch (Exception e) {
@@ -250,6 +321,40 @@ public class ExactVectorScanFilterOperator extends BaseFilterOperator {
         _column, result.getCardinality(), _numDocs, _distanceThreshold);
 
     return result.toImmutableRoaringBitmap();
+  }
+
+  @SuppressWarnings("unchecked")
+  private void considerDocForThreshold(ForwardIndexReader rawReader, ForwardIndexReaderContext context, int docId,
+      float[] queryVector, MutableRoaringBitmap result) {
+    float[] docVector = rawReader.getFloatMV(docId, context);
+    if (docVector == null || docVector.length == 0) {
+      return;
+    }
+    float distance = VectorDistanceUtils.computeDistance(queryVector, docVector,
+        _vectorExplainContext.getDistanceFunction());
+    if (distance <= _distanceThreshold) {
+      result.add(docId);
+    }
+  }
+
+  /// The exact scan is the expected path when the upsert doc-ids snapshot must be enforced and the vector
+  /// index cannot honor it (a pluggable/custom reader that is not filter-aware; all built-in readers,
+  /// including the mutable HNSW index, are filter-aware and take the filtered-ANN path instead) -- log
+  /// that at DEBUG. Everything else (genuinely missing or unusable index) keeps the actionable WARN.
+  private void logScanStart() {
+    String fallbackReason = _vectorExplainContext.getFallbackReason();
+    if (fallbackReason != null && fallbackReason.startsWith(UPSERT_SNAPSHOT_FALLBACK_REASON_PREFIX)) {
+      LOGGER.debug("Performing exact vector scan restricted to {} required docs on column: {} ({} docs total), "
+              + "reason={}, distanceFunction={}, hasThreshold={}",
+          _requiredDocIds != null ? _requiredDocIds.getCardinality() : "all", _column, _numDocs, fallbackReason,
+          _vectorExplainContext.getDistanceFunction(), _hasDistanceThreshold);
+    } else {
+      LOGGER.warn("Performing exact vector scan fallback on column: {} for segment with {} docs. "
+              + "reason={}, distanceFunction={}, hasThreshold={}, requiredDocIdsCardinality={}. "
+              + "This is expensive -- consider adding a vector index.",
+          _column, _numDocs, fallbackReason, _vectorExplainContext.getDistanceFunction(), _hasDistanceThreshold,
+          _requiredDocIds != null ? _requiredDocIds.getCardinality() : "all");
+    }
   }
 
   /// Computes the squared L2 (Euclidean) distance between two vectors.
