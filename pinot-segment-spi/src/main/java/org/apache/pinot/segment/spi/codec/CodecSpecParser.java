@@ -36,6 +36,28 @@ import java.util.List;
 /// Examples are `DELTA`, `ZSTD(3)`, and `DELTA,ZSTD(3)`. The removed
 /// `CODEC(...)` wrapper is deliberately not accepted. This parser validates only structure;
 /// codec names, arguments, and type compatibility are validated by the codec runtime.
+///
+/// The grammar is function-call shaped, so reusing Pinot's SQL expression parsing is a natural
+/// question. `CalciteSqlParser` is not reachable from here: it lives in `pinot-common`, which
+/// already depends on this module, so calling into it would close a module cycle. Calcite's own
+/// `SqlParser` is on the classpath — this module uses Calcite for type inference — but is
+/// deliberately not used either:
+///
+///   - The canonical form produced here is frozen into segment headers and compared by string
+///     equality to detect rewrites. Delegating canonicalization would tie on-disk segment
+///     compatibility to Calcite's identifier-casing, quoting, and literal-formatting rules across
+///     Calcite upgrades.
+///   - A SQL parser accepts far more than this grammar allows — arithmetic, nested calls, string
+///     literals, aliases, qualified names. The node-tree rejection logic needed to narrow it back
+///     down would exceed this parser in size, and would fail open as new node types appear in
+///     later Calcite versions, in a config path that otherwise fails closed.
+///   - Parsing runs on every table-config deserialization, from the `ForwardIndexConfig`
+///     constructor, on controller, server, and minion.
+///
+/// The cost of that choice is a narrow argument grammar: unsigned integers only, so neither
+/// negative arguments (such as ZSTD fast-mode levels) nor keyword arguments are expressible.
+/// Widening this grammar later stays a contained change; removing a Calcite dependency from
+/// segment headers would not be.
 public final class CodecSpecParser {
   public static final int MAX_SPEC_LENGTH = 4096;
   public static final int MAX_PIPELINE_STAGES = 32;
