@@ -131,6 +131,20 @@ public class ColocatedJoinEmptyPartitionTest extends CustomDataQueryClusterInteg
       throws Exception {
     setUpTable(LEFT_TABLE_NAME, LEFT_POPULATED_PARTITIONS, LEFT_METRIC_MULTIPLIER);
     setUpTable(RIGHT_TABLE_NAME, RIGHT_POPULATED_PARTITIONS, RIGHT_METRIC_MULTIPLIER);
+    // Setting up the second table must not have removed the first one's tar files, see setUpTable(String, List, int).
+    assertTarFilesRetained(LEFT_TABLE_NAME, LEFT_POPULATED_PARTITIONS.size());
+    assertTarFilesRetained(RIGHT_TABLE_NAME, RIGHT_POPULATED_PARTITIONS.size());
+  }
+
+  /// Asserts that the segment tar files uploaded for the given table are still on disk. A metadata-only push, which
+  /// `ClusterTest#uploadSegments` selects at random, makes the tar file the only deep store copy, so deleting one
+  /// leaves its segment stuck in ERROR -- and only for a table whose segments no server had fetched yet, which is a
+  /// race that fails rarely and far from its cause.
+  private void assertTarFilesRetained(String tableName, int expectedNumSegments) {
+    File[] tarFiles = new File(_tarDir, tableName).listFiles();
+    assertNotNull(tarFiles, "Missing tar directory for table: " + tableName);
+    assertEquals(tarFiles.length, expectedNumSegments,
+        "Unexpected number of segment tar files for table: " + tableName);
   }
 
   @Override
@@ -358,17 +372,22 @@ public class ColocatedJoinEmptyPartitionTest extends CustomDataQueryClusterInteg
     TableConfig tableConfig = createTableConfigForTable(tableName);
     addTableConfig(tableConfig);
 
-    // The segment directories are shared across tables, and uploadSegments pushes everything it finds in the tar one.
-    TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
+    // Give each table its own directories, and never empty a directory another table already uploaded from. A
+    // metadata-only push records a file:// download URI that points at the tar file, and the servers read it after the
+    // upload call has returned, so deleting that file makes the segment unloadable. Separate directories also keep
+    // uploadSegments, which pushes every tar it finds, from picking up the other table's segments.
+    File segmentDir = new File(_segmentDir, tableName);
+    File tarDir = new File(_tarDir, tableName);
+    TestUtils.ensureDirectoriesExistAndEmpty(segmentDir, tarDir);
     int segmentIndex = 0;
     for (int partition : populatedPartitions) {
       // One segment per partition, so that every segment holds exactly one partition id (a segment spanning several has
       // no usable partition metadata) and every partition has a fully replicated server.
       File avroFile = createAvroFile(tableName, partition, metricMultiplier);
-      ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex++, _segmentDir,
-          _tarDir);
+      ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex++, segmentDir,
+          tarDir);
     }
-    uploadSegments(tableName, _tarDir);
+    uploadSegments(tableName, tarDir);
   }
 
   private static Schema createSchemaForTable(String tableName) {
