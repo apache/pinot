@@ -29,6 +29,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -328,6 +329,23 @@ public class EquivalentStagesFinder {
             // compute different values and must not be spooled together.
             && node1.getExclude() == that.getExclude()
             && Objects.equals(node1.getConstants(), that.getConstants());
+      }
+
+      @Override
+      public Boolean visitMatch(MatchNode node1, PlanNode node2) {
+        if (!(node2 instanceof MatchNode)) {
+          return false;
+        }
+        MatchNode that = (MatchNode) node2;
+        return areBaseNodesEquivalent(node1, node2)
+            && Objects.equals(node1.getPatternSymbols(), that.getPatternSymbols())
+            && Objects.equals(node1.getPattern(), that.getPattern())
+            && Objects.equals(node1.getMeasures(), that.getMeasures())
+            && Objects.equals(node1.getPartitionKeys(), that.getPartitionKeys())
+            && Objects.equals(node1.getCollations(), that.getCollations())
+            && node1.getAfterMatchSkipMode() == that.getAfterMatchSkipMode()
+            && node1.getAfterMatchSkipToSymbolOrdinal() == that.getAfterMatchSkipToSymbolOrdinal()
+            && node1.getRowsPerMatchMode() == that.getRowsPerMatchMode();
       }
 
       @Override

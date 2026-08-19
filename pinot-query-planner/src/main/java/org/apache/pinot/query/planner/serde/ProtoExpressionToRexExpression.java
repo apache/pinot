@@ -41,6 +41,8 @@ public class ProtoExpressionToRexExpression {
         return convertLiteral(expression.getLiteral());
       case FUNCTIONCALL:
         return convertFunctionCall(expression.getFunctionCall());
+      case PATTERNFIELDREF:
+        return convertPatternFieldRef(expression.getPatternFieldRef());
       default:
         throw new IllegalStateException("Unsupported proto Expression type: " + expression.getExpressionCase());
     }
@@ -48,6 +50,11 @@ public class ProtoExpressionToRexExpression {
 
   public static RexExpression.InputRef convertInputRef(Expressions.InputRef inputRef) {
     return new RexExpression.InputRef(inputRef.getIndex());
+  }
+
+  public static RexExpression.PatternFieldRef convertPatternFieldRef(Expressions.PatternFieldRef patternFieldRef) {
+    return new RexExpression.PatternFieldRef(patternFieldRef.getIndex(), patternFieldRef.getSymbolOrdinal(),
+        patternFieldRef.getAlpha());
   }
 
   public static RexExpression.FunctionCall convertFunctionCall(Expressions.FunctionCall functionCall) {
