@@ -845,6 +845,11 @@ public class CommonConstants {
         // un-upgraded server cannot honor, so only enable it once all servers support it.
         // NOTE: This is a no-op under usePhysicalOptimizer (the v2 path does not go through RelToPlanNodeConverter).
         public static final String UNNEST_COLUMN_PRUNING = "unnestColumnPruning";
+        /// A MATCH_RECOGNIZE partition is evaluated as a whole on a single worker, so a query without a PARTITION BY
+        /// clause hashes on zero keys and routes the entire table to one worker. The multi-stage planner rejects that
+        /// plan by default; set this to true to accept single-worker execution (fine for small tables, or when the
+        /// WHERE clause already narrows the input down to one logical partition).
+        public static final String ALLOW_MATCH_RECOGNIZE_WITHOUT_PARTITION_BY = "allowMatchRecognizeWithoutPartitionBy";
         /// When set to true, the broker uses the long-lived `SubmitWithStream` bidi RPC to dispatch the query,
         /// receiving stage stats out-of-band as `OpChainComplete` messages instead of via mailbox EOS. The
         /// broker awaits stats completion as soon as the receiving mailbox finishes (early completion), bounded by

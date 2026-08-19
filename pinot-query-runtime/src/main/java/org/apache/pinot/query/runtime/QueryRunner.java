@@ -57,6 +57,7 @@ import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.LeafOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.operator.match.MatchLimits;
 import org.apache.pinot.query.runtime.plan.OpChainConverterDispatcher;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
@@ -127,6 +128,8 @@ public class QueryRunner {
   private Integer _maxRowsInWindow;
   @Nullable
   private WindowOverFlowMode _windowOverflowMode;
+  private Integer _maxRowsInMatch;
+  private Long _maxStepsPerMatchAttempt;
   @Nullable
   private PhysicalTimeSeriesServerPlanVisitor _timeSeriesPhysicalPlanVisitor;
   /// Cluster-level decision on whether to send stats over the mailbox path, driven by the `SendStatsPredicate`
@@ -187,6 +190,12 @@ public class QueryRunner {
 
     String windowOverflowModeStr = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_WINDOW_OVERFLOW_MODE);
     _windowOverflowMode = windowOverflowModeStr != null ? WindowOverFlowMode.valueOf(windowOverflowModeStr) : null;
+
+    String maxRowsInMatchStr = serverConf.getProperty(MatchLimits.KEY_OF_MAX_ROWS_IN_MATCH);
+    _maxRowsInMatch = maxRowsInMatchStr != null ? Integer.parseInt(maxRowsInMatchStr) : null;
+
+    String maxStepsPerMatchAttemptStr = serverConf.getProperty(MatchLimits.KEY_OF_MAX_STEPS_PER_MATCH_ATTEMPT);
+    _maxStepsPerMatchAttempt = maxStepsPerMatchAttemptStr != null ? Long.parseLong(maxStepsPerMatchAttemptStr) : null;
 
     ExecutorService baseExecutorService =
         ExecutorServiceUtils.create(serverConf, Server.MULTISTAGE_EXECUTOR_CONFIG_PREFIX, "query-runner-on-" + port,
@@ -544,6 +553,16 @@ public class QueryRunner {
     }
     if (windowOverflowMode != null) {
       opChainMetadata.put(QueryOptionKey.WINDOW_OVERFLOW_MODE, windowOverflowMode.name());
+    }
+
+    // MATCH_RECOGNIZE limits: the cluster config only applies when the query did not set the option itself, which is
+    // the same query option over cluster config precedence the window and join limits use.
+    if (_maxRowsInMatch != null && !opChainMetadata.containsKey(MatchLimits.MAX_ROWS_IN_MATCH)) {
+      opChainMetadata.put(MatchLimits.MAX_ROWS_IN_MATCH, Integer.toString(_maxRowsInMatch));
+    }
+    if (_maxStepsPerMatchAttempt != null
+        && !opChainMetadata.containsKey(MatchLimits.MAX_STEPS_PER_MATCH_ATTEMPT)) {
+      opChainMetadata.put(MatchLimits.MAX_STEPS_PER_MATCH_ATTEMPT, Long.toString(_maxStepsPerMatchAttempt));
     }
 
     return opChainMetadata;

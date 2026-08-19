@@ -40,8 +40,11 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
+import org.apache.pinot.query.planner.plannode.PatternSymbol;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RowPattern;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -87,6 +90,8 @@ public class PlanNodeDeserializer {
         return deserializeEnrichedJoinNode(protoNode);
       case UNNESTNODE:
         return deserializeUnnestNode(protoNode);
+      case MATCHNODE:
+        return deserializeMatchNode(protoNode);
       default:
         throw new IllegalStateException("Unsupported PlanNode type: " + protoNode.getNodeCase());
     }
@@ -262,6 +267,96 @@ public class PlanNodeDeserializer {
 
     return new UnnestNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), arrayExprs, context);
+  }
+
+  private static MatchNode deserializeMatchNode(Plan.PlanNode protoNode) {
+    Plan.MatchNode protoMatchNode = protoNode.getMatchNode();
+
+    List<Plan.PatternSymbol> protoSymbols = protoMatchNode.getPatternSymbolsList();
+    List<PatternSymbol> patternSymbols = new ArrayList<>(protoSymbols.size());
+    for (Plan.PatternSymbol protoSymbol : protoSymbols) {
+      // An absent definition means the pattern variable has no DEFINE entry, i.e. it matches every row.
+      patternSymbols.add(new PatternSymbol(protoSymbol.getName(),
+          protoSymbol.hasDefinition() ? ProtoExpressionToRexExpression.convertExpression(protoSymbol.getDefinition())
+              : null));
+    }
+
+    List<Plan.MatchMeasure> protoMeasures = protoMatchNode.getMeasuresList();
+    List<MatchNode.Measure> measures = new ArrayList<>(protoMeasures.size());
+    for (Plan.MatchMeasure protoMeasure : protoMeasures) {
+      measures.add(new MatchNode.Measure(protoMeasure.getName(),
+          ProtoExpressionToRexExpression.convertExpression(protoMeasure.getExpression())));
+    }
+
+    int skipToSymbolOrdinal = protoMatchNode.hasAfterMatchSkipToSymbolOrdinal()
+        ? protoMatchNode.getAfterMatchSkipToSymbolOrdinal() : MatchNode.NO_SKIP_TO_SYMBOL;
+
+    return new MatchNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
+        extractInputs(protoNode), patternSymbols, convertRowPattern(protoMatchNode.getPattern()), measures,
+        protoMatchNode.getPartitionKeysList(), convertCollations(protoMatchNode.getCollationsList()),
+        convertAfterMatchSkipMode(protoMatchNode.getAfterMatchSkipMode()), skipToSymbolOrdinal,
+        convertRowsPerMatchMode(protoMatchNode.getRowsPerMatchMode()));
+  }
+
+  private static RowPattern convertRowPattern(Plan.RowPattern protoPattern) {
+    List<Plan.RowPattern> protoChildren = protoPattern.getChildrenList();
+    switch (protoPattern.getKind()) {
+      case PATTERN_SYMBOL:
+        return new RowPattern.Symbol(protoPattern.getSymbolOrdinal());
+      case PATTERN_CONCAT:
+        return new RowPattern.Concat(convertRowPatterns(protoChildren));
+      case PATTERN_ALTERNATE:
+        return new RowPattern.Alternate(convertRowPatterns(protoChildren));
+      case PATTERN_QUANTIFY: {
+        Preconditions.checkState(protoChildren.size() == 1,
+            "PATTERN_QUANTIFY must have exactly 1 child, got: %s", protoChildren.size());
+        Plan.RowPatternQuantifier quantifier = protoPattern.getQuantifier();
+        return new RowPattern.Quantify(convertRowPattern(protoChildren.get(0)), quantifier.getMinRepeat(),
+            quantifier.getMaxRepeat(), quantifier.getGreedy());
+      }
+      case PATTERN_ANCHOR_START:
+        return RowPattern.AnchorStart.INSTANCE;
+      case PATTERN_ANCHOR_END:
+        return RowPattern.AnchorEnd.INSTANCE;
+      default:
+        // PATTERN_EXCLUDE and PATTERN_PERMUTE are pinned in the wire format but not implemented. A newer broker
+        // must not be allowed to degrade into a different pattern on an older server.
+        throw new IllegalStateException("Unsupported MATCH_RECOGNIZE pattern kind: " + protoPattern.getKind());
+    }
+  }
+
+  private static List<RowPattern> convertRowPatterns(List<Plan.RowPattern> protoPatterns) {
+    List<RowPattern> patterns = new ArrayList<>(protoPatterns.size());
+    for (Plan.RowPattern protoPattern : protoPatterns) {
+      patterns.add(convertRowPattern(protoPattern));
+    }
+    return patterns;
+  }
+
+  private static MatchNode.AfterMatchSkipMode convertAfterMatchSkipMode(Plan.AfterMatchSkipMode skipMode) {
+    switch (skipMode) {
+      case SKIP_PAST_LAST_ROW:
+        return MatchNode.AfterMatchSkipMode.PAST_LAST_ROW;
+      case SKIP_TO_NEXT_ROW:
+        return MatchNode.AfterMatchSkipMode.TO_NEXT_ROW;
+      case SKIP_TO_FIRST:
+        return MatchNode.AfterMatchSkipMode.TO_FIRST;
+      case SKIP_TO_LAST:
+        return MatchNode.AfterMatchSkipMode.TO_LAST;
+      default:
+        throw new IllegalStateException("Unsupported AfterMatchSkipMode: " + skipMode);
+    }
+  }
+
+  private static MatchNode.RowsPerMatchMode convertRowsPerMatchMode(Plan.RowsPerMatchMode rowsPerMatchMode) {
+    switch (rowsPerMatchMode) {
+      case ONE_ROW_PER_MATCH:
+        return MatchNode.RowsPerMatchMode.ONE_ROW_PER_MATCH;
+      case ALL_ROWS_PER_MATCH:
+        return MatchNode.RowsPerMatchMode.ALL_ROWS_PER_MATCH;
+      default:
+        throw new IllegalStateException("Unsupported RowsPerMatchMode: " + rowsPerMatchMode);
+    }
   }
 
   private static DataSchema extractDataSchema(Plan.DataSchema protoDataSchema) {
