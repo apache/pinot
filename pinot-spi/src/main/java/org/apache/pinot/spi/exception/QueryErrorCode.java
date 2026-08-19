@@ -66,6 +66,10 @@ public enum QueryErrorCode {
   UNKNOWN_COLUMN(710, "UnknownColumnError", Response.Status.BAD_REQUEST),
   /// Error while planning the query. For example, trying to run a colocated join on non-colocated tables.
   QUERY_PLANNING(720, "QueryPlanningError", Response.Status.BAD_REQUEST),
+  /// Error deserializing a DataTable response from a server. The server sent back bytes that the broker could not
+  /// deserialize, so the query will complete with partial results from the other servers instead of waiting for the
+  /// full timeout.
+  DATA_TABLE_DESERIALIZATION_ERROR(426, "DataTableDeserializationError", Response.Status.INTERNAL_SERVER_ERROR),
   UNKNOWN(1000, "UnknownError", Response.Status.INTERNAL_SERVER_ERROR);
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryErrorCode.class);
 
