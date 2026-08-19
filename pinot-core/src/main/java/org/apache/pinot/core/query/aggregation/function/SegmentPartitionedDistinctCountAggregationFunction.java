@@ -47,10 +47,12 @@ import org.roaringbitmap.RoaringBitmap;
 ///
 /// This function calculates the exact number of distinct values within the segment, then simply sums up the results
 /// from different segments to get the final result.
-public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSingleInputAggregationFunction<Long, Long> {
+public class SegmentPartitionedDistinctCountAggregationFunction extends NullableSingleInputAggregationFunction<Long,
+    Long> {
 
-  public SegmentPartitionedDistinctCountAggregationFunction(List<ExpressionContext> arguments) {
-    super(verifySingleArgument(arguments, "SEGMENT_PARTITIONED_DISTINCT_COUNT"));
+  public SegmentPartitionedDistinctCountAggregationFunction(List<ExpressionContext> arguments,
+      boolean nullHandlingEnabled) {
+    super(verifySingleArgument(arguments, "SEGMENT_PARTITIONED_DISTINCT_COUNT"), nullHandlingEnabled);
   }
 
   @Override
@@ -83,12 +85,14 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     // For dictionary-encoded expression, store dictionary ids into a RoaringBitmap
     if (blockValSet.isDictionaryEncoded()) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
-      RoaringBitmap bitmap = aggregationResultHolder.getResult();
-      if (bitmap == null) {
-        bitmap = new RoaringBitmap();
-        aggregationResultHolder.setValue(bitmap);
-      }
-      bitmap.addN(dictIds, 0, length);
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        RoaringBitmap bitmap = aggregationResultHolder.getResult();
+        if (bitmap == null) {
+          bitmap = new RoaringBitmap();
+          aggregationResultHolder.setValue(bitmap);
+        }
+        bitmap.addN(dictIds, from, to - from);
+      });
       return;
     }
 
@@ -97,68 +101,79 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
-        RoaringBitmap bitmap = aggregationResultHolder.getResult();
-        if (bitmap == null) {
-          bitmap = new RoaringBitmap();
-          aggregationResultHolder.setValue(bitmap);
-        }
-        bitmap.addN(intValues, 0, length);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          RoaringBitmap bitmap = aggregationResultHolder.getResult();
+          if (bitmap == null) {
+            bitmap = new RoaringBitmap();
+            aggregationResultHolder.setValue(bitmap);
+          }
+          bitmap.addN(intValues, from, to - from);
+        });
         break;
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
-        LongOpenHashSet longSet = aggregationResultHolder.getResult();
-        if (longSet == null) {
-          longSet = new LongOpenHashSet();
-          aggregationResultHolder.setValue(longSet);
-        }
-        for (int i = 0; i < length; i++) {
-          longSet.add(longValues[i]);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          LongOpenHashSet longSet = aggregationResultHolder.getResult();
+          if (longSet == null) {
+            longSet = new LongOpenHashSet();
+            aggregationResultHolder.setValue(longSet);
+          }
+          for (int i = from; i < to; i++) {
+            longSet.add(longValues[i]);
+          }
+        });
         break;
       case FLOAT:
         float[] floatValues = blockValSet.getFloatValuesSV();
-        FloatOpenHashSet floatSet = aggregationResultHolder.getResult();
-        if (floatSet == null) {
-          floatSet = new FloatOpenHashSet();
-          aggregationResultHolder.setValue(floatSet);
-        }
-        for (int i = 0; i < length; i++) {
-          floatSet.add(floatValues[i]);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          FloatOpenHashSet floatSet = aggregationResultHolder.getResult();
+          if (floatSet == null) {
+            floatSet = new FloatOpenHashSet();
+            aggregationResultHolder.setValue(floatSet);
+          }
+          for (int i = from; i < to; i++) {
+            floatSet.add(floatValues[i]);
+          }
+        });
         break;
       case DOUBLE:
         double[] doubleValues = blockValSet.getDoubleValuesSV();
-        DoubleOpenHashSet doubleSet = aggregationResultHolder.getResult();
-        if (doubleSet == null) {
-          doubleSet = new DoubleOpenHashSet();
-          aggregationResultHolder.setValue(doubleSet);
-        }
-        for (int i = 0; i < length; i++) {
-          doubleSet.add(doubleValues[i]);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          DoubleOpenHashSet doubleSet = aggregationResultHolder.getResult();
+          if (doubleSet == null) {
+            doubleSet = new DoubleOpenHashSet();
+            aggregationResultHolder.setValue(doubleSet);
+          }
+          for (int i = from; i < to; i++) {
+            doubleSet.add(doubleValues[i]);
+          }
+        });
         break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
-        ObjectOpenHashSet<String> stringSet = aggregationResultHolder.getResult();
-        if (stringSet == null) {
-          stringSet = new ObjectOpenHashSet<>();
-          aggregationResultHolder.setValue(stringSet);
-        }
-        //noinspection ManualArrayToCollectionCopy
-        for (int i = 0; i < length; i++) {
-          stringSet.add(stringValues[i]);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          ObjectOpenHashSet<String> stringSet = aggregationResultHolder.getResult();
+          if (stringSet == null) {
+            stringSet = new ObjectOpenHashSet<>();
+            aggregationResultHolder.setValue(stringSet);
+          }
+          for (int i = from; i < to; i++) {
+            stringSet.add(stringValues[i]);
+          }
+        });
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        ObjectOpenHashSet<ByteArray> bytesSet = aggregationResultHolder.getResult();
-        if (bytesSet == null) {
-          bytesSet = new ObjectOpenHashSet<>();
-          aggregationResultHolder.setValue(bytesSet);
-        }
-        for (int i = 0; i < length; i++) {
-          bytesSet.add(new ByteArray(bytesValues[i]));
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          ObjectOpenHashSet<ByteArray> bytesSet = aggregationResultHolder.getResult();
+          if (bytesSet == null) {
+            bytesSet = new ObjectOpenHashSet<>();
+            aggregationResultHolder.setValue(bytesSet);
+          }
+          for (int i = from; i < to; i++) {
+            bytesSet.add(new ByteArray(bytesValues[i]));
+          }
+        });
         break;
       default:
         throw new IllegalStateException(
@@ -170,14 +185,16 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     // For dictionary-encoded expression, store dictionary ids into a RoaringBitmap
     if (blockValSet.isDictionaryEncoded()) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
-      RoaringBitmap bitmap = aggregationResultHolder.getResult();
-      if (bitmap == null) {
-        bitmap = new RoaringBitmap();
-        aggregationResultHolder.setValue(bitmap);
-      }
-      for (int i = 0; i < length; i++) {
-        bitmap.add(dictIds[i]);
-      }
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        RoaringBitmap bitmap = aggregationResultHolder.getResult();
+        if (bitmap == null) {
+          bitmap = new RoaringBitmap();
+          aggregationResultHolder.setValue(bitmap);
+        }
+        for (int i = from; i < to; i++) {
+          bitmap.add(dictIds[i]);
+        }
+      });
       return;
     }
 
@@ -186,79 +203,91 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     switch (storedType) {
       case INT:
         int[][] intValues = blockValSet.getIntValuesMV();
-        RoaringBitmap bitmap = aggregationResultHolder.getResult();
-        if (bitmap == null) {
-          bitmap = new RoaringBitmap();
-          aggregationResultHolder.setValue(bitmap);
-        }
-        for (int i = 0; i < length; i++) {
-          bitmap.add(intValues[i]);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          RoaringBitmap bitmap = aggregationResultHolder.getResult();
+          if (bitmap == null) {
+            bitmap = new RoaringBitmap();
+            aggregationResultHolder.setValue(bitmap);
+          }
+          for (int i = from; i < to; i++) {
+            bitmap.add(intValues[i]);
+          }
+        });
         break;
       case LONG:
         long[][] longValues = blockValSet.getLongValuesMV();
-        LongOpenHashSet longSet = aggregationResultHolder.getResult();
-        if (longSet == null) {
-          longSet = new LongOpenHashSet();
-          aggregationResultHolder.setValue(longSet);
-        }
-        for (int i = 0; i < length; i++) {
-          for (long value : longValues[i]) {
-            longSet.add(value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          LongOpenHashSet longSet = aggregationResultHolder.getResult();
+          if (longSet == null) {
+            longSet = new LongOpenHashSet();
+            aggregationResultHolder.setValue(longSet);
           }
-        }
+          for (int i = from; i < to; i++) {
+            for (long value : longValues[i]) {
+              longSet.add(value);
+            }
+          }
+        });
         break;
       case FLOAT:
         float[][] floatValues = blockValSet.getFloatValuesMV();
-        FloatOpenHashSet floatSet = aggregationResultHolder.getResult();
-        if (floatSet == null) {
-          floatSet = new FloatOpenHashSet();
-          aggregationResultHolder.setValue(floatSet);
-        }
-        for (int i = 0; i < length; i++) {
-          for (float value : floatValues[i]) {
-            floatSet.add(value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          FloatOpenHashSet floatSet = aggregationResultHolder.getResult();
+          if (floatSet == null) {
+            floatSet = new FloatOpenHashSet();
+            aggregationResultHolder.setValue(floatSet);
           }
-        }
+          for (int i = from; i < to; i++) {
+            for (float value : floatValues[i]) {
+              floatSet.add(value);
+            }
+          }
+        });
         break;
       case DOUBLE:
         double[][] doubleValues = blockValSet.getDoubleValuesMV();
-        DoubleOpenHashSet doubleSet = aggregationResultHolder.getResult();
-        if (doubleSet == null) {
-          doubleSet = new DoubleOpenHashSet();
-          aggregationResultHolder.setValue(doubleSet);
-        }
-        for (int i = 0; i < length; i++) {
-          for (double value : doubleValues[i]) {
-            doubleSet.add(value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          DoubleOpenHashSet doubleSet = aggregationResultHolder.getResult();
+          if (doubleSet == null) {
+            doubleSet = new DoubleOpenHashSet();
+            aggregationResultHolder.setValue(doubleSet);
           }
-        }
+          for (int i = from; i < to; i++) {
+            for (double value : doubleValues[i]) {
+              doubleSet.add(value);
+            }
+          }
+        });
         break;
       case STRING:
         String[][] stringValues = blockValSet.getStringValuesMV();
-        ObjectOpenHashSet<String> stringSet = aggregationResultHolder.getResult();
-        if (stringSet == null) {
-          stringSet = new ObjectOpenHashSet<>();
-          aggregationResultHolder.setValue(stringSet);
-        }
-        for (int i = 0; i < length; i++) {
-          for (String value : stringValues[i]) {
-            stringSet.add(value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          ObjectOpenHashSet<String> stringSet = aggregationResultHolder.getResult();
+          if (stringSet == null) {
+            stringSet = new ObjectOpenHashSet<>();
+            aggregationResultHolder.setValue(stringSet);
           }
-        }
+          for (int i = from; i < to; i++) {
+            for (String value : stringValues[i]) {
+              stringSet.add(value);
+            }
+          }
+        });
         break;
       case BYTES:
         byte[][][] bytesValues = blockValSet.getBytesValuesMV();
-        ObjectOpenHashSet<ByteArray> bytesSet = aggregationResultHolder.getResult();
-        if (bytesSet == null) {
-          bytesSet = new ObjectOpenHashSet<>();
-          aggregationResultHolder.setValue(bytesSet);
-        }
-        for (int i = 0; i < length; i++) {
-          for (byte[] value : bytesValues[i]) {
-            bytesSet.add(new ByteArray(value));
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          ObjectOpenHashSet<ByteArray> bytesSet = aggregationResultHolder.getResult();
+          if (bytesSet == null) {
+            bytesSet = new ObjectOpenHashSet<>();
+            aggregationResultHolder.setValue(bytesSet);
           }
-        }
+          for (int i = from; i < to; i++) {
+            for (byte[] value : bytesValues[i]) {
+              bytesSet.add(new ByteArray(value));
+            }
+          }
+        });
         break;
       default:
         throw new IllegalStateException(
@@ -282,9 +311,11 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     // For dictionary-encoded expression, store dictionary ids into a RoaringBitmap
     if (blockValSet.isDictionaryEncoded()) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
-      for (int i = 0; i < length; i++) {
-        setIntValueForGroup(groupByResultHolder, groupKeyArray[i], dictIds[i]);
-      }
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          setIntValueForGroup(groupByResultHolder, groupKeyArray[i], dictIds[i]);
+        }
+      });
       return;
     }
 
@@ -293,39 +324,51 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
-        for (int i = 0; i < length; i++) {
-          setIntValueForGroup(groupByResultHolder, groupKeyArray[i], intValues[i]);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            setIntValueForGroup(groupByResultHolder, groupKeyArray[i], intValues[i]);
+          }
+        });
         break;
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
-        for (int i = 0; i < length; i++) {
-          setLongValueForGroup(groupByResultHolder, groupKeyArray[i], longValues[i]);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            setLongValueForGroup(groupByResultHolder, groupKeyArray[i], longValues[i]);
+          }
+        });
         break;
       case FLOAT:
         float[] floatValues = blockValSet.getFloatValuesSV();
-        for (int i = 0; i < length; i++) {
-          setFloatValueForGroup(groupByResultHolder, groupKeyArray[i], floatValues[i]);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            setFloatValueForGroup(groupByResultHolder, groupKeyArray[i], floatValues[i]);
+          }
+        });
         break;
       case DOUBLE:
         double[] doubleValues = blockValSet.getDoubleValuesSV();
-        for (int i = 0; i < length; i++) {
-          setDoubleValueForGroup(groupByResultHolder, groupKeyArray[i], doubleValues[i]);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            setDoubleValueForGroup(groupByResultHolder, groupKeyArray[i], doubleValues[i]);
+          }
+        });
         break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
-        for (int i = 0; i < length; i++) {
-          setStringValueForGroup(groupByResultHolder, groupKeyArray[i], stringValues[i]);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            setStringValueForGroup(groupByResultHolder, groupKeyArray[i], stringValues[i]);
+          }
+        });
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        for (int i = 0; i < length; i++) {
-          setBytesValueForGroup(groupByResultHolder, groupKeyArray[i], new ByteArray(bytesValues[i]));
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            setBytesValueForGroup(groupByResultHolder, groupKeyArray[i], new ByteArray(bytesValues[i]));
+          }
+        });
         break;
       default:
         throw new IllegalStateException(
@@ -338,11 +381,13 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     // For dictionary-encoded expression, store dictionary ids into a RoaringBitmap
     if (blockValSet.isDictionaryEncoded()) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
-      for (int i = 0; i < length; i++) {
-        for (int dictId : dictIds[i]) {
-          setIntValueForGroup(groupByResultHolder, groupKeyArray[i], dictId);
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          for (int dictId : dictIds[i]) {
+            setIntValueForGroup(groupByResultHolder, groupKeyArray[i], dictId);
+          }
         }
-      }
+      });
       return;
     }
 
@@ -351,51 +396,63 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     switch (storedType) {
       case INT:
         int[][] intValues = blockValSet.getIntValuesMV();
-        for (int i = 0; i < length; i++) {
-          for (int value : intValues[i]) {
-            setIntValueForGroup(groupByResultHolder, groupKeyArray[i], value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (int value : intValues[i]) {
+              setIntValueForGroup(groupByResultHolder, groupKeyArray[i], value);
+            }
           }
-        }
+        });
         break;
       case LONG:
         long[][] longValues = blockValSet.getLongValuesMV();
-        for (int i = 0; i < length; i++) {
-          for (long value : longValues[i]) {
-            setLongValueForGroup(groupByResultHolder, groupKeyArray[i], value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (long value : longValues[i]) {
+              setLongValueForGroup(groupByResultHolder, groupKeyArray[i], value);
+            }
           }
-        }
+        });
         break;
       case FLOAT:
         float[][] floatValues = blockValSet.getFloatValuesMV();
-        for (int i = 0; i < length; i++) {
-          for (float value : floatValues[i]) {
-            setFloatValueForGroup(groupByResultHolder, groupKeyArray[i], value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (float value : floatValues[i]) {
+              setFloatValueForGroup(groupByResultHolder, groupKeyArray[i], value);
+            }
           }
-        }
+        });
         break;
       case DOUBLE:
         double[][] doubleValues = blockValSet.getDoubleValuesMV();
-        for (int i = 0; i < length; i++) {
-          for (double value : doubleValues[i]) {
-            setDoubleValueForGroup(groupByResultHolder, groupKeyArray[i], value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (double value : doubleValues[i]) {
+              setDoubleValueForGroup(groupByResultHolder, groupKeyArray[i], value);
+            }
           }
-        }
+        });
         break;
       case STRING:
         String[][] stringValues = blockValSet.getStringValuesMV();
-        for (int i = 0; i < length; i++) {
-          for (String value : stringValues[i]) {
-            setStringValueForGroup(groupByResultHolder, groupKeyArray[i], value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (String value : stringValues[i]) {
+              setStringValueForGroup(groupByResultHolder, groupKeyArray[i], value);
+            }
           }
-        }
+        });
         break;
       case BYTES:
         byte[][][] bytesValues = blockValSet.getBytesValuesMV();
-        for (int i = 0; i < length; i++) {
-          for (byte[] value : bytesValues[i]) {
-            setBytesValueForGroup(groupByResultHolder, groupKeyArray[i], new ByteArray(value));
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (byte[] value : bytesValues[i]) {
+              setBytesValueForGroup(groupByResultHolder, groupKeyArray[i], new ByteArray(value));
+            }
           }
-        }
+        });
         break;
       default:
         throw new IllegalStateException(
@@ -419,12 +476,14 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     // For dictionary-encoded expression, store dictionary ids into a RoaringBitmap
     if (blockValSet.isDictionaryEncoded()) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
-      for (int i = 0; i < length; i++) {
-        int dictId = dictIds[i];
-        for (int groupKey : groupKeysArray[i]) {
-          setIntValueForGroup(groupByResultHolder, groupKey, dictId);
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int dictId = dictIds[i];
+          for (int groupKey : groupKeysArray[i]) {
+            setIntValueForGroup(groupByResultHolder, groupKey, dictId);
+          }
         }
-      }
+      });
       return;
     }
 
@@ -433,57 +492,69 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
-        for (int i = 0; i < length; i++) {
-          int value = intValues[i];
-          for (int groupKey : groupKeysArray[i]) {
-            setIntValueForGroup(groupByResultHolder, groupKey, value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            int value = intValues[i];
+            for (int groupKey : groupKeysArray[i]) {
+              setIntValueForGroup(groupByResultHolder, groupKey, value);
+            }
           }
-        }
+        });
         break;
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
-        for (int i = 0; i < length; i++) {
-          long value = longValues[i];
-          for (int groupKey : groupKeysArray[i]) {
-            setLongValueForGroup(groupByResultHolder, groupKey, value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            long value = longValues[i];
+            for (int groupKey : groupKeysArray[i]) {
+              setLongValueForGroup(groupByResultHolder, groupKey, value);
+            }
           }
-        }
+        });
         break;
       case FLOAT:
         float[] floatValues = blockValSet.getFloatValuesSV();
-        for (int i = 0; i < length; i++) {
-          float value = floatValues[i];
-          for (int groupKey : groupKeysArray[i]) {
-            setFloatValueForGroup(groupByResultHolder, groupKey, value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            float value = floatValues[i];
+            for (int groupKey : groupKeysArray[i]) {
+              setFloatValueForGroup(groupByResultHolder, groupKey, value);
+            }
           }
-        }
+        });
         break;
       case DOUBLE:
         double[] doubleValues = blockValSet.getDoubleValuesSV();
-        for (int i = 0; i < length; i++) {
-          double value = doubleValues[i];
-          for (int groupKey : groupKeysArray[i]) {
-            setDoubleValueForGroup(groupByResultHolder, groupKey, value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            double value = doubleValues[i];
+            for (int groupKey : groupKeysArray[i]) {
+              setDoubleValueForGroup(groupByResultHolder, groupKey, value);
+            }
           }
-        }
+        });
         break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
-        for (int i = 0; i < length; i++) {
-          String value = stringValues[i];
-          for (int groupKey : groupKeysArray[i]) {
-            setStringValueForGroup(groupByResultHolder, groupKey, value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            String value = stringValues[i];
+            for (int groupKey : groupKeysArray[i]) {
+              setStringValueForGroup(groupByResultHolder, groupKey, value);
+            }
           }
-        }
+        });
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        for (int i = 0; i < length; i++) {
-          ByteArray value = new ByteArray(bytesValues[i]);
-          for (int groupKey : groupKeysArray[i]) {
-            setBytesValueForGroup(groupByResultHolder, groupKey, value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            ByteArray value = new ByteArray(bytesValues[i]);
+            for (int groupKey : groupKeysArray[i]) {
+              setBytesValueForGroup(groupByResultHolder, groupKey, value);
+            }
           }
-        }
+        });
         break;
       default:
         throw new IllegalStateException(
@@ -496,14 +567,16 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     // For dictionary-encoded expression, store dictionary ids into a RoaringBitmap
     if (blockValSet.isDictionaryEncoded()) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
-      for (int i = 0; i < length; i++) {
-        int[] rowDictIds = dictIds[i];
-        for (int groupKey : groupKeysArray[i]) {
-          for (int dictId : rowDictIds) {
-            setIntValueForGroup(groupByResultHolder, groupKey, dictId);
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int[] rowDictIds = dictIds[i];
+          for (int groupKey : groupKeysArray[i]) {
+            for (int dictId : rowDictIds) {
+              setIntValueForGroup(groupByResultHolder, groupKey, dictId);
+            }
           }
         }
-      }
+      });
       return;
     }
 
@@ -512,69 +585,81 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     switch (storedType) {
       case INT:
         int[][] intValues = blockValSet.getIntValuesMV();
-        for (int i = 0; i < length; i++) {
-          int[] intRow = intValues[i];
-          for (int groupKey : groupKeysArray[i]) {
-            for (int value : intRow) {
-              setIntValueForGroup(groupByResultHolder, groupKey, value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            int[] intRow = intValues[i];
+            for (int groupKey : groupKeysArray[i]) {
+              for (int value : intRow) {
+                setIntValueForGroup(groupByResultHolder, groupKey, value);
+              }
             }
           }
-        }
+        });
         break;
       case LONG:
         long[][] longValues = blockValSet.getLongValuesMV();
-        for (int i = 0; i < length; i++) {
-          long[] longRow = longValues[i];
-          for (int groupKey : groupKeysArray[i]) {
-            for (long value : longRow) {
-              setLongValueForGroup(groupByResultHolder, groupKey, value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            long[] longRow = longValues[i];
+            for (int groupKey : groupKeysArray[i]) {
+              for (long value : longRow) {
+                setLongValueForGroup(groupByResultHolder, groupKey, value);
+              }
             }
           }
-        }
+        });
         break;
       case FLOAT:
         float[][] floatValues = blockValSet.getFloatValuesMV();
-        for (int i = 0; i < length; i++) {
-          float[] floatRow = floatValues[i];
-          for (int groupKey : groupKeysArray[i]) {
-            for (float value : floatRow) {
-              setFloatValueForGroup(groupByResultHolder, groupKey, value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            float[] floatRow = floatValues[i];
+            for (int groupKey : groupKeysArray[i]) {
+              for (float value : floatRow) {
+                setFloatValueForGroup(groupByResultHolder, groupKey, value);
+              }
             }
           }
-        }
+        });
         break;
       case DOUBLE:
         double[][] doubleValues = blockValSet.getDoubleValuesMV();
-        for (int i = 0; i < length; i++) {
-          double[] doubleRow = doubleValues[i];
-          for (int groupKey : groupKeysArray[i]) {
-            for (double value : doubleRow) {
-              setDoubleValueForGroup(groupByResultHolder, groupKey, value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            double[] doubleRow = doubleValues[i];
+            for (int groupKey : groupKeysArray[i]) {
+              for (double value : doubleRow) {
+                setDoubleValueForGroup(groupByResultHolder, groupKey, value);
+              }
             }
           }
-        }
+        });
         break;
       case STRING:
         String[][] stringValues = blockValSet.getStringValuesMV();
-        for (int i = 0; i < length; i++) {
-          String[] stringRow = stringValues[i];
-          for (int groupKey : groupKeysArray[i]) {
-            for (String value : stringRow) {
-              setStringValueForGroup(groupByResultHolder, groupKey, value);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            String[] stringRow = stringValues[i];
+            for (int groupKey : groupKeysArray[i]) {
+              for (String value : stringRow) {
+                setStringValueForGroup(groupByResultHolder, groupKey, value);
+              }
             }
           }
-        }
+        });
         break;
       case BYTES:
         byte[][][] bytesValues = blockValSet.getBytesValuesMV();
-        for (int i = 0; i < length; i++) {
-          for (byte[] value : bytesValues[i]) {
-            ByteArray byteArray = new ByteArray(value);
-            for (int groupKey : groupKeysArray[i]) {
-              setBytesValueForGroup(groupByResultHolder, groupKey, byteArray);
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (byte[] value : bytesValues[i]) {
+              ByteArray byteArray = new ByteArray(value);
+              for (int groupKey : groupKeysArray[i]) {
+                setBytesValueForGroup(groupByResultHolder, groupKey, byteArray);
+              }
             }
           }
-        }
+        });
         break;
       default:
         throw new IllegalStateException(

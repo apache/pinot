@@ -28,6 +28,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -47,7 +48,11 @@ public class SegmentPartitionedDistinctCountAggregationFunctionTest {
   private static final long[] FLATTENED = {1L, 2L, 3L, 4L, 5L, 6L, 1L, 3L};
 
   private static SegmentPartitionedDistinctCountAggregationFunction create() {
-    return new SegmentPartitionedDistinctCountAggregationFunction(List.of(COLUMN));
+    return create(false);
+  }
+
+  private static SegmentPartitionedDistinctCountAggregationFunction create(boolean nullHandlingEnabled) {
+    return new SegmentPartitionedDistinctCountAggregationFunction(List.of(COLUMN), nullHandlingEnabled);
   }
 
   private static Map<ExpressionContext, BlockValSet> mvBlock() {
@@ -114,6 +119,30 @@ public class SegmentPartitionedDistinctCountAggregationFunctionTest {
     AggregationResultHolder resultHolder = function.createAggregationResultHolder();
     function.aggregate(dictIds.length, resultHolder,
         Map.of(COLUMN, SyntheticBlockValSets.DictIdsMV.create(null, dictIds, dictionary, DataType.LONG)));
+
+    assertEquals(function.extractFinalResult(function.extractAggregationResult(resultHolder)).longValue(), 6L);
+  }
+
+  /// With null handling enabled, a null row of a multi-value column contributes none of its values.
+  @Test
+  public void testMVColumnSkipsNullRowsWhenNullHandlingEnabled() {
+    SegmentPartitionedDistinctCountAggregationFunction function = create(true);
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    function.aggregate(MV_ROWS.length, resultHolder,
+        Map.of(COLUMN, SyntheticBlockValSets.LongMV.create(RoaringBitmap.bitmapOf(1, 3), MV_ROWS)));
+
+    // Rows 1 and 3 are null, so only 1, 2, 5 and 6 are counted
+    assertEquals(function.extractFinalResult(function.extractAggregationResult(resultHolder)).longValue(), 4L);
+  }
+
+  /// With null handling disabled the null rows are read as the column default and still counted, which is the
+  /// answer this mode has always given.
+  @Test
+  public void testMVColumnCountsNullRowsWhenNullHandlingDisabled() {
+    SegmentPartitionedDistinctCountAggregationFunction function = create(false);
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    function.aggregate(MV_ROWS.length, resultHolder,
+        Map.of(COLUMN, SyntheticBlockValSets.LongMV.create(RoaringBitmap.bitmapOf(1, 3), MV_ROWS)));
 
     assertEquals(function.extractFinalResult(function.extractAggregationResult(resultHolder)).longValue(), 6L);
   }

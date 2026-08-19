@@ -30,6 +30,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -45,7 +46,7 @@ public class DistinctCountULLAggregationFunctionTest {
   @Test
   public void testCanUseStarTreeDefaultP() {
     DistinctCountULLAggregationFunction function = new DistinctCountULLAggregationFunction(
-        List.of(ExpressionContext.forIdentifier("col")));
+        List.of(ExpressionContext.forIdentifier("col")), false);
 
     assertTrue(function.canUseStarTree(Map.of()));
     assertTrue(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, "12")));
@@ -53,7 +54,7 @@ public class DistinctCountULLAggregationFunctionTest {
     assertFalse(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, 16)));
 
     function = new DistinctCountULLAggregationFunction(List.of(ExpressionContext.forIdentifier("col"),
-        ExpressionContext.forLiteral(Literal.intValue(12))));
+        ExpressionContext.forLiteral(Literal.intValue(12))), false);
 
     assertTrue(function.canUseStarTree(Map.of()));
     assertTrue(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, "12")));
@@ -64,7 +65,8 @@ public class DistinctCountULLAggregationFunctionTest {
   @Test
   public void testCanUseStarTreeCustomP() {
     DistinctCountULLAggregationFunction function = new DistinctCountULLAggregationFunction(
-        List.of(ExpressionContext.forIdentifier("col"), ExpressionContext.forLiteral(Literal.stringValue("16"))));
+        List.of(ExpressionContext.forIdentifier("col"), ExpressionContext.forLiteral(Literal.stringValue("16"))),
+            false);
 
     assertFalse(function.canUseStarTree(Map.of()));
     assertFalse(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, "12")));
@@ -77,7 +79,11 @@ public class DistinctCountULLAggregationFunctionTest {
   private static final long[] FLATTENED = {1L, 2L, 3L, 4L, 5L, 6L, 1L, 3L};
 
   private static DistinctCountULLAggregationFunction create() {
-    return new DistinctCountULLAggregationFunction(List.of(COLUMN));
+    return create(false);
+  }
+
+  private static DistinctCountULLAggregationFunction create(boolean nullHandlingEnabled) {
+    return new DistinctCountULLAggregationFunction(List.of(COLUMN), nullHandlingEnabled);
   }
 
   private static Map<ExpressionContext, BlockValSet> mvBlock() {
@@ -141,5 +147,29 @@ public class DistinctCountULLAggregationFunctionTest {
         Map.of(COLUMN, SyntheticBlockValSets.DictIdsMV.create(null, dictIds, dictionary, DataType.LONG)));
 
     assertEquals((long) function.extractFinalResult(function.extractAggregationResult(resultHolder)), 6L);
+  }
+
+  /// With null handling enabled, a null row of a multi-value column contributes none of its values.
+  @Test
+  public void testMVColumnSkipsNullRowsWhenNullHandlingEnabled() {
+    DistinctCountULLAggregationFunction function = create(true);
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    function.aggregate(MV_ROWS.length, resultHolder,
+        Map.of(COLUMN, SyntheticBlockValSets.LongMV.create(RoaringBitmap.bitmapOf(1, 3), MV_ROWS)));
+
+    // Rows 1 and 3 are null, so only 1, 2, 5 and 6 are counted
+    assertEquals(function.extractFinalResult(function.extractAggregationResult(resultHolder)), 4L);
+  }
+
+  /// With null handling disabled the null rows are read as the column default and still counted, which is the
+  /// answer this mode has always given.
+  @Test
+  public void testMVColumnCountsNullRowsWhenNullHandlingDisabled() {
+    DistinctCountULLAggregationFunction function = create(false);
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    function.aggregate(MV_ROWS.length, resultHolder,
+        Map.of(COLUMN, SyntheticBlockValSets.LongMV.create(RoaringBitmap.bitmapOf(1, 3), MV_ROWS)));
+
+    assertEquals(function.extractFinalResult(function.extractAggregationResult(resultHolder)), 6L);
   }
 }

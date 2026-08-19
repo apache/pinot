@@ -439,6 +439,44 @@ public class SyntheticBlockValSets {
     }
   }
 
+  /// A simple [BlockValSet] for nullable, not dictionary-encoded multi-value string values.
+  public static class StrMV extends Base {
+
+    @Nullable
+    final RoaringBitmap _nullBitmap;
+    final String[][] _values;
+
+    private StrMV(@Nullable RoaringBitmap nullBitmap, String[][] values) {
+      _nullBitmap = nullBitmap;
+      _values = values;
+    }
+
+    public static StrMV create(@Nullable RoaringBitmap nullBitmap, String[][] values) {
+      return new StrMV(nullBitmap, values);
+    }
+
+    @Nullable
+    @Override
+    public RoaringBitmap getNullBitmap() {
+      return _nullBitmap;
+    }
+
+    @Override
+    public DataType getValueType() {
+      return DataType.STRING;
+    }
+
+    @Override
+    public boolean isSingleValue() {
+      return false;
+    }
+
+    @Override
+    public String[][] getStringValuesMV() {
+      return _values;
+    }
+  }
+
   /// A simple [BlockValSet] for nullable, not dictionary-encoded byte array values.
   public static class Bytes extends Base {
 
@@ -482,6 +520,44 @@ public class SyntheticBlockValSets {
 
     @Override
     public byte[][] getBytesValuesSV() {
+      return _values;
+    }
+  }
+
+  /// A simple [BlockValSet] for nullable, not dictionary-encoded multi-value byte array values.
+  public static class BytesMV extends Base {
+
+    @Nullable
+    final RoaringBitmap _nullBitmap;
+    final byte[][][] _values;
+
+    private BytesMV(@Nullable RoaringBitmap nullBitmap, byte[][][] values) {
+      _nullBitmap = nullBitmap;
+      _values = values;
+    }
+
+    public static BytesMV create(@Nullable RoaringBitmap nullBitmap, byte[][][] values) {
+      return new BytesMV(nullBitmap, values);
+    }
+
+    @Nullable
+    @Override
+    public RoaringBitmap getNullBitmap() {
+      return _nullBitmap;
+    }
+
+    @Override
+    public DataType getValueType() {
+      return DataType.BYTES;
+    }
+
+    @Override
+    public boolean isSingleValue() {
+      return false;
+    }
+
+    @Override
+    public byte[][][] getBytesValuesMV() {
       return _values;
     }
   }

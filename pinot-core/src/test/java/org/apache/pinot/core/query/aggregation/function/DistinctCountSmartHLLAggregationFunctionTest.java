@@ -39,67 +39,72 @@ public class DistinctCountSmartHLLAggregationFunctionTest {
   public void testParameterParsing() {
     // Test default values
     DistinctCountSmartHLLAggregationFunction function = new DistinctCountSmartHLLAggregationFunction(
-        List.of(ExpressionContext.forIdentifier("col")));
+        List.of(ExpressionContext.forIdentifier("col")), false);
     assertEquals(function.getThreshold(), 100_000);
     assertEquals(function.getDictIdCardinalityThreshold(), 100_000);
 
     // Test individual parameters
     function = new DistinctCountSmartHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "threshold=50000")));
+            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "threshold=50000")), false);
     assertEquals(function.getThreshold(), 50_000);
     assertEquals(function.getDictIdCardinalityThreshold(), 100_000);
 
     function = new DistinctCountSmartHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "log2m=8")));
+            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "log2m=8")), false);
     assertEquals(function.getThreshold(), 100_000);
     assertEquals(function.getDictIdCardinalityThreshold(), 100_000);
 
     function = new DistinctCountSmartHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "dictThreshold=50000")));
+            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "dictThreshold=50000")), false);
     assertEquals(function.getThreshold(), 100_000);
     assertEquals(function.getDictIdCardinalityThreshold(), 50_000);
 
     // Test disabled dictThreshold (non-positive values)
     function = new DistinctCountSmartHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "dictThreshold=-1")));
+            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "dictThreshold=-1")), false);
     assertEquals(function.getDictIdCardinalityThreshold(), Integer.MAX_VALUE);
 
     function = new DistinctCountSmartHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "dictThreshold=0")));
+            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "dictThreshold=0")), false);
     assertEquals(function.getDictIdCardinalityThreshold(), Integer.MAX_VALUE);
 
     // Test multiple parameters together
     function = new DistinctCountSmartHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "threshold=200000;log2m=10;dictThreshold=150000")));
+            ExpressionContext.forLiteral(FieldSpec.DataType.STRING,
+                "threshold=200000;log2m=10;dictThreshold=150000")), false);
     assertEquals(function.getThreshold(), 200_000);
     assertEquals(function.getDictIdCardinalityThreshold(), 150_000);
 
     // Test parameter order independence
     DistinctCountSmartHLLAggregationFunction function1 = new DistinctCountSmartHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "dictThreshold=50000;threshold=100000;log2m=8")));
+            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "dictThreshold=50000;threshold=100000;log2m=8")),
+                false);
     DistinctCountSmartHLLAggregationFunction function2 = new DistinctCountSmartHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "log2m=8;dictThreshold=50000;threshold=100000")));
+            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "log2m=8;dictThreshold=50000;threshold=100000")),
+                false);
     assertEquals(function1.getThreshold(), function2.getThreshold());
     assertEquals(function1.getDictIdCardinalityThreshold(), function2.getDictIdCardinalityThreshold());
 
     // Test legacy parameter names
     function = new DistinctCountSmartHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "hllConversionThreshold=50000;hllLog2m=10")));
+            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "hllConversionThreshold=50000;hllLog2m=10")),
+                false);
     assertEquals(function.getThreshold(), 50_000);
 
     // Test case-insensitive parameters
     function = new DistinctCountSmartHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "THRESHOLD=50000;LOG2M=8;DICTTHRESHOLD=100000")));
+            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "THRESHOLD=50000;LOG2M=8;DICTTHRESHOLD=100000")),
+                false);
     assertEquals(function.getThreshold(), 50_000);
     assertEquals(function.getDictIdCardinalityThreshold(), 100_000);
   }
@@ -107,7 +112,7 @@ public class DistinctCountSmartHLLAggregationFunctionTest {
   @Test
   public void testFunctionMetadata() {
     DistinctCountSmartHLLAggregationFunction function = new DistinctCountSmartHLLAggregationFunction(
-        List.of(ExpressionContext.forIdentifier("col")));
+        List.of(ExpressionContext.forIdentifier("col")), false);
 
     // Test function type
     assertEquals(function.getType().getName(), "distinctCountSmartHLL");
@@ -124,7 +129,7 @@ public class DistinctCountSmartHLLAggregationFunctionTest {
   @Test
   public void testHLLOperations() {
     DistinctCountSmartHLLAggregationFunction function = new DistinctCountSmartHLLAggregationFunction(
-        List.of(ExpressionContext.forIdentifier("col")));
+        List.of(ExpressionContext.forIdentifier("col")), false);
 
     // Test merge final results (should sum)
     Integer finalResult = function.mergeFinalResult(100, 200);
@@ -158,7 +163,7 @@ public class DistinctCountSmartHLLAggregationFunctionTest {
   public void itExtractsHLLFromGroupByResultHolderWhenSketchConverted() {
     DistinctCountSmartHLLAggregationFunction function = new DistinctCountSmartHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "threshold=5;dictThreshold=5")));
+            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "threshold=5;dictThreshold=5")), false);
 
     ObjectGroupByResultHolder holder = new ObjectGroupByResultHolder(10, 10);
 
@@ -181,25 +186,25 @@ public class DistinctCountSmartHLLAggregationFunctionTest {
   public void testAdaptiveConversion() {
     // Test adaptive conversion enabled by default (100K threshold)
     DistinctCountSmartHLLAggregationFunction function = new DistinctCountSmartHLLAggregationFunction(
-        List.of(ExpressionContext.forIdentifier("col")));
+        List.of(ExpressionContext.forIdentifier("col")), false);
     assertEquals(function.getDictIdCardinalityThreshold(), 100_000);
 
     // Test adaptive conversion with custom threshold
     function = new DistinctCountSmartHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "dictThreshold=50000")));
+            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "dictThreshold=50000")), false);
     assertEquals(function.getDictIdCardinalityThreshold(), 50_000);
 
     // Test adaptive conversion disabled (Integer.MAX_VALUE)
     function = new DistinctCountSmartHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "dictThreshold=" + Integer.MAX_VALUE)));
+            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "dictThreshold=" + Integer.MAX_VALUE)), false);
     assertEquals(function.getDictIdCardinalityThreshold(), Integer.MAX_VALUE);
 
     // Test non-positive threshold converted to Integer.MAX_VALUE (disabled)
     function = new DistinctCountSmartHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "dictThreshold=-1")));
+            ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "dictThreshold=-1")), false);
     assertEquals(function.getDictIdCardinalityThreshold(), Integer.MAX_VALUE);
   }
 }

@@ -31,8 +31,9 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 /// [DistinctCountCPCSketchAggregationFunction], and returns the sketch as a base64 encoded string.
 public class DistinctCountRawCPCSketchAggregationFunction extends DistinctCountCPCSketchAggregationFunction {
 
-  public DistinctCountRawCPCSketchAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments);
+  public DistinctCountRawCPCSketchAggregationFunction(List<ExpressionContext> arguments,
+      boolean nullHandlingEnabled) {
+    super(arguments, nullHandlingEnabled);
   }
 
   @Override

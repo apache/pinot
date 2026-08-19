@@ -36,7 +36,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.SerializedFrequentLongsSketch;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 ///  `FrequentLongsSketchAggregationFunction` provides an approximate FrequentItems aggregation function based on
@@ -93,39 +93,52 @@ public class FrequentLongsSketchAggregationFunction
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet valueSet = blockValSetMap.get(_expression);
-    FieldSpec.DataType valueType = valueSet.getValueType();
+    DataType dataType = valueSet.getValueType();
+    boolean singleValue = valueSet.isSingleValue();
+    if (dataType == DataType.BYTES && singleValue) {
+      // Assuming the column contains serialized data sketch
+      byte[][] bytesValues = valueSet.getBytesValuesSV();
+      // The sketch is created inside the range, so a block with no non-null row leaves the holder untouched and
+      // extractFinalResult sees the null that means nothing was aggregated
+      forEachNotNull(length, valueSet, (from, to) -> {
+        if (to == from) {
+          return;
+        }
+        FrequentLongsSketch sketch = getOrCreateSketch(aggregationResultHolder);
+        for (int i = from; i < to; i++) {
+          sketch.merge(deserializeSketch(bytesValues[i]));
+        }
+      });
+      return;
+    }
 
-    switch (valueType) {
-      case BYTES:
-        // Assuming the column contains serialized data sketch
-        byte[][] bytesValues = valueSet.getBytesValuesSV();
-        // The sketch is created inside the range, so a block with no non-null row leaves the holder untouched and
-        // extractFinalResult sees the null that means nothing was aggregated
-        forEachNotNull(length, valueSet, (from, to) -> {
-          if (to == from) {
-            return;
+    DataType storedType = dataType.getStoredType();
+    Preconditions.checkState(storedType == DataType.INT || storedType == DataType.LONG,
+        "FREQUENT_LONGS_SKETCH only supports INT/LONG column");
+    if (singleValue) {
+      long[] longValues = valueSet.getLongValuesSV();
+      forEachNotNull(length, valueSet, (from, to) -> {
+        if (to == from) {
+          return;
+        }
+        FrequentLongsSketch sketch = getOrCreateSketch(aggregationResultHolder);
+        for (int i = from; i < to; i++) {
+          sketch.update(longValues[i]);
+        }
+      });
+    } else {
+      long[][] longValues = valueSet.getLongValuesMV();
+      forEachNotNull(length, valueSet, (from, to) -> {
+        if (to == from) {
+          return;
+        }
+        FrequentLongsSketch sketch = getOrCreateSketch(aggregationResultHolder);
+        for (int i = from; i < to; i++) {
+          for (long value : longValues[i]) {
+            sketch.update(value);
           }
-          FrequentLongsSketch sketch = getOrCreateSketch(aggregationResultHolder);
-          for (int i = from; i < to; i++) {
-            sketch.merge(deserializeSketch(bytesValues[i]));
-          }
-        });
-        break;
-      case INT:
-      case LONG:
-        long[] longValues = valueSet.getLongValuesSV();
-        forEachNotNull(length, valueSet, (from, to) -> {
-          if (to == from) {
-            return;
-          }
-          FrequentLongsSketch sketch = getOrCreateSketch(aggregationResultHolder);
-          for (int i = from; i < to; i++) {
-            sketch.update(longValues[i]);
-          }
-        });
-        break;
-      default:
-        throw new UnsupportedOperationException("Cannot aggregate on non int/long types");
+        }
+      });
     }
   }
 
@@ -133,29 +146,39 @@ public class FrequentLongsSketchAggregationFunction
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet valueSet = blockValSetMap.get(_expression);
-    FieldSpec.DataType valueType = valueSet.getValueType();
+    DataType dataType = valueSet.getValueType();
+    boolean singleValue = valueSet.isSingleValue();
+    if (dataType == DataType.BYTES && singleValue) {
+      // Assuming the column contains serialized data sketch
+      byte[][] bytesValues = valueSet.getBytesValuesSV();
+      forEachNotNull(length, valueSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          getOrCreateSketch(groupByResultHolder, groupKeyArray[i]).merge(deserializeSketch(bytesValues[i]));
+        }
+      });
+      return;
+    }
 
-    switch (valueType) {
-      case BYTES:
-        // serialized sketch
-        byte[][] bytesValues = valueSet.getBytesValuesSV();
-        forEachNotNull(length, valueSet, (from, to) -> {
-          for (int i = from; i < to; i++) {
-            getOrCreateSketch(groupByResultHolder, groupKeyArray[i]).merge(deserializeSketch(bytesValues[i]));
+    DataType storedType = dataType.getStoredType();
+    Preconditions.checkState(storedType == DataType.INT || storedType == DataType.LONG,
+        "FREQUENT_LONGS_SKETCH only supports INT/LONG column");
+    if (singleValue) {
+      long[] values = valueSet.getLongValuesSV();
+      forEachNotNull(length, valueSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          getOrCreateSketch(groupByResultHolder, groupKeyArray[i]).update(values[i]);
+        }
+      });
+    } else {
+      long[][] values = valueSet.getLongValuesMV();
+      forEachNotNull(length, valueSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          FrequentLongsSketch sketch = getOrCreateSketch(groupByResultHolder, groupKeyArray[i]);
+          for (long value : values[i]) {
+            sketch.update(value);
           }
-        });
-        break;
-      case INT:
-      case LONG:
-        long[] values = valueSet.getLongValuesSV();
-        forEachNotNull(length, valueSet, (from, to) -> {
-          for (int i = from; i < to; i++) {
-            getOrCreateSketch(groupByResultHolder, groupKeyArray[i]).update(values[i]);
-          }
-        });
-        break;
-      default:
-        throw new UnsupportedOperationException("Cannot aggregate on non int/long types");
+        }
+      });
     }
   }
 
@@ -163,35 +186,48 @@ public class FrequentLongsSketchAggregationFunction
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet valueSet = blockValSetMap.get(_expression);
-    FieldSpec.DataType valueType = valueSet.getValueType();
+    DataType dataType = valueSet.getValueType();
+    boolean singleValue = valueSet.isSingleValue();
+    if (dataType == DataType.BYTES && singleValue) {
+      // Assuming the column contains serialized data sketch
+      byte[][] bytesValues = valueSet.getBytesValuesSV();
+      forEachNotNull(length, valueSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          // Deserialized once per row, not once per group key the row belongs to
+          FrequentLongsSketch rowSketch = deserializeSketch(bytesValues[i]);
+          for (int groupKey : groupKeysArray[i]) {
+            getOrCreateSketch(groupByResultHolder, groupKey).merge(rowSketch);
+          }
+        }
+      });
+      return;
+    }
 
-    switch (valueType) {
-      case BYTES:
-        // serialized sketch
-        byte[][] bytesValues = valueSet.getBytesValuesSV();
-        forEachNotNull(length, valueSet, (from, to) -> {
-          for (int i = from; i < to; i++) {
-            // Deserialized once per row, not once per group key the row belongs to
-            FrequentLongsSketch rowSketch = deserializeSketch(bytesValues[i]);
-            for (int groupKey : groupKeysArray[i]) {
-              getOrCreateSketch(groupByResultHolder, groupKey).merge(rowSketch);
+    DataType storedType = dataType.getStoredType();
+    Preconditions.checkState(storedType == DataType.INT || storedType == DataType.LONG,
+        "FREQUENT_LONGS_SKETCH only supports INT/LONG column");
+    if (singleValue) {
+      long[] values = valueSet.getLongValuesSV();
+      forEachNotNull(length, valueSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            getOrCreateSketch(groupByResultHolder, groupKey).update(values[i]);
+          }
+        }
+      });
+    } else {
+      long[][] values = valueSet.getLongValuesMV();
+      forEachNotNull(length, valueSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          long[] rowValues = values[i];
+          for (int groupKey : groupKeysArray[i]) {
+            FrequentLongsSketch sketch = getOrCreateSketch(groupByResultHolder, groupKey);
+            for (long value : rowValues) {
+              sketch.update(value);
             }
           }
-        });
-        break;
-      case INT:
-      case LONG:
-        long[] values = valueSet.getLongValuesSV();
-        forEachNotNull(length, valueSet, (from, to) -> {
-          for (int i = from; i < to; i++) {
-            for (int groupKey : groupKeysArray[i]) {
-              getOrCreateSketch(groupByResultHolder, groupKey).update(values[i]);
-            }
-          }
-        });
-        break;
-      default:
-        throw new UnsupportedOperationException("Cannot aggregate on non int/long types");
+        }
+      });
     }
   }
 
