@@ -56,7 +56,6 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   protected static final int NUM_REALTIME_SEGMENTS = 48;
   protected static final long DEFAULT_COUNT_STAR_RESULT = 115545L;
   protected static final String DEFAULT_TABLE_NAME_2 = DEFAULT_TABLE_NAME + "_2";
-  private static final long MAX_SEGMENT_COMPLETION_TIME_MILLIS = 10_000;
 
   protected List<File> _avroFiles;
   protected boolean _failureEnabled = false;
@@ -106,7 +105,6 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     startController();
     startBroker();
     startServer();
-    setMaxSegmentCompletionTimeMillis();
     setupNonPauselessTable();
     injectFailure();
     setupPauselessTable();
@@ -156,14 +154,6 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     addTableConfig(tableConfig);
   }
 
-  protected void setMaxSegmentCompletionTimeMillis() {
-    PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
-    if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
-      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager)
-          .setMaxSegmentCompletionTimeoutMs(MAX_SEGMENT_COMPLETION_TIME_MILLIS);
-    }
-  }
-
   protected void injectFailure() {
     PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
     if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
@@ -210,12 +200,21 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
       return segmentZKMetadataList.size() == getExpectedZKMetadataWithFailure();
     }, 1000, 100000, "New Segment ZK Metadata not created");
 
-    Thread.sleep(MAX_SEGMENT_COMPLETION_TIME_MILLIS);
     disableFailure();
 
-    Properties periodicTaskProperties = new Properties();
-    periodicTaskProperties.setProperty(ControllerPeriodicTask.RUN_SEGMENT_LEVEL_VALIDATION, Boolean.TRUE.toString());
-    _controllerStarter.getRealtimeSegmentValidationManager().run(periodicTaskProperties);
+    // Force-expire the segments stranded by the injected failure instead of waiting out the max segment completion
+    // time: they become immediately eligible for repair, and their in-flight commit attempts keep getting rejected,
+    // so the single validation run below stays the only recovery path under test. Segments created afterwards keep
+    // the production completion time and are never artificially rejected. Clear the expiry right after the run so
+    // that segments re-activated by the repair can commit normally.
+    PauselessRealtimeTestUtils.forceExpireSegments(_helixResourceManager, tableNameWithType);
+    try {
+      Properties periodicTaskProperties = new Properties();
+      periodicTaskProperties.setProperty(ControllerPeriodicTask.RUN_SEGMENT_LEVEL_VALIDATION, Boolean.TRUE.toString());
+      _controllerStarter.getRealtimeSegmentValidationManager().run(periodicTaskProperties);
+    } finally {
+      PauselessRealtimeTestUtils.clearForceExpiredSegments(_helixResourceManager);
+    }
 
     waitForAllDocsLoaded(600_000L);
     waitForAllDocsLoaded(tableNameWithType2, 600_000L);
