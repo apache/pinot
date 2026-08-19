@@ -45,15 +45,39 @@ public class RexExpressionToProtoExpression {
       expressionBuilder.setInputRef(convertInputRef((RexExpression.InputRef) expression));
     } else if (expression instanceof RexExpression.Literal) {
       expressionBuilder.setLiteral(convertLiteral((RexExpression.Literal) expression));
-    } else {
-      assert expression instanceof RexExpression.FunctionCall;
+    } else if (expression instanceof RexExpression.PatternFieldRef) {
+      expressionBuilder.setPatternFieldRef(convertPatternFieldRef((RexExpression.PatternFieldRef) expression));
+    } else if (expression instanceof RexExpression.FunctionCall) {
       expressionBuilder.setFunctionCall(convertFunctionCall((RexExpression.FunctionCall) expression));
+    } else {
+      // Never silently drop an expression kind: an unhandled kind that fell through to InputRef here would produce
+      // results that are wrong but type-correct.
+      throw new IllegalStateException("Unsupported RexExpression type: " + expression.getClass().getName());
     }
     return expressionBuilder.build();
   }
 
   public static Expressions.InputRef convertInputRef(RexExpression.InputRef inputRef) {
     return Expressions.InputRef.newBuilder().setIndex(inputRef.getIndex()).build();
+  }
+
+  /**
+   * Converts a MATCH_RECOGNIZE pattern field reference. Rejects an unresolved symbol ordinal rather than writing an
+   * ambiguous reference to the wire: the MATCH_RECOGNIZE planning pass must bind every reference to a pattern symbol
+   * before the plan is serialized.
+   */
+  public static Expressions.PatternFieldRef convertPatternFieldRef(RexExpression.PatternFieldRef patternFieldRef) {
+    int symbolOrdinal = patternFieldRef.getSymbolOrdinal();
+    if (symbolOrdinal == RexExpression.PatternFieldRef.UNRESOLVED_SYMBOL_ORDINAL) {
+      throw new IllegalStateException(
+          "Unresolved MATCH_RECOGNIZE pattern variable in reference to: " + patternFieldRef.getAlpha() + "."
+              + patternFieldRef.getIndex() + ". The pattern symbol table must be bound before serialization.");
+    }
+    return Expressions.PatternFieldRef.newBuilder()
+        .setIndex(patternFieldRef.getIndex())
+        .setSymbolOrdinal(symbolOrdinal)
+        .setAlpha(patternFieldRef.getAlpha())
+        .build();
   }
 
   public static Expressions.FunctionCall convertFunctionCall(RexExpression.FunctionCall functionCall) {
