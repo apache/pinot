@@ -33,31 +33,29 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
-/**
- * A compiled MEASURES item or DEFINE predicate, evaluated against the state of one match.
- *
- * <h2>How it reuses Pinot's row expression evaluation</h2>
- * A MATCH_RECOGNIZE expression such as {@code PREV(A.price, 1) > B.price * 2} is only <i>partly</i> match specific:
- * the navigations {@code PREV(A.price, 1)} and {@code B.price} depend on the match, but the {@code >} and the
- * {@code *} are ordinary scalar operators. Compilation therefore splits the expression in two:
- * <ol>
- *   <li>every maximal match specific sub-expression - a navigation, {@code CLASSIFIER()}, {@code MATCH_NUMBER()} or
- *       a single variable aggregate - becomes a {@link MatchTerm} bound to a slot of a synthetic row;</li>
- *   <li>what is left is a plain {@link RexExpression} over those slots, compiled by
- *       {@link TransformOperandFactory} exactly like any other Pinot row expression.</li>
- * </ol>
- * The example compiles to slots {@code [PREV(A.price,1), B.price]} plus the operand {@code $0 > $1 * 2}. Comparisons,
- * boolean connectives, arithmetic, casts, null semantics and every scalar UDF therefore behave exactly as they do
- * elsewhere in the multi-stage engine, and this class does not reimplement any of them.
- *
- * <p>{@code RUNNING} and {@code FINAL} are stripped during compilation: with ONE ROW PER MATCH the measures are
- * computed once the match is complete, and running semantics evaluated at the last row of a match coincide with final
- * semantics. Both modifiers therefore have no effect and are unwrapped rather than rejected.
- *
- * <p>Not thread safe: the slot array is reused between evaluations, so one instance belongs to one operator.
- */
+/// A compiled MEASURES item or DEFINE predicate, evaluated against the state of one match.
+///
+/// ## How it reuses Pinot's row expression evaluation
+///
+/// A MATCH_RECOGNIZE expression such as `PREV(A.price, 1) > B.price * 2` is only *partly* match specific:
+/// the navigations `PREV(A.price, 1)` and `B.price` depend on the match, but the `>` and the
+/// `*` are ordinary scalar operators. Compilation therefore splits the expression in two:
+/// 1. every maximal match specific sub-expression - a navigation, `CLASSIFIER()`, `MATCH_NUMBER()` or
+///    a single variable aggregate - becomes a [MatchTerm] bound to a slot of a synthetic row;
+/// 2. what is left is a plain [RexExpression] over those slots, compiled by
+///    [TransformOperandFactory] exactly like any other Pinot row expression.
+///
+/// The example compiles to slots `[PREV(A.price,1), B.price]` plus the operand `$0 > $1 * 2`. Comparisons,
+/// boolean connectives, arithmetic, casts, null semantics and every scalar UDF therefore behave exactly as they do
+/// elsewhere in the multi-stage engine, and this class does not reimplement any of them.
+///
+/// `RUNNING` and `FINAL` are stripped during compilation: with ONE ROW PER MATCH the measures are
+/// computed once the match is complete, and running semantics evaluated at the last row of a match coincide with final
+/// semantics. Both modifiers therefore have no effect and are unwrapped rather than rejected.
+///
+/// Not thread safe: the slot array is reused between evaluations, so one instance belongs to one operator.
 public class MatchExpression {
-  /** Navigation and match state functions, as Calcite names them in the converted expression. */
+  /// Navigation and match state functions, as Calcite names them in the converted expression.
   private static final String PREV = "PREV";
   private static final String NEXT = "NEXT";
   private static final String FIRST = "FIRST";
@@ -80,12 +78,10 @@ public class MatchExpression {
     _slots = new Object[terms.size()];
   }
 
-  /**
-   * Compiles {@code expression}, which addresses columns of {@code inputSchema} through pattern field references.
-   *
-   * @throws org.apache.pinot.spi.exception.QueryException if the expression uses a construct that is not supported
-   *         yet. Nothing is dropped or approximated, because either would return wrong rows instead of an error.
-   */
+  /// Compiles `expression`, which addresses columns of `inputSchema` through pattern field references.
+  ///
+  /// @throws org.apache.pinot.spi.exception.QueryException if the expression uses a construct that is not supported
+  ///         yet. Nothing is dropped or approximated, because either would return wrong rows instead of an error.
   public static MatchExpression compile(RexExpression expression, DataSchema inputSchema) {
     List<MatchTerm> terms = new ArrayList<>();
     RexExpression slotExpression = rewrite(expression, inputSchema, terms);
@@ -101,9 +97,7 @@ public class MatchExpression {
     return new MatchExpression(operand, terms);
   }
 
-  /**
-   * Evaluates this expression against the current state of {@code tape}.
-   */
+  /// Evaluates this expression against the current state of `tape`.
   @Nullable
   public Object evaluate(MatchTape tape) {
     for (int i = 0; i < _terms.size(); i++) {
@@ -112,10 +106,8 @@ public class MatchExpression {
     return _operand.apply(_slots);
   }
 
-  /**
-   * Evaluates this expression as a DEFINE predicate. SQL three valued logic collapses to false here: a row is mapped
-   * to a pattern variable only if its condition is definitely true.
-   */
+  /// Evaluates this expression as a DEFINE predicate. SQL three valued logic collapses to false here: a row is mapped
+  /// to a pattern variable only if its condition is definitely true.
   public boolean test(MatchTape tape) {
     Object value = evaluate(tape);
     if (value == null) {
@@ -127,10 +119,8 @@ public class MatchExpression {
     return ((Number) value).intValue() != 0;
   }
 
-  /**
-   * Replaces every match specific sub-expression of {@code expression} with an input reference to a freshly appended
-   * slot of {@code terms}, and returns the resulting expression over the synthetic slot row.
-   */
+  /// Replaces every match specific sub-expression of `expression` with an input reference to a freshly appended
+  /// slot of `terms`, and returns the resulting expression over the synthetic slot row.
   private static RexExpression rewrite(RexExpression expression, DataSchema inputSchema, List<MatchTerm> terms) {
     if (expression instanceof RexExpression.PatternFieldRef) {
       // A bare column reference such as `A.price` is `LAST(A.price, 0)` per SQL:2016.
@@ -192,11 +182,9 @@ public class MatchExpression {
     return new RexExpression.InputRef(terms.size() - 1);
   }
 
-  /**
-   * Flattens a nest of navigation calls such as {@code PREV(LAST(A.price, 1), 2)} into a single
-   * {@link MatchTerm.Navigation}: at most one logical step ({@code FIRST} / {@code LAST}) selects a row of the match,
-   * and the {@code PREV} / {@code NEXT} offsets around it add up into one physical delta.
-   */
+  /// Flattens a nest of navigation calls such as `PREV(LAST(A.price, 1), 2)` into a single
+  /// [MatchTerm.Navigation]: at most one logical step (`FIRST` / `LAST`) selects a row of the match,
+  /// and the `PREV` / `NEXT` offsets around it add up into one physical delta.
   private static MatchTerm.Navigation navigation(RexExpression.FunctionCall call) {
     boolean fromEnd = true;
     int logicalOffset = 0;
@@ -242,10 +230,8 @@ public class MatchExpression {
         call.getDataType());
   }
 
-  /**
-   * The offset operand of a navigation call. {@code PREV} and {@code NEXT} default to one row, {@code FIRST} and
-   * {@code LAST} to the first / last row itself.
-   */
+  /// The offset operand of a navigation call. `PREV` and `NEXT` default to one row, `FIRST` and
+  /// `LAST` to the first / last row itself.
   private static int navigationOffset(RexExpression.FunctionCall call) {
     List<RexExpression> operands = call.getFunctionOperands();
     if (operands.size() < 2) {
@@ -270,10 +256,8 @@ public class MatchExpression {
     return intValue;
   }
 
-  /**
-   * Compiles a single variable aggregate. The aggregated expression is compiled against the input schema so that it
-   * can be evaluated per row of the match, which is why {@code SUM(A.price * A.quantity)} works.
-   */
+  /// Compiles a single variable aggregate. The aggregated expression is compiled against the input schema so that it
+  /// can be evaluated per row of the match, which is why `SUM(A.price * A.quantity)` works.
   private static MatchTerm.Aggregate aggregate(RexExpression.FunctionCall call, DataSchema inputSchema) {
     String functionName = call.getFunctionName();
     if (call.isDistinct()) {
@@ -314,10 +298,8 @@ public class MatchExpression {
     return new MatchTerm.Aggregate(kind, symbolOrdinal, argumentOperand, call.getDataType());
   }
 
-  /**
-   * Rewrites pattern field references into plain input references so the expression can be evaluated against a single
-   * input row.
-   */
+  /// Rewrites pattern field references into plain input references so the expression can be evaluated against a single
+  /// input row.
   private static RexExpression toRowExpression(RexExpression expression) {
     if (expression instanceof RexExpression.PatternFieldRef) {
       return new RexExpression.InputRef(((RexExpression.PatternFieldRef) expression).getIndex());
@@ -384,10 +366,8 @@ public class MatchExpression {
     return operands.get(0);
   }
 
-  /**
-   * Type of the column a bare pattern field reference reads. Unlike a navigation call, a bare reference carries no
-   * declared type of its own.
-   */
+  /// Type of the column a bare pattern field reference reads. Unlike a navigation call, a bare reference carries no
+  /// declared type of its own.
   private static ColumnDataType columnType(DataSchema inputSchema, RexExpression.PatternFieldRef ref) {
     int index = ref.getIndex();
     if (index < 0 || index >= inputSchema.size()) {

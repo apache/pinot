@@ -34,18 +34,16 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * End-to-end coverage of SQL:2016 {@code MATCH_RECOGNIZE} against a real Pinot cluster (ZooKeeper + controller +
- * broker + two servers), as opposed to the mock server enclosures used by
- * {@code pinot-query-runtime/src/test/resources/queries/MatchRecognize.json}.
- *
- * <p>The fixture is a small stock ticker with five symbols of different lengths, written round-robin into
- * {@link #getNumAvroFiles()} Avro files, so every partition is spread over several segments and both servers. That
- * makes every assertion here also an assertion that the sort exchange inserted by
- * {@code PinotMatchExchangeNodeInsertRule} really does deliver each partition contiguously and in ORDER BY order.
- *
- * <p>Every expected result set below is hand-computed from {@link #PRICES} rather than captured from a run.
- */
+/// End-to-end coverage of SQL:2016 `MATCH_RECOGNIZE` against a real Pinot cluster (ZooKeeper + controller +
+/// broker + two servers), as opposed to the mock server enclosures used by
+/// `pinot-query-runtime/src/test/resources/queries/MatchRecognize.json`.
+///
+/// The fixture is a small stock ticker with five symbols of different lengths, written round-robin into
+/// [#getNumAvroFiles()] Avro files, so every partition is spread over several segments and both servers. That
+/// makes every assertion here also an assertion that the sort exchange inserted by
+/// `PinotMatchExchangeNodeInsertRule` really does deliver each partition contiguously and in ORDER BY order.
+///
+/// Every expected result set below is hand-computed from [#PRICES] rather than captured from a run.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegrationTest {
 
@@ -54,19 +52,15 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
   private static final String SEQ_COLUMN = "seqCol";
   private static final String PRICE_COLUMN = "priceCol";
 
-  /** Symbols in ascending order, which is also the order every query below sorts its output by. */
+  /// Symbols in ascending order, which is also the order every query below sorts its output by.
   private static final String[] SYMBOLS = {"AAPL", "AMZN", "GOOG", "MSFT", "NFLX"};
 
-  /**
-   * Prices per symbol, indexed like {@link #SYMBOLS}. {@code seqCol} is the 1-based index within the symbol.
-   * <ul>
-   *   <li>AAPL: two disjoint V shapes, the second one overlapping the first under SKIP TO NEXT ROW.</li>
-   *   <li>AMZN: one long descent, so a single match covers most of the partition.</li>
-   *   <li>GOOG: flat, so no strict rise or fall matches anywhere - a partition that contributes nothing.</li>
-   *   <li>MSFT: the minimal V shape.</li>
-   *   <li>NFLX: strictly increasing, which is what separates greedy from reluctant quantifiers.</li>
-   * </ul>
-   */
+  /// Prices per symbol, indexed like [#SYMBOLS]. `seqCol` is the 1-based index within the symbol.
+  /// - AAPL: two disjoint V shapes, the second one overlapping the first under SKIP TO NEXT ROW.
+  /// - AMZN: one long descent, so a single match covers most of the partition.
+  /// - GOOG: flat, so no strict rise or fall matches anywhere - a partition that contributes nothing.
+  /// - MSFT: the minimal V shape.
+  /// - NFLX: strictly increasing, which is what separates greedy from reluctant quantifiers.
   private static final int[][] PRICES = {
       {10, 8, 5, 9, 12, 7, 11},
       {20, 15, 10, 5, 25},
@@ -78,9 +72,7 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
   private static final String V_SHAPE_DEFINE =
       " DEFINE DOWN AS DOWN.priceCol < PREV(DOWN.priceCol), UP AS UP.priceCol > PREV(UP.priceCol)";
 
-  /**
-   * The canonical vendor-documentation V-shape query: a start row, a strictly falling run, then a strictly rising run.
-   */
+  /// The canonical vendor-documentation V-shape query: a start row, a strictly falling run, then a strictly rising run.
   @Test(dataProvider = "useV2QueryEngine")
   public void testCanonicalVShape(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -104,11 +96,9 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
     });
   }
 
-  /**
-   * THE critical default. SQL:2016, Trino, Snowflake and Oracle all default an omitted AFTER MATCH clause to
-   * SKIP PAST LAST ROW, while Calcite's {@code SqlToRelConverter} silently substitutes SKIP TO NEXT ROW. The two
-   * differ in whether matches may overlap, so a regression here changes results without changing anything visible.
-   */
+  /// THE critical default. SQL:2016, Trino, Snowflake and Oracle all default an omitted AFTER MATCH clause to
+  /// SKIP PAST LAST ROW, while Calcite's `SqlToRelConverter` silently substitutes SKIP TO NEXT ROW. The two
+  /// differ in whether matches may overlap, so a regression here changes results without changing anything visible.
   @Test(dataProvider = "useV2QueryEngine")
   public void testOmittedAfterMatchIsSkipPastLastRow(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -135,11 +125,9 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
     });
   }
 
-  /**
-   * All four skip modes over the same pattern, each producing a different row set. {@code S{2}} pushes the first row
-   * mapped to {@code U} two rows past the start of the match, which is what makes SKIP TO FIRST U differ from
-   * SKIP TO NEXT ROW.
-   */
+  /// All four skip modes over the same pattern, each producing a different row set. `S{2}` pushes the first row
+  /// mapped to `U` two rows past the start of the match, which is what makes SKIP TO FIRST U differ from
+  /// SKIP TO NEXT ROW.
   @Test(dataProvider = "useV2QueryEngine")
   public void testSkipToFirstAndLastOfPatternVariable(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -173,10 +161,8 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
     });
   }
 
-  /**
-   * A greedy quantifier takes the longest run it can, a reluctant one the shortest. On NFLX the difference is one
-   * seven-row match versus four two-row matches.
-   */
+  /// A greedy quantifier takes the longest run it can, a reluctant one the shortest. On NFLX the difference is one
+  /// seven-row match versus four two-row matches.
   @Test(dataProvider = "useV2QueryEngine")
   public void testGreedyVersusReluctantQuantifier(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -200,9 +186,7 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
     });
   }
 
-  /**
-   * Alternation prefers the leftmost branch that lets the whole pattern complete, which CLASSIFIER() reports.
-   */
+  /// Alternation prefers the leftmost branch that lets the whole pattern complete, which CLASSIFIER() reports.
   @Test(dataProvider = "useV2QueryEngine")
   public void testAlternation(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -229,10 +213,8 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
     });
   }
 
-  /**
-   * A bounded quantifier honours both bounds: AAPL can only supply the minimum of two rows, NFLX could supply seven
-   * but is capped at the maximum of three.
-   */
+  /// A bounded quantifier honours both bounds: AAPL can only supply the minimum of two rows, NFLX could supply seven
+  /// but is capped at the maximum of three.
   @Test(dataProvider = "useV2QueryEngine")
   public void testBoundedQuantifier(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -251,13 +233,11 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
     });
   }
 
-  /**
-   * MATCH_NUMBER() restarts at 1 in every partition, CLASSIFIER() reports the label of the final row of the match,
-   * and each single-variable aggregate sees only the rows bound to its own pattern variable.
-   *
-   * <p>COUNT is pinned here because {@code MatchTerm.Aggregate} used to route {@code COUNT(<expr>)} through the
-   * accumulator, which has no COUNT branch. AVG is pinned because an integral result type would truncate 6.5 to 6.
-   */
+  /// MATCH_NUMBER() restarts at 1 in every partition, CLASSIFIER() reports the label of the final row of the match,
+  /// and each single-variable aggregate sees only the rows bound to its own pattern variable.
+  ///
+  /// COUNT is pinned here because `MatchTerm.Aggregate` used to route `COUNT(<expr>)` through the
+  /// accumulator, which has no COUNT branch. AVG is pinned because an integral result type would truncate 6.5 to 6.
   @Test(dataProvider = "useV2QueryEngine")
   public void testMatchNumberClassifierAndAggregates(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -280,19 +260,17 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
     });
   }
 
-  /**
-   * PREV and NEXT are bounded by the partition, not by the input: at a partition boundary they must yield NULL rather
-   * than the neighbouring partition's row.
-   *
-   * <p>The navigations live in DEFINE rather than in MEASURES because Calcite's {@code SqlValidatorImpl
-   * .PatternValidator} unconditionally rejects PREV/NEXT inside a MEASURES item (see
-   * {@link #testDeferredConstructsAreRejected}), so DEFINE is the only place a query can reach them.
-   *
-   * <p>{@code PREV(...)} being NULL makes the whole predicate NULL, which SQL:2016 treats as "not matched". So the
-   * proof that PREV stops at the partition start is that <b>no</b> row with {@code seqCol = 1} appears in the first
-   * result, and the proof that NEXT stops at the partition end is that no partition's last row appears in the second
-   * one - even though every one of those rows would satisfy the predicate against a neighbouring partition's price.
-   */
+  /// PREV and NEXT are bounded by the partition, not by the input: at a partition boundary they must yield NULL rather
+  /// than the neighbouring partition's row.
+  ///
+  /// The navigations live in DEFINE rather than in MEASURES because Calcite's `SqlValidatorImpl
+  /// .PatternValidator` unconditionally rejects PREV/NEXT inside a MEASURES item (see
+  /// [#testDeferredConstructsAreRejected]), so DEFINE is the only place a query can reach them.
+  ///
+  /// `PREV(...)` being NULL makes the whole predicate NULL, which SQL:2016 treats as "not matched". So the
+  /// proof that PREV stops at the partition start is that **no** row with `seqCol = 1` appears in the first
+  /// result, and the proof that NEXT stops at the partition end is that no partition's last row appears in the second
+  /// one - even though every one of those rows would satisfy the predicate against a neighbouring partition's price.
   @Test(dataProvider = "useV2QueryEngine")
   public void testPrevAndNextAreBoundedByPartition(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -324,10 +302,8 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
     });
   }
 
-  /**
-   * PARTITION BY genuinely isolates matches. The {@code ^} and {@code $} anchors are relative to the partition, so
-   * each must match exactly once per symbol; if partitioning leaked they would match once for the whole table.
-   */
+  /// PARTITION BY genuinely isolates matches. The `^` and `$` anchors are relative to the partition, so
+  /// each must match exactly once per symbol; if partitioning leaked they would match once for the whole table.
   @Test(dataProvider = "useV2QueryEngine")
   public void testPartitionIsolationAcrossSegments(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -371,18 +347,16 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
     });
   }
 
-  /**
-   * A multi-column PARTITION BY whose source order is not ascending input-column order.
-   *
-   * <p>The Pinot schema is a {@code TreeMap}, so the input columns are {@code priceCol(0), seqCol(1), symbolCol(2)}
-   * and {@code PARTITION BY symbolCol, priceCol} is therefore in <b>descending</b> index order. Calcite's
-   * {@code Match#getPartitionKeys()} is an {@code ImmutableBitSet}, which loses that order, while the output row type
-   * keeps it - so an engine that read the partition keys off the bit set would write {@code priceCol}'s Integer into
-   * the STRING slot and fail the whole query with a ClassCastException.
-   *
-   * <p>GOOG is the load-bearing row: its three rows all cost 4, so they form one three-row partition and
-   * {@code COUNT(*)} reports 3. Every other (symbol, price) pair is unique and yields a one-row partition.
-   */
+  /// A multi-column PARTITION BY whose source order is not ascending input-column order.
+  ///
+  /// The Pinot schema is a `TreeMap`, so the input columns are `priceCol(0), seqCol(1), symbolCol(2)`
+  /// and `PARTITION BY symbolCol, priceCol` is therefore in **descending** index order. Calcite's
+  /// `Match#getPartitionKeys()` is an `ImmutableBitSet`, which loses that order, while the output row type
+  /// keeps it - so an engine that read the partition keys off the bit set would write `priceCol`'s Integer into
+  /// the STRING slot and fail the whole query with a ClassCastException.
+  ///
+  /// GOOG is the load-bearing row: its three rows all cost 4, so they form one three-row partition and
+  /// `COUNT(*)` reports 3. Every other (symbol, price) pair is unique and yields a one-row partition.
   @Test(dataProvider = "useV2QueryEngine")
   public void testPartitionByKeepsItsSourceOrder(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -406,10 +380,8 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
     });
   }
 
-  /**
-   * Every deferred construct is rejected during planning with a message that names it, rather than producing a wrong
-   * result or an internal Calcite failure.
-   */
+  /// Every deferred construct is rejected during planning with a message that names it, rather than producing a wrong
+  /// result or an internal Calcite failure.
   @Test(dataProvider = "useV2QueryEngine")
   public void testDeferredConstructsAreRejected(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -552,10 +524,8 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
         + ") AS mr ORDER BY symbolCol, start_seq";
   }
 
-  /**
-   * Asserts the full result set of {@code query}, cell by cell. {@code null} expects a SQL NULL, a {@link String}
-   * expects a string, a {@link Double} expects an approximate double and any other {@link Number} an exact integer.
-   */
+  /// Asserts the full result set of `query`, cell by cell. `null` expects a SQL NULL, a [String]
+  /// expects a string, a [Double] expects an approximate double and any other [Number] an exact integer.
   private void assertMatchRows(String query, Object[][] expected)
       throws Exception {
     JsonNode response = postQuery(query);

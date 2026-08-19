@@ -22,39 +22,31 @@ import java.util.List;
 import java.util.Objects;
 
 
-/**
- * A node of the MATCH_RECOGNIZE row pattern tree, i.e. the parsed form of the {@code PATTERN} clause.
- *
- * <p>This is a self-contained representation: pattern variables are referenced by their ordinal in the enclosing
- * {@link MatchNode}'s symbol table, never by name, so an operator never has to string-match variable names. It is
- * also independent of Calcite's encoding of the pattern as a {@code RexCall} tree over string literals.
- *
- * <p>Instances are immutable.
- */
+/// A node of the MATCH_RECOGNIZE row pattern tree, i.e. the parsed form of the `PATTERN` clause.
+///
+/// This is a self-contained representation: pattern variables are referenced by their ordinal in the enclosing
+/// [MatchNode]'s symbol table, never by name, so an operator never has to string-match variable names. It is
+/// also independent of Calcite's encoding of the pattern as a `RexCall` tree over string literals.
+///
+/// Instances are immutable.
 public interface RowPattern {
 
   Kind getKind();
 
-  /**
-   * Renders this pattern into {@code builder} using {@code symbols} to resolve variable ordinals to names, e.g.
-   * {@code (A B* | C){2,3}}. Used for explain plans and error messages.
-   */
+  /// Renders this pattern into `builder` using `symbols` to resolve variable ordinals to names, e.g.
+  /// `(A B* | C){2,3}`. Used for explain plans and error messages.
   void appendTo(StringBuilder builder, List<PatternSymbol> symbols);
 
-  /**
-   * The kind of pattern node.
-   *
-   * <p>The SQL:2016 {@code {- -}} exclusion and {@code PERMUTE(...)} constructs are deliberately absent: they are
-   * rejected at planning time. Their wire values are already pinned in {@code Plan.RowPatternKind} so that adding
-   * them later is a purely additive change.
-   */
+  /// The kind of pattern node.
+  ///
+  /// The SQL:2016 `{- -}` exclusion and `PERMUTE(...)` constructs are deliberately absent: they are
+  /// rejected at planning time. Their wire values are already pinned in `Plan.RowPatternKind` so that adding
+  /// them later is a purely additive change.
   enum Kind {
     SYMBOL, CONCAT, ALTERNATE, QUANTIFY, ANCHOR_START, ANCHOR_END
   }
 
-  /**
-   * A single pattern variable, identified by its ordinal in the enclosing {@link MatchNode}'s symbol table.
-   */
+  /// A single pattern variable, identified by its ordinal in the enclosing [MatchNode]'s symbol table.
   final class Symbol implements RowPattern {
     private final int _symbolOrdinal;
 
@@ -95,9 +87,7 @@ public interface RowPattern {
     }
   }
 
-  /**
-   * Juxtaposition of two or more sub-patterns that must match consecutively, e.g. {@code A B C}.
-   */
+  /// Juxtaposition of two or more sub-patterns that must match consecutively, e.g. `A B C`.
   final class Concat implements RowPattern {
     private final List<RowPattern> _children;
 
@@ -141,10 +131,8 @@ public interface RowPattern {
     }
   }
 
-  /**
-   * Alternation of two or more sub-patterns, e.g. {@code A | B}. Alternatives are ordered: per SQL:2016 the
-   * leftmost alternative that yields a match wins.
-   */
+  /// Alternation of two or more sub-patterns, e.g. `A | B`. Alternatives are ordered: per SQL:2016 the
+  /// leftmost alternative that yields a match wins.
   final class Alternate implements RowPattern {
     private final List<RowPattern> _children;
 
@@ -190,12 +178,10 @@ public interface RowPattern {
     }
   }
 
-  /**
-   * A repetition applied to a single sub-pattern. {@code *}, {@code +} and {@code ?} are normalized into this form:
-   * {@code *} is {@code {0,UNBOUNDED}}, {@code +} is {@code {1,UNBOUNDED}} and {@code ?} is {@code {0,1}}.
-   */
+  /// A repetition applied to a single sub-pattern. `*`, `+` and `?` are normalized into this form:
+  /// `*` is `{0,UNBOUNDED}`, `+` is `{1,UNBOUNDED}` and `?` is `{0,1}`.
   final class Quantify implements RowPattern {
-    /** Sentinel for {@code maxRepeat} meaning "no upper bound", i.e. {@code *}, {@code +} and {@code {n,}}. */
+    /// Sentinel for `maxRepeat` meaning "no upper bound", i.e. `*`, `+` and `{n,}`.
     public static final int UNBOUNDED = -1;
 
     private final RowPattern _child;
@@ -218,17 +204,13 @@ public interface RowPattern {
       return _minRepeat;
     }
 
-    /**
-     * Maximum number of repetitions, or {@link #UNBOUNDED}.
-     */
+    /// Maximum number of repetitions, or [#UNBOUNDED].
     public int getMaxRepeat() {
       return _maxRepeat;
     }
 
-    /**
-     * Whether the quantifier is greedy. The reluctant forms ({@code *?}, {@code +?}, {@code ??}, {@code {n,m}?})
-     * prefer the shortest match.
-     */
+    /// Whether the quantifier is greedy. The reluctant forms (`*?`, `+?`, `??`, `{n,m}?`)
+    /// prefer the shortest match.
     public boolean isGreedy() {
       return _greedy;
     }
@@ -290,9 +272,7 @@ public interface RowPattern {
     }
   }
 
-  /**
-   * The {@code ^} anchor: the match must start at the first row of the partition.
-   */
+  /// The `^` anchor: the match must start at the first row of the partition.
   final class AnchorStart implements RowPattern {
     public static final AnchorStart INSTANCE = new AnchorStart();
 
@@ -320,9 +300,7 @@ public interface RowPattern {
     }
   }
 
-  /**
-   * The {@code $} anchor: the match must end at the last row of the partition.
-   */
+  /// The `$` anchor: the match must end at the last row of the partition.
   final class AnchorEnd implements RowPattern {
     public static final AnchorEnd INSTANCE = new AnchorEnd();
 

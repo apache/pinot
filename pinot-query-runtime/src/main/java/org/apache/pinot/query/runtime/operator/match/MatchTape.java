@@ -25,36 +25,37 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.PatternSymbol;
 
 
-/**
- * The classifier tape of the match currently being explored: which pattern variable each row of the candidate match
- * is mapped to, plus everything the MEASURES and DEFINE expressions need in order to navigate it.
- *
- * <h2>Append only, O(1) backtrack</h2>
- * The tape grows by one entry every time the matcher consumes a row ({@link #push}) and shrinks by one every time it
- * backtracks over that row ({@link #pop}). Both are O(1): {@link #pop} only decrements lengths, it never rebuilds an
- * index. The per symbol position lists are maintained the same way, which makes {@link #lastRow} and
- * {@link #firstRow} O(1) as well, so logical navigation does not degrade into a scan of the match.
- *
- * <h2>Rows are addressed by partition index</h2>
- * All row indexes handed out by this class are indexes into the partition, not into the match, because physical
- * navigation ({@code PREV} / {@code NEXT}) may leave the match while staying inside the partition. The invariant
- * {@code getEndPos() == getStartPos() + getLength()} always holds: the rows of a match are contiguous.
- *
- * <h2>Running semantics</h2>
- * While the matcher is exploring, the tape holds only the rows matched so far, so a DEFINE predicate evaluated
- * through it automatically sees SQL:2016 <i>running</i> semantics. The candidate row is pushed <i>before</i> its own
- * predicate is evaluated, which is what makes {@code PREV(A.col, 0)} inside {@code DEFINE A} resolve to the current
- * row. Once the match is complete the tape holds all of its rows, so the same lookups give <i>final</i> semantics for
- * MEASURES.
- *
- * <p>Not thread safe: one instance belongs to one {@link PartitionMatcher}.
- */
+/// The classifier tape of the match currently being explored: which pattern variable each row of the candidate match
+/// is mapped to, plus everything the MEASURES and DEFINE expressions need in order to navigate it.
+///
+/// ## Append only, O(1) backtrack
+///
+/// The tape grows by one entry every time the matcher consumes a row ([#push]) and shrinks by one every time it
+/// backtracks over that row ([#pop]). Both are O(1): [#pop] only decrements lengths, it never rebuilds an
+/// index. The per symbol position lists are maintained the same way, which makes [#lastRow] and
+/// [#firstRow] O(1) as well, so logical navigation does not degrade into a scan of the match.
+///
+/// ## Rows are addressed by partition index
+///
+/// All row indexes handed out by this class are indexes into the partition, not into the match, because physical
+/// navigation (`PREV` / `NEXT`) may leave the match while staying inside the partition. The invariant
+/// `getEndPos() == getStartPos() + getLength()` always holds: the rows of a match are contiguous.
+///
+/// ## Running semantics
+///
+/// While the matcher is exploring, the tape holds only the rows matched so far, so a DEFINE predicate evaluated
+/// through it automatically sees SQL:2016 *running* semantics. The candidate row is pushed *before* its own
+/// predicate is evaluated, which is what makes `PREV(A.col, 0)` inside `DEFINE A` resolve to the current
+/// row. Once the match is complete the tape holds all of its rows, so the same lookups give *final* semantics for
+/// MEASURES.
+///
+/// Not thread safe: one instance belongs to one [PartitionMatcher].
 public class MatchTape {
-  /** Returned by {@link #lastRow} and {@link #firstRow} when no such row exists. */
+  /// Returned by [#lastRow] and [#firstRow] when no such row exists.
   public static final int NO_ROW = -1;
 
   private final List<PatternSymbol> _patternSymbols;
-  /** Partition row indexes mapped to each symbol, in ascending order; index is the symbol ordinal. */
+  /// Partition row indexes mapped to each symbol, in ascending order; index is the symbol ordinal.
   private final IntArrayList[] _rowsBySymbol;
 
   private List<Object[]> _partitionRows = List.of();
@@ -71,10 +72,8 @@ public class MatchTape {
     }
   }
 
-  /**
-   * Starts a new match attempt at {@code startPos} of {@code partitionRows}. {@code matchNumber} is the value
-   * {@code MATCH_NUMBER()} reports, which SQL:2016 assigns before the match is known to succeed.
-   */
+  /// Starts a new match attempt at `startPos` of `partitionRows`. `matchNumber` is the value
+  /// `MATCH_NUMBER()` reports, which SQL:2016 assigns before the match is known to succeed.
   public void reset(List<Object[]> partitionRows, int startPos, long matchNumber) {
     _partitionRows = partitionRows;
     _startPos = startPos;
@@ -85,9 +84,7 @@ public class MatchTape {
     }
   }
 
-  /**
-   * Maps the row at {@link #getEndPos()} to {@code symbolOrdinal} and extends the tape by one row.
-   */
+  /// Maps the row at [#getEndPos()] to `symbolOrdinal` and extends the tape by one row.
   public void push(int symbolOrdinal) {
     if (_length == _labels.length) {
       int[] grown = new int[_labels.length * 2];
@@ -99,9 +96,7 @@ public class MatchTape {
     _length++;
   }
 
-  /**
-   * Removes the last row from the tape. O(1); this is what makes backtracking cheap.
-   */
+  /// Removes the last row from the tape. O(1); this is what makes backtracking cheap.
   public void pop() {
     _length--;
     IntArrayList rows = _rowsBySymbol[_labels[_length]];
@@ -112,23 +107,17 @@ public class MatchTape {
     return _partitionRows;
   }
 
-  /**
-   * Partition index of the first row of the match.
-   */
+  /// Partition index of the first row of the match.
   public int getStartPos() {
     return _startPos;
   }
 
-  /**
-   * Partition index one past the last row of the match, i.e. where the next row would be consumed.
-   */
+  /// Partition index one past the last row of the match, i.e. where the next row would be consumed.
   public int getEndPos() {
     return _startPos + _length;
   }
 
-  /**
-   * Number of rows currently on the tape.
-   */
+  /// Number of rows currently on the tape.
   public int getLength() {
     return _length;
   }
@@ -137,31 +126,25 @@ public class MatchTape {
     return _matchNumber;
   }
 
-  /**
-   * Symbol ordinal the row at partition index {@code rowIndex} is mapped to, or {@link #NO_ROW} if that row is not
-   * part of the match.
-   */
+  /// Symbol ordinal the row at partition index `rowIndex` is mapped to, or [#NO_ROW] if that row is not
+  /// part of the match.
   public int labelAt(int rowIndex) {
     int offset = rowIndex - _startPos;
     return offset >= 0 && offset < _length ? _labels[offset] : NO_ROW;
   }
 
-  /**
-   * Name of the pattern variable the row at partition index {@code rowIndex} is mapped to, i.e. the value of
-   * {@code CLASSIFIER()} at that row, or {@code null} if that row is not part of the match.
-   */
+  /// Name of the pattern variable the row at partition index `rowIndex` is mapped to, i.e. the value of
+  /// `CLASSIFIER()` at that row, or `null` if that row is not part of the match.
   @Nullable
   public String classifierAt(int rowIndex) {
     int label = labelAt(rowIndex);
     return label == NO_ROW ? null : _patternSymbols.get(label).getName();
   }
 
-  /**
-   * Partition index of the {@code (offset + 1)}-th row from the <b>end</b> of the rows mapped to
-   * {@code symbolOrdinal}, i.e. the row {@code LAST(symbol.col, offset)} designates. Pass
-   * {@link RexExpression.PatternFieldRef#UNIVERSAL_SYMBOL_ORDINAL} to navigate the rows of the whole match instead of
-   * a single variable. Returns {@link #NO_ROW} if there are not that many such rows.
-   */
+  /// Partition index of the `(offset + 1)`-th row from the **end** of the rows mapped to
+  /// `symbolOrdinal`, i.e. the row `LAST(symbol.col, offset)` designates. Pass
+  /// [RexExpression.PatternFieldRef#UNIVERSAL_SYMBOL_ORDINAL] to navigate the rows of the whole match instead of
+  /// a single variable. Returns [#NO_ROW] if there are not that many such rows.
   public int lastRow(int symbolOrdinal, int offset) {
     if (symbolOrdinal == RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL) {
       int index = _length - 1 - offset;
@@ -172,11 +155,9 @@ public class MatchTape {
     return index >= 0 ? rows.getInt(index) : NO_ROW;
   }
 
-  /**
-   * Partition index of the {@code (offset + 1)}-th row from the <b>start</b> of the rows mapped to
-   * {@code symbolOrdinal}, i.e. the row {@code FIRST(symbol.col, offset)} designates. Behaves like {@link #lastRow}
-   * otherwise.
-   */
+  /// Partition index of the `(offset + 1)`-th row from the **start** of the rows mapped to
+  /// `symbolOrdinal`, i.e. the row `FIRST(symbol.col, offset)` designates. Behaves like [#lastRow]
+  /// otherwise.
   public int firstRow(int symbolOrdinal, int offset) {
     if (symbolOrdinal == RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL) {
       return offset < _length ? _startPos + offset : NO_ROW;
@@ -185,11 +166,9 @@ public class MatchTape {
     return offset < rows.size() ? rows.getInt(offset) : NO_ROW;
   }
 
-  /**
-   * Partition indexes of the rows mapped to {@code symbolOrdinal}, in ascending order, or of the whole match for
-   * {@link RexExpression.PatternFieldRef#UNIVERSAL_SYMBOL_ORDINAL}. Used by the MEASURES aggregates. The returned
-   * list is the live backing list and is invalidated by the next {@link #push} or {@link #pop}.
-   */
+  /// Partition indexes of the rows mapped to `symbolOrdinal`, in ascending order, or of the whole match for
+  /// [RexExpression.PatternFieldRef#UNIVERSAL_SYMBOL_ORDINAL]. Used by the MEASURES aggregates. The returned
+  /// list is the live backing list and is invalidated by the next [#push] or [#pop].
   public IntArrayList rowsOf(int symbolOrdinal) {
     if (symbolOrdinal == RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL) {
       IntArrayList allRows = new IntArrayList(_length);
