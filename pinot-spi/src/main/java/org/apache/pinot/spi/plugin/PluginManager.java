@@ -34,10 +34,13 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -482,13 +485,9 @@ public class PluginManager {
   /// and loaded into a dedicated [ClassRealm]. Legacy shaded plugins (loaded via
   /// [PluginClassLoader]) are excluded — new SPIs should only target new-style plugins.
   ///
-  /// Intended for `ServiceLoader` enumeration across plugin classloaders:
-  ///
-  /// ```java
-  /// for (ClassLoader cl : PluginManager.get().getPluginClassLoaders()) {
-  ///   for (MyService svc : ServiceLoader.load(MyService.class, cl)) { ... }
-  /// }
-  /// ```
+  /// Prefer [#loadServiceProviders(Class)] for `ServiceLoader` enumeration across the
+  /// context classloader and plugin classloaders; use this accessor directly only when a
+  /// caller needs the raw classloaders.
   ///
   /// Call after all plugins have been loaded; classloaders added after this
   /// call returns will not appear in the snapshot.
@@ -501,6 +500,93 @@ public class PluginManager {
       }
     }
     return Collections.unmodifiableSet(result);
+  }
+
+  /// Discovers service providers of the given service type via `ServiceLoader`, first from the thread context
+  /// classloader (the application classpath in a standard deployment), then from every plugin classloader (see
+  /// [#getPluginClassLoaders()]), in that order.
+  ///
+  /// Providers are de-duplicated by fully-qualified class name across classloaders: overlapping classpaths (e.g.
+  /// fat-jar + plugin realm) can surface the same provider through multiple loaders, and the first sighting wins.
+  /// A same-named provider whose `Class` object differs from the first sighting indicates version skew between
+  /// classloaders; it is logged at WARN and skipped.
+  ///
+  /// Each returned entry pairs the provider instance with a human-readable description of the classloader it was
+  /// discovered from, for use in call-site log and error messages. Enumeration failures
+  /// ([ServiceConfigurationError] — malformed descriptors, provider classes that cannot be found, are not subtypes
+  /// of the service type, or fail to construct) fail fast as [IllegalStateException] carrying the source
+  /// description, with the original error preserved as the cause. Per-provider validation and registration policy
+  /// stay with the caller.
+  ///
+  /// Returns an unmodifiable, freshly computed list — never null, empty when no providers are found. Thread-safe:
+  /// each call performs a fresh enumeration using only method-local state (the plugin classloader snapshot is taken
+  /// under the existing lock), and the result reflects the calling thread's context classloader.
+  ///
+  /// Call after all plugins have been loaded; plugin classloaders registered after this call returns are not
+  /// searched.
+  public <S> List<ServiceProvider<S>> loadServiceProviders(Class<S> serviceClass) {
+    List<ServiceProvider<S>> providers = new ArrayList<>();
+    Map<String, Class<?>> seenProviderClasses = new HashMap<>();
+    collectServiceProviders(ServiceLoader.load(serviceClass), serviceClass, "thread context classloader", providers,
+        seenProviderClasses);
+    for (ClassLoader pluginClassLoader : getPluginClassLoaders()) {
+      collectServiceProviders(ServiceLoader.load(serviceClass, pluginClassLoader), serviceClass,
+          "plugin classloader: " + pluginClassLoader, providers, seenProviderClasses);
+    }
+    return Collections.unmodifiableList(providers);
+  }
+
+  private static <S> void collectServiceProviders(ServiceLoader<S> serviceLoader, Class<S> serviceClass, String source,
+      List<ServiceProvider<S>> providers, Map<String, Class<?>> seenProviderClasses) {
+    Iterator<S> iterator = serviceLoader.iterator();
+    while (true) {
+      S provider;
+      try {
+        if (!iterator.hasNext()) {
+          return;
+        }
+        provider = iterator.next();
+      } catch (ServiceConfigurationError e) {
+        throw new IllegalStateException(
+            "Failed to load a " + serviceClass.getName() + " service provider from: " + source, e);
+      }
+      Class<?> providerClass = provider.getClass();
+      String providerClassName = providerClass.getName();
+      Class<?> seenClass = seenProviderClasses.putIfAbsent(providerClassName, providerClass);
+      if (seenClass != null) {
+        // Same provider already discovered through an overlapping classloader. A different Class object with the
+        // same name indicates version skew between classloaders; the first discovered copy wins.
+        if (seenClass != providerClass) {
+          LOGGER.warn("Ignoring duplicate service provider class: {} (classloader: {}, discovered from: {}); keeping "
+                  + "the copy from classloader: {}", providerClassName, providerClass.getClassLoader(), source,
+              seenClass.getClassLoader());
+        }
+        continue;
+      }
+      providers.add(new ServiceProvider<>(provider, source));
+    }
+  }
+
+  /// A service provider discovered by [#loadServiceProviders(Class)], paired with a human-readable description of
+  /// the classloader it was discovered from. Immutable and thread-safe.
+  public static final class ServiceProvider<S> {
+    private final S _provider;
+    private final String _source;
+
+    private ServiceProvider(S provider, String source) {
+      _provider = provider;
+      _source = source;
+    }
+
+    public S getProvider() {
+      return _provider;
+    }
+
+    /// Returns a human-readable description of the classloader the provider was discovered from, for use in log
+    /// and error messages.
+    public String getSource() {
+      return _source;
+    }
   }
 
   public static PluginManager get() {
