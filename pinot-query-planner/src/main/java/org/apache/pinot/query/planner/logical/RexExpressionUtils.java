@@ -37,6 +37,7 @@ import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexPatternFieldRef;
 import org.apache.calcite.rex.RexUnknownAs;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlIdentifier;
@@ -67,7 +68,11 @@ public class RexExpressionUtils {
   }
 
   public static RexNode toRexNode(RelBuilder builder, RexExpression rexExpression) {
-    if (rexExpression instanceof RexExpression.InputRef) {
+    // NOTE: PatternFieldRef does not extend InputRef, but it must still be handled before it for symmetry with
+    // fromRexNode: a pattern field reference that fell through to the InputRef branch would lose its variable.
+    if (rexExpression instanceof RexExpression.PatternFieldRef) {
+      return toRexPatternFieldRef(builder, (RexExpression.PatternFieldRef) rexExpression);
+    } else if (rexExpression instanceof RexExpression.InputRef) {
       return toRexInputRef(builder, (RexExpression.InputRef) rexExpression);
     } else if (rexExpression instanceof RexExpression.Literal) {
       return toRexLiteral(builder, (RexExpression.Literal) rexExpression);
@@ -80,6 +85,12 @@ public class RexExpressionUtils {
 
   private static RexNode toRexInputRef(RelBuilder builder, RexExpression.InputRef rexExpression) {
     return builder.field(rexExpression.getIndex());
+  }
+
+  private static RexNode toRexPatternFieldRef(RelBuilder builder, RexExpression.PatternFieldRef rexExpression) {
+    RexNode field = builder.field(rexExpression.getIndex());
+    return field instanceof RexInputRef ? RexPatternFieldRef.of(rexExpression.getAlpha(), (RexInputRef) field)
+        : new RexPatternFieldRef(rexExpression.getAlpha(), rexExpression.getIndex(), field.getType());
   }
 
   private static RexNode toRexCall(RelBuilder builder, RexExpression.FunctionCall rexExpression) {
@@ -194,7 +205,12 @@ public class RexExpressionUtils {
   }
 
   public static RexExpression fromRexNode(RexNode rexNode) {
-    if (rexNode instanceof RexInputRef) {
+    // NOTE: RexPatternFieldRef extends RexInputRef, so it MUST be checked first. Falling through to the RexInputRef
+    // branch drops the pattern variable and degrades `UP.price` into a read of the current row's column: results that
+    // are wrong but still type-correct, and therefore invisible.
+    if (rexNode instanceof RexPatternFieldRef) {
+      return fromRexPatternFieldRef((RexPatternFieldRef) rexNode);
+    } else if (rexNode instanceof RexInputRef) {
       return fromRexInputRef((RexInputRef) rexNode);
     } else if (rexNode instanceof RexLiteral) {
       return fromRexLiteral((RexLiteral) rexNode);
@@ -215,6 +231,19 @@ public class RexExpressionUtils {
 
   public static RexExpression.InputRef fromRexInputRef(RexInputRef rexInputRef) {
     return new RexExpression.InputRef(rexInputRef.getIndex());
+  }
+
+  /**
+   * Converts a MATCH_RECOGNIZE pattern field reference (e.g. {@code UP.price} inside MEASURES or DEFINE).
+   *
+   * <p>The pattern symbol table is not known here, so the returned reference carries
+   * {@link RexExpression.PatternFieldRef#UNRESOLVED_SYMBOL_ORDINAL}. The MATCH_RECOGNIZE planning pass must bind it
+   * to the symbol ordinal before the plan is serialized; the serializer rejects unresolved ordinals rather than
+   * writing an ambiguous reference to the wire.
+   */
+  public static RexExpression.PatternFieldRef fromRexPatternFieldRef(RexPatternFieldRef rexPatternFieldRef) {
+    return new RexExpression.PatternFieldRef(rexPatternFieldRef.getIndex(),
+        RexExpression.PatternFieldRef.UNRESOLVED_SYMBOL_ORDINAL, rexPatternFieldRef.getAlpha());
   }
 
   public static RexExpression.Literal fromRexLiteral(RexLiteral rexLiteral) {

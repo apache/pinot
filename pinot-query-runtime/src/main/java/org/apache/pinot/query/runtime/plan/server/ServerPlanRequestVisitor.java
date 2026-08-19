@@ -38,6 +38,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -332,6 +333,15 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   public Void visitUnnest(UnnestNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
       // Unnest is not runnable on leaf, use its input as the boundary.
+      context.setLeafStageBoundaryNode(node.getInputs().get(0));
+    }
+    return null;
+  }
+
+  @Override
+  public Void visitMatch(MatchNode node, ServerPlanRequestContext context) {
+    if (visit(node.getInputs().get(0), context)) {
+      // MATCH_RECOGNIZE is not runnable on leaf, use its input as the boundary.
       context.setLeafStageBoundaryNode(node.getInputs().get(0));
     }
     return null;

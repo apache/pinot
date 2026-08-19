@@ -52,6 +52,27 @@ message InputRef {
   int32 index = 1;
 }
 
+// A reference to a column of the row bound to a specific MATCH_RECOGNIZE pattern variable, as it appears inside
+// MEASURES and DEFINE expressions. Mirrors Calcite's RexPatternFieldRef, which carries the pattern variable
+// alongside the input index.
+//
+// This is deliberately NOT modelled as an InputRef. RexPatternFieldRef extends RexInputRef, so anything that only
+// looks at the index silently turns `DEFINE UP AS UP.price > PREV(UP.price)` into a read of the current row's
+// column: results that are wrong but still type-correct, and therefore invisible. Any consumer that does not
+// understand this expression case must fail loudly instead of degrading it to an InputRef.
+//
+// Only meaningful inside a MatchNode: symbolOrdinal indexes MatchNode.patternSymbols.
+message PatternFieldRef {
+  // Column index into the MatchNode input row.
+  int32 index = 1;
+  // Ordinal of the pattern variable this reference is bound to, i.e. the index into MatchNode.patternSymbols.
+  // This is the authoritative identification of the variable.
+  int32 symbolOrdinal = 2;
+  // Pattern variable name as written in the query, carried for explain plans and error messages only.
+  // Consumers must resolve the variable through symbolOrdinal and never string-match on this field.
+  string alpha = 3;
+}
+
 message Literal {
   ColumnDataType dataType = 1;
   oneof value {
@@ -108,5 +129,6 @@ message Expression {
     InputRef inputRef = 1;
     Literal literal = 2;
     FunctionCall functionCall = 3;
+    PatternFieldRef patternFieldRef = 4;
   }
 }
