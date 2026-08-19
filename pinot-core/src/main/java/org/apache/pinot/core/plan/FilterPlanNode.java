@@ -47,6 +47,7 @@ import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.MapFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
+import org.apache.pinot.core.operator.filter.VectorCandidateScope;
 import org.apache.pinot.core.operator.filter.VectorDistanceUtils;
 import org.apache.pinot.core.operator.filter.VectorRadiusFilterOperator;
 import org.apache.pinot.core.operator.filter.VectorSearchMode;
@@ -65,6 +66,7 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
+import org.apache.pinot.segment.spi.index.reader.FilterAwareVectorIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
@@ -72,6 +74,7 @@ import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -80,6 +83,8 @@ public class FilterPlanNode implements PlanNode {
   private final SegmentContext _segmentContext;
   private final QueryContext _queryContext;
   private final FilterContext _filter;
+  @Nullable
+  private VectorCandidateScope _requiredVectorCandidateScope;
 
   // Cache the predicate evaluators
   private final List<Pair<Predicate, PredicateEvaluator>> _predicateEvaluators = new ArrayList<>(4);
@@ -97,20 +102,29 @@ public class FilterPlanNode implements PlanNode {
 
   @Override
   public BaseFilterOperator run() {
-    MutableRoaringBitmap docIdsSnapshot = _segmentContext.getDocIdsSnapshot();
     int numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
+    MutableRoaringBitmap docIdsSnapshot = _segmentContext.getDocIdsSnapshot();
+    // Vector top-K is not monotonic, so a restricted visible-document set must reach candidate generation instead of
+    // only being intersected with the result. Test the snapshot first so ordinary queries skip the filter tree walk.
+    _requiredVectorCandidateScope = docIdsSnapshot != null && _filter != null && containsVectorPredicate(_filter)
+        ? VectorCandidateScope.of(docIdsSnapshot) : null;
+
+    // Candidate generation and the outer valid-document AND must observe the same document set for this query.
+    ImmutableRoaringBitmap outerDocIdsSnapshot = _requiredVectorCandidateScope != null
+        ? _requiredVectorCandidateScope.getRequiredDocIds() : docIdsSnapshot;
 
     if (_filter != null) {
       BaseFilterOperator filterOperator = constructPhysicalOperator(_filter, numDocs);
-      if (docIdsSnapshot != null) {
-        BaseFilterOperator validDocFilter = new BitmapBasedFilterOperator(docIdsSnapshot, false, numDocs);
+      if (outerDocIdsSnapshot != null) {
+        BaseFilterOperator validDocFilter =
+            new BitmapBasedFilterOperator(outerDocIdsSnapshot, false, numDocs);
         return FilterOperatorUtils.getAndFilterOperator(_queryContext, Arrays.asList(filterOperator, validDocFilter),
             numDocs);
       } else {
         return filterOperator;
       }
-    } else if (docIdsSnapshot != null) {
-      return new BitmapBasedFilterOperator(docIdsSnapshot, false, numDocs);
+    } else if (outerDocIdsSnapshot != null) {
+      return new BitmapBasedFilterOperator(outerDocIdsSnapshot, false, numDocs);
     } else {
       return new MatchAllFilterOperator(numDocs);
     }
@@ -367,8 +381,26 @@ public class FilterPlanNode implements PlanNode {
     boolean isMutableSegment = _indexSegment.getSegmentMetadata().isMutableSegment();
     VectorSearchParams searchParams = VectorSearchParams.fromQueryOptions(_queryContext.getQueryOptions());
 
+    // Nothing in this segment is visible to the query, so no candidate generation is needed and no reader
+    // capability is required. The outer valid-document AND would discard any result anyway.
+    if (_requiredVectorCandidateScope != null && _requiredVectorCandidateScope.isEmpty()) {
+      return EmptyFilterOperator.getInstance();
+    }
+
     if (vectorIndex != null) {
-      // ANN index path: pass forward index reader if rerank or threshold search requires exact distances
+      // A required candidate scope can only be honored by a reader that does filtered search. When it cannot, the
+      // ANN index is unusable for this query and an exact scan over the allowed documents is the correct plan --
+      // decided here, where both the reader capability and the forward index availability are known.
+      if (_requiredVectorCandidateScope != null && !supportsPreFilter(vectorIndex)) {
+        ForwardIndexReader<?> exactScanReader = dataSource.getForwardIndex();
+        Preconditions.checkState(exactScanReader != null,
+            "Cannot honor required candidate doc IDs on vector column: %s -- vector index reader does not support "
+                + "filtered search and no forward index is available", column);
+        return new ExactVectorScanFilterOperator(exactScanReader, predicate, column, numDocs, vectorIndexConfig,
+            getFilteredSearchUnsupportedReason(isMutableSegment), searchParams, _requiredVectorCandidateScope);
+      }
+
+      // ANN index path: pass the forward index when rerank or threshold needs exact distances.
       ForwardIndexReader<?> forwardIndexReader = null;
       VectorBackendType backendType = VectorDistanceUtils.resolveBackendType(vectorIndexConfig);
       if (searchParams.isExactRerank(backendType) || searchParams.hasDistanceThreshold()) {
@@ -378,7 +410,7 @@ public class FilterPlanNode implements PlanNode {
             column);
       }
       return new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs, searchParams, forwardIndexReader,
-          vectorIndexConfig, hasMetadataFilter);
+          vectorIndexConfig, hasMetadataFilter, _requiredVectorCandidateScope);
     }
 
     // Exact scan fallback: no vector index on this segment
@@ -386,7 +418,7 @@ public class FilterPlanNode implements PlanNode {
     Preconditions.checkState(forwardIndexReader != null,
         "Cannot apply VECTOR_SIMILARITY on column: %s -- no vector index and no forward index available", column);
     return new ExactVectorScanFilterOperator(forwardIndexReader, predicate, column, numDocs, vectorIndexConfig,
-        getVectorFallbackReason(vectorIndexConfig, isMutableSegment), searchParams);
+        getVectorFallbackReason(vectorIndexConfig, isMutableSegment), searchParams, _requiredVectorCandidateScope);
   }
 
   /// Constructs a vector operator for a VECTOR_SIMILARITY predicate that is part of an AND
@@ -460,8 +492,8 @@ public class FilterPlanNode implements PlanNode {
   /// The [VectorSearchStrategy] selectivity check below ensures queries only pay this cost when the estimated
   /// cardinality suggests pre-filtering is worthwhile.
   ///
-  /// If no vector operators are found, this method is a no-op. A query whose reader does not support
-  /// pre-filtering retains the default post-filter path.
+  /// If no vector operators are found, this method is a no-op. A query whose reader does not support pre-filtering
+  /// retains the default post-filter path.
   ///
   /// @param childOperators the list of child filter operators under an AND node
   /// @param numDocs total documents in the segment
@@ -558,6 +590,18 @@ public class FilterPlanNode implements PlanNode {
         vectorOp.setPreFilterBitmap(combinedBitmap);
       }
     }
+  }
+
+  private static boolean supportsPreFilter(VectorIndexReader vectorIndex) {
+    return vectorIndex instanceof FilterAwareVectorIndexReader
+        && ((FilterAwareVectorIndexReader) vectorIndex).supportsPreFilter();
+  }
+
+  /// Reason reported by [ExactVectorScanFilterOperator] when a vector index exists but cannot restrict its search to
+  /// the documents the query is allowed to see.
+  private static String getFilteredSearchUnsupportedReason(boolean isMutableSegment) {
+    return isMutableSegment ? "mutable_vector_index_not_filter_aware"
+        : "vector_index_not_filter_aware";
   }
 
   private static String getVectorFallbackReason(@Nullable VectorIndexConfig vectorIndexConfig,
