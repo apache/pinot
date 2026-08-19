@@ -27,8 +27,9 @@ import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
+
 
 /// Synthetic [BlockValSet] for testing and benchmarking.
 public class SyntheticBlockValSets {
@@ -138,6 +139,105 @@ public class SyntheticBlockValSets {
     }
   }
 
+  /// A [BlockValSet] for a dictionary-encoded multi-value column, which exposes dictionary ids rather than values.
+  ///
+  /// Functions that collect dictionary ids take a different path from the one that reads values, and resolve the ids
+  /// against the dictionary only when the result is extracted.
+  public static class DictIdsMV extends Base {
+
+    @Nullable
+    final RoaringBitmap _nullBitmap;
+    final int[][] _dictIds;
+    final Dictionary _dictionary;
+    final DataType _valueType;
+
+    private DictIdsMV(@Nullable RoaringBitmap nullBitmap, int[][] dictIds, Dictionary dictionary, DataType valueType) {
+      _nullBitmap = nullBitmap;
+      _dictIds = dictIds;
+      _dictionary = dictionary;
+      _valueType = valueType;
+    }
+
+    public static DictIdsMV create(@Nullable RoaringBitmap nullBitmap, int[][] dictIds, Dictionary dictionary,
+        DataType valueType) {
+      return new DictIdsMV(nullBitmap, dictIds, dictionary, valueType);
+    }
+
+    @Nullable
+    @Override
+    public RoaringBitmap getNullBitmap() {
+      return _nullBitmap;
+    }
+
+    @Override
+    public DataType getValueType() {
+      return _valueType;
+    }
+
+    @Override
+    public boolean isSingleValue() {
+      return false;
+    }
+
+    @Nullable
+    @Override
+    public Dictionary getDictionary() {
+      return _dictionary;
+    }
+
+    @Override
+    public int[][] getDictionaryIdsMV() {
+      return _dictIds;
+    }
+  }
+
+  /// A simple [BlockValSet] for nullable, not dictionary-encoded int values.
+  public static class Int extends Base {
+
+    @Nullable
+    final RoaringBitmap _nullBitmap;
+    final int[] _values;
+
+    private Int(@Nullable RoaringBitmap nullBitmap, int[] values) {
+      _nullBitmap = nullBitmap;
+      _values = values;
+    }
+
+    public static Int create(int numDocs, @Nullable RoaringBitmap nullBitmap, IntSupplier supplier) {
+      Preconditions.checkArgument(nullBitmap == null || nullBitmap.last() < numDocs, "null bitmap larger than numDocs");
+      int[] values = new int[numDocs];
+      for (int i = 0; i < numDocs; i++) {
+        values[i] = supplier.getAsInt();
+      }
+      return new Int(nullBitmap, values);
+    }
+
+    public static Int create(@Nullable RoaringBitmap nullBitmap, int[] values) {
+      return new Int(nullBitmap, values);
+    }
+
+    @Nullable
+    @Override
+    public RoaringBitmap getNullBitmap() {
+      return _nullBitmap;
+    }
+
+    @Override
+    public DataType getValueType() {
+      return DataType.INT;
+    }
+
+    @Override
+    public boolean isSingleValue() {
+      return true;
+    }
+
+    @Override
+    public int[] getIntValuesSV() {
+      return _values;
+    }
+  }
+
   /// A simple [BlockValSet] for nullable, not dictionary-encoded long values.
   public static class Long extends Base {
 
@@ -159,8 +259,7 @@ public class SyntheticBlockValSets {
     }
 
     public static Long create(int numDocs, @Nullable RoaringBitmap nullBitmap, LongSupplier supplier) {
-      Preconditions.checkArgument(nullBitmap == null || nullBitmap.last() < numDocs,
-          "null bitmap larger than numDocs");
+      Preconditions.checkArgument(nullBitmap == null || nullBitmap.last() < numDocs, "null bitmap larger than numDocs");
       long[] values = new long[numDocs];
       for (int i = 0; i < numDocs; i++) {
         values[i] = supplier.getAsLong();
@@ -180,8 +279,8 @@ public class SyntheticBlockValSets {
     }
 
     @Override
-    public FieldSpec.DataType getValueType() {
-      return FieldSpec.DataType.LONG;
+    public DataType getValueType() {
+      return DataType.LONG;
     }
 
     @Override
@@ -191,6 +290,44 @@ public class SyntheticBlockValSets {
 
     @Override
     public long[] getLongValuesSV() {
+      return _values;
+    }
+  }
+
+  /// A simple [BlockValSet] for nullable, not dictionary-encoded multi-value long values.
+  public static class LongMV extends Base {
+
+    @Nullable
+    final RoaringBitmap _nullBitmap;
+    final long[][] _values;
+
+    private LongMV(@Nullable RoaringBitmap nullBitmap, long[][] values) {
+      _nullBitmap = nullBitmap;
+      _values = values;
+    }
+
+    public static LongMV create(@Nullable RoaringBitmap nullBitmap, long[][] values) {
+      return new LongMV(nullBitmap, values);
+    }
+
+    @Nullable
+    @Override
+    public RoaringBitmap getNullBitmap() {
+      return _nullBitmap;
+    }
+
+    @Override
+    public DataType getValueType() {
+      return DataType.LONG;
+    }
+
+    @Override
+    public boolean isSingleValue() {
+      return false;
+    }
+
+    @Override
+    public long[][] getLongValuesMV() {
       return _values;
     }
   }
@@ -216,8 +353,7 @@ public class SyntheticBlockValSets {
     }
 
     public static Double create(int numDocs, @Nullable RoaringBitmap nullBitmap, DoubleSupplier supplier) {
-      Preconditions.checkArgument(nullBitmap == null || nullBitmap.last() < numDocs,
-          "null bitmap larger than numDocs");
+      Preconditions.checkArgument(nullBitmap == null || nullBitmap.last() < numDocs, "null bitmap larger than numDocs");
       double[] values = new double[numDocs];
       for (int i = 0; i < numDocs; i++) {
         values[i] = supplier.getAsDouble();
@@ -237,8 +373,8 @@ public class SyntheticBlockValSets {
     }
 
     @Override
-    public FieldSpec.DataType getValueType() {
-      return FieldSpec.DataType.DOUBLE;
+    public DataType getValueType() {
+      return DataType.DOUBLE;
     }
 
     @Override
@@ -269,8 +405,7 @@ public class SyntheticBlockValSets {
     }
 
     public static Str create(int numDocs, @Nullable RoaringBitmap nullBitmap, Supplier<String> supplier) {
-      Preconditions.checkArgument(nullBitmap == null || nullBitmap.last() < numDocs,
-          "null bitmap larger than numDocs");
+      Preconditions.checkArgument(nullBitmap == null || nullBitmap.last() < numDocs, "null bitmap larger than numDocs");
       String[] values = new String[numDocs];
       for (int i = 0; i < numDocs; i++) {
         values[i] = supplier.get();
@@ -289,8 +424,8 @@ public class SyntheticBlockValSets {
     }
 
     @Override
-    public FieldSpec.DataType getValueType() {
-      return FieldSpec.DataType.STRING;
+    public DataType getValueType() {
+      return DataType.STRING;
     }
 
     @Override
@@ -317,8 +452,7 @@ public class SyntheticBlockValSets {
     }
 
     public static Bytes create(int numDocs, @Nullable RoaringBitmap nullBitmap, Supplier<byte[]> supplier) {
-      Preconditions.checkArgument(nullBitmap == null || nullBitmap.last() < numDocs,
-          "null bitmap larger than numDocs");
+      Preconditions.checkArgument(nullBitmap == null || nullBitmap.last() < numDocs, "null bitmap larger than numDocs");
       byte[][] values = new byte[numDocs][];
       for (int i = 0; i < numDocs; i++) {
         values[i] = supplier.get();
@@ -337,8 +471,8 @@ public class SyntheticBlockValSets {
     }
 
     @Override
-    public FieldSpec.DataType getValueType() {
-      return FieldSpec.DataType.BYTES;
+    public DataType getValueType() {
+      return DataType.BYTES;
     }
 
     @Override
@@ -348,54 +482,6 @@ public class SyntheticBlockValSets {
 
     @Override
     public byte[][] getBytesValuesSV() {
-      return _values;
-    }
-  }
-
-  /// A simple [BlockValSet] for nullable, not dictionary-encoded int values.
-  public static class Int extends Base {
-
-    @Nullable
-    final RoaringBitmap _nullBitmap;
-    final int[] _values;
-
-    private Int(@Nullable RoaringBitmap nullBitmap, int[] values) {
-      _nullBitmap = nullBitmap;
-      _values = values;
-    }
-
-    public static Int create(int numDocs, @Nullable RoaringBitmap nullBitmap, IntSupplier supplier) {
-      Preconditions.checkArgument(nullBitmap == null || nullBitmap.last() < numDocs,
-          "null bitmap larger than numDocs");
-      int[] values = new int[numDocs];
-      for (int i = 0; i < numDocs; i++) {
-        values[i] = supplier.getAsInt();
-      }
-      return new Int(nullBitmap, values);
-    }
-
-    public static Int create(@Nullable RoaringBitmap nullBitmap, int[] values) {
-      return new Int(nullBitmap, values);
-    }
-
-    @Nullable
-    @Override
-    public RoaringBitmap getNullBitmap() {
-      return _nullBitmap;
-    }
-
-    @Override
-    public FieldSpec.DataType getValueType() {
-      return FieldSpec.DataType.INT;
-    }
-
-    @Override
-    public boolean isSingleValue() {
-      return true;
-    }
-
-    @Override
-    public int[] getIntValuesSV() {
       return _values;
     }
   }

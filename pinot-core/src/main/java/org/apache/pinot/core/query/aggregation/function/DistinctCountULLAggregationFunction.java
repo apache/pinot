@@ -105,6 +105,15 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
 
     DataType storedType = dataType.getStoredType();
 
+    if (blockValSet.isSingleValue()) {
+      aggregateSV(length, aggregationResultHolder, blockValSet, storedType);
+    } else {
+      aggregateMV(length, aggregationResultHolder, blockValSet, storedType);
+    }
+  }
+
+  protected void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet,
+      DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
@@ -158,6 +167,76 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     }
   }
 
+  protected void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet,
+      DataType storedType) {
+    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
+    if (dictionary != null) {
+      RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
+      int[][] dictIds = blockValSet.getDictionaryIdsMV();
+      for (int i = 0; i < length; i++) {
+        dictIdBitmap.add(dictIds[i]);
+      }
+      return;
+    }
+
+    // For non-dictionary-encoded expression, store values into the UltraLogLog
+    UltraLogLog ull = getULL(aggregationResultHolder);
+    switch (storedType) {
+      case INT:
+        int[][] intValues = blockValSet.getIntValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (int value : intValues[i]) {
+            UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          }
+        }
+        break;
+      case LONG:
+        long[][] longValues = blockValSet.getLongValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (long value : longValues[i]) {
+            UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          }
+        }
+        break;
+      case FLOAT:
+        float[][] floatValues = blockValSet.getFloatValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (float value : floatValues[i]) {
+            UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          }
+        }
+        break;
+      case DOUBLE:
+        double[][] doubleValues = blockValSet.getDoubleValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (double value : doubleValues[i]) {
+            UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          }
+        }
+        break;
+      case STRING:
+        String[][] stringValues = blockValSet.getStringValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (String value : stringValues[i]) {
+            UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          }
+        }
+        break;
+      case BYTES:
+        byte[][][] bytesValues = blockValSet.getBytesValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (byte[] value : bytesValues[i]) {
+            UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          }
+        }
+        break;
+      default:
+        throw new IllegalStateException(
+            "Illegal data type for DISTINCT_COUNT_ULL aggregation function: " + storedType);
+    }
+  }
+
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
@@ -186,6 +265,15 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
 
     DataType storedType = dataType.getStoredType();
 
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet, storedType);
+    } else {
+      aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet, storedType);
+    }
+  }
+
+  protected void aggregateSVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
@@ -196,7 +284,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       return;
     }
 
-    // For non-dictionary-encoded expression, store values into the HyperLogLogPlus
+    // For non-dictionary-encoded expression, store values into the UltraLogLog
     switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
@@ -246,6 +334,80 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     }
   }
 
+  protected void aggregateMVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet, DataType storedType) {
+    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
+    if (dictionary != null) {
+      int[][] dictIds = blockValSet.getDictionaryIdsMV();
+      for (int i = 0; i < length; i++) {
+        getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
+      }
+      return;
+    }
+
+    // For non-dictionary-encoded expression, store values into the UltraLogLog
+    switch (storedType) {
+      case INT:
+        int[][] intValues = blockValSet.getIntValuesMV();
+        for (int i = 0; i < length; i++) {
+          UltraLogLog ull = getULL(groupByResultHolder, groupKeyArray[i]);
+          for (int value : intValues[i]) {
+            UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          }
+        }
+        break;
+      case LONG:
+        long[][] longValues = blockValSet.getLongValuesMV();
+        for (int i = 0; i < length; i++) {
+          UltraLogLog ull = getULL(groupByResultHolder, groupKeyArray[i]);
+          for (long value : longValues[i]) {
+            UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          }
+        }
+        break;
+      case FLOAT:
+        float[][] floatValues = blockValSet.getFloatValuesMV();
+        for (int i = 0; i < length; i++) {
+          UltraLogLog ull = getULL(groupByResultHolder, groupKeyArray[i]);
+          for (float value : floatValues[i]) {
+            UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          }
+        }
+        break;
+      case DOUBLE:
+        double[][] doubleValues = blockValSet.getDoubleValuesMV();
+        for (int i = 0; i < length; i++) {
+          UltraLogLog ull = getULL(groupByResultHolder, groupKeyArray[i]);
+          for (double value : doubleValues[i]) {
+            UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          }
+        }
+        break;
+      case STRING:
+        String[][] stringValues = blockValSet.getStringValuesMV();
+        for (int i = 0; i < length; i++) {
+          UltraLogLog ull = getULL(groupByResultHolder, groupKeyArray[i]);
+          for (String value : stringValues[i]) {
+            UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          }
+        }
+        break;
+      case BYTES:
+        byte[][][] bytesValues = blockValSet.getBytesValuesMV();
+        for (int i = 0; i < length; i++) {
+          UltraLogLog ull = getULL(groupByResultHolder, groupKeyArray[i]);
+          for (byte[] value : bytesValues[i]) {
+            UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          }
+        }
+        break;
+      default:
+        throw new IllegalStateException(
+            "Illegal data type for DISTINCT_COUNT_ULL aggregation function: " + storedType);
+    }
+  }
+
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
@@ -276,6 +438,15 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
 
     DataType storedType = dataType.getStoredType();
 
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet, storedType);
+    } else {
+      aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet, storedType);
+    }
+  }
+
+  protected void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
@@ -326,7 +497,101 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
         break;
       default:
         throw new IllegalStateException(
-            "Illegal data type for DISTINCT_COUNT_HLL_PLUS aggregation function: " + storedType);
+            "Illegal data type for DISTINCT_COUNT_ULL aggregation function: " + storedType);
+    }
+  }
+
+  protected void aggregateMVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet, DataType storedType) {
+    // For dictionary-encoded expression, store dictionary ids into the bitmap
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
+    if (dictionary != null) {
+      int[][] dictIds = blockValSet.getDictionaryIdsMV();
+      for (int i = 0; i < length; i++) {
+        for (int groupKey : groupKeysArray[i]) {
+          getDictIdBitmap(groupByResultHolder, groupKey, dictionary).add(dictIds[i]);
+        }
+      }
+      return;
+    }
+
+    // For non-dictionary-encoded expression, store values into the UltraLogLog
+    switch (storedType) {
+      case INT:
+        int[][] intValues = blockValSet.getIntValuesMV();
+        for (int i = 0; i < length; i++) {
+          int[] intRow = intValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            UltraLogLog ull = getULL(groupByResultHolder, groupKey);
+            for (int value : intRow) {
+              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+            }
+          }
+        }
+        break;
+      case LONG:
+        long[][] longValues = blockValSet.getLongValuesMV();
+        for (int i = 0; i < length; i++) {
+          long[] longRow = longValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            UltraLogLog ull = getULL(groupByResultHolder, groupKey);
+            for (long value : longRow) {
+              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+            }
+          }
+        }
+        break;
+      case FLOAT:
+        float[][] floatValues = blockValSet.getFloatValuesMV();
+        for (int i = 0; i < length; i++) {
+          float[] floatRow = floatValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            UltraLogLog ull = getULL(groupByResultHolder, groupKey);
+            for (float value : floatRow) {
+              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+            }
+          }
+        }
+        break;
+      case DOUBLE:
+        double[][] doubleValues = blockValSet.getDoubleValuesMV();
+        for (int i = 0; i < length; i++) {
+          double[] doubleRow = doubleValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            UltraLogLog ull = getULL(groupByResultHolder, groupKey);
+            for (double value : doubleRow) {
+              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+            }
+          }
+        }
+        break;
+      case STRING:
+        String[][] stringValues = blockValSet.getStringValuesMV();
+        for (int i = 0; i < length; i++) {
+          String[] stringRow = stringValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            UltraLogLog ull = getULL(groupByResultHolder, groupKey);
+            for (String value : stringRow) {
+              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+            }
+          }
+        }
+        break;
+      case BYTES:
+        byte[][][] bytesValues = blockValSet.getBytesValuesMV();
+        for (int i = 0; i < length; i++) {
+          byte[][] bytesRow = bytesValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            UltraLogLog ull = getULL(groupByResultHolder, groupKey);
+            for (byte[] value : bytesRow) {
+              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+            }
+          }
+        }
+        break;
+      default:
+        throw new IllegalStateException(
+            "Illegal data type for DISTINCT_COUNT_ULL aggregation function: " + storedType);
     }
   }
 

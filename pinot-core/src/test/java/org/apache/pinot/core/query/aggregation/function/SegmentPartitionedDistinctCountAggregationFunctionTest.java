@@ -20,14 +20,12 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
@@ -36,94 +34,71 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
 
 
-public class DistinctCountULLAggregationFunctionTest {
-
-  @Test
-  public void testCanUseStarTreeDefaultP() {
-    DistinctCountULLAggregationFunction function = new DistinctCountULLAggregationFunction(
-        List.of(ExpressionContext.forIdentifier("col")));
-
-    assertTrue(function.canUseStarTree(Map.of()));
-    assertTrue(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, "12")));
-    assertTrue(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, 12)));
-    assertFalse(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, 16)));
-
-    function = new DistinctCountULLAggregationFunction(List.of(ExpressionContext.forIdentifier("col"),
-        ExpressionContext.forLiteral(Literal.intValue(12))));
-
-    assertTrue(function.canUseStarTree(Map.of()));
-    assertTrue(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, "12")));
-    assertTrue(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, 12)));
-    assertFalse(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, "16")));
-  }
-
-  @Test
-  public void testCanUseStarTreeCustomP() {
-    DistinctCountULLAggregationFunction function = new DistinctCountULLAggregationFunction(
-        List.of(ExpressionContext.forIdentifier("col"), ExpressionContext.forLiteral(Literal.stringValue("16"))));
-
-    assertFalse(function.canUseStarTree(Map.of()));
-    assertFalse(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, "12")));
-    assertTrue(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, 16)));
-    assertTrue(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, "16")));
-  }
-
+/// Multi-value column support for `SEGMENTPARTITIONEDDISTINCTCOUNT`.
+///
+/// This function used to read the single-value accessors unconditionally, so a multi-value column was not something
+/// it could aggregate at all. It now branches on `BlockValSet.isSingleValue()` the way the HyperLogLog and bitmap
+/// families already did. Its counts are exact, so the answers are asserted directly rather than as estimates.
+public class SegmentPartitionedDistinctCountAggregationFunctionTest {
   private static final ExpressionContext COLUMN = ExpressionContext.forIdentifier("column");
   private static final long[][] MV_ROWS = {{1L, 2L}, {3L, 4L}, {5L, 6L}, {1L, 3L}};
   private static final long[] FLATTENED = {1L, 2L, 3L, 4L, 5L, 6L, 1L, 3L};
 
-  private static DistinctCountULLAggregationFunction create() {
-    return new DistinctCountULLAggregationFunction(List.of(COLUMN));
+  private static SegmentPartitionedDistinctCountAggregationFunction create() {
+    return new SegmentPartitionedDistinctCountAggregationFunction(List.of(COLUMN));
   }
 
   private static Map<ExpressionContext, BlockValSet> mvBlock() {
     return Map.of(COLUMN, SyntheticBlockValSets.LongMV.create(null, MV_ROWS));
   }
 
-  /// Aggregating a multi-value column gives exactly what aggregating its flattened values as a single-value column
-  /// gives. Comparing the two rather than asserting an estimate keeps this exact for a sketch.
+  /// Every value of every row is counted, with repeats collapsing.
   @Test
-  public void testMVColumnMatchesFlattenedSVColumn() {
-    DistinctCountULLAggregationFunction function = create();
+  public void testMVColumnCountsEveryValue() {
+    SegmentPartitionedDistinctCountAggregationFunction function = create();
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    function.aggregate(MV_ROWS.length, resultHolder, mvBlock());
 
-    AggregationResultHolder mvHolder = function.createAggregationResultHolder();
-    function.aggregate(MV_ROWS.length, mvHolder, mvBlock());
-
-    AggregationResultHolder svHolder = function.createAggregationResultHolder();
-    function.aggregate(FLATTENED.length, svHolder,
-        Map.of(COLUMN, SyntheticBlockValSets.Long.create(null, FLATTENED)));
-
-    assertEquals(function.extractFinalResult(function.extractAggregationResult(mvHolder)),
-        function.extractFinalResult(function.extractAggregationResult(svHolder)));
+    // 1, 2, 3, 4, 5 and 6, with 1 and 3 seen twice
+    assertEquals(function.extractFinalResult(function.extractAggregationResult(resultHolder)).longValue(), 6L);
   }
 
   /// Every value of a row lands in that row's group.
   @Test
   public void testMVColumnGroupBySV() {
-    DistinctCountULLAggregationFunction function = create();
+    SegmentPartitionedDistinctCountAggregationFunction function = create();
     GroupByResultHolder resultHolder = new ObjectGroupByResultHolder(2, 2);
     // Rows 0 and 3 to group 0, giving 1, 2, 1, 3; rows 1 and 2 to group 1, giving 3, 4, 5, 6
     function.aggregateGroupBySV(MV_ROWS.length, new int[]{0, 1, 1, 0}, resultHolder, mvBlock());
 
-    assertEquals(function.extractFinalResult(function.extractGroupByResult(resultHolder, 0)), 3L);
-    assertEquals(function.extractFinalResult(function.extractGroupByResult(resultHolder, 1)), 4L);
+    assertEquals(function.extractFinalResult(function.extractGroupByResult(resultHolder, 0)).longValue(), 3L);
+    assertEquals(function.extractFinalResult(function.extractGroupByResult(resultHolder, 1)).longValue(), 4L);
   }
 
   /// A row's values land in every group key that row carries.
   @Test
   public void testMVColumnGroupByMV() {
-    DistinctCountULLAggregationFunction function = create();
+    SegmentPartitionedDistinctCountAggregationFunction function = create();
     GroupByResultHolder resultHolder = new ObjectGroupByResultHolder(2, 2);
     int[][] groupKeys = {{0, 1}, {0}, {1}, {0, 1}};
     function.aggregateGroupByMV(MV_ROWS.length, groupKeys, resultHolder, mvBlock());
 
     // Group 0 sees rows 0, 1 and 3, giving 1, 2, 3, 4; group 1 sees rows 0, 2 and 3, giving 1, 2, 5, 6, 3
-    assertEquals(function.extractFinalResult(function.extractGroupByResult(resultHolder, 0)), 4L);
-    assertEquals(function.extractFinalResult(function.extractGroupByResult(resultHolder, 1)), 5L);
+    assertEquals(function.extractFinalResult(function.extractGroupByResult(resultHolder, 0)).longValue(), 4L);
+    assertEquals(function.extractFinalResult(function.extractGroupByResult(resultHolder, 1)).longValue(), 5L);
+  }
+
+  /// A single-value column still takes the single-value path, so the split did not disturb it.
+  @Test
+  public void testSVColumnStillAggregates() {
+    SegmentPartitionedDistinctCountAggregationFunction function = create();
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    function.aggregate(FLATTENED.length, resultHolder,
+        Map.of(COLUMN, SyntheticBlockValSets.Long.create(null, FLATTENED)));
+
+    assertEquals(function.extractFinalResult(function.extractAggregationResult(resultHolder)).longValue(), 6L);
   }
 
   /// A dictionary-encoded multi-value column collects dictionary ids and resolves them against the dictionary only
@@ -135,11 +110,11 @@ public class DistinctCountULLAggregationFunctionTest {
     // Ids 0..5 stand for values 1..6, so these rows carry the same values as MV_ROWS
     int[][] dictIds = {{0, 1}, {2, 3}, {4, 5}, {0, 2}};
 
-    DistinctCountULLAggregationFunction function = create();
+    SegmentPartitionedDistinctCountAggregationFunction function = create();
     AggregationResultHolder resultHolder = function.createAggregationResultHolder();
     function.aggregate(dictIds.length, resultHolder,
         Map.of(COLUMN, SyntheticBlockValSets.DictIdsMV.create(null, dictIds, dictionary, DataType.LONG)));
 
-    assertEquals((long) function.extractFinalResult(function.extractAggregationResult(resultHolder)), 6L);
+    assertEquals(function.extractFinalResult(function.extractAggregationResult(resultHolder)).longValue(), 6L);
   }
 }
