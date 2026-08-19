@@ -18,13 +18,18 @@
  */
 package org.apache.pinot.segment.local.io.codec;
 
+import java.io.IOException;
 import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.util.List;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// Tests for the immutable production registry and its package-scoped mutable test fixture.
@@ -69,5 +74,68 @@ public class CodecRegistryTest {
   public void testMutableRegistryRejectsDuplicateNameIgnoringCase() {
     CodecRegistry registry = new CodecRegistry().register(Lz4CodecDefinition.INSTANCE);
     assertThrows(IllegalArgumentException.class, () -> registry.register(Lz4CodecDefinition.INSTANCE));
+  }
+
+  @Test
+  public void testMutableRegistryRejectsReservedWrapperName() {
+    CodecRegistry registry = new CodecRegistry();
+    IllegalArgumentException exception =
+        expectThrows(IllegalArgumentException.class, () -> registry.register(new ReservedNameStub()));
+    assertTrue(exception.getMessage().contains("reserved"), exception.getMessage());
+  }
+
+  /// Stub whose name collides with the reserved wrapper keyword; every behavior method is unreachable.
+  private static final class ReservedNameStub implements ChunkCodecHandler<CodecOptions> {
+    @Override
+    public String name() {
+      return "codec";
+    }
+
+    @Override
+    public CodecKind kind() {
+      return CodecKind.COMPRESSION;
+    }
+
+    @Override
+    public CodecOptions parseOptions(List<String> args) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void validateContext(CodecOptions options, CodecContext ctx) {
+    }
+
+    @Override
+    public String canonicalize(CodecOptions options) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ByteBuffer encode(CodecOptions options, CodecContext ctx, ByteBuffer src)
+        throws IOException {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ByteBuffer decode(CodecOptions options, CodecContext ctx, ByteBuffer src)
+        throws IOException {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void decodeInto(CodecOptions options, CodecContext ctx, ByteBuffer src, ByteBuffer dst)
+        throws IOException {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public int maxEncodedSize(CodecOptions options, int inputSize) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean requiresDirectDstBuffer() {
+      return false;
+    }
   }
 }

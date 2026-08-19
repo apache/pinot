@@ -45,7 +45,7 @@ public class CodecPipelineExecutorTest {
         {"SNAPPY", false}, {"SNAPPY", true},
         {"GZIP", false}, {"GZIP", true},
         {"ZSTD", false}, {"ZSTD", true},
-        {"ZSTD(0)", false}, {"ZSTD(0)", true}
+        {"ZSTD(1)", false}, {"ZSTD(1)", true}
     };
   }
 
@@ -83,7 +83,9 @@ public class CodecPipelineExecutorTest {
   public void testCanonicalNamesAliasesAndOptions() {
     assertEquals(CodecPipelineExecutor.create("zstd", DataType.INT).getCanonicalSpec(), "ZSTD(3)");
     assertEquals(CodecPipelineExecutor.create("zstandard", DataType.INT).getCanonicalSpec(), "ZSTD(3)");
-    assertEquals(CodecPipelineExecutor.create("zstd(0)", DataType.INT).getCanonicalSpec(), "ZSTD(0)");
+    // Zstd treats level 0 as "use the default level", which would give ZSTD(0) and ZSTD(3) identical
+    // behavior under two canonical spellings; it is rejected so each behavior has exactly one spelling.
+    assertThrows(IllegalArgumentException.class, () -> CodecPipelineExecutor.create("zstd(0)", DataType.INT));
     assertEquals(CodecPipelineExecutor.create("zstd(5),gzip", DataType.INT).getCanonicalSpec(),
         "ZSTD(5),GZIP");
     assertEquals(CodecPipelineExecutor.create("lz4,snappy", DataType.INT).getCanonicalSpec(),

@@ -30,11 +30,12 @@ import java.util.Objects;
 /// DSL forms:
 ///
 /// - `ZSTD` — uses default level 3
-/// - `ZSTD(3)` — explicit level in the range `0` through [Zstd#maxCompressionLevel()]
+/// - `ZSTD(3)` — explicit level in the range `1` through [Zstd#maxCompressionLevel()]
 ///
 /// Zstd also supports negative fast-compression levels, but the initial codec DSL deliberately
 /// accepts unsigned integer arguments only. Those levels are therefore outside this version's
-/// public codec contract.
+/// public codec contract. Level `0` (zstd's alias for "use the default level") is rejected so that
+/// each behavior has exactly one canonical spelling; use `ZSTD` or an explicit level instead.
 ///
 /// ZSTD is a [CodecKind#COMPRESSION] stage. Compression stages may be chained after all
 /// transforms.
@@ -50,10 +51,6 @@ final class ZstdCodecDefinition implements ChunkCodecHandler<ZstdCodecDefinition
 
   /// Default compression level when none is specified.
   public static final int DEFAULT_LEVEL = 3;
-
-  /// Sanity cap on decompressedSize read from the (untrusted) Zstd frame header to prevent
-  /// DoS-on-corrupt-segment via a giant pre-allocation. 1 GiB is well above any realistic chunk size.
-  private static final long MAX_REASONABLE_DECOMPRESSED_SIZE = 1L << 30;
 
   private ZstdCodecDefinition() {
   }
@@ -112,7 +109,10 @@ final class ZstdCodecDefinition implements ChunkCodecHandler<ZstdCodecDefinition
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException("ZSTD codec level must be an integer, got: " + args.get(0));
     }
-    int minLevel = 0;
+    // Level 0 is rejected rather than accepted: zstd treats 0 as "use the default level", which would give
+    // ZSTD(0) and ZSTD(3) identical behavior under two different canonical spellings. The canonical spec is
+    // frozen into segment headers, so each behavior must have exactly one spelling; use ZSTD or ZSTD(3).
+    int minLevel = 1;
     int maxLevel = Zstd.maxCompressionLevel();
     if (level < minLevel || level > maxLevel) {
       throw new IllegalArgumentException(
@@ -170,12 +170,8 @@ final class ZstdCodecDefinition implements ChunkCodecHandler<ZstdCodecDefinition
       if (decompressedSize < 0) {
         throw new IOException("Zstd: cannot determine decompressed size from frame header");
       }
-      if (decompressedSize > MAX_REASONABLE_DECOMPRESSED_SIZE) {
-        throw new IOException("Zstd: decompressed size " + decompressedSize
-            + " in frame header exceeds sanity cap " + MAX_REASONABLE_DECOMPRESSED_SIZE
-            + ". Segment may be corrupt.");
-      }
-      out = ByteBuffer.allocateDirect((int) decompressedSize);
+      out = ByteBuffer.allocateDirect(
+          CodecBufferUtils.checkDeclaredDecompressedSize(decompressedSize, "Zstd", "frame header"));
       long result = Zstd.decompress(out, directSrc);
       if (Zstd.isError(result)) {
         throw new IOException("Zstd decompression failed: " + Zstd.getErrorName(result));
