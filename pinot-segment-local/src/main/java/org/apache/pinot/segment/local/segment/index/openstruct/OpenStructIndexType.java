@@ -104,6 +104,11 @@ public class OpenStructIndexType
       if (indexes == null) {
         continue;
       }
+      JsonNode forwardIndex = indexes.get(StandardIndexes.forward().getPrettyName());
+      // The OPEN_STRUCT splitter builds its own per-key forward-index configs (dict-vs-raw decision plus a
+      // fixed LZ4 raw compression), so a per-key codecSpec would be silently discarded. Reject it explicitly.
+      Preconditions.checkState(forwardIndex == null || !forwardIndex.hasNonNull("codecSpec"),
+          "codecSpec is not supported for OPEN_STRUCT key: %s", fieldConfig.getName());
       Iterator<String> indexNames = indexes.fieldNames();
       while (indexNames.hasNext()) {
         String indexName = indexNames.next();
