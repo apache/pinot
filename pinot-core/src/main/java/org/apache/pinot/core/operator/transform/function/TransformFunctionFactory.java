@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -90,18 +91,60 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /// Factory class for transformation functions.
+///
+/// The registry always contains the built-in transform functions. On top of those, [#init(Set)] registers external
+/// block-oriented [TransformFunction] implementations from two sources:
+///
+/// 1. **`ServiceLoader` discovery.** Any jar visible through the thread context classloader (the application
+///    classpath in a standard server deployment), or through any plugin classloader returned by
+///    [PluginManager#getPluginClassLoaders()], can register transform functions by shipping a standard service
+///    descriptor:
+///
+///    `META-INF/services/org.apache.pinot.core.operator.transform.function.TransformFunction`
+///
+///    listing one implementation class per line. A provider must be a public concrete class with a public
+///    no-argument constructor, and must return a non-null, non-blank name from [TransformFunction#getName()]. The
+///    instance created at discovery time is used only to read and validate its name; it is never initialized or
+///    evaluated — query execution always constructs a fresh instance through this factory. Names are canonicalized
+///    with [#canonicalize(String)]. The same implementation class visible through overlapping classloaders is
+///    de-duplicated, but a discovered class whose canonical name collides with a built-in or with a different
+///    discovered class fails initialization, as does any malformed descriptor or misbehaving provider.
+///
+/// 2. **Explicit configuration** (`pinot.server.transforms`). Explicitly configured classes are registered after
+///    discovered ones and keep their historical override semantics: they may replace built-in as well as discovered
+///    registrations. Discovery skips classes that are also explicitly configured, so shipping a service descriptor
+///    for an explicitly configured class never causes a collision failure.
+///
+/// Discovery only runs inside [#init(Set)], which the server calls once during startup after plugins are loaded;
+/// the query path ([#get]) performs plain map lookups against an immutable snapshot and never triggers
+/// `ServiceLoader` work. [#init(Set)] is synchronized and atomically publishes a fully validated snapshot, so
+/// concurrent readers never observe a partially initialized registry; calling it again with the same inputs is
+/// idempotent. Note that each function-expression lookup reads the current snapshot, so an expression compiled
+/// concurrently with a re-initialization may resolve different sub-expressions against different (complete)
+/// snapshots — irrelevant in practice because initialization happens before queries are served.
+///
+/// Note: this registers functions for server-side single-stage (leaf) execution only. It does not register them
+/// with the multi-stage engine's function catalog ([org.apache.pinot.common.function.FunctionRegistry] /
+/// PinotOperatorTable).
 public class TransformFunctionFactory {
   private TransformFunctionFactory() {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TransformFunctionFactory.class);
-  private static final Map<String, Class<? extends TransformFunction>> TRANSFORM_FUNCTION_MAP = createRegistry();
+  private static final Map<String, Class<? extends TransformFunction>> BUILT_IN_TRANSFORM_FUNCTIONS =
+      Collections.unmodifiableMap(createRegistry());
+
+  /// Immutable snapshot of the transform function registry, atomically replaced by [#init(Set)]. Starts as the
+  /// built-in registry so the factory is usable without an explicit init call.
+  private static volatile Map<String, Class<? extends TransformFunction>> _transformFunctionMap =
+      BUILT_IN_TRANSFORM_FUNCTIONS;
 
   private static Map<String, Class<? extends TransformFunction>> createRegistry() {
     Map<TransformFunctionType, Class<? extends TransformFunction>> typeToImplementation =
@@ -278,12 +321,38 @@ public class TransformFunctionFactory {
     return registry;
   }
 
-  /// Initializes the factory with a set of transform function classes.
+  /// Initializes the factory with the explicitly configured transform function classes (`pinot.server.transforms`)
+  /// and the [TransformFunction] service providers discovered via [PluginManager#loadServiceProviders(Class)] (see
+  /// the class documentation for the provider contract).
   ///
-  /// Should be called only once before using the factory.
+  /// Should be called during server startup, after all plugins have been loaded and before serving queries. The
+  /// registry is built and validated locally and published atomically, so concurrent readers never observe a
+  /// partially initialized registry; repeated calls with the same inputs are idempotent. Any discovery or
+  /// validation failure aborts initialization (with the original cause preserved) and leaves the previously
+  /// published registry in place.
   ///
-  /// @param transformFunctionClasses Set of transform function classes
-  public static void init(Set<Class<TransformFunction>> transformFunctionClasses) {
+  /// @param transformFunctionClasses Set of explicitly configured transform function classes
+  public static synchronized void init(Set<Class<TransformFunction>> transformFunctionClasses) {
+    Map<String, Class<? extends TransformFunction>> registry = new HashMap<>(BUILT_IN_TRANSFORM_FUNCTIONS);
+
+    // Classes registered through explicit configuration are skipped during discovery: the explicit registration
+    // below handles them with its historical override semantics, so a service descriptor shipped for an explicitly
+    // configured class must not fail startup as a collision.
+    Set<String> explicitClassNames = new HashSet<>();
+    for (Class<TransformFunction> transformFunctionClass : transformFunctionClasses) {
+      explicitClassNames.add(transformFunctionClass.getName());
+    }
+
+    // Discover service providers from the thread context classloader (the application classpath in a standard
+    // server deployment) and from every plugin classloader, de-duplicated by implementation class name (see
+    // PluginManager#loadServiceProviders)
+    for (PluginManager.ServiceProvider<TransformFunction> discovered : PluginManager.get()
+        .loadServiceProviders(TransformFunction.class)) {
+      registerServiceProvider(discovered.getProvider(), discovered.getSource(), registry, explicitClassNames);
+    }
+
+    // Register the explicitly configured classes last: explicit configuration keeps its historical override
+    // semantics and may replace built-in as well as discovered registrations.
     for (Class<TransformFunction> transformFunctionClass : transformFunctionClasses) {
       TransformFunction transformFunction;
       try {
@@ -292,13 +361,73 @@ public class TransformFunctionFactory {
         throw new RuntimeException(
             "Caught exception while instantiating transform function from class: " + transformFunctionClass, e);
       }
-      String transformFunctionName = canonicalize(transformFunction.getName());
-      if (TRANSFORM_FUNCTION_MAP.put(transformFunctionName, transformFunctionClass) == null) {
+      String name = transformFunction.getName();
+      if (StringUtils.isBlank(name)) {
+        throw new IllegalStateException("Transform function class: " + transformFunctionClass.getName()
+            + " returned a " + (name == null ? "null" : "blank") + " name from getName()");
+      }
+      String transformFunctionName = canonicalize(name);
+      if (registry.put(transformFunctionName, transformFunctionClass) == null) {
         LOGGER.info("Registering function: {} with class: {}", transformFunctionName, transformFunctionClass);
       } else {
         LOGGER.info("Replacing function: {} with class: {}", transformFunctionName, transformFunctionClass);
       }
     }
+
+    // Atomically publish the fully built and validated snapshot.
+    _transformFunctionMap = Collections.unmodifiableMap(registry);
+  }
+
+  /// Registers a discovered [TransformFunction] service provider into the local registry being built. The provider
+  /// instance is only used to obtain the implementation class and validate its name; it is never initialized or
+  /// evaluated. Fails fast on null/blank function names and canonical name collisions.
+  private static void registerServiceProvider(TransformFunction provider, String source,
+      Map<String, Class<? extends TransformFunction>> registry, Set<String> explicitClassNames) {
+    Class<? extends TransformFunction> providerClass = provider.getClass();
+    String providerClassName = providerClass.getName();
+    if (explicitClassNames.contains(providerClassName)) {
+      LOGGER.info("Skipping service provider: {} (from: {}) which is also explicitly configured", providerClassName,
+          source);
+      return;
+    }
+    String name = provider.getName();
+    if (StringUtils.isBlank(name)) {
+      throw new IllegalStateException("TransformFunction service provider: " + providerClassName + " (classloader: "
+          + providerClass.getClassLoader() + ", discovered from: " + source + ") returned a "
+          + (name == null ? "null" : "blank") + " name from getName()");
+    }
+    String canonicalName = canonicalize(name);
+    Class<? extends TransformFunction> existing = registry.get(canonicalName);
+    if (existing != null) {
+      if (existing.getName().equals(providerClassName)) {
+        // Repeated registration of the identical implementation is a no-op. A different Class object with the same
+        // name indicates version skew between classloaders; the registered copy wins.
+        if (existing != providerClass) {
+          LOGGER.warn("Function: {} is already registered with class: {} from classloader: {}; ignoring the copy "
+                  + "from classloader: {} (discovered from: {})", canonicalName, existing.getName(),
+              existing.getClassLoader(), providerClass.getClassLoader(), source);
+        }
+        return;
+      }
+      String existingDescription = BUILT_IN_TRANSFORM_FUNCTIONS.get(canonicalName) == existing
+          ? "built-in transform function class: " + existing.getName()
+          : "discovered transform function class: " + existing.getName();
+      throw new IllegalStateException(
+          "Transform function name collision on: " + canonicalName + ". Service provider class: "
+              + providerClassName + " (classloader: " + providerClass.getClassLoader() + ", discovered from: "
+              + source + ") collides with " + existingDescription + " (classloader: " + existing.getClassLoader()
+              + ")");
+    }
+    if (FunctionRegistry.contains(FunctionRegistry.canonicalize(name))) {
+      // Not a failure: providing a block-oriented implementation of an existing scalar function is the same
+      // pattern the built-ins use — but for an independently owned scalar function the semantics may diverge
+      // (e.g. literal-only invocations still constant-fold through the scalar implementation at compile time).
+      LOGGER.warn("Service-discovered transform function: {} with class: {} (from: {}) shadows a scalar function "
+          + "with the same name for single-stage server-side execution", canonicalName, providerClassName, source);
+    }
+    registry.put(canonicalName, providerClass);
+    LOGGER.info("Registering service-discovered function: {} with class: {} (from: {})", canonicalName,
+        providerClassName, source);
   }
 
   /// Returns an instance of transform function for the given expression.
@@ -337,7 +466,7 @@ public class TransformFunctionFactory {
         }
 
         TransformFunction transformFunction;
-        Class<? extends TransformFunction> transformFunctionClass = TRANSFORM_FUNCTION_MAP.get(functionName);
+        Class<? extends TransformFunction> transformFunctionClass = _transformFunctionMap.get(functionName);
         if (transformFunctionClass != null) {
           // Transform function
           try {
@@ -422,7 +551,9 @@ public class TransformFunctionFactory {
     return StringUtils.remove(functionName, '_').toLowerCase();
   }
 
+  /// Returns an immutable snapshot of the current registry (canonical name to implementation class). Registrations
+  /// from later [#init(Set)] calls are not reflected in previously returned maps.
   public static Map<String, Class<? extends TransformFunction>> getAllFunctions() {
-    return Collections.unmodifiableMap(TRANSFORM_FUNCTION_MAP);
+    return _transformFunctionMap;
   }
 }
