@@ -54,13 +54,27 @@ public class MapUtils {
   }
 
   /// Immutable MAP key with its UTF-8 representation cached for selective lookup hot paths.
+  ///
+  /// The UTF-8 bytes are additionally kept pre-packed into big-endian `long`s so that a frame scan can compare eight
+  /// key bytes per buffer read instead of one. Attribute keys in practice run 15-30 bytes, and entries that clear the
+  /// length check are exactly the ones sharing a prefix (`k8s.pod.name` vs `k8s.node.name`), so the comparison loop is
+  /// what a scan actually spends its time on.
   public static final class PreparedMapKey {
     private final String _key;
     private final byte[] _utf8Bytes;
+    private final long[] _utf8Words;
 
     public PreparedMapKey(String key) {
       _key = key;
       _utf8Bytes = Utf8Utils.encode(key);
+      _utf8Words = new long[_utf8Bytes.length / Long.BYTES];
+      for (int i = 0; i < _utf8Words.length; i++) {
+        long word = 0;
+        for (int j = 0; j < Long.BYTES; j++) {
+          word = (word << 8) | (_utf8Bytes[i * Long.BYTES + j] & 0xFFL);
+        }
+        _utf8Words[i] = word;
+      }
     }
 
     public String getKey() {
@@ -184,7 +198,11 @@ public class MapUtils {
     return deserializeMap(ByteBuffer.wrap(bytes));
   }
 
+  /// Consumes the buffer from its current position and forces [ByteOrder#BIG_ENDIAN] on it, exactly as the other
+  /// frame readers here do — the write path frames lengths through a big-endian [ByteBuffer], while a view onto
+  /// off-heap memory inherits whatever order its source carried.
   public static Map<String, Object> deserializeMap(ByteBuffer byteBuffer) {
+    byteBuffer.order(ByteOrder.BIG_ENDIAN);
     int size = byteBuffer.getInt();
     if (size == 0) {
       return Map.of();
@@ -256,6 +274,12 @@ public class MapUtils {
     return deserializeMapEntryValueAsString(byteBuffer, new PreparedMapKey(key));
   }
 
+  /// Variant of [#deserializeMapEntryValueAsString(ByteBuffer, PreparedMapKey)] reading a frame already on heap.
+  @Nullable
+  public static String deserializeMapEntryValueAsString(byte[] bytes, PreparedMapKey key) {
+    return deserializeMapEntryValueAsString(ByteBuffer.wrap(bytes), key);
+  }
+
   /// Reads the value for a prepared key as a string, skipping Jackson for the value shapes whose stored bytes are
   /// already exactly what `toString()` on the parsed value would produce.
   ///
@@ -265,9 +289,61 @@ public class MapUtils {
   @Nullable
   public static String deserializeMapEntryValueAsString(ByteBuffer byteBuffer, PreparedMapKey key) {
     byte[] valueBytes = findValueBytes(byteBuffer, key);
-    if (valueBytes == null) {
-      return null;
+    return valueBytes == null ? null : decodeValueAsString(valueBytes, key);
+  }
+
+  /// Reads the values for several prepared keys in a single pass over the frame, writing `values[i]` for `keys[i]`
+  /// and `null` for any key the frame does not carry.
+  ///
+  /// A query projecting `attributes['a']`, `attributes['b']`, ... resolves each key to its own column, so read one
+  /// key at a time the frame is walked once per key: the entry lengths are decoded, the positions advanced and -
+  /// for a chunked index - the value fetched, all repeated. Walking once and testing every entry against all the
+  /// keys collapses that to a single traversal; the per-entry length check settles all but the matching key without
+  /// touching any key bytes, and the scan stops as soon as every key has been found.
+  ///
+  /// Keys must be distinct - the write path builds a frame from a `Map`, so a frame never repeats one either.
+  ///
+  /// Consumes the buffer from its current position and forces [ByteOrder#BIG_ENDIAN] on it, exactly as the
+  /// single-key readers do. A truncated or corrupt frame raises [BufferUnderflowException].
+  public static void deserializeMapEntryValuesAsString(ByteBuffer byteBuffer, PreparedMapKey[] keys, String[] values) {
+    int numKeys = keys.length;
+    Arrays.fill(values, 0, numKeys, null);
+    byteBuffer.order(ByteOrder.BIG_ENDIAN);
+    int size = byteBuffer.getInt();
+    if (size < 0) {
+      throw new BufferUnderflowException();
     }
+    int found = 0;
+    for (int i = 0; i < size && found < numKeys; i++) {
+      int keyLength = byteBuffer.getInt();
+      checkLength(byteBuffer, keyLength);
+      int keyOffset = byteBuffer.position();
+      int match = -1;
+      for (int k = 0; k < numKeys; k++) {
+        PreparedMapKey key = keys[k];
+        if (key._utf8Bytes.length == keyLength && keyMatches(byteBuffer, keyOffset, key)) {
+          match = k;
+          break;
+        }
+      }
+      byteBuffer.position(keyOffset + keyLength);
+      int valueLength = byteBuffer.getInt();
+      checkLength(byteBuffer, valueLength);
+      if (match < 0) {
+        byteBuffer.position(byteBuffer.position() + valueLength);
+        continue;
+      }
+      byte[] valueBytes = new byte[valueLength];
+      byteBuffer.get(valueBytes);
+      values[match] = decodeValueAsString(valueBytes, keys[match]);
+      found++;
+    }
+  }
+
+  /// Shared tail of the string readers: render the stored JSON value, falling back to Jackson only for the shapes
+  /// [#decodeWithoutJackson] cannot reproduce byte for byte.
+  @Nullable
+  private static String decodeValueAsString(byte[] valueBytes, PreparedMapKey key) {
     String decoded = decodeWithoutJackson(valueBytes);
     if (decoded != null) {
       return decoded;
@@ -349,25 +425,16 @@ public class MapUtils {
     if (size == 0) {
       return null;
     }
-    byte[] keyBytes = key._utf8Bytes;
-    int keyBytesLength = keyBytes.length;
+    int keyBytesLength = key._utf8Bytes.length;
     for (int i = 0; i < size; i++) {
       int keyLength = byteBuffer.getInt();
       // Bounds-check up front so the absolute gets below are provably in range, and so a truncated frame still
       // surfaces as BufferUnderflowException rather than IndexOutOfBoundsException.
       checkLength(byteBuffer, keyLength);
       // Compare through absolute gets so a length mismatch or a differing byte skips the rest of the key outright,
-      // rather than walking it one relative get at a time just to advance the position.
-      boolean matches = keyLength == keyBytesLength;
-      if (matches) {
-        int keyOffset = byteBuffer.position();
-        for (int j = 0; j < keyLength; j++) {
-          if (byteBuffer.get(keyOffset + j) != keyBytes[j]) {
-            matches = false;
-            break;
-          }
-        }
-      }
+      // rather than walking it one relative get at a time just to advance the position. The length check comes
+      // first because it settles most entries without touching the key bytes at all.
+      boolean matches = keyLength == keyBytesLength && keyMatches(byteBuffer, byteBuffer.position(), key);
       byteBuffer.position(byteBuffer.position() + keyLength);
 
       int valueLength = byteBuffer.getInt();
@@ -383,6 +450,26 @@ public class MapUtils {
       return valueBytes;
     }
     return null;
+  }
+
+  /// Compares the key bytes at `offset` against a prepared key of the same length, eight bytes per read for the
+  /// whole words and byte-wise for the remainder. The caller has already bounds-checked the key, and the buffer is
+  /// in [ByteOrder#BIG_ENDIAN], which is the order [PreparedMapKey] packs its words in.
+  private static boolean keyMatches(ByteBuffer byteBuffer, int offset, PreparedMapKey key) {
+    long[] words = key._utf8Words;
+    int numWords = words.length;
+    for (int i = 0; i < numWords; i++) {
+      if (byteBuffer.getLong(offset + i * Long.BYTES) != words[i]) {
+        return false;
+      }
+    }
+    byte[] keyBytes = key._utf8Bytes;
+    for (int i = numWords * Long.BYTES; i < keyBytes.length; i++) {
+      if (byteBuffer.get(offset + i) != keyBytes[i]) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private static byte[] readLengthPrefixed(ByteBuffer byteBuffer) {
@@ -430,12 +517,10 @@ public class MapUtils {
       int keyLength = byteBuffer.getInt();
       checkLength(byteBuffer, keyLength);
       builder.appendQuotedKey(byteBuffer, keyLength);
-      byteBuffer.position(byteBuffer.position() + keyLength);
       builder.append((byte) ':');
       int valueLength = byteBuffer.getInt();
       checkLength(byteBuffer, valueLength);
       builder.appendRaw(byteBuffer, valueLength);
-      byteBuffer.position(byteBuffer.position() + valueLength);
     }
     builder.append((byte) '}');
     return builder.toUtf8String();
@@ -462,17 +547,17 @@ public class MapUtils {
       _bytes[_length++] = b;
     }
 
-    /// Copies `length` bytes from the buffer's current position without advancing it.
+    /// Consumes `length` bytes from the buffer's current position. The copy is a single bulk transfer rather than a
+    /// byte-at-a-time walk, which is what makes rendering an off-heap frame - where every individual `get` would be
+    /// its own load - as cheap as rendering one already on heap.
     private void appendRaw(ByteBuffer byteBuffer, int length) {
       ensure(length);
-      int offset = byteBuffer.position();
-      for (int i = 0; i < length; i++) {
-        _bytes[_length++] = byteBuffer.get(offset + i);
-      }
+      byteBuffer.get(_bytes, _length, length);
+      _length += length;
     }
 
-    /// Writes the key as a JSON string. Keys needing no escaping - the overwhelming majority - are copied as raw
-    /// UTF-8; anything else falls back to decoding the key and letting Jackson escape it.
+    /// Writes the key as a JSON string, consuming it from the buffer. Keys needing no escaping - the overwhelming
+    /// majority - are copied as raw UTF-8; anything else falls back to decoding the key and letting Jackson escape it.
     private void appendQuotedKey(ByteBuffer byteBuffer, int length) {
       int offset = byteBuffer.position();
       boolean clean = true;
@@ -490,9 +575,7 @@ public class MapUtils {
         appendRaw(byteBuffer, length);
       } else {
         byte[] keyBytes = new byte[length];
-        for (int i = 0; i < length; i++) {
-          keyBytes[i] = byteBuffer.get(offset + i);
-        }
+        byteBuffer.get(keyBytes);
         byte[] escaped = JsonStringEncoder.getInstance().quoteAsUTF8(Utf8Utils.decode(keyBytes));
         ensure(escaped.length);
         System.arraycopy(escaped, 0, _bytes, _length, escaped.length);

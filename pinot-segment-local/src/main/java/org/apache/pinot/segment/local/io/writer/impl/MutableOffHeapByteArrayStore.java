@@ -90,6 +90,14 @@ public class MutableOffHeapByteArrayStore implements Closeable {
 
     private int _numValues = 0;
     private int _availEndOffset;  // Exclusive
+    /// Read-only view of the whole region, so that [#getByteBuffer] can hand out a value view with a single `slice`
+    /// rather than the `duplicate` + `slice` + `asReadOnlyBuffer` chain building one from scratch costs. Reads on the
+    /// consuming MAP path go through here once per row per projected key, so those allocations add up.
+    ///
+    /// Built on first use rather than up front, so a store that is never read this way - every dictionary and every
+    /// non-MAP raw column - behaves exactly as before. Racing readers may each build one; they are interchangeable,
+    /// and the field is volatile so a reader never sees a half-initialized buffer.
+    private volatile ByteBuffer _readOnlyView;
 
     private Buffer(int size, int startIndex, PinotDataBufferMemoryManager memoryManager, String allocationContext) {
       LOGGER.info("Allocating byte array store buffer of size {} for: {}", size, allocationContext);
@@ -151,7 +159,16 @@ public class MutableOffHeapByteArrayStore implements Closeable {
       } else {
         endOffset = _size;
       }
-      return _pinotDataBuffer.toDirectByteBuffer(startOffset, endOffset - startOffset);
+      return readOnlyView().slice(startOffset, endOffset - startOffset);
+    }
+
+    private ByteBuffer readOnlyView() {
+      ByteBuffer readOnlyView = _readOnlyView;
+      if (readOnlyView == null) {
+        readOnlyView = _pinotDataBuffer.toDirectByteBuffer(0, _size).asReadOnlyBuffer();
+        _readOnlyView = readOnlyView;
+      }
+      return readOnlyView;
     }
 
     private int getValueSize(int index) {
@@ -240,7 +257,7 @@ public class MutableOffHeapByteArrayStore implements Closeable {
     for (int x = bufList.size() - 1; x >= 0; x--) {
       Buffer buffer = bufList.get(x);
       if (index >= buffer.getStartIndex()) {
-        return buffer.getByteBuffer(index - buffer.getStartIndex()).asReadOnlyBuffer();
+        return buffer.getByteBuffer(index - buffer.getStartIndex());
       }
     }
     throw new RuntimeException("dictionary ID '" + index + "' too low");

@@ -22,9 +22,12 @@ import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.segment.local.segment.index.map.MapKeyIndexReader;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
@@ -52,6 +55,12 @@ public class DataFetcher implements AutoCloseable {
   private final int[] _reusableMVDictIds;
   private final int _maxNumValuesPerMVEntry;
   private final Map<String, String> _queryOptions;
+  /// Keys of the same MAP column, grouped by the forward index they share so they can be read in one traversal per
+  /// document rather than one per key. Keyed by reader identity - two key readers are groupable exactly when they
+  /// sit on the same underlying index.
+  private final Map<ForwardIndexReader, MapKeyGroupReader> _mapKeyGroupReaders = new IdentityHashMap<>();
+  /// The group each MAP key column belongs to, so a caller holding only a column name can find its siblings.
+  private final Map<String, MapKeyGroupReader> _mapKeyGroupsByColumn = new HashMap<>();
 
   /// Constructor for DataFetcher.
   ///
@@ -97,7 +106,30 @@ public class DataFetcher implements AutoCloseable {
     // RAW + shared-dict column must read raw values and consult the dictionary directly.
     Dictionary dictionary = forwardIndexReader.isDictionaryEncoded() ? dataSource.getDictionary() : null;
     ColumnValueReader columnValueReader = new ColumnValueReader(forwardIndexReader, dictionary);
+    if (forwardIndexReader instanceof MapKeyIndexReader) {
+      MapKeyIndexReader mapKeyIndexReader = (MapKeyIndexReader) forwardIndexReader;
+      MapKeyGroupReader groupReader = _mapKeyGroupReaders.computeIfAbsent(mapKeyIndexReader.getForwardIndexReader(),
+          reader -> new MapKeyGroupReader(reader, _queryOptions));
+      groupReader.addKey(column, mapKeyIndexReader);
+      _mapKeyGroupsByColumn.put(column, groupReader);
+    }
     _columnValueReaderMap.put(column, columnValueReader);
+  }
+
+  /// The columns reading keys of the same MAP forward index as `column`, itself included, in the order
+  /// [#fetchStringValuesForMapKeyGroup] fills its output. Returns `null` when `column` is not a MAP key, or is the
+  /// only key of its map being read - there is nothing to share then.
+  @Nullable
+  public List<String> getMapKeyGroupColumns(String column) {
+    MapKeyGroupReader groupReader = _mapKeyGroupsByColumn.get(column);
+    return groupReader != null && groupReader.isGrouped() ? groupReader.getColumns() : null;
+  }
+
+  /// Fetches every key of `column`'s MAP group, visiting each document once. `outValues[i]` receives the values for
+  /// the i-th column of [#getMapKeyGroupColumns].
+  public void fetchStringValuesForMapKeyGroup(String column, int[] inDocIds, int length, String[][] outValues) {
+    Tracing.activeRecording().setInputDataType(DataType.STRING, true);
+    _mapKeyGroupsByColumn.get(column).readStringValues(inDocIds, length, outValues);
   }
 
   /// SINGLE-VALUED COLUMN API
@@ -600,6 +632,9 @@ public class DataFetcher implements AutoCloseable {
   public void close() {
     for (ColumnValueReader columnValueReader : _columnValueReaderMap.values()) {
       columnValueReader.close();
+    }
+    for (MapKeyGroupReader mapKeyGroupReader : _mapKeyGroupReaders.values()) {
+      mapKeyGroupReader.close();
     }
   }
 }

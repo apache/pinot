@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.io.writer.impl;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.ReadOnlyBufferException;
 import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
@@ -90,6 +91,38 @@ public class MutableOffHeapByteArrayStoreTest implements PinotBuffersAfterClassC
       secondBuffer.get(secondResult);
       Assert.assertEquals(secondResult, secondValue);
       Assert.assertThrows(ReadOnlyBufferException.class, () -> store.getByteBuffer(secondIndex).put((byte) 0));
+    }
+  }
+
+  /// Views are sliced out of one shared read-only buffer per underlying region rather than rebuilt from scratch on
+  /// every call, so the guarantee worth pinning is that they stay independent: callers on the MAP read path consume
+  /// position and force byte order, and must not disturb each other or a later reader.
+  @Test
+  public void byteBufferViewsAreIndependentTest()
+      throws Exception {
+    try (MutableOffHeapByteArrayStore store = new MutableOffHeapByteArrayStore(_memoryManager, "bytesColumn", 8, 8)) {
+      byte[] firstValue = {1, 2, 3, 4};
+      byte[] secondValue = {5, 6, 7, 8};
+      int firstIndex = store.add(firstValue);
+      int secondIndex = store.add(secondValue);
+
+      ByteBuffer first = store.getByteBuffer(firstIndex);
+      first.position(first.limit());
+      first.order(ByteOrder.LITTLE_ENDIAN);
+
+      ByteBuffer second = store.getByteBuffer(secondIndex);
+      Assert.assertEquals(second.remaining(), secondValue.length);
+      Assert.assertEquals(second.order(), ByteOrder.BIG_ENDIAN);
+      byte[] secondResult = new byte[second.remaining()];
+      second.get(secondResult);
+      Assert.assertEquals(secondResult, secondValue);
+
+      ByteBuffer firstAgain = store.getByteBuffer(firstIndex);
+      Assert.assertEquals(firstAgain.remaining(), firstValue.length);
+      Assert.assertEquals(firstAgain.order(), ByteOrder.BIG_ENDIAN);
+      byte[] firstResult = new byte[firstAgain.remaining()];
+      firstAgain.get(firstResult);
+      Assert.assertEquals(firstResult, firstValue);
     }
   }
 

@@ -33,12 +33,31 @@ public class MapKeyIndexReader implements ForwardIndexReader {
   private final FieldSpec _keyFieldSpec;
   private final PreparedMapKey _mapKey;
   private final Object _defaultNullValue;
+  private final String _defaultNullValueString;
 
   public MapKeyIndexReader(ForwardIndexReader forwardIndexReader, String keyName, FieldSpec keyFieldSpec) {
     _forwardIndexReader = forwardIndexReader;
     _mapKey = new PreparedMapKey(keyName);
     _keyFieldSpec = keyFieldSpec;
     _defaultNullValue = keyFieldSpec.getDefaultNullValue();
+    // Through the FieldSpec rather than Object#toString: the two agree for every scalar type except BYTES, whose
+    // default renders as an identity string ("[B@1b6d3586") instead of hex.
+    _defaultNullValueString = keyFieldSpec.getDefaultNullValueString();
+  }
+
+  /// The underlying MAP forward index. Two key readers over the same instance read the same serialized frames, which
+  /// is what lets a caller group them into a single traversal per document.
+  public ForwardIndexReader getForwardIndexReader() {
+    return _forwardIndexReader;
+  }
+
+  public PreparedMapKey getMapKey() {
+    return _mapKey;
+  }
+
+  /// What [#getString] substitutes for a document that does not carry the key.
+  public String getDefaultNullValueString() {
+    return _defaultNullValueString;
   }
 
   @Override
@@ -90,7 +109,7 @@ public class MapKeyIndexReader implements ForwardIndexReader {
   @Override
   public String getString(int docId, ForwardIndexReaderContext context) {
     String value = _forwardIndexReader.getMapEntryValueAsString(docId, context, _mapKey);
-    return value != null ? value : _defaultNullValue.toString();
+    return value != null ? value : _defaultNullValueString;
   }
 
   @Override
