@@ -38,10 +38,13 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
+import org.apache.pinot.query.planner.plannode.PatternSymbol;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNode.NodeHint;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RowPattern;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -296,6 +299,106 @@ public class PlanNodeSerializer {
           .setPrunedPassthrough(context.isPrunedPassthrough());
       builder.setUnnestNode(unnestNodeBuilder.build());
       return null;
+    }
+
+    @Override
+    public Void visitMatch(MatchNode node, Plan.PlanNode.Builder builder) {
+      Plan.MatchNode.Builder matchNodeBuilder = Plan.MatchNode.newBuilder()
+          .setPattern(convertRowPattern(node.getPattern()))
+          .addAllPartitionKeys(node.getPartitionKeys())
+          .addAllCollations(convertCollations(node.getCollations()))
+          .setAfterMatchSkipMode(convertAfterMatchSkipMode(node.getAfterMatchSkipMode()))
+          .setRowsPerMatchMode(convertRowsPerMatchMode(node.getRowsPerMatchMode()));
+      for (PatternSymbol symbol : node.getPatternSymbols()) {
+        Plan.PatternSymbol.Builder symbolBuilder = Plan.PatternSymbol.newBuilder().setName(symbol.getName());
+        RexExpression definition = symbol.getDefinition();
+        if (definition != null) {
+          symbolBuilder.setDefinition(RexExpressionToProtoExpression.convertExpression(definition));
+        }
+        matchNodeBuilder.addPatternSymbols(symbolBuilder.build());
+      }
+      for (MatchNode.Measure measure : node.getMeasures()) {
+        matchNodeBuilder.addMeasures(Plan.MatchMeasure.newBuilder()
+            .setName(measure.getName())
+            .setExpression(RexExpressionToProtoExpression.convertExpression(measure.getExpression()))
+            .build());
+      }
+      // Left unset for the skip modes without a target variable, because ordinal 0 is itself a valid variable.
+      if (node.getAfterMatchSkipToSymbolOrdinal() != MatchNode.NO_SKIP_TO_SYMBOL) {
+        matchNodeBuilder.setAfterMatchSkipToSymbolOrdinal(node.getAfterMatchSkipToSymbolOrdinal());
+      }
+      builder.setMatchNode(matchNodeBuilder.build());
+      return null;
+    }
+
+    private static Plan.RowPattern convertRowPattern(RowPattern pattern) {
+      Plan.RowPattern.Builder builder = Plan.RowPattern.newBuilder();
+      switch (pattern.getKind()) {
+        case SYMBOL:
+          builder.setKind(Plan.RowPatternKind.PATTERN_SYMBOL)
+              .setSymbolOrdinal(((RowPattern.Symbol) pattern).getSymbolOrdinal());
+          break;
+        case CONCAT:
+          builder.setKind(Plan.RowPatternKind.PATTERN_CONCAT);
+          addRowPatternChildren(builder, ((RowPattern.Concat) pattern).getChildren());
+          break;
+        case ALTERNATE:
+          builder.setKind(Plan.RowPatternKind.PATTERN_ALTERNATE);
+          addRowPatternChildren(builder, ((RowPattern.Alternate) pattern).getChildren());
+          break;
+        case QUANTIFY: {
+          RowPattern.Quantify quantify = (RowPattern.Quantify) pattern;
+          builder.setKind(Plan.RowPatternKind.PATTERN_QUANTIFY)
+              .addChildren(convertRowPattern(quantify.getChild()))
+              .setQuantifier(Plan.RowPatternQuantifier.newBuilder()
+                  .setMinRepeat(quantify.getMinRepeat())
+                  .setMaxRepeat(quantify.getMaxRepeat())
+                  .setGreedy(quantify.isGreedy())
+                  .build());
+          break;
+        }
+        case ANCHOR_START:
+          builder.setKind(Plan.RowPatternKind.PATTERN_ANCHOR_START);
+          break;
+        case ANCHOR_END:
+          builder.setKind(Plan.RowPatternKind.PATTERN_ANCHOR_END);
+          break;
+        default:
+          throw new IllegalStateException("Unsupported RowPattern kind: " + pattern.getKind());
+      }
+      return builder.build();
+    }
+
+    private static void addRowPatternChildren(Plan.RowPattern.Builder builder, List<RowPattern> children) {
+      for (RowPattern child : children) {
+        builder.addChildren(convertRowPattern(child));
+      }
+    }
+
+    private static Plan.AfterMatchSkipMode convertAfterMatchSkipMode(MatchNode.AfterMatchSkipMode skipMode) {
+      switch (skipMode) {
+        case PAST_LAST_ROW:
+          return Plan.AfterMatchSkipMode.SKIP_PAST_LAST_ROW;
+        case TO_NEXT_ROW:
+          return Plan.AfterMatchSkipMode.SKIP_TO_NEXT_ROW;
+        case TO_FIRST:
+          return Plan.AfterMatchSkipMode.SKIP_TO_FIRST;
+        case TO_LAST:
+          return Plan.AfterMatchSkipMode.SKIP_TO_LAST;
+        default:
+          throw new IllegalStateException("Unsupported AfterMatchSkipMode: " + skipMode);
+      }
+    }
+
+    private static Plan.RowsPerMatchMode convertRowsPerMatchMode(MatchNode.RowsPerMatchMode rowsPerMatchMode) {
+      switch (rowsPerMatchMode) {
+        case ONE_ROW_PER_MATCH:
+          return Plan.RowsPerMatchMode.ONE_ROW_PER_MATCH;
+        case ALL_ROWS_PER_MATCH:
+          return Plan.RowsPerMatchMode.ALL_ROWS_PER_MATCH;
+        default:
+          throw new IllegalStateException("Unsupported RowsPerMatchMode: " + rowsPerMatchMode);
+      }
     }
 
     private static List<Expressions.Expression> convertExpressions(List<RexExpression> expressions) {

@@ -38,6 +38,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -374,6 +375,11 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
   @Override
   public ObjectNode visitUnnest(UnnestNode node, Context context) {
     return recursiveCase(node, MultiStageOperator.Type.UNNEST, context);
+  }
+
+  @Override
+  public ObjectNode visitMatch(MatchNode node, Context context) {
+    return recursiveCase(node, MultiStageOperator.Type.MATCH, context);
   }
 
   public static class Context {

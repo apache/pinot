@@ -1,0 +1,93 @@
+{
+  "match_recognize_v_shape": {
+    "tables": {
+      "ticker": {
+        "schema": [
+          {"name": "symbol", "type": "STRING"},
+          {"name": "seq", "type": "LONG"},
+          {"name": "price", "type": "INT"}
+        ],
+        "inputs": [
+          ["A", 1, 10],
+          ["A", 2, 8],
+          ["A", 3, 6],
+          ["A", 4, 9],
+          ["A", 5, 12],
+          ["A", 6, 7],
+          ["A", 7, 11],
+          ["B", 1, 5],
+          ["B", 2, 3],
+          ["B", 3, 8]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "V-shape detection with an explicit AFTER MATCH SKIP PAST LAST ROW: matches never overlap. H2 has no MATCH_RECOGNIZE, so the expected rows are hand-computed.",
+        "sql": "SELECT * FROM {ticker} MATCH_RECOGNIZE (PARTITION BY symbol ORDER BY seq MEASURES FIRST(DOWN.price) AS start_price, LAST(UP.price) AS end_price ONE ROW PER MATCH AFTER MATCH SKIP PAST LAST ROW PATTERN (DOWN+ UP+) DEFINE DOWN AS DOWN.price < PREV(DOWN.price), UP AS UP.price > PREV(UP.price)) AS mr",
+        "outputs": [
+          ["A", 8, 12],
+          ["A", 7, 11],
+          ["B", 3, 8]
+        ],
+        "ignoreV2Optimizer": true,
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "THE CRITICAL DEFAULT: omitting AFTER MATCH must behave as SKIP PAST LAST ROW (SQL:2016 / Trino / Snowflake / Oracle), NOT Calcite's internal SKIP TO NEXT ROW. Expected rows are byte-identical to the explicit PAST LAST ROW query above; if the default regressed to SKIP TO NEXT ROW this query would return the extra overlapping row [A, 6, 12].",
+        "sql": "SELECT * FROM {ticker} MATCH_RECOGNIZE (PARTITION BY symbol ORDER BY seq MEASURES FIRST(DOWN.price) AS start_price, LAST(UP.price) AS end_price ONE ROW PER MATCH PATTERN (DOWN+ UP+) DEFINE DOWN AS DOWN.price < PREV(DOWN.price), UP AS UP.price > PREV(UP.price)) AS mr",
+        "outputs": [
+          ["A", 8, 12],
+          ["A", 7, 11],
+          ["B", 3, 8]
+        ],
+        "ignoreV2Optimizer": true,
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Explicit AFTER MATCH SKIP TO NEXT ROW produces overlapping matches. The extra row [A, 6, 12] is what an engine that silently kept Calcite's default would wrongly return for the query above, so this pins that the two modes really do differ.",
+        "sql": "SELECT * FROM {ticker} MATCH_RECOGNIZE (PARTITION BY symbol ORDER BY seq MEASURES FIRST(DOWN.price) AS start_price, LAST(UP.price) AS end_price ONE ROW PER MATCH AFTER MATCH SKIP TO NEXT ROW PATTERN (DOWN+ UP+) DEFINE DOWN AS DOWN.price < PREV(DOWN.price), UP AS UP.price > PREV(UP.price)) AS mr",
+        "outputs": [
+          ["A", 8, 12],
+          ["A", 6, 12],
+          ["A", 7, 11],
+          ["B", 3, 8]
+        ],
+        "ignoreV2Optimizer": true,
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "MATCH_NUMBER() restarts per partition, CLASSIFIER() reports the label of the final row of the match, and a single-variable aggregate counts only the rows bound to that variable.",
+        "sql": "SELECT * FROM {ticker} MATCH_RECOGNIZE (PARTITION BY symbol ORDER BY seq MEASURES MATCH_NUMBER() AS mno, CLASSIFIER() AS cls, COUNT(DOWN.price) AS down_cnt ONE ROW PER MATCH PATTERN (DOWN+ UP+) DEFINE DOWN AS DOWN.price < PREV(DOWN.price), UP AS UP.price > PREV(UP.price)) AS mr",
+        "outputs": [
+          ["A", 1, "UP", 2],
+          ["A", 2, "UP", 1],
+          ["B", 1, "UP", 1]
+        ],
+        "ignoreV2Optimizer": true,
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Start anchor plus a pattern variable that has no DEFINE entry (SQL:2016 says it matches every row). The anchor is load-bearing: without it partition A would also yield the later match [A, 7, 7] starting at seq=5.",
+        "sql": "SELECT * FROM {ticker} MATCH_RECOGNIZE (PARTITION BY symbol ORDER BY seq MEASURES FIRST(DIP.price) AS first_dip, LAST(DIP.price) AS last_dip ONE ROW PER MATCH PATTERN (^ START DIP+) DEFINE DIP AS DIP.price < PREV(DIP.price)) AS mr",
+        "outputs": [
+          ["A", 8, 6],
+          ["B", 3, 3]
+        ],
+        "ignoreV2Optimizer": true,
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Same pattern without the start anchor, to prove the anchor above is actually enforced rather than silently dropped: partition A now also matches the later dip at seq=5..6.",
+        "sql": "SELECT * FROM {ticker} MATCH_RECOGNIZE (PARTITION BY symbol ORDER BY seq MEASURES FIRST(DIP.price) AS first_dip, LAST(DIP.price) AS last_dip ONE ROW PER MATCH PATTERN (START DIP+) DEFINE DIP AS DIP.price < PREV(DIP.price)) AS mr",
+        "outputs": [
+          ["A", 8, 6],
+          ["A", 7, 7],
+          ["B", 3, 3]
+        ],
+        "ignoreV2Optimizer": true,
+        "ignoreLiteMode": true
+      }
+    ]
+  }
+}
