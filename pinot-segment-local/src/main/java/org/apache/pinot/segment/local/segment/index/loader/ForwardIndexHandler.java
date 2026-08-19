@@ -523,6 +523,12 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
     try (ForwardIndexReader<?> fwdIndexReader = readerFactory.createIndexReader(segmentReader,
         _fieldIndexConfigs.get(column), existingColMetadata)) {
+      // V7 codec-pipeline segments carry a codecSpec instead of a legacy ChunkCompressionType. This handler
+      // does not rewrite codec-pipeline forward indexes yet (full reload support for codecSpec changes lands
+      // in a follow-up), so skip them here rather than tripping the null-compressionType precondition below.
+      if (fwdIndexReader.getCodecSpec() != null) {
+        return false;
+      }
       existingCompressionType = fwdIndexReader.getCompressionType();
       Preconditions.checkState(existingCompressionType != null,
           "Existing compressionType cannot be null for raw forward index column=" + column);
