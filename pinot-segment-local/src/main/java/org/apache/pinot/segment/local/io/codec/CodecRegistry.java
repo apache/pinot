@@ -24,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.codec.CodecSpecParser;
 
 
 /// Registry of known [ChunkCodecHandler] instances, looked up by
@@ -86,6 +87,12 @@ final class CodecRegistry {
       throw new UnsupportedOperationException("CodecRegistry.DEFAULT is immutable");
     }
     String key = codec.name().toUpperCase(Locale.ROOT);
+    // Defense in depth: the DSL parser and CodecInvocation already reserve this name, but a codec
+    // registered under it would be unreachable at best and grammar-ambiguous if the parser ever changed.
+    if (CodecSpecParser.REMOVED_WRAPPER_NAME.equals(key)) {
+      throw new IllegalArgumentException("'" + CodecSpecParser.REMOVED_WRAPPER_NAME
+          + "' is reserved by the removed wrapper syntax and cannot be registered");
+    }
     if (_codecs.containsKey(key)) {
       throw new IllegalArgumentException("A codec named '" + key + "' is already registered");
     }

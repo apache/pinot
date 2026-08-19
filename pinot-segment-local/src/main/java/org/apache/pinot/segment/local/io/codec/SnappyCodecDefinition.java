@@ -115,11 +115,8 @@ final class SnappyCodecDefinition implements ChunkCodecHandler<SnappyCodecDefini
     ByteBuffer out = null;
     boolean succeeded = false;
     try {
-      int decompressedSize = Snappy.uncompressedLength(directSrc.duplicate());
-      if (decompressedSize < 0) {
-        throw new IOException("Snappy: invalid decompressed size in header: " + decompressedSize
-            + ". Segment may be corrupt.");
-      }
+      int decompressedSize = CodecBufferUtils.checkDeclaredDecompressedSize(
+          Snappy.uncompressedLength(directSrc.duplicate()), "Snappy", "varint length header");
       out = ByteBuffer.allocateDirect(decompressedSize);
       // Snappy JNI writes at dst.position() but does NOT advance it; use returned count to set limit
       int written = Snappy.uncompress(directSrc, out);
@@ -146,11 +143,8 @@ final class SnappyCodecDefinition implements ChunkCodecHandler<SnappyCodecDefini
     // Snappy JNI requires direct buffers — convert before reading the size header.
     ByteBuffer directSrc = CodecBufferUtils.toDirectBuffer(src);
     try {
-      int decompressedSize = Snappy.uncompressedLength(directSrc.duplicate());
-      if (decompressedSize < 0) {
-        throw new IOException("Snappy: invalid decompressed size in header: " + decompressedSize
-            + ". Segment may be corrupt.");
-      }
+      int decompressedSize = CodecBufferUtils.checkDeclaredDecompressedSize(
+          Snappy.uncompressedLength(directSrc.duplicate()), "Snappy", "varint length header");
       if (decompressedSize > dst.capacity()) {
         throw new IllegalArgumentException(
             "Snappy: decompressed size " + decompressedSize + " exceeds dst capacity " + dst.capacity());

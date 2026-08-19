@@ -57,10 +57,6 @@ final class GzipCodecDefinition implements ChunkCodecHandler<GzipCodecDefinition
   private static final ThreadLocal<Inflater> INFLATER = ThreadLocal.withInitial(Inflater::new);
   private static final ThreadLocal<byte[]> COMPLETION_PROBE = ThreadLocal.withInitial(() -> new byte[1]);
 
-  /// Sanity cap on decompressedSize read from the (untrusted) GZIP trailer to prevent DoS-on-corrupt-segment
-  /// via a giant pre-allocation. 1 GiB is well above any realistic chunk size.
-  private static final int MAX_REASONABLE_DECOMPRESSED_SIZE = 1 << 30;
-
   public static final GzipCodecDefinition INSTANCE = new GzipCodecDefinition();
 
   /// Singleton options — GZIP has no configurable parameters.
@@ -196,12 +192,7 @@ final class GzipCodecDefinition implements ChunkCodecHandler<GzipCodecDefinition
     if (decompressedSize < 0) {
       throw new IOException("GZIP: invalid decompressed size in footer: " + decompressedSize);
     }
-    if (decompressedSize > MAX_REASONABLE_DECOMPRESSED_SIZE) {
-      throw new IOException(
-          "GZIP: decompressed size " + decompressedSize + " in footer exceeds sanity cap "
-              + MAX_REASONABLE_DECOMPRESSED_SIZE + ". Segment may be corrupt.");
-    }
-    return decompressedSize;
+    return CodecBufferUtils.checkDeclaredDecompressedSize(decompressedSize, "GZIP", "footer");
   }
 
   private static void inflateInto(ByteBuffer src, ByteBuffer dst, int decompressedSize) throws IOException {

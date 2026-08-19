@@ -60,6 +60,40 @@ public class CompressionCodecCorruptInputTest {
   }
 
   @Test
+  public void testSnappyDecodeRejectsGarbage() {
+    assertThrows(Exception.class,
+        () -> SnappyCodecDefinition.INSTANCE.decode(SnappyCodecDefinition.OPTIONS, CTX, garbage(64)));
+  }
+
+  @Test
+  public void testSnappyDecodeRejectsOversizedDeclaredSize() {
+    // The sanity cap must fire before any allocation driven by the untrusted header. The declared size is
+    // the smallest rejected value (cap + 1), pinning the inclusive boundary: exactly 1 GiB is accepted.
+    IOException exception = expectThrows(IOException.class,
+        () -> SnappyCodecDefinition.INSTANCE.decode(SnappyCodecDefinition.OPTIONS, CTX, oversizedSnappyFrame()));
+    assertTrue(exception.getMessage().contains("out of range"), exception.getMessage());
+  }
+
+  @Test
+  public void testSnappyDecodeIntoRejectsOversizedDeclaredSize() {
+    // decodeInto is the path the bounded executor uses in production; it must reject with the size-cap
+    // IOException, not the later dst-capacity IllegalArgumentException.
+    ByteBuffer dst = ByteBuffer.allocateDirect(16);
+    IOException exception = expectThrows(IOException.class,
+        () -> SnappyCodecDefinition.INSTANCE.decodeInto(SnappyCodecDefinition.OPTIONS, CTX,
+            oversizedSnappyFrame(), dst));
+    assertTrue(exception.getMessage().contains("out of range"), exception.getMessage());
+  }
+
+  /// Frame whose varint length header declares (1 << 30) + 1 decompressed bytes — one past the cap.
+  private static ByteBuffer oversizedSnappyFrame() {
+    ByteBuffer frame = ByteBuffer.allocateDirect(8);
+    frame.put(new byte[]{(byte) 0x81, (byte) 0x80, (byte) 0x80, (byte) 0x80, 0x04, 0x00, 0x00, 0x00});
+    frame.flip();
+    return frame;
+  }
+
+  @Test
   public void testGzipDecodeRejectsGarbage() {
     IOException exception = expectThrows(IOException.class,
         () -> GzipCodecDefinition.INSTANCE.decode(GzipCodecDefinition.OPTIONS, CTX, garbage(64)));
