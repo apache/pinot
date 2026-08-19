@@ -49,7 +49,9 @@ import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -70,6 +72,7 @@ import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
@@ -116,6 +119,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 ///   - "/segments/{tableNameWithType}/{segmentName}/reset": reset a segment
 ///   - "/segments/{tableNameWithType}/reset": reset all segments
 ///   - "/segments/{tableName}/delete": delete the segments in the payload
+/// - PUT requests:
+///   - "/segments/{tableNameWithType}/{segmentName}/metadata": update the custom map in segment ZK metadata
 /// - DELETE requests:
 ///   - "/segments/{tableName}/{segmentName}": delete a segment
 ///   - "/segments/{tableName}: delete all segments
@@ -315,6 +320,77 @@ public class PinotSegmentRestletResource {
       throw new ControllerApplicationException(LOGGER,
           "Failed to find segment: " + segmentName + " in table: " + tableName, Status.NOT_FOUND);
     }
+  }
+
+  @PUT
+  @Path("segments/{tableNameWithType}/{segmentName}/metadata")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.UPLOAD_SEGMENT)
+  @Authenticate(AccessType.UPDATE)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Update the custom map in the ZK metadata for a segment",
+      notes = "Updates only the segment ZK metadata custom map without uploading or refreshing the segment")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 400, message = "Invalid table name, CRC, or custom map modifier"),
+      @ApiResponse(code = 404, message = "Table or segment not found"),
+      @ApiResponse(code = 409, message = "Segment metadata changed concurrently"),
+      @ApiResponse(code = 412, message = "Segment CRC does not match")
+  })
+  public SuccessResponse updateSegmentZKMetadataCustomMap(
+      @ApiParam(value = "Table name with type", required = true, example = "myTable_OFFLINE")
+      @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @ApiParam(value = "Expected segment CRC", required = true) @HeaderParam(HttpHeaders.IF_MATCH)
+      String expectedCrcString,
+      @ApiParam(value = "Custom map modifier", required = true) String customMapModifierJson,
+      @Context HttpHeaders headers) {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
+    segmentName = URIUtils.decode(segmentName);
+    if (TableNameBuilder.getTableTypeFromTableName(tableNameWithType) == null) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Table type not provided with table name: %s", tableNameWithType), Status.BAD_REQUEST);
+    }
+
+    long expectedCrc;
+    try {
+      expectedCrc = Long.parseLong(expectedCrcString);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Missing or invalid If-Match segment CRC", Status.BAD_REQUEST,
+          e);
+    }
+
+    SegmentZKMetadataCustomMapModifier customMapModifier;
+    try {
+      customMapModifier = new SegmentZKMetadataCustomMapModifier(customMapModifierJson);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Invalid segment ZK metadata custom map modifier",
+          Status.BAD_REQUEST, e);
+    }
+
+    ZNRecord segmentMetadataRecord =
+        _pinotHelixResourceManager.getSegmentMetadataZnRecord(tableNameWithType, segmentName);
+    if (segmentMetadataRecord == null) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to find segment: %s in table: %s", segmentName, tableNameWithType), Status.NOT_FOUND);
+    }
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadataRecord);
+    if (segmentZKMetadata.getCrc() != expectedCrc) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Segment CRC does not match for segment: %s in table: %s", segmentName, tableNameWithType),
+          Status.PRECONDITION_FAILED);
+    }
+    segmentZKMetadata.setRefreshTime(System.currentTimeMillis());
+    segmentZKMetadata.setCustomMap(customMapModifier.modifyMap(segmentZKMetadata.getCustomMap()));
+    if (!_pinotHelixResourceManager.updateZkMetadata(tableNameWithType, segmentZKMetadata,
+        segmentMetadataRecord.getVersion())) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Segment metadata changed concurrently for segment: %s in table: %s", segmentName,
+              tableNameWithType), Status.CONFLICT);
+    }
+    return new SuccessResponse(
+        String.format("Successfully updated ZK metadata for segment: %s in table: %s", segmentName,
+            tableNameWithType));
   }
 
   private JsonNode getExtraMetaData(String tableName, String segmentName, List<String> columns) {
