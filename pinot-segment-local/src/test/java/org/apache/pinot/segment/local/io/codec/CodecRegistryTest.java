@@ -44,7 +44,9 @@ public class CodecRegistryTest {
     assertSame(CodecRegistry.DEFAULT.get("zstandard"), ZstdCodecDefinition.INSTANCE);
     assertSame(CodecRegistry.DEFAULT.get("delta"), DeltaCodecDefinition.INSTANCE);
     assertSame(CodecRegistry.DEFAULT.get("DELTADELTA"), DeltaDeltaCodecDefinition.INSTANCE);
-    assertNull(CodecRegistry.DEFAULT.get("T64"));
+    assertSame(CodecRegistry.DEFAULT.get("t64"), T64CodecDefinition.INSTANCE);
+    assertSame(CodecRegistry.DEFAULT.get("GORILLA"), GorillaCodecDefinition.INSTANCE);
+    assertNull(CodecRegistry.DEFAULT.get("NOSUCHCODEC"));
   }
 
   @Test
