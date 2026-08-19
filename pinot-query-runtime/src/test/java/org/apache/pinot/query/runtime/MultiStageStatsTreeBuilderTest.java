@@ -24,7 +24,6 @@ import java.util.Map;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
@@ -34,6 +33,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OperatorTypeDescriptor;
+import org.apache.pinot.query.runtime.operator.TestOperatorTypeDescriptors;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.StageStatsTreeNode;
 import org.testng.Assert;
@@ -66,27 +66,7 @@ public class MultiStageStatsTreeBuilderTest {
   }
 
   private static OperatorTypeDescriptor pluginType(int id, String name) {
-    return new OperatorTypeDescriptor() {
-      @Override
-      public int getId() {
-        return id;
-      }
-
-      @Override
-      public String name() {
-        return name;
-      }
-
-      @Override
-      @SuppressWarnings("rawtypes")
-      public Class getStatKeyClass() {
-        return TestPluginStat.class;
-      }
-
-      @Override
-      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
-      }
-    };
+    return TestOperatorTypeDescriptors.of(id, name, TestPluginStat.class);
   }
 
   private static MailboxReceiveNode receiveNode(int stageId, int senderStageId) {
