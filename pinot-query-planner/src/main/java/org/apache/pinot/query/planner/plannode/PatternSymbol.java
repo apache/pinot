@@ -23,17 +23,15 @@ import javax.annotation.Nullable;
 import org.apache.pinot.query.planner.logical.RexExpression;
 
 
-/**
- * One entry of a {@link MatchNode}'s MATCH_RECOGNIZE pattern variable symbol table: a variable name and its
- * {@code DEFINE} predicate.
- *
- * <p>The variable's <em>ordinal</em> is its index in {@link MatchNode#getPatternSymbols()}. Everything that refers
- * to a pattern variable - {@link RowPattern.Symbol}, {@link RexExpression.PatternFieldRef} and
- * {@link MatchNode#getAfterMatchSkipToSymbolOrdinal()} - does so by that ordinal, so the operator never has to
- * string-match on {@link #getName()}.
- *
- * <p>Instances are immutable.
- */
+/// One entry of a [MatchNode]'s MATCH_RECOGNIZE pattern variable symbol table: a variable name and its
+/// `DEFINE` predicate.
+///
+/// The variable's *ordinal* is its index in [MatchNode#getPatternSymbols()]. Everything that refers
+/// to a pattern variable - [RowPattern.Symbol], [RexExpression.PatternFieldRef] and
+/// [MatchNode#getAfterMatchSkipToSymbolOrdinal()] - does so by that ordinal, so the operator never has to
+/// string-match on [#getName()].
+///
+/// Instances are immutable.
 public class PatternSymbol {
   private final String _name;
   private final RexExpression _definition;
@@ -43,17 +41,13 @@ public class PatternSymbol {
     _definition = definition;
   }
 
-  /**
-   * Pattern variable name as written in the {@code PATTERN} / {@code DEFINE} clauses. Informational only.
-   */
+  /// Pattern variable name as written in the `PATTERN` / `DEFINE` clauses. Informational only.
   public String getName() {
     return _name;
   }
 
-  /**
-   * The {@code DEFINE} predicate for this variable, or {@code null} when the variable has no {@code DEFINE} entry.
-   * Per SQL:2016 an undefined pattern variable matches every row.
-   */
+  /// The `DEFINE` predicate for this variable, or `null` when the variable has no `DEFINE` entry.
+  /// Per SQL:2016 an undefined pattern variable matches every row.
   @Nullable
   public RexExpression getDefinition() {
     return _definition;

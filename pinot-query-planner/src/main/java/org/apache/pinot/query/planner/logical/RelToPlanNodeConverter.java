@@ -61,7 +61,6 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlMatchRecognize;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
@@ -703,20 +702,18 @@ public final class RelToPlanNodeConverter {
         aggCalls, windowFrameType, lowerBound, upperBound, fromRexWindowExclusion(windowGroup.exclude), constants);
   }
 
-  /**
-   * Converts Calcite's {@link Match} (SQL:2016 MATCH_RECOGNIZE) into a {@link MatchNode}.
-   *
-   * <p>The main job is lowering Calcite's encoding of the {@code PATTERN} clause - a {@code RexCall} tree of
-   * PATTERN_CONCAT / PATTERN_ALTER / PATTERN_QUANTIFIER over string literals - into the explicit
-   * {@link RowPattern} tree, and binding every pattern variable reference to an ordinal in the symbol table so that
-   * the operator never string-matches variable names.
-   *
-   * <p>{@link org.apache.pinot.query.validate.MatchRecognizeValidator} runs on the {@code SqlNode} tree before
-   * conversion: it rewrites an omitted {@code AFTER MATCH} to {@code SKIP PAST LAST ROW} (the SQL:2016 default, not
-   * Calcite's {@code SKIP TO NEXT ROW}) and rejects the constructs that are not supported yet. No default is
-   * re-applied here. The rejections repeated below are a safety net: {@link MatchNode} cannot represent those
-   * constructs, so dropping one silently would return wrong rows.
-   */
+  /// Converts Calcite's [Match] (SQL:2016 MATCH_RECOGNIZE) into a [MatchNode].
+  ///
+  /// The main job is lowering Calcite's encoding of the `PATTERN` clause - a `RexCall` tree of
+  /// PATTERN_CONCAT / PATTERN_ALTER / PATTERN_QUANTIFIER over string literals - into the explicit
+  /// [RowPattern] tree, and binding every pattern variable reference to an ordinal in the symbol table so that
+  /// the operator never string-matches variable names.
+  ///
+  /// [org.apache.pinot.query.validate.MatchRecognizeValidator] runs on the `SqlNode` tree before
+  /// conversion: it rewrites an omitted `AFTER MATCH` to `SKIP PAST LAST ROW` (the SQL:2016 default, not
+  /// Calcite's `SKIP TO NEXT ROW`) and rejects the constructs that are not supported yet. No default is
+  /// re-applied here. The rejections repeated below are a safety net: [MatchNode] cannot represent those
+  /// constructs, so dropping one silently would return wrong rows.
   private MatchNode convertLogicalMatch(Match node) {
     if (node.isAllRows()) {
       throw new QueryException(QueryErrorCode.QUERY_PLANNING,
@@ -787,22 +784,20 @@ public final class RelToPlanNodeConverter {
         MatchNode.RowsPerMatchMode.ONE_ROW_PER_MATCH);
   }
 
-  /**
-   * The input column indexes of the {@code PARTITION BY} keys, in {@code PARTITION BY} <b>source</b> order.
-   *
-   * <p>{@link Match#getPartitionKeys()} is an {@link ImmutableBitSet}, so {@code asList()} always returns the keys in
-   * ascending index order and the order the user wrote them in is gone. The output row type built by
-   * {@code SqlValidatorImpl.validateMatchRecognize} does keep it: its leading fields are the partition columns in
-   * source order, named after the last component of each {@code PARTITION BY} identifier. {@code MatchOperator} fills
-   * the output row positionally, so the two have to agree - otherwise
-   * {@code PARTITION BY <later column>, <earlier column>} reports each partition column's value under the other one's
-   * name, or fails with a {@code ClassCastException} when the two types differ.
-   *
-   * <p>The number of leading partition fields is derived from the measure count rather than from
-   * {@code partitionKeys.cardinality()}, because {@code PARTITION BY col, col} contributes two output fields but only
-   * one bit. The names are resolved against the partition key set only, case-sensitively first, because the schema may
-   * be case-insensitive and the row type carries the identifier as it was written rather than as it was resolved.
-   */
+  /// The input column indexes of the `PARTITION BY` keys, in `PARTITION BY` **source** order.
+  ///
+  /// [Match#getPartitionKeys()] is an [ImmutableBitSet], so `asList()` always returns the keys in
+  /// ascending index order and the order the user wrote them in is gone. The output row type built by
+  /// `SqlValidatorImpl.validateMatchRecognize` does keep it: its leading fields are the partition columns in
+  /// source order, named after the last component of each `PARTITION BY` identifier. `MatchOperator` fills
+  /// the output row positionally, so the two have to agree - otherwise
+  /// `PARTITION BY <later column>, <earlier column>` reports each partition column's value under the other one's
+  /// name, or fails with a `ClassCastException` when the two types differ.
+  ///
+  /// The number of leading partition fields is derived from the measure count rather than from
+  /// `partitionKeys.cardinality()`, because `PARTITION BY col, col` contributes two output fields but only
+  /// one bit. The names are resolved against the partition key set only, case-sensitively first, because the schema may
+  /// be case-insensitive and the row type carries the identifier as it was written rather than as it was resolved.
   private static List<Integer> partitionKeysInSourceOrder(Match node) {
     ImmutableBitSet partitionKeys = node.getPartitionKeys();
     List<String> outputFieldNames = node.getRowType().getFieldNames();
@@ -840,9 +835,7 @@ public final class RelToPlanNodeConverter {
     return caseInsensitiveMatch;
   }
 
-  /**
-   * Registers every pattern variable of {@code pattern} in {@code symbolOrdinals}, in order of first appearance.
-   */
+  /// Registers every pattern variable of `pattern` in `symbolOrdinals`, in order of first appearance.
   private static void collectPatternSymbols(RexNode pattern, Map<String, Integer> symbolOrdinals) {
     if (pattern instanceof RexLiteral) {
       symbolOrdinals.putIfAbsent(RexLiteral.stringValue(pattern), symbolOrdinals.size());
@@ -855,10 +848,8 @@ public final class RelToPlanNodeConverter {
     }
   }
 
-  /**
-   * The sub-pattern operands of a pattern call. All operands are sub-patterns except for a quantifier, whose last
-   * three operands are the bounds and the reluctant flag rather than pattern variables.
-   */
+  /// The sub-pattern operands of a pattern call. All operands are sub-patterns except for a quantifier, whose last
+  /// three operands are the bounds and the reluctant flag rather than pattern variables.
   private static List<RexNode> patternChildren(RexCall call) {
     return call.getKind() == SqlKind.PATTERN_QUANTIFIER ? call.getOperands().subList(0, 1) : call.getOperands();
   }
@@ -894,11 +885,9 @@ public final class RelToPlanNodeConverter {
     }
   }
 
-  /**
-   * Flattens the left-deep binary tree Calcite builds for {@code A B C} and {@code A | B | C} into the operands of a
-   * single n-ary node. Both operators are associative and the operand order is preserved, so the SQL:2016
-   * leftmost-alternative-wins rule is unaffected.
-   */
+  /// Flattens the left-deep binary tree Calcite builds for `A B C` and `A | B | C` into the operands of a
+  /// single n-ary node. Both operators are associative and the operand order is preserved, so the SQL:2016
+  /// leftmost-alternative-wins rule is unaffected.
   private List<RowPattern> flattenRowPatterns(RexCall call, Map<String, Integer> symbolOrdinals) {
     List<RowPattern> children = new ArrayList<>(call.getOperands().size());
     flattenRowPatterns(call, call.getKind(), symbolOrdinals, children);
@@ -953,10 +942,8 @@ public final class RelToPlanNodeConverter {
     return value;
   }
 
-  /**
-   * Turns Calcite's {@code strictStart} / {@code strictEnd} booleans back into the {@code ^} and {@code $} anchor
-   * nodes that {@link RowPattern} models explicitly.
-   */
+  /// Turns Calcite's `strictStart` / `strictEnd` booleans back into the `^` and `$` anchor
+  /// nodes that [RowPattern] models explicitly.
   private static RowPattern withAnchors(RowPattern pattern, boolean strictStart, boolean strictEnd) {
     if (!strictStart && !strictEnd) {
       return pattern;
@@ -1018,16 +1005,14 @@ public final class RelToPlanNodeConverter {
     return bindPatternFieldRefs(RexExpressionUtils.fromRexNode(rexNode), symbolOrdinals);
   }
 
-  /**
-   * Binds every {@link RexExpression.PatternFieldRef} in {@code expression} to its pattern symbol ordinal.
-   * {@link RexExpressionUtils} has no symbol table, so the references it produces are unresolved; the plan
-   * serializer rejects an unresolved reference rather than writing an ambiguous one to the wire.
-   *
-   * <p>An alpha that is not a pattern variable is the SQL:2016 universal row pattern variable: Calcite has no
-   * dedicated representation for an unqualified column reference such as {@code price} in
-   * {@code DEFINE UP AS price > PREV(price)} and reuses the row source alias instead. Those bind to
-   * {@link RexExpression.PatternFieldRef#UNIVERSAL_SYMBOL_ORDINAL}.
-   */
+  /// Binds every [RexExpression.PatternFieldRef] in `expression` to its pattern symbol ordinal.
+  /// [RexExpressionUtils] has no symbol table, so the references it produces are unresolved; the plan
+  /// serializer rejects an unresolved reference rather than writing an ambiguous one to the wire.
+  ///
+  /// An alpha that is not a pattern variable is the SQL:2016 universal row pattern variable: Calcite has no
+  /// dedicated representation for an unqualified column reference such as `price` in
+  /// `DEFINE UP AS price > PREV(price)` and reuses the row source alias instead. Those bind to
+  /// [RexExpression.PatternFieldRef#UNIVERSAL_SYMBOL_ORDINAL].
   private RexExpression bindPatternFieldRefs(RexExpression expression, Map<String, Integer> symbolOrdinals) {
     if (expression instanceof RexExpression.PatternFieldRef) {
       RexExpression.PatternFieldRef ref = (RexExpression.PatternFieldRef) expression;

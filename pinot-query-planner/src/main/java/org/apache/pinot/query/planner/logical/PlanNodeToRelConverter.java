@@ -474,11 +474,9 @@ public final class PlanNodeToRelConverter {
       return stripped.size() == 1 ? stripped.get(0) : new RowPattern.Concat(stripped);
     }
 
-    /**
-     * Rebuilds Calcite's {@code RexCall} encoding of the PATTERN clause: PATTERN_CONCAT and PATTERN_ALTER are binary
-     * and left associative, quantifiers carry their bounds and reluctant flag as literal operands, and a pattern
-     * variable is a plain string literal.
-     */
+    /// Rebuilds Calcite's `RexCall` encoding of the PATTERN clause: PATTERN_CONCAT and PATTERN_ALTER are binary
+    /// and left associative, quantifiers carry their bounds and reluctant flag as literal operands, and a pattern
+    /// variable is a plain string literal.
     private RexNode toPatternRexNode(RowPattern pattern, List<PatternSymbol> symbols) {
       RexBuilder rexBuilder = _builder.getRexBuilder();
       switch (pattern.getKind()) {
