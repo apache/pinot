@@ -1606,7 +1606,8 @@ public class CommonConstants {
         "pinot.server.startup.serviceStatusCheckIntervalMs";
     public static final long DEFAULT_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS = 10_000L;
     // Startup: wait for brokers to add the server to routing before reporting the server as ready. Disabled by default
-    // for the initial rollout so mixed-version clusters retain the existing readiness behavior.
+    // for the initial rollout so mixed-version clusters retain the existing readiness behavior. Enable only after all
+    // brokers are upgraded to a version that exposes the routing-readiness endpoint.
     public static final String CONFIG_OF_STARTUP_ENABLE_BROKER_ROUTING_CHECK =
         "pinot.server.startup.enableBrokerRoutingCheck";
     public static final boolean DEFAULT_STARTUP_ENABLE_BROKER_ROUTING_CHECK = false;
@@ -1617,7 +1618,7 @@ public class CommonConstants {
     // keep reporting unready and continue checking until the brokers recover.
     public static final String CONFIG_OF_STARTUP_BROKER_ROUTING_CHECK_FAIL_OPEN =
         "pinot.server.startup.brokerRoutingCheckFailOpen";
-    public static final boolean DEFAULT_STARTUP_BROKER_ROUTING_CHECK_FAIL_OPEN = true;
+    public static final boolean DEFAULT_STARTUP_BROKER_ROUTING_CHECK_FAIL_OPEN = false;
     // Authentication used by the server when it queries the broker routing-readiness endpoint.
     public static final String CONFIG_OF_STARTUP_BROKER_ROUTING_CHECK_AUTH_PREFIX =
         "pinot.server.startup.brokerRoutingCheck.auth";

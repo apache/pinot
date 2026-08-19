@@ -21,6 +21,11 @@ package org.apache.pinot.server.starter.helix;
 import java.net.URI;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -51,6 +56,7 @@ public class BrokerRoutingReadyCheckerTest {
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
     when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
     when(helixManager.getClusterName()).thenReturn("testCluster");
+    when(helixManager.getInstanceName()).thenReturn(SERVER_INSTANCE);
 
     ExternalView brokerResource = new ExternalView(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     brokerResource.setStateMap("0", Map.of(BROKER_INSTANCE, "ONLINE"));
@@ -72,9 +78,7 @@ public class BrokerRoutingReadyCheckerTest {
     };
 
     try (BrokerRoutingReadyChecker checker =
-        new BrokerRoutingReadyChecker(helixManager, SERVER_INSTANCE, 5_000L, false, authProvider,
-            routingStatusClient)) {
-      checker.check();
+        new BrokerRoutingReadyChecker(helixManager, 5_000L, false, authProvider, routingStatusClient)) {
       assertTrue(checker.isReady());
     }
 
@@ -88,11 +92,9 @@ public class BrokerRoutingReadyCheckerTest {
     BrokerRoutingReadyChecker checker =
         new BrokerRoutingReadyChecker(SERVER_INSTANCE, onlineBrokers::get, brokers -> true);
 
-    checker.check();
     assertFalse(checker.isReady());
 
     onlineBrokers.set(Set.of("Broker_localhost_8099"));
-    checker.check();
     assertTrue(checker.isReady());
   }
 
@@ -103,11 +105,12 @@ public class BrokerRoutingReadyCheckerTest {
         () -> Set.of("Broker_localhost_8099", "Broker_localhost_8100"),
         brokers -> attempts.incrementAndGet() > 1);
 
-    checker.check();
+    assertEquals(attempts.get(), 0);
     assertFalse(checker.isReady());
 
-    checker.check();
     assertTrue(checker.isReady());
+    assertTrue(checker.isReady());
+    assertEquals(attempts.get(), 2);
   }
 
   @Test
@@ -118,7 +121,6 @@ public class BrokerRoutingReadyCheckerTest {
             : Set.of("Broker_localhost_8099", "Broker_localhost_8100"),
         brokers -> true);
 
-    checker.check();
     assertFalse(checker.isReady());
   }
 
@@ -128,11 +130,9 @@ public class BrokerRoutingReadyCheckerTest {
     BrokerRoutingReadyChecker checker = new BrokerRoutingReadyChecker(SERVER_INSTANCE,
         () -> Set.of("Broker_localhost_8099"), brokers -> false, 5_000L, true, currentTimeMs::get);
 
-    checker.check();
     assertFalse(checker.isReady());
 
     currentTimeMs.set(6_000L);
-    checker.check();
     assertTrue(checker.isReady());
   }
 
@@ -144,11 +144,56 @@ public class BrokerRoutingReadyCheckerTest {
         () -> Set.of("Broker_localhost_8099"), brokers -> brokerReady.get(), 5_000L, false, currentTimeMs::get);
 
     currentTimeMs.set(6_000L);
-    checker.check();
     assertFalse(checker.isReady());
 
     brokerReady.set(true);
-    checker.check();
     assertTrue(checker.isReady());
+  }
+
+  @Test
+  public void testConcurrentReadinessChecksAreSerialized() throws Exception {
+    CountDownLatch firstCheckStarted = new CountDownLatch(1);
+    CountDownLatch releaseFirstCheck = new CountDownLatch(1);
+    CountDownLatch secondRequestStarted = new CountDownLatch(1);
+    AtomicInteger activeChecks = new AtomicInteger();
+    AtomicInteger maxActiveChecks = new AtomicInteger();
+    AtomicInteger attempts = new AtomicInteger();
+    BrokerRoutingReadyChecker checker = new BrokerRoutingReadyChecker(SERVER_INSTANCE,
+        () -> Set.of(BROKER_INSTANCE), brokers -> {
+          int active = activeChecks.incrementAndGet();
+          maxActiveChecks.accumulateAndGet(active, Math::max);
+          attempts.incrementAndGet();
+          firstCheckStarted.countDown();
+          try {
+            assertTrue(releaseFirstCheck.await(5, TimeUnit.SECONDS));
+            return false;
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+          } finally {
+            activeChecks.decrementAndGet();
+          }
+        });
+
+    ExecutorService callers = Executors.newFixedThreadPool(2);
+    try {
+      Future<Boolean> firstResult = callers.submit(checker::isReady);
+      assertTrue(firstCheckStarted.await(5, TimeUnit.SECONDS));
+      Future<Boolean> secondResult = callers.submit(() -> {
+        secondRequestStarted.countDown();
+        return checker.isReady();
+      });
+      assertTrue(secondRequestStarted.await(5, TimeUnit.SECONDS));
+      assertFalse(secondResult.isDone());
+
+      releaseFirstCheck.countDown();
+      assertFalse(firstResult.get(5, TimeUnit.SECONDS));
+      assertFalse(secondResult.get(5, TimeUnit.SECONDS));
+      assertEquals(attempts.get(), 2);
+      assertEquals(maxActiveChecks.get(), 1);
+    } finally {
+      releaseFirstCheck.countDown();
+      callers.shutdownNow();
+    }
   }
 }

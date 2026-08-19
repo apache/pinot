@@ -54,6 +54,7 @@ public class AdminApiApplication extends ResourceConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(AdminApiApplication.class);
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
   public static final String SERVER_INSTANCE_ID = "serverInstanceId";
+  public static final String SERVER_SHUTDOWN_IN_PROGRESS = "serverShutdownInProgress";
   public static final String SERVER_READY_TO_SERVE_QUERIES = "serverReadyToServeQueries";
 
   public static final String START_TIME = "serverStartTime";
@@ -67,7 +68,7 @@ public class AdminApiApplication extends ResourceConfig {
 
   public AdminApiApplication(ServerInstance instance, AccessControlFactory accessControlFactory,
       ServerReloadJobStatusCache reloadJobStatusCache, PinotConfiguration serverConf,
-      BooleanSupplier isServerReadyToServeQueries) {
+      BooleanSupplier serverReadyToServeQueries) {
     _serverInstance = instance;
     _accessControlFactory = accessControlFactory;
 
@@ -80,8 +81,8 @@ public class AdminApiApplication extends ResourceConfig {
     register(new AbstractBinder() {
       @Override
       protected void configure() {
-        bind(_shutDownInProgress).to(AtomicBoolean.class);
-        bind(isServerReadyToServeQueries).to(BooleanSupplier.class).named(SERVER_READY_TO_SERVE_QUERIES);
+        bind((BooleanSupplier) _shutDownInProgress::get).to(BooleanSupplier.class).named(SERVER_SHUTDOWN_IN_PROGRESS);
+        bind(serverReadyToServeQueries).to(BooleanSupplier.class).named(SERVER_READY_TO_SERVE_QUERIES);
         bind(_serverInstance).to(ServerInstance.class);
         bind(_serverInstance.getHelixManager()).to(HelixManager.class);
         bind(_serverInstance.getServerMetrics()).to(ServerMetrics.class);

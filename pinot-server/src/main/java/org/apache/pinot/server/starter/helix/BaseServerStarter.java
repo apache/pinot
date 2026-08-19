@@ -184,7 +184,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected QueryKillingManager _queryKillingManager;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
-  protected volatile BrokerRoutingReadyChecker _brokerRoutingReadyChecker;
+  protected BrokerRoutingReadyChecker _brokerRoutingReadyChecker;
   protected ScheduledExecutorService _helixMessageCountScheduler;
   protected ServerReloadJobStatusCache _reloadJobStatusCache;
   // Override this to provide custom thread pool for Helix state transitions. Null means using Helix's default
@@ -917,7 +917,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     if (_serverConf.getProperty(Server.CONFIG_OF_STARTUP_ENABLE_BROKER_ROUTING_CHECK,
         Server.DEFAULT_STARTUP_ENABLE_BROKER_ROUTING_CHECK)) {
       _brokerRoutingReadyChecker = createBrokerRoutingReadyChecker();
-      _brokerRoutingReadyChecker.start();
     }
     // Publish query readiness only after the optional routing checker is installed. Otherwise a concurrent health
     // request could observe a transient ready state while the checker is still null.
@@ -990,7 +989,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
         Server.DEFAULT_STARTUP_BROKER_ROUTING_CHECK_FAIL_OPEN);
     AuthProvider authProvider = AuthProviderUtils.extractAuthProvider(_serverConf,
         Server.CONFIG_OF_STARTUP_BROKER_ROUTING_CHECK_AUTH_PREFIX);
-    return new BrokerRoutingReadyChecker(_helixManager, _instanceId, timeoutMs, failOpen, authProvider);
+    return new BrokerRoutingReadyChecker(_helixManager, timeoutMs, failOpen, authProvider);
   }
 
   protected SegmentOperationsThrottler createMultiColumnIndexPreprocessThrottler() {

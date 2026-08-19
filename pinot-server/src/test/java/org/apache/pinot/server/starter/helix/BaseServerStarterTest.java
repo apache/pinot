@@ -44,6 +44,7 @@ public class BaseServerStarterTest {
         Server.CONFIG_OF_STARTUP_BROKER_ROUTING_CHECK_AUTH_PREFIX + ".token", "test-token"));
     serverStarter._helixManager = mock(HelixManager.class);
     serverStarter._instanceId = "Server_localhost_8098";
+    when(serverStarter._helixManager.getInstanceName()).thenReturn(serverStarter._instanceId);
 
     try (BrokerRoutingReadyChecker checker = serverStarter.createBrokerRoutingReadyChecker()) {
       assertEquals(checker.getAuthProvider().getRequestHeaders(), Map.of("Authorization", "Bearer test-token"));
@@ -53,7 +54,7 @@ public class BaseServerStarterTest {
   @Test
   public void testBrokerRoutingReadinessRollout() {
     assertFalse(Server.DEFAULT_STARTUP_ENABLE_BROKER_ROUTING_CHECK);
-    assertTrue(Server.DEFAULT_STARTUP_BROKER_ROUTING_CHECK_FAIL_OPEN);
+    assertFalse(Server.DEFAULT_STARTUP_BROKER_ROUTING_CHECK_FAIL_OPEN);
 
     HelixServerStarter serverStarter = new HelixServerStarter();
     assertFalse(serverStarter.isServerReadyForHealthCheck());

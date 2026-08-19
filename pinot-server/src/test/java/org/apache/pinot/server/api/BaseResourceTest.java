@@ -96,6 +96,7 @@ public abstract class BaseResourceTest {
   protected WebTarget _webTarget;
   protected String _instanceId;
   protected ServerInstance _serverInstance;
+  protected ServerMetrics _serverMetrics;
 
   protected String getAvroFileName() {
     return "data/test_data-mv.avro";
@@ -126,7 +127,8 @@ public abstract class BaseResourceTest {
 
     // Mock the server instance
     _serverInstance = mock(ServerInstance.class);
-    when(_serverInstance.getServerMetrics()).thenReturn(mock(ServerMetrics.class));
+    _serverMetrics = mock(ServerMetrics.class);
+    when(_serverInstance.getServerMetrics()).thenReturn(_serverMetrics);
     when(_serverInstance.getInstanceDataManager()).thenReturn(instanceDataManager);
     when(_serverInstance.getInstanceDataManager().getSegmentFileDirectory()).thenReturn(
         _tempDir.getAbsolutePath());

@@ -26,7 +26,6 @@ import io.swagger.annotations.ApiResponses;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -40,8 +39,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.ServiceStatus;
-import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
@@ -49,21 +46,18 @@ import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.api.ServerPublicAccess;
 
 
-/// REST API to do health check through ServiceStatus.
+/// REST API to check server liveness and readiness.
 @Api(tags = "Health")
 @Path("/")
 public class HealthCheckResource {
 
   @Inject
-  private AtomicBoolean _shutDownInProgress;
+  @Named(AdminApiApplication.SERVER_SHUTDOWN_IN_PROGRESS)
+  private BooleanSupplier _shutDownInProgress;
 
   @Inject
   @Named(AdminApiApplication.SERVER_READY_TO_SERVE_QUERIES)
-  private BooleanSupplier _isServerReadyToServeQueries;
-
-  @Inject
-  @Named(AdminApiApplication.SERVER_INSTANCE_ID)
-  private String _instanceId;
+  private BooleanSupplier _serverReadyToServeQueries;
 
   @Inject
   private ServerMetrics _serverMetrics;
@@ -115,26 +109,19 @@ public class HealthCheckResource {
       @ApiResponse(code = 503, message = "Server is not ready to serve queries")
   })
   public String checkReadiness() {
-    if (_shutDownInProgress.get()) {
+    if (_shutDownInProgress.getAsBoolean()) {
       String errMessage = "Server is shutting down";
       throw new WebApplicationException(errMessage,
           Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build());
     }
-    if (!_isServerReadyToServeQueries.getAsBoolean()) {
+    if (!_serverReadyToServeQueries.getAsBoolean()) {
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.READINESS_CHECK_BAD_CALLS, 1);
       String errMessage = "Server is not ready to serve queries";
       throw new WebApplicationException(errMessage,
           Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build());
     }
-    Status status = ServiceStatus.getServiceStatus(_instanceId);
-    if (status == Status.GOOD) {
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.READINESS_CHECK_OK_CALLS, 1);
-      return "OK";
-    }
-    _serverMetrics.addMeteredGlobalValue(ServerMeter.READINESS_CHECK_BAD_CALLS, 1);
-    String errMessage = String.format("Pinot server status is %s", status);
-    Response response =
-        Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build();
-    throw new WebApplicationException(errMessage, response);
+    _serverMetrics.addMeteredGlobalValue(ServerMeter.READINESS_CHECK_OK_CALLS, 1);
+    return "OK";
   }
 
   @GET

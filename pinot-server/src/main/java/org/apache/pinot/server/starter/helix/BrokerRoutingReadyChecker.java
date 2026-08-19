@@ -28,11 +28,11 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
@@ -48,84 +48,90 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// Checks broker routing state in the background while a server starts. The checker remains false until every online
-/// broker reports the server as routable, or until the configured timeout when fail-open behavior is enabled. Health
-/// endpoints only read the cached result. Brokers must return the routing-specific response, so an older broker's
-/// normal health response cannot be mistaken for an acknowledgement. All mutable state is confined to the scheduler
-/// thread except for the volatile ready flag read by health-check threads.
+/// Checks broker routing state while a server starts. Readiness requests perform a synchronized check until every
+/// online broker reports the server as routable, or until the configured timeout when fail-open behavior is enabled.
+/// Successful readiness is cached. Brokers must return the routing-specific response, so an older broker's normal
+/// health response cannot be mistaken for an acknowledgement.
 public class BrokerRoutingReadyChecker implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRoutingReadyChecker.class);
-  private static final long CHECK_INTERVAL_MS = 1_000L;
   private static final long CHECK_TIMEOUT_MS = 5_000L;
 
   private final String _serverInstanceId;
   private final Supplier<Set<String>> _onlineBrokersSupplier;
   private final Predicate<Set<String>> _allBrokersReady;
-  private final ScheduledExecutorService _scheduler;
+  @Nullable
   private final ExecutorService _requestExecutor;
   private final LongSupplier _currentTimeMs;
   private final long _deadlineMs;
   private final boolean _failOpen;
   private final AuthProvider _authProvider;
-  private final RoutingStatusClient _routingStatusClient;
-  private volatile boolean _ready;
+  private boolean _ready;
   private boolean _timeoutLogged;
 
-  public BrokerRoutingReadyChecker(HelixManager helixManager, String serverInstanceId, long timeoutMs,
-      boolean failOpen, AuthProvider authProvider) {
-    this(helixManager, serverInstanceId, timeoutMs, failOpen, authProvider,
+  public BrokerRoutingReadyChecker(HelixManager helixManager, long timeoutMs, boolean failOpen,
+      AuthProvider authProvider) {
+    this(helixManager, timeoutMs, failOpen, authProvider,
         (uri, provider) -> HttpClient.getInstance().sendGetRequest(uri, null, provider));
   }
 
   @VisibleForTesting
-  BrokerRoutingReadyChecker(HelixManager helixManager, String serverInstanceId, long timeoutMs,
-      boolean failOpen, AuthProvider authProvider, RoutingStatusClient routingStatusClient) {
-    _serverInstanceId = serverInstanceId;
+  BrokerRoutingReadyChecker(HelixManager helixManager, long timeoutMs, boolean failOpen, AuthProvider authProvider,
+      RoutingStatusClient routingStatusClient) {
+    this(createProductionContext(helixManager, authProvider, routingStatusClient), timeoutMs, failOpen, authProvider);
+  }
+
+  private BrokerRoutingReadyChecker(ProductionContext context, long timeoutMs, boolean failOpen,
+      AuthProvider authProvider) {
+    this(context._serverInstanceId, context._onlineBrokersSupplier, context._allBrokersReady,
+        context._requestExecutor, timeoutMs, failOpen, System::currentTimeMillis, authProvider);
+  }
+
+  private static ProductionContext createProductionContext(HelixManager helixManager, AuthProvider authProvider,
+      RoutingStatusClient routingStatusClient) {
+    String serverInstanceId = helixManager.getInstanceName();
     HelixAdmin helixAdmin = helixManager.getClusterManagmentTool();
     String clusterName = helixManager.getClusterName();
-    _onlineBrokersSupplier = () -> {
+    Supplier<Set<String>> onlineBrokersSupplier = () -> {
       ExternalView brokerResource = helixAdmin.getResourceExternalView(clusterName,
           CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-      return Set.copyOf(HelixHelper.getOnlineInstanceFromExternalView(brokerResource));
+      return HelixHelper.getOnlineInstanceFromExternalView(brokerResource);
     };
-    _requestExecutor = Executors.newCachedThreadPool(
+    ExecutorService requestExecutor = Executors.newCachedThreadPool(
         new ThreadFactoryBuilder().setNameFormat("broker-routing-ready-request-%d").setDaemon(true).build());
-    _allBrokersReady = brokers -> checkAllBrokers(helixAdmin, clusterName, brokers);
-    _scheduler = Executors.newSingleThreadScheduledExecutor(
-        new ThreadFactoryBuilder().setNameFormat("broker-routing-ready-checker").setDaemon(true).build());
-    _currentTimeMs = System::currentTimeMillis;
-    _deadlineMs = _currentTimeMs.getAsLong() + timeoutMs;
-    _failOpen = failOpen;
-    _authProvider = authProvider;
-    _routingStatusClient = routingStatusClient;
+    Predicate<Set<String>> allBrokersReady = brokers -> checkAllBrokers(serverInstanceId, helixAdmin, clusterName,
+        brokers, requestExecutor, authProvider, routingStatusClient);
+    return new ProductionContext(serverInstanceId, onlineBrokersSupplier, allBrokersReady, requestExecutor);
   }
 
   @VisibleForTesting
   BrokerRoutingReadyChecker(String serverInstanceId, Supplier<Set<String>> onlineBrokersSupplier,
       Predicate<Set<String>> allBrokersReady) {
-    this(serverInstanceId, onlineBrokersSupplier, allBrokersReady, Long.MAX_VALUE, false, () -> 0L);
+    this(serverInstanceId, onlineBrokersSupplier, allBrokersReady, null, Long.MAX_VALUE, false, () -> 0L,
+        new NullAuthProvider());
   }
 
   @VisibleForTesting
   BrokerRoutingReadyChecker(String serverInstanceId, Supplier<Set<String>> onlineBrokersSupplier,
       Predicate<Set<String>> allBrokersReady, long timeoutMs, boolean failOpen, LongSupplier currentTimeMs) {
+    this(serverInstanceId, onlineBrokersSupplier, allBrokersReady, null, timeoutMs, failOpen, currentTimeMs,
+        new NullAuthProvider());
+  }
+
+  private BrokerRoutingReadyChecker(String serverInstanceId, Supplier<Set<String>> onlineBrokersSupplier,
+      Predicate<Set<String>> allBrokersReady, @Nullable ExecutorService requestExecutor, long timeoutMs,
+      boolean failOpen, LongSupplier currentTimeMs, AuthProvider authProvider) {
     _serverInstanceId = serverInstanceId;
     _onlineBrokersSupplier = onlineBrokersSupplier;
     _allBrokersReady = allBrokersReady;
-    _requestExecutor = null;
-    _scheduler = null;
+    _requestExecutor = requestExecutor;
     _currentTimeMs = currentTimeMs;
     _deadlineMs = currentTimeMs.getAsLong() + timeoutMs;
     _failOpen = failOpen;
-    _authProvider = new NullAuthProvider();
-    _routingStatusClient = null;
+    _authProvider = authProvider;
   }
 
-  public void start() {
-    _scheduler.scheduleWithFixedDelay(this::check, 0L, CHECK_INTERVAL_MS, TimeUnit.MILLISECONDS);
-  }
-
-  public boolean isReady() {
+  public synchronized boolean isReady() {
+    check();
     return _ready;
   }
 
@@ -134,8 +140,7 @@ public class BrokerRoutingReadyChecker implements AutoCloseable {
     return _authProvider;
   }
 
-  @VisibleForTesting
-  void check() {
+  private void check() {
     if (_ready) {
       return;
     }
@@ -164,10 +169,14 @@ public class BrokerRoutingReadyChecker implements AutoCloseable {
     }
   }
 
-  private boolean checkAllBrokers(HelixAdmin helixAdmin, String clusterName, Set<String> brokers) {
+  private static boolean checkAllBrokers(String serverInstanceId, HelixAdmin helixAdmin, String clusterName,
+      Set<String> brokers, ExecutorService requestExecutor, AuthProvider authProvider,
+      RoutingStatusClient routingStatusClient) {
     List<CompletableFuture<Boolean>> futures = new ArrayList<>(brokers.size());
     for (String broker : brokers) {
-      futures.add(CompletableFuture.supplyAsync(() -> checkBroker(helixAdmin, clusterName, broker), _requestExecutor));
+      futures.add(CompletableFuture.supplyAsync(
+          () -> checkBroker(serverInstanceId, helixAdmin, clusterName, broker, authProvider, routingStatusClient),
+          requestExecutor));
     }
     try {
       CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
@@ -175,34 +184,47 @@ public class BrokerRoutingReadyChecker implements AutoCloseable {
       return futures.stream().allMatch(CompletableFuture::join);
     } catch (Exception e) {
       futures.forEach(future -> future.cancel(true));
-      LOGGER.debug("Failed to collect routing readiness from all online brokers for server {}", _serverInstanceId, e);
+      LOGGER.debug("Failed to collect routing readiness from all online brokers for server {}", serverInstanceId, e);
       return false;
     }
   }
 
-  private boolean checkBroker(HelixAdmin helixAdmin, String clusterName, String broker) {
+  private static boolean checkBroker(String serverInstanceId, HelixAdmin helixAdmin, String clusterName, String broker,
+      AuthProvider authProvider, RoutingStatusClient routingStatusClient) {
     try {
       InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, broker);
       if (instanceConfig == null) {
         return false;
       }
-      URI uri = URI.create(InstanceUtils.getInstanceBaseUri(instanceConfig) + "/routing/server/" + _serverInstanceId);
-      SimpleHttpResponse response = _routingStatusClient.get(uri, _authProvider);
+      URI uri = URI.create(InstanceUtils.getInstanceBaseUri(instanceConfig) + "/routing/server/" + serverInstanceId);
+      SimpleHttpResponse response = routingStatusClient.get(uri, authProvider);
       return response.getStatusCode() == 200
           && CommonConstants.Broker.SERVER_ROUTING_READY_RESPONSE.equals(response.getResponse());
     } catch (Exception e) {
-      LOGGER.debug("Broker {} has not confirmed routing readiness for server {}", broker, _serverInstanceId, e);
+      LOGGER.debug("Broker {} has not confirmed routing readiness for server {}", broker, serverInstanceId, e);
       return false;
     }
   }
 
   @Override
-  public void close() {
-    if (_scheduler != null) {
-      _scheduler.shutdownNow();
-    }
+  public synchronized void close() {
     if (_requestExecutor != null) {
       _requestExecutor.shutdownNow();
+    }
+  }
+
+  private static class ProductionContext {
+    private final String _serverInstanceId;
+    private final Supplier<Set<String>> _onlineBrokersSupplier;
+    private final Predicate<Set<String>> _allBrokersReady;
+    private final ExecutorService _requestExecutor;
+
+    private ProductionContext(String serverInstanceId, Supplier<Set<String>> onlineBrokersSupplier,
+        Predicate<Set<String>> allBrokersReady, ExecutorService requestExecutor) {
+      _serverInstanceId = serverInstanceId;
+      _onlineBrokersSupplier = onlineBrokersSupplier;
+      _allBrokersReady = allBrokersReady;
+      _requestExecutor = requestExecutor;
     }
   }
 
