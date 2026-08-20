@@ -168,6 +168,10 @@
         "sql": "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ {tbl1}.num FROM {tbl1} INTERSECT SELECT {tbl2}.num FROM {tbl2}"
       },
       {
+        "description": "GROUP BY above a colocated INTERSECT: the hint asserts equal rows already share a worker, so the set op's output is claimed hash distributed on all columns and the aggregate above skips its shuffle too -- it must still see complete groups",
+        "sql": "SELECT t.num, COUNT(*) FROM (SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ {tbl1}.num AS num FROM {tbl1} INTERSECT SELECT {tbl2}.num AS num FROM {tbl2}) AS t GROUP BY t.num"
+      },
+      {
         "description": "EXCEPT on the partition column num with is_colocated_by_set_op_keys hint forces a pre-partitioned (direct) exchange; tbl1 and tbl2 are both partitioned by num so results stay correct",
         "sql": "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ {tbl1}.num FROM {tbl1} EXCEPT SELECT {tbl2}.num FROM {tbl2}"
       },
@@ -191,6 +195,26 @@
       {
         "description": "Chained colocated operations stay correct: a UNION ALL of two colocated JOINs on num, set-op hint on the outer wrap and join hint per branch (the no-shuffle plan shape is asserted in QueryCompilationTest)",
         "sql": "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ * FROM (SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ {tbl1}.num FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num UNION ALL SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ {tbl1}.num FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num)"
+      },
+      {
+        "description": "UNION ALL without any hint uses local (SINGLETON) exchanges; UNION ALL only concatenates so a direct exchange is always correct",
+        "sql": "SELECT {tbl1}.num FROM {tbl1} UNION ALL SELECT {tbl2}.num FROM {tbl2}"
+      },
+      {
+        "description": "UNION ALL of heterogeneous non-partition columns without any hint: the local exchange is correct under any row-to-worker mapping",
+        "sql": "SELECT {tbl1}.name FROM {tbl1} UNION ALL SELECT {tbl2}.val FROM {tbl2}"
+      },
+      {
+        "description": "Distinct UNION deduplicates correctly above the local UNION ALL exchange: the union's output claims no distribution, so the dedup aggregate shuffles for correct results",
+        "sql": "SELECT {tbl1}.name FROM {tbl1} UNION SELECT {tbl2}.val FROM {tbl2}"
+      },
+      {
+        "description": "GROUP BY above a hint-free UNION ALL deduplicates correctly: the union's output claims no distribution, so the aggregate shuffles for correct results",
+        "sql": "SELECT t.name, COUNT(*) FROM (SELECT {tbl1}.name AS name FROM {tbl1} UNION ALL SELECT {tbl2}.val AS name FROM {tbl2}) AS t GROUP BY t.name"
+      },
+      {
+        "description": "is_partitioned_by_group_by_keys above a hint-free self-UNION ALL: both branches route identically, so the assertion holds on the physical data and the direct (un-shuffled) aggregate sees complete groups",
+        "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ t.num, COUNT(*) FROM (SELECT {tbl1}.num AS num FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ UNION ALL SELECT {tbl1}.num AS num FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */) AS t GROUP BY t.num"
       }
     ]
   },
@@ -272,6 +296,10 @@
       {
         "description": "Forcing is_colocated_by_set_op_keys='true' when the inputs have mismatched partition counts (tbl1=2, tbl2=4): the planner cannot form a direct exchange, so it still shuffles and results stay correct",
         "sql": "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ {tbl1}.num FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='2') */ INTERSECT SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */"
+      },
+      {
+        "description": "Hint-free UNION ALL over inputs with mismatched partition counts (tbl1=2, tbl2=4): the branches cannot share one worker assignment, so the local exchange degrades to an arbitrary fan-out and results stay correct",
+        "sql": "SELECT {tbl1}.num FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='2') */ UNION ALL SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */"
       }
     ]
   },
