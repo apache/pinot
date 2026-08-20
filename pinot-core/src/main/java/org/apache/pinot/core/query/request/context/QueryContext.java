@@ -590,6 +590,24 @@ public class QueryContext {
     return -1;
   }
 
+  /// Returns the PER-grouping-set server-side trim size for a base-aggregation grouping-set query, or -1 to
+  /// disable (no ORDER BY, or the `groupingSetsServerTrimSize` option is unset/non-positive). When positive, the
+  /// server keeps up to this many groups WITHIN each grouping set after deriving them (bucketed by the
+  /// $groupingId discriminator), bounding each server's derived output without starving low-magnitude sets. The
+  /// broker still applies the final ORDER BY + LIMIT. See
+  /// [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_SERVER_TRIM_SIZE].
+  public int getGroupingSetServerTrimSize() {
+    if (!isGroupingSets() || getOrderByExpressions() == null) {
+      return -1;
+    }
+    String option = _queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.GROUPING_SETS_SERVER_TRIM_SIZE);
+    if (option == null) {
+      return -1;
+    }
+    int minGroupTrimSize = Integer.parseInt(option);
+    return minGroupTrimSize > 0 ? GroupByUtils.getTableCapacity(getLimit(), minGroupTrimSize) : -1;
+  }
+
   private int calculateEffectiveSegmentGroupTrimSize() {
     /// Grouping sets expand each input row into one group per set; a global per-segment top-K could drop
     /// groups belonging to low-magnitude sets (e.g. the grand-total set) before they are merged. Grouping-set
