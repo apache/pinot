@@ -97,6 +97,42 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
     assertEquals(groupedStages.toString(), "[[0], [1], [2]]");
   }
 
+  /// Spool merging must not fuse a mapping-agnostic sender (a UNION ALL input, which MailboxAssignmentVisitor may
+  /// degrade to an arbitrary fan-out) with an otherwise identical strict one (a colocated semi-join build side or a
+  /// 'local' join input, which must never be degraded). The marker is deliberately absent from MailboxSendNode's
+  /// equals(), so this hand-written comparison is the only thing preventing the merge.
+  @Test
+  void differentMappingAgnosticBreaksEquivalence() {
+    when(
+        join(
+            exchange(1, tableScan("T1"))
+                .withDistributionType(RelDistribution.Type.SINGLETON)
+                .withMappingAgnostic(),
+            exchange(2, tableScan("T1"))
+                .withDistributionType(RelDistribution.Type.SINGLETON)
+        )
+    );
+    GroupedStages groupedStages = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(groupedStages.toString(), "[[0], [1], [2]]");
+  }
+
+  /// Control for the test above: when both sides agree on the marker they merge as usual.
+  @Test
+  void sameMappingAgnosticDoesNotBreakEquivalence() {
+    when(
+        join(
+            exchange(1, tableScan("T1"))
+                .withDistributionType(RelDistribution.Type.SINGLETON)
+                .withMappingAgnostic(),
+            exchange(2, tableScan("T1"))
+                .withDistributionType(RelDistribution.Type.SINGLETON)
+                .withMappingAgnostic()
+        )
+    );
+    GroupedStages groupedStages = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(groupedStages.toString(), "[[0], [1, 2]]");
+  }
+
   @Test
   public void sameHintsDontBreakEquivalence() {
     when(

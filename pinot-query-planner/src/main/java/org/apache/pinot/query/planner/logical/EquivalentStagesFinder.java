@@ -129,6 +129,11 @@ public class EquivalentStagesFinder {
             // TODO: Pre-partitioned and collations can probably be removed from the equivalence check, but would
             //  require some extra checks or transformation on the spooling logic. We are not doing that for now.
             && stage.isPrePartitioned() == visitedStage.isPrePartitioned()
+            // Must be compared explicitly: it is deliberately absent from MailboxSendNode.equals (it is broker-only
+            // and not serialized, so including it there would break serde round-trip equality). Merging a
+            // mapping-agnostic sender with a strict one would either relax a guard that must not be relaxed, or drop
+            // the marker from a UNION ALL branch and fail a query that works today.
+            && stage.isMappingAgnostic() == visitedStage.isMappingAgnostic()
             && Objects.equals(stage.getCollations(), visitedStage.getCollations());
       }
 

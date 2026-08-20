@@ -19,8 +19,10 @@
 package org.apache.pinot.query.planner.physical;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
@@ -107,13 +109,82 @@ public class MailboxAssignmentVisitorTest extends QueryEnvironmentTestBase {
   }
 
   /// An unequal-but-non-multiple worker count (2 senders, 3 receivers) must be rejected rather than rounding the
-  /// parallelism down to 1 and silently dropping the extra receiver.
+  /// parallelism down to 1 and silently dropping the extra receiver. Only applies to a KEYED local exchange, which
+  /// is the one that redistributes by hash; see
+  /// [#testMappingAgnosticSingletonWithUnequalWorkersFansOut()] for the mapping-agnostic case.
   @Test(expectedExceptions = IllegalStateException.class,
       expectedExceptionsMessageRegExp = ".*multiple of number of senders.*")
   public void testSingletonRejectsNonMultipleReceiverCount() {
     DispatchablePlanMetadata sender = metadata(Map.of(0, server("A"), 1, server("B")));
     DispatchablePlanMetadata receiver = metadata(Map.of(0, server("A"), 1, server("B"), 2, server("C")));
     process(singletonSendNode(List.of(0)), sender, receiver);
+  }
+
+  /// A MAPPING-AGNOSTIC local exchange (a UNION ALL input) whose stages resolved to worker counts that do not divide
+  /// evenly cannot be wired 1-to-1. Any row-to-worker mapping is correct for a concatenation, so it degrades to an
+  /// arbitrary fan-out rather than failing. The distribution type must be rewritten off SINGLETON because
+  /// SingletonExchange asserts a single destination mailbox at runtime.
+  @Test
+  public void testMappingAgnosticSingletonWithUnequalWorkersFansOut() {
+    DispatchablePlanMetadata sender = metadata(Map.of(0, server("A"), 1, server("B")));
+    DispatchablePlanMetadata receiver = metadata(Map.of(0, server("A"), 1, server("B"), 2, server("C")));
+    MailboxSendNode sendNode = mappingAgnosticSendNode();
+    process(sendNode, sender, receiver);
+
+    assertEquals(sendNode.getDistributionType(), RelDistribution.Type.RANDOM_DISTRIBUTED);
+    // Fanned out: every receiver worker reads from every sender worker.
+    for (int workerId = 0; workerId < 3; workerId++) {
+      assertEquals(expandedWorkerIds(receiver.getWorkerIdToMailboxesMap(), workerId, SENDER_STAGE), List.of(0, 1));
+    }
+  }
+
+  /// A mapping-agnostic exchange never takes the parallelism path, even when the counts divide evenly: that path
+  /// addresses a whole receiver range at the FIRST receiver's host, which is only valid when the receiver map came
+  /// from the sender. Here receivers 0-1 sit on different servers, so every receiver must be addressed at its own
+  /// host -- posting them all to host_A would stall the receiver on host_B until the deadline.
+  @Test
+  public void testMappingAgnosticSingletonWithParallelismFansOutPerHost() {
+    DispatchablePlanMetadata sender = metadata(Map.of(0, server("A")));
+    DispatchablePlanMetadata receiver = metadata(Map.of(0, server("A"), 1, server("B")));
+    MailboxSendNode sendNode = mappingAgnosticSendNode();
+    process(sendNode, sender, receiver);
+
+    assertEquals(sendNode.getDistributionType(), RelDistribution.Type.RANDOM_DISTRIBUTED);
+    List<MailboxInfo> senderMailboxes =
+        sender.getWorkerIdToMailboxesMap().get(0).get(RECEIVER_STAGE).getMailboxInfos();
+    Set<String> hosts = new HashSet<>();
+    for (MailboxInfo mailboxInfo : senderMailboxes) {
+      hosts.add(mailboxInfo.getHostname());
+    }
+    assertEquals(hosts, Set.of("host_A", "host_B"), "Each receiver must be addressed at its own host");
+  }
+
+  /// A keyless local exchange that is NOT mapping agnostic must still fail loudly. This is the colocated
+  /// dynamic-broadcast semi-join build side: every receiver needs the WHOLE build side to construct its filter (the
+  /// non-colocated variant broadcasts for exactly that reason), so an arbitrary fan-out would silently drop matches.
+  @Test(expectedExceptions = IllegalStateException.class,
+      expectedExceptionsMessageRegExp = ".*(requires keys|multiple of number of senders).*")
+  public void testKeylessNonAgnosticSingletonStillFails() {
+    DispatchablePlanMetadata sender = metadata(Map.of(0, server("A"), 1, server("B")));
+    DispatchablePlanMetadata receiver = metadata(Map.of(0, server("A"), 1, server("B"), 2, server("C")));
+    process(singletonSendNode(List.of()), sender, receiver);
+  }
+
+  /// A local exchange whose sender stage has no worker at all (a fully pruned leaf) has nothing to wire 1-to-1, and
+  /// computing the parallelism would divide by zero. Every live receiver must still get an entry, holding an empty
+  /// mailbox list, or its WorkerMetadata carries a null mailbox map and fails during dispatch serialization.
+  @Test
+  public void testSingletonWithZeroSendersDoesNotDivideByZero() {
+    DispatchablePlanMetadata sender = metadata(Map.of());
+    DispatchablePlanMetadata receiver = metadata(Map.of(0, server("A"), 1, server("B")));
+    process(singletonSendNode(List.of()), sender, receiver);
+
+    assertTrue(sender.getWorkerIdToMailboxesMap().isEmpty());
+    for (int workerId = 0; workerId < 2; workerId++) {
+      MailboxInfos mailboxInfos = receiver.getWorkerIdToMailboxesMap().get(workerId).get(SENDER_STAGE);
+      assertNotNull(mailboxInfos, "Missing entry for worker: " + workerId);
+      assertTrue(mailboxInfos.getMailboxInfos().isEmpty());
+    }
   }
 
   /// A SINGLETON local exchange with parallelism (more receivers than senders) does not assert co-location either: it
@@ -193,6 +264,21 @@ public class MailboxAssignmentVisitorTest extends QueryEnvironmentTestBase {
     assertTrue(receiver.getWorkerIdToMailboxesMap().isEmpty());
   }
 
+  /// A pre-partitioned hash exchange whose sender stage has zero workers (all its leaf segments were pruned) must not
+  /// be wired as a direct exchange: with the receiver stage also empty (as when every branch of a UNION ALL is fully
+  /// pruned), the sender and receiver counts trivially "match" and computing the fan-out parallelism would divide by
+  /// zero. It must fall back to the regular wiring, which is a no-op for empty stages.
+  @Test
+  public void testPrePartitionedExchangeWithZeroWorkersFallsBackToShuffle() {
+    DispatchablePlanMetadata sender = metadata(Map.of());
+    sender.setPrePartitioned(true);
+    DispatchablePlanMetadata receiver = metadata(Map.of());
+    process(hashSendNode(), sender, receiver);
+
+    assertTrue(sender.getWorkerIdToMailboxesMap().isEmpty());
+    assertTrue(receiver.getWorkerIdToMailboxesMap().isEmpty());
+  }
+
   private static QueryServerInstance server(String id) {
     return new QueryServerInstance(id, "host_" + id, 1, 1);
   }
@@ -209,6 +295,13 @@ public class MailboxAssignmentVisitorTest extends QueryEnvironmentTestBase {
     sender.setPrePartitioned(true);
     sender.setPartitionFunction("absHashCodeSum");
     return sender;
+  }
+
+  /// A keyless SINGLETON send marked mapping agnostic, i.e. what a UNION ALL input produces.
+  private static MailboxSendNode mappingAgnosticSendNode() {
+    MailboxSendNode sendNode = singletonSendNode(List.of());
+    sendNode.setMappingAgnostic(true);
+    return sendNode;
   }
 
   private static MailboxSendNode singletonSendNode(List<Integer> keys) {

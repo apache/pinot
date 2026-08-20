@@ -39,6 +39,11 @@ public class MailboxSendNode extends BasePlanNode {
   private final List<RelFieldCollation> _collations;
   private final boolean _sort;
   private final String _hashFunction;
+  /// See PinotLogicalExchange#isMappingAgnostic(). Broker-only: it drives worker assignment and mailbox
+  /// wiring before dispatch and is deliberately not serialized to servers.
+  /// Deliberately excluded from equals()/hashCode(): it is broker-only and never serialized, so including it
+  /// would break serde round-trip equality. EquivalentStagesFinder compares it explicitly instead.
+  private boolean _mappingAgnostic;
 
   // NOTE: null List is converted to empty List because there is no way to differentiate them in proto during ser/de.
   private MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
@@ -150,6 +155,15 @@ public class MailboxSendNode extends BasePlanNode {
     return _prePartitioned;
   }
 
+  /// See PinotLogicalExchange#isMappingAgnostic().
+  public boolean isMappingAgnostic() {
+    return _mappingAgnostic;
+  }
+
+  public void setMappingAgnostic(boolean mappingAgnostic) {
+    _mappingAgnostic = mappingAgnostic;
+  }
+
   public List<RelFieldCollation> getCollations() {
     return _collations;
   }
@@ -184,8 +198,12 @@ public class MailboxSendNode extends BasePlanNode {
 
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
-    return new MailboxSendNode(_stageId, _dataSchema, inputs, _receiverStages, _exchangeType, _distributionType, _keys,
+    MailboxSendNode copy = new MailboxSendNode(_stageId, _dataSchema, inputs, _receiverStages, _exchangeType,
+        _distributionType, _keys,
         _prePartitioned, _collations, _sort, _hashFunction);
+    // Carry the broker-only marker: it is set after construction, so the constructor cannot.
+    copy.setMappingAgnostic(_mappingAgnostic);
+    return copy;
   }
 
   @Override

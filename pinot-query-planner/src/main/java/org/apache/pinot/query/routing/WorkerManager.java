@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
@@ -38,6 +39,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.calcite.rel.rules.ImmutableTableOptions;
 import org.apache.pinot.calcite.rel.rules.TableOptions;
@@ -377,6 +379,31 @@ public class WorkerManager {
     return false;
   }
 
+  /// A stage takes its worker assignment, partition function and partition classes from the FIRST of its local
+  /// exchange children, so it may only do so when every one of them agrees on all of those -- otherwise the ones that
+  /// disagree would be wired against an assignment that does not describe them. Mirrors the checks in
+  /// [#isPrePartitionAssignment]. A child with no worker at all (a fully pruned leaf) can never anchor the
+  /// assignment: inheriting its empty map would leave this stage with no workers and silently drop the rows of every
+  /// live sibling. Returning false falls back to the regular assignment, and the mailbox layer then degrades each
+  /// mapping-agnostic exchange to a fan-out.
+  private static boolean canInheritWorkerAssignment(List<DispatchablePlanMetadata> localExchangeChildren) {
+    DispatchablePlanMetadata first = localExchangeChildren.get(0);
+    Map<Integer, QueryServerInstance> firstWorkers = first.getWorkerIdToServerInstanceMap();
+    if (firstWorkers == null || firstWorkers.isEmpty()) {
+      return false;
+    }
+    for (int i = 1; i < localExchangeChildren.size(); i++) {
+      DispatchablePlanMetadata other = localExchangeChildren.get(i);
+      if (first.getPartitionParallelism() != other.getPartitionParallelism()
+          || !Objects.equals(firstWorkers, other.getWorkerIdToServerInstanceMap())
+          || !Arrays.equals(first.getPartitionClassIds(), other.getPartitionClassIds())
+          || !StringUtils.equalsIgnoreCase(first.getPartitionFunction(), other.getPartitionFunction())) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   private Map<Integer, QueryServerInstance> assignWorkersForLocalExchange(DispatchablePlanMetadata childMetadata) {
     int partitionParallelism = childMetadata.getPartitionParallelism();
     Map<Integer, QueryServerInstance> childWorkerIdToServerInstanceMap = childMetadata.getWorkerIdToServerInstanceMap();
@@ -452,14 +479,24 @@ public class WorkerManager {
     }
 
     // Assign workers for local exchange if there is one
-    DispatchablePlanMetadata localExchangeChildMetadata = null;
-    Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = null;
+    List<DispatchablePlanMetadata> localExchangeChildren = new ArrayList<>(children.size());
+    boolean allMappingAgnostic = true;
     for (PlanFragment child : children) {
       if (isLocalExchange(child, context)) {
-        Preconditions.checkState(localExchangeChildMetadata == null, "Found multiple local exchanges in the children");
-        localExchangeChildMetadata = metadataMap.get(child.getFragmentId());
-        workerIdToServerInstanceMap = assignWorkersForLocalExchange(localExchangeChildMetadata);
+        localExchangeChildren.add(metadataMap.get(child.getFragmentId()));
+        allMappingAgnostic &= ((MailboxSendNode) child.getFragmentRoot()).isMappingAgnostic();
       }
+    }
+    // Several local exchange children are only meaningful when each of them tolerates any row-to-worker mapping (the
+    // branches of a UNION ALL). Any other combination -- notably a join hinted local on both sides -- has no single
+    // assignment that satisfies both, and used to be rejected here; keep rejecting it rather than mis-wiring it.
+    Preconditions.checkState(localExchangeChildren.size() <= 1 || allMappingAgnostic,
+        "Found multiple local exchanges in the children");
+    DispatchablePlanMetadata localExchangeChildMetadata = null;
+    Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = null;
+    if (!localExchangeChildren.isEmpty() && canInheritWorkerAssignment(localExchangeChildren)) {
+      localExchangeChildMetadata = localExchangeChildren.get(0);
+      workerIdToServerInstanceMap = assignWorkersForLocalExchange(localExchangeChildMetadata);
     }
 
     // If there is no local exchange, assign workers to the servers hosting the tables
@@ -567,6 +604,11 @@ public class WorkerManager {
         return false;
       }
       int childComputedPartitionCount = workerIdToServerInstanceMap.size() * childMetadata.getPartitionParallelism();
+      if (childComputedPartitionCount == 0) {
+        // A child with no workers (e.g. all its segments were pruned) cannot anchor a local exchange: inheriting its
+        // (empty) worker assignment would leave this fragment with no workers.
+        return false;
+      }
       if (partitionCount == 0) {
         partitionCount = childComputedPartitionCount;
       } else if (childComputedPartitionCount != partitionCount) {

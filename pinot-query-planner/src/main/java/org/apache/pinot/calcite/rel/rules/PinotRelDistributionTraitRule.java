@@ -31,6 +31,7 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Project;
+import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
@@ -161,6 +162,25 @@ public class PinotRelDistributionTraitRule extends RelOptRule {
       if (inputRelDistribution != null) {
         return inputRelDistribution;
       }
+    } else if (node instanceof SetOp) {
+      // A set operation sits above the exchanges inserted by PinotSetOpExchangeNodeInsertRule. Only a hash exchange
+      // on all output columns leaves the output hash distributed on those columns. That holds whether the exchange
+      // genuinely shuffles or is pre-partitioned by the is_colocated_by_set_op_keys hint, because the hint asserts
+      // that rows equal across all projected columns already share a worker -- exactly the claimed distribution. We
+      // take the hint at its word here, just as the exchange itself does.
+      // A local (SINGLETON) exchange, which is what UNION ALL gets, does not redistribute anything and therefore
+      // guarantees nothing about the output. Claiming a distribution there would let a deduplicating consumer above
+      // it -- for example the aggregate UnionToDistinctRule puts over a distinct UNION -- skip a shuffle it needs.
+      // All inputs are checked so a future per-branch decision cannot silently invalidate this.
+      for (RelNode setOpInput : inputs) {
+        RelNode unboxedInput = PinotRuleUtils.unboxRel(setOpInput);
+        if (!(unboxedInput instanceof PinotLogicalExchange)
+            || ((PinotLogicalExchange) unboxedInput).getDistribution().getType()
+            != RelDistribution.Type.HASH_DISTRIBUTED) {
+          return RelDistributions.of(RelDistribution.Type.RANDOM_DISTRIBUTED, RelDistributions.EMPTY);
+        }
+      }
+      return ((PinotLogicalExchange) input).getDistribution();
     }
     // TODO: add the rest of the nodes.
     return computeCurrentDistribution(node);

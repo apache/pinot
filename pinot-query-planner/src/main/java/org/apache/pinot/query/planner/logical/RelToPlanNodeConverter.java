@@ -608,7 +608,7 @@ public final class RelToPlanNodeConverter {
     }
     return new ExchangeNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), convertInputs(node.getInputs()),
         exchangeType, distributionType, keys, prePartitioned, collations, sortOnSender, sortOnReceiver, null, null,
-        _hashFunction);
+        _hashFunction, node instanceof PinotLogicalExchange && ((PinotLogicalExchange) node).isMappingAgnostic());
   }
 
   private SetOpNode convertLogicalSetOp(SetOp node) {

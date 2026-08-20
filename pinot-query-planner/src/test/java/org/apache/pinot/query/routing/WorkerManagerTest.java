@@ -447,6 +447,12 @@ public class WorkerManagerTest {
         "SELECT col1, COUNT(*) FROM testTable WHERE col1 = 'foo' GROUP BY col1 ORDER BY COUNT(*) LIMIT 3",
         "SELECT SUM(col3) OVER () FROM testTable WHERE col1 = 'foo'",
         "SELECT col2 FROM testTable WHERE col1 = 'foo' UNION ALL SELECT col2 FROM testTable",
+        // UNION ALL where EVERY branch is fully pruned: with the local UNION ALL exchange (the guard is now
+        // canInheritWorkerAssignment), a zero-worker
+        // child must neither anchor the union stage's local-exchange worker assignment (it would leave the union
+        // stage with no workers) nor be wired as a direct exchange (0 senders and 0 receivers trivially "match" and
+        // computing the fan-out parallelism divides by zero).
+        "SELECT col2 FROM testTable WHERE col1 = 'foo' UNION ALL SELECT col2 FROM testTable WHERE col1 = 'foo'",
         "SELECT DISTINCT col2 FROM testTable WHERE col1 = 'foo' LIMIT 4",
         // Dynamic-broadcast semi-join: the build side (subquery) is a separate prunable leaf feeding a
         // PIPELINE_BREAKER exchange into the main-scan leaf.
@@ -466,6 +472,18 @@ public class WorkerManagerTest {
       try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query)) {
         DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
         assertNotNull(dispatchableSubPlan, "Planning failed for all-pruned query: " + query);
+        // Pins the WorkerManager zero-worker guard: a pruned (zero-worker) child must never anchor an intermediate
+        // stage's local-exchange worker assignment. Without the guard, the pre-partitioned UNION ALL default lets
+        // the pruned branch anchor the union stage with an EMPTY worker map (the partitionCount == 0 sentinel
+        // conflates "unset" with "computed zero"), so the live branch's rows are wired to zero receivers and the
+        // query silently returns empty results. Leaf stages may legitimately have zero workers when fully pruned;
+        // intermediate stages must not.
+        for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStageMap().values()) {
+          if (fragment.getTableName() == null) {
+            assertFalse(fragment.getServerInstanceToWorkerIdMap().isEmpty(),
+                "Intermediate stage assigned zero workers for all-pruned query: " + query);
+          }
+        }
       } catch (RuntimeException e) {
         throw new AssertionError("All-pruned leaf broke planning for query: " + query + " -- " + e, e);
       }

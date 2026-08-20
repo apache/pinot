@@ -140,6 +140,17 @@ public class StagesTestBase {
       return build(stageId, null, null, null, null, null, false, null, false, false);
     }
 
+    /// Marks the built exchange mapping agnostic, i.e. what a UNION ALL input carries.
+    default ExchangeBuilder withMappingAgnostic() {
+      return (stageId, dataSchema, hints, exchangeType, distribution, keys, prePartitioned, collations, sort,
+          sortedOnSender) -> {
+        MailboxReceiveNode receiveNode = build(stageId, dataSchema, hints, exchangeType, distribution, keys,
+            prePartitioned, collations, sort, sortedOnSender);
+        receiveNode.getSender().setMappingAgnostic(true);
+        return receiveNode;
+      };
+    }
+
     default ExchangeBuilder withDistributionType(RelDistribution.Type distribution) {
       return (stageId, dataSchema, hints, exchangeType, distribution1, keys, prePartitioned, collations, sort,
           sortedOnSender) ->

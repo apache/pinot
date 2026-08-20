@@ -25,6 +25,7 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelShuttle;
 import org.apache.calcite.rel.RelWriter;
@@ -45,13 +46,41 @@ public class PinotLogicalExchange extends Exchange {
   // Can be used to override the partitioning info calculated from the distribution trait.
   private final Boolean _prePartitioned;
 
+  /// Marks an exchange that exists only as a stage boundary and imposes no requirement on where a row ends up, i.e.
+  /// every row-to-worker mapping produces the same result. Only a UNION ALL input qualifies today. This must be
+  /// carried explicitly rather than inferred from the distribution type: a SINGLETON exchange with no keys is also
+  /// produced for the colocated dynamic-broadcast semi-join (which needs EVERY receiver to see the whole build side)
+  /// and for `distribution_type='local'` joins (which must pair equal keys), and neither tolerates an arbitrary
+  /// mapping.
+  private final boolean _mappingAgnostic;
+
   private PinotLogicalExchange(RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelDistribution distribution,
       PinotRelExchangeType exchangeType, List<Integer> keys, @Nullable Boolean prePartitioned) {
+    this(cluster, traitSet, input, distribution, exchangeType, keys, prePartitioned, false);
+  }
+
+  private PinotLogicalExchange(RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelDistribution distribution,
+      PinotRelExchangeType exchangeType, List<Integer> keys, @Nullable Boolean prePartitioned,
+      boolean mappingAgnostic) {
     super(cluster, traitSet, input, distribution);
     assert traitSet.containsIfApplicable(Convention.NONE);
     _exchangeType = exchangeType;
     _keys = keys;
     _prePartitioned = prePartitioned;
+    _mappingAgnostic = mappingAgnostic;
+  }
+
+  /// Creates a local exchange for an input whose rows may land on any worker; see [#isMappingAgnostic()].
+  public static PinotLogicalExchange createMappingAgnostic(RelNode input) {
+    RelOptCluster cluster = input.getCluster();
+    RelDistribution distribution = RelDistributionTraitDef.INSTANCE.canonize(RelDistributions.SINGLETON);
+    RelTraitSet traitSet = input.getTraitSet().replace(Convention.NONE).replace(distribution);
+    return new PinotLogicalExchange(cluster, traitSet, input, distribution,
+        PinotRelExchangeType.getDefaultExchangeType(), distribution.getKeys(), null, true);
+  }
+
+  public boolean isMappingAgnostic() {
+    return _mappingAgnostic;
   }
 
   public static PinotLogicalExchange create(RelNode input, RelDistribution distribution) {
@@ -91,7 +120,9 @@ public class PinotLogicalExchange extends Exchange {
   @Override
   public Exchange copy(RelTraitSet traitSet, RelNode newInput, RelDistribution newDistribution) {
     return new PinotLogicalExchange(getCluster(), traitSet, newInput, newDistribution, _exchangeType, _keys,
-        _prePartitioned);
+        _prePartitioned,
+        // The marker describes a LOCAL exchange; a copy onto another distribution has not earned it.
+        _mappingAgnostic && newDistribution.getType() == RelDistribution.Type.SINGLETON);
   }
 
   @Override
@@ -105,6 +136,9 @@ public class PinotLogicalExchange extends Exchange {
     if (_exchangeType != PinotRelExchangeType.getDefaultExchangeType()) {
       relWriter.item("relExchangeType", _exchangeType);
     }
+    // Part of the digest: HepPlanner dedupes vertices by digest, so without this a mapping-agnostic exchange and a
+    // strict SINGLETON one over the same input would collapse into whichever registered first.
+    relWriter.itemIf("mappingAgnostic", true, _mappingAgnostic);
     return relWriter;
   }
 

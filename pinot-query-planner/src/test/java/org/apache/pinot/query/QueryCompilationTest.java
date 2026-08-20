@@ -22,6 +22,7 @@ import com.google.common.base.Throwables;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -1274,8 +1275,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
 
   /// The `setOpOptions(is_colocated_by_set_op_keys='true')` hint forces a pre-partitioned (direct) exchange on
   /// every input of a set operation, avoiding the shuffle. Here the inputs project `col3`, which is neither
-  /// table's partition column, so without the hint the planner would shuffle. Covers UNION ALL, INTERSECT and EXCEPT,
-  /// which all share [org.apache.pinot.calcite.rel.rules.PinotSetOpExchangeNodeInsertRule].
+  /// table's partition column, so without the hint the planner would shuffle. UNION ALL is not covered here: it
+  /// gets a local exchange with or without the hint (see [#testUnionAllUsesLocalExchange]).
   @Test(dataProvider = "setOpColocationHintQueries")
   public void testSetOpColocationHintForcesPrePartitionedExchange(String query) {
     List<MailboxSendNode> sendNodes = findSetOpInputSendNodes(_queryEnvironment.planQuery(query));
@@ -1290,7 +1291,6 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   private Object[][] setOpColocationHintQueries() {
     String hint = "/*+ setOpOptions(is_colocated_by_set_op_keys='true') */";
     return new Object[][]{
-        {"SELECT " + hint + " col3 FROM a UNION ALL SELECT col3 FROM b"},
         {"SELECT " + hint + " col3 FROM a INTERSECT SELECT col3 FROM b"},
         {"SELECT " + hint + " col3 FROM a EXCEPT SELECT col3 FROM b"},
     };
@@ -1301,7 +1301,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   @Test
   public void testSetOpColocationHintViaOuterSelectWrap() {
     String query = "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ * FROM "
-        + "(SELECT col3 FROM a UNION ALL SELECT col3 FROM b)";
+        + "(SELECT col3 FROM a INTERSECT SELECT col3 FROM b)";
     for (MailboxSendNode sendNode : findSetOpInputSendNodes(_queryEnvironment.planQuery(query))) {
       assertTrue(sendNode.isPrePartitioned(), "Hint on the wrapping SELECT should force a pre-partitioned exchange");
     }
@@ -1313,22 +1313,130 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   @Test
   public void testSetOpColocationHintFirstInputWins() {
     String query = "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ col3 FROM a "
-        + "UNION ALL SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='false') */ col3 FROM a";
+        + "INTERSECT SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='false') */ col3 FROM a";
     for (MailboxSendNode sendNode : findSetOpInputSendNodes(_queryEnvironment.planQuery(query))) {
       assertTrue(sendNode.isPrePartitioned(),
           "The first input's hint value should win and apply to all inputs when branches conflict");
     }
   }
 
-  /// Without the hint and with inputs that are not partitioned by the projected column, the exchanges below the set
-  /// operation must be regular (shuffled) exchanges.
-  @Test
-  public void testSetOpWithoutHintIsNotPrePartitioned() {
-    String query = "SELECT col3 FROM a UNION ALL SELECT col3 FROM b";
+  /// Without the hint and with inputs that are not partitioned by the projected column, the exchanges below a
+  /// distinct set operation must be regular (shuffled) exchanges. UNION ALL is exempt: it only concatenates, so it
+  /// gets a local exchange instead (see [#testUnionAllUsesLocalExchange]).
+  @Test(dataProvider = "shuffledSetOpQueries")
+  public void testDistinctSetOpWithoutHintIsNotPrePartitioned(String query) {
     for (MailboxSendNode sendNode : findSetOpInputSendNodes(_queryEnvironment.planQuery(query))) {
       assertFalse(sendNode.isPrePartitioned(),
           "Without the hint and matching partitioning, the set op exchanges should be a full shuffle");
     }
+  }
+
+  @DataProvider(name = "shuffledSetOpQueries")
+  private Object[][] shuffledSetOpQueries() {
+    return new Object[][]{
+        {"SELECT col3 FROM a INTERSECT SELECT col3 FROM b"},
+        {"SELECT col3 FROM a EXCEPT SELECT col3 FROM b"},
+    };
+  }
+
+  /// UNION ALL only concatenates, so any row-to-worker mapping is correct and no redistribution is required. Its
+  /// input exchanges are local (SINGLETON) exchanges: the union stage inherits its inputs' workers and the rows are
+  /// handed over in place. Note SINGLETON is Pinot's marker for a local exchange, not a gather to one node.
+  @Test
+  public void testUnionAllUsesLocalExchange() {
+    // Both branches read table a, so they resolve to the same workers and the local exchange survives to the plan.
+    String query = "SELECT col3 FROM a UNION ALL SELECT col3 FROM a";
+    List<MailboxSendNode> sendNodes = findSetOpInputSendNodes(_queryEnvironment.planQuery(query));
+    assertFalse(sendNodes.isEmpty());
+    for (MailboxSendNode sendNode : sendNodes) {
+      assertEquals(sendNode.getDistributionType(), RelDistribution.Type.SINGLETON);
+      assertTrue(sendNode.getKeys().isEmpty(), "A local UNION ALL exchange should carry no distribution keys");
+    }
+  }
+
+  /// When the branches do not resolve to the same workers -- table a lives on two servers and table b on one -- the
+  /// union stage cannot inherit both. It takes the two-worker layout, so branch a is still wired 1-to-1 and stays
+  /// SINGLETON while branch b, which cannot be, degrades to an arbitrary fan-out. That is still correct for a
+  /// concatenation, and cheaper than the full-row hash shuffle it replaces.
+  @Test
+  public void testUnionAllWithMisalignedBranchesDegradesToFanOut() {
+    String query = "SELECT col3 FROM a UNION ALL SELECT col3 FROM b";
+    List<MailboxSendNode> sendNodes = findSetOpInputSendNodes(_queryEnvironment.planQuery(query));
+    assertEquals(sendNodes.size(), 2);
+    Set<RelDistribution.Type> types = new HashSet<>();
+    for (MailboxSendNode sendNode : sendNodes) {
+      types.add(sendNode.getDistributionType());
+    }
+    assertEquals(types, Set.of(RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED),
+        "The aligned branch should stay local and the misaligned one should degrade to a fan-out");
+  }
+
+  /// `setOpOptions(is_colocated_by_set_op_keys='false')` opts UNION ALL out of the local exchange and restores the
+  /// full-row hash shuffle.
+  @Test
+  public void testUnionAllHintFalseRestoresShuffle() {
+    String query = "SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='false') */ col3 FROM a "
+        + "UNION ALL SELECT col3 FROM b";
+    for (MailboxSendNode sendNode : findSetOpInputSendNodes(_queryEnvironment.planQuery(query))) {
+      assertEquals(sendNode.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
+      assertFalse(sendNode.isPrePartitioned(),
+          "setOpOptions(is_colocated_by_set_op_keys='false') should restore the shuffle for UNION ALL");
+    }
+  }
+
+  /// A non-UNION-ALL set operation's input exchanges shuffle on the full row, so its output is hash distributed on
+  /// all of its columns and a downstream exchange keyed on those columns is auto-detected as pre-partitioned.
+  /// INTERSECT ALL is used (rather than INTERSECT) so the aggregate above survives planning: a distinct set op's
+  /// output is unique on the group keys, which lets Calcite remove the aggregate and its exchange entirely.
+  @Test
+  public void testSetOpOutputIsHashDistributedOnAllColumns() {
+    String query = "SELECT col1, col2, COUNT(*) FROM "
+        + "(SELECT col1, col2 FROM a INTERSECT ALL SELECT col1, col2 FROM b) GROUP BY col1, col2";
+    MailboxSendNode sendNode = findSendNodeAboveSetOp(_queryEnvironment.planQuery(query));
+    assertEquals(sendNode.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
+    assertTrue(sendNode.isPrePartitioned(),
+        "An exchange keyed on all columns of a shuffled set op should auto-detect pre-partitioning");
+  }
+
+  /// UNION ALL's output carries no distribution guarantee: a local exchange does not redistribute anything, so it
+  /// promises nothing about where equal rows land. A downstream exchange keyed on all of its columns must NOT be
+  /// auto-detected as pre-partitioned -- the deduplicating aggregate above it needs a real shuffle to be correct.
+  @Test
+  public void testUnionAllOutputIsNotTreatedAsHashDistributed() {
+    String query = "SELECT col1, col2, COUNT(*) FROM "
+        + "(SELECT col1, col2 FROM a UNION ALL SELECT col1, col2 FROM b) GROUP BY col1, col2";
+    MailboxSendNode sendNode = findSendNodeAboveSetOp(_queryEnvironment.planQuery(query));
+    assertFalse(sendNode.isPrePartitioned(),
+        "UNION ALL output must not be treated as hash distributed: its inputs are not shuffled");
+  }
+
+  /// `is_colocated_by_set_op_keys='true'` asserts that rows equal across all projected columns already share a
+  /// worker, which is exactly the all-column hash distribution. The set op's output is therefore claimed as hash
+  /// distributed just as it is for genuinely shuffled inputs, so a downstream exchange keyed on those columns is
+  /// auto-detected as pre-partitioned too and the colocation carries all the way up. Same query as
+  /// [#testSetOpOutputIsHashDistributedOnAllColumns] plus the hint.
+  @Test
+  public void testHintedColocatedSetOpOutputIsHashDistributed() {
+    String query = "SELECT col1, col2, COUNT(*) FROM "
+        + "(SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ col1, col2 FROM a "
+        + "INTERSECT ALL SELECT col1, col2 FROM b) GROUP BY col1, col2";
+    MailboxSendNode sendNode = findSendNodeAboveSetOp(_queryEnvironment.planQuery(query));
+    assertEquals(sendNode.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
+    assertTrue(sendNode.isPrePartitioned(),
+        "A hint-forced colocated set op's output should be treated as hash distributed on all columns");
+  }
+
+  /// An explicit `is_colocated_by_set_op_keys='true'` on a UNION ALL still yields a local exchange, which
+  /// redistributes nothing and so guarantees nothing about the output. The deduplicating aggregate above must still
+  /// shuffle for correct results.
+  @Test
+  public void testHintedColocatedUnionAllOutputIsNotTreatedAsHashDistributed() {
+    String query = "SELECT col1, col2 FROM "
+        + "(SELECT /*+ setOpOptions(is_colocated_by_set_op_keys='true') */ col1, col2 FROM a "
+        + "UNION ALL SELECT col1, col2 FROM b) GROUP BY col1, col2";
+    MailboxSendNode sendNode = findSendNodeAboveSetOp(_queryEnvironment.planQuery(query));
+    assertFalse(sendNode.isPrePartitioned(),
+        "A hinted UNION ALL's output must not be treated as hash distributed");
   }
 
   /// When each input is declared partitioned by the projected column, the single-column set-op exchange matches the
@@ -1358,7 +1466,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   // op matches the input partitioning and the planner auto-detects pre-partitioning.
   private static final String AUTO_DETECTED_SET_OP =
       "SELECT col2 FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ "
-          + "UNION ALL "
+          + "INTERSECT "
           + "SELECT col1 FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', "
           + "partition_size='4') */";
 
@@ -1384,6 +1492,18 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
     assertFalse(sendNodes.isEmpty(), "Expected the SetOp to have input send nodes");
     return sendNodes;
+  }
+
+  /// Finds the [MailboxSendNode] at the root of the fragment containing the (single) set-op node, i.e. the exchange
+  /// that ships the set operation's output to its consumer stage.
+  private MailboxSendNode findSendNodeAboveSetOp(DispatchableSubPlan dispatchableSubPlan) {
+    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
+      PlanNode root = fragment.getPlanFragment().getFragmentRoot();
+      if (root instanceof MailboxSendNode && findNodeOfType(root, SetOpNode.class) != null) {
+        return (MailboxSendNode) root;
+      }
+    }
+    throw new AssertionError("Expected a fragment rooted at a MailboxSendNode containing a SetOp node");
   }
 
   /// When colocation hints are applied to a chain of operations that are all keyed on the same (partition) column, the
