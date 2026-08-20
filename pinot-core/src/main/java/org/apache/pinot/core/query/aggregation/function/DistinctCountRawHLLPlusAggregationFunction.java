@@ -33,16 +33,17 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class DistinctCountRawHLLPlusAggregationFunction
-    extends BaseSingleInputAggregationFunction<HyperLogLogPlus, SerializedHLLPlus> {
+    extends NullableSingleInputAggregationFunction<HyperLogLogPlus, SerializedHLLPlus> {
   private final DistinctCountHLLPlusAggregationFunction _distinctCountHLLPlusAggregationFunction;
 
-  public DistinctCountRawHLLPlusAggregationFunction(List<ExpressionContext> arguments) {
-    this(arguments.get(0), new DistinctCountHLLPlusAggregationFunction(arguments));
+  public DistinctCountRawHLLPlusAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    this(arguments.get(0), new DistinctCountHLLPlusAggregationFunction(arguments, nullHandlingEnabled),
+        nullHandlingEnabled);
   }
 
   DistinctCountRawHLLPlusAggregationFunction(ExpressionContext expression,
-      DistinctCountHLLPlusAggregationFunction distinctCountHLLPlusAggregationFunction) {
-    super(expression);
+      DistinctCountHLLPlusAggregationFunction distinctCountHLLPlusAggregationFunction, boolean nullHandlingEnabled) {
+    super(expression, nullHandlingEnabled);
     _distinctCountHLLPlusAggregationFunction = distinctCountHLLPlusAggregationFunction;
   }
 

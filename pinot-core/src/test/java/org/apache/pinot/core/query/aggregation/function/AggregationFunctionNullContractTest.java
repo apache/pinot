@@ -156,8 +156,8 @@ public class AggregationFunctionNullContractTest {
   ///
   /// Returning is not enough to prove the `null` was resolved: a function can wrap the `null` in a serializer that only
   /// dereferences it when the value is rendered, which moves the failure out of this method and into the response path.
-  /// [ColumnDataType#convert] is the step that threw in production, so it is exercised alongside `toString`; a
-  /// serializer wrapping a `null` can survive one and fail the other.
+  /// [org.apache.pinot.common.utils.DataSchema.ColumnDataType#convert] is the step that threw in production, so it is
+  /// exercised alongside `toString`; a serializer wrapping a `null` can survive one and fail the other.
   private static void render(AggregationFunction function, @Nullable Object finalResult) {
     if (finalResult != null) {
       finalResult.toString();
@@ -257,7 +257,19 @@ public class AggregationFunctionNullContractTest {
       // Given the option so they can skip null rows. These two were in this set once before, on the strength of an
       // identity comparison that reported every serializer-valued function as honouring it; they belong here now
       // because they genuinely do.
-      AggregationFunctionType.FREQUENTSTRINGSSKETCH, AggregationFunctionType.FREQUENTLONGSSKETCH
+      AggregationFunctionType.FREQUENTSTRINGSSKETCH, AggregationFunctionType.FREQUENTLONGSSKETCH,
+      // Given the option so they can skip null rows. A distinct count over nothing is 0 in every one of these, so
+      // the empty-input answer is unchanged; what changed is that a null row no longer contributes the column default.
+      AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT, AggregationFunctionType.DISTINCTCOUNTBITMAP,
+      AggregationFunctionType.DISTINCTCOUNTHLL, AggregationFunctionType.DISTINCTCOUNTRAWHLL,
+      AggregationFunctionType.DISTINCTCOUNTSMARTHLL, AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
+      AggregationFunctionType.DISTINCTCOUNTRAWHLLPLUS, AggregationFunctionType.DISTINCTCOUNTSMARTHLLPLUS,
+      AggregationFunctionType.DISTINCTCOUNTULL, AggregationFunctionType.DISTINCTCOUNTRAWULL,
+      AggregationFunctionType.DISTINCTCOUNTSMARTULL, AggregationFunctionType.DISTINCTCOUNTTHETASKETCH,
+      AggregationFunctionType.DISTINCTCOUNTRAWTHETASKETCH, AggregationFunctionType.DISTINCTCOUNTCPCSKETCH,
+      AggregationFunctionType.DISTINCTCOUNTRAWCPCSKETCH, AggregationFunctionType.DISTINCTCOUNTBITMAPMV,
+      AggregationFunctionType.DISTINCTCOUNTHLLMV, AggregationFunctionType.DISTINCTCOUNTRAWHLLMV,
+      AggregationFunctionType.DISTINCTCOUNTHLLPLUSMV, AggregationFunctionType.DISTINCTCOUNTRAWHLLPLUSMV
   );
 
   /// Functions this test cannot drive with a one-column synthetic block, pinned so that a silent drop-out is always a

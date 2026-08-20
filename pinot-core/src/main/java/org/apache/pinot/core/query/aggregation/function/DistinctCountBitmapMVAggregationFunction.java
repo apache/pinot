@@ -25,8 +25,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitmapAggregationFunction {
 
-  public DistinctCountBitmapMVAggregationFunction(List<ExpressionContext> arguments) {
-    super(verifySingleArgument(arguments, "DISTINCT_COUNT_BITMAP_MV"));
+  public DistinctCountBitmapMVAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(verifySingleArgument(arguments, "DISTINCT_COUNT_BITMAP_MV"), nullHandlingEnabled);
   }
 
   @Override

@@ -32,7 +32,7 @@ public class DistinctCountHLLPlusAggregationFunctionTest {
   @Test
   public void testCanUseStarTreeDefaultP() {
     DistinctCountHLLPlusAggregationFunction function = new DistinctCountHLLPlusAggregationFunction(
-        List.of(ExpressionContext.forIdentifier("col")));
+        List.of(ExpressionContext.forIdentifier("col")), false);
 
     Assert.assertTrue(function.canUseStarTree(Map.of()));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, "14")));
@@ -40,7 +40,7 @@ public class DistinctCountHLLPlusAggregationFunctionTest {
     Assert.assertFalse(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, 16)));
 
     function = new DistinctCountHLLPlusAggregationFunction(List.of(ExpressionContext.forIdentifier("col"),
-        ExpressionContext.forLiteral(Literal.stringValue("14"))));
+        ExpressionContext.forLiteral(Literal.stringValue("14"))), false);
 
     Assert.assertTrue(function.canUseStarTree(Map.of()));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, "14")));
@@ -49,7 +49,7 @@ public class DistinctCountHLLPlusAggregationFunctionTest {
 
     // sp value isn't checked
     function = new DistinctCountHLLPlusAggregationFunction(List.of(ExpressionContext.forIdentifier("col"),
-        ExpressionContext.forLiteral(Literal.intValue(14)), ExpressionContext.forLiteral(Literal.intValue(20))));
+        ExpressionContext.forLiteral(Literal.intValue(14)), ExpressionContext.forLiteral(Literal.intValue(20))), false);
 
     Assert.assertTrue(function.canUseStarTree(Map.of()));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, "14")));
@@ -60,7 +60,7 @@ public class DistinctCountHLLPlusAggregationFunctionTest {
   @Test
   public void testCanUseStarTreeCustomP() {
     DistinctCountHLLPlusAggregationFunction function = new DistinctCountHLLPlusAggregationFunction(
-        List.of(ExpressionContext.forIdentifier("col"), ExpressionContext.forLiteral(Literal.intValue(16))));
+        List.of(ExpressionContext.forIdentifier("col"), ExpressionContext.forLiteral(Literal.intValue(16))), false);
 
     Assert.assertFalse(function.canUseStarTree(Map.of()));
     Assert.assertFalse(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, "8")));

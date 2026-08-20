@@ -59,8 +59,8 @@ public class DistinctCountSmartULLAggregationFunction extends BaseDistinctCountS
   private final int _threshold;
   private final int _p;
 
-  public DistinctCountSmartULLAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments.get(0));
+  public DistinctCountSmartULLAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments.get(0), nullHandlingEnabled);
     int numExpressions = arguments.size();
     // This function expects 1 or 2 arguments.
     Preconditions.checkArgument(numExpressions <= 2, "DistinctCountSmartULL expects 1 or 2 arguments, got: %s",
@@ -101,12 +101,14 @@ public class DistinctCountSmartULLAggregationFunction extends BaseDistinctCountS
       RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
       if (blockValSet.isSingleValue()) {
         int[] dictIds = blockValSet.getDictionaryIdsSV();
-        dictIdBitmap.addN(dictIds, 0, length);
+        forEachNotNull(length, blockValSet, (from, to) -> dictIdBitmap.addN(dictIds, from, to - from));
       } else {
         int[][] dictIds = blockValSet.getDictionaryIdsMV();
-        for (int i = 0; i < length; i++) {
-          dictIdBitmap.add(dictIds[i]);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            dictIdBitmap.add(dictIds[i]);
+          }
+        });
       }
       return;
     }
@@ -127,44 +129,56 @@ public class DistinctCountSmartULLAggregationFunction extends BaseDistinctCountS
       switch (storedType) {
         case INT: {
           int[] intValues = blockValSet.getIntValuesSV();
-          for (int i = 0; i < length; i++) {
-            UltraLogLogUtils.hashObject(intValues[i]).ifPresent(ull::add);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              UltraLogLogUtils.hashObject(intValues[i]).ifPresent(ull::add);
+            }
+          });
           break;
         }
         case LONG: {
           long[] longValues = blockValSet.getLongValuesSV();
-          for (int i = 0; i < length; i++) {
-            UltraLogLogUtils.hashObject(longValues[i]).ifPresent(ull::add);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              UltraLogLogUtils.hashObject(longValues[i]).ifPresent(ull::add);
+            }
+          });
           break;
         }
         case FLOAT: {
           float[] floatValues = blockValSet.getFloatValuesSV();
-          for (int i = 0; i < length; i++) {
-            UltraLogLogUtils.hashObject(floatValues[i]).ifPresent(ull::add);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              UltraLogLogUtils.hashObject(floatValues[i]).ifPresent(ull::add);
+            }
+          });
           break;
         }
         case DOUBLE: {
           double[] doubleValues = blockValSet.getDoubleValuesSV();
-          for (int i = 0; i < length; i++) {
-            UltraLogLogUtils.hashObject(doubleValues[i]).ifPresent(ull::add);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              UltraLogLogUtils.hashObject(doubleValues[i]).ifPresent(ull::add);
+            }
+          });
           break;
         }
         case STRING: {
           String[] stringValues = blockValSet.getStringValuesSV();
-          for (int i = 0; i < length; i++) {
-            UltraLogLogUtils.hashObject(stringValues[i]).ifPresent(ull::add);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              UltraLogLogUtils.hashObject(stringValues[i]).ifPresent(ull::add);
+            }
+          });
           break;
         }
         case BYTES: {
           byte[][] bytesValues = blockValSet.getBytesValuesSV();
-          for (int i = 0; i < length; i++) {
-            UltraLogLogUtils.hashObject(bytesValues[i]).ifPresent(ull::add);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              UltraLogLogUtils.hashObject(bytesValues[i]).ifPresent(ull::add);
+            }
+          });
           break;
         }
         default:
@@ -174,56 +188,68 @@ public class DistinctCountSmartULLAggregationFunction extends BaseDistinctCountS
       switch (storedType) {
         case INT: {
           int[][] intValues = blockValSet.getIntValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (int value : intValues[i]) {
-              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (int value : intValues[i]) {
+                UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+              }
             }
-          }
+          });
           break;
         }
         case LONG: {
           long[][] longValues = blockValSet.getLongValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (long value : longValues[i]) {
-              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (long value : longValues[i]) {
+                UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+              }
             }
-          }
+          });
           break;
         }
         case FLOAT: {
           float[][] floatValues = blockValSet.getFloatValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (float value : floatValues[i]) {
-              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (float value : floatValues[i]) {
+                UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+              }
             }
-          }
+          });
           break;
         }
         case DOUBLE: {
           double[][] doubleValues = blockValSet.getDoubleValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (double value : doubleValues[i]) {
-              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (double value : doubleValues[i]) {
+                UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+              }
             }
-          }
+          });
           break;
         }
         case STRING: {
           String[][] stringValues = blockValSet.getStringValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (String value : stringValues[i]) {
-              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (String value : stringValues[i]) {
+                UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+              }
             }
-          }
+          });
           break;
         }
         case BYTES: {
           byte[][][] bytesValues = blockValSet.getBytesValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (byte[] value : bytesValues[i]) {
-              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (byte[] value : bytesValues[i]) {
+                UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+              }
             }
-          }
+          });
           break;
         }
         default:

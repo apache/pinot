@@ -396,25 +396,25 @@ public class AggregationFunctionFactory {
           case DISTINCTCOUNTOFFHEAP:
             return new DistinctCountOffHeapAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTBITMAP:
-            return new DistinctCountBitmapAggregationFunction(arguments);
+            return new DistinctCountBitmapAggregationFunction(arguments, nullHandlingEnabled);
           case SEGMENTPARTITIONEDDISTINCTCOUNT:
-            return new SegmentPartitionedDistinctCountAggregationFunction(arguments);
+            return new SegmentPartitionedDistinctCountAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTHLL:
-            return new DistinctCountHLLAggregationFunction(arguments);
+            return new DistinctCountHLLAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWHLL:
-            return new DistinctCountRawHLLAggregationFunction(arguments);
+            return new DistinctCountRawHLLAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTSMARTHLL:
-            return new DistinctCountSmartHLLAggregationFunction(arguments);
+            return new DistinctCountSmartHLLAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTSMARTHLLPLUS:
-            return new DistinctCountSmartHLLPlusAggregationFunction(arguments);
+            return new DistinctCountSmartHLLPlusAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTSMARTULL:
-            return new DistinctCountSmartULLAggregationFunction(arguments);
+            return new DistinctCountSmartULLAggregationFunction(arguments, nullHandlingEnabled);
           case FASTHLL:
-            return new FastHLLAggregationFunction(arguments);
+            return new FastHLLAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTTHETASKETCH:
-            return new DistinctCountThetaSketchAggregationFunction(arguments);
+            return new DistinctCountThetaSketchAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWTHETASKETCH:
-            return new DistinctCountRawThetaSketchAggregationFunction(arguments);
+            return new DistinctCountRawThetaSketchAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTSUM:
             return new DistinctSumAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTAVG:
@@ -436,19 +436,19 @@ public class AggregationFunctionFactory {
           case DISTINCTCOUNTMV:
             return new DistinctCountMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTBITMAPMV:
-            return new DistinctCountBitmapMVAggregationFunction(arguments);
+            return new DistinctCountBitmapMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTHLLMV:
-            return new DistinctCountHLLMVAggregationFunction(arguments);
+            return new DistinctCountHLLMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWHLLMV:
-            return new DistinctCountRawHLLMVAggregationFunction(arguments);
+            return new DistinctCountRawHLLMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTHLLPLUS:
-            return new DistinctCountHLLPlusAggregationFunction(arguments);
+            return new DistinctCountHLLPlusAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWHLLPLUS:
-            return new DistinctCountRawHLLPlusAggregationFunction(arguments);
+            return new DistinctCountRawHLLPlusAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTHLLPLUSMV:
-            return new DistinctCountHLLPlusMVAggregationFunction(arguments);
+            return new DistinctCountHLLPlusMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWHLLPLUSMV:
-            return new DistinctCountRawHLLPlusMVAggregationFunction(arguments);
+            return new DistinctCountRawHLLPlusMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTSUMMV:
             return new DistinctSumMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTAVGMV:
@@ -520,13 +520,13 @@ public class AggregationFunctionFactory {
           case FREQUENTLONGSSKETCH:
             return new FrequentLongsSketchAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTCPCSKETCH:
-            return new DistinctCountCPCSketchAggregationFunction(arguments);
+            return new DistinctCountCPCSketchAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWCPCSKETCH:
-            return new DistinctCountRawCPCSketchAggregationFunction(arguments);
+            return new DistinctCountRawCPCSketchAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTULL:
-            return new DistinctCountULLAggregationFunction(arguments);
+            return new DistinctCountULLAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWULL:
-            return new DistinctCountRawULLAggregationFunction(arguments);
+            return new DistinctCountRawULLAggregationFunction(arguments, nullHandlingEnabled);
           case TIMESERIESAGGREGATE:
             return new TimeSeriesAggregationFunction(arguments);
           default:
