@@ -29,11 +29,9 @@ import org.testng.annotations.Test;
 
 public class NoClosePinotFSTest {
 
-  /**
-   * {@link NoClosePinotFS} must delegate the ranged-read methods to its delegate; otherwise anything obtained
-   * via {@link PinotFSFactory} (which wraps every registered FS in a NoClosePinotFS) would report no ranged-read
-   * support and throw on {@link PinotFS#openForRead}.
-   */
+  /// {@link NoClosePinotFS} must delegate the ranged-read methods to its delegate; otherwise anything obtained
+  /// via {@link PinotFSFactory} (which wraps every registered FS in a NoClosePinotFS) would report no ranged-read
+  /// support and throw on {@link PinotFS#openForRead}.
   @Test
   public void testDelegatesRangedRead()
       throws Exception {

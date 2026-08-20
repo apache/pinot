@@ -290,10 +290,8 @@ public class LocalPinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Wraps an InputStream to expose at most {@code limit} bytes. Closing this stream propagates to the
-   * delegate (which releases the underlying file handle).
-   */
+  /// Wraps an InputStream to expose at most {@code limit} bytes. Closing this stream propagates to the
+  /// delegate (which releases the underlying file handle).
   private static class RangeInputStream extends FilterInputStream {
     private long _remaining;
 
