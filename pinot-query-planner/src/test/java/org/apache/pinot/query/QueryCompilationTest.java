@@ -772,6 +772,55 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
+  /// `ProjectAggregateMergeRule` rebuilds the aggregate with a `RelBuilder`, and Calcite's automatic hint
+  /// propagation only restores the hints of the node the rule matched on -- the `Project`, which never carries
+  /// `aggOptions`. Without [org.apache.pinot.calcite.rel.rules.PinotProjectAggregateMergeRule] the aggregate's
+  /// hints are dropped and the aggregate is split into LEAF + exchange + FINAL despite the colocation hint.
+  ///
+  /// A `Project` lands directly above the aggregate here because the `SUM` argument is nullable:
+  /// `PinotAggregateReduceFunctionsRule` rewrites `SUM(x)` into `$SUM0(x) + COUNT(x)` plus a
+  /// `CASE(COUNT(x) = 0, NULL, $SUM0(x))` project. With a non-nullable argument the reduction collapses to a
+  /// bare `$SUM0` with no project, the rule does not match, and the hint survives either way.
+  @Test
+  public void testAggregateHintSurvivesProjectAggregateMerge() {
+    String query = "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ "
+        + "col1, SUM(CASE WHEN col3 > 5 THEN col3 ELSE NULL END) FROM b GROUP BY col1";
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("aggType=[DIRECT]"),
+        "is_partitioned_by_group_by_keys should produce a DIRECT aggregate, but got:\n" + explain);
+    assertFalse(explain.contains("PinotLogicalExchange"),
+        "A colocated aggregate must not have an exchange below it, but got:\n" + explain);
+  }
+
+  /// Same defect reached through a window function, which is how it shows up in practice: `LAG` is nullable, so
+  /// any expression derived from it is nullable, so the `SUM` over it takes the reduction path above. The window
+  /// itself is colocated by `windowOptions`; only the aggregate above it used to lose its hint.
+  @Test
+  public void testAggregateHintSurvivesProjectAggregateMergeAboveWindow() {
+    String query = "EXPLAIN PLAN FOR WITH w AS ("
+        + "SELECT /*+ windowOptions(is_partitioned_by_window_keys='true') */ col1, col3, ts, "
+        + "LAG(col3, 1) OVER (PARTITION BY col1 ORDER BY ts) AS prev FROM b) "
+        + "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ "
+        + "col1, SUM(CASE WHEN prev IS NULL THEN 0 ELSE col3 - prev END) FROM w GROUP BY col1";
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("aggType=[DIRECT]"),
+        "is_partitioned_by_group_by_keys should produce a DIRECT aggregate, but got:\n" + explain);
+  }
+
+  /// The other `aggOptions` options travel on the same hint and were lost the same way.
+  /// `is_skip_leaf_stage_group_by` must still push the aggregate above the exchange.
+  @Test
+  public void testSkipLeafStageGroupByHintSurvivesProjectAggregateMerge() {
+    String query = "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ "
+        + "col1, SUM(CASE WHEN col3 > 5 THEN col3 ELSE NULL END) FROM b GROUP BY col1";
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("aggType=[DIRECT]"),
+        "is_skip_leaf_stage_group_by should produce a single DIRECT aggregate above the exchange, but got:\n"
+            + explain);
+    assertFalse(explain.contains("aggType=[LEAF]"),
+        "is_skip_leaf_stage_group_by must not leave a LEAF aggregate, but got:\n" + explain);
+  }
+
   @Test
   public void testQueryWithHint() {
     // Hinting the query to use final stage aggregation makes server directly return final result
