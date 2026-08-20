@@ -39,6 +39,8 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.testng.Assert.*;
 
 
@@ -370,5 +372,41 @@ public class ReceivingMailboxTest {
       assertTrue(allocatedBytes > 0);
       _resourceUsageUpdated = true;
     }
+  }
+
+  @Test
+  public void readerRegisteredAfterDataIsNotified() {
+    ReceivingMailbox receivingMailbox = new ReceivingMailbox("id", 10);
+
+    ReceivingMailbox.ReceivingMailboxStatus status = receivingMailbox.offer(DATA_BLOCK, List.of(), 10);
+    assertEquals(status, ReceivingMailbox.ReceivingMailboxStatus.SUCCESS, "Should be able to offer without a reader");
+
+    receivingMailbox.registeredReader(_reader);
+
+    verify(_reader).blockReadyToRead();
+    assertNotNull(receivingMailbox.poll(), "Block offered before registration should still be readable");
+  }
+
+  @Test
+  public void readerRegisteredAfterEosIsNotified() {
+    ReceivingMailbox receivingMailbox = new ReceivingMailbox("id", 10);
+
+    assertEquals(receivingMailbox.offer(DATA_BLOCK, List.of(), 10), ReceivingMailbox.ReceivingMailboxStatus.SUCCESS,
+        "Should be able to offer without a reader");
+    assertEquals(receivingMailbox.offer(SuccessMseBlock.INSTANCE, List.of(), 10),
+        ReceivingMailbox.ReceivingMailboxStatus.LAST_BLOCK, "Should be able to offer EOS without a reader");
+
+    receivingMailbox.registeredReader(_reader);
+
+    verify(_reader).blockReadyToRead();
+  }
+
+  @Test
+  public void readerRegisteredOnEmptyMailboxIsNotNotified() {
+    ReceivingMailbox receivingMailbox = new ReceivingMailbox("id", 10);
+
+    receivingMailbox.registeredReader(_reader);
+
+    verifyNoInteractions(_reader);
   }
 }

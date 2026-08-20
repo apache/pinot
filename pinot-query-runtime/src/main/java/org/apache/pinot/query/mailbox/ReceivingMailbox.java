@@ -740,13 +740,23 @@ public class ReceivingMailbox {
     }
 
     public void registerReader(Reader reader) {
-      if (_reader != null) {
-        throw new IllegalArgumentException("Only one reader is supported");
+      ReentrantLock lock = _lock;
+      lock.lock();
+      try {
+        if (_reader != null) {
+          throw new IllegalArgumentException("Only one reader is supported");
+        }
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("==[MAILBOX]== Reader registered for mailbox: " + _id);
+        }
+        _reader = reader;
+        // Offers made before registration found no reader to notify, so deliver the pending wake-up.
+        if (_count > 0 || _eos != null) {
+          notifyReader();
+        }
+      } finally {
+        lock.unlock();
       }
-      if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("==[MAILBOX]== Reader registered for mailbox: " + _id);
-      }
-      _reader = reader;
     }
   }
 }
