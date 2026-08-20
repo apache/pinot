@@ -217,13 +217,19 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     // Resume consumption to trigger snapshot
     getOrCreateAdminClient().getTableClient().resumeConsumption(rawTableName, null);
 
-    // All the immutable (committed and uploaded) segments should have snapshots generated
+    // All the uploaded segments should have snapshots generated. Snapshots for the just committed segments are best
+    // effort: the snapshot round triggered by the new consuming segment skips a segment without retry when its
+    // segmentLock is still held, e.g. by the committing thread or the CONSUMING -> ONLINE state transition. Only the
+    // latest committed segment of each partition is best effort, but this test has a single commit cycle, so every
+    // LLC segment is a just committed one, and all of them are excluded from the check.
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
     TestUtils.waitForCondition(aVoid -> {
       for (BaseServerStarter serverStarter : _serverStarters) {
         String segmentDir = serverStarter.getConfig().getProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR);
-        File[] files = new File(segmentDir, realtimeTableName).listFiles((dir, name) -> name.startsWith(rawTableName));
+        File[] files = new File(segmentDir, realtimeTableName).listFiles(
+            (dir, name) -> name.startsWith(rawTableName) && LLCSegmentName.of(name) == null);
         assertNotNull(files);
+        assertEquals(files.length, 3);
         for (File file : files) {
           if (!new File(new File(file, "v3"), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).exists()) {
             return false;
