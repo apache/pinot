@@ -160,20 +160,11 @@ public class ImmutableSegmentLoader {
 
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
     if (segmentMetadata.getTotalDocs() > 0) {
-      if (segmentOperationsThrottlerSet != null) {
-        segmentOperationsThrottlerSet.getSegmentAllIndexPreprocessThrottler().acquire();
-      }
-      try {
-        convertSegmentFormat(indexDir, indexLoadingConfig, segmentMetadata);
-        // Preprocess requires table config and schema
-        if (indexLoadingConfig.getTableConfig() != null && indexLoadingConfig.getSchema() != null) {
-          preprocessSegment(indexDir, segmentMetadata.getName(), segmentMetadata.getCrc(), indexLoadingConfig,
-              segmentOperationsThrottlerSet, zkMetadata);
-        }
-      } finally {
-        if (segmentOperationsThrottlerSet != null) {
-          segmentOperationsThrottlerSet.getSegmentAllIndexPreprocessThrottler().release();
-        }
+      convertSegmentFormat(indexDir, indexLoadingConfig, segmentMetadata, segmentOperationsThrottlerSet);
+      // Preprocess requires table config and schema
+      if (indexLoadingConfig.getTableConfig() != null && indexLoadingConfig.getSchema() != null) {
+        preprocessSegment(indexDir, segmentMetadata.getName(), segmentMetadata.getCrc(), indexLoadingConfig,
+            segmentOperationsThrottlerSet, zkMetadata);
       }
     }
   }
@@ -291,8 +282,13 @@ public class ImmutableSegmentLoader {
     return segmentVersionToLoad != null && segmentVersionToLoad != segmentMetadata.getVersion();
   }
 
+  /// Up-converts the segment format if needed, e.g. from v1 to v3. The conversion rewrites every index of every
+  /// column into the new format, so it is guarded by the all-index preprocess throttler, the same throttler that
+  /// guards the index building step in [SegmentPreProcessor]. The permit is taken and released here, so a segment
+  /// needing both steps queues on the throttler twice rather than holding a permit across both.
   private static void convertSegmentFormat(File indexDir, IndexLoadingConfig indexLoadingConfig,
-      SegmentMetadataImpl localSegmentMetadata)
+      SegmentMetadataImpl localSegmentMetadata,
+      @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet)
       throws Exception {
     SegmentVersion segmentVersionToLoad = indexLoadingConfig.getSegmentVersion();
     if (segmentVersionToLoad == null || SegmentDirectoryPaths.segmentDirectoryFor(indexDir, segmentVersionToLoad)
@@ -309,7 +305,16 @@ public class ImmutableSegmentLoader {
     SegmentFormatConverter converter =
         SegmentFormatConverterFactory.getConverter(segmentVersionOnDisk, segmentVersionToLoad);
     LOGGER.info("Using converter: {} to up-convert segment: {}", converter.getClass().getSimpleName(), segmentName);
-    converter.convert(indexDir);
+    if (segmentOperationsThrottlerSet != null) {
+      segmentOperationsThrottlerSet.getSegmentAllIndexPreprocessThrottler().acquire();
+    }
+    try {
+      converter.convert(indexDir);
+    } finally {
+      if (segmentOperationsThrottlerSet != null) {
+        segmentOperationsThrottlerSet.getSegmentAllIndexPreprocessThrottler().release();
+      }
+    }
     LOGGER.info("Successfully up-converted segment: {} from version: {} to {}", segmentName,
         segmentVersionOnDisk, segmentVersionToLoad);
   }
