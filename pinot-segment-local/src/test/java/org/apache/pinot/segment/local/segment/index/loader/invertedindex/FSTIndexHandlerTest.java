@@ -70,13 +70,11 @@ import static org.testng.Assert.assertTrue;
 public class FSTIndexHandlerTest {
   private static final String COLUMN = "name";
 
-  /**
-   * Magic int written at offset 0 of every legacy native FST file.
-   * Mirrors the private constant in {@code FstIndexUtils}.
-   */
+  /// Magic int written at offset 0 of every legacy native FST file.
+  /// Mirrors the private constant in `FstIndexUtils`.
   private static final int LEGACY_NATIVE_FST_MAGIC = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
 
-  /** [FieldIndexConfigs] with FST explicitly disabled — used in removed-column tests. */
+  /// [FieldIndexConfigs] with FST explicitly disabled — used in removed-column tests.
   private static final FieldIndexConfigs NO_FST =
       new FieldIndexConfigs.Builder().add(StandardIndexes.fst(), FstIndexConfig.DISABLED).build();
 
@@ -253,10 +251,8 @@ public class FSTIndexHandlerTest {
     return segmentDirectory;
   }
 
-  /**
-   * Mocks a {@link SegmentDirectory} where {@code COLUMN} has no existing FST index but is
-   * configured to receive one — used by the unsupported-operation tests.
-   */
+  /// Mocks a [SegmentDirectory] where `COLUMN` has no existing FST index but is
+  /// configured to receive one — used by the unsupported-operation tests.
   private static SegmentDirectory mockSegmentDirectoryForNewColumn(
       FieldSpec.DataType dataType, boolean hasDictionary, boolean isSingleValue) {
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
@@ -295,7 +291,7 @@ public class FSTIndexHandlerTest {
     return writer;
   }
 
-  /** A {@link PinotDataBuffer} whose first int is the legacy native FST magic value. */
+  /// A [PinotDataBuffer] whose first int is the legacy native FST magic value.
   private static PinotDataBuffer legacyNativeBuffer() {
     PinotDataBuffer buffer = mock(PinotDataBuffer.class);
     when(buffer.size()).thenReturn((long) Integer.BYTES);
@@ -303,7 +299,7 @@ public class FSTIndexHandlerTest {
     return buffer;
   }
 
-  /** A {@link PinotDataBuffer} whose first int is NOT the legacy native FST magic value. */
+  /// A [PinotDataBuffer] whose first int is NOT the legacy native FST magic value.
   private static PinotDataBuffer nonLegacyBuffer() {
     PinotDataBuffer buffer = mock(PinotDataBuffer.class);
     when(buffer.size()).thenReturn((long) Integer.BYTES);
@@ -311,11 +307,9 @@ public class FSTIndexHandlerTest {
     return buffer;
   }
 
-  /**
-   * Builds a minimal v1 segment with a single dictionary-encoded STRING column ({@code COLUMN}).
-   *
-   * @return the segment directory (tempDir/segmentName)
-   */
+  /// Builds a minimal v1 segment with a single dictionary-encoded STRING column (`COLUMN`).
+  ///
+  /// @return the segment directory (tempDir/segmentName)
   private static File buildMinimalSegment()
       throws Exception {
     File tempDir = new File(FileUtils.getTempDirectory(), "fst-index-handler-test-" + System.nanoTime());
