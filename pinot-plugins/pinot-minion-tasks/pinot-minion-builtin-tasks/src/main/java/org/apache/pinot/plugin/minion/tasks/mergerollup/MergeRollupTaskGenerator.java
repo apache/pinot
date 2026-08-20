@@ -865,10 +865,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     return pinotTaskConfigs;
   }
 
-  /**
-   * Get maxSegmentSizeBytesPerTask from merge configs.
-   * Returns 0 if not configured (indicating row-based grouping should be used).
-   */
+  /// Get maxSegmentSizeBytesPerTask from merge configs.
+  /// Returns 0 if not configured (indicating row-based grouping should be used).
   private long getMaxSegmentSizeBytesPerTask(Map<String, String> mergeConfigs) {
     String value = mergeConfigs.get(MergeTask.MAX_SEGMENT_SIZE_BYTES_PER_TASK_KEY);
     if (value != null) {

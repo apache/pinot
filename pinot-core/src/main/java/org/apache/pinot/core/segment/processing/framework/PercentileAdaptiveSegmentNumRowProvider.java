@@ -27,67 +27,65 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Percentile-based adaptive segment num row provider that handles heterogeneous data with
- * high variance in row sizes. Unlike {@link AdaptiveSegmentNumRowProvider} which uses a simple
- * moving average, this provider uses reservoir sampling to maintain a representative sample
- * of observed bytes-per-row values and calculates row counts based on a configurable percentile.
- *
- * <p>This is especially useful for tables where different subsets of data have vastly different
- * sizes, such as:</p>
- * <ul>
- *   <li>Multi-tenant tables where some customers have large Theta sketches and others have small ones</li>
- *   <li>Tables with variable-length text where some rows have huge documents</li>
- *   <li>Tables with optional binary fields that may or may not be populated</li>
- * </ul>
- *
- * <h3>Algorithm:</h3>
- * <ol>
- *   <li>Maintains a reservoir of up to N observed bytes-per-row values using reservoir sampling</li>
- *   <li>After each segment is created, adds the measured bytes-per-row to the reservoir</li>
- *   <li>Calculates the configured percentile (e.g., P75, P90) from the reservoir</li>
- *   <li>Uses the percentile value to calculate the next segment's row count</li>
- *   <li>Using a higher percentile (e.g., P75 or P90) biases toward creating smaller segments,
- *       which is safer for heterogeneous data</li>
- * </ol>
- *
- * <h3>Why Percentiles vs Mean:</h3>
- * <ul>
- *   <li><b>Robustness:</b> Percentiles are resistant to outliers</li>
- *   <li><b>Safety:</b> Using P75 means 75% of segments will be smaller than target, preventing oversized segments</li>
- *   <li><b>Predictability:</b> More stable estimates when data has high variance</li>
- * </ul>
- *
- * <h3>Configuration:</h3>
- * <ul>
- *   <li><b>desiredSegmentSizeBytes:</b> Target segment size in bytes (e.g., 200MB)</li>
- *   <li><b>maxNumRecordsPerSegment:</b> Hard ceiling on rows per segment</li>
- *   <li><b>percentile:</b> Which percentile to use (0-100); recommended: 75 or 90</li>
- *   <li><b>reservoirSize:</b> Number of observations to keep (default: 1000)</li>
- * </ul>
- *
- * <h3>Example Configuration:</h3>
- * <pre>
- * {
- *   "desiredSegmentSizeBytes": "209715200",  // 200MB
- *   "maxNumRecordsPerSegment": "2000000",    // 2M rows ceiling
- *   "segmentSizingStrategy": "PERCENTILE",
- *   "sizingPercentile": "75"                 // Use P75
- * }
- * </pre>
- *
- * <h3>Percentile Selection Guide:</h3>
- * <ul>
- *   <li><b>P75 (recommended):</b> Balanced approach, 75% of segments under target</li>
- *   <li><b>P90:</b> More conservative, prevents most oversized segments but may create smaller segments</li>
- *   <li><b>P50 (median):</b> Half over, half under - only use if you're okay with 50% oversized segments</li>
- * </ul>
- *
- * <h3>Thread Safety:</h3>
- * This class is NOT thread-safe. It should be used by a single thread during segment processing.
- *
- * @see AdaptiveSegmentNumRowProvider for simpler EMA-based approach suitable for homogeneous data
- */
+/// Percentile-based adaptive segment num row provider that handles heterogeneous data with
+/// high variance in row sizes. Unlike {@link AdaptiveSegmentNumRowProvider} which uses a simple
+/// moving average, this provider uses reservoir sampling to maintain a representative sample
+/// of observed bytes-per-row values and calculates row counts based on a configurable percentile.
+///
+/// <p>This is especially useful for tables where different subsets of data have vastly different
+/// sizes, such as:</p>
+/// <ul>
+///   <li>Multi-tenant tables where some customers have large Theta sketches and others have small ones</li>
+///   <li>Tables with variable-length text where some rows have huge documents</li>
+///   <li>Tables with optional binary fields that may or may not be populated</li>
+/// </ul>
+///
+/// <h3>Algorithm:</h3>
+/// <ol>
+///   <li>Maintains a reservoir of up to N observed bytes-per-row values using reservoir sampling</li>
+///   <li>After each segment is created, adds the measured bytes-per-row to the reservoir</li>
+///   <li>Calculates the configured percentile (e.g., P75, P90) from the reservoir</li>
+///   <li>Uses the percentile value to calculate the next segment's row count</li>
+///   <li>Using a higher percentile (e.g., P75 or P90) biases toward creating smaller segments,
+///       which is safer for heterogeneous data</li>
+/// </ol>
+///
+/// <h3>Why Percentiles vs Mean:</h3>
+/// <ul>
+///   <li><b>Robustness:</b> Percentiles are resistant to outliers</li>
+///   <li><b>Safety:</b> Using P75 means 75% of segments will be smaller than target, preventing oversized segments</li>
+///   <li><b>Predictability:</b> More stable estimates when data has high variance</li>
+/// </ul>
+///
+/// <h3>Configuration:</h3>
+/// <ul>
+///   <li><b>desiredSegmentSizeBytes:</b> Target segment size in bytes (e.g., 200MB)</li>
+///   <li><b>maxNumRecordsPerSegment:</b> Hard ceiling on rows per segment</li>
+///   <li><b>percentile:</b> Which percentile to use (0-100); recommended: 75 or 90</li>
+///   <li><b>reservoirSize:</b> Number of observations to keep (default: 1000)</li>
+/// </ul>
+///
+/// <h3>Example Configuration:</h3>
+/// <pre>
+/// {
+///   "desiredSegmentSizeBytes": "209715200",  // 200MB
+///   "maxNumRecordsPerSegment": "2000000",    // 2M rows ceiling
+///   "segmentSizingStrategy": "PERCENTILE",
+///   "sizingPercentile": "75"                 // Use P75
+/// }
+/// </pre>
+///
+/// <h3>Percentile Selection Guide:</h3>
+/// <ul>
+///   <li><b>P75 (recommended):</b> Balanced approach, 75% of segments under target</li>
+///   <li><b>P90:</b> More conservative, prevents most oversized segments but may create smaller segments</li>
+///   <li><b>P50 (median):</b> Half over, half under - only use if you're okay with 50% oversized segments</li>
+/// </ul>
+///
+/// <h3>Thread Safety:</h3>
+/// This class is NOT thread-safe. It should be used by a single thread during segment processing.
+///
+/// @see AdaptiveSegmentNumRowProvider for simpler EMA-based approach suitable for homogeneous data
 public class PercentileAdaptiveSegmentNumRowProvider implements SegmentNumRowProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(PercentileAdaptiveSegmentNumRowProvider.class);
 
@@ -119,39 +117,33 @@ public class PercentileAdaptiveSegmentNumRowProvider implements SegmentNumRowPro
   private long _totalBytesProcessed;
   private long _totalRowsProcessed;
 
-  /**
-   * Creates a PercentileAdaptiveSegmentNumRowProvider with default parameters.
-   *
-   * @param desiredSegmentSizeBytes target segment size in bytes (must be positive)
-   * @param maxNumRecordsPerSegment maximum rows per segment (must be positive)
-   */
+  /// Creates a PercentileAdaptiveSegmentNumRowProvider with default parameters.
+  ///
+  /// @param desiredSegmentSizeBytes target segment size in bytes (must be positive)
+  /// @param maxNumRecordsPerSegment maximum rows per segment (must be positive)
   public PercentileAdaptiveSegmentNumRowProvider(long desiredSegmentSizeBytes, int maxNumRecordsPerSegment) {
     this(desiredSegmentSizeBytes, maxNumRecordsPerSegment, DEFAULT_PERCENTILE, DEFAULT_RESERVOIR_SIZE,
         DEFAULT_INITIAL_BYTES_PER_ROW);
   }
 
-  /**
-   * Creates a PercentileAdaptiveSegmentNumRowProvider with custom percentile.
-   *
-   * @param desiredSegmentSizeBytes target segment size in bytes (must be positive)
-   * @param maxNumRecordsPerSegment maximum rows per segment (must be positive)
-   * @param percentile percentile to use (1-99); recommended: 75 or 90
-   */
+  /// Creates a PercentileAdaptiveSegmentNumRowProvider with custom percentile.
+  ///
+  /// @param desiredSegmentSizeBytes target segment size in bytes (must be positive)
+  /// @param maxNumRecordsPerSegment maximum rows per segment (must be positive)
+  /// @param percentile percentile to use (1-99); recommended: 75 or 90
   public PercentileAdaptiveSegmentNumRowProvider(long desiredSegmentSizeBytes, int maxNumRecordsPerSegment,
       int percentile) {
     this(desiredSegmentSizeBytes, maxNumRecordsPerSegment, percentile, DEFAULT_RESERVOIR_SIZE,
         DEFAULT_INITIAL_BYTES_PER_ROW);
   }
 
-  /**
-   * Creates a PercentileAdaptiveSegmentNumRowProvider with full customization.
-   *
-   * @param desiredSegmentSizeBytes target segment size in bytes (must be positive)
-   * @param maxNumRecordsPerSegment maximum rows per segment (must be positive)
-   * @param percentile percentile to use (1-99)
-   * @param reservoirSize number of observations to maintain (must be positive)
-   * @param initialBytesPerRowEstimate starting estimate before sufficient observations (must be positive)
-   */
+  /// Creates a PercentileAdaptiveSegmentNumRowProvider with full customization.
+  ///
+  /// @param desiredSegmentSizeBytes target segment size in bytes (must be positive)
+  /// @param maxNumRecordsPerSegment maximum rows per segment (must be positive)
+  /// @param percentile percentile to use (1-99)
+  /// @param reservoirSize number of observations to maintain (must be positive)
+  /// @param initialBytesPerRowEstimate starting estimate before sufficient observations (must be positive)
   public PercentileAdaptiveSegmentNumRowProvider(long desiredSegmentSizeBytes, int maxNumRecordsPerSegment,
       int percentile, int reservoirSize, double initialBytesPerRowEstimate) {
     Preconditions.checkArgument(desiredSegmentSizeBytes > 0,
@@ -221,12 +213,10 @@ public class PercentileAdaptiveSegmentNumRowProvider implements SegmentNumRowPro
         _reservoir.size(), _reservoirSize, previousRowCount, _currentRowCount);
   }
 
-  /**
-   * Updates the reservoir with a new observation using the reservoir sampling algorithm.
-   * This ensures uniform probability for all observations while maintaining fixed memory usage.
-   *
-   * @param bytesPerRow the new observation to potentially add to reservoir
-   */
+  /// Updates the reservoir with a new observation using the reservoir sampling algorithm.
+  /// This ensures uniform probability for all observations while maintaining fixed memory usage.
+  ///
+  /// @param bytesPerRow the new observation to potentially add to reservoir
   private void updateReservoir(long bytesPerRow) {
     if (_reservoir.size() < _reservoirSize) {
       // Reservoir not full yet, just add
@@ -241,11 +231,9 @@ public class PercentileAdaptiveSegmentNumRowProvider implements SegmentNumRowPro
     }
   }
 
-  /**
-   * Calculates the number of rows for the next segment based on the current percentile estimate.
-   *
-   * @return number of rows, guaranteed to be between MIN_ROWS_PER_SEGMENT and maxNumRecordsPerSegment
-   */
+  /// Calculates the number of rows for the next segment based on the current percentile estimate.
+  ///
+  /// @return number of rows, guaranteed to be between MIN_ROWS_PER_SEGMENT and maxNumRecordsPerSegment
   private int calculateRowCount() {
     double bytesPerRowEstimate = getPercentileBytesPerRow();
     int calculatedRows = (int) (_desiredSegmentSizeBytes / bytesPerRowEstimate);
@@ -257,12 +245,10 @@ public class PercentileAdaptiveSegmentNumRowProvider implements SegmentNumRowPro
     return boundedRows;
   }
 
-  /**
-   * Calculates the configured percentile from the reservoir.
-   * If insufficient observations, returns the initial estimate.
-   *
-   * @return the percentile bytes-per-row value
-   */
+  /// Calculates the configured percentile from the reservoir.
+  /// If insufficient observations, returns the initial estimate.
+  ///
+  /// @return the percentile bytes-per-row value
   private double getPercentileBytesPerRow() {
     if (_reservoir.size() < MIN_OBSERVATIONS_FOR_PERCENTILE) {
       // Not enough observations yet, use initial estimate
@@ -280,47 +266,37 @@ public class PercentileAdaptiveSegmentNumRowProvider implements SegmentNumRowPro
     return sorted.get(index).doubleValue();
   }
 
-  /**
-   * Gets the current percentile bytes per row estimate.
-   *
-   * @return current percentile estimate
-   */
+  /// Gets the current percentile bytes per row estimate.
+  ///
+  /// @return current percentile estimate
   public double getPercentileEstimate() {
     return getPercentileBytesPerRow();
   }
 
-  /**
-   * Gets the number of segments processed so far.
-   *
-   * @return segment count
-   */
+  /// Gets the number of segments processed so far.
+  ///
+  /// @return segment count
   public int getSegmentsProcessed() {
     return _observationCount;
   }
 
-  /**
-   * Gets the overall average bytes per row across all processed segments.
-   *
-   * @return average bytes per row, or 0 if no segments processed
-   */
+  /// Gets the overall average bytes per row across all processed segments.
+  ///
+  /// @return average bytes per row, or 0 if no segments processed
   public double getOverallAverageBytesPerRow() {
     return _totalRowsProcessed > 0 ? (double) _totalBytesProcessed / _totalRowsProcessed : 0.0;
   }
 
-  /**
-   * Gets the current reservoir size.
-   *
-   * @return number of observations currently in reservoir
-   */
+  /// Gets the current reservoir size.
+  ///
+  /// @return number of observations currently in reservoir
   public int getReservoirCurrentSize() {
     return _reservoir.size();
   }
 
-  /**
-   * Gets statistics about the adaptation process.
-   *
-   * @return human-readable statistics string
-   */
+  /// Gets statistics about the adaptation process.
+  ///
+  /// @return human-readable statistics string
   public String getStatistics() {
     return String.format(
         "PercentileAdaptiveSegmentNumRowProvider Stats: segments=%d, P%d=%.2f bytes/row, "
@@ -331,11 +307,9 @@ public class PercentileAdaptiveSegmentNumRowProvider implements SegmentNumRowPro
         _totalRowsProcessed, _totalBytesProcessed / (1024 * 1024));
   }
 
-  /**
-   * Gets the minimum, median, and maximum values from the reservoir for debugging.
-   *
-   * @return string with min/median/max statistics, or empty string if insufficient data
-   */
+  /// Gets the minimum, median, and maximum values from the reservoir for debugging.
+  ///
+  /// @return string with min/median/max statistics, or empty string if insufficient data
   public String getReservoirStatistics() {
     if (_reservoir.isEmpty()) {
       return "Reservoir empty";

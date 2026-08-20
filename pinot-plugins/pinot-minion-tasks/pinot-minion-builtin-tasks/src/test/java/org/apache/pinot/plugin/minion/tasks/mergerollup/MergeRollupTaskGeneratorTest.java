@@ -636,9 +636,7 @@ public class MergeRollupTaskGeneratorTest {
     checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3, DAILY, "concat", "1d", null, "1000000");
   }
 
-  /**
-   * Test max segment size bytes per task
-   */
+  /// Test max segment size bytes per task
   @Test
   public void testMaxSegmentSizeBytesPerTask() {
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
@@ -667,14 +665,15 @@ public class MergeRollupTaskGeneratorTest {
     when(mockClusterInfoProvide.getIdealState(OFFLINE_TABLE_NAME)).thenReturn(
         getIdealState(OFFLINE_TABLE_NAME, Lists.newArrayList(segmentName1, segmentName2)));
 
-    // Single task (both segments fit under 100MB limit)
+    // Each segment lands in its own task: 50MB + 60MB would exceed the 100MB cap.
     MergeRollupTaskGenerator generator = new MergeRollupTaskGenerator();
     generator.init(mockClusterInfoProvide);
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
-    assertEquals(pinotTaskConfigs.size(), 1);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat", "1d",
-        null, "1000000");
-    assertEquals(pinotTaskConfigs.get(0).getConfigs().get(MinionConstants.DOWNLOAD_URL_KEY), "download1,download2");
+    assertEquals(pinotTaskConfigs.size(), 2);
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1, DAILY, "concat", "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName2, DAILY, "concat", "1d", null, "1000000");
+    assertEquals(pinotTaskConfigs.get(0).getConfigs().get(MinionConstants.DOWNLOAD_URL_KEY), "download1");
+    assertEquals(pinotTaskConfigs.get(1).getConfigs().get(MinionConstants.DOWNLOAD_URL_KEY), "download2");
 
     // Multiple tasks when segments exceed size limit
     String segmentName3 = "testTable__3";
@@ -692,18 +691,16 @@ public class MergeRollupTaskGeneratorTest {
     when(mockClusterInfoProvide.getIdealState(OFFLINE_TABLE_NAME)).thenReturn(
         getIdealState(OFFLINE_TABLE_NAME, Lists.newArrayList(segmentName1, segmentName2, segmentName3, segmentName4)));
 
-    // With 4 segments @ 50+60+50+60 MB, should create: task1=(seg1+seg2=110MB), task2=(seg3+seg4=110MB)
+    // No two of these segments fit under the cap, so each gets its own task.
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
-    assertEquals(pinotTaskConfigs.size(), 2);
-    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1 + "," + segmentName2, DAILY, "concat", "1d",
-        null, "1000000");
-    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3 + "," + segmentName4, DAILY, "concat", "1d",
-        null, "1000000");
+    assertEquals(pinotTaskConfigs.size(), 4);
+    checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName1, DAILY, "concat", "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName2, DAILY, "concat", "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(2).getConfigs(), segmentName3, DAILY, "concat", "1d", null, "1000000");
+    checkPinotTaskConfig(pinotTaskConfigs.get(3).getConfigs(), segmentName4, DAILY, "concat", "1d", null, "1000000");
   }
 
-  /**
-   * Test backwards compatibility: when maxSegmentSizeBytesPerTask is not set, fall back to row-based grouping
-   */
+  /// Test backwards compatibility: when maxSegmentSizeBytesPerTask is not set, fall back to row-based grouping
   @Test
   public void testBackwardsCompatibilityWithRowBasedGrouping() {
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();

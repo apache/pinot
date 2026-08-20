@@ -161,25 +161,23 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
     return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, updateMap);
   }
 
-  /**
-   * Creates the appropriate SegmentNumRowProvider based on the task configuration for merge rollup tasks.
-   * <p>
-   * This method enables adaptive segment sizing by examining the task configuration and creating
-   * the corresponding provider:
-   * <ul>
-   *   <li>If desiredSegmentSizeBytes is not configured: uses DefaultSegmentNumRowProvider (static sizing)</li>
-   *   <li>If ADAPTIVE strategy: uses AdaptiveSegmentNumRowProvider with EMA-based learning</li>
-   *   <li>If PERCENTILE strategy: uses PercentileAdaptiveSegmentNumRowProvider for heterogeneous data</li>
-   *   <li>If DEFAULT strategy: uses DefaultSegmentNumRowProvider even if size configured</li>
-   * </ul>
-   *
-   * <p>Similar to how eraseDimensionValues is handled, this reads directly from the task config map
-   * rather than going through SegmentConfig, since it's specific to MergeRollupTask.</p>
-   *
-   * @param taskConfig the task configuration map
-   * @param segmentConfig the segment configuration (used for maxNumRecordsPerSegment)
-   * @return the appropriate SegmentNumRowProvider instance
-   */
+  /// Creates the appropriate SegmentNumRowProvider based on the task configuration for merge rollup tasks.
+  /// <p>
+  /// This method enables adaptive segment sizing by examining the task configuration and creating
+  /// the corresponding provider:
+  /// <ul>
+  ///   <li>If desiredSegmentSizeBytes is not configured: uses DefaultSegmentNumRowProvider (static sizing)</li>
+  ///   <li>If ADAPTIVE strategy: uses AdaptiveSegmentNumRowProvider with EMA-based learning</li>
+  ///   <li>If PERCENTILE strategy: uses PercentileAdaptiveSegmentNumRowProvider for heterogeneous data</li>
+  ///   <li>If DEFAULT strategy: uses DefaultSegmentNumRowProvider even if size configured</li>
+  /// </ul>
+  ///
+  /// <p>Similar to how eraseDimensionValues is handled, this reads directly from the task config map
+  /// rather than going through SegmentConfig, since it's specific to MergeRollupTask.</p>
+  ///
+  /// @param taskConfig the task configuration map
+  /// @param segmentConfig the segment configuration (used for maxNumRecordsPerSegment)
+  /// @return the appropriate SegmentNumRowProvider instance
   private static SegmentNumRowProvider createSegmentNumRowProvider(Map<String, String> taskConfig,
       SegmentConfig segmentConfig) {
     int maxNumRecordsPerSegment = segmentConfig.getMaxNumRecordsPerSegment();

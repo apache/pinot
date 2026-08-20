@@ -23,49 +23,47 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Adaptive segment num row provider that dynamically adjusts the number of rows per segment
- * based on actual segment sizes observed during segment generation. This provider uses an
- * Exponential Moving Average (EMA) to learn from each segment's actual size and continuously
- * refine the estimate of bytes per row.
- *
- * <p>This is particularly useful for tables with variable-sized columns (e.g., Theta sketches,
- * large text fields, or binary data) where the number of rows alone is not a reliable indicator
- * of segment size.</p>
- *
- * <h3>Algorithm:</h3>
- * <ol>
- *   <li>Starts with a conservative initial estimate of bytes per row</li>
- *   <li>After each segment is created, observes the actual segment size and row count</li>
- *   <li>Updates the bytes-per-row estimate using EMA:
- *       <code>estimate = α * measured + (1-α) * estimate</code></li>
- *   <li>Calculates the next segment's row count as:
- *       <code>desiredSegmentSize / estimatedBytesPerRow</code></li>
- *   <li>Applies the configured maximum row limit as a ceiling</li>
- * </ol>
- *
- * <h3>Configuration:</h3>
- * <ul>
- *   <li><b>desiredSegmentSizeBytes:</b> Target segment size in bytes (e.g., 200MB)</li>
- *   <li><b>maxNumRecordsPerSegment:</b> Hard ceiling on rows per segment (safety limit)</li>
- *   <li><b>learningRate:</b> EMA alpha parameter (0-1); higher = faster adaptation to changes</li>
- *   <li><b>initialBytesPerRowEstimate:</b> Conservative starting estimate</li>
- * </ul>
- *
- * <h3>Example Configuration:</h3>
- * <pre>
- * {
- *   "desiredSegmentSizeBytes": "209715200",  // 200MB
- *   "maxNumRecordsPerSegment": "2000000",    // 2M rows ceiling
- *   "segmentSizingStrategy": "ADAPTIVE"
- * }
- * </pre>
- *
- * <h3>Thread Safety:</h3>
- * This class is NOT thread-safe. It should be used by a single thread during segment processing.
- *
- * @see PercentileAdaptiveSegmentNumRowProvider for handling heterogeneous data with high variance
- */
+/// Adaptive segment num row provider that dynamically adjusts the number of rows per segment
+/// based on actual segment sizes observed during segment generation. This provider uses an
+/// Exponential Moving Average (EMA) to learn from each segment's actual size and continuously
+/// refine the estimate of bytes per row.
+///
+/// <p>This is particularly useful for tables with variable-sized columns (e.g., Theta sketches,
+/// large text fields, or binary data) where the number of rows alone is not a reliable indicator
+/// of segment size.</p>
+///
+/// <h3>Algorithm:</h3>
+/// <ol>
+///   <li>Starts with a conservative initial estimate of bytes per row</li>
+///   <li>After each segment is created, observes the actual segment size and row count</li>
+///   <li>Updates the bytes-per-row estimate using EMA:
+///       <code>estimate = α * measured + (1-α) * estimate</code></li>
+///   <li>Calculates the next segment's row count as:
+///       <code>desiredSegmentSize / estimatedBytesPerRow</code></li>
+///   <li>Applies the configured maximum row limit as a ceiling</li>
+/// </ol>
+///
+/// <h3>Configuration:</h3>
+/// <ul>
+///   <li><b>desiredSegmentSizeBytes:</b> Target segment size in bytes (e.g., 200MB)</li>
+///   <li><b>maxNumRecordsPerSegment:</b> Hard ceiling on rows per segment (safety limit)</li>
+///   <li><b>learningRate:</b> EMA alpha parameter (0-1); higher = faster adaptation to changes</li>
+///   <li><b>initialBytesPerRowEstimate:</b> Conservative starting estimate</li>
+/// </ul>
+///
+/// <h3>Example Configuration:</h3>
+/// <pre>
+/// {
+///   "desiredSegmentSizeBytes": "209715200",  // 200MB
+///   "maxNumRecordsPerSegment": "2000000",    // 2M rows ceiling
+///   "segmentSizingStrategy": "ADAPTIVE"
+/// }
+/// </pre>
+///
+/// <h3>Thread Safety:</h3>
+/// This class is NOT thread-safe. It should be used by a single thread during segment processing.
+///
+/// @see PercentileAdaptiveSegmentNumRowProvider for handling heterogeneous data with high variance
 public class AdaptiveSegmentNumRowProvider implements SegmentNumRowProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(AdaptiveSegmentNumRowProvider.class);
 
@@ -88,24 +86,20 @@ public class AdaptiveSegmentNumRowProvider implements SegmentNumRowProvider {
   private long _totalBytesProcessed;
   private long _totalRowsProcessed;
 
-  /**
-   * Creates an AdaptiveSegmentNumRowProvider with default learning rate and initial estimate.
-   *
-   * @param desiredSegmentSizeBytes target segment size in bytes (must be positive)
-   * @param maxNumRecordsPerSegment maximum rows per segment (must be positive)
-   */
+  /// Creates an AdaptiveSegmentNumRowProvider with default learning rate and initial estimate.
+  ///
+  /// @param desiredSegmentSizeBytes target segment size in bytes (must be positive)
+  /// @param maxNumRecordsPerSegment maximum rows per segment (must be positive)
   public AdaptiveSegmentNumRowProvider(long desiredSegmentSizeBytes, int maxNumRecordsPerSegment) {
     this(desiredSegmentSizeBytes, maxNumRecordsPerSegment, DEFAULT_LEARNING_RATE, DEFAULT_INITIAL_BYTES_PER_ROW);
   }
 
-  /**
-   * Creates an AdaptiveSegmentNumRowProvider with custom parameters.
-   *
-   * @param desiredSegmentSizeBytes target segment size in bytes (must be positive)
-   * @param maxNumRecordsPerSegment maximum rows per segment (must be positive)
-   * @param learningRate EMA alpha parameter (0.0 to 1.0); higher values adapt faster
-   * @param initialBytesPerRowEstimate starting estimate of bytes per row (must be positive)
-   */
+  /// Creates an AdaptiveSegmentNumRowProvider with custom parameters.
+  ///
+  /// @param desiredSegmentSizeBytes target segment size in bytes (must be positive)
+  /// @param maxNumRecordsPerSegment maximum rows per segment (must be positive)
+  /// @param learningRate EMA alpha parameter (0.0 to 1.0); higher values adapt faster
+  /// @param initialBytesPerRowEstimate starting estimate of bytes per row (must be positive)
   public AdaptiveSegmentNumRowProvider(long desiredSegmentSizeBytes, int maxNumRecordsPerSegment,
       double learningRate, double initialBytesPerRowEstimate) {
     Preconditions.checkArgument(desiredSegmentSizeBytes > 0,
@@ -169,11 +163,9 @@ public class AdaptiveSegmentNumRowProvider implements SegmentNumRowProvider {
         String.format("%.2f", _estimatedBytesPerRow), previousRowCount, _currentRowCount);
   }
 
-  /**
-   * Calculates the number of rows for the next segment based on current estimate.
-   *
-   * @return number of rows, guaranteed to be between MIN_ROWS_PER_SEGMENT and maxNumRecordsPerSegment
-   */
+  /// Calculates the number of rows for the next segment based on current estimate.
+  ///
+  /// @return number of rows, guaranteed to be between MIN_ROWS_PER_SEGMENT and maxNumRecordsPerSegment
   private int calculateRowCount() {
     int calculatedRows = (int) (_desiredSegmentSizeBytes / _estimatedBytesPerRow);
 
@@ -184,38 +176,30 @@ public class AdaptiveSegmentNumRowProvider implements SegmentNumRowProvider {
     return boundedRows;
   }
 
-  /**
-   * Gets the current estimated bytes per row.
-   *
-   * @return current estimate of bytes per row
-   */
+  /// Gets the current estimated bytes per row.
+  ///
+  /// @return current estimate of bytes per row
   public double getEstimatedBytesPerRow() {
     return _estimatedBytesPerRow;
   }
 
-  /**
-   * Gets the number of segments processed so far.
-   *
-   * @return segment count
-   */
+  /// Gets the number of segments processed so far.
+  ///
+  /// @return segment count
   public int getSegmentsProcessed() {
     return _segmentsProcessed;
   }
 
-  /**
-   * Gets the overall average bytes per row across all processed segments.
-   *
-   * @return average bytes per row, or 0 if no segments processed
-   */
+  /// Gets the overall average bytes per row across all processed segments.
+  ///
+  /// @return average bytes per row, or 0 if no segments processed
   public double getOverallAverageBytesPerRow() {
     return _totalRowsProcessed > 0 ? (double) _totalBytesProcessed / _totalRowsProcessed : 0.0;
   }
 
-  /**
-   * Gets statistics about the adaptation process.
-   *
-   * @return human-readable statistics string
-   */
+  /// Gets statistics about the adaptation process.
+  ///
+  /// @return human-readable statistics string
   public String getStatistics() {
     return String.format(
         "AdaptiveSegmentNumRowProvider Stats: segments=%d, currentEstimate=%.2f bytes/row, "

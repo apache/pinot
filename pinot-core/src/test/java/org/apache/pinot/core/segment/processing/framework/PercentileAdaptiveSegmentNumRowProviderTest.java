@@ -25,9 +25,7 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for PercentileAdaptiveSegmentNumRowProvider
- */
+/// Unit tests for PercentileAdaptiveSegmentNumRowProvider
 public class PercentileAdaptiveSegmentNumRowProviderTest {
 
   @Test

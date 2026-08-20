@@ -25,9 +25,7 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for AdaptiveSegmentNumRowProvider
- */
+/// Unit tests for AdaptiveSegmentNumRowProvider
 public class AdaptiveSegmentNumRowProviderTest {
 
   @Test
