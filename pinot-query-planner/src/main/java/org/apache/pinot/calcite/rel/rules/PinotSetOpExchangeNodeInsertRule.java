@@ -26,6 +26,7 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.SetOp;
+import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.hint.Hintable;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.ImmutableIntList;
@@ -53,13 +54,27 @@ public class PinotSetOpExchangeNodeInsertRule extends RelOptRule {
     SetOp setOp = call.rel(0);
     List<RelNode> inputs = setOp.getInputs();
     // When the colocation hint is set, force a pre-partitioned (direct, no-shuffle) exchange on every input; otherwise
-    // leave it null so the planner auto-detects pre-partitioning from the inputs' distribution. See
+    // leave it null so the planner auto-detects pre-partitioning from the inputs' distribution. On a UNION ALL only
+    // 'false' has an effect, because its inputs already get a local exchange either way. See
     // PinotHintOptions.SetOpHintOptions.IS_COLOCATED_BY_SET_OP_KEYS for the correctness contract.
     Boolean prePartitioned = resolveColocationHint(setOp);
+    // UNION ALL only concatenates its inputs, so any row-to-worker mapping produces correct results and no
+    // redistribution is required. Use a local (SINGLETON) exchange so the union stage inherits its inputs' worker
+    // assignment and the rows are handed over in place, with no shuffle and no network hop when sender and receiver
+    // land on the same server.
+    // The projected columns are still attached as keys. They are unused while the exchange stays local, but they let
+    // the mailbox layer promote it to a real HASH distribution when the inputs do not resolve to the same workers --
+    // the same idiom PinotJoinExchangeNodeInsertRule uses for distribution_type='local'. Keeping keys also means a
+    // UNION ALL input is never a KEYLESS local exchange, so the "local exchange with parallelism requires keys"
+    // guard continues to protect the colocated semi-join build side untouched.
+    // An explicit is_colocated_by_set_op_keys='false' hint opts out and restores the full-row shuffle.
+    List<Integer> keys = ImmutableIntList.range(0, setOp.getRowType().getFieldCount());
+    boolean useLocalExchange = setOp instanceof Union && ((Union) setOp).all && !Boolean.FALSE.equals(prePartitioned);
     List<RelNode> newInputs = new ArrayList<>(inputs.size());
     for (RelNode input : inputs) {
-      RelNode exchange = PinotLogicalExchange.create(input,
-          RelDistributions.hash(ImmutableIntList.range(0, setOp.getRowType().getFieldCount())), prePartitioned);
+      RelNode exchange = useLocalExchange
+          ? PinotLogicalExchange.create(input, RelDistributions.SINGLETON, keys, null)
+          : PinotLogicalExchange.create(input, RelDistributions.hash(keys), prePartitioned);
       newInputs.add(exchange);
     }
     call.transformTo(setOp.copy(setOp.getTraitSet(), newInputs));
