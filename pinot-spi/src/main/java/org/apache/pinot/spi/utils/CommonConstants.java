@@ -785,6 +785,17 @@ public class CommonConstants {
         public static final String MIN_BROKER_GROUP_TRIM_SIZE = "minBrokerGroupTrimSize";
         public static final String MSE_MIN_GROUP_TRIM_SIZE = "mseMinGroupTrimSize";
 
+        /// For GROUP BY GROUPING SETS / ROLLUP / CUBE using base aggregation (see
+        /// [#GROUPING_SETS_BASE_AGGREGATION]) WITH an ORDER BY: after deriving the grouping sets on the server,
+        /// keep at most this many groups WITHIN each grouping set (a per-set top-K bucketed by the $groupingId
+        /// discriminator, so a global top-K can never starve a low-magnitude set such as the grand total). This
+        /// bounds each server's derived output for high-cardinality unions at the cost of an approximate top-K
+        /// (a group ranked below K on one server may still be globally in the top-K once servers merge). The
+        /// broker still applies the final ORDER BY + LIMIT across all sets. Non-positive or unset (default)
+        /// disables the server-side trim, so all derived groups are kept and only the broker trims -- the exact
+        /// (but higher memory/network) policy. Ignored without an ORDER BY.
+        public static final String GROUPING_SETS_SERVER_TRIM_SIZE = "groupingSetsServerTrimSize";
+
         // When safeTrim (ORDER BY groupKeys without HAVING clause), do sort aggregate when LIMIT is below this value
         public static final String SORT_AGGREGATE_LIMIT_THRESHOLD = "sortAggregateLimitThreshold";
 
