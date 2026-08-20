@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.segment.local.startree.v2.builder;
 
+import org.apache.pinot.segment.local.startree.v2.builder.OffHeapSingleTreeBuilder.FixedSizeRecordOffsets;
 import org.apache.pinot.segment.local.startree.v2.builder.OffHeapSingleTreeBuilder.RecordOffsets;
+import org.apache.pinot.segment.local.startree.v2.builder.OffHeapSingleTreeBuilder.VariableSizeRecordOffsets;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -27,8 +29,20 @@ import static org.testng.Assert.assertEquals;
 public class OffHeapSingleTreeBuilderTest {
 
   @Test
-  public void testRecordOffsets() {
-    RecordOffsets offsets = new RecordOffsets();
+  public void testFixedSizeRecordOffsets() {
+    RecordOffsets offsets = new FixedSizeRecordOffsets(1 << 30);
+    for (int i = 0; i < 4; i++) {
+      offsets.addRecord(1 << 30);
+    }
+    assertEquals(offsets.getStartOffset(0), 0L);
+    assertEquals(offsets.getStartOffset(1), 1L << 30);
+    assertEquals(offsets.getStartOffset(3), 3L << 30);
+    assertEquals(offsets.getEndOffset(), 1L << 32);
+  }
+
+  @Test
+  public void testVariableSizeRecordOffsets() {
+    RecordOffsets offsets = new VariableSizeRecordOffsets();
     offsets.addRecord(123);
     offsets.addRecord(Integer.MAX_VALUE - 123);
     offsets.addRecord(456);

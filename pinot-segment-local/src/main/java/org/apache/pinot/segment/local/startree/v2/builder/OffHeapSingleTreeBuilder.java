@@ -47,7 +47,7 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   private final File _segmentRecordFile;
   private final File _starTreeRecordFile;
   private final BufferedOutputStream _starTreeRecordOutputStream;
-  private final RecordOffsets _starTreeRecordOffsets = new RecordOffsets();
+  private final RecordOffsets _starTreeRecordOffsets;
 
   private PinotDataBuffer _starTreeRecordBuffer;
   private int _numReadableStarTreeRecords;
@@ -63,6 +63,27 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
     Preconditions.checkState(!_starTreeRecordFile.exists(), "Star-tree record file: %s already exists",
         _starTreeRecordFile);
     _starTreeRecordOutputStream = new BufferedOutputStream(new FileOutputStream(_starTreeRecordFile));
+    _starTreeRecordOffsets = createRecordOffsets();
+  }
+
+  /// Returns [FixedSizeRecordOffsets] when all metrics are serialized with a fixed size (see
+  /// [#serializeStarTreeRecord]), where the record start offsets can be computed arithmetically without being stored;
+  /// otherwise returns [VariableSizeRecordOffsets].
+  private RecordOffsets createRecordOffsets() {
+    int recordSize = _numDimensions * Integer.BYTES;
+    for (int i = 0; i < _numMetrics; i++) {
+      switch (_valueAggregators[i].getAggregatedValueType()) {
+        case LONG:
+          recordSize += Long.BYTES;
+          break;
+        case DOUBLE:
+          recordSize += Double.BYTES;
+          break;
+        default:
+          return new VariableSizeRecordOffsets();
+      }
+    }
+    return new FixedSizeRecordOffsets(recordSize);
   }
 
   @SuppressWarnings("unchecked")
@@ -339,18 +360,58 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
     FileUtils.forceDelete(_starTreeRecordFile);
   }
 
-  /// Memory-efficient list of record offsets within the star-tree record file, tracked as a prefix sum of the appended
-  /// record lengths. Start offsets are stored as `int` (4 bytes per record) until the first record starting beyond
-  /// `Integer.MAX_VALUE`, and as `long` (8 bytes per record) afterwards. The number of star-tree records can go into
-  /// the hundreds of millions for large segments, where a boxed `List<Long>` (~28 bytes per record) would dominate the
-  /// heap.
+  /// Per-record offsets within the star-tree record file. [#addRecord] is invoked once per appended record with the
+  /// serialized record length; [#getStartOffset] and [#getEndOffset] return absolute offsets within the file.
   @VisibleForTesting
-  static class RecordOffsets {
+  interface RecordOffsets {
+
+    void addRecord(int numBytes);
+
+    long getStartOffset(int index);
+
+    long getEndOffset();
+  }
+
+  /// [RecordOffsets] for fixed-size records (all metrics serialized with a fixed size), where the offsets are
+  /// computed arithmetically without being stored.
+  @VisibleForTesting
+  static class FixedSizeRecordOffsets implements RecordOffsets {
+    private final int _recordSize;
+    private int _numRecords;
+
+    FixedSizeRecordOffsets(int recordSize) {
+      _recordSize = recordSize;
+    }
+
+    @Override
+    public void addRecord(int numBytes) {
+      assert numBytes == _recordSize;
+      _numRecords++;
+    }
+
+    @Override
+    public long getStartOffset(int index) {
+      return (long) index * _recordSize;
+    }
+
+    @Override
+    public long getEndOffset() {
+      return (long) _numRecords * _recordSize;
+    }
+  }
+
+  /// [RecordOffsets] for variable-size records, tracked as a prefix sum of the appended record lengths. Start offsets
+  /// are stored as `int` (4 bytes per record) until the first record starting beyond `Integer.MAX_VALUE`, and as
+  /// `long` (8 bytes per record) afterwards. The number of star-tree records can go into the hundreds of millions for
+  /// large segments, where a boxed `List<Long>` (~28 bytes per record) would dominate the heap.
+  @VisibleForTesting
+  static class VariableSizeRecordOffsets implements RecordOffsets {
     private final IntArrayList _intOffsets = new IntArrayList();
     private final LongArrayList _longOffsets = new LongArrayList();
     private long _endOffset;
 
-    void addRecord(int numBytes) {
+    @Override
+    public void addRecord(int numBytes) {
       if (_endOffset <= Integer.MAX_VALUE) {
         _intOffsets.add((int) _endOffset);
       } else {
@@ -359,12 +420,14 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
       _endOffset += numBytes;
     }
 
-    long getStartOffset(int index) {
+    @Override
+    public long getStartOffset(int index) {
       int numIntOffsets = _intOffsets.size();
       return index < numIntOffsets ? _intOffsets.getInt(index) : _longOffsets.getLong(index - numIntOffsets);
     }
 
-    long getEndOffset() {
+    @Override
+    public long getEndOffset() {
       return _endOffset;
     }
   }
