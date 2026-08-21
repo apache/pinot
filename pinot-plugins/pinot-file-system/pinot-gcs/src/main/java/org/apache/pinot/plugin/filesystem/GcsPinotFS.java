@@ -403,11 +403,21 @@ public class GcsPinotFS extends BasePinotFS {
       if (blob == null) {
         throw new FileNotFoundException("File '" + uri + "' does not exist");
       }
+      // A zero-length range would make limit == offset, which formats as an invalid HTTP range header; match
+      // LocalPinotFS and return an empty stream. Checked after the existence check so a missing file still throws.
+      if (length == 0) {
+        return InputStream.nullInputStream();
+      }
       // ReadChannel.limit is the absolute, exclusive end position; seek positions the start. This issues a
       // ranged GET so only [offset, offset + length) is transferred (truncated at end-of-file).
+      long endExclusive = offset + length;
+      if (endExclusive < 0) {
+        // Saturate rather than wrap, so a deliberately huge length still means "read to end of file".
+        endExclusive = Long.MAX_VALUE;
+      }
       ReadChannel reader = blob.reader();
       reader.seek(offset);
-      reader.limit(offset + length);
+      reader.limit(endExclusive);
       return Channels.newInputStream(reader);
     } catch (StorageException e) {
       throw new IOException(e);

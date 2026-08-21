@@ -291,7 +291,7 @@ public class LocalPinotFS extends BasePinotFS {
   }
 
   /// Wraps an InputStream to expose at most {@code limit} bytes. Closing this stream propagates to the
-  /// delegate (which releases the underlying file handle).
+  /// delegate (which releases the underlying file handle). Not thread-safe: confine an instance to one thread.
   private static class RangeInputStream extends FilterInputStream {
     private long _remaining;
 
@@ -327,9 +327,29 @@ public class LocalPinotFS extends BasePinotFS {
     }
 
     @Override
+    public long skip(long n)
+        throws IOException {
+      if (n <= 0 || _remaining <= 0) {
+        return 0;
+      }
+      long skipped = in.skip(Math.min(n, _remaining));
+      if (skipped > 0) {
+        _remaining -= skipped;
+      }
+      return skipped;
+    }
+
+    @Override
     public int available()
         throws IOException {
       return (int) Math.min(in.available(), _remaining);
+    }
+
+    /// Not supported: mark/reset would let a caller re-read bytes without {@code _remaining} accounting for them,
+    /// which would expose more than {@code limit} bytes.
+    @Override
+    public boolean markSupported() {
+      return false;
     }
   }
 }

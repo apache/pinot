@@ -373,4 +373,35 @@ public class LocalPinotFSTest {
 
     Assert.assertTrue(rangeFile.delete());
   }
+
+  @Test
+  public void testOpenForReadSkipStaysWithinRange()
+      throws IOException {
+    LocalPinotFS localPinotFS = new LocalPinotFS();
+
+    File rangeFile = new File(_absoluteTmpDirPath, "skipRangeFile");
+    byte[] data = new byte[256];
+    for (int i = 0; i < data.length; i++) {
+      data[i] = (byte) i;
+    }
+    FileUtils.writeByteArrayToFile(rangeFile, data);
+    URI uri = rangeFile.toURI();
+
+    // Skipping must consume the range, not extend it: 5 skipped of [0, 10) leaves 5 readable
+    try (InputStream in = localPinotFS.openForRead(uri, 0, 10)) {
+      Assert.assertEquals(in.skip(5), 5);
+      Assert.assertEquals(in.readAllBytes(), Arrays.copyOfRange(data, 5, 10));
+    }
+    // Skipping beyond the range is capped at the range end
+    try (InputStream in = localPinotFS.openForRead(uri, 10, 20)) {
+      Assert.assertEquals(in.skip(100), 20);
+      Assert.assertEquals(in.readAllBytes().length, 0);
+    }
+    // mark/reset must not be advertised, or a caller could re-read past the bound
+    try (InputStream in = localPinotFS.openForRead(uri, 0, 10)) {
+      Assert.assertFalse(in.markSupported());
+    }
+
+    Assert.assertTrue(rangeFile.delete());
+  }
 }
