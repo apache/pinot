@@ -592,6 +592,12 @@ public class TableRebalancer {
     //
     // NOTE: Monitor the segments to be moved from both the previous round and this round to ensure the moved segments
     //       in the previous round are also converged.
+    // Anchor the per-server disk ceiling to the assignment the rebalance starts from, before the first step runs. The
+    // step loop can recalculate the target assignment, so the ceiling itself is derived per step from this anchor and
+    // the target of that step.
+    DiskUsageBudget diskUsageBudget =
+        lowDiskMode ? DiskUsageBudget.create(currentAssignment, tableSubTypeSizeDetails) : null;
+
     List<String> oldSegmentsToMove = segmentsToMove;
     while (true) {
       boolean segmentsToMoveChanged = oldSegmentsToMove != segmentsToMove;
@@ -710,7 +716,7 @@ public class TableRebalancer {
             nextAssignment =
                 getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
                     lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor,
-                    tableRebalanceLogger);
+                    tableRebalanceLogger, diskUsageBudget);
           } catch (Exception e) {
             String errorMsg =
                 "Caught exception while calculating the next assignment, aborting the rebalance: " + e.getMessage();
@@ -775,7 +781,7 @@ public class TableRebalancer {
         nextAssignment =
             getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
                 lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor,
-                tableRebalanceLogger);
+                tableRebalanceLogger, diskUsageBudget);
       } catch (Exception e) {
         String errorMsg =
             "Caught exception while calculating the next assignment, aborting the rebalance: " + e.getMessage();
@@ -1662,7 +1668,20 @@ public class TableRebalancer {
       boolean lowDiskMode, int batchSizePerServer, Object2IntOpenHashMap<String> segmentPartitionIdMap,
       PartitionIdFetcher partitionIdFetcher, DataLossRiskAssessor dataLossRiskAssessor) {
     return getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
-        lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor, LOGGER);
+        lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor, LOGGER,
+        null);
+  }
+
+  /// Uses the default LOGGER, with an explicit disk usage budget
+  @VisibleForTesting
+  static Map<String, Map<String, String>> getNextAssignment(Map<String, Map<String, String>> currentAssignment,
+      Map<String, Map<String, String>> targetAssignment, int minAvailableReplicas, boolean enableStrictReplicaGroup,
+      boolean lowDiskMode, int batchSizePerServer, Object2IntOpenHashMap<String> segmentPartitionIdMap,
+      PartitionIdFetcher partitionIdFetcher, DataLossRiskAssessor dataLossRiskAssessor,
+      @Nullable DiskUsageBudget diskUsageBudget) {
+    return getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
+        lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor, LOGGER,
+        diskUsageBudget);
   }
 
   /// Returns the next assignment for the table based on the current assignment and the target assignment with regard to
@@ -1687,19 +1706,188 @@ public class TableRebalancer {
   private static Map<String, Map<String, String>> getNextAssignment(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment, int minAvailableReplicas, boolean enableStrictReplicaGroup,
       boolean lowDiskMode, int batchSizePerServer, Object2IntOpenHashMap<String> segmentPartitionIdMap,
-      PartitionIdFetcher partitionIdFetcher, DataLossRiskAssessor dataLossRiskAssessor, Logger tableRebalanceLogger) {
+      PartitionIdFetcher partitionIdFetcher, DataLossRiskAssessor dataLossRiskAssessor, Logger tableRebalanceLogger,
+      @Nullable DiskUsageBudget diskUsageBudget) {
+    if (!lowDiskMode) {
+      return computeNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
+          false, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor,
+          tableRebalanceLogger, null);
+    }
+
+    // We use DiskUsageBudget and StepDiskBudget here to keep track of per-server byte gain/loss and to guarantee the
+    // invariant of lowDiskMode where each server won't get more bytes than its net gain at any intermediate steps.
+    DiskUsageBudget budget =
+        diskUsageBudget != null ? diskUsageBudget : DiskUsageBudget.create(currentAssignment, null);
+    StepDiskBudget stepBudget = budget.forStep(currentAssignment, targetAssignment);
+    Map<String, Map<String, String>> nextAssignment =
+        computeNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup, true,
+            batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor, tableRebalanceLogger,
+            stepBudget);
+    if (!nextAssignment.equals(currentAssignment)) {
+      return nextAssignment;
+    }
+
+    // Can't progress while respecting the budget. This could happen if servers circular wait for others to drop first.
+    tableRebalanceLogger.warn("Cannot make progress in low disk mode without exceeding the disk usage a server "
+            + "started the rebalance with. Allowing the additions for this step, which temporarily increases the disk "
+            + "usage of these servers. Bytes each server could still take on: {}", stepBudget.getRemainingBytes());
+    return computeNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
+        true, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor,
+        tableRebalanceLogger, null);
+  }
+
+  /// @param stepBudget bounds the disk each server may take on in this step, `null` to apply no bound
+  private static Map<String, Map<String, String>> computeNextAssignment(
+      Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
+      int minAvailableReplicas, boolean enableStrictReplicaGroup, boolean lowDiskMode, int batchSizePerServer,
+      Object2IntOpenHashMap<String> segmentPartitionIdMap, PartitionIdFetcher partitionIdFetcher,
+      DataLossRiskAssessor dataLossRiskAssessor, Logger tableRebalanceLogger,
+      @Nullable StepDiskBudget stepBudget) {
     return enableStrictReplicaGroup
         ? getNextStrictReplicaGroupAssignment(currentAssignment, targetAssignment, minAvailableReplicas, lowDiskMode,
-        batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor, tableRebalanceLogger)
+        batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor, tableRebalanceLogger,
+        stepBudget)
         : getNextNonStrictReplicaGroupAssignment(currentAssignment, targetAssignment, minAvailableReplicas,
-            lowDiskMode, batchSizePerServer, dataLossRiskAssessor);
+            lowDiskMode, batchSizePerServer, dataLossRiskAssessor, stepBudget);
+  }
+
+  /// Bounds the disk a server may use while a low disk mode rebalance is in flight.
+  ///
+  /// The ceiling for a server is `max(bytes it hosted when the rebalance started, bytes the target assignment places
+  /// on it)`, so a server whose net change is an increase may grow up to its final size and no further, and a server
+  /// whose net change is a decrease never goes above what it started with. Segments dropped in a step never fund
+  /// additions in that same step, since there is no guarantee that a server processes the drop before the addition.
+  ///
+  /// Anchoring `initialServerBytes` at the start of the rebalance is what makes this a bound rather than a ratchet -
+  /// deriving it from the assignment of the step in progress would let the ceiling climb every time it was exceeded.
+  /// Re-deriving it from a partially rebalanced assignment (a retried rebalance job, say) is still safe, because a
+  /// rebalance that respected the ceiling leaves every server at or below it, so the re-derived ceiling can only be
+  /// tighter.
+  ///
+  /// When no per-segment size is known every segment counts as one byte, which degenerates to bounding the number of
+  /// segments hosted rather than the bytes.
+  @VisibleForTesting
+  static class DiskUsageBudget {
+    private final Map<String, Long> _segmentSizeBytes;
+    private final long _defaultSegmentSizeBytes;
+    private final Map<String, Long> _initialServerBytes;
+
+    private DiskUsageBudget(Map<String, Long> segmentSizeBytes, long defaultSegmentSizeBytes,
+        Map<String, Long> initialServerBytes) {
+      _segmentSizeBytes = segmentSizeBytes;
+      _defaultSegmentSizeBytes = defaultSegmentSizeBytes;
+      _initialServerBytes = initialServerBytes;
+    }
+
+    /// @param initialAssignment the assignment the rebalance starts from, used to anchor the per-server ceiling
+    /// @param tableSizeDetails per-segment sizes, `null` to fall back to counting segments instead of bytes
+    static DiskUsageBudget create(Map<String, Map<String, String>> initialAssignment,
+        @Nullable TableSizeReader.TableSubTypeSizeDetails tableSizeDetails) {
+      Map<String, Long> segmentSizeBytes = new HashMap<>();
+      long totalKnownBytes = 0;
+      if (tableSizeDetails != null) {
+        for (Map.Entry<String, TableSizeReader.SegmentSizeDetails> entry : tableSizeDetails._segments.entrySet()) {
+          // The size a single replica takes up on disk, which is what one server pays for hosting the segment
+          long sizeBytes = entry.getValue()._maxReportedSizePerReplicaInBytes;
+          if (sizeBytes > 0) {
+            segmentSizeBytes.put(entry.getKey(), sizeBytes);
+            totalKnownBytes += sizeBytes;
+          }
+        }
+      }
+      // Segments whose size could not be read (missing from all servers, or still consuming) are charged the average
+      // size of the segments that could be read
+      long defaultSegmentSizeBytes =
+          segmentSizeBytes.isEmpty() ? 1L : Math.max(1L, totalKnownBytes / segmentSizeBytes.size());
+      Map<String, Long> initialServerBytes = new HashMap<>();
+      for (Map.Entry<String, Map<String, String>> entry : initialAssignment.entrySet()) {
+        long sizeBytes = segmentSizeBytes.getOrDefault(entry.getKey(), defaultSegmentSizeBytes);
+        for (String instance : entry.getValue().keySet()) {
+          initialServerBytes.merge(instance, sizeBytes, Long::sum);
+        }
+      }
+      return new DiskUsageBudget(segmentSizeBytes, defaultSegmentSizeBytes, initialServerBytes);
+    }
+
+    long getSegmentSizeBytes(String segmentName) {
+      return _segmentSizeBytes.getOrDefault(segmentName, _defaultSegmentSizeBytes);
+    }
+
+    Map<String, Long> getServerToHostedBytes(Map<String, Map<String, String>> assignment) {
+      Map<String, Long> serverToHostedBytes = new HashMap<>();
+      for (Map.Entry<String, Map<String, String>> entry : assignment.entrySet()) {
+        long sizeBytes = getSegmentSizeBytes(entry.getKey());
+        for (String instance : entry.getValue().keySet()) {
+          serverToHostedBytes.merge(instance, sizeBytes, Long::sum);
+        }
+      }
+      return serverToHostedBytes;
+    }
+
+    /// Returns the bytes each server may still take on in this step, i.e. `ceiling - currently hosted`.
+    StepDiskBudget forStep(Map<String, Map<String, String>> currentAssignment,
+        Map<String, Map<String, String>> targetAssignment) {
+      Map<String, Long> hostedBytes = getServerToHostedBytes(currentAssignment);
+      Map<String, Long> targetBytes = getServerToHostedBytes(targetAssignment);
+      Set<String> servers = new HashSet<>(_initialServerBytes.keySet());
+      servers.addAll(hostedBytes.keySet());
+      servers.addAll(targetBytes.keySet());
+      Map<String, Long> remainingBytes = new HashMap<>();
+      for (String server : servers) {
+        long ceilingBytes =
+            Math.max(_initialServerBytes.getOrDefault(server, 0L), targetBytes.getOrDefault(server, 0L));
+        remainingBytes.put(server, Math.max(0L, ceilingBytes - hostedBytes.getOrDefault(server, 0L)));
+      }
+      return new StepDiskBudget(this, remainingBytes);
+    }
+  }
+
+  /// The [DiskUsageBudget] left for a single rebalance step, drawn down as segments are assigned.
+  @VisibleForTesting
+  static class StepDiskBudget {
+    private final DiskUsageBudget _budget;
+    private final Map<String, Long> _remainingBytes;
+
+    private StepDiskBudget(DiskUsageBudget budget, Map<String, Long> remainingBytes) {
+      _budget = budget;
+      _remainingBytes = remainingBytes;
+    }
+
+    Map<String, Long> getRemainingBytes() {
+      return _remainingBytes;
+    }
+
+    long getSegmentSizeBytes(String segmentName) {
+      return _budget.getSegmentSizeBytes(segmentName);
+    }
+
+    /// Charges every server in `serversAdded` for hosting `segmentName`, and returns whether all of them had the
+    /// space for it. Nothing is charged when any one of them did not, so the segment can be left where it is.
+    boolean tryCharge(Set<String> serversAdded, String segmentName) {
+      return tryCharge(serversAdded, getSegmentSizeBytes(segmentName));
+    }
+
+    /// Charges every server in `serversAdded` `sizeBytes`, and returns whether all of them had the space for it.
+    /// Nothing is charged when any one of them did not, so the segments can be left where they are.
+    boolean tryCharge(Set<String> serversAdded, long sizeBytes) {
+      for (String server : serversAdded) {
+        if (_remainingBytes.getOrDefault(server, 0L) < sizeBytes) {
+          return false;
+        }
+      }
+      for (String server : serversAdded) {
+        _remainingBytes.merge(server, -sizeBytes, Long::sum);
+      }
+      return true;
+    }
   }
 
   private static Map<String, Map<String, String>> getNextStrictReplicaGroupAssignment(
       Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
       int minAvailableReplicas, boolean lowDiskMode, int batchSizePerServer,
       Object2IntOpenHashMap<String> segmentPartitionIdMap, PartitionIdFetcher partitionIdFetcher,
-      DataLossRiskAssessor dataLossRiskAssessor, Logger tableRebalanceLogger) {
+      DataLossRiskAssessor dataLossRiskAssessor, Logger tableRebalanceLogger,
+      @Nullable StepDiskBudget stepBudget) {
     Map<String, Map<String, String>> nextAssignment = new TreeMap<>();
     Map<String, Integer> numSegmentsToOffloadMap = getNumSegmentsToOffloadMap(currentAssignment, targetAssignment);
     Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap = new HashMap<>();
@@ -1710,7 +1898,7 @@ public class TableRebalancer {
       // Directly update the nextAssignment with anyServerExhaustedBatchSize = false and return if batching is disabled
       updateNextAssignmentForPartitionIdStrictReplicaGroup(currentAssignment, targetAssignment, nextAssignment,
           false, minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap,
-          availableInstancesMap, serverToNumSegmentsAddedSoFar, dataLossRiskAssessor);
+          availableInstancesMap, serverToNumSegmentsAddedSoFar, dataLossRiskAssessor, stepBudget);
       return nextAssignment;
     }
 
@@ -1755,7 +1943,7 @@ public class TableRebalancer {
         }
         updateNextAssignmentForPartitionIdStrictReplicaGroup(curAssignment, targetAssignment, nextAssignment,
             anyServerExhaustedBatchSize, minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap,
-            availableInstancesMap, serverToNumSegmentsAddedSoFar, dataLossRiskAssessor);
+            availableInstancesMap, serverToNumSegmentsAddedSoFar, dataLossRiskAssessor, stepBudget);
       }
     }
 
@@ -1770,11 +1958,24 @@ public class TableRebalancer {
       boolean lowDiskMode, Map<String, Integer> numSegmentsToOffloadMap,
       Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap,
       Map<Set<String>, Set<String>> availableInstancesMap, Map<String, Integer> serverToNumSegmentsAddedSoFar,
-      DataLossRiskAssessor dataLossRiskAssessor) {
+      DataLossRiskAssessor dataLossRiskAssessor, @Nullable StepDiskBudget stepBudget) {
     if (anyServerExhaustedBatchSize) {
       // Exhausted the batch size for at least 1 server, just copy over the remaining segments as is
       nextAssignment.putAll(currentAssignment);
     } else {
+      // Total size of each group of segments that share the same current and target instances, needed to charge the
+      // disk budget for a group as a whole. Computed up front so that the first segment of a group already knows how
+      // much space the whole group needs.
+      Map<Pair<Set<String>, Set<String>>, Long> groupToSizeBytes = new HashMap<>();
+      Map<Pair<Set<String>, Set<String>>, Boolean> groupToFitsDisk = new HashMap<>();
+      if (stepBudget != null) {
+        for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
+          groupToSizeBytes.merge(
+              Pair.of(entry.getValue().keySet(), targetAssignment.get(entry.getKey()).keySet()),
+              stepBudget.getSegmentSizeBytes(entry.getKey()), Long::sum);
+        }
+      }
+
       // Process all the partitionIds even if segmentsAddedSoFar becomes larger than batchSizePerServer
       // Can only do bestEfforts w.r.t. StrictReplicaGroup since a whole partition must be moved together for
       // maintaining consistency
@@ -1787,6 +1988,26 @@ public class TableRebalancer {
                 lowDiskMode, numSegmentsToOffloadMap, assignmentMap);
         Set<String> assignedInstances = assignment._instanceStateMap.keySet();
         Set<String> availableInstances = assignment._availableInstances;
+        // Strict replica group routing requires every segment that shares the same current and target instances to
+        // move together, so the disk budget has to be charged for such a group as a whole. The disk budget constraint
+        // makes the entire group either all move or all stay
+        if (stepBudget != null) {
+          Pair<Set<String>, Set<String>> group =
+              Pair.of(currentInstanceStateMap.keySet(), targetInstanceStateMap.keySet());
+          Boolean groupFitsDisk = groupToFitsDisk.get(group);
+          if (groupFitsDisk == null) {
+            Set<String> serversAdded =
+                getServersAddedInSingleSegmentAssignment(currentInstanceStateMap, assignment._instanceStateMap);
+            groupFitsDisk =
+                serversAdded.isEmpty() || stepBudget.tryCharge(serversAdded, groupToSizeBytes.getOrDefault(group, 0L));
+            groupToFitsDisk.put(group, groupFitsDisk);
+          }
+          if (!groupFitsDisk) {
+            // A later step picks the group up once the drops have freed up the space
+            nextAssignment.put(segmentName, currentInstanceStateMap);
+            continue;
+          }
+        }
         availableInstancesMap.compute(assignedInstances, (k, currentAvailableInstances) -> {
           if (currentAvailableInstances == null) {
             // First segment assigned to these instances, use the new assignment and update the available instances
@@ -1998,7 +2219,7 @@ public class TableRebalancer {
   private static Map<String, Map<String, String>> getNextNonStrictReplicaGroupAssignment(
       Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
       int minAvailableReplicas, boolean lowDiskMode, int batchSizePerServer,
-      DataLossRiskAssessor dataLossRiskAssessor) {
+      DataLossRiskAssessor dataLossRiskAssessor, @Nullable StepDiskBudget stepBudget) {
     Map<String, Integer> serverToNumSegmentsAddedSoFar = new HashMap<>();
     Map<String, Map<String, String>> nextAssignment = new TreeMap<>();
     Map<String, Integer> numSegmentsToOffloadMap = getNumSegmentsToOffloadMap(currentAssignment, targetAssignment);
@@ -2021,8 +2242,14 @@ public class TableRebalancer {
           }
         }
       }
-      if (anyServerExhaustedBatchSize) {
-        // Exhausted the batch size for at least 1 server, set to existing assignment
+      // Leave the segment where it is when one of the servers it would be added to cannot take on its size without
+      // going over the disk it started the rebalance with. A later step picks it up once the drops have freed up the
+      // space. Note that tryCharge must not run once the batch size is known to be exhausted, as the segment is not
+      // going to be moved in that case.
+      boolean anyServerOutOfDisk = !anyServerExhaustedBatchSize && stepBudget != null
+          && !serversAddedForSegment.isEmpty() && !stepBudget.tryCharge(serversAddedForSegment, segmentName);
+      if (anyServerExhaustedBatchSize || anyServerOutOfDisk) {
+        // Exhausted the batch size or the disk budget for at least 1 server, set to existing assignment
         nextAssignment.put(segmentName, currentInstanceStateMap);
       } else {
         // Add the next assignment and update the segments added so far counts
