@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -30,6 +31,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mockito;
 import org.testng.annotations.Test;
@@ -150,6 +152,49 @@ public class SegmentZkMetadataFetcherTest extends ControllerTest {
     verify(mockPropertyStore, times(1)).get(endsWith("foo"), any(), anyInt());
     verify(pruner1, times(1)).refreshSegment(eq("foo"), any());
     verify(pruner2, times(1)).refreshSegment(eq("foo"), any());
+  }
+
+  @Test
+  public void testSegmentZkMetadataFetcherShouldNotCacheConsumingSegmentUntilCommitted() {
+    ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
+    when(mockPropertyStore.get(any(), any(), anyInt(), anyBoolean())).thenAnswer(inv -> {
+      List<String> pathList = inv.getArgument(0);
+      List<ZNRecord> result = new ArrayList<>(pathList.size());
+      for (String path : pathList) {
+        String[] pathParts = path.split("/");
+        String segmentName = pathParts[pathParts.length - 1];
+        result.add(new SegmentZKMetadata(segmentName).toZNRecord());
+      }
+      return result;
+    });
+    SegmentPruner pruner = mock(SegmentPruner.class);
+    SegmentZkMetadataFetcher segmentZkMetadataFetcher =
+        new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME, mockPropertyStore);
+    segmentZkMetadataFetcher.register(pruner);
+    IdealState idealState = mock(IdealState.class);
+    segmentZkMetadataFetcher.init(idealState, mock(ExternalView.class), Set.of());
+    clearInvocations(mockPropertyStore);
+
+    // Segment is CONSUMING: onAssignmentChange should skip fetching and caching it
+    ExternalView consumingExternalView = mock(ExternalView.class);
+    when(consumingExternalView.getStateMap("segment")).thenReturn(
+        Map.of("server0", CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING));
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, consumingExternalView, Set.of("segment"));
+    verify(mockPropertyStore, times(0)).get(argThat(new ListMatcher("segment")), any(), anyInt(), anyBoolean());
+    verify(pruner, times(0)).onAssignmentChange(any(), any(), any(), argThat(new ListMatcher("segment")), any());
+
+    // Segment commits and transitions to ONLINE: should now be fetched and cached
+    ExternalView onlineExternalView = mock(ExternalView.class);
+    when(onlineExternalView.getStateMap("segment")).thenReturn(
+        Map.of("server0", CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE));
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, onlineExternalView, Set.of("segment"));
+    verify(mockPropertyStore, times(1)).get(argThat(new ListMatcher("segment")), any(), anyInt(), anyBoolean());
+    verify(pruner, times(1)).onAssignmentChange(any(), any(), any(), argThat(new ListMatcher("segment")), any());
+
+    // Already cached: subsequent assignment changes should not re-fetch or re-notify
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, onlineExternalView, Set.of("segment"));
+    verify(mockPropertyStore, times(1)).get(argThat(new ListMatcher("segment")), any(), anyInt(), anyBoolean());
+    verify(pruner, times(1)).onAssignmentChange(any(), any(), any(), argThat(new ListMatcher("segment")), any());
   }
 
   private static class ListMatcher implements ArgumentMatcher<List<String>> {
