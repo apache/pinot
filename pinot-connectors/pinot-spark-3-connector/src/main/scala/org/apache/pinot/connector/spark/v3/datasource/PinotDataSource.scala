@@ -24,14 +24,27 @@ import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.util
 
 /**
  * PinotDataSource implements TableProvider interface of Spark DataSourceV2 API
  * to provide read access to Pinot tables.
+ *
+ * Both pinot-spark-3-connector and pinot-spark-4-connector register the same `"pinot"`
+ * short name via `META-INF/services/org.apache.spark.sql.sources.DataSourceRegister`. If both
+ * jars end up on the same classpath (e.g., a fat-jar that mistakenly bundles both, or a
+ * `--packages` invocation that includes both), Spark's `DataSource.lookupDataSource` resolves
+ * the format non-deterministically — and the wrong builder being picked silently flips
+ * write semantics. We fail fast at connector construction with a clear message instructing
+ * the user to remove one jar. The symmetric guard in pinot-spark-4-connector probes for v3;
+ * this one probes for v4 — together they guarantee the conflict is caught regardless of
+ * which connector Spark happens to instantiate first.
  */
 class PinotDataSource extends TableProvider with DataSourceRegister {
+  PinotDataSource.guardAgainstSpark4ConnectorOnClasspath()
+
   override def shortName(): String = "pinot"
 
   override def inferSchema(options: CaseInsensitiveStringMap): StructType = {
@@ -52,4 +65,77 @@ class PinotDataSource extends TableProvider with DataSourceRegister {
   }
 
   override def supportsExternalMetadata(): Boolean = true
+}
+
+private[datasource] object PinotDataSource {
+  private val LOGGER: Logger = LoggerFactory.getLogger(classOf[PinotDataSource])
+  private val SPARK_4_DATASOURCE_FQN = "org.apache.pinot.connector.spark.v4.datasource.PinotDataSource"
+  // Escape hatch: when set to "true", the classpath-collision detection logs a WARN and
+  // continues instead of throwing. Same property name as the v4-side guard so a single -D
+  // flag disables both directions of the bidirectional check.
+  private[datasource] val SKIP_CONFLICT_GUARD_PROP = "pinot.spark.connector.skip-conflict-guard"
+
+  // Probe for the Spark 4 connector's PinotDataSource by class name. We probe both
+  // `getClass.getClassLoader` and the thread context classloader to cover Spark deployments
+  // where the v4 jar is visible only via one or the other. The result is cached per
+  // (ownLoader, ctxLoader) pair so the probe runs at most once per pair — Spark instantiates
+  // `PinotDataSource` repeatedly during a job (driver + executors + planner), and a per-call
+  // probe burns ~20 microseconds on each `spark.read.format("pinot")…`. The only deployment
+  // we cannot detect is one that mutates a single JVM's classpath after the first probe; the
+  // `pinot.spark.connector.skip-conflict-guard` escape hatch already covers that case.
+  private val probeCache = new java.util.concurrent.ConcurrentHashMap[(ClassLoader, ClassLoader), java.lang.Boolean]()
+
+  private[datasource] def spark4Conflict: Boolean = {
+    val ownLoader = getClass.getClassLoader
+    val ctxLoader = Thread.currentThread.getContextClassLoader
+    val effectiveCtxLoader = if (ctxLoader != null) ctxLoader else ownLoader
+    val key = (ownLoader, effectiveCtxLoader)
+    val cached = probeCache.get(key)
+    if (cached != null) {
+      return cached.booleanValue()
+    }
+    val result = isSpark4ConnectorOnClasspath(ownLoader) ||
+      ((effectiveCtxLoader ne ownLoader) && isSpark4ConnectorOnClasspath(effectiveCtxLoader))
+    probeCache.put(key, java.lang.Boolean.valueOf(result))
+    result
+  }
+
+  def guardAgainstSpark4ConnectorOnClasspath(): Unit = {
+    if (spark4Conflict) {
+      if (java.lang.Boolean.getBoolean(SKIP_CONFLICT_GUARD_PROP)) {
+        LOGGER.warn(
+          "{} (escape hatch -D{}=true was set, continuing anyway)",
+          spark4ConflictMessage, SKIP_CONFLICT_GUARD_PROP)
+      } else {
+        throw new IllegalStateException(spark4ConflictMessage)
+      }
+    }
+  }
+
+  private[datasource] def isSpark4ConnectorOnClasspath(loader: ClassLoader): Boolean = {
+    try {
+      Class.forName(SPARK_4_DATASOURCE_FQN, /* initialize */ false, loader)
+      true
+    } catch {
+      case _: ClassNotFoundException => false
+      // Treat partial linkage as "present" (fail-closed) — the v4 class IS on the classpath,
+      // it just cannot run. Falling back to "absent" would let the exact non-deterministic
+      // resolution this guard exists to prevent slip through.
+      case e: LinkageError =>
+        LOGGER.warn(
+          "Spark 4 PinotDataSource is on the classpath but failed to link ({}); " +
+            "treating as a conflict to preserve the fail-fast guarantee. " +
+            "Set -D{}=true to bypass.",
+          e.getMessage, SKIP_CONFLICT_GUARD_PROP)
+        true
+    }
+  }
+
+  private[datasource] val spark4ConflictMessage: String =
+    "pinot-spark-3-connector and pinot-spark-4-connector are both on the classpath; both " +
+      "register the data-source short name 'pinot'. Spark would resolve the format " +
+      "non-deterministically, which can silently route writes through the wrong overwrite " +
+      "contract. Remove pinot-spark-4-connector-*.jar from the Spark application's --jars / " +
+      "--packages / fat-jar, or remove pinot-spark-3-connector-*.jar if you intended to use " +
+      "the Spark 4 connector."
 }
