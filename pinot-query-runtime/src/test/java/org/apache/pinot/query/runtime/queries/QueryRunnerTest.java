@@ -249,6 +249,12 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         new Object[]{"SELECT col1, roundDecimal(COUNT(*)) FROM a GROUP BY col1", 5},
         new Object[]{"SELECT col1, round_decimal(COUNT(*)) FROM a GROUP BY col1", 5},
 
+        // test json_extract_scalar resolves on the intermediate stage. Taking the jsonPath from the joined table
+        // keeps the call above the join, so it can only be answered by the scalar function. col1 is not JSON, so
+        // every row falls back to the default value and the query is a pure row-count check.
+        new Object[]{"SELECT json_extract_scalar(a.col1, b.col2, 'INT', 0) FROM a JOIN b ON a.col1 = b.col1", 15},
+        new Object[]{"SELECT jsonExtractScalar(a.col1, '$.x', 'INT', 0) FROM a JOIN b ON a.col1 = b.col1", 15},
+
         // test queries with special query options attached
         //   - when leaf limit is set, each server returns multiStageLeafLimit number of rows only.
         new Object[]{"SET multiStageLeafLimit = 1; SELECT * FROM a", 2},
@@ -340,11 +346,6 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
               + "(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue']) to be single-quoted literal values"
       });
     }
-    //    - checked function cannot be found b/c there's no intermediate stage impl for json_extract_scalar
-    testCases.add(new Object[]{
-        "SELECT CAST(json_extract_scalar(a.col1, b.col2, 'INT') AS INT) FROM a JOIN b ON a.col1 = b.col1",
-        "Unsupported function: JSONEXTRACTSCALAR"
-    });
 
     // Positive int keys (only included ones that will be parsed for this query)
     for (String key : new String[]{
