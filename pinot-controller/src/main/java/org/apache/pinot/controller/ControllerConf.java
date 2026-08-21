@@ -235,6 +235,13 @@ public class ControllerConf extends PinotConfiguration {
         "controller.segment.error.autoReset";
     public static final String ENABLE_PARTIAL_OFFLINE_REPLICA_REPAIR =
         "controller.realtime.segment.partialOfflineReplicaRepairEnabled";
+    // When enabled, RSVM auto force-commits partitions that have mixed CONSUMING+OFFLINE replicas
+    // (issue #15897). Default false — ops must opt in. Distinct from OFFLINE→CONSUMING repair above.
+    public static final String ENABLE_AUTO_FORCE_COMMIT_ON_PARTIAL_OFFLINE =
+        "controller.realtime.segment.autoForceCommitOnPartialOfflineEnabled";
+    // Minimum segment age before auto force-commit is attempted (proxy for having consumed rows).
+    public static final String AUTO_FORCE_COMMIT_ON_PARTIAL_OFFLINE_MIN_AGE_MS =
+        "controller.realtime.segment.autoForceCommitOnPartialOfflineMinAgeMs";
     public static final String DISASTER_RECOVERY_MODE_CONFIG_KEY = "controller.segment.disaster.recovery.mode";
 
     // Initial delays
@@ -1312,6 +1319,18 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean isPartialOfflineReplicaRepairEnabled() {
     return getProperty(ControllerPeriodicTasksConf.ENABLE_PARTIAL_OFFLINE_REPLICA_REPAIR, false);
+  }
+
+  /// Whether RSVM should auto force-commit partitions with partial OFFLINE consuming replicas.
+  /// Default false. See issue #15897.
+  public boolean isAutoForceCommitOnPartialOfflineEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.ENABLE_AUTO_FORCE_COMMIT_ON_PARTIAL_OFFLINE, false);
+  }
+
+  /// Minimum age (ms) of an IN_PROGRESS consuming segment before auto force-commit on partial OFFLINE.
+  /// Default 5 minutes. Age is derived from LLC segment name creation time (fallback: ZK creation time).
+  public long getAutoForceCommitOnPartialOfflineMinAgeMs() {
+    return getProperty(ControllerPeriodicTasksConf.AUTO_FORCE_COMMIT_ON_PARTIAL_OFFLINE_MIN_AGE_MS, 300_000L);
   }
 
   public DisasterRecoveryMode getDisasterRecoveryMode() {
