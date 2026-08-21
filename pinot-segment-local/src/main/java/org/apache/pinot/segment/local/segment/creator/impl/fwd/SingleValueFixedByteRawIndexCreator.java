@@ -85,6 +85,11 @@ public class SingleValueFixedByteRawIndexCreator implements CompressionStatsTrac
   public SingleValueFixedByteRawIndexCreator(File baseIndexDir, String column, int totalDocs, DataType valueType,
       int targetDocsPerChunk, CodecPipelineExecutor executor)
       throws IOException {
+    if (valueType != executor.getStoredType()) {
+      throw new IllegalArgumentException(
+          "Creator value type " + valueType + " does not match codec executor stored type "
+              + executor.getStoredType() + " for column: " + column);
+    }
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     _indexWriter = new FixedByteChunkForwardIndexWriterV7(file, executor, totalDocs, targetDocsPerChunk,
         valueType.size());

@@ -30,6 +30,7 @@ import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
 import org.apache.pinot.segment.spi.codec.CodecSpecParser;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /// Chunk-based raw (non-dictionary-encoded) forward index writer for single-value fixed-width
@@ -130,6 +131,16 @@ public class FixedByteChunkForwardIndexWriterV7 implements FixedByteValueWriter 
     if (sizeOfEntry != Integer.BYTES && sizeOfEntry != Long.BYTES) {
       throw new IllegalArgumentException("sizeOfEntry must be 4 (INT) or 8 (LONG), got: " + sizeOfEntry);
     }
+    DataType executorType = executor.getStoredType();
+    if (executorType != DataType.INT && executorType != DataType.LONG) {
+      throw new IllegalArgumentException(
+          "V7 writer requires an INT or LONG executor, got: " + executorType);
+    }
+    if (sizeOfEntry != executorType.size()) {
+      throw new IllegalArgumentException(
+          "sizeOfEntry " + sizeOfEntry + " does not match executor stored type " + executorType
+              + " (" + executorType.size() + " bytes)");
+    }
     _sizeOfEntry = sizeOfEntry;
     _totalDocs = totalDocs;
     _numDocsPerChunk = normalizePower2(numDocsPerChunk);
@@ -213,6 +224,9 @@ public class FixedByteChunkForwardIndexWriterV7 implements FixedByteValueWriter 
   /// Writes a 4-byte integer value.
   @Override
   public void putInt(int value) {
+    if (_sizeOfEntry != Integer.BYTES) {
+      throw new IllegalStateException("putInt cannot write a LONG V7 forward index");
+    }
     checkRoomForOneMore();
     _chunkBuffer.putInt(value);
     _docsWritten++;
@@ -222,6 +236,9 @@ public class FixedByteChunkForwardIndexWriterV7 implements FixedByteValueWriter 
   /// Writes an 8-byte long value.
   @Override
   public void putLong(long value) {
+    if (_sizeOfEntry != Long.BYTES) {
+      throw new IllegalStateException("putLong cannot write an INT V7 forward index");
+    }
     checkRoomForOneMore();
     _chunkBuffer.putLong(value);
     _docsWritten++;

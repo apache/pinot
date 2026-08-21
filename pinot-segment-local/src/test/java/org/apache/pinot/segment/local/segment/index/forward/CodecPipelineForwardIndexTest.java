@@ -26,6 +26,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriterV7;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReaderV7;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -470,6 +471,76 @@ public class CodecPipelineForwardIndexTest implements PinotBuffersAfterMethodChe
         () -> new FixedByteChunkForwardIndexWriterV7(file, executor, 0, 1 << 24, Integer.BYTES));
     assertTrue(error.getMessage().contains("cumulative-work"), error.getMessage());
     assertFalse(file.exists(), "Writer must reject the pipeline before creating an output file");
+  }
+
+  @Test
+  public void testWriterRejectsExecutorEntrySizeMismatchBeforeCreatingFile() {
+    CodecPipelineExecutor executor = CodecPipelineExecutor.create("DELTA", DataType.LONG);
+    File file = new File(TEST_FILE_PREFIX + "_executor_entry_size_mismatch");
+    FileUtils.deleteQuietly(file);
+
+    IllegalArgumentException error = expectThrows(IllegalArgumentException.class,
+        () -> new FixedByteChunkForwardIndexWriterV7(file, executor, 0, 1, Integer.BYTES));
+    assertTrue(error.getMessage().contains("does not match executor stored type LONG"), error.getMessage());
+    assertFalse(file.exists(), "Writer must reject the type mismatch before creating an output file");
+  }
+
+  @Test
+  public void testCreatorRejectsExecutorValueTypeMismatchBeforeCreatingFile()
+      throws Exception {
+    CodecPipelineExecutor executor = CodecPipelineExecutor.create("DELTA", DataType.INT);
+    File indexDir = new File(TEST_FILE_PREFIX + "_creator_type_mismatch");
+    FileUtils.deleteQuietly(indexDir);
+    assertTrue(indexDir.mkdirs(), "Failed to create test index directory");
+    try {
+      IllegalArgumentException error = expectThrows(IllegalArgumentException.class,
+          () -> new SingleValueFixedByteRawIndexCreator(indexDir, "mismatched", 0, DataType.LONG, 1, executor));
+      assertTrue(error.getMessage().contains("does not match codec executor stored type INT"), error.getMessage());
+      assertEquals(indexDir.list().length, 0, "Creator must reject the type mismatch before creating an index file");
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  @Test
+  public void testWriterRejectsWrongValueMethodBeforeMutatingState()
+      throws Exception {
+    File intFile = new File(TEST_FILE_PREFIX + "_wrong_put_long");
+    File longFile = new File(TEST_FILE_PREFIX + "_wrong_put_int");
+    FileUtils.deleteQuietly(intFile);
+    FileUtils.deleteQuietly(longFile);
+    try {
+      CodecPipelineExecutor intExecutor = CodecPipelineExecutor.create("DELTA", DataType.INT);
+      try (FixedByteChunkForwardIndexWriterV7 writer = new FixedByteChunkForwardIndexWriterV7(
+          intFile, intExecutor, 1, 2, Integer.BYTES)) {
+        IllegalStateException error = expectThrows(IllegalStateException.class, () -> writer.putLong(42L));
+        assertTrue(error.getMessage().contains("putLong cannot write an INT"), error.getMessage());
+        writer.putInt(42);
+      }
+      try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(intFile);
+          FixedByteChunkSVForwardIndexReaderV7 reader =
+              new FixedByteChunkSVForwardIndexReaderV7(buffer, DataType.INT, 1);
+          ChunkReaderContext context = reader.createContext()) {
+        assertEquals(reader.getInt(0, context), 42);
+      }
+
+      CodecPipelineExecutor longExecutor = CodecPipelineExecutor.create("DELTA", DataType.LONG);
+      try (FixedByteChunkForwardIndexWriterV7 writer = new FixedByteChunkForwardIndexWriterV7(
+          longFile, longExecutor, 1, 2, Long.BYTES)) {
+        IllegalStateException error = expectThrows(IllegalStateException.class, () -> writer.putInt(42));
+        assertTrue(error.getMessage().contains("putInt cannot write a LONG"), error.getMessage());
+        writer.putLong(42L);
+      }
+      try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(longFile);
+          FixedByteChunkSVForwardIndexReaderV7 reader =
+              new FixedByteChunkSVForwardIndexReaderV7(buffer, DataType.LONG, 1);
+          ChunkReaderContext context = reader.createContext()) {
+        assertEquals(reader.getLong(0, context), 42L);
+      }
+    } finally {
+      FileUtils.deleteQuietly(intFile);
+      FileUtils.deleteQuietly(longFile);
+    }
   }
 
   @Test

@@ -63,6 +63,18 @@ public class FixedByteChunkSVForwardIndexReaderV7CorruptionTest {
   }
 
   @Test
+  public void testRejectsChunkCountInconsistentWithTotalDocs()
+      throws IOException {
+    for (int numChunks : new int[]{1, 3}) {
+      try (PinotDataBuffer buffer = newHeader(numChunks, 4, 5, dataHeaderStart())) {
+        IllegalArgumentException error = expectThrows(IllegalArgumentException.class,
+            () -> new FixedByteChunkSVForwardIndexReaderV7(buffer, DataType.INT));
+        assertTrue(error.getMessage().contains("expected 2"), error.getMessage());
+      }
+    }
+  }
+
+  @Test
   public void testFactoryDoesNotFallBackToLegacyReaderForCorruptPipelineHeader()
       throws IOException {
     try (PinotDataBuffer buffer = newHeader(0, 1, 0, dataHeaderStart())) {

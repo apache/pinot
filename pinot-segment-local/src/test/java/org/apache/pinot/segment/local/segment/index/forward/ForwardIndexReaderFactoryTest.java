@@ -37,6 +37,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// Regression coverage for V7 reader dispatch. A V7 segment on disk must be served through the
@@ -67,6 +68,7 @@ public class ForwardIndexReaderFactoryTest {
       Mockito.when(metadata.getForwardIndexEncoding()).thenReturn(FieldConfig.EncodingType.RAW);
       Mockito.when(metadata.isSingleValue()).thenReturn(true);
       Mockito.when(metadata.getDataType()).thenReturn(DataType.INT);
+      Mockito.when(metadata.getTotalDocs()).thenReturn(100);
 
       try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile)) {
         SegmentDirectory.Reader segmentReader = Mockito.mock(SegmentDirectory.Reader.class);
@@ -79,6 +81,14 @@ public class ForwardIndexReaderFactoryTest {
               "V7 segment was routed to " + reader.getClass().getSimpleName());
           assertEquals(reader.getCodecSpec(), "DELTA,LZ4");
         }
+
+        Mockito.when(metadata.getTotalDocs()).thenReturn(101);
+        RuntimeException exception = expectThrows(RuntimeException.class,
+            () -> ForwardIndexReaderFactory.getInstance().createIndexReader(segmentReader, fieldIndexConfigs,
+                metadata));
+        assertTrue(exception.getCause() instanceof IllegalArgumentException);
+        assertTrue(exception.getCause().getMessage().contains("totalDocs=100"));
+        assertTrue(exception.getCause().getMessage().contains("metadata totalDocs=101"));
       }
     } finally {
       FileUtils.deleteQuietly(indexFile);

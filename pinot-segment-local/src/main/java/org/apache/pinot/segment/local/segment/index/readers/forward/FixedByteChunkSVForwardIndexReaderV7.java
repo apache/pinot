@@ -71,6 +71,14 @@ public final class FixedByteChunkSVForwardIndexReaderV7 implements ForwardIndexR
   }
 
   public FixedByteChunkSVForwardIndexReaderV7(PinotDataBuffer dataBuffer, DataType storedType) {
+    this(dataBuffer, storedType, -1);
+  }
+
+  /// Creates a V7 reader and, when `expectedTotalDocs` is non-negative, verifies that the index
+  /// belongs to segment metadata with the same document count. The two-argument constructor keeps
+  /// standalone fixture and StarTree helper reads available when no segment metadata is present.
+  public FixedByteChunkSVForwardIndexReaderV7(PinotDataBuffer dataBuffer, DataType storedType,
+      int expectedTotalDocs) {
     _dataBuffer = dataBuffer;
     _storedType = storedType;
 
@@ -137,6 +145,11 @@ public final class FixedByteChunkSVForwardIndexReaderV7 implements ForwardIndexR
     offset += Integer.BYTES;
     if (_totalDocs < 0) {
       throw new IllegalArgumentException("Invalid totalDocs in forward index header: " + _totalDocs);
+    }
+    if (expectedTotalDocs >= 0 && _totalDocs != expectedTotalDocs) {
+      throw new IllegalArgumentException(
+          "V7 forward index totalDocs=" + _totalDocs + " does not match segment metadata totalDocs="
+              + expectedTotalDocs);
     }
 
     // Validate numChunks/totalDocs/numDocsPerChunk are mutually consistent. A corrupt header

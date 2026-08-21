@@ -108,12 +108,18 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
           return new CLPForwardIndexReaderV2(dataBuffer, metadata.getTotalDocs());
         }
       }
-      return createRawIndexReader(dataBuffer, metadata.getDataType().getStoredType(), metadata.isSingleValue());
+      return createRawIndexReader(dataBuffer, metadata.getDataType().getStoredType(), metadata.isSingleValue(),
+          metadata.getTotalDocs());
     }
   }
 
   public ForwardIndexReader createRawIndexReader(PinotDataBuffer dataBuffer, DataType storedType,
       boolean isSingleValue) {
+    return createRawIndexReader(dataBuffer, storedType, isSingleValue, -1);
+  }
+
+  private ForwardIndexReader createRawIndexReader(PinotDataBuffer dataBuffer, DataType storedType,
+      boolean isSingleValue, int expectedTotalDocs) {
     if (dataBuffer.size() < Integer.BYTES) {
       throw new IllegalArgumentException(
           "Raw forward index is truncated: " + dataBuffer.size() + " bytes; cannot read format version");
@@ -128,7 +134,7 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
           throw new UnsupportedOperationException(
               "V7 codec pipeline does not yet support " + storedType + " columns");
         }
-        return new FixedByteChunkSVForwardIndexReaderV7(dataBuffer, storedType);
+        return new FixedByteChunkSVForwardIndexReaderV7(dataBuffer, storedType, expectedTotalDocs);
       }
       if (version >= FixedBytePower2ChunkSVForwardIndexReader.VERSION) {
         return new FixedBytePower2ChunkSVForwardIndexReader(dataBuffer, storedType);
