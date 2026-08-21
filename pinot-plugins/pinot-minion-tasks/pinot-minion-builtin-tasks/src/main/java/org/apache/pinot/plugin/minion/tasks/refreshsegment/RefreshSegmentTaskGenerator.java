@@ -130,7 +130,7 @@ public class RefreshSegmentTaskGenerator extends BaseTaskGenerator {
       configs.putAll(MinionTaskUtils.getPushTaskConfig(tableNameWithType, taskConfigs, _clusterInfoAccessor));
       configs.put(MinionConstants.DOWNLOAD_URL_KEY, segmentZKMetadata.getDownloadUrl());
       configs.put(MinionConstants.UPLOAD_URL_KEY,
-          _clusterInfoAccessor.getVipUrlForLeadController(tableNameWithType) + "/segments");
+          _clusterInfoAccessor.getVipUrlForLeadController(tableNameWithType) + "/v2/segments");
       configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segmentZKMetadata.getCrc()));
       pinotTaskConfigs.add(new PinotTaskConfig(taskType, configs));
       tableNumTasks++;
