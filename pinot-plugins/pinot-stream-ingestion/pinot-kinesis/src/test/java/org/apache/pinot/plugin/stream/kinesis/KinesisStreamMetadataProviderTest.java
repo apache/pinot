@@ -46,6 +46,7 @@ import static org.apache.pinot.spi.stream.OffsetCriteria.LARGEST_OFFSET_CRITERIA
 import static org.apache.pinot.spi.stream.OffsetCriteria.SMALLEST_OFFSET_CRITERIA;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertTrue;
 
 
 public class KinesisStreamMetadataProviderTest {
@@ -101,6 +102,9 @@ public class KinesisStreamMetadataProviderTest {
     Assert.assertEquals(result.size(), 2);
     Assert.assertEquals(result.get(0).getPartitionGroupId(), 0);
     Assert.assertEquals(result.get(1).getPartitionGroupId(), 1);
+    // New shards must have inclusive offsets so the first record is not skipped
+    assertTrue(((KinesisPartitionGroupOffset) result.get(0).getStartOffset()).isInclusive());
+    assertTrue(((KinesisPartitionGroupOffset) result.get(1).getStartOffset()).isInclusive());
   }
 
   @Test
@@ -123,6 +127,7 @@ public class KinesisStreamMetadataProviderTest {
             SMALLEST_OFFSET_CRITERIA, TIMEOUT);
     Assert.assertEquals(kinesisPartitionGroupOffset.getShardId(), SHARD_ID_PREFIX + SHARD_ID_0);
     Assert.assertEquals(kinesisPartitionGroupOffset.getSequenceNumber(), "1");
+    assertTrue(kinesisPartitionGroupOffset.isInclusive());
 
     kinesisPartitionGroupOffset =
         (KinesisPartitionGroupOffset) kinesisStreamMetadataProviderShard0.fetchStreamPartitionOffset(
