@@ -24,7 +24,9 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.ws.rs.DELETE;
@@ -55,6 +57,9 @@ public class AuthenticationFilter implements ContainerRequestFilter {
   private static final String KEY_TABLE_NAME = "tableName";
   private static final String KEY_TABLE_NAME_WITH_TYPE = "tableNameWithType";
   private static final String KEY_SCHEMA_NAME = "schemaName";
+  /// Parameter names that identify the table an endpoint acts on, in the order they are consulted.
+  private static final List<String> TABLE_NAME_KEYS =
+      List.of(KEY_TABLE_NAME, KEY_TABLE_NAME_WITH_TYPE, KEY_SCHEMA_NAME);
 
   @Inject
   Provider<Request> _requestProvider;
@@ -130,35 +135,46 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     return AccessType.READ;
   }
 
+  /// Resolves the table `endpointMethod` acts on, or `null` when the request addresses the cluster rather than a
+  /// table. `AccessControlUtils.validatePermission` picks the table-scoped or the cluster-wide check on that answer,
+  /// so it must not be steerable by the caller.
+  ///
+  /// Path parameters are template variables of the endpoint's own `@Path`, hence part of its declaration. Query
+  /// parameters are caller-supplied and JAX-RS surfaces every one present on the URI, so only those the endpoint
+  /// declares may name the table: otherwise a caller could append `?tableName=<a table it is scoped to>` to a cluster
+  /// endpoint and have it authorized as a table-scoped request.
+  ///
+  /// Binding a table query parameter is treated as authorizing table scope. That is correct only when the endpoint
+  /// uses the parameter to scope the operation. An optional `tableName` that only filters a nested view (for example
+  /// `GET /tasks/task/{taskName}/debug`) still grants table scope for the whole request.
+  @Nullable
   @VisibleForTesting
   static String extractTableName(Method endpointMethod, MultivaluedMap<String, String> pathParameters,
       MultivaluedMap<String, String> queryParameters) {
     Authorize authorize = endpointMethod.getAnnotation(Authorize.class);
     if (authorize != null && authorize.targetType() == TargetType.TABLE) {
-      return FineGrainedAuthUtils.findRawTargetId(authorize, pathParameters, queryParameters);
+      // Same primitive as FineGrainedAuthUtils.validateFineGrainedAuth: path first, then a declared query param.
+      return FineGrainedAuthUtils.findRawTargetId(authorize, endpointMethod, pathParameters, queryParameters);
     }
-    return extractTableName(pathParameters, queryParameters);
-  }
-
-  @VisibleForTesting
-  static String extractTableName(MultivaluedMap<String, String> pathParameters,
-      MultivaluedMap<String, String> queryParameters) {
     String tableName = extractTableName(pathParameters);
     if (tableName != null) {
       return tableName;
     }
-    return extractTableName(queryParameters);
+    Set<String> declaredQueryParams = FineGrainedAuthUtils.declaredQueryParams(endpointMethod);
+    for (String key : TABLE_NAME_KEYS) {
+      if (queryParameters.containsKey(key) && declaredQueryParams.contains(key)) {
+        return queryParameters.getFirst(key);
+      }
+    }
+    return null;
   }
 
+  @Nullable
   private static String extractTableName(MultivaluedMap<String, String> mmap) {
-    if (mmap.containsKey(KEY_TABLE_NAME)) {
-      return mmap.getFirst(KEY_TABLE_NAME);
-    }
-    if (mmap.containsKey(KEY_TABLE_NAME_WITH_TYPE)) {
-      return mmap.getFirst(KEY_TABLE_NAME_WITH_TYPE);
-    }
-    if (mmap.containsKey(KEY_SCHEMA_NAME)) {
-      return mmap.getFirst(KEY_SCHEMA_NAME);
+    for (String key : TABLE_NAME_KEYS) {
+      if (mmap.containsKey(key)) {
+        return mmap.getFirst(key);
+      }
     }
     return null;
   }
