@@ -26,6 +26,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.vector.HnswVectorIndexReader;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -90,6 +91,21 @@ public class HnswVectorIndexCreatorTest {
       // Expect to get 1 matching docId since topK = 1 is used
       Assert.assertEquals(matchedDocIds.length, 1);
       Assert.assertEquals(matchedDocIds[0], 2);
+    }
+  }
+
+  @Test
+  public void testFilteredReaderReturnsKAllowedDocuments()
+      throws IOException {
+    MutableRoaringBitmap allowedDocIds = new MutableRoaringBitmap();
+    allowedDocIds.add(1);
+    allowedDocIds.add(3);
+    try (HnswVectorIndexReader reader = new HnswVectorIndexReader("foo", INDEX_DIR, 4, _config)) {
+      float[] queryVector = {5.0F, 42.0F, 54.33333F, 42.24F, 1001.045F};
+      Assert.assertEquals(reader.getDocIds(queryVector, 1).toArray(), new int[]{0},
+          "The nearest physical document should be outside the allowed set");
+      int[] matchedDocIds = reader.getDocIds(queryVector, 2, allowedDocIds).toArray();
+      Assert.assertEquals(matchedDocIds, new int[]{1, 3});
     }
   }
 
