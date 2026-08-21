@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.io.codec;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -469,9 +470,10 @@ public class T64CodecDefinitionTest {
     encoded[14] = (byte) 0xE4;
     long[] expected = {0L, 1L, 2L, 3L};
 
-    assertDecodedLongs(CODEC.decode(OPTS, LONG_CTX, ByteBuffer.wrap(encoded)), expected);
+    assertDecodedLongs(
+        CODEC.decode(OPTS, LONG_CTX, ByteBuffer.wrap(encoded).order(ByteOrder.LITTLE_ENDIAN)), expected);
     ByteBuffer dst = ByteBuffer.allocateDirect(expected.length * Long.BYTES);
-    CODEC.decodeInto(OPTS, LONG_CTX, ByteBuffer.wrap(encoded), dst);
+    CODEC.decodeInto(OPTS, LONG_CTX, ByteBuffer.wrap(encoded).order(ByteOrder.LITTLE_ENDIAN), dst);
     assertDecodedLongs(dst, expected);
   }
 

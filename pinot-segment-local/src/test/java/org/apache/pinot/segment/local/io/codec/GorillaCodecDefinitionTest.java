@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.io.codec;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -334,7 +335,8 @@ public class GorillaCodecDefinitionTest {
         0, 0, 0, 0,
         (byte) 0xFE, 0x08
     };
-    assertDecodedInts(CODEC.decode(OPTS, INT_CTX, ByteBuffer.wrap(encodedInt)), new int[]{0, 1});
+    assertDecodedInts(
+        CODEC.decode(OPTS, INT_CTX, ByteBuffer.wrap(encodedInt).order(ByteOrder.LITTLE_ENDIAN)), new int[]{0, 1});
 
     byte[] encodedLong = {
         1,
@@ -343,9 +345,10 @@ public class GorillaCodecDefinitionTest {
         (byte) 0xFF, 0x02
     };
     long[] expectedLongs = {0L, 1L};
-    assertDecodedLongs(CODEC.decode(OPTS, LONG_CTX, ByteBuffer.wrap(encodedLong)), expectedLongs);
+    assertDecodedLongs(
+        CODEC.decode(OPTS, LONG_CTX, ByteBuffer.wrap(encodedLong).order(ByteOrder.LITTLE_ENDIAN)), expectedLongs);
     ByteBuffer dst = ByteBuffer.allocateDirect(expectedLongs.length * Long.BYTES);
-    CODEC.decodeInto(OPTS, LONG_CTX, ByteBuffer.wrap(encodedLong), dst);
+    CODEC.decodeInto(OPTS, LONG_CTX, ByteBuffer.wrap(encodedLong).order(ByteOrder.LITTLE_ENDIAN), dst);
     assertDecodedLongs(dst, expectedLongs);
   }
 

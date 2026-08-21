@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.io.codec;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.List;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -34,17 +35,17 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /// - Compute `x = v_i XOR v_{i-1}`.
 /// - If `x == 0`: write a single `0` bit.
 /// - Else: write `1` bit + meaningful-bit window metadata + the meaningful bits themselves.
-///   - If the new window fits inside the previous window (same leading + same width), write
-///     a `0` control bit followed by the meaningful bits.
+///   - If the new window is contained inside the previous window, write a `0` control bit followed
+///     by the bits selected with that previous window.
 ///   - Otherwise, write a `1` control bit, the leading-zero count (5 bits for INT, 6 bits for
-///     LONG), the meaningful-bit count (5/6 bits, biased so width=N stored as 0), and the bits.
+///     LONG), the meaningful-bit count minus one (5/6 bits), and the meaningful bits.
 ///
 /// Wire format:
 /// ```
 ///   [flag : 1 byte]     // 0=INT (32-bit), 1=LONG (64-bit)
-///   [count: 4 bytes]    // total number of values
-///   [first: elementSize bytes]   // verbatim first value (if count > 0)
-///   [bit_stream: N bytes]        // variable-length per-value encoding (if count > 1)
+///   [count: 4 bytes BE]          // total number of values
+///   [first: elementSize bytes BE] // verbatim first value (if count > 0)
+///   [bit_stream: N bytes]         // MSB-first per-value encoding (if count > 1)
 /// ```
 /// `count == 0` is the 5-byte header with no payload.
 ///
@@ -219,6 +220,7 @@ final class GorillaCodecDefinition implements ChunkCodecHandler<GorillaCodecDefi
 
   @Override
   public ByteBuffer decode(Options options, CodecContext ctx, ByteBuffer src) {
+    src = src.duplicate().order(ByteOrder.BIG_ENDIAN);
     byte flag = src.get();
     int count = src.getInt();
     validateHeader(flag, count, ctx);
@@ -236,6 +238,7 @@ final class GorillaCodecDefinition implements ChunkCodecHandler<GorillaCodecDefi
 
   @Override
   public void decodeInto(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) {
+    src = src.duplicate().order(ByteOrder.BIG_ENDIAN);
     dst.clear();
     byte flag = src.get();
     int count = src.getInt();

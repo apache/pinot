@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.io.codec;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -217,6 +218,7 @@ final class T64CodecDefinition implements ChunkCodecHandler<T64CodecDefinition.O
 
   @Override
   public ByteBuffer decode(Options options, CodecContext ctx, ByteBuffer src) {
+    src = src.duplicate().order(ByteOrder.BIG_ENDIAN);
     byte flag = src.get();
     int count = src.getInt();
     validateHeader(flag, count, ctx);
@@ -234,6 +236,7 @@ final class T64CodecDefinition implements ChunkCodecHandler<T64CodecDefinition.O
 
   @Override
   public void decodeInto(Options options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) {
+    src = src.duplicate().order(ByteOrder.BIG_ENDIAN);
     dst.clear();
     byte flag = src.get();
     int count = src.getInt();

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.DataProvider;
@@ -111,6 +112,17 @@ public class CodecPipelineExecutorTest {
         "ZSTD(5),GZIP");
     assertEquals(CodecPipelineExecutor.create("lz4,snappy", DataType.INT).getCanonicalSpec(),
         "LZ4,SNAPPY");
+  }
+
+  @Test
+  public void testTypedTransformsIgnoreCallerByteOrder()
+      throws Exception {
+    for (String spec : new String[]{"DELTA", "DELTADELTA", "T64", "GORILLA"}) {
+      assertTypedTransformIgnoresCallerByteOrder(spec, DataType.INT,
+          new long[]{Integer.MIN_VALUE, -1, 0, 1, Integer.MAX_VALUE});
+      assertTypedTransformIgnoresCallerByteOrder(spec, DataType.LONG,
+          new long[]{Long.MIN_VALUE, -1L, 0L, 1L, Long.MAX_VALUE});
+    }
   }
 
   @Test
@@ -236,6 +248,58 @@ public class CodecPipelineExecutorTest {
   private static ByteBuffer inputBuffer(boolean direct) {
     ByteBuffer buffer = direct ? ByteBuffer.allocateDirect(INPUT.length) : ByteBuffer.allocate(INPUT.length);
     return buffer.put(INPUT).flip();
+  }
+
+  private static void assertTypedTransformIgnoresCallerByteOrder(String spec, DataType dataType, long[] values)
+      throws Exception {
+    int decodedSize = values.length * dataType.size();
+    ByteBuffer canonicalInput = ByteBuffer.allocateDirect(decodedSize).order(ByteOrder.BIG_ENDIAN);
+    for (long value : values) {
+      if (dataType == DataType.INT) {
+        canonicalInput.putInt((int) value);
+      } else {
+        canonicalInput.putLong(value);
+      }
+    }
+    canonicalInput.flip();
+
+    CodecPipelineExecutor executor = CodecPipelineExecutor.create(spec, dataType);
+    int maxIntermediateSize = Math.max(decodedSize, executor.maxEncodedSize(decodedSize));
+
+    // A LITTLE_ENDIAN input view must still be interpreted as persisted big-endian typed words.
+    ByteBuffer littleEndianInput = canonicalInput.duplicate().order(ByteOrder.LITTLE_ENDIAN);
+    ByteBuffer encodedFromLittleEndian = executor.encode(littleEndianInput);
+    assertEquals(littleEndianInput.position(), 0, "encode must not consume the caller's input view");
+    assertEquals(littleEndianInput.order(), ByteOrder.LITTLE_ENDIAN);
+    ByteBuffer bigEndianDestination = ByteBuffer.allocateDirect(decodedSize).order(ByteOrder.BIG_ENDIAN);
+    try (CodecPipelineExecutor.DecodeScratch scratch = new CodecPipelineExecutor.DecodeScratch()) {
+      executor.decode(encodedFromLittleEndian, bigEndianDestination, decodedSize, maxIntermediateSize,
+          Long.MAX_VALUE, scratch);
+    }
+    assertTypedValues(bigEndianDestination, dataType, values, spec + " LITTLE_ENDIAN encode view");
+
+    // A LITTLE_ENDIAN destination view must receive the same canonical big-endian bytes without
+    // changing the caller's configured order.
+    ByteBuffer encodedFromBigEndian = executor.encode(canonicalInput.duplicate());
+    ByteBuffer littleEndianDestination = ByteBuffer.allocateDirect(decodedSize).order(ByteOrder.LITTLE_ENDIAN);
+    try (CodecPipelineExecutor.DecodeScratch scratch = new CodecPipelineExecutor.DecodeScratch()) {
+      executor.decode(encodedFromBigEndian, littleEndianDestination, decodedSize, maxIntermediateSize,
+          Long.MAX_VALUE, scratch);
+    }
+    assertEquals(littleEndianDestination.order(), ByteOrder.LITTLE_ENDIAN);
+    assertTypedValues(littleEndianDestination, dataType, values, spec + " LITTLE_ENDIAN decode destination");
+  }
+
+  private static void assertTypedValues(ByteBuffer actual, DataType dataType, long[] expected, String message) {
+    ByteBuffer bigEndian = actual.duplicate().order(ByteOrder.BIG_ENDIAN);
+    assertEquals(bigEndian.remaining(), expected.length * dataType.size(), message);
+    for (long value : expected) {
+      if (dataType == DataType.INT) {
+        assertEquals(bigEndian.getInt(), (int) value, message);
+      } else {
+        assertEquals(bigEndian.getLong(), value, message);
+      }
+    }
   }
 
   private static void assertBytesEqual(ByteBuffer actual) {
