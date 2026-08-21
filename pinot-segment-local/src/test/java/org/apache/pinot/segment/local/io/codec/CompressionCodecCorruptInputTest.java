@@ -20,6 +20,8 @@ package org.apache.pinot.segment.local.io.codec;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
@@ -137,6 +139,33 @@ public class CompressionCodecCorruptInputTest {
   }
 
   @Test
+  public void testGzipDecodeReadsBigEndianFooterFromLittleEndianView()
+      throws Exception {
+    byte[] values = new byte[256];
+    Arrays.fill(values, (byte) 0x5A);
+    ByteBuffer encoded = encodeGzip(values).order(ByteOrder.LITTLE_ENDIAN);
+
+    assertDecodedEquals(values,
+        GzipCodecDefinition.INSTANCE.decode(GzipCodecDefinition.OPTIONS, CTX, encoded));
+  }
+
+  @Test
+  public void testGzipDecodeHonorsNonZeroSourcePosition()
+      throws Exception {
+    byte[] values = new byte[256];
+    Arrays.fill(values, (byte) 0x6B);
+    ByteBuffer encoded = encodeGzip(values);
+    int prefixLength = 7;
+    ByteBuffer framed = ByteBuffer.allocateDirect(prefixLength + encoded.remaining());
+    framed.position(prefixLength);
+    framed.put(encoded.duplicate()).flip();
+    framed.position(prefixLength);
+
+    assertDecodedEquals(values,
+        GzipCodecDefinition.INSTANCE.decode(GzipCodecDefinition.OPTIONS, CTX, framed));
+  }
+
+  @Test
   public void testGzipMaxEncodedSizeRejectsOverflow() {
     assertThrows(IllegalArgumentException.class,
         () -> GzipCodecDefinition.INSTANCE.maxEncodedSize(GzipCodecDefinition.OPTIONS, Integer.MAX_VALUE));
@@ -177,5 +206,11 @@ public class CompressionCodecCorruptInputTest {
     ByteBuffer source = ByteBuffer.allocateDirect(values.length);
     source.put(values).flip();
     return GzipCodecDefinition.INSTANCE.encode(GzipCodecDefinition.OPTIONS, CTX, source);
+  }
+
+  private static void assertDecodedEquals(byte[] expected, ByteBuffer decoded) {
+    byte[] actual = new byte[decoded.remaining()];
+    decoded.get(actual);
+    assertTrue(Arrays.equals(actual, expected));
   }
 }
