@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.DeprecatedConfig;
 
 
 public class RoutingConfig extends BaseJsonConfig {
@@ -55,6 +56,9 @@ public class RoutingConfig extends BaseJsonConfig {
   }
 
   @Nullable
+  @Deprecated
+  @DeprecatedConfig(replacement = "Use 'routing.segmentPrunerTypes' and 'routing.instanceSelectorType' instead.",
+      since = "0.3.0")
   public String getRoutingTableBuilderName() {
     return _routingTableBuilderName;
   }
