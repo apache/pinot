@@ -117,6 +117,50 @@ public class TableNameBuilder {
     return REALTIME.tableHasTypeSuffix(resourceName);
   }
 
+  /// Quotes a typed table name for use as a SQL identifier. When the table name is database-qualified, the database
+  /// and table components are quoted separately. Embedded double quotes are escaped by doubling them.
+  ///
+  /// @param tableNameWithType Table name ending in `_OFFLINE` or `_REALTIME`, optionally prefixed with a database name
+  /// @return Table name quoted for use in a SQL statement
+  /// @throws IllegalArgumentException If the table name is not a valid typed table resource
+  public static String quoteTableNameWithType(String tableNameWithType) {
+    if (tableNameWithType == null || containsWhitespace(tableNameWithType)) {
+      throw new IllegalArgumentException("Invalid table name with type");
+    }
+
+    int separatorIndex = tableNameWithType.indexOf('.');
+    if (separatorIndex < 0) {
+      validateTableResourceName(tableNameWithType);
+      return quoteIdentifier(tableNameWithType);
+    }
+    if (separatorIndex == 0 || separatorIndex != tableNameWithType.lastIndexOf('.')) {
+      throw new IllegalArgumentException("Invalid table name with type");
+    }
+
+    String tableResourceName = tableNameWithType.substring(separatorIndex + 1);
+    validateTableResourceName(tableResourceName);
+    return quoteIdentifier(tableNameWithType.substring(0, separatorIndex)) + "." + quoteIdentifier(tableResourceName);
+  }
+
+  private static void validateTableResourceName(String tableResourceName) {
+    if (!isTableResource(tableResourceName)) {
+      throw new IllegalArgumentException("Invalid table name with type");
+    }
+  }
+
+  private static boolean containsWhitespace(String value) {
+    for (int i = 0; i < value.length(); i++) {
+      if (Character.isWhitespace(value.charAt(i))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static String quoteIdentifier(String identifier) {
+    return "\"" + identifier.replace("\"", "\"\"") + "\"";
+  }
+
   public static Set<String> getTableNameVariations(String tableName) {
     String rawTableName = extractRawTableName(tableName);
     String offlineTableName = OFFLINE.tableNameWithType(rawTableName);
