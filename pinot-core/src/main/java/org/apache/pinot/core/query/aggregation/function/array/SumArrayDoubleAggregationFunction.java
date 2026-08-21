@@ -29,17 +29,17 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.function.BaseSingleInputAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.NullableSingleInputAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class SumArrayDoubleAggregationFunction
-    extends BaseSingleInputAggregationFunction<DoubleArrayList, DoubleArrayList> {
+    extends NullableSingleInputAggregationFunction<DoubleArrayList, DoubleArrayList> {
 
-  public SumArrayDoubleAggregationFunction(List<ExpressionContext> arguments) {
-    super(verifySingleArgument(arguments, "SUM_ARRAY"));
+  public SumArrayDoubleAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(verifySingleArgument(arguments, "SUM_ARRAY"), nullHandlingEnabled);
   }
 
   @Override
@@ -60,39 +60,50 @@ public class SumArrayDoubleAggregationFunction
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[][] values = blockValSetMap.get(_expression).getDoubleValuesMV();
-    if (aggregationResultHolder.getResult() == null) {
-      aggregationResultHolder.setValue(new DoubleArrayList());
-    }
-    DoubleArrayList result = aggregationResultHolder.getResult();
-    for (int i = 0; i < length; i++) {
-      double[] value = values[i];
-      aggregateMerge(value, result);
-    }
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    double[][] values = blockValSet.getDoubleValuesMV();
+    // The accumulator is created inside the range, so a block with no non-null row leaves the holder untouched and
+    // extractFinalResult sees the null that means nothing was aggregated
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      if (to == from) {
+        return;
+      }
+      DoubleArrayList result = aggregationResultHolder.getResult();
+      if (result == null) {
+        result = new DoubleArrayList();
+        aggregationResultHolder.setValue(result);
+      }
+      for (int i = from; i < to; i++) {
+        aggregateMerge(values[i], result);
+      }
+    });
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
-    for (int i = 0; i < length; i++) {
-      double[] values = valuesArray[i];
-      int groupKey = groupKeyArray[i];
-      setGroupByResult(groupByResultHolder, values, groupKey);
-    }
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        setGroupByResult(groupByResultHolder, valuesArray[i], groupKeyArray[i]);
+      }
+    });
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
-    for (int i = 0; i < length; i++) {
-      double[] values = valuesArray[i];
-      int[] groupKeys = groupKeysArray[i];
-      for (int groupKey : groupKeys) {
-        setGroupByResult(groupByResultHolder, values, groupKey);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        double[] values = valuesArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          setGroupByResult(groupByResultHolder, values, groupKey);
+        }
       }
-    }
+    });
   }
 
   private void setGroupByResult(GroupByResultHolder groupByResultHolder, double[] values, int groupKey) {
