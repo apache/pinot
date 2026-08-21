@@ -105,7 +105,7 @@ final class SegmentCompressionStatsReader {
         chunkCompressionType = null;
       } else {
         long uncompressedValueSize = columnMetadata.getRawForwardIndexUncompressedValueSizeInBytes();
-        if (uncompressedValueSize < 0 || columnMetadata.getRawForwardIndexChunkCompressionType() == null) {
+        if (uncompressedValueSize < 0) {
           if (!includeColumnCompressionStats) {
             return incomplete(segmentMetadata);
           }

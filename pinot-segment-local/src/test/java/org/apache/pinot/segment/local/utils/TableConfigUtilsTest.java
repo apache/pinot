@@ -1855,6 +1855,24 @@ public class TableConfigUtilsTest {
     assertTrue(exception.getMessage().contains("must operate on column values"),
         "Unexpected error: " + exception.getMessage());
 
+    // A disabled modern forward-index config cannot retain an ignored codecSpec. This must be rejected even
+    // without the legacy FieldConfig.forwardIndexDisabled property.
+    ObjectNode disabledForward = JsonUtils.newObjectNode();
+    disabledForward.put("disabled", true);
+    disabledForward.put("codecSpec", "DELTA,LZ4");
+    ObjectNode disabledIndexes = JsonUtils.newObjectNode();
+    disabledIndexes.set("forward", disabledForward);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    tableConfig.setFieldConfigList(List.of(new FieldConfig.Builder("intCol")
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(disabledIndexes)
+        .build()));
+    TableConfig disabledCodecSpecTableConfig = tableConfig;
+    exception = expectThrows(Exception.class,
+        () -> TableConfigUtils.validate(disabledCodecSpecTableConfig, schema));
+    assertTrue(exception.getMessage().contains("codecSpec cannot be configured when the forward index is disabled")
+        && exception.getMessage().contains("intCol"), "Unexpected error: " + exception.getMessage());
+
     // A well-formed compression-only RAW codecSpec passes table-config validation.
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     tableConfig.setFieldConfigList(List.of(rawFieldConfigWithCodecSpec("intCol", "ZSTD(3)")));
@@ -1870,12 +1888,21 @@ public class TableConfigUtilsTest {
     tableConfig.setFieldConfigList(List.of(rawFieldConfigWithCodecSpec("longCol", "DELTADELTA,LZ4")));
     TableConfigUtils.validate(tableConfig, schema);
 
-    // Compression-only codecSpecs map onto the legacy raw writers, so they are accepted on any RAW
-    // column, including STRING and multi-value columns.
+    // Every non-null codecSpec routes through the V7 writer, including a single compression stage. Reject
+    // unsupported stored types and multi-value columns consistently with transform pipelines.
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    tableConfig.setFieldConfigList(List.of(rawFieldConfigWithCodecSpec("stringCol", "SNAPPY"),
-        rawFieldConfigWithCodecSpec("mvIntCol", "LZ4")));
-    TableConfigUtils.validate(tableConfig, schema);
+    tableConfig.setFieldConfigList(List.of(rawFieldConfigWithCodecSpec("stringCol", "SNAPPY")));
+    TableConfig stringCompressionTableConfig = tableConfig;
+    exception = expectThrows(Exception.class, () -> TableConfigUtils.validate(stringCompressionTableConfig, schema));
+    assertTrue(exception.getMessage().contains("only supports INT and LONG columns")
+        && exception.getMessage().contains("stringCol"), "Unexpected error: " + exception.getMessage());
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    tableConfig.setFieldConfigList(List.of(rawFieldConfigWithCodecSpec("mvIntCol", "LZ4")));
+    TableConfig mvCompressionTableConfig = tableConfig;
+    exception = expectThrows(Exception.class, () -> TableConfigUtils.validate(mvCompressionTableConfig, schema));
+    assertTrue(exception.getMessage().contains("only supports single-value columns")
+        && exception.getMessage().contains("mvIntCol"), "Unexpected error: " + exception.getMessage());
 
     // Regression: codecSpec validation runs via `IndexType.validate(...)` after
     // `FieldIndexConfigsUtil` resolves overrides — not by an early raw-FieldConfig pre-pass.
