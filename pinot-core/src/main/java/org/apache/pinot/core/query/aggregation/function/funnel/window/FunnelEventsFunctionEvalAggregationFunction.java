@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function.funnel.window;
 
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -212,12 +213,11 @@ public class FunnelEventsFunctionEvalAggregationFunction
     List<Object> extraFieldsBlocks = new ArrayList<>(_numExtraFields);
     for (ExpressionContext extraExpression : _extraExpressions) {
       BlockValSet blockValSet = blockValSetMap.get(extraExpression);
-      switch (blockValSet.getValueType()) {
+      switch (blockValSet.getValueType().getStoredType()) {
         case INT:
           extraFieldsBlocks.add(blockValSet.getIntValuesSV());
           break;
         case LONG:
-        case TIMESTAMP:
           extraFieldsBlocks.add(blockValSet.getLongValuesSV());
           break;
         case FLOAT:
@@ -226,9 +226,15 @@ public class FunnelEventsFunctionEvalAggregationFunction
         case DOUBLE:
           extraFieldsBlocks.add(blockValSet.getDoubleValuesSV());
           break;
+        case BIG_DECIMAL:
+          extraFieldsBlocks.add(blockValSet.getBigDecimalValuesSV());
+          break;
         case STRING:
           extraFieldsBlocks.add(blockValSet.getStringValuesSV());
           break;
+        // TODO: Support BYTES extra fields.
+        //   The events are rendered as strings, so a byte array needs an agreed encoding - hex or base64 - before
+        //   it can be carried here, which is a format decision rather than a missing getter.
         default:
           throw new IllegalArgumentException("Unsupported data type for extra field: " + extraExpression + " - "
               + blockValSet.getValueType());
@@ -252,6 +258,9 @@ public class FunnelEventsFunctionEvalAggregationFunction
           break;
         case "double":
           extraFields.add(((double[]) extraFieldsBlock)[i]);
+          break;
+        case "BigDecimal":
+          extraFields.add(((BigDecimal[]) extraFieldsBlock)[i]);
           break;
         case "String":
           extraFields.add(((String[]) extraFieldsBlock)[i]);
