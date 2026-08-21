@@ -427,7 +427,8 @@ public class MutableSegmentImpl implements MutableSegment {
       if (dataType == DataType.OPEN_STRUCT && fieldSpec instanceof ComplexFieldSpec) {
         IndexConfig openStructConfig = indexConfigs.getConfig(StandardIndexes.openStruct());
         if (openStructConfig instanceof OpenStructIndexConfig && openStructConfig.isEnabled()) {
-          MutableOpenStructIndex openStructIndex = new MutableOpenStructIndex(column, (ComplexFieldSpec) fieldSpec,
+          MutableOpenStructIndex openStructIndex = new MutableOpenStructIndex(column, _realtimeTableName,
+              (ComplexFieldSpec) fieldSpec,
               (OpenStructIndexConfig) openStructConfig, _memoryManager, _capacity);
           mutableIndexes.put(StandardIndexes.openStruct(), openStructIndex);
         }

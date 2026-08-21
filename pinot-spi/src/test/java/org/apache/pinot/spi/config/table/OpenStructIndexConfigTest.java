@@ -47,6 +47,28 @@ public class OpenStructIndexConfigTest {
   }
 
   @Test
+  public void testPerKeyMetricsDefaultsToFalse() {
+    // 7-arg constructor (pre-existing callers) — must default to false.
+    OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, -1, null, 0.5, null, null);
+    assertFalse(config.isPerKeyMetricsEnabled());
+    // DEFAULT constant.
+    assertFalse(OpenStructIndexConfig.DEFAULT.isPerKeyMetricsEnabled());
+  }
+
+  @Test
+  public void testPerKeyMetricsRoundTripsFromJson()
+      throws Exception {
+    String json = "{\"perKeyMetricsEnabled\": true, \"denseKeys\": [\"clicks\"]}";
+    OpenStructIndexConfig config = JsonUtils.stringToObject(json, OpenStructIndexConfig.class);
+    assertTrue(config.isPerKeyMetricsEnabled());
+    assertEquals(config.getDenseKeys(), Set.of("clicks"));
+
+    // Absent field → false.
+    OpenStructIndexConfig noFlag = JsonUtils.stringToObject("{}", OpenStructIndexConfig.class);
+    assertFalse(noFlag.isPerKeyMetricsEnabled());
+  }
+
+  @Test
   public void testDisabledConfig() {
     OpenStructIndexConfig config = OpenStructIndexConfig.DISABLED;
     assertFalse(config.isEnabled());

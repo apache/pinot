@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -87,6 +88,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
 
   private final File _indexDir;
   private final String _columnName;
+  private final String _tableNameWithType;
   private final Map<String, FieldSpec> _childFieldSpecs;
   private final OpenStructIndexConfig _config;
   private final int _maxDenseKeys;
@@ -95,18 +97,20 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
   private final Map<String, RoaringBitmap> _presenceBitmaps = new HashMap<>();
   private final Map<String, List<Object>> _values = new HashMap<>();
   private final Map<String, DataType> _inferredTypes = new HashMap<>();
+  private final Map<String, Long> _coercionFailuresPerKey = new HashMap<>();
+  private final Map<String, Long> _inferenceFailuresPerKey = new HashMap<>();
   private int _numDocs;
-  private int _coercionFailures;
 
   // Resolved at seal time
   @Nullable
   private Set<String> _resolvedDenseKeys;
   private final Map<String, PropertiesConfiguration> _materializedColumnMetadata = new LinkedHashMap<>();
 
-  public OpenStructColumnSplitter(File indexDir, String columnName, FieldSpec fieldSpec,
+  public OpenStructColumnSplitter(File indexDir, String columnName, String tableNameWithType, FieldSpec fieldSpec,
       OpenStructIndexConfig config) {
     _indexDir = indexDir;
     _columnName = columnName;
+    _tableNameWithType = tableNameWithType;
     _config = config;
     _maxDenseKeys = config.getMaxDenseKeys();
 
@@ -197,12 +201,34 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
           continue;
         }
         FieldSpec keySpec = _childFieldSpecs.get(key);
-        DataType valueType = keySpec != null
-            ? keySpec.getDataType()
-            : _inferredTypes.computeIfAbsent(key, k -> {
-              DataType inferred = OpenStructTypeInference.inferDataType(rawValue);
-              return inferred != null ? inferred : DataType.STRING;
-            });
+        DataType valueType;
+        if (keySpec != null) {
+          valueType = keySpec.getDataType();
+        } else {
+          DataType established = _inferredTypes.get(key);
+          if (established != null && established != DataType.STRING) {
+            // Sticky: a key already resolved to a non-STRING type can't flip later, so skip
+            // inference entirely -- matches MutableOpenStructIndex's fast path. An unmappable
+            // value here is a coercion failure below, not a fresh inference decision; overriding
+            // valueType to STRING per-row would desync it from _inferredTypes and corrupt _values
+            // with a mix of types for one key.
+            valueType = established;
+          } else {
+            // Resolve per value rather than only on first sighting: the key's inferred type is
+            // cached, so folding the counter into a computeIfAbsent would record one failure per
+            // key no matter how many values actually took the STRING fallback.
+            DataType inferred = OpenStructTypeInference.inferDataType(rawValue);
+            if (inferred == null) {
+              valueType = DataType.STRING;
+              _inferenceFailuresPerKey.merge(key, 1L, Long::sum);
+            } else {
+              // established is STRING here (or null): once a key falls back to STRING it stays
+              // STRING even if a later value would infer cleanly on its own.
+              valueType = established != null ? established : inferred;
+            }
+            _inferredTypes.putIfAbsent(key, valueType);
+          }
+        }
         if (!_presenceBitmaps.containsKey(key)) {
           _presenceBitmaps.put(key, new RoaringBitmap());
           _values.put(key, new ArrayList<>());
@@ -214,7 +240,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
           PinotDataType destType = ColumnDataType.fromDataTypeSV(valueType.getStoredType()).toPinotDataType();
           coerced = destType.convert(rawValue, sourceType);
         } catch (Exception e) {
-          _coercionFailures++;
+          _coercionFailuresPerKey.merge(key, 1L, Long::sum);
           _presenceBitmaps.get(key).remove(_numDocs);
           continue;
         }
@@ -246,15 +272,72 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       writeSparseJsonColumn(sparseKeys);
     }
 
-    if (_coercionFailures > 0) {
-      LOGGER.info("OPEN_STRUCT '{}': dropped {} values due to type coercion failures", _columnName, _coercionFailures);
-      ServerMetrics serverMetrics = ServerMetrics.get();
-      if (serverMetrics != null) {
-        serverMetrics.addMeteredGlobalValue(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, _coercionFailures);
-      }
+    long totalCoercionFailures = sumValues(_coercionFailuresPerKey);
+    if (totalCoercionFailures > 0) {
+      LOGGER.info("OPEN_STRUCT '{}': dropped {} values due to type coercion failures across {} keys",
+          _columnName, totalCoercionFailures, _coercionFailuresPerKey.size());
+      // The key space is user-controlled, so the per-key breakdown is DEBUG-only.
+      LOGGER.debug("OPEN_STRUCT '{}': full coercion failure counts: {}", _columnName, _coercionFailuresPerKey);
     }
+    long totalInferenceFailures = sumValues(_inferenceFailuresPerKey);
+    if (totalInferenceFailures > 0) {
+      LOGGER.info("OPEN_STRUCT '{}': {} values across {} keys fell back to STRING after type inference failed",
+          _columnName, totalInferenceFailures, _inferenceFailuresPerKey.size());
+      LOGGER.debug("OPEN_STRUCT '{}': full inference failure counts: {}", _columnName, _inferenceFailuresPerKey);
+    }
+    emitMetrics(sparseKeys.size(), totalCoercionFailures, totalInferenceFailures);
 
     emitParentColumnMetadata(sparseKeys);
+  }
+
+  private static long sumValues(Map<String, Long> counts) {
+    return counts.values().stream().mapToLong(Long::longValue).sum();
+  }
+
+  private void emitMetrics(int sparseKeyCount, long totalCoercionFailures, long totalInferenceFailures) {
+    ServerMetrics serverMetrics = ServerMetrics.get();
+    if (serverMetrics == null || _numDocs == 0) {
+      return;
+    }
+
+    if (totalCoercionFailures > 0) {
+      serverMetrics.addMeteredTableValue(_tableNameWithType, _columnName,
+          ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, totalCoercionFailures);
+    }
+    if (totalInferenceFailures > 0) {
+      serverMetrics.addMeteredTableValue(_tableNameWithType, _columnName,
+          ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, totalInferenceFailures);
+    }
+
+    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
+        ServerGauge.OPEN_STRUCT_LAST_SEGMENT_DENSE_KEY_COUNT, _resolvedDenseKeys.size());
+    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
+        ServerGauge.OPEN_STRUCT_LAST_SEGMENT_SPARSE_KEY_COUNT, sparseKeyCount);
+    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
+        ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_COUNT, _presenceBitmaps.size());
+    // Denominator for the per-key fill rate. Emitted as a raw count rather than folding the ratio into a
+    // single percentage gauge: integer division truncates a key present in a handful of docs to 0, which
+    // is indistinguishable from no data and is exactly the case worth alerting on.
+    serverMetrics.setOrUpdateTableGauge(_tableNameWithType, _columnName,
+        ServerGauge.OPEN_STRUCT_LAST_SEGMENT_DOC_COUNT, _numDocs);
+
+    if (_config.isPerKeyMetricsEnabled()) {
+      // Emit for every key in the segment. Registry entries follow the ingested key space;
+      // table deletion can only sweep keys recoverable from denseKeys.
+      _presenceBitmaps.forEach((key, presence) -> serverMetrics.setOrUpdateTableGauge(_tableNameWithType,
+          OpenStructNaming.metricKey(_columnName, key),
+          ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT, presence.getCardinality()));
+    } else {
+      // Emit only for configured dense keys — bounded by the table config.
+      for (String key : _config.getDenseKeys()) {
+        RoaringBitmap presence = _presenceBitmaps.get(key);
+        if (presence != null) {
+          serverMetrics.setOrUpdateTableGauge(_tableNameWithType,
+              OpenStructNaming.metricKey(_columnName, key),
+              ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT, presence.getCardinality());
+        }
+      }
+    }
   }
 
   @Override
