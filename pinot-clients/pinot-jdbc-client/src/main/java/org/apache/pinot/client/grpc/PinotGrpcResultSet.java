@@ -18,32 +18,28 @@
  */
 package org.apache.pinot.client.grpc;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
 import java.math.BigDecimal;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.sql.Date;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLDataException;
 import java.sql.SQLException;
-import java.sql.Time;
-import java.sql.Timestamp;
-import java.util.Calendar;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
-import org.apache.commons.codec.binary.Hex;
+import javax.annotation.Nullable;
 import org.apache.pinot.client.PinotResultMetadata;
 import org.apache.pinot.client.base.AbstractBaseResultSet;
-import org.apache.pinot.client.utils.DateTimeUtils;
 import org.apache.pinot.common.proto.Broker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,6 +47,8 @@ import org.slf4j.LoggerFactory;
 public class PinotGrpcResultSet extends AbstractBaseResultSet {
   public static final String NULL_STRING = "null";
   private static final Logger LOG = LoggerFactory.getLogger(PinotGrpcResultSet.class);
+  private static final ObjectReader MAP_READER =
+      JsonUtils.DEFAULT_READER.forType(new TypeReference<Map<?, ?>>() { });
 
   private final Iterator<Broker.BrokerResponse> _brokerResponseIterator;
   private final int _totalColumns;
@@ -88,13 +86,6 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
 
   public static PinotGrpcResultSet empty() {
     return new PinotGrpcResultSet();
-  }
-
-  protected void validateState()
-      throws SQLException {
-    if (isClosed()) {
-      throw new SQLException("Not possible to operate on closed or empty result sets");
-    }
   }
 
   protected void validateColumn(int columnIndex)
@@ -153,105 +144,16 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
   }
 
   @Override
+  @Nullable
+  protected ColumnDataType getColumnType(int columnIndex) {
+    return _dataSchema.getColumnDataType(columnIndex - 1);
+  }
+
+  @Override
   public boolean first()
       throws SQLException {
     validateState();
     throw new SQLDataException("Absolute row number not supported");
-  }
-
-  @Override
-  public InputStream getAsciiStream(int columnIndex)
-      throws SQLException {
-    String value = getString(columnIndex);
-    InputStream in = new ByteArrayInputStream(value.getBytes(StandardCharsets.US_ASCII));
-    return in;
-  }
-
-  @Override
-  public BigDecimal getBigDecimal(int columnIndex, int scale)
-      throws SQLException {
-    try {
-      String value = this.getString(columnIndex);
-      int calculatedScale = getCalculatedScale(value);
-      return value == null ? null : new BigDecimal(value).setScale(calculatedScale);
-    } catch (Exception e) {
-      throw new SQLException("Unable to fetch BigDecimal value", e);
-    }
-  }
-
-  int getCalculatedScale(String value) {
-    int index = value.indexOf(".");
-    return index == -1 ? 0 : value.length() - index - 1;
-  }
-
-  @Override
-  public boolean getBoolean(int columnIndex)
-      throws SQLException {
-    validateColumn(columnIndex);
-    String value = getString(columnIndex);
-    return value == null ? false : Boolean.parseBoolean(value);
-  }
-
-  @Override
-  public byte[] getBytes(int columnIndex)
-      throws SQLException {
-    try {
-      String value = getString(columnIndex);
-      return value == null ? null : Hex.decodeHex(value.toCharArray());
-    } catch (Exception e) {
-      throw new SQLException(String.format("Unable to fetch value for column %d", columnIndex), e);
-    }
-  }
-
-  @Override
-  public Reader getCharacterStream(int columnIndex)
-      throws SQLException {
-    InputStream in = getUnicodeStream(columnIndex);
-    Reader reader = new InputStreamReader(in, StandardCharsets.UTF_8);
-    return reader;
-  }
-
-  @Override
-  public Date getDate(int columnIndex, Calendar cal)
-      throws SQLException {
-    try {
-      String value = getString(columnIndex);
-      return value == null ? null : DateTimeUtils.getDateFromString(value, cal);
-    } catch (Exception e) {
-      throw new SQLException("Unable to fetch date", e);
-    }
-  }
-
-  @Override
-  public double getDouble(int columnIndex)
-      throws SQLException {
-    validateColumn(columnIndex);
-    String value = getString(columnIndex);
-    return value == null ? 0.0 : Double.parseDouble(value);
-  }
-
-  @Override
-  public float getFloat(int columnIndex)
-      throws SQLException {
-    validateColumn(columnIndex);
-    String value = getString(columnIndex);
-    return value == null ? 0.0f : Float.parseFloat(value);
-  }
-
-  @Override
-  public int getInt(int columnIndex)
-      throws SQLException {
-    validateColumn(columnIndex);
-    String value = getString(columnIndex);
-    return value == null ? 0 : Integer.parseInt(value);
-  }
-
-  @Override
-  public long getLong(int columnIndex)
-      throws SQLException {
-    validateColumn(columnIndex);
-    String value = getString(columnIndex);
-    return value == null ? 0 : Long.parseLong(value);
   }
 
   @Override
@@ -262,69 +164,137 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
   }
 
   @Override
-  public short getShort(int columnIndex)
-      throws SQLException {
-    Integer value = getInt(columnIndex);
-    return value == null ? null : value.shortValue();
-  }
-
-  @Override
+  @Nullable
   public String getString(int columnIndex)
       throws SQLException {
-    validateColumn(columnIndex);
-    String val = _currentRowBatch.getRows().get(_currentBatchIndex)[columnIndex - 1].toString();
+    Object value = getValue(columnIndex);
+    String val = value == null ? null : value.toString();
     if (checkIsNull(val)) {
       return null;
     }
     return val;
   }
 
-  @Override
-  public Object getObject(int columnIndex)
+  @Nullable
+  private Object getValue(int columnIndex)
       throws SQLException {
-
-    String dataType = _columnDataTypes.getOrDefault(columnIndex, "");
-
-    if (dataType.isEmpty()) {
-      throw new SQLDataException("Data type not supported for " + dataType);
+    validateColumn(columnIndex);
+    Object value = _currentRowBatch.getRows().get(_currentBatchIndex)[columnIndex - 1];
+    if (value == null) {
+      _wasNull = true;
     }
-
-    switch (dataType) {
-      case "STRING":
-        return getString(columnIndex);
-      case "INT":
-        return getInt(columnIndex);
-      case "LONG":
-        return getLong(columnIndex);
-      case "FLOAT":
-        return getFloat(columnIndex);
-      case "DOUBLE":
-        return getDouble(columnIndex);
-      case "BOOLEAN":
-        return getBoolean(columnIndex);
-      case "BYTES":
-        return getBytes(columnIndex);
-      default:
-        throw new SQLDataException("Data type not supported for " + dataType);
-    }
+    return value;
   }
 
   @Override
-  public <T> T getObject(int columnIndex, Class<T> type)
+  @Nullable
+  protected Map<?, ?> getMap(int columnIndex)
       throws SQLException {
-    Object value = getObject(columnIndex);
-
+    Object value = getValue(columnIndex);
+    if (value == null) {
+      return null;
+    }
+    if (!(value instanceof Map)) {
+      throw new SQLDataException("Expected map value, found: " + value.getClass());
+    }
     try {
-      return type.cast(value);
-    } catch (ClassCastException e) {
-      throw new SQLDataException("Data type conversion is not supported from :" + value.getClass() + " to: " + type);
+      // Rebind through the same untyped Jackson reader used by PinotResultSet so numeric and nested container types
+      // do not depend on the transport decoder's intermediate representation.
+      return MAP_READER.readValue(JsonUtils.objectToString(value));
+    } catch (IOException e) {
+      throw new SQLDataException("Error parsing map", e);
     }
   }
 
   @Override
-  public <T> T getObject(String columnLabel, Class<T> type)
+  @Nullable
+  protected List<?> getList(int columnIndex, ColumnDataType dataType)
       throws SQLException {
-    return super.getObject(columnLabel, type);
+    Object value = getValue(columnIndex);
+    if (value == null) {
+      return null;
+    }
+    try {
+      switch (dataType) {
+        case BOOLEAN_ARRAY:
+          return toList((boolean[]) value);
+        case INT_ARRAY:
+          return toList((int[]) value);
+        case LONG_ARRAY:
+          return toList((long[]) value);
+        case FLOAT_ARRAY:
+          return toList((float[]) value);
+        case DOUBLE_ARRAY:
+          return toList((double[]) value);
+        case BIG_DECIMAL_ARRAY:
+          return toBigDecimalList((String[]) value);
+        case TIMESTAMP_ARRAY:
+          return toTimestampList(Arrays.asList((String[]) value));
+        case STRING_ARRAY:
+          return new ArrayList<>(Arrays.asList((String[]) value));
+        case BYTES_ARRAY:
+          return toBytesList(Arrays.asList((String[]) value));
+        case UUID_ARRAY:
+          return toUuidList(Arrays.asList((String[]) value));
+        default:
+          throw new SQLDataException("Data type is not an array: " + dataType);
+      }
+    } catch (ClassCastException e) {
+      throw new SQLDataException("Unexpected value type for " + dataType + ": " + value.getClass(), e);
+    }
+  }
+
+  private static List<Boolean> toList(boolean[] values) {
+    List<Boolean> list = new ArrayList<>(values.length);
+    for (boolean value : values) {
+      list.add(value);
+    }
+    return list;
+  }
+
+  private static List<Integer> toList(int[] values) {
+    List<Integer> list = new ArrayList<>(values.length);
+    for (int value : values) {
+      list.add(value);
+    }
+    return list;
+  }
+
+  private static List<Long> toList(long[] values) {
+    List<Long> list = new ArrayList<>(values.length);
+    for (long value : values) {
+      list.add(value);
+    }
+    return list;
+  }
+
+  private static List<Float> toList(float[] values) {
+    List<Float> list = new ArrayList<>(values.length);
+    for (float value : values) {
+      list.add(value);
+    }
+    return list;
+  }
+
+  private static List<Double> toList(double[] values) {
+    List<Double> list = new ArrayList<>(values.length);
+    for (double value : values) {
+      list.add(value);
+    }
+    return list;
+  }
+
+  private static List<BigDecimal> toBigDecimalList(String[] values)
+      throws SQLException {
+    List<BigDecimal> list = new ArrayList<>(values.length);
+    try {
+      for (String value : values) {
+        list.add(value == null ? null : new BigDecimal(value));
+      }
+      return list;
+    } catch (NumberFormatException e) {
+      throw new SQLDataException("Error parsing big decimal array", e);
+    }
   }
 
   private boolean checkIsNull(String val) {
@@ -333,47 +303,6 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
       return true;
     }
     return false;
-  }
-
-  @Override
-  public Time getTime(int columnIndex, Calendar cal)
-      throws SQLException {
-    try {
-      String value = getString(columnIndex);
-      return value == null ? null : DateTimeUtils.getTimeFromString(value, cal);
-    } catch (Exception e) {
-      throw new SQLException("Unable to fetch date", e);
-    }
-  }
-
-  @Override
-  public Timestamp getTimestamp(int columnIndex, Calendar cal)
-      throws SQLException {
-    try {
-      String value = getString(columnIndex);
-      return value == null ? null : DateTimeUtils.getTimestampFromString(value, cal);
-    } catch (Exception e) {
-      throw new SQLException("Unable to fetch date", e);
-    }
-  }
-
-  @Override
-  public URL getURL(int columnIndex)
-      throws SQLException {
-    try {
-      URL url = new URL(getString(columnIndex));
-      return url;
-    } catch (Exception e) {
-      throw new SQLException("Unable to fetch URL", e);
-    }
-  }
-
-  @Override
-  public InputStream getUnicodeStream(int columnIndex)
-      throws SQLException {
-    String value = getString(columnIndex);
-    InputStream in = new ByteArrayInputStream(value.getBytes(StandardCharsets.UTF_8));
-    return in;
   }
 
   @Override
