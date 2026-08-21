@@ -226,12 +226,6 @@ public class ForwardIndexConfig extends IndexConfig {
     return _codecSpec;
   }
 
-  /// Returns whether this config contains a codec specification.
-  @JsonIgnore
-  public boolean hasCodecSpec() {
-    return _codecSpec != null;
-  }
-
   public boolean isDeriveNumDocsPerChunk() {
     return _deriveNumDocsPerChunk;
   }
@@ -287,10 +281,12 @@ public class ForwardIndexConfig extends IndexConfig {
       return false;
     }
     ForwardIndexConfig that = (ForwardIndexConfig) o;
-    return _compressionCodec == that._compressionCodec && Objects.equals(_codecSpec, that._codecSpec)
+    return _compressionCodec == that._compressionCodec
+        && Objects.equals(_codecSpec, that._codecSpec)
         && _deriveNumDocsPerChunk == that._deriveNumDocsPerChunk
-        && _rawIndexWriterVersion == that._rawIndexWriterVersion && Objects.equals(_targetMaxChunkSize,
-        that._targetMaxChunkSize) && _targetDocsPerChunk == that._targetDocsPerChunk
+        && _rawIndexWriterVersion == that._rawIndexWriterVersion
+        && Objects.equals(_targetMaxChunkSize, that._targetMaxChunkSize)
+        && _targetDocsPerChunk == that._targetDocsPerChunk
         && _encodingType == that._encodingType;
   }
 
@@ -343,6 +339,8 @@ public class ForwardIndexConfig extends IndexConfig {
       return this;
     }
 
+    /// Selects the legacy compression path. A non-null value clears the codec-spec setting; `null` clears only the
+    /// legacy codec and leaves any codec specification unchanged.
     public Builder withCompressionCodec(@Nullable CompressionCodec compressionCodec) {
       _compressionCodec = compressionCodec;
       if (compressionCodec != null) {
@@ -351,6 +349,9 @@ public class ForwardIndexConfig extends IndexConfig {
       return this;
     }
 
+    /// Selects the codec-spec path. A non-null value clears the legacy compression codec; `null` clears only the codec
+    /// specification and leaves any legacy compression codec unchanged. Thus the last non-null compression setting
+    /// selects the active path.
     public Builder withCodecSpec(@Nullable String codecSpec) {
       _codecSpec = codecSpec;
       if (codecSpec != null) {

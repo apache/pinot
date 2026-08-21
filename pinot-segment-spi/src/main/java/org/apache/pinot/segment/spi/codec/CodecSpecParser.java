@@ -59,19 +59,14 @@ import java.util.List;
 /// Widening this grammar later stays a contained change; removing a Calcite dependency from
 /// segment headers would not be.
 public final class CodecSpecParser {
+  private CodecSpecParser() {
+  }
+
   public static final int MAX_SPEC_LENGTH = 4096;
   public static final int MAX_PIPELINE_STAGES = 32;
   public static final int MAX_IDENTIFIER_LENGTH = 128;
   public static final int MAX_ARGS_PER_INVOCATION = 16;
   public static final int MAX_ARGUMENT_LENGTH = 32;
-
-  /// Reserved codec name from the removed `CODEC(...)` wrapper syntax. Public so every layer that
-  /// enforces the reservation (this parser, [CodecInvocation], and the codec registry) shares one
-  /// definition instead of re-spelling the literal.
-  public static final String REMOVED_WRAPPER_NAME = "CODEC";
-
-  private CodecSpecParser() {
-  }
 
   /// Parses the codec specification into an immutable AST.
   ///
@@ -120,7 +115,7 @@ public final class CodecSpecParser {
 
     private CodecInvocation parseInvocation() {
       String name = parseName();
-      if (REMOVED_WRAPPER_NAME.equalsIgnoreCase(name)) {
+      if ("CODEC".equalsIgnoreCase(name)) {
         throw new IllegalArgumentException(
             "CODEC(...) wrapper is not supported; list codec invocations directly in: " + _input);
       }

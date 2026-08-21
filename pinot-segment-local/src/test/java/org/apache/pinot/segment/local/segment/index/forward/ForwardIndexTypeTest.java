@@ -30,12 +30,8 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
-import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -571,19 +567,5 @@ public class ForwardIndexTypeTest {
   public void testStandardIndex() {
     assertSame(StandardIndexes.forward(), StandardIndexes.forward(), "Standard index should use the same as "
         + "the ForwardIndexType static instance");
-  }
-
-  @Test
-  public void testCodecSpecIsRejectedForRealtimeMutableIndex() {
-    MutableIndexContext context = Mockito.mock(MutableIndexContext.class);
-    Mockito.when(context.getFieldSpec()).thenReturn(
-        new DimensionFieldSpec("dimInt", FieldSpec.DataType.INT, true));
-    ForwardIndexConfig config = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
-        .withCodecSpec("LZ4")
-        .build();
-
-    IllegalStateException exception = expectThrows(IllegalStateException.class,
-        () -> StandardIndexes.forward().createMutableIndex(context, config));
-    Assert.assertEquals(exception.getMessage(), "codecSpec is not supported yet for column: dimInt");
   }
 }

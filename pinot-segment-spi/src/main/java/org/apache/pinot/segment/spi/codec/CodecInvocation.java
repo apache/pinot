@@ -58,9 +58,14 @@ public final class CodecInvocation {
     return _args;
   }
 
+  /// Returns this invocation in its canonical DSL form.
+  public String toDslString() {
+    return _args.isEmpty() ? _name : _name + "(" + String.join(",", _args) + ")";
+  }
+
   @Override
   public String toString() {
-    return _args.isEmpty() ? _name : _name + "(" + String.join(",", _args) + ")";
+    return toDslString();
   }
 
   @Override
@@ -90,7 +95,7 @@ public final class CodecInvocation {
         throw new IllegalArgumentException("Invalid codec name: " + name);
       }
     }
-    if (CodecSpecParser.REMOVED_WRAPPER_NAME.equalsIgnoreCase(name)) {
+    if ("CODEC".equalsIgnoreCase(name)) {
       throw new IllegalArgumentException("CODEC is reserved by the removed wrapper syntax");
     }
   }

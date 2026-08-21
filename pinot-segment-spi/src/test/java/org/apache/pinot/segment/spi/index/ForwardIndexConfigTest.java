@@ -198,7 +198,6 @@ public class ForwardIndexConfigTest {
     ForwardIndexConfig config = JsonUtils.stringToObject(
         "{\"encodingType\":\"RAW\",\"codecSpec\":\" delta , zstd( 3 ) \"}", ForwardIndexConfig.class);
 
-    assertTrue(config.hasCodecSpec());
     assertEquals(config.getCodecSpec(), "DELTA,ZSTD(3)");
     assertNull(config.getCompressionCodec());
 
@@ -213,7 +212,6 @@ public class ForwardIndexConfigTest {
     ForwardIndexConfig config = JsonUtils.stringToObject(
         "{\"encodingType\":\"RAW\",\"codecSpec\":null}", ForwardIndexConfig.class);
 
-    assertFalse(config.hasCodecSpec());
     assertNull(config.getCodecSpec());
   }
 
@@ -241,7 +239,7 @@ public class ForwardIndexConfigTest {
   }
 
   @Test
-  public void builderUsesTheLastCompressionConfiguration() {
+  public void builderUsesTheLastNonNullCompressionConfiguration() {
     ForwardIndexConfig codecSpec = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
         .withCompressionCodec(FieldConfig.CompressionCodec.LZ4)
         .withCodecSpec("ZSTD(3)")
@@ -252,8 +250,22 @@ public class ForwardIndexConfigTest {
     ForwardIndexConfig legacy = new ForwardIndexConfig.Builder(codecSpec)
         .withCompressionCodec(FieldConfig.CompressionCodec.SNAPPY)
         .build();
-    assertFalse(legacy.hasCodecSpec());
+    assertNull(legacy.getCodecSpec());
     assertEquals(legacy.getCompressionCodec(), FieldConfig.CompressionCodec.SNAPPY);
+
+    ForwardIndexConfig codecSpecAfterNullLegacyCodec = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCodecSpec("ZSTD(3)")
+        .withCompressionCodec(null)
+        .build();
+    assertEquals(codecSpecAfterNullLegacyCodec.getCodecSpec(), "ZSTD(3)");
+    assertNull(codecSpecAfterNullLegacyCodec.getCompressionCodec());
+
+    ForwardIndexConfig legacyCodecAfterNullCodecSpec = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCompressionCodec(FieldConfig.CompressionCodec.LZ4)
+        .withCodecSpec(null)
+        .build();
+    assertNull(legacyCodecAfterNullCodecSpec.getCodecSpec());
+    assertEquals(legacyCodecAfterNullCodecSpec.getCompressionCodec(), FieldConfig.CompressionCodec.LZ4);
   }
 
   @Test

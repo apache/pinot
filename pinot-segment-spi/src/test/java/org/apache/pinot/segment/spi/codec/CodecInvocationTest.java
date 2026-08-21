@@ -62,6 +62,7 @@ public class CodecInvocationTest {
     CodecInvocation built = new CodecInvocation("ZSTD", List.of("3"));
     assertEquals(built, parsed);
     assertEquals(built.hashCode(), parsed.hashCode());
+    assertEquals(built.toDslString(), "ZSTD(3)");
     assertEquals(built.toString(), "ZSTD(3)");
 
     assertNotEquals(built, new CodecInvocation("ZSTD", List.of("4")));

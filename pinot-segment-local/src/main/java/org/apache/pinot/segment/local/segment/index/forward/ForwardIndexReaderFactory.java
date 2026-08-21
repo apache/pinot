@@ -19,9 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
-import java.io.IOException;
 import java.util.Arrays;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV6;
@@ -42,7 +40,6 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunk
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
@@ -50,7 +47,6 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -71,21 +67,10 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
     return StandardIndexes.forward();
   }
 
-  @Nullable
-  @Override
-  public ForwardIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
-      FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
-      throws IOException, IndexReaderConstraintException {
-    ForwardIndexType.rejectUnsupportedCodecSpec(
-        fieldIndexConfigs.getConfig(StandardIndexes.forward()), metadata.getColumnName());
-    return super.createIndexReader(segmentReader, fieldIndexConfigs, metadata);
-  }
-
   @Override
   protected ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
       ForwardIndexConfig indexConfig)
       throws IndexReaderConstraintException {
-    ForwardIndexType.rejectUnsupportedCodecSpec(indexConfig, metadata.getColumnName());
     return createIndexReader(dataBuffer, metadata);
   }
 

@@ -104,17 +104,11 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   @Override
   public void validate(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, TableConfig tableConfig) {
     ForwardIndexConfig forwardIndexConfig = indexConfigs.getConfig(StandardIndexes.forward());
-    rejectUnsupportedCodecSpec(forwardIndexConfig, fieldSpec.getName());
     if (forwardIndexConfig.isEnabled()) {
       validateForwardIndexEnabled(forwardIndexConfig, indexConfigs, fieldSpec);
     } else {
       validateForwardIndexDisabled(indexConfigs, fieldSpec, tableConfig);
     }
-  }
-
-  static void rejectUnsupportedCodecSpec(ForwardIndexConfig config, String column) {
-    Preconditions.checkState(!config.hasCodecSpec(),
-        "codecSpec is not supported yet for column: %s", column);
   }
 
   private void validateForwardIndexEnabled(ForwardIndexConfig forwardIndexConfig, FieldIndexConfigs indexConfigs,
@@ -314,7 +308,6 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
 
   @Override
   public boolean shouldCreateIndex(IndexCreationContext context, ForwardIndexConfig indexConfig) {
-    rejectUnsupportedCodecSpec(indexConfig, context.getFieldSpec().getName());
     return context.getFieldSpec().getDataType() != FieldSpec.DataType.OPEN_STRUCT;
   }
 
@@ -377,7 +370,6 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   @Nullable
   @Override
   public MutableIndex createMutableIndex(MutableIndexContext context, ForwardIndexConfig config) {
-    rejectUnsupportedCodecSpec(config, context.getFieldSpec().getName());
     if (config.isDisabled()) {
       return null;
     }

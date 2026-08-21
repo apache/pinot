@@ -48,7 +48,7 @@ public final class CodecPipeline {
 
   /// Returns the structurally normalized DSL string. Semantic normalization is codec-specific.
   public String toDslString() {
-    return _stages.stream().map(CodecInvocation::toString).collect(Collectors.joining(","));
+    return _stages.stream().map(CodecInvocation::toDslString).collect(Collectors.joining(","));
   }
 
   @Override
