@@ -443,8 +443,8 @@ public class ControllerConf extends PinotConfiguration {
 
   public static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
 
-  public static final String DISABLE_GROOVY = "controller.disable.ingestion.groovy";
-  public static final boolean DEFAULT_DISABLE_GROOVY = true;
+  public static final String DISABLE_GROOVY = CommonConstants.Groovy.DISABLE_INGESTION_GROOVY;
+  public static final boolean DEFAULT_DISABLE_GROOVY = CommonConstants.Groovy.DEFAULT_DISABLE_INGESTION_GROOVY;
 
   public static final String ENFORCE_POOL_BASED_ASSIGNMENT_KEY = "enforce.pool.based.assignment";
   public static final boolean DEFAULT_ENFORCE_POOL_BASED_ASSIGNMENT = false;
@@ -1527,7 +1527,7 @@ public class ControllerConf extends PinotConfiguration {
 
   /// @return true if Groovy functions are disabled in controller config, otherwise returns false.
   public boolean isDisableIngestionGroovy() {
-    return getProperty(DISABLE_GROOVY, DEFAULT_DISABLE_GROOVY);
+    return CommonConstants.Groovy.isIngestionGroovyDisabled(getProperty(DISABLE_GROOVY));
   }
 
   private long convertPeriodToUnit(String period, TimeUnit timeUnitToConvertTo) {

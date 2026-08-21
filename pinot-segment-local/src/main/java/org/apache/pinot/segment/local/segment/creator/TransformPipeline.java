@@ -27,6 +27,7 @@ import org.apache.pinot.segment.local.recordtransformer.RecordTransformerUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,6 +68,12 @@ public class TransformPipeline {
 
   public TransformPipeline(TableConfig tableConfig, Schema schema) {
     this(tableConfig.getTableName(), RecordTransformerUtils.getDefaultTransformers(tableConfig, schema));
+  }
+
+  public TransformPipeline(TableConfig tableConfig, Schema schema, IngestionGroovyPolicy ingestionGroovyPolicy) {
+    this(tableConfig.getTableName(),
+        RecordTransformerUtils.getDefaultTransformers(tableConfig, schema,
+            ingestionGroovyPolicy.isIngestionGroovyDisabled()));
   }
 
   public static TransformPipeline getPassThroughPipeline(String tableNameWithType) {

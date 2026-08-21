@@ -24,12 +24,16 @@ import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Server.Upsert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,8 +76,12 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     Supplier<PartialUpsertHandler> partialUpsertHandlerSupplier = null;
     if (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
       List<String> handlerComparisonColumns = comparisonColumns;
+      InstanceDataManagerConfig instanceDataManagerConfig = tableDataManager.getInstanceDataManagerConfig();
+      boolean disableGroovy = FunctionEvaluatorFactory.resolveIngestionGroovyDisabled(instanceDataManagerConfig != null
+          ? instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY) : null);
       partialUpsertHandlerSupplier =
-          () -> new PartialUpsertHandler(tableConfig, schema, handlerComparisonColumns, upsertConfig);
+          () -> new PartialUpsertHandler(tableConfig, schema, handlerComparisonColumns, upsertConfig,
+              IngestionGroovyPolicy.fromDisabled(disableGroovy));
     }
 
     boolean enableSnapshot = upsertConfig.getSnapshot()

@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
@@ -61,6 +62,7 @@ import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
+import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.SourceFieldConfig;
@@ -87,6 +89,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -103,6 +107,73 @@ public class TableConfigUtilsTest {
 
   private static final RoutingConfig STRICT_REPLICA_ROUTING_CONFIG =
       new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false);
+
+  @BeforeMethod
+  public void enableGroovyForExistingValidationTests() {
+    FunctionEvaluatorFactory.setIngestionGroovyDisabled(false);
+  }
+
+  @AfterMethod(alwaysRun = true)
+  public void restoreDefaultGroovyPolicy() {
+    FunctionEvaluatorFactory.setIngestionGroovyDisabled(true);
+  }
+
+  @Test
+  public void testGroovyPolicyValidationCannotBeSkipped() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("source", DataType.STRING)
+        .addSingleValueDimension("destination", DataType.STRING)
+        .build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    String groovyFunction = "Groovy({source.reverse()}, source)";
+    FunctionEvaluatorFactory.setIngestionGroovyDisabled(true);
+
+    schema.getFieldSpecFor("destination").setTransformFunction(groovyFunction);
+    assertGroovyPolicyRejected(tableConfig, schema);
+    schema.getFieldSpecFor("destination").setTransformFunction(null);
+
+    ingestionConfig.setFilterConfig(new FilterConfig(groovyFunction));
+    assertGroovyPolicyRejected(tableConfig, schema);
+    ingestionConfig.setFilterConfig(null);
+
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("destination", groovyFunction)));
+    assertGroovyPolicyRejected(tableConfig, schema);
+    ingestionConfig.setTransformConfigs(null);
+
+    ObjectNode fieldToFunctionMap = JsonNodeFactory.instance.objectNode();
+    fieldToFunctionMap.put("destination", groovyFunction);
+    ObjectNode enrichmentProperties = JsonNodeFactory.instance.objectNode();
+    enrichmentProperties.set("fieldToFunctionMap", fieldToFunctionMap);
+    ingestionConfig.setEnrichmentConfigs(
+        List.of(new EnrichmentConfig("generateColumn", enrichmentProperties, false)));
+    assertGroovyPolicyRejected(tableConfig, schema);
+    ingestionConfig.setEnrichmentConfigs(null);
+
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("destination", groovyFunction)));
+    tableConfig.setUpsertConfig(upsertConfig);
+    assertGroovyPolicyRejected(tableConfig, schema);
+
+    schema.getFieldSpecFor("destination").setTransformFunction("reverse(source)");
+    ingestionConfig.setFilterConfig(new FilterConfig("isNotNull(source)"));
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("destination", "reverse(source)")));
+    fieldToFunctionMap.put("destination", "reverse(source)");
+    ingestionConfig.setEnrichmentConfigs(
+        List.of(new EnrichmentConfig("generateColumn", enrichmentProperties, false)));
+    upsertConfig.setPostPartialUpsertTransformConfigs(
+        List.of(new TransformConfig("destination", "reverse(source)")));
+    TableConfigUtils.validate(tableConfig, schema, "ALL");
+  }
+
+  private static void assertGroovyPolicyRejected(TableConfig tableConfig, Schema schema) {
+    IllegalStateException error = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validate(tableConfig, schema, "ALL"));
+    assertTrue(error.getMessage().contains(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY), error.getMessage());
+  }
 
   @Test
   public void validateTimeColumnValidationConfig() {
@@ -455,14 +526,16 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validate(tableConfig, schema);
 
     // invalid transform config since Groovy is disabled
+    FunctionEvaluatorFactory.setIngestionGroovyDisabled(true);
     try {
-      TableConfigUtils.setDisableGroovy(true);
-      TableConfigUtils.validate(tableConfig, schema);
-      // Reset to false
-      TableConfigUtils.setDisableGroovy(false);
-      fail("Should fail when Groovy functions disabled but found in transform config");
-    } catch (IllegalStateException e) {
-      // expected
+      try {
+        TableConfigUtils.validate(tableConfig, schema);
+        fail("Should fail when Groovy functions disabled but found in transform config");
+      } catch (IllegalStateException e) {
+        // expected
+      }
+    } finally {
+      FunctionEvaluatorFactory.setIngestionGroovyDisabled(false);
     }
 
     // Using peer download scheme with replication of 1
@@ -491,14 +564,16 @@ public class TableConfigUtilsTest {
 
     // invalid filter config since Groovy is disabled
     ingestionConfig.setFilterConfig(new FilterConfig("Groovy({timestamp > 0}, timestamp)"));
+    FunctionEvaluatorFactory.setIngestionGroovyDisabled(true);
     try {
-      TableConfigUtils.setDisableGroovy(true);
-      TableConfigUtils.validate(tableConfig, schema);
-      // Reset to false
-      TableConfigUtils.setDisableGroovy(false);
-      fail("Should fail when Groovy functions disabled but found in filter config");
-    } catch (IllegalStateException e) {
-      // expected
+      try {
+        TableConfigUtils.validate(tableConfig, schema);
+        fail("Should fail when Groovy functions disabled but found in filter config");
+      } catch (IllegalStateException e) {
+        // expected
+      }
+    } finally {
+      FunctionEvaluatorFactory.setIngestionGroovyDisabled(false);
     }
 
     // null transform column name

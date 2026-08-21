@@ -25,6 +25,7 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.testng.Assert;
@@ -51,6 +52,16 @@ public class ControllerConfTest {
   );
 
   private static final Random RAND = new Random();
+
+  @Test
+  public void testIngestionGroovyPolicyDefaultAndOptIn() {
+    Assert.assertEquals(ControllerConf.DISABLE_GROOVY, CommonConstants.Groovy.DISABLE_INGESTION_GROOVY);
+    Assert.assertEquals(ControllerConf.DEFAULT_DISABLE_GROOVY,
+        CommonConstants.Groovy.DEFAULT_DISABLE_INGESTION_GROOVY);
+    Assert.assertTrue(new ControllerConf(Map.of()).isDisableIngestionGroovy());
+    Assert.assertFalse(
+        new ControllerConf(Map.of(ControllerConf.DISABLE_GROOVY, false)).isDisableIngestionGroovy());
+  }
 
   /// When only new configs are supplied (deprecated configs have been removed), then the correct
   /// converted value is returned.

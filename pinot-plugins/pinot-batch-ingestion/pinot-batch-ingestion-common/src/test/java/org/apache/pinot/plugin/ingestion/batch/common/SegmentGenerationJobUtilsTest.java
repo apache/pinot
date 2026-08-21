@@ -21,12 +21,48 @@ package org.apache.pinot.plugin.ingestion.batch.common;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
+import org.apache.pinot.spi.ingestion.batch.spec.ExecutionFrameworkSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 public class SegmentGenerationJobUtilsTest {
+
+  @Test
+  public void testResolveAndPersistIngestionGroovyPolicy() {
+    SegmentGenerationJobSpec spec = new SegmentGenerationJobSpec();
+    ExecutionFrameworkSpec executionFrameworkSpec = new ExecutionFrameworkSpec();
+    executionFrameworkSpec.setExtraConfigs(Map.of(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY, "false"));
+    spec.setExecutionFrameworkSpec(executionFrameworkSpec);
+
+    Assert.assertFalse(SegmentGenerationJobUtils.resolveAndPersistIngestionGroovyPolicy(spec));
+    Assert.assertFalse(SegmentGenerationJobUtils.isIngestionGroovyDisabled(spec));
+    Assert.assertEquals(spec.getExecutionFrameworkSpec().getExtraConfigs(),
+        Map.of(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY, "false"));
+  }
+
+  @Test
+  public void testMissingPolicyIsCapturedForLaunchAndFailsClosedOnLegacyWorker() {
+    SegmentGenerationJobSpec launchSpec = new SegmentGenerationJobSpec();
+    boolean expectedLaunchPolicy = FunctionEvaluatorFactory.isIngestionGroovyDisabled();
+
+    Assert.assertEquals(SegmentGenerationJobUtils.resolveAndPersistIngestionGroovyPolicy(launchSpec),
+        expectedLaunchPolicy);
+    Assert.assertEquals(launchSpec.getExecutionFrameworkSpec().getExtraConfigs().get(
+        CommonConstants.Groovy.DISABLE_INGESTION_GROOVY), Boolean.toString(expectedLaunchPolicy));
+
+    SegmentGenerationJobSpec legacyWorkerSpec = new SegmentGenerationJobSpec();
+    Assert.assertTrue(SegmentGenerationJobUtils.isIngestionGroovyDisabled(legacyWorkerSpec));
+    ExecutionFrameworkSpec invalidExecutionFrameworkSpec = new ExecutionFrameworkSpec();
+    invalidExecutionFrameworkSpec.setExtraConfigs(
+        Map.of(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY, "invalid"));
+    legacyWorkerSpec.setExecutionFrameworkSpec(invalidExecutionFrameworkSpec);
+    Assert.assertTrue(SegmentGenerationJobUtils.isIngestionGroovyDisabled(legacyWorkerSpec));
+  }
 
   @Test
   public void testUseGlobalDirectorySequenceId() {

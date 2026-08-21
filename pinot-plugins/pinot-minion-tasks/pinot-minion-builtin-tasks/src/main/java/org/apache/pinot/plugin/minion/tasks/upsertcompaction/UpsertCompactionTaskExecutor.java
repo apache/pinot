@@ -36,6 +36,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.utils.Obfuscator;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
@@ -44,6 +45,15 @@ import org.slf4j.LoggerFactory;
 
 public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskExecutor.class);
+  private final IngestionGroovyPolicy _ingestionGroovyPolicy;
+
+  public UpsertCompactionTaskExecutor() {
+    this(IngestionGroovyPolicy.DISABLED);
+  }
+
+  public UpsertCompactionTaskExecutor(IngestionGroovyPolicy ingestionGroovyPolicy) {
+    _ingestionGroovyPolicy = ingestionGroovyPolicy;
+  }
 
   @Override
   protected SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
@@ -110,7 +120,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     try (CompactedPinotSegmentRecordReader compactedRecordReader = new CompactedPinotSegmentRecordReader(validDocIds)) {
       compactedRecordReader.init(indexDir, null, null);
       SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName,
-          getSchema(tableNameWithType));
+          getSchema(tableNameWithType), _ingestionGroovyPolicy.isIngestionGroovyDisabled());
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(config, compactedRecordReader);
       driver.build();
@@ -138,8 +148,9 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
   }
 
   private static SegmentGeneratorConfig getSegmentGeneratorConfig(File workingDir, TableConfig tableConfig,
-      SegmentMetadataImpl segmentMetadata, String segmentName, Schema schema) {
+      SegmentMetadataImpl segmentMetadata, String segmentName, Schema schema, boolean disableGroovy) {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setIngestionGroovyDisabled(disableGroovy);
     config.setInstanceType(InstanceType.MINION);
     config.setOutDir(workingDir.getPath());
     config.setSegmentName(segmentName);

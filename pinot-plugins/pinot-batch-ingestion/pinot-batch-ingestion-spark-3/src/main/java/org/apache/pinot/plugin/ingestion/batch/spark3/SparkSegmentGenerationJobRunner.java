@@ -41,6 +41,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.IngestionGroovyPolicy;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
@@ -113,9 +114,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
           _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setTableConfigURI(tableConfigURI);
     }
-    if (_spec.getExecutionFrameworkSpec().getExtraConfigs() == null) {
-      _spec.getExecutionFrameworkSpec().setExtraConfigs(new HashMap<>());
-    }
+    SegmentGenerationJobUtils.resolveAndPersistIngestionGroovyPolicy(_spec);
   }
 
   @Override
@@ -286,9 +285,11 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
           taskSpec.setSequenceId(idx);
           taskSpec.setSegmentNameGeneratorSpec(_spec.getSegmentNameGeneratorSpec());
           taskSpec.setFailOnEmptySegment(_spec.isFailOnEmptySegment());
+          boolean isGroovyDisabled = SegmentGenerationJobUtils.isIngestionGroovyDisabled(_spec);
           taskSpec.setCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
 
-          SegmentGenerationTaskRunner taskRunner = new SegmentGenerationTaskRunner(taskSpec);
+          SegmentGenerationTaskRunner taskRunner = new SegmentGenerationTaskRunner(taskSpec,
+              IngestionGroovyPolicy.fromDisabled(isGroovyDisabled));
           String segmentName = taskRunner.run();
 
           // Tar segment directory to compress file

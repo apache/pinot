@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 
 
@@ -2764,6 +2765,14 @@ public class CommonConstants {
   /// User can config different configuration for query and ingestion (table creation and update) static analyzer.
   /// The all configuration is the default configuration for both query and ingestion static analyzer.
   public static class Groovy {
+    public static final String DISABLE_INGESTION_GROOVY = "controller.disable.ingestion.groovy";
+    public static final boolean DEFAULT_DISABLE_INGESTION_GROOVY = true;
+
+    /// Only an explicit `false` enables ingestion Groovy. Missing, blank, and invalid values fail closed.
+    public static boolean isIngestionGroovyDisabled(@Nullable String configuredValue) {
+      return configuredValue == null || !Boolean.FALSE.toString().equalsIgnoreCase(configuredValue.trim());
+    }
+
     public static final String GROOVY_ALL_STATIC_ANALYZER_CONFIG = "pinot.groovy.all.static.analyzer";
     public static final String GROOVY_QUERY_STATIC_ANALYZER_CONFIG = "pinot.groovy.query.static.analyzer";
     public static final String GROOVY_INGESTION_STATIC_ANALYZER_CONFIG = "pinot.groovy.ingestion.static.analyzer";
