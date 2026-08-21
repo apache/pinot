@@ -31,8 +31,8 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 
 public class FunnelCompleteCountAggregationFunction extends FunnelBaseAggregationFunction<Integer> {
 
-  public FunnelCompleteCountAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments);
+  public FunnelCompleteCountAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments, nullHandlingEnabled);
   }
 
   @Override

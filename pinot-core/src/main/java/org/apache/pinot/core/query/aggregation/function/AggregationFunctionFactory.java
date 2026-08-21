@@ -507,17 +507,17 @@ public class AggregationFunctionFactory {
             throw new IllegalArgumentException(
                 "Aggregation function: " + functionType + " is only supported in selection without alias.");
           case FUNNELCOUNT:
-            return new FunnelCountAggregationFunctionFactory(arguments).get();
+            return new FunnelCountAggregationFunctionFactory(arguments, nullHandlingEnabled).get();
           case FUNNELMAXSTEP:
-            return new FunnelMaxStepAggregationFunction(arguments);
+            return new FunnelMaxStepAggregationFunction(arguments, nullHandlingEnabled);
           case FUNNELMATCHSTEP:
-            return new FunnelMatchStepAggregationFunction(arguments);
+            return new FunnelMatchStepAggregationFunction(arguments, nullHandlingEnabled);
           case FUNNELCOMPLETECOUNT:
-            return new FunnelCompleteCountAggregationFunction(arguments);
+            return new FunnelCompleteCountAggregationFunction(arguments, nullHandlingEnabled);
           case FUNNELSTEPDURATIONSTATS:
-            return new FunnelStepDurationStatsAggregationFunction(arguments);
+            return new FunnelStepDurationStatsAggregationFunction(arguments, nullHandlingEnabled);
           case FUNNELEVENTSFUNCTIONEVAL:
-            return new FunnelEventsFunctionEvalAggregationFunction(arguments);
+            return new FunnelEventsFunctionEvalAggregationFunction(arguments, nullHandlingEnabled);
           case FREQUENTSTRINGSSKETCH:
             return new FrequentStringsSketchAggregationFunction(arguments, nullHandlingEnabled);
           case FREQUENTLONGSSKETCH:

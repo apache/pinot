@@ -21,12 +21,15 @@ package org.apache.pinot.core.query.aggregation.function.funnel;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /// Interface for within segment aggregation strategy.
@@ -49,7 +52,11 @@ public abstract class AggregationStrategy<A> {
   private final List<ExpressionContext> _correlateByExpressions;
   private final ExpressionContext _primaryCorrelationCol;
 
-  public AggregationStrategy(List<ExpressionContext> stepExpressions, List<ExpressionContext> correlateByExpressions) {
+  protected final boolean _nullHandlingEnabled;
+
+  public AggregationStrategy(List<ExpressionContext> stepExpressions, List<ExpressionContext> correlateByExpressions,
+      boolean nullHandlingEnabled) {
+    _nullHandlingEnabled = nullHandlingEnabled;
     _stepExpressions = stepExpressions;
     _correlateByExpressions = correlateByExpressions;
     _primaryCorrelationCol = _correlateByExpressions.get(0);
@@ -117,13 +124,15 @@ public abstract class AggregationStrategy<A> {
     final Dictionary dictionary = getPrimaryDictionary(blockValSetMap);
     final int[] correlationIds = getPrimaryCorrelationIds(blockValSetMap);
     final A aggResult = getAggregationResult(dictionary, aggregationResultHolder);
-    for (int i = 0; i < length; i++) {
-      for (int n = 0; n < _numSteps; n++) {
-        if (steps[n][i] > 0) {
-          add(dictionary, aggResult, n, correlationIds[i]);
+    forEachNotNullCorrelation(length, blockValSetMap, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        for (int n = 0; n < _numSteps; n++) {
+          if (steps[n][i] > 0) {
+            add(dictionary, aggResult, n, correlationIds[i]);
+          }
         }
       }
-    }
+    });
   }
 
   private void aggregateMultiKey(int length, AggregationResultHolder aggregationResultHolder,
@@ -132,16 +141,18 @@ public abstract class AggregationStrategy<A> {
     final int[][] allCorrelationIds = getAllCorrelationDictIds(blockValSetMap);
     final A aggResult = getAggregationResultMultiKey(dictionaries, aggregationResultHolder);
     final int[] rowDictIds = new int[_numCorrelateByKeys];
-    for (int i = 0; i < length; i++) {
-      for (int k = 0; k < _numCorrelateByKeys; k++) {
-        rowDictIds[k] = allCorrelationIds[k][i];
-      }
-      for (int n = 0; n < _numSteps; n++) {
-        if (steps[n][i] > 0) {
-          addMultiKey(aggResult, n, dictionaries, rowDictIds);
+    forEachNotNullCorrelation(length, blockValSetMap, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        for (int k = 0; k < _numCorrelateByKeys; k++) {
+          rowDictIds[k] = allCorrelationIds[k][i];
+        }
+        for (int n = 0; n < _numSteps; n++) {
+          if (steps[n][i] > 0) {
+            addMultiKey(aggResult, n, dictionaries, rowDictIds);
+          }
         }
       }
-    }
+    });
   }
 
   /// Performs aggregation on the given group key array and block value sets (aggregation group-by on single-value
@@ -160,15 +171,17 @@ public abstract class AggregationStrategy<A> {
       Map<ExpressionContext, BlockValSet> blockValSetMap, int[][] steps) {
     final Dictionary dictionary = getPrimaryDictionary(blockValSetMap);
     final int[] correlationIds = getPrimaryCorrelationIds(blockValSetMap);
-    for (int i = 0; i < length; i++) {
-      final int groupKey = groupKeyArray[i];
-      final A aggResult = getAggregationResultGroupBy(dictionary, groupByResultHolder, groupKey);
-      for (int n = 0; n < _numSteps; n++) {
-        if (steps[n][i] > 0) {
-          add(dictionary, aggResult, n, correlationIds[i]);
+    forEachNotNullCorrelation(length, blockValSetMap, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        final int groupKey = groupKeyArray[i];
+        final A aggResult = getAggregationResultGroupBy(dictionary, groupByResultHolder, groupKey);
+        for (int n = 0; n < _numSteps; n++) {
+          if (steps[n][i] > 0) {
+            add(dictionary, aggResult, n, correlationIds[i]);
+          }
         }
       }
-    }
+    });
   }
 
   private void aggregateGroupBySVMultiKey(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
@@ -176,18 +189,20 @@ public abstract class AggregationStrategy<A> {
     final Dictionary[] dictionaries = getAllDictionaries(blockValSetMap);
     final int[][] allCorrelationIds = getAllCorrelationDictIds(blockValSetMap);
     final int[] rowDictIds = new int[_numCorrelateByKeys];
-    for (int i = 0; i < length; i++) {
-      for (int k = 0; k < _numCorrelateByKeys; k++) {
-        rowDictIds[k] = allCorrelationIds[k][i];
-      }
-      final int groupKey = groupKeyArray[i];
-      final A aggResult = getAggregationResultGroupByMultiKey(dictionaries, groupByResultHolder, groupKey);
-      for (int n = 0; n < _numSteps; n++) {
-        if (steps[n][i] > 0) {
-          addMultiKey(aggResult, n, dictionaries, rowDictIds);
+    forEachNotNullCorrelation(length, blockValSetMap, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        for (int k = 0; k < _numCorrelateByKeys; k++) {
+          rowDictIds[k] = allCorrelationIds[k][i];
+        }
+        final int groupKey = groupKeyArray[i];
+        final A aggResult = getAggregationResultGroupByMultiKey(dictionaries, groupByResultHolder, groupKey);
+        for (int n = 0; n < _numSteps; n++) {
+          if (steps[n][i] > 0) {
+            addMultiKey(aggResult, n, dictionaries, rowDictIds);
+          }
         }
       }
-    }
+    });
   }
 
   /// Performs aggregation on the given group keys array and block value sets (aggregation group-by on multi-value
@@ -206,16 +221,18 @@ public abstract class AggregationStrategy<A> {
       GroupByResultHolder groupByResultHolder, Map<ExpressionContext, BlockValSet> blockValSetMap, int[][] steps) {
     final Dictionary dictionary = getPrimaryDictionary(blockValSetMap);
     final int[] correlationIds = getPrimaryCorrelationIds(blockValSetMap);
-    for (int i = 0; i < length; i++) {
-      for (int groupKey : groupKeysArray[i]) {
-        final A aggResult = getAggregationResultGroupBy(dictionary, groupByResultHolder, groupKey);
-        for (int n = 0; n < _numSteps; n++) {
-          if (steps[n][i] > 0) {
-            add(dictionary, aggResult, n, correlationIds[i]);
+    forEachNotNullCorrelation(length, blockValSetMap, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        for (int groupKey : groupKeysArray[i]) {
+          final A aggResult = getAggregationResultGroupBy(dictionary, groupByResultHolder, groupKey);
+          for (int n = 0; n < _numSteps; n++) {
+            if (steps[n][i] > 0) {
+              add(dictionary, aggResult, n, correlationIds[i]);
+            }
           }
         }
       }
-    }
+    });
   }
 
   private void aggregateGroupByMVMultiKey(int length, int[][] groupKeysArray,
@@ -223,19 +240,21 @@ public abstract class AggregationStrategy<A> {
     final Dictionary[] dictionaries = getAllDictionaries(blockValSetMap);
     final int[][] allCorrelationIds = getAllCorrelationDictIds(blockValSetMap);
     final int[] rowDictIds = new int[_numCorrelateByKeys];
-    for (int i = 0; i < length; i++) {
-      for (int k = 0; k < _numCorrelateByKeys; k++) {
-        rowDictIds[k] = allCorrelationIds[k][i];
-      }
-      for (int groupKey : groupKeysArray[i]) {
-        final A aggResult = getAggregationResultGroupByMultiKey(dictionaries, groupByResultHolder, groupKey);
-        for (int n = 0; n < _numSteps; n++) {
-          if (steps[n][i] > 0) {
-            addMultiKey(aggResult, n, dictionaries, rowDictIds);
+    forEachNotNullCorrelation(length, blockValSetMap, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        for (int k = 0; k < _numCorrelateByKeys; k++) {
+          rowDictIds[k] = allCorrelationIds[k][i];
+        }
+        for (int groupKey : groupKeysArray[i]) {
+          final A aggResult = getAggregationResultGroupByMultiKey(dictionaries, groupByResultHolder, groupKey);
+          for (int n = 0; n < _numSteps; n++) {
+            if (steps[n][i] > 0) {
+              addMultiKey(aggResult, n, dictionaries, rowDictIds);
+            }
           }
         }
       }
-    }
+    });
   }
 
   /// Adds a correlation id to the aggregation counter for a given step in the funnel.
@@ -280,6 +299,49 @@ public abstract class AggregationStrategy<A> {
       allIds[k] = blockValSetMap.get(_correlateByExpressions.get(k)).getDictionaryIdsSV();
     }
     return allIds;
+  }
+
+  /// Runs the consumer over each range of rows whose correlation key is entirely non-null, or over the whole block
+  /// when the option is disabled.
+  ///
+  /// Only the correlation key is consulted. A step expression is a predicate, and a predicate over a null operand is
+  /// UNKNOWN, which SQL treats as not satisfied wherever a boolean is consumed, so a null step already means that
+  /// step did not match. The correlation key is what the funnel counts distinct values of, and a row whose key is
+  /// null belongs to no key at all; its dictionary id would otherwise be the default's, counted as a real one. With
+  /// a composite key a null in any component leaves the whole key undefined, so the row is skipped.
+  private void forEachNotNullCorrelation(int length, Map<ExpressionContext, BlockValSet> blockValSetMap,
+      RoaringBitmapUtils.BatchConsumer consumer) {
+    RoaringBitmap nullBitmap = correlationNullBitmap(blockValSetMap);
+    if (nullBitmap == null) {
+      consumer.consume(0, length);
+      return;
+    }
+    // Skip if the entire block is null
+    if (!nullBitmap.contains(0, length)) {
+      RoaringBitmapUtils.forEachUnset(length, nullBitmap.getIntIterator(), consumer);
+    }
+  }
+
+  /// Returns the union of the correlation columns' null bitmaps, or `null` when no row is null.
+  @Nullable
+  private RoaringBitmap correlationNullBitmap(Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    if (!_nullHandlingEnabled) {
+      return null;
+    }
+    RoaringBitmap merged = null;
+    for (ExpressionContext correlateByExpression : _correlateByExpressions) {
+      RoaringBitmap nullBitmap = blockValSetMap.get(correlateByExpression).getNullBitmap();
+      if (nullBitmap == null) {
+        continue;
+      }
+      // Copied before merging: the bitmap belongs to the block and must not be mutated
+      if (merged == null) {
+        merged = nullBitmap.clone();
+      } else {
+        merged.or(nullBitmap);
+      }
+    }
+    return merged;
   }
 
   private int[][] getSteps(Map<ExpressionContext, BlockValSet> blockValSetMap) {

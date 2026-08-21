@@ -32,6 +32,22 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 /// Synthetic [BlockValSet] for testing and benchmarking.
+///
+/// There is one fixture per stored type, single- and multi-value: `Int`/`IntMV`, `Long`/`LongMV`, `Float`/`FloatMV`,
+/// `Double`/`DoubleMV`, `BigDec`/`BigDecMV`, `Str`/`StrMV` and `Bytes`/`BytesMV`, plus `DictIds`/`DictIdsMV` for
+/// dictionary-encoded columns. Each takes an optional null bitmap and the raw values.
+///
+/// Two of them are named for a JDK type they must not shadow. A nested class called `String` or `BigDecimal` hides
+/// [String] or [BigDecimal] across the whole of this class, which silently changes the signature of every `getString*`
+/// or `getBigDecimal*` method declared here so that it no longer implements [BlockValSet]. Hence `Str` and `BigDec`;
+/// keep any future fixture clear of the same collision.
+///
+/// **The null bitmap is independent of the values.** A row marked null still holds whatever the values array puts
+/// at that index, and these fixtures have no notion of a column's `defaultNullValue`. That matches what a caller
+/// with null handling enabled sees, since it reads the bitmap and skips those rows. It does **not** match a real
+/// segment with null handling disabled, where a null row reads as the column default rather than as a neighbouring
+/// value. So a test that wants "nothing was aggregated" in the disabled mode cannot get there with an all-null
+/// bitmap - the values are still aggregated - and needs a holder that was never touched instead.
 public class SyntheticBlockValSets {
   private SyntheticBlockValSets() {
   }
@@ -142,6 +158,55 @@ public class SyntheticBlockValSets {
   /// A [BlockValSet] for a dictionary-encoded multi-value column, which exposes dictionary ids rather than values.
   ///
   /// Functions that collect dictionary ids take a different path from the one that reads values, and resolve the ids
+  /// A simple [BlockValSet] for nullable, dictionary-encoded single-value columns.
+  public static class DictIds extends Base {
+
+    @Nullable
+    final RoaringBitmap _nullBitmap;
+    final int[] _dictIds;
+    final Dictionary _dictionary;
+    final DataType _valueType;
+
+    private DictIds(@Nullable RoaringBitmap nullBitmap, int[] dictIds, Dictionary dictionary, DataType valueType) {
+      _nullBitmap = nullBitmap;
+      _dictIds = dictIds;
+      _dictionary = dictionary;
+      _valueType = valueType;
+    }
+
+    public static DictIds create(@Nullable RoaringBitmap nullBitmap, int[] dictIds, Dictionary dictionary,
+        DataType valueType) {
+      return new DictIds(nullBitmap, dictIds, dictionary, valueType);
+    }
+
+    @Nullable
+    @Override
+    public RoaringBitmap getNullBitmap() {
+      return _nullBitmap;
+    }
+
+    @Override
+    public DataType getValueType() {
+      return _valueType;
+    }
+
+    @Override
+    public boolean isSingleValue() {
+      return true;
+    }
+
+    @Nullable
+    @Override
+    public Dictionary getDictionary() {
+      return _dictionary;
+    }
+
+    @Override
+    public int[] getDictionaryIdsSV() {
+      return _dictIds;
+    }
+  }
+
   /// against the dictionary only when the result is extracted.
   public static class DictIdsMV extends Base {
 
@@ -542,9 +607,7 @@ public class SyntheticBlockValSets {
 
   /// A simple [BlockValSet] for nullable, not dictionary-encoded BigDecimal values.
   ///
-  /// Named `BigDec` rather than `BigDecimal` for the same reason [Str] is not named `String`: a nested class of that
-  /// name shadows [java.math.BigDecimal] across the whole enclosing class, which silently changes the signature of
-  /// every `getBigDecimal*` method declared here so that it no longer implements [BlockValSet].
+  /// Named `BigDec` rather than `BigDecimal` to avoid shadowing [BigDecimal]; see the class comment.
   public static class BigDec extends Base {
 
     @Nullable
