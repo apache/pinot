@@ -190,6 +190,9 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   private void validateForwardIndexDisabled(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec,
       TableConfig tableConfig) {
     String column = fieldSpec.getName();
+    ForwardIndexConfig forwardIndexConfig = indexConfigs.getConfig(StandardIndexes.forward());
+    Preconditions.checkState(forwardIndexConfig.getCodecSpec() == null,
+        "codecSpec cannot be configured when the forward index is disabled for column: %s", column);
 
     // TODO: Revisit this. We should allow dropping forward index after segment is sealed.
     Preconditions.checkState(tableConfig.getTableType() != TableType.REALTIME,

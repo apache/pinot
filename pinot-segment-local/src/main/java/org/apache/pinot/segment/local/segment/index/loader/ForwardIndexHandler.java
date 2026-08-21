@@ -302,7 +302,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   ///    `desiredDict = newIsDict || any-enabled-index-requires-dict`. The "force on if required" rule is the
   ///    only place this method consults other indexes — once `desiredDict` is computed, the rest of the logic
   ///    treats it as the source of truth.
-  /// 3. **Compression-type change** — only when no encoding change happened (forward + dict both unchanged).
+  /// 3. **Compression-type change** — whenever an existing RAW forward index remains RAW after the other
+  ///    operations. Adding/removing a standalone dictionary does not recreate that raw index, so a codec change
+  ///    must be queued alongside the dictionary operation.
   /// 4. **Cross-cutting guards** — sorted columns can't toggle forward; range index format is incompatible
   ///    with disabling the dictionary; enabling forward needs dict + inverted on disk; enabling dict needs
   ///    forward to be on so the dict can be bootstrapped.
@@ -409,17 +411,18 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       }
     }
 
-    // 3. Compression-type change (only when no encoding change happened).
-    if (ops.isEmpty() && existingFwdEncoding != null && existingFwdEncoding == newFwdEncoding
-        && existingHasDict == desiredDict) {
-      if (existingFwdEncoding == EncodingType.RAW) {
-        // TODO: Also check if raw index version needs to be changed
-        if (shouldRewriteRawForwardIndex(column, segmentReader)) {
-          ops.add(Operation.CHANGE_INDEX_COMPRESSION_TYPE);
-        }
-      } else if (shouldChangeDictIdCompressionType(column, segmentReader)) {
+    // 3. Compression-type change. A RAW -> RAW transition preserves the forward index even when a standalone
+    // dictionary is added, removed, or declined by optimize-dictionary heuristics. Check it independently of
+    // dictionary operations so the configured codec is applied in the same reload. Encoding conversions recreate
+    // the forward index with the new config and therefore do not need a second rewrite.
+    if (existingFwdEncoding == EncodingType.RAW && newFwdEncoding == EncodingType.RAW) {
+      // TODO: Also check if raw index version needs to be changed
+      if (shouldRewriteRawForwardIndex(column, segmentReader)) {
         ops.add(Operation.CHANGE_INDEX_COMPRESSION_TYPE);
       }
+    } else if (ops.isEmpty() && existingFwdEncoding == EncodingType.DICTIONARY
+        && newFwdEncoding == EncodingType.DICTIONARY && shouldChangeDictIdCompressionType(column, segmentReader)) {
+      ops.add(Operation.CHANGE_INDEX_COMPRESSION_TYPE);
     }
 
     return ops;
@@ -552,7 +555,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         // rewrite back to the legacy format so the segment can be read by older servers.
         // Use the typed CompressionCodec enum to distinguish:
         //   - explicit PASS_THROUGH (user wants no compression) → rewrite to legacy PASS_THROUGH
-        //   - any other named codec (LZ4/ZSTANDARD/SNAPPY/GZIP/DELTA/DELTADELTA) → rewrite
+        //   - a supported named codec (LZ4/ZSTANDARD/SNAPPY/GZIP) → rewrite
+        //   - historical DELTA/DELTADELTA values → defensively rewrite if an old config reaches reload,
+        //     although current table-config validation rejects those enum values for every column shape
         //   - CLP family / MV_ENTRY_DICT → not applicable to fixed-byte SV; skip
         //   - null (no compression configured) → no-op
         FieldConfig.CompressionCodec newCompressionCodec = fwdConfig.getCompressionCodec();
@@ -637,10 +642,10 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   }
 
   /// Identifies [FieldConfig.CompressionCodec] values that, when configured on a fixed-byte SV column whose
-  /// existing on-disk format is V7 (codec-pipeline), represent a legitimate rollback target — i.e.
-  /// the segment should be rewritten to a legacy format readable by older servers. Excludes the
-  /// CLP family (which doesn't apply to fixed-byte SV INT/LONG) and MV_ENTRY_DICT (dict-encoded
-  /// MV index).
+  /// existing on-disk format is V7 (codec-pipeline), should cause a rewrite to a legacy format readable
+  /// by older servers. DELTA and DELTADELTA are retained only as defensive compatibility for historical
+  /// configs; current table-config validation rejects both enum values for every column shape. Excludes
+  /// the CLP family (which doesn't apply to fixed-byte SV INT/LONG) and MV_ENTRY_DICT (dict-encoded MV index).
   private static boolean isLegacyRevertTargetForFixedByteSv(FieldConfig.CompressionCodec codec) {
     switch (codec) {
       case PASS_THROUGH:

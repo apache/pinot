@@ -649,17 +649,127 @@ public class ForwardIndexHandlerTest {
     }
   }
 
+  @Test
+  public void testAddStandaloneDictionaryAndChangeCodecInOneReload()
+      throws Exception {
+    String column = DIM_LZ4_INTEGER;
+    _noDictionaryColumns.remove(column);
+    _fieldConfigMap.put(column, rawFieldConfigWithCodecSpec(column, "DELTA,LZ4", true));
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+      ForwardIndexHandler handler = createForwardIndexHandler();
+      assertEquals(handler.computeOperations(writer), Map.of(column,
+          List.of(ForwardIndexHandler.Operation.ENABLE_DICTIONARY,
+              ForwardIndexHandler.Operation.CHANGE_INDEX_COMPRESSION_TYPE)));
+      handler.updateIndices(writer);
+      handler.postUpdateIndicesCleanup(writer);
+    }
+
+    assertRawCodecPipelineState(column, "DELTA,LZ4", true);
+  }
+
+  @Test
+  public void testRemoveStandaloneDictionaryAndChangeCodecInOneReload()
+      throws Exception {
+    String column = DIM_LZ4_INTEGER;
+
+    // Establish RAW + standalone dictionary while retaining the original legacy LZ4 forward index.
+    _noDictionaryColumns.remove(column);
+    ObjectNode dictionaryIndexes = JsonUtils.newObjectNode();
+    dictionaryIndexes.set("dictionary", JsonUtils.newObjectNode());
+    _fieldConfigMap.put(column, new FieldConfig.Builder(column)
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withCompressionCodec(CompressionCodec.LZ4)
+        .withIndexes(dictionaryIndexes)
+        .build());
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+      updateIndices();
+    }
+
+    // Remove only the standalone dictionary and change the preserved RAW index to V7 in one reload.
+    _noDictionaryColumns.add(column);
+    _fieldConfigMap.put(column, rawFieldConfigWithCodecSpec(column, "DELTA,LZ4"));
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+      ForwardIndexHandler handler = createForwardIndexHandler();
+      assertEquals(handler.computeOperations(writer), Map.of(column,
+          List.of(ForwardIndexHandler.Operation.DISABLE_DICTIONARY,
+              ForwardIndexHandler.Operation.CHANGE_INDEX_COMPRESSION_TYPE)));
+      handler.updateIndices(writer);
+      handler.postUpdateIndicesCleanup(writer);
+    }
+
+    assertRawCodecPipelineState(column, "DELTA,LZ4", false);
+  }
+
+  @Test
+  public void testCodecChangeSurvivesOptimizeDictionaryDecline()
+      throws Exception {
+    String column = DIM_LZ4_INTEGER;
+    _noDictionaryColumns.remove(column);
+    _fieldConfigMap.put(column, rawFieldConfigWithCodecSpec(column, "DELTA,LZ4", true));
+    TableConfig tableConfig = createTableConfig();
+    tableConfig.getIndexingConfig().setOptimizeDictionary(true);
+    tableConfig.getIndexingConfig().setNoDictionarySizeRatioThreshold(100.0d);
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+      ForwardIndexHandler handler = new ForwardIndexHandler(segmentDirectory, new IndexLoadingConfig(tableConfig,
+          SCHEMA));
+      assertEquals(handler.computeOperations(writer), Map.of(column,
+          List.of(ForwardIndexHandler.Operation.CHANGE_INDEX_COMPRESSION_TYPE)));
+      handler.updateIndices(writer);
+      handler.postUpdateIndicesCleanup(writer);
+    }
+
+    assertRawCodecPipelineState(column, "DELTA,LZ4", false);
+  }
+
   /// Builds a RAW FieldConfig whose codecSpec is configured via the modern `indexes.forward` block
   /// (the only supported path; there is no top-level FieldConfig.codecSpec field).
   private static FieldConfig rawFieldConfigWithCodecSpec(String column, String codecSpec) {
+    return rawFieldConfigWithCodecSpec(column, codecSpec, false);
+  }
+
+  private static FieldConfig rawFieldConfigWithCodecSpec(String column, String codecSpec, boolean enableDictionary) {
     ObjectNode forward = JsonUtils.newObjectNode();
     forward.put("codecSpec", codecSpec);
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("forward", forward);
+    if (enableDictionary) {
+      indexes.set("dictionary", JsonUtils.newObjectNode());
+    }
     return new FieldConfig.Builder(column)
         .withEncodingType(FieldConfig.EncodingType.RAW)
         .withIndexes(indexes)
         .build();
+  }
+
+  private void assertRawCodecPipelineState(String column, String codecSpec, boolean hasDictionary)
+      throws Exception {
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      ColumnMetadata metadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      assertEquals(metadata.hasDictionary(), hasDictionary);
+      assertEquals(metadata.getForwardIndexEncoding(), FieldConfig.EncodingType.RAW);
+      assertEquals(reader.hasIndexFor(column, StandardIndexes.dictionary()), hasDictionary);
+      IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+      try (ForwardIndexReader<?> forwardReader =
+          readerFactory.createIndexReader(reader, createFieldIndexConfigsFromMetadata(metadata), metadata)) {
+        assertEquals(forwardReader.getCodecSpec(), codecSpec);
+        assertNull(forwardReader.getCompressionType());
+      }
+    }
   }
 
   private IndexLoadingConfig createIndexLoadingConfig() {
@@ -3147,7 +3257,10 @@ public class ForwardIndexHandlerTest {
         SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
       _segmentDirectory = segmentDirectory;
       _writer = writer;
-      ForwardIndexHandler handler = createForwardIndexHandler();
+      TableConfig reloadTableConfig = createTableConfig();
+      reloadTableConfig.getIndexingConfig().setCompressionStatsEnabled(true);
+      ForwardIndexHandler handler =
+          new ForwardIndexHandler(segmentDirectory, new IndexLoadingConfig(reloadTableConfig, SCHEMA));
       assertEquals(handler.computeOperations(writer),
           Map.of(DIM_LZ4_INTEGER, List.of(ForwardIndexHandler.Operation.CHANGE_INDEX_COMPRESSION_TYPE)));
       handler.updateIndices(writer);
@@ -3157,6 +3270,8 @@ public class ForwardIndexHandlerTest {
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       ColumnMetadata metadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(DIM_LZ4_INTEGER);
+      assertEquals(metadata.getRawForwardIndexUncompressedValueSizeInBytes(), (long) totalDocs * Integer.BYTES);
+      assertNull(metadata.getRawForwardIndexChunkCompressionType());
       IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
       try (ForwardIndexReader<ChunkReaderContext>
           forwardReader = readerFactory.createIndexReader(reader, createFieldIndexConfigsFromMetadata(metadata),

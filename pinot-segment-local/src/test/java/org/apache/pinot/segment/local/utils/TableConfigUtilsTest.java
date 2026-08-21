@@ -1854,6 +1854,24 @@ public class TableConfigUtilsTest {
     assertTrue(exception.getMessage().contains("must operate on column values"),
         "Unexpected error: " + exception.getMessage());
 
+    // A disabled modern forward-index config cannot retain an ignored codecSpec. This must be rejected even
+    // without the legacy FieldConfig.forwardIndexDisabled property.
+    ObjectNode disabledForward = JsonUtils.newObjectNode();
+    disabledForward.put("disabled", true);
+    disabledForward.put("codecSpec", "DELTA,LZ4");
+    ObjectNode disabledIndexes = JsonUtils.newObjectNode();
+    disabledIndexes.set("forward", disabledForward);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    tableConfig.setFieldConfigList(List.of(new FieldConfig.Builder("intCol")
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(disabledIndexes)
+        .build()));
+    TableConfig disabledCodecSpecTableConfig = tableConfig;
+    exception = expectThrows(Exception.class,
+        () -> TableConfigUtils.validate(disabledCodecSpecTableConfig, schema));
+    assertTrue(exception.getMessage().contains("codecSpec cannot be configured when the forward index is disabled")
+        && exception.getMessage().contains("intCol"), "Unexpected error: " + exception.getMessage());
+
     // A well-formed compression-only RAW codecSpec passes table-config validation.
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     tableConfig.setFieldConfigList(List.of(rawFieldConfigWithCodecSpec("intCol", "ZSTD(3)")));
