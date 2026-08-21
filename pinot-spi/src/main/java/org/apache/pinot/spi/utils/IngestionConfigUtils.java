@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -33,6 +34,9 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -307,6 +311,31 @@ public final class IngestionConfigUtils {
       return Long.parseLong(pushRetryIntervalMillis);
     }
     return DEFAULT_PUSH_RETRY_INTERVAL_MILLIS;
+  }
+
+  /// Builds a column-to-transform-function map once so callers do not rescan the ingestion config per column.
+  /// Ingestion [TransformConfig]s win; schema-level [FieldSpec#getTransformFunction] is the legacy fallback for
+  /// columns not listed in the ingestion config.
+  public static Map<String, String> getTransformFunctionByColumn(@Nullable TableConfig tableConfig,
+      @Nullable Schema schema) {
+    Map<String, String> transformFunctionByColumn = new HashMap<>();
+    IngestionConfig ingestionConfig = tableConfig != null ? tableConfig.getIngestionConfig() : null;
+    if (ingestionConfig != null && ingestionConfig.getTransformConfigs() != null) {
+      for (TransformConfig transformConfig : ingestionConfig.getTransformConfigs()) {
+        if (transformConfig.getColumnName() != null && transformConfig.getTransformFunction() != null) {
+          transformFunctionByColumn.put(transformConfig.getColumnName(), transformConfig.getTransformFunction());
+        }
+      }
+    }
+    if (schema != null) {
+      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+        String transformFunction = fieldSpec.getTransformFunction();
+        if (transformFunction != null) {
+          transformFunctionByColumn.putIfAbsent(fieldSpec.getName(), transformFunction);
+        }
+      }
+    }
+    return transformFunctionByColumn;
   }
 
   /// Returns a unique client id which can be used for Stream providers
