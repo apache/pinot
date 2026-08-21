@@ -35,17 +35,15 @@ public final class CodecInvocation {
   /// @param args positional numeric arguments
   public CodecInvocation(String name, List<String> args) {
     String checkedName = Objects.requireNonNull(name, "name");
-    validateName(checkedName);
+    CodecDslSyntax.validateName(checkedName);
+    if (CodecDslSyntax.isRemovedWrapperName(checkedName)) {
+      throw new IllegalArgumentException("CODEC is reserved by the removed wrapper syntax");
+    }
     _name = checkedName.toUpperCase(Locale.ROOT);
 
     List<String> checkedArgs = Objects.requireNonNull(args, "args");
-    if (checkedArgs.size() > CodecSpecParser.MAX_ARGS_PER_INVOCATION) {
-      throw new IllegalArgumentException(
-          "Too many codec arguments: " + checkedArgs.size() + " (max "
-              + CodecSpecParser.MAX_ARGS_PER_INVOCATION + ")");
-    }
+    CodecDslSyntax.validateArguments(checkedArgs);
     _args = List.copyOf(checkedArgs);
-    validateArgs(_args);
   }
 
   /// Returns the codec name normalized to upper case.
@@ -83,47 +81,5 @@ public final class CodecInvocation {
   @Override
   public int hashCode() {
     return Objects.hash(_name, _args);
-  }
-
-  private static void validateName(String name) {
-    if (name.isEmpty() || name.length() > CodecSpecParser.MAX_IDENTIFIER_LENGTH
-        || !isAsciiIdentifierStart(name.charAt(0))) {
-      throw new IllegalArgumentException("Invalid codec name: " + name);
-    }
-    for (int i = 1; i < name.length(); i++) {
-      if (!isAsciiIdentifierPart(name.charAt(i))) {
-        throw new IllegalArgumentException("Invalid codec name: " + name);
-      }
-    }
-    if ("CODEC".equalsIgnoreCase(name)) {
-      throw new IllegalArgumentException("CODEC is reserved by the removed wrapper syntax");
-    }
-  }
-
-  private static void validateArgs(List<String> args) {
-    for (String arg : args) {
-      if (arg.isEmpty() || arg.length() > CodecSpecParser.MAX_ARGUMENT_LENGTH) {
-        throw new IllegalArgumentException("Invalid codec argument: " + arg);
-      }
-      for (int i = 0; i < arg.length(); i++) {
-        char c = arg.charAt(i);
-        if (c < '0' || c > '9') {
-          throw new IllegalArgumentException("Invalid codec argument: " + arg);
-        }
-      }
-      // Reject leading zeros so each argument value has exactly one spelling in the canonical form that is
-      // later frozen into segment headers.
-      if (arg.length() > 1 && arg.charAt(0) == '0') {
-        throw new IllegalArgumentException("Invalid codec argument (leading zeros): " + arg);
-      }
-    }
-  }
-
-  private static boolean isAsciiIdentifierStart(char c) {
-    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_';
-  }
-
-  private static boolean isAsciiIdentifierPart(char c) {
-    return isAsciiIdentifierStart(c) || (c >= '0' && c <= '9');
   }
 }

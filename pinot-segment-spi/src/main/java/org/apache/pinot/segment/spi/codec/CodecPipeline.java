@@ -33,10 +33,10 @@ public final class CodecPipeline {
     if (checkedStages.isEmpty()) {
       throw new IllegalArgumentException("A codec pipeline must have at least one stage");
     }
-    if (checkedStages.size() > CodecSpecParser.MAX_PIPELINE_STAGES) {
+    if (checkedStages.size() > CodecDslSyntax.MAX_PIPELINE_STAGES) {
       throw new IllegalArgumentException(
           "Codec pipeline has " + checkedStages.size() + " stages; maximum is "
-              + CodecSpecParser.MAX_PIPELINE_STAGES);
+              + CodecDslSyntax.MAX_PIPELINE_STAGES);
     }
     _stages = List.copyOf(checkedStages);
   }

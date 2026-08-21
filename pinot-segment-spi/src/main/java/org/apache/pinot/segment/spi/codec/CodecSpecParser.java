@@ -62,11 +62,11 @@ public final class CodecSpecParser {
   private CodecSpecParser() {
   }
 
-  public static final int MAX_SPEC_LENGTH = 4096;
-  public static final int MAX_PIPELINE_STAGES = 32;
-  public static final int MAX_IDENTIFIER_LENGTH = 128;
-  public static final int MAX_ARGS_PER_INVOCATION = 16;
-  public static final int MAX_ARGUMENT_LENGTH = 32;
+  public static final int MAX_SPEC_LENGTH = CodecDslSyntax.MAX_SPEC_LENGTH;
+  public static final int MAX_PIPELINE_STAGES = CodecDslSyntax.MAX_PIPELINE_STAGES;
+  public static final int MAX_IDENTIFIER_LENGTH = CodecDslSyntax.MAX_IDENTIFIER_LENGTH;
+  public static final int MAX_ARGS_PER_INVOCATION = CodecDslSyntax.MAX_ARGS_PER_INVOCATION;
+  public static final int MAX_ARGUMENT_LENGTH = CodecDslSyntax.MAX_ARGUMENT_LENGTH;
 
   /// Parses the codec specification into an immutable AST.
   ///
@@ -115,7 +115,7 @@ public final class CodecSpecParser {
 
     private CodecInvocation parseInvocation() {
       String name = parseName();
-      if ("CODEC".equalsIgnoreCase(name)) {
+      if (CodecDslSyntax.isRemovedWrapperName(name)) {
         throw new IllegalArgumentException(
             "CODEC(...) wrapper is not supported; list codec invocations directly in: " + _input);
       }
@@ -134,20 +134,17 @@ public final class CodecSpecParser {
         throw new IllegalArgumentException("Expected codec name but reached end of input: " + _input);
       }
       char first = _input.charAt(_pos);
-      if (!isAsciiIdentifierStart(first)) {
+      if (!CodecDslSyntax.isAsciiIdentifierStart(first)) {
         throw new IllegalArgumentException(
             "Expected codec name starting with [A-Za-z_] at position " + _pos + " in: " + _input);
       }
       int start = _pos++;
-      while (_pos < _input.length() && isAsciiIdentifierPart(_input.charAt(_pos))) {
+      while (_pos < _input.length() && CodecDslSyntax.isAsciiIdentifierPart(_input.charAt(_pos))) {
         _pos++;
       }
-      if (_pos - start > MAX_IDENTIFIER_LENGTH) {
-        throw new IllegalArgumentException(
-            "Codec name length " + (_pos - start) + " exceeds maximum " + MAX_IDENTIFIER_LENGTH + " in: "
-                + _input);
-      }
-      return _input.substring(start, _pos);
+      String name = _input.substring(start, _pos);
+      CodecDslSyntax.validateName(name);
+      return name;
     }
 
     private List<String> parseArgs() {
@@ -179,28 +176,19 @@ public final class CodecSpecParser {
         throw new IllegalArgumentException(
             "Leading sign is not allowed in codec argument at position " + start + " in: " + _input);
       }
-      if (first < '0' || first > '9') {
+      if (!CodecDslSyntax.isAsciiDigit(first)) {
         throw new IllegalArgumentException("Expected integer argument at position " + start + " in: " + _input);
       }
       while (_pos < _input.length()) {
         char c = _input.charAt(_pos);
-        if (c < '0' || c > '9') {
+        if (!CodecDslSyntax.isAsciiDigit(c)) {
           break;
         }
         _pos++;
       }
-      if (_pos - start > MAX_ARGUMENT_LENGTH) {
-        throw new IllegalArgumentException(
-            "Codec argument length " + (_pos - start) + " exceeds maximum " + MAX_ARGUMENT_LENGTH + " in: "
-                + _input);
-      }
-      // Leading zeros are rejected so that every argument value has exactly one spelling: the parsed spec is
-      // canonicalized and later frozen into segment headers, where "ZSTD(03)" and "ZSTD(3)" must not differ.
-      if (_pos - start > 1 && first == '0') {
-        throw new IllegalArgumentException(
-            "Leading zeros are not allowed in codec argument at position " + start + " in: " + _input);
-      }
-      return _input.substring(start, _pos);
+      String argument = _input.substring(start, _pos);
+      CodecDslSyntax.validateArgument(argument);
+      return argument;
     }
 
     private char peek() {
@@ -234,14 +222,6 @@ public final class CodecSpecParser {
         throw new IllegalArgumentException(
             "Unexpected trailing content '" + _input.substring(_pos) + "' in: " + _input);
       }
-    }
-
-    private static boolean isAsciiIdentifierStart(char c) {
-      return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_';
-    }
-
-    private static boolean isAsciiIdentifierPart(char c) {
-      return isAsciiIdentifierStart(c) || (c >= '0' && c <= '9');
     }
   }
 }
