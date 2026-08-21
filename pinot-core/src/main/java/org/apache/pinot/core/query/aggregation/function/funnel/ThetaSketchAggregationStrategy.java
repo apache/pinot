@@ -30,8 +30,8 @@ class ThetaSketchAggregationStrategy extends AggregationStrategy<UpdatableThetaS
   final UpdatableThetaSketchBuilder _updateSketchBuilder;
 
   public ThetaSketchAggregationStrategy(List<ExpressionContext> stepExpressions,
-      List<ExpressionContext> correlateByExpressions, int nominalEntries) {
-    super(stepExpressions, correlateByExpressions);
+      List<ExpressionContext> correlateByExpressions, int nominalEntries, boolean nullHandlingEnabled) {
+    super(stepExpressions, correlateByExpressions, nullHandlingEnabled);
     _updateSketchBuilder = new UpdatableThetaSketchBuilder().setNominalEntries(nominalEntries);
   }
 

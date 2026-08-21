@@ -64,9 +64,9 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 ///   matching value was null. It carries no per-function meaning, which is what makes it correct for the aggregation
 ///   methods to skip null rows outright rather than fold them in.
 ///   `null` is not the only way that state is represented, though: an empty accumulator — an empty set, value list,
-///   digest, sketch or map — means the same thing, and still arrives. A peer that serialized one sends it, and so do
-///   the functions in the first deviation below, which never receive the option and substitute one rather than
-///   returning `null`. So [#extractFinalResult] accepts both.
+///   digest, sketch or map — means the same thing, and still arrives. A peer that serialized one sends it, and so
+///   does any function whose disabled-mode answer is an empty accumulator rather than a constant, since it
+///   substitutes one in that mode to keep the answer it has always given. So [#extractFinalResult] accepts both.
 ///   `null` is the representation to produce where there is a choice, because it is the only one always available:
 ///   `MAXSTRING`, `MINSTRING` and `ANYVALUE` are object-backed and have no empty value to substitute.
 /// - [#extractFinalResult] decides what that means for this aggregation, and is the only method that does. `COUNT`
@@ -95,37 +95,31 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 /// these is therefore a behavioural change and not a documentation fix, because it widens what the rest of the
 /// engine must carry.
 ///
-/// TODO: Known deviations from the above.
-///   1. Several aggregation functions never receive the query's null handling option at all, so they cannot skip
-///      null rows and fold the column's default value into the aggregate whatever the query asked for: the
-///      sketch-backed distinct counts (`DISTINCTCOUNTBITMAP`, `DISTINCTCOUNTHLL`, `DISTINCTCOUNTTHETASKETCH`,
-///      `DISTINCTCOUNTCPCSKETCH`, `FASTHLL`, `SEGMENTPARTITIONEDDISTINCTCOUNT` and the raw and smart variants of
-///      each), `HISTOGRAM`, `IDSET`, `STUNION`, the array sums, and the funnel family. Whether a function takes the
-///      option is visible at its construction site, which is the reliable way to tell.
-///      The family names are not a safe shorthand for this, in either direction. The exact distinct functions
-///      (`DISTINCTCOUNT`, `DISTINCTSUM`, `DISTINCTAVG`, `DISTINCTCOUNTOFFHEAP`) do take the option and skip null
-///      rows through their shared base, as do the variance, standard-deviation and covariance functions and the
-///      first/last-with-time functions, so "the distinct-count family" and "the statistical functions" both include
-///      members that honour the option and members that cannot.
-///      These same functions also substitute an empty accumulator in [#extractAggregationResult],
-///      [#extractGroupByResult] or both, rather than returning `null` and letting [#extractFinalResult] render the
-///      disabled-mode value. That is not a separate defect: without the option [#extractFinalResult] cannot tell the
-///      two modes apart, so it has nothing to decide with and the substitution is the only thing holding the answer.
-///      Which of the two paths substitutes is inconsistent across them and sometimes within one, so such a function
-///      can answer differently depending on whether the query groups — a filtered aggregation makes that observable,
-///      since one group key space is shared by every aggregation in a query and a group created by one of them can
-///      hold no rows for another.
-///      Conforming them alongside the option is more than moving a branch. The value to preserve is often not a
-///      constant, and the function that substitutes is frequently not the one that renders: the raw variants
-///      delegate extraction to the plain function and serialize what it returns, so conforming the plain function
-///      alone changes the raw variant's answer from a serialized empty sketch to `NULL` without touching the raw
-///      variant at all.
-///   2. The multi-stage engine constructs every aggregation function with null handling enabled and never consults the
-///      query's null handling option, so a query that disables it still gets enabled-mode semantics there. The two
-///      engines can therefore answer the same query differently: with null handling disabled, `SUM` over a query
-///      whose segments are all pruned is `NULL` on the multi-stage engine and `0` on the single-stage engine. This
-///      may be intended, the multi-stage engine being the SQL-conformant one, but it means the mode described above
-///      is not actually per-query everywhere.
+/// ### Multi-input functions
+///
+/// A function that reads more than one column decides for itself which of them a `null` disqualifies the row on,
+/// because that follows from what each column is for rather than from a single rule. The covariances skip a row
+/// unless both value columns are non-null. A funnel skips a row whose timestamp or correlation key is null, since
+/// neither an event with no position in the window nor a row belonging to no key can contribute, but it does not
+/// skip a row for a null step: a step expression is a predicate, and a predicate over a null operand is UNKNOWN,
+/// which SQL treats as not satisfied wherever a boolean is consumed, so a null step already means that step did not
+/// match.
+///
+/// ### Functions outside this contract
+///
+/// Every user-facing aggregation receives the option. Three do not, and none of them is an aggregate a query can
+/// ask for by name: `ParentExprMinMax` and `ChildExprMinMax` are produced by the query rewriter rather than written
+/// by users, and `TimeSeriesAggregationFunction` is built from time-series plan context rather than from a
+/// [org.apache.pinot.common.request.context.FunctionContext]. Whether a function takes the option is visible at its
+/// construction site in [AggregationFunctionFactory], which is the reliable way to tell.
+///
+/// TODO: Known deviation from the above.
+///   The multi-stage engine constructs every aggregation function with null handling enabled and never consults the
+///   query's null handling option, so a query that disables it still gets enabled-mode semantics there. The two
+///   engines can therefore answer the same query differently: with null handling disabled, `SUM` over a query
+///   whose segments are all pruned is `NULL` on the multi-stage engine and `0` on the single-stage engine. This
+///   may be intended, the multi-stage engine being the SQL-conformant one, but it means the mode described above
+///   is not actually per-query everywhere.
 ///
 /// @param <IntermediateResult> Intermediate result generated from segment
 /// @param <FinalResult> Final result used in broker response
