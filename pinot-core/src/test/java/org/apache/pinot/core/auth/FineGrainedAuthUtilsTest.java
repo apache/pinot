@@ -55,6 +55,15 @@ public class FineGrainedAuthUtilsTest {
   }
 
   @Test
+  public void testRawZnodeReadIsDeniedByDefault() {
+    FineGrainedAccessControl accessControl = new FineGrainedAccessControl() {
+    };
+
+    Assert.assertFalse(accessControl.hasAccess(null, TargetType.CLUSTER, null, Actions.Cluster.GET_ZNODE));
+    Assert.assertTrue(accessControl.hasAccess(null, TargetType.CLUSTER, null, Actions.Cluster.GET_CLUSTER_CONFIG));
+  }
+
+  @Test
   public void testValidateFineGrainedAuthAllowed() {
     FineGrainedAccessControl ac = Mockito.mock(FineGrainedAccessControl.class);
     Mockito.when(ac.hasAccess(Mockito.any(HttpHeaders.class), Mockito.any(), Mockito.any(), Mockito.any()))

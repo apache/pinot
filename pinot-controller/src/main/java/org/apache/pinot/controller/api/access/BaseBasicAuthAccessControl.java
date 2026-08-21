@@ -22,6 +22,7 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -59,9 +60,13 @@ abstract class BaseBasicAuthAccessControl<P extends BasicAuthPrincipal> implemen
 
   @Override
   public final boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId, String action) {
+    Optional<P> principal = getPrincipal(httpHeaders);
+    if (Actions.Cluster.GET_ZNODE.equals(action)) {
+      return principal.filter(p -> p.hasExplicitPermission(Actions.Cluster.GET_ZNODE)).isPresent();
+    }
     // Basic auth permissions are CRUD access types, not action names. AuthenticationFilter enforces the resolved
     // AccessType before invoking this fine-grained check, so this overload must only prevent unauthenticated access.
-    return getPrincipal(httpHeaders).isPresent();
+    return principal.isPresent();
   }
 
   @Override
