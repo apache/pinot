@@ -142,6 +142,17 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
+  @Test
+  public void testPostgreSqlByteaLiteralTypeInference() {
+    RelDataType rowType = _queryEnvironment.compile(
+            "SELECT '\\x0102'::bytea, ARRAY['\\x00'::bytea, CAST('\\x0102' AS BYTEA)] FROM a")
+        .getRelRoot().validatedRowType;
+    assertEquals(rowType.getFieldList().get(0).getType().getSqlTypeName(), SqlTypeName.BINARY);
+    RelDataType arrayType = rowType.getFieldList().get(1).getType();
+    assertEquals(arrayType.getSqlTypeName(), SqlTypeName.ARRAY);
+    assertEquals(arrayType.getComponentType().getSqlTypeName(), SqlTypeName.VARBINARY);
+  }
+
   /// `jsonPath` must resolve to a literal, but the operand type checker deliberately does not demand a literal
   /// `SqlNode` in that position: operand checking runs before `PinotEvaluateLiteralRule` folds constant
   /// expressions, so an argument such as `CONCAT('$.', 'foo')` folds to a literal and plans and executes

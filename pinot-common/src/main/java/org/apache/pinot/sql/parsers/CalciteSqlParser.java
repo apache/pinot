@@ -129,6 +129,7 @@ public class CalciteSqlParser {
     try (StringReader inStream = new StringReader(sql)) {
       SqlParserImpl sqlParser = newSqlParser(inStream);
       SqlNodeList sqlNodeList = sqlParser.parseSqlStmtList();
+      sqlNodeList = (SqlNodeList) PostgreSqlByteaLiteralRewriter.rewrite(sqlNodeList);
       // Extract OPTION statements from sql.
       SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
       // add legacy OPTIONS keyword-based options
@@ -549,6 +550,7 @@ public class CalciteSqlParser {
     try (StringReader inStream = new StringReader(expression)) {
       SqlParserImpl sqlParser = newSqlParser(inStream);
       sqlNode = sqlParser.parseSqlExpressionEof();
+      sqlNode = PostgreSqlByteaLiteralRewriter.rewrite(sqlNode);
     } catch (Throwable e) {
       throw new SqlCompilationException("Caught exception while parsing expression: " + expression, e);
     }
@@ -1233,6 +1235,9 @@ public class CalciteSqlParser {
       Function function = e.getFunctionCall();
       if (function.getOperator().equals("as")) {
         return isLiteralOnlyExpression(function.getOperands().get(0));
+      }
+      if (function.getOperator().equals("arrayvalueconstructor")) {
+        return function.getOperands().stream().allMatch(CalciteSqlParser::isLiteralOnlyExpression);
       }
       return false;
     }

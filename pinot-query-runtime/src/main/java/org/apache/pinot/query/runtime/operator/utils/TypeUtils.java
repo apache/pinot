@@ -132,6 +132,18 @@ public class TypeUtils {
           // For ArrayAggregationFunction
           return ArrayListUtils.toBytesArray((ObjectArrayList<ByteArray>) value);
         }
+        if (value instanceof Object[] && ((Object[]) value).length == 0) {
+          // The generic array value constructor has no element type to preserve for an empty array.
+          return new ByteArray[0];
+        }
+        if (value instanceof byte[][]) {
+          byte[][] bytesArray = (byte[][]) value;
+          ByteArray[] internalBytesArray = new ByteArray[bytesArray.length];
+          for (int i = 0; i < bytesArray.length; i++) {
+            internalBytesArray[i] = new ByteArray(bytesArray[i]);
+          }
+          return internalBytesArray;
+        }
         assert value instanceof ByteArray[];
         return value;
       // TODO: Add more conversions

@@ -2116,6 +2116,20 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         List<Expression> operands = function.getOperands();
         computeResultsForExpression(operands.get(0), columnNames, columnTypes, values, index);
         columnNames[index] = operands.get(1).getIdentifier().getName();
+      } else if (operator.equals("arrayvalueconstructor")) {
+        List<Expression> operands = function.getOperands();
+        int numOperands = operands.size();
+        byte[][] bytes = new byte[numOperands][];
+        for (int i = 0; i < numOperands; i++) {
+          Literal literal = operands.get(i).getLiteral();
+          if (literal == null || !literal.isSetBinaryValue()) {
+            throw new IllegalStateException("Unable to compute non-BYTES array literal at broker");
+          }
+          bytes[i] = literal.getBinaryValue();
+        }
+        columnNames[index] = function.getOperator();
+        columnTypes[index] = ColumnDataType.BYTES_ARRAY;
+        values[index] = bytes;
       } else {
         throw new IllegalStateException("No able to compute results for function - " + operator);
       }
