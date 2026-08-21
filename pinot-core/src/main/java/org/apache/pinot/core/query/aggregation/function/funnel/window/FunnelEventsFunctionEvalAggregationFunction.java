@@ -176,12 +176,13 @@ public class FunnelEventsFunctionEvalAggregationFunction
     List<Object> extraFieldsBlocks = new ArrayList<>(_numExtraFields);
     for (ExpressionContext extraExpression : _extraExpressions) {
       BlockValSet blockValSet = blockValSetMap.get(extraExpression);
-      switch (blockValSet.getValueType()) {
+      // Dispatched on the stored type, so BOOLEAN reads as INT, TIMESTAMP as LONG and JSON as STRING rather than
+      // being rejected as unsupported
+      switch (blockValSet.getValueType().getStoredType()) {
         case INT:
           extraFieldsBlocks.add(blockValSet.getIntValuesSV());
           break;
         case LONG:
-        case TIMESTAMP:
           extraFieldsBlocks.add(blockValSet.getLongValuesSV());
           break;
         case FLOAT:
