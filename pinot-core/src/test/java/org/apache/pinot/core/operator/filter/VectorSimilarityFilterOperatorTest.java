@@ -571,11 +571,38 @@ public class VectorSimilarityFilterOperatorTest {
     Assert.assertTrue(explain.contains("effectiveHnswUseBoundedQueue:false"), explain);
   }
 
+  @Test
+  public void testBackendParamsAreClearedWhenConfigurationFailsPartway() {
+    ConfigurableVectorReader mockReader = mock(ConfigurableVectorReader.class);
+    Mockito.doThrow(new IllegalStateException("efSearch configuration failed"))
+        .when(mockReader).setEfSearch(20);
+
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(
+        ExpressionContext.forIdentifier("embedding"), new float[]{1.0f, 2.0f}, 1);
+    VectorSearchParams params = new VectorSearchParams(8, false, null, null, 20, null, null);
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(mockReader, predicate,
+        100, params, null,
+        createVectorIndexConfig("HNSW", VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN));
+
+    IllegalStateException exception = Assert.expectThrows(IllegalStateException.class, operator::getBitmaps);
+    Assert.assertEquals(exception.getMessage(), "efSearch configuration failed");
+    verify(mockReader).setNprobe(8);
+    verify(mockReader).setEfSearch(20);
+    verify(mockReader).clearNprobe();
+    verify(mockReader).clearEfSearch();
+    verify(mockReader).clearUseRelativeDistance();
+    verify(mockReader).clearUseBoundedQueue();
+    verify(mockReader, never()).getDocIds(Mockito.any(float[].class), Mockito.anyInt());
+  }
+
   /// Interface combining VectorIndexReader and NprobeAware for mocking IVF_FLAT readers.
   interface NprobeAwareVectorReader extends VectorIndexReader, NprobeAware {
   }
 
   interface EfSearchAwareVectorReader extends VectorIndexReader, EfSearchAware {
+  }
+
+  interface ConfigurableVectorReader extends VectorIndexReader, NprobeAware, EfSearchAware {
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
