@@ -278,8 +278,16 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendRequest(ClassicHttpRequest request, long socketTimeoutMs)
       throws IOException {
 
+    // Besides the per-request response (socket) timeout, explicitly bound the connection-request
+    // (pool checkout) wait instead of silently inheriting the Apache HttpClient default, so a
+    // saturated connection pool cannot block a replace/upload request unboundedly. The TCP connect
+    // timeout is applied at the connection-manager level and is tunable via
+    // http.client.connectionTimeoutMs (see HttpClientConfig).
     RequestConfig requestConfig =
-        RequestConfig.custom().setResponseTimeout(Timeout.ofMilliseconds(socketTimeoutMs)).build();
+        RequestConfig.custom()
+            .setResponseTimeout(Timeout.ofMilliseconds(socketTimeoutMs))
+            .setConnectionRequestTimeout(Timeout.ofMilliseconds(DEFAULT_CONNECTION_REQUEST_TIMEOUT_MS))
+            .build();
     HttpClientContext clientContext = HttpClientContext.create();
     clientContext.setRequestConfig(requestConfig);
 
