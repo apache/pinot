@@ -203,7 +203,13 @@ public class AggregationFunctionNullContractTest {
         AggregationFunctionType.AVG, AggregationFunctionType.MINMAXRANGE, AggregationFunctionType.VARPOP,
         AggregationFunctionType.STDDEVPOP, AggregationFunctionType.PERCENTILE,
         AggregationFunctionType.PERCENTILEEST, AggregationFunctionType.PERCENTILETDIGEST,
-        AggregationFunctionType.PERCENTILEKLL, AggregationFunctionType.PERCENTILESMARTTDIGEST}) {
+        AggregationFunctionType.PERCENTILEKLL, AggregationFunctionType.PERCENTILESMARTTDIGEST,
+        // These carry a legacy sentinel with the option disabled - NaN, the empty point, an all-zero histogram, an
+        // empty id set - so only the enabled answer is NULL, and only the enabled answer is checked here
+        AggregationFunctionType.SKEWNESS, AggregationFunctionType.KURTOSIS, AggregationFunctionType.STUNION,
+        AggregationFunctionType.HISTOGRAM, AggregationFunctionType.IDSET,
+        // These two answer NULL in both modes, which is why neither needs a mode-aware branch
+        AggregationFunctionType.SUMARRAYLONG, AggregationFunctionType.SUMARRAYDOUBLE}) {
       // Built through the shared argument shapes: the percentile families disagree on whether the percentile is a
       // name suffix or an argument, and only some accept both
       AggregationFunction function = tryCreate(type, true);
@@ -241,7 +247,9 @@ public class AggregationFunctionNullContractTest {
       AggregationFunctionType.PERCENTILETDIGEST, AggregationFunctionType.PERCENTILERAWTDIGEST,
       AggregationFunctionType.PERCENTILESMARTTDIGEST, AggregationFunctionType.PERCENTILEKLL,
       AggregationFunctionType.PERCENTILERAWKLL, AggregationFunctionType.VARPOP, AggregationFunctionType.VARSAMP,
-      AggregationFunctionType.STDDEVPOP, AggregationFunctionType.STDDEVSAMP, AggregationFunctionType.MINMV,
+      AggregationFunctionType.STDDEVPOP, AggregationFunctionType.STDDEVSAMP,
+      // Both are the same PinotFourthMoment accumulator, so threading the option into it moves the pair
+      AggregationFunctionType.SKEWNESS, AggregationFunctionType.KURTOSIS, AggregationFunctionType.MINMV,
       AggregationFunctionType.MAXMV, AggregationFunctionType.SUMMV, AggregationFunctionType.AVGMV,
       AggregationFunctionType.MINMAXRANGEMV, AggregationFunctionType.DISTINCTCOUNTMV,
       AggregationFunctionType.DISTINCTSUMMV, AggregationFunctionType.DISTINCTAVGMV,
@@ -252,6 +260,7 @@ public class AggregationFunctionNullContractTest {
       AggregationFunctionType.MINLONG, AggregationFunctionType.MAXLONG, AggregationFunctionType.SUMINT,
       AggregationFunctionType.SUMLONG, AggregationFunctionType.SUMPRECISION, AggregationFunctionType.FIRSTWITHTIME,
       AggregationFunctionType.LASTWITHTIME, AggregationFunctionType.ARRAYAGG, AggregationFunctionType.LISTAGG,
+      AggregationFunctionType.IDSET, AggregationFunctionType.HISTOGRAM,
       // Given the option so they can skip null rows; a row counts only when both input columns are non-null
       AggregationFunctionType.COVARPOP, AggregationFunctionType.COVARSAMP,
       // Given the option so they can skip null rows. These two were in this set once before, on the strength of an

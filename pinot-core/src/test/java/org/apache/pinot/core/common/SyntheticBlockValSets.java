@@ -238,6 +238,44 @@ public class SyntheticBlockValSets {
     }
   }
 
+  /// A simple [BlockValSet] for nullable, not dictionary-encoded multi-value int values.
+  public static class IntMV extends Base {
+
+    @Nullable
+    final RoaringBitmap _nullBitmap;
+    final int[][] _values;
+
+    private IntMV(@Nullable RoaringBitmap nullBitmap, int[][] values) {
+      _nullBitmap = nullBitmap;
+      _values = values;
+    }
+
+    public static IntMV create(@Nullable RoaringBitmap nullBitmap, int[][] values) {
+      return new IntMV(nullBitmap, values);
+    }
+
+    @Nullable
+    @Override
+    public RoaringBitmap getNullBitmap() {
+      return _nullBitmap;
+    }
+
+    @Override
+    public DataType getValueType() {
+      return DataType.INT;
+    }
+
+    @Override
+    public boolean isSingleValue() {
+      return false;
+    }
+
+    @Override
+    public int[][] getIntValuesMV() {
+      return _values;
+    }
+  }
+
   /// A simple [BlockValSet] for nullable, not dictionary-encoded long values.
   public static class Long extends Base {
 
@@ -332,6 +370,82 @@ public class SyntheticBlockValSets {
     }
   }
 
+  /// A simple [BlockValSet] for nullable, not dictionary-encoded float values.
+  public static class Float extends Base {
+
+    @Nullable
+    final RoaringBitmap _nullBitmap;
+    final float[] _values;
+
+    private Float(@Nullable RoaringBitmap nullBitmap, float[] values) {
+      _nullBitmap = nullBitmap;
+      _values = values;
+    }
+
+    public static Float create(@Nullable RoaringBitmap nullBitmap, float[] values) {
+      return new Float(nullBitmap, values);
+    }
+
+    @Nullable
+    @Override
+    public RoaringBitmap getNullBitmap() {
+      return _nullBitmap;
+    }
+
+    @Override
+    public DataType getValueType() {
+      return DataType.FLOAT;
+    }
+
+    @Override
+    public boolean isSingleValue() {
+      return true;
+    }
+
+    @Override
+    public float[] getFloatValuesSV() {
+      return _values;
+    }
+  }
+
+  /// A simple [BlockValSet] for nullable, not dictionary-encoded multi-value float values.
+  public static class FloatMV extends Base {
+
+    @Nullable
+    final RoaringBitmap _nullBitmap;
+    final float[][] _values;
+
+    private FloatMV(@Nullable RoaringBitmap nullBitmap, float[][] values) {
+      _nullBitmap = nullBitmap;
+      _values = values;
+    }
+
+    public static FloatMV create(@Nullable RoaringBitmap nullBitmap, float[][] values) {
+      return new FloatMV(nullBitmap, values);
+    }
+
+    @Nullable
+    @Override
+    public RoaringBitmap getNullBitmap() {
+      return _nullBitmap;
+    }
+
+    @Override
+    public DataType getValueType() {
+      return DataType.FLOAT;
+    }
+
+    @Override
+    public boolean isSingleValue() {
+      return false;
+    }
+
+    @Override
+    public float[][] getFloatValuesMV() {
+      return _values;
+    }
+  }
+
   /// A simple [BlockValSet] for nullable, not dictionary-encoded double values.
   public static class Double extends Base {
 
@@ -384,6 +498,124 @@ public class SyntheticBlockValSets {
 
     @Override
     public double[] getDoubleValuesSV() {
+      return _values;
+    }
+  }
+
+  /// A simple [BlockValSet] for nullable, not dictionary-encoded multi-value double values.
+  public static class DoubleMV extends Base {
+
+    @Nullable
+    final RoaringBitmap _nullBitmap;
+    final double[][] _values;
+
+    private DoubleMV(@Nullable RoaringBitmap nullBitmap, double[][] values) {
+      _nullBitmap = nullBitmap;
+      _values = values;
+    }
+
+    public static DoubleMV create(@Nullable RoaringBitmap nullBitmap, double[][] values) {
+      return new DoubleMV(nullBitmap, values);
+    }
+
+    @Nullable
+    @Override
+    public RoaringBitmap getNullBitmap() {
+      return _nullBitmap;
+    }
+
+    @Override
+    public DataType getValueType() {
+      return DataType.DOUBLE;
+    }
+
+    @Override
+    public boolean isSingleValue() {
+      return false;
+    }
+
+    @Override
+    public double[][] getDoubleValuesMV() {
+      return _values;
+    }
+  }
+
+  /// A simple [BlockValSet] for nullable, not dictionary-encoded BigDecimal values.
+  ///
+  /// Named `BigDec` rather than `BigDecimal` for the same reason [Str] is not named `String`: a nested class of that
+  /// name shadows [java.math.BigDecimal] across the whole enclosing class, which silently changes the signature of
+  /// every `getBigDecimal*` method declared here so that it no longer implements [BlockValSet].
+  public static class BigDec extends Base {
+
+    @Nullable
+    final RoaringBitmap _nullBitmap;
+    final BigDecimal[] _values;
+
+    private BigDec(@Nullable RoaringBitmap nullBitmap, BigDecimal[] values) {
+      _nullBitmap = nullBitmap;
+      _values = values;
+    }
+
+    public static BigDec create(@Nullable RoaringBitmap nullBitmap, BigDecimal[] values) {
+      return new BigDec(nullBitmap, values);
+    }
+
+    @Nullable
+    @Override
+    public RoaringBitmap getNullBitmap() {
+      return _nullBitmap;
+    }
+
+    @Override
+    public DataType getValueType() {
+      return DataType.BIG_DECIMAL;
+    }
+
+    @Override
+    public boolean isSingleValue() {
+      return true;
+    }
+
+    @Override
+    public BigDecimal[] getBigDecimalValuesSV() {
+      return _values;
+    }
+  }
+
+  /// A simple [BlockValSet] for nullable, not dictionary-encoded multi-value BigDecimal values.
+  public static class BigDecMV extends Base {
+
+    @Nullable
+    final RoaringBitmap _nullBitmap;
+    final BigDecimal[][] _values;
+
+    private BigDecMV(@Nullable RoaringBitmap nullBitmap, BigDecimal[][] values) {
+      _nullBitmap = nullBitmap;
+      _values = values;
+    }
+
+    public static BigDecMV create(@Nullable RoaringBitmap nullBitmap, BigDecimal[][] values) {
+      return new BigDecMV(nullBitmap, values);
+    }
+
+    @Nullable
+    @Override
+    public RoaringBitmap getNullBitmap() {
+      return _nullBitmap;
+    }
+
+    @Override
+    public DataType getValueType() {
+      return DataType.BIG_DECIMAL;
+    }
+
+    @Override
+    public boolean isSingleValue() {
+      return false;
+    }
+
+    @Override
+    public BigDecimal[][] getBigDecimalValuesMV() {
       return _values;
     }
   }

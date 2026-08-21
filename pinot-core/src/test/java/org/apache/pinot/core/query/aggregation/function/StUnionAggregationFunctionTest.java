@@ -40,7 +40,7 @@ public class StUnionAggregationFunctionTest {
   public void testMergeHandlesGeometryCollectionInputs()
       throws Exception {
     ExpressionContext expression = ExpressionContext.forIdentifier("geometryColumn");
-    StUnionAggregationFunction aggregationFunction = new StUnionAggregationFunction(List.of(expression));
+    StUnionAggregationFunction aggregationFunction = new StUnionAggregationFunction(List.of(expression), false);
     Geometry polygon = GeometryUtils.GEOMETRY_WKT_READER.read("POLYGON((0 0, 0 5, 5 5, 5 0, 0 0))");
     Geometry line = GeometryUtils.GEOMETRY_WKT_READER.read("LINESTRING(20 20, 25 25)");
     Geometry geometryCollection =
@@ -57,7 +57,7 @@ public class StUnionAggregationFunctionTest {
   public void testAggregateHandlesMixedDimensionSequence()
       throws Exception {
     ExpressionContext expression = ExpressionContext.forIdentifier("geometryColumn");
-    StUnionAggregationFunction aggregationFunction = new StUnionAggregationFunction(List.of(expression));
+    StUnionAggregationFunction aggregationFunction = new StUnionAggregationFunction(List.of(expression), false);
 
     Geometry polygon = GeometryUtils.GEOMETRY_WKT_READER.read("POLYGON((0 0, 0 5, 5 5, 5 0, 0 0))");
     Geometry line = GeometryUtils.GEOMETRY_WKT_READER.read("LINESTRING(10 10, 15 15)");

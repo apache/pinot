@@ -299,9 +299,9 @@ public class AggregationFunctionFactory {
             return new ListAggFunction(arguments.get(0), separator, nullHandlingEnabled);
           }
           case SUMARRAYLONG:
-            return new SumArrayLongAggregationFunction(arguments);
+            return new SumArrayLongAggregationFunction(arguments, nullHandlingEnabled);
           case SUMARRAYDOUBLE:
-            return new SumArrayDoubleAggregationFunction(arguments);
+            return new SumArrayDoubleAggregationFunction(arguments, nullHandlingEnabled);
           case ARRAYAGG: {
             Preconditions.checkArgument(numArguments >= 2,
                 "ARRAY_AGG expects 2 or 3 arguments, got: %s. The function can be used as "
@@ -420,7 +420,7 @@ public class AggregationFunctionFactory {
           case DISTINCTAVG:
             return new DistinctAvgAggregationFunction(arguments, nullHandlingEnabled);
           case IDSET:
-            return new IdSetAggregationFunction(arguments);
+            return new IdSetAggregationFunction(arguments, nullHandlingEnabled);
           case COUNTMV:
             return new CountMVAggregationFunction(arguments, nullHandlingEnabled);
           case MINMV:
@@ -454,9 +454,9 @@ public class AggregationFunctionFactory {
           case DISTINCTAVGMV:
             return new DistinctAvgMVAggregationFunction(arguments, nullHandlingEnabled);
           case STUNION:
-            return new StUnionAggregationFunction(arguments);
+            return new StUnionAggregationFunction(arguments, nullHandlingEnabled);
           case HISTOGRAM:
-            return new HistogramAggregationFunction(arguments);
+            return new HistogramAggregationFunction(arguments, nullHandlingEnabled);
           case COVARPOP:
             return new CovarianceAggregationFunction(arguments, false, nullHandlingEnabled);
           case COVARSAMP:
@@ -474,11 +474,14 @@ public class AggregationFunctionFactory {
           case STDDEVSAMP:
             return new VarianceAggregationFunction(arguments, true, true, nullHandlingEnabled);
           case SKEWNESS:
-            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.SKEWNESS);
+            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.SKEWNESS,
+                nullHandlingEnabled);
           case KURTOSIS:
-            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.KURTOSIS);
+            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.KURTOSIS,
+                nullHandlingEnabled);
           case FOURTHMOMENT:
-            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.MOMENT);
+            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.MOMENT,
+                nullHandlingEnabled);
           case DISTINCTCOUNTTUPLESKETCH:
             // mode actually doesn't matter here because we only care about keys, not values
             return new DistinctCountIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum,
