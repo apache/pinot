@@ -222,6 +222,25 @@ public class MultipleTreesBuilder implements Closeable {
         _buildMode);
 
     File starTreeV2IndexFile = new File(_segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME);
+    // A previous build that was killed (JVM crash, container OOM, hard interrupt) can leave stale artifacts
+    // behind: a partial `star_tree_index` / `star_tree_index_map` at the segment root and/or a lingering
+    // EXISTING_STAR_TREE_TEMP_DIR from the incremental-build set-aside step. Segment metadata is
+    // authoritative: when `_separator == null` (getSeparator() found no STAR_TREE_COUNT in metadata),
+    // any of these on-disk files are orphaned and were never registered as part of the segment. Clean them
+    // up so the combiner precondition on `starTreeV2IndexFile` holds. When `_separator != null` we are on
+    // the incremental path and getSeparator() already moved the previous files aside legitimately; do not
+    // touch anything there.
+    if (_separator == null) {
+      File starTreeV2IndexMapFile = new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME);
+      File existingSeparatorDir = new File(_segmentDirectory, StarTreeV2Constants.EXISTING_STAR_TREE_TEMP_DIR);
+      if (starTreeV2IndexFile.exists() || starTreeV2IndexMapFile.exists() || existingSeparatorDir.exists()) {
+        LOGGER.warn("Cleaning up stale star-tree artifacts in {} from a prior incomplete build",
+            _segmentDirectory);
+        FileUtils.deleteQuietly(starTreeV2IndexFile);
+        FileUtils.deleteQuietly(starTreeV2IndexMapFile);
+        FileUtils.deleteQuietly(existingSeparatorDir);
+      }
+    }
     try (StarTreeIndexCombiner indexCombiner = new StarTreeIndexCombiner(starTreeV2IndexFile)) {
       File starTreeIndexDir = new File(_segmentDirectory, StarTreeV2Constants.STAR_TREE_TEMP_DIR);
       FileUtils.forceMkdir(starTreeIndexDir);
