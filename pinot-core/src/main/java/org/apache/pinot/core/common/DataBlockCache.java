@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -195,9 +196,36 @@ public class DataBlockCache implements AutoCloseable {
         stringValues = new String[_length];
         putValues(FieldSpec.DataType.STRING, column, stringValues);
       }
-      _dataFetcher.fetchStringValues(column, _docIds, _length, stringValues);
+      // Keys of one MAP column are read out of each document in a single visit rather than one visit per key. The
+      // siblings' values land in this block's buffers too, so their own lookups are served from here.
+      List<String> mapKeyGroup = _dataFetcher.getMapKeyGroupColumns(column);
+      if (mapKeyGroup != null) {
+        fetchMapKeyGroup(column, mapKeyGroup);
+      } else {
+        _dataFetcher.fetchStringValues(column, _docIds, _length, stringValues);
+      }
     }
     return stringValues;
+  }
+
+  /// Reads every column of a MAP key group into this block's buffers and marks them all loaded.
+  ///
+  /// A sibling already read for this block is refilled rather than skipped: same block, same documents, same values,
+  /// and the group has to produce them anyway.
+  private void fetchMapKeyGroup(String column, List<String> mapKeyGroup) {
+    int numColumns = mapKeyGroup.size();
+    String[][] buffers = new String[numColumns][];
+    for (int i = 0; i < numColumns; i++) {
+      String groupColumn = mapKeyGroup.get(i);
+      String[] values = getValues(FieldSpec.DataType.STRING, groupColumn);
+      if (values == null) {
+        values = new String[_length];
+        putValues(FieldSpec.DataType.STRING, groupColumn, values);
+      }
+      buffers[i] = values;
+      markLoaded(FieldSpec.DataType.STRING, groupColumn);
+    }
+    _dataFetcher.fetchStringValuesForMapKeyGroup(column, _docIds, _length, buffers);
   }
 
   /// Get byte\[\] values for the given single-valued column.

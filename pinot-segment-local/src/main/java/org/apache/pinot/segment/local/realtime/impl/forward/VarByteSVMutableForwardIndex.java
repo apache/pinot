@@ -99,7 +99,7 @@ public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
 
   @Override
   public Map<String, Object> getMap(int docId, ForwardIndexReaderContext context) {
-    return MapUtils.deserializeMap(getBytes(docId));
+    return MapUtils.deserializeMap(_byteArrayStore.getByteBuffer(docId));
   }
 
   @Nullable
@@ -110,13 +110,19 @@ public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
 
   @Override
   public String getMapAsJsonString(int docId, ForwardIndexReaderContext context) {
-    return MapUtils.frameToJsonString(getBytes(docId));
+    return MapUtils.frameToJsonString(_byteArrayStore.getByteBuffer(docId));
   }
 
   @Override
   @Nullable
   public String getMapEntryValueAsString(int docId, ForwardIndexReaderContext context, PreparedMapKey key) {
     return MapUtils.deserializeMapEntryValueAsString(_byteArrayStore.getByteBuffer(docId), key);
+  }
+
+  @Override
+  public void getMapEntryValuesAsString(int docId, ForwardIndexReaderContext context, PreparedMapKey[] keys,
+      String[] values) {
+    MapUtils.deserializeMapEntryValuesAsString(_byteArrayStore.getByteBuffer(docId), keys, values);
   }
 
   @Override

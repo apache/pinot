@@ -520,6 +520,26 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
     return value == null ? null : value.toString();
   }
 
+  /// Reads the values for several keys of a MAP type single-value column at the given document id, writing
+  /// `values[i]` for `keys[i]` and `null` for any key the document does not carry.
+  ///
+  /// A query projecting `attributes['a']`, `attributes['b']`, ... resolves each key to a column of its own, so read
+  /// one key at a time the document's map is fetched and traversed once per key. Implementations that hold the map
+  /// as a serialized frame override this to fetch and traverse it once for all of them; the default keeps the
+  /// per-key behaviour, which is what a reader holding the map columnar-decomposed wants anyway.
+  ///
+  /// Keys must be distinct.
+  ///
+  /// @param docId Document id
+  /// @param context Reader context
+  /// @param keys Map keys to read
+  /// @param values Buffer for the output, at least `keys.length` long
+  default void getMapEntryValuesAsString(int docId, T context, PreparedMapKey[] keys, String[] values) {
+    for (int i = 0; i < keys.length; i++) {
+      values[i] = getMapEntryValueAsString(docId, context, keys[i]);
+    }
+  }
+
   default int get32BitsMurmur3Hash(int docId, T context) {
     return MurmurHashFunctions.murmurHash3X64Bit32(getBytes(docId, context), 0);
   }

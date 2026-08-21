@@ -507,4 +507,172 @@ public class MapUtilsTest {
 
     assertEquals(MapUtils.frameToJsonString(littleEndian), "{\"k8s.workload.name\":\"pinot-server\"}");
   }
+
+  /// Same reasoning as [#testFrameToJsonStringForcesBigEndian], for the full-map read that the consuming forward
+  /// index now serves straight off an off-heap view rather than off a copy.
+  @Test
+  void testDeserializeMapForcesBigEndian() {
+    byte[] serialized = MapUtils.serializeMap(Map.of("k8s.workload.name", "pinot-server"));
+    ByteBuffer littleEndian = ByteBuffer.wrap(serialized).order(ByteOrder.LITTLE_ENDIAN);
+
+    assertEquals(MapUtils.deserializeMap(littleEndian), Map.of("k8s.workload.name", "pinot-server"));
+  }
+
+  /// Rendering has to work off a read-only view, which is what the consuming forward index hands out, and off a
+  /// buffer whose frame does not start at index 0, which is what slicing one value out of a shared region produces.
+  @Test
+  void testFrameToJsonStringReadsReadOnlyAndOffsetBuffers() {
+    byte[] serialized = MapUtils.serializeMap(Map.of("k8s.workload.name", "pinot-server"));
+    String expected = "{\"k8s.workload.name\":\"pinot-server\"}";
+
+    assertEquals(MapUtils.frameToJsonString(ByteBuffer.wrap(serialized).asReadOnlyBuffer()), expected);
+
+    ByteBuffer padded = ByteBuffer.allocate(serialized.length + 7);
+    padded.position(7);
+    padded.put(serialized);
+    padded.position(7);
+    assertEquals(MapUtils.frameToJsonString(padded.slice()), expected);
+  }
+
+  // === Selective key lookup. The scan compares eight key bytes per read, so the cases that matter are keys whose
+  // length lands on, just under and just over a word boundary, and near-miss keys that diverge only in the tail. ===
+
+  @Test
+  void testDeserializeMapEntryValueAcrossKeyLengths() {
+    // 7 bytes (tail only), 8 (one exact word), 9 (word plus one tail byte), 16 (two exact words), 17 and 23.
+    Map<String, Object> map = new LinkedHashMap<>();
+    for (int length : new int[]{7, 8, 9, 16, 17, 23}) {
+      map.put("k".repeat(length - 1) + (char) ('0' + length % 10), "value-" + length);
+    }
+    byte[] serialized = MapUtils.serializeMap(map);
+
+    for (Map.Entry<String, Object> entry : map.entrySet()) {
+      String key = entry.getKey();
+      assertEquals(MapUtils.deserializeMapEntryValue(serialized, key), entry.getValue(),
+          "Lookup failed for key of length " + key.length());
+      assertEquals(MapUtils.deserializeMapEntryValueAsString(serialized, new MapUtils.PreparedMapKey(key)),
+          entry.getValue(), "String lookup failed for key of length " + key.length());
+    }
+  }
+
+  /// Keys that agree over whole words and diverge only afterwards are exactly what a word-at-a-time comparison can
+  /// get wrong: `k8s.workload.name` and `k8s.workload.kind` share their first 16 bytes and differ in the 17th.
+  @Test
+  void testDeserializeMapEntryValueDistinguishesKeysSharingWholeWords() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("k8s.workload.name", "checkout");
+    map.put("k8s.workload.kind", "Deployment");
+    map.put("k8s.namespace.name", "default");
+    byte[] serialized = MapUtils.serializeMap(map);
+
+    assertEquals(MapUtils.deserializeMapEntryValue(serialized, "k8s.workload.name"), "checkout");
+    assertEquals(MapUtils.deserializeMapEntryValue(serialized, "k8s.workload.kind"), "Deployment");
+    assertEquals(MapUtils.deserializeMapEntryValue(serialized, "k8s.namespace.name"), "default");
+    // Same length as the first two, diverging only in the final byte, which sits past the second word.
+    assertNull(MapUtils.deserializeMapEntryValue(serialized, "k8s.workload.namf"));
+    // Diverging inside the first word.
+    assertNull(MapUtils.deserializeMapEntryValue(serialized, "k9s.workload.name"));
+  }
+
+  @Test
+  void testDeserializeMapEntryValueWithMultiByteKeys() {
+    // Keys whose UTF-8 encoding carries bytes with the high bit set, which the word packing must not sign-extend.
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("命名空间名称", "namespace");
+    map.put("命名空间标签", "labels");
+    map.put("çöğüşÇÖĞÜŞ", "turkish");
+    byte[] serialized = MapUtils.serializeMap(map);
+
+    assertEquals(MapUtils.deserializeMapEntryValue(serialized, "命名空间名称"), "namespace");
+    assertEquals(MapUtils.deserializeMapEntryValue(serialized, "命名空间标签"), "labels");
+    assertEquals(MapUtils.deserializeMapEntryValue(serialized, "çöğüşÇÖĞÜŞ"), "turkish");
+    assertNull(MapUtils.deserializeMapEntryValue(serialized, "命名空间名字"));
+  }
+
+  // === Multi-key lookup. One walk of the frame has to produce exactly what a walk per key produces, including for
+  // keys the frame does not carry and for the value shapes that fall back to Jackson. ===
+
+  @Test
+  void testDeserializeMapEntryValuesAsStringMatchesPerKeyReads() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("k8s.workload.name", "checkout");
+    map.put("k8s.workload.kind", "Deployment");
+    map.put("k8s.namespace.name", "default");
+    map.put("host_logical_cpus", 4);
+    map.put("enabled", true);
+    map.put("ratio", 1.50);
+    map.put("nested", Map.of("inner", "value"));
+    map.put("命名空间", "namespace");
+    byte[] serialized = MapUtils.serializeMap(map);
+
+    // Present keys of varied shape, one absent key, and a near-miss sharing whole words with a present key.
+    String[] lookups = {
+        "k8s.workload.name", "absent", "ratio", "nested", "host_logical_cpus", "命名空间", "enabled",
+        "k8s.workload.namf", "k8s.namespace.name"
+    };
+    MapUtils.PreparedMapKey[] keys = new MapUtils.PreparedMapKey[lookups.length];
+    for (int i = 0; i < lookups.length; i++) {
+      keys[i] = new MapUtils.PreparedMapKey(lookups[i]);
+    }
+
+    String[] values = new String[lookups.length];
+    MapUtils.deserializeMapEntryValuesAsString(ByteBuffer.wrap(serialized), keys, values);
+
+    for (int i = 0; i < lookups.length; i++) {
+      assertEquals(values[i], MapUtils.deserializeMapEntryValueAsString(serialized, keys[i]),
+          "One-pass read disagrees with the per-key read for: " + lookups[i]);
+    }
+    // Spot-check the shapes rather than trusting only the cross-check above.
+    assertEquals(values[0], "checkout");
+    assertNull(values[1]);
+    assertEquals(values[2], "1.5", "A non-integral number has to render the way Jackson binds it");
+    assertEquals(values[4], "4");
+    assertEquals(values[6], "true");
+    assertNull(values[7]);
+  }
+
+  /// The buffer is walked once, so a key repeated in the lookup array or a key whose value is JSON null must not
+  /// leave the scan hunting for something it already passed.
+  @Test
+  void testDeserializeMapEntryValuesAsStringHandlesEmptyAndAllAbsent() {
+    String[] values = new String[2];
+    MapUtils.PreparedMapKey[] keys =
+        {new MapUtils.PreparedMapKey("a"), new MapUtils.PreparedMapKey("k8s.workload.name")};
+
+    MapUtils.deserializeMapEntryValuesAsString(ByteBuffer.wrap(MapUtils.serializeMap(Map.of())), keys, values);
+    assertNull(values[0]);
+    assertNull(values[1]);
+
+    byte[] serialized = MapUtils.serializeMap(Map.of("other", "value"));
+    values[0] = "stale";
+    values[1] = "stale";
+    MapUtils.deserializeMapEntryValuesAsString(ByteBuffer.wrap(serialized), keys, values);
+    assertNull(values[0], "A previous block's value must not survive into a frame without the key");
+    assertNull(values[1]);
+  }
+
+  /// The output buffer is reused across documents, so it may be longer than the key array; the reader must only
+  /// touch the leading `keys.length` slots.
+  @Test
+  void testDeserializeMapEntryValuesAsStringLeavesTrailingBufferSlotsAlone() {
+    MapUtils.PreparedMapKey[] keys = {new MapUtils.PreparedMapKey("a")};
+    String[] values = {"stale", "untouched"};
+
+    MapUtils.deserializeMapEntryValuesAsString(ByteBuffer.wrap(MapUtils.serializeMap(Map.of("a", "value"))), keys,
+        values);
+
+    assertEquals(values[0], "value");
+    assertEquals(values[1], "untouched");
+  }
+
+  /// The `byte\[\]` overload the sealed forward index reads through, which hands over a chunk value already on heap.
+  @Test
+  void testDeserializeMapEntryValueAsStringFromByteArray() {
+    byte[] serialized = MapUtils.serializeMap(Map.of("k8s.pod.name", "paymentservice-779dff4596-jhhrw", "count", 42));
+
+    assertEquals(MapUtils.deserializeMapEntryValueAsString(serialized, new MapUtils.PreparedMapKey("k8s.pod.name")),
+        "paymentservice-779dff4596-jhhrw");
+    assertEquals(MapUtils.deserializeMapEntryValueAsString(serialized, new MapUtils.PreparedMapKey("count")), "42");
+    assertNull(MapUtils.deserializeMapEntryValueAsString(serialized, new MapUtils.PreparedMapKey("absent")));
+  }
 }

@@ -18,12 +18,19 @@
  */
 package org.apache.pinot.perf;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.realtime.impl.forward.VarByteSVMutableForwardIndex;
+import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.MapUtils;
@@ -87,9 +94,14 @@ public class BenchmarkMapKeyAccess {
   private PreparedMapKey _targetMapKey;
   private PinotDataBufferMemoryManager _memoryManager;
   private VarByteSVMutableForwardIndex _forwardIndex;
+  private File _sealedIndexDir;
+  private PinotDataBuffer _sealedDataBuffer;
+  private VarByteChunkForwardIndexReaderV4 _sealedForwardIndex;
+  private VarByteChunkForwardIndexReaderV4.ReaderContext _sealedContext;
 
   @Setup(Level.Trial)
-  public void setUp() {
+  public void setUp()
+      throws IOException {
     Map<String, Object> map = new LinkedHashMap<>();
     for (int i = 0; i < _numEntries; i++) {
       String value = "value-with-enough-bytes-to-exercise-json-parsing-" + i;
@@ -116,15 +128,34 @@ public class BenchmarkMapKeyAccess {
     _forwardIndex =
         new VarByteSVMutableForwardIndex(DataType.MAP, _memoryManager, "mapColumn", 1, serialized.length);
     _forwardIndex.setBytes(0, serialized);
+
+    // The sealed counterpart of the same frame. A completed segment stores the MAP column in a chunked raw forward
+    // index, so key access there goes through a different reader than the consuming path above.
+    _sealedIndexDir = Files.createTempDirectory(BenchmarkMapKeyAccess.class.getSimpleName()).toFile();
+    File indexFile = new File(_sealedIndexDir, "map.fwd");
+    try (VarByteChunkForwardIndexWriterV4 writer = new VarByteChunkForwardIndexWriterV4(indexFile,
+        ChunkCompressionType.LZ4, Math.max(1024, serialized.length * 2))) {
+      writer.putBytes(serialized);
+    }
+    _sealedDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
+    _sealedForwardIndex = new VarByteChunkForwardIndexReaderV4(_sealedDataBuffer, DataType.MAP, true);
+    _sealedContext = _sealedForwardIndex.createContext();
   }
 
   @TearDown(Level.Trial)
   public void tearDown()
       throws IOException {
     try {
+      _sealedContext.close();
+      _sealedForwardIndex.close();
+      _sealedDataBuffer.close();
       _forwardIndex.close();
     } finally {
-      _memoryManager.close();
+      try {
+        _memoryManager.close();
+      } finally {
+        FileUtils.deleteQuietly(_sealedIndexDir);
+      }
     }
   }
 
@@ -159,5 +190,24 @@ public class BenchmarkMapKeyAccess {
   @Benchmark
   public Object selectiveMapValueAsString() {
     return _forwardIndex.getMapEntryValueAsString(0, null, _targetMapKey);
+  }
+
+  /// Whole-column projection off the consuming segment - what `SELECT attributes` and
+  /// `LASTWITHTIME(attributes, ..., 'STRING')` do for every row they see.
+  @Benchmark
+  public Object mapAsJsonString() {
+    return _forwardIndex.getMapAsJsonString(0, null);
+  }
+
+  /// The same selective lookup against a completed segment's chunked forward index.
+  @Benchmark
+  public Object sealedSelectiveMapValueAsString() {
+    return _sealedForwardIndex.getMapEntryValueAsString(0, _sealedContext, _targetMapKey);
+  }
+
+  /// The sealed baseline: deserialize every entry of the chunk value, then select the requested key.
+  @Benchmark
+  public Object sealedFullMapValue() {
+    return _sealedForwardIndex.getMap(0, _sealedContext).get(_targetKey);
   }
 }

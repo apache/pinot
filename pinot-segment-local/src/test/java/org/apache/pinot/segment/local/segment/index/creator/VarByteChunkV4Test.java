@@ -23,7 +23,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiConsumer;
@@ -39,12 +41,15 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunk
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.MapUtils;
+import org.apache.pinot.spi.utils.MapUtils.PreparedMapKey;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
 public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
@@ -130,6 +135,58 @@ public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
     testWriteRead(bytesMVFile, compressionType, longestEntry, chunkSize, FieldSpec.DataType.BYTES, new ByteSplitterMV(),
         VarByteChunkWriter::putBytesMV, (reader, context, docId) -> reader.getBytesMV(docId, context));
     FileUtils.deleteQuietly(bytesMVFile);
+  }
+
+  /// A sealed MAP column is a chunked raw index over serialized frames, and a projected `attributes['key']` resolves
+  /// to a single-key read against it. Pins that the selective readers agree with deserializing the whole frame, for
+  /// every compression type and - through the subclasses - every reader version.
+  @Test(dataProvider = "params")
+  public void testMapSV(File file, ChunkCompressionType compressionType, int longestEntry, int chunkSize)
+      throws IOException {
+    File mapSVFile = new File(file, "testMapSV");
+    int numDocs = 1000;
+    List<Map<String, Object>> maps = new ArrayList<>(numDocs);
+    try (VarByteChunkWriter writer = createWriter(mapSVFile, compressionType, chunkSize)) {
+      for (int i = 0; i < numDocs; i++) {
+        // Dotted OpenTelemetry-style keys, the first two of equal length so the scan has to compare their bytes
+        // rather than skip on a length mismatch.
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("k8s.workload.name", "workload-" + i);
+        map.put("k8s.workload.kind", "Deployment");
+        map.put("k8s.namespace.name", "namespace-" + i % 7);
+        map.put("host_logical_cpus", i);
+        maps.add(map);
+        writer.putBytes(MapUtils.serializeMap(map));
+      }
+    }
+
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(mapSVFile);
+        VarByteChunkForwardIndexReaderV4 reader = createReader(buffer, FieldSpec.DataType.MAP, true);
+        VarByteChunkForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
+      PreparedMapKey workloadName = new PreparedMapKey("k8s.workload.name");
+      PreparedMapKey cpus = new PreparedMapKey("host_logical_cpus");
+      PreparedMapKey absent = new PreparedMapKey("k8s.workload.namf");
+      PreparedMapKey[] allKeys = {workloadName, absent, cpus, new PreparedMapKey("k8s.namespace.name")};
+      String[] allValues = new String[allKeys.length];
+      for (int i = 0; i < numDocs; i++) {
+        Map<String, Object> expected = maps.get(i);
+        assertEquals(reader.getMap(i, context), expected);
+        assertEquals(reader.getMapAsJsonString(i, context), MapUtils.toString(expected));
+        assertEquals(reader.getMapEntryValue(i, context, workloadName), expected.get("k8s.workload.name"));
+        assertEquals(reader.getMapEntryValueAsString(i, context, workloadName), expected.get("k8s.workload.name"));
+        assertEquals(reader.getMapEntryValue(i, context, cpus), expected.get("host_logical_cpus"));
+        assertEquals(reader.getMapEntryValueAsString(i, context, cpus), String.valueOf(i));
+        assertNull(reader.getMapEntryValue(i, context, absent));
+        assertNull(reader.getMapEntryValueAsString(i, context, absent));
+
+        // Reading every key in one walk of the frame has to agree with reading them one at a time.
+        reader.getMapEntryValuesAsString(i, context, allKeys, allValues);
+        for (int k = 0; k < allKeys.length; k++) {
+          assertEquals(allValues[k], reader.getMapEntryValueAsString(i, context, allKeys[k]));
+        }
+      }
+    }
+    FileUtils.deleteQuietly(mapSVFile);
   }
 
   static class StringSplitterMV implements Function<String, String[]> {
