@@ -50,11 +50,13 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.STRING;
+import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.VARIANT;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class SortedMailboxReceiveOperatorTest {
@@ -111,6 +113,29 @@ public class SortedMailboxReceiveOperatorTest {
   public void shouldThrowOnEmptyCollationKey() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON, DATA_SCHEMA, List.of(), Long.MAX_VALUE);
+  }
+
+  @Test
+  public void shouldRejectRawVariantCollation() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    DataSchema variantSchema = new DataSchema(new String[]{"payload"}, new DataSchema.ColumnDataType[]{VARIANT});
+
+    IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
+        () -> getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON, variantSchema, FIELD_COLLATIONS,
+            Long.MAX_VALUE));
+    assertTrue(exception.getMessage().contains("ORDER BY does not support raw VARIANT"));
+  }
+
+  @Test
+  public void shouldNameUnsupportedNonVariantCollationType() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    DataSchema objectSchema =
+        new DataSchema(new String[]{"payload"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.OBJECT});
+
+    IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
+        () -> getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON, objectSchema, FIELD_COLLATIONS,
+            Long.MAX_VALUE));
+    assertTrue(exception.getMessage().contains("ORDER BY does not support OBJECT values"));
   }
 
   @Test

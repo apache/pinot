@@ -200,6 +200,18 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-timeseries-spi</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.parquet</groupId>
+      <artifactId>parquet-variant</artifactId>
+      <!-- Query-time Variant navigation uses parquet-variant's codec classes and their parquet-common utilities.
+           Keep the full parquet-column/schema stack isolated to the Parquet ingestion plugin. -->
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.parquet</groupId>
+          <artifactId>parquet-column</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
 
     <dependency>
       <groupId>org.apache.arrow</groupId>

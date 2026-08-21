@@ -40,6 +40,16 @@ public abstract class SetOperator extends MultiStageOperator {
     _inputOperators = inputOperators;
   }
 
+  protected static void validateEqualityAndHashingSupported(DataSchema dataSchema, String operation) {
+    for (DataSchema.ColumnDataType dataType : dataSchema.getColumnDataTypes()) {
+      if (!dataType.supportsEquality() || !dataType.supportsHashing()) {
+        throw new IllegalArgumentException(dataType == DataSchema.ColumnDataType.VARIANT
+            ? operation + " does not support raw VARIANT values; extract a typed path with variantGet first"
+            : operation + " does not support " + dataType + " values");
+      }
+    }
+  }
+
   @Override
   public void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs) {
     _statMap.merge(StatKey.EXECUTION_TIME_MS, time);

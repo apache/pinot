@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
@@ -31,6 +32,8 @@ import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.validation.JoinKeyTypeValidator;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.join.DoubleLookupTable;
 import org.apache.pinot.query.runtime.operator.join.FloatLookupTable;
@@ -66,11 +69,28 @@ public class HashJoinOperator extends BaseJoinOperator {
   @Nullable
   private List<Object[]> _nullKeyRightRows;
 
+  /// Creates a hash join using schemas available on the join node.
+  ///
+  /// <p>For SEMI and ANTI joins whose node does not carry its inputs, the result schema contains only left columns, so
+  /// this legacy constructor cannot validate the right key's logical type. New callers that need right-side VARIANT
+  /// validation must use the overload that accepts {@code rightSchema}.
   public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
       MultiStageOperator rightInput, JoinNode node) {
+    this(context, leftInput, leftSchema, rightInput, tryInferRightSchema(leftSchema, node), node, false);
+  }
+
+  public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
+      MultiStageOperator rightInput, DataSchema rightSchema, JoinNode node) {
+    this(context, leftInput, leftSchema, rightInput, rightSchema, node, true);
+  }
+
+  private HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
+      MultiStageOperator rightInput, @Nullable DataSchema rightSchema, JoinNode node, boolean rightSchemaRequired) {
     super(context, leftInput, leftSchema, rightInput, node);
     List<Integer> leftKeys = node.getLeftKeys();
     Preconditions.checkState(!leftKeys.isEmpty(), "Hash join operator requires join keys");
+    Preconditions.checkArgument(!rightSchemaRequired || rightSchema != null, "Right input schema must not be null");
+    JoinKeyTypeValidator.validate(node, leftSchema, rightSchema);
     _leftKeySelector = KeySelectorFactory.getKeySelector(leftKeys);
     _rightKeySelector = KeySelectorFactory.getKeySelector(node.getRightKeys());
     _rightTable = createLookupTable(leftKeys, leftSchema);
@@ -79,16 +99,53 @@ public class HashJoinOperator extends BaseJoinOperator {
     _nullKeyRightRows = needUnmatchedRightRows() ? new ArrayList<>() : null;
   }
 
-  /// Constructor that takes the schema for NonEquiEvaluator as an argument
+  /// Constructor that takes the schema for NonEquiEvaluator as an argument.
+  ///
+  /// <p>For SEMI and ANTI joins whose node does not carry its inputs, the result schema contains only left columns, so
+  /// this legacy constructor cannot validate the right key's logical type. New callers that need right-side VARIANT
+  /// validation must use the overload that accepts {@code rightSchema}.
   public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
       MultiStageOperator rightInput, JoinNode node, DataSchema nonEquiEvaluationSchema) {
+    this(context, leftInput, leftSchema, rightInput, tryInferRightSchema(leftSchema, node), node,
+        nonEquiEvaluationSchema, false);
+  }
+
+  /// Constructor that takes the schema for NonEquiEvaluator as an argument
+  public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
+      MultiStageOperator rightInput, DataSchema rightSchema, JoinNode node, DataSchema nonEquiEvaluationSchema) {
+    this(context, leftInput, leftSchema, rightInput, rightSchema, node, nonEquiEvaluationSchema, true);
+  }
+
+  private HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
+      MultiStageOperator rightInput, @Nullable DataSchema rightSchema, JoinNode node,
+      DataSchema nonEquiEvaluationSchema, boolean rightSchemaRequired) {
     super(context, leftInput, leftSchema, rightInput, node, nonEquiEvaluationSchema);
     List<Integer> leftKeys = node.getLeftKeys();
     Preconditions.checkState(!leftKeys.isEmpty(), "Hash join operator requires join keys");
+    Preconditions.checkArgument(!rightSchemaRequired || rightSchema != null, "Right input schema must not be null");
+    JoinKeyTypeValidator.validate(node, leftSchema, rightSchema);
     _leftKeySelector = KeySelectorFactory.getKeySelector(leftKeys);
     _rightKeySelector = KeySelectorFactory.getKeySelector(node.getRightKeys());
     _rightTable = createLookupTable(leftKeys, leftSchema);
     _matchedRightRows = needUnmatchedRightRows() ? new HashMap<>() : null;
+  }
+
+  @Nullable
+  private static DataSchema tryInferRightSchema(DataSchema leftSchema, JoinNode node) {
+    List<PlanNode> inputs = node.getInputs();
+    if (inputs.size() > 1) {
+      return inputs.get(1).getDataSchema();
+    }
+
+    DataSchema resultSchema = node.getDataSchema();
+    int rightColumnOffset = leftSchema.size();
+    int rightColumnCount = resultSchema.size() - rightColumnOffset;
+    int maxRightKey = node.getRightKeys().stream().mapToInt(Integer::intValue).max().orElse(-1);
+    if (rightColumnCount <= maxRightKey) {
+      return null;
+    }
+    return new DataSchema(Arrays.copyOfRange(resultSchema.getColumnNames(), rightColumnOffset, resultSchema.size()),
+        Arrays.copyOfRange(resultSchema.getColumnDataTypes(), rightColumnOffset, resultSchema.size()));
   }
 
   private static LookupTable createLookupTable(List<Integer> joinKeys, DataSchema schema) {

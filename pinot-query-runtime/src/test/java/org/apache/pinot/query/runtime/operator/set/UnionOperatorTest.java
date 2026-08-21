@@ -30,6 +30,8 @@ import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+
 
 public class UnionOperatorTest {
 
@@ -111,5 +113,24 @@ public class UnionOperatorTest {
       result = unionOperator.nextBlock();
     }
     Assert.assertTrue(result.isError());
+  }
+
+  @Test
+  public void testVariantSetOperationValidation() {
+    DataSchema schema = new DataSchema(new String[]{"payload"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.VARIANT});
+    List<MultiStageOperator> inputs = List.of(mock(MultiStageOperator.class), mock(MultiStageOperator.class));
+
+    IllegalArgumentException exception = Assert.expectThrows(IllegalArgumentException.class,
+        () -> new UnionOperator(OperatorTestUtil.getTracingContext(), inputs, schema));
+    Assert.assertTrue(exception.getMessage().contains("UNION DISTINCT does not support raw VARIANT"));
+
+    new UnionAllOperator(OperatorTestUtil.getTracingContext(), inputs, schema);
+
+    DataSchema objectSchema =
+        new DataSchema(new String[]{"payload"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.OBJECT});
+    exception = Assert.expectThrows(IllegalArgumentException.class,
+        () -> new UnionOperator(OperatorTestUtil.getTracingContext(), inputs, objectSchema));
+    Assert.assertTrue(exception.getMessage().contains("UNION DISTINCT does not support OBJECT values"));
   }
 }

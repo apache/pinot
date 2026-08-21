@@ -1,0 +1,35 @@
+{
+  "resultTable": {
+    "dataSchema": {
+      "columnNames": [
+        "payload"
+      ],
+      "columnDataTypes": [
+        "VARIANT"
+      ]
+    },
+    "rows": [
+      [
+        "{\"a\":[1,true,null],\"b\":\"text\"}"
+      ],
+      [
+        "null"
+      ],
+      [
+        "\"null\""
+      ],
+      [
+        null
+      ]
+    ]
+  },
+  "exceptions": [],
+  "numServersQueried": 1,
+  "numServersResponded": 1,
+  "numSegmentsQueried": 1,
+  "numSegmentsProcessed": 1,
+  "numSegmentsMatched": 1,
+  "numDocsScanned": 4,
+  "totalDocs": 4,
+  "timeUsedMs": 1
+}
