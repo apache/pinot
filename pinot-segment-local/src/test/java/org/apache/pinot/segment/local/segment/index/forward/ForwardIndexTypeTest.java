@@ -25,13 +25,20 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
+import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -567,5 +574,33 @@ public class ForwardIndexTypeTest {
   public void testStandardIndex() {
     assertSame(StandardIndexes.forward(), StandardIndexes.forward(), "Standard index should use the same as "
         + "the ForwardIndexType static instance");
+  }
+
+  /// codecSpec applies only at immutable segment creation/conversion time. The mutable (consuming)
+  /// forward index must build the standard in-memory format, ignoring the configured codecSpec, so
+  /// realtime tables with a codecSpec keep consuming normally.
+  @Test
+  public void testCodecSpecBuildsStandardMutableIndexForRealtime()
+      throws Exception {
+    MutableIndexContext context = Mockito.mock(MutableIndexContext.class);
+    Mockito.when(context.getFieldSpec()).thenReturn(
+        new DimensionFieldSpec("dimInt", FieldSpec.DataType.INT, true));
+    Mockito.when(context.getSegmentName()).thenReturn("testSegment");
+    Mockito.when(context.getCapacity()).thenReturn(16);
+    ForwardIndexConfig config = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCodecSpec("DELTA,LZ4")
+        .build();
+
+    try (DirectMemoryManager memoryManager = new DirectMemoryManager("testSegment")) {
+      Mockito.when(context.getMemoryManager()).thenReturn(memoryManager);
+      MutableIndex mutableIndex = StandardIndexes.forward().createMutableIndex(context, config);
+      assertNotNull(mutableIndex);
+      try {
+        assertTrue(mutableIndex instanceof FixedByteSVMutableForwardIndex,
+            "Expected the standard SV mutable forward index, got: " + mutableIndex.getClass());
+      } finally {
+        mutableIndex.close();
+      }
+    }
   }
 }

@@ -93,14 +93,9 @@ public class ForwardIndexCreatorFactory {
         if (chunkCompressionType == null) {
           // The spec is either a transform or a compression-only spec with arguments that can't be
           // represented by a legacy ChunkCompressionType (e.g. ZSTD(5)). Both routes need V7.
-          Preconditions.checkArgument(fieldSpec.isSingleValueField(),
-              "codecSpec '%s' requires the V7 codec-pipeline writer (transform, chain, or non-default options), "
-                  + "which only supports single-value columns. Column '%s' is multi-value.",
-              codecSpec, columnName);
-          Preconditions.checkArgument(storedType == DataType.INT || storedType == DataType.LONG,
-              "codecSpec '%s' requires the V7 codec-pipeline writer (transform, chain, or non-default options), "
-                  + "which only supports INT and LONG columns. Column '%s' has type: %s.",
-              codecSpec, columnName, storedType);
+          // ForwardIndexType.validate enforces the same shape constraints at table-config time;
+          // this check is defense-in-depth for direct factory calls that bypass validation.
+          ForwardIndexType.validateV7WriterShape(codecSpec, fieldSpec);
           CodecPipelineExecutor executor = CodecPipelineExecutor.create(codecSpec, storedType);
           creator = new SingleValueFixedByteRawIndexCreator(indexDir, columnName, numTotalDocs, storedType,
               indexConfig.getTargetDocsPerChunk(), executor);

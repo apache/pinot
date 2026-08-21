@@ -29,6 +29,7 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -107,6 +108,24 @@ public class ForwardIndexCreatorFactoryTest {
       TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
       tableConfig.getIndexingConfig().setCompressionStatsEnabled(true);
       assertTrue(newContext(indexDir, true, tableConfig).isCompressionStatsEnabled());
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  /// The codecSpec feature gate is removed: `shouldCreateIndex` accepts codecSpec configs, so
+  /// config-driven segment builds reach the creator routing below.
+  @Test
+  public void testCodecSpecIsAcceptedByShouldCreateIndex()
+      throws Exception {
+    File indexDir = Files.createTempDirectory("ForwardIndexCreatorFactoryTest").toFile();
+    try {
+      ForwardIndexConfig config = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+          .withCodecSpec("LZ4")
+          .build();
+      IndexCreationContext context = newContext(indexDir, false);
+
+      assertTrue(StandardIndexes.forward().shouldCreateIndex(context, config));
     } finally {
       FileUtils.deleteQuietly(indexDir);
     }
