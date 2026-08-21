@@ -98,6 +98,13 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
           "Cannot create vector index on single-value column: %s", column);
       Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.FLOAT,
           "Cannot create vector index on column: %s of stored type other than FLOAT", column);
+      // Every vector read path that touches the forward index (exact-scan fallback, exact rerank,
+      // distance-threshold and radius refinement) reads raw float vectors via ForwardIndexReader#getFloatMV,
+      // which dictionary-encoded MV readers do not implement -- a dictionary-encoded vector column would pass
+      // table validation but fail at query time.
+      Preconditions.checkState(!indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
+          "Cannot create vector index on dictionary-encoded column: %s -- use RAW encoding (noDictionary)",
+          column);
 
       // Resolve the backend type (defaults to HNSW if not specified)
       VectorBackendType backendType = vectorIndexConfig.resolveBackendType();

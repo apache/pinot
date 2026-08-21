@@ -51,6 +51,7 @@ import org.apache.pinot.core.operator.filter.VectorDistanceUtils;
 import org.apache.pinot.core.operator.filter.VectorRadiusFilterOperator;
 import org.apache.pinot.core.operator.filter.VectorSearchMode;
 import org.apache.pinot.core.operator.filter.VectorSearchParams;
+import org.apache.pinot.core.operator.filter.VectorSearchSpec;
 import org.apache.pinot.core.operator.filter.VectorSearchStrategy;
 import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -65,6 +66,7 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
+import org.apache.pinot.segment.spi.index.reader.FilterAwareVectorIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
@@ -72,6 +74,7 @@ import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -83,6 +86,13 @@ public class FilterPlanNode implements PlanNode {
 
   // Cache the predicate evaluators
   private final List<Pair<Predicate, PredicateEvaluator>> _predicateEvaluators = new ArrayList<>(4);
+
+  // Defensive copy of the upsert doc-ids snapshot, populated in run() only when the filter tree contains a
+  // VECTOR_SIMILARITY predicate. Vector operators must restrict candidate generation to this bitmap so that
+  // upsert-obsoleted rows never consume top-K candidate slots (the outer bitmap AND in run() only removes
+  // them after the candidate budget has been spent).
+  @Nullable
+  private ImmutableRoaringBitmap _vectorRequiredDocIds;
 
   public FilterPlanNode(SegmentContext segmentContext, QueryContext queryContext) {
     this(segmentContext, queryContext, null);
@@ -100,10 +110,39 @@ public class FilterPlanNode implements PlanNode {
     MutableRoaringBitmap docIdsSnapshot = _segmentContext.getDocIdsSnapshot();
     int numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
 
+    if (docIdsSnapshot != null && docIdsSnapshot.isEmpty() && _filter != null
+        && containsVectorSearchPredicate(_filter)) {
+      // No queryable docs in this segment (e.g. every row is upsert-obsoleted): return an empty result without
+      // invoking any ANN vector search. Non-vector queries keep the pre-existing plan shape (outer bitmap AND
+      // with the empty snapshot) so their planning side effects are unchanged.
+      return EmptyFilterOperator.getInstance();
+    }
+
     if (_filter != null) {
+      if (docIdsSnapshot != null && containsVectorSearchPredicate(_filter)) {
+        // Vector operators iterate this bitmap during candidate generation (including on the asynchronous
+        // searcher-pool hand-off of the mutable index), so they need an instance that is stable for the
+        // query's lifetime and that this planner can safely mutate. The snapshot contract requires the
+        // published bitmap to be quiescent at planning time (the built-in upsert metadata managers hand out
+        // per-query clones or replace-only shared views); the clone insulates the operators from any
+        // post-planning replacement and preserves the query-scoped semantics (skipUpsert / skipUpsertDelete
+        // / tombstones) captured at snapshot time.
+        MutableRoaringBitmap requiredDocIds = docIdsSnapshot.clone();
+        // Clamp to the planned doc range: under upsert ConsistencyMode.NONE the snapshot can already
+        // contain a doc id whose row data is still being written by the ingestion thread. The exact-scan
+        // paths guard the bound while iterating, but filtered ANN (in particular the mutable index's
+        // near-real-time reader) could otherwise surface such a doc to the rerank / threshold refinement,
+        // which reads the forward index without a bound check.
+        requiredDocIds.remove(numDocs, 1L << 32);
+        _vectorRequiredDocIds = requiredDocIds;
+      }
       BaseFilterOperator filterOperator = constructPhysicalOperator(_filter, numDocs);
       if (docIdsSnapshot != null) {
-        BaseFilterOperator validDocFilter = new BitmapBasedFilterOperator(docIdsSnapshot, false, numDocs);
+        // Keep the outer bitmap AND as defense in depth even though vector operators already restrict their
+        // candidate generation to the snapshot. Use the same cloned instance the vector operators hold (when
+        // one was taken) so both consumers observe an identical view of the snapshot.
+        BaseFilterOperator validDocFilter = new BitmapBasedFilterOperator(
+            _vectorRequiredDocIds != null ? _vectorRequiredDocIds : docIdsSnapshot, false, numDocs);
         return FilterOperatorUtils.getAndFilterOperator(_queryContext, Arrays.asList(filterOperator, validDocFilter),
             numDocs);
       } else {
@@ -113,6 +152,35 @@ public class FilterPlanNode implements PlanNode {
       return new BitmapBasedFilterOperator(docIdsSnapshot, false, numDocs);
     } else {
       return new MatchAllFilterOperator(numDocs);
+    }
+  }
+
+  /// Returns true if the filter tree contains at least one vector search predicate (VECTOR_SIMILARITY or
+  /// VECTOR_SIMILARITY_RADIUS) at any depth.
+  ///
+  /// For VECTOR_SIMILARITY the required doc-ids filter is a correctness constraint (obsolete rows must not
+  /// consume the per-segment top-K candidate budget). For VECTOR_SIMILARITY_RADIUS results were already
+  /// correct without it ([VectorRadiusFilterOperator] falls back to a complete brute-force scan when its ANN
+  /// candidate pool saturates, and the outer snapshot AND removes obsolete matches), but restricting
+  /// candidate generation avoids spending the candidate budget -- and triggering the expensive saturation
+  /// fallback -- on upsert-obsoleted rows.
+  private static boolean containsVectorSearchPredicate(FilterContext filter) {
+    switch (filter.getType()) {
+      case AND:
+      case OR:
+      case NOT:
+        for (FilterContext child : filter.getChildren()) {
+          if (containsVectorSearchPredicate(child)) {
+            return true;
+          }
+        }
+        return false;
+      case PREDICATE:
+        Predicate.Type predicateType = filter.getPredicate().getType();
+        return predicateType == Predicate.Type.VECTOR_SIMILARITY
+            || predicateType == Predicate.Type.VECTOR_SIMILARITY_RADIUS;
+      default:
+        return false;
     }
   }
 
@@ -352,10 +420,16 @@ public class FilterPlanNode implements PlanNode {
   ///
   /// Decision tree:
   ///
-  /// 1. If the segment has a vector index for the column, use [VectorSimilarityFilterOperator]
-  ///       with query options (nprobe, rerank, maxCandidates).
-  /// 2. If no vector index exists, fall back to [ExactVectorScanFilterOperator] which
-  ///       performs brute-force scan of the forward index.
+  /// 1. If the segment has a vector index for the column, and either no upsert doc-ids snapshot needs to be
+  ///       enforced or the index can restrict candidate generation to it (implements
+  ///       [FilterAwareVectorIndexReader]), use [VectorSimilarityFilterOperator] with query options
+  ///       (nprobe, rerank, maxCandidates).
+  /// 2. Otherwise fall back to [ExactVectorScanFilterOperator] which performs a brute-force scan of the
+  ///       forward index -- over all docs when no snapshot is present, or over only the snapshot docs when one
+  ///       is. This correctness-first fallback also applies when a vector index exists but cannot honor the
+  ///       required doc-ids bitmap (any reader that is not filter-aware): unfiltered ANN would let
+  ///       upsert-obsoleted rows consume the top-K candidate budget. All built-in readers, including the
+  ///       mutable HNSW index, are filter-aware.
   ///
   /// @param hasMetadataFilter true if this vector predicate is combined with metadata filters (AND)
   private BaseFilterOperator constructVectorSimilarityOperator(DataSource dataSource,
@@ -364,8 +438,15 @@ public class FilterPlanNode implements PlanNode {
     VectorIndexConfig vectorIndexConfig = dataSource.getVectorIndexConfig();
     boolean isMutableSegment = _indexSegment.getSegmentMetadata().isMutableSegment();
     VectorSearchParams searchParams = VectorSearchParams.fromQueryOptions(_queryContext.getQueryOptions());
+    ImmutableRoaringBitmap requiredDocIds = _vectorRequiredDocIds;
+    VectorSearchSpec searchSpec = new VectorSearchSpec.Builder()
+        .withSearchParams(searchParams)
+        .withVectorIndexConfig(vectorIndexConfig)
+        .withMetadataFilter(hasMetadataFilter)
+        .withRequiredDocIds(requiredDocIds)
+        .build();
 
-    if (vectorIndex != null) {
+    if (vectorIndex != null && canHonorRequiredDocIds(vectorIndex, requiredDocIds)) {
       // ANN index path: pass forward index reader if rerank or threshold search requires exact distances
       ForwardIndexReader<?> forwardIndexReader = null;
       VectorBackendType backendType = VectorDistanceUtils.resolveBackendType(vectorIndexConfig);
@@ -375,16 +456,44 @@ public class FilterPlanNode implements PlanNode {
             "Cannot apply vectorDistanceThreshold on column: %s -- forward index required for threshold refinement",
             column);
       }
-      return new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs, searchParams, forwardIndexReader,
-          vectorIndexConfig, hasMetadataFilter);
+      return new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs, forwardIndexReader, searchSpec);
     }
 
-    // Exact scan fallback: no vector index on this segment
     ForwardIndexReader<?> forwardIndexReader = dataSource.getForwardIndex();
+    if (vectorIndex == null) {
+      // Exact scan fallback: no vector index on this segment
+      Preconditions.checkState(forwardIndexReader != null,
+          "Cannot apply VECTOR_SIMILARITY on column: %s -- no vector index and no forward index available", column);
+      return new ExactVectorScanFilterOperator(forwardIndexReader, predicate, column, numDocs,
+          getVectorFallbackReason(vectorIndexConfig, isMutableSegment), searchSpec);
+    }
+
+    // Exact scan fallback: a vector index exists but cannot enforce the required upsert doc-ids bitmap.
+    // Never silently run unfiltered ANN in this case -- fail instead when no forward index is available.
     Preconditions.checkState(forwardIndexReader != null,
-        "Cannot apply VECTOR_SIMILARITY on column: %s -- no vector index and no forward index available", column);
-    return new ExactVectorScanFilterOperator(forwardIndexReader, predicate, column, numDocs, vectorIndexConfig,
-        getVectorFallbackReason(vectorIndexConfig, isMutableSegment), searchParams);
+        "Cannot enforce upsert-consistent VECTOR_SIMILARITY on column: %s -- the vector index does not support the"
+            + " required document filter and no forward index is available for exact scan", column);
+    return new ExactVectorScanFilterOperator(forwardIndexReader, predicate, column, numDocs,
+        getRequiredDocIdsFallbackReason(isMutableSegment), searchSpec);
+  }
+
+  /// Returns true if no required doc-ids bitmap needs to be enforced, or the vector index can restrict its
+  /// candidate generation to the required bitmap (implements [FilterAwareVectorIndexReader] and supports
+  /// pre-filtering). Unlike the optional metadata pre-filter, this check deliberately bypasses the
+  /// [VectorSearchStrategy] selectivity heuristics: the upsert snapshot is a correctness constraint, not an
+  /// optimization.
+  private static boolean canHonorRequiredDocIds(VectorIndexReader vectorIndex,
+      @Nullable ImmutableRoaringBitmap requiredDocIds) {
+    if (requiredDocIds == null) {
+      return true;
+    }
+    return vectorIndex instanceof FilterAwareVectorIndexReader
+        && ((FilterAwareVectorIndexReader) vectorIndex).supportsPreFilter();
+  }
+
+  private static String getRequiredDocIdsFallbackReason(boolean isMutableSegment) {
+    return ExactVectorScanFilterOperator.UPSERT_SNAPSHOT_FALLBACK_REASON_PREFIX
+        + (isMutableSegment ? "_mutable_vector_index_not_filter_aware" : "_vector_index_not_filter_aware");
   }
 
   /// Constructs a vector operator for a VECTOR_SIMILARITY predicate that is part of an AND
@@ -419,6 +528,7 @@ public class FilterPlanNode implements PlanNode {
   ///
   /// The radius operator always needs the forward index for exact distance computation.
   /// When a vector index is available, it is used for candidate retrieval before exact filtering.
+  /// The required doc-ids filter (upsert snapshot), when present, restricts every path inside the operator.
   private BaseFilterOperator constructVectorRadiusOperator(DataSource dataSource,
       VectorSimilarityRadiusPredicate predicate, String column, int numDocs) {
     ForwardIndexReader<?> forwardIndexReader = dataSource.getForwardIndex();
@@ -426,8 +536,11 @@ public class FilterPlanNode implements PlanNode {
         "Cannot apply VECTOR_SIMILARITY_RADIUS on column: %s -- no forward index available", column);
     VectorIndexReader vectorIndex = dataSource.getVectorIndex();
     VectorIndexConfig vectorIndexConfig = dataSource.getVectorIndexConfig();
-    return new VectorRadiusFilterOperator(forwardIndexReader, vectorIndex, predicate, column, numDocs,
-        vectorIndexConfig);
+    VectorSearchSpec searchSpec = new VectorSearchSpec.Builder()
+        .withVectorIndexConfig(vectorIndexConfig)
+        .withRequiredDocIds(_vectorRequiredDocIds)
+        .build();
+    return new VectorRadiusFilterOperator(forwardIndexReader, vectorIndex, predicate, column, numDocs, searchSpec);
   }
 
   /// Wires pre-filter bitmaps for filter-aware ANN search when an AND node contains both
@@ -520,11 +633,10 @@ public class FilterPlanNode implements PlanNode {
     // the estimated selectivity. Only pass the bitmap if the strategy recommends
     // FILTER_THEN_ANN; otherwise fall back to the default post-filter path.
     int estimatedFilteredDocs = combinedBitmap.getCardinality();
-    // isMutableSegment=false is acceptable here because the supportsPreFilter() check above
-    // already ensures we only reach this point for immutable segments with
-    // FilterAwareVectorIndexReader. MutableVectorIndex does not implement
-    // FilterAwareVectorIndexReader, so mutable segments exit early via the
-    // anySupportsPreFilter guard.
+    // Pass the real segment mutability: MutableVectorIndex is filter-aware (so mutable segments can reach
+    // this point), but the strategy deliberately stays conservative about OPTIONAL pre-filtering on mutable
+    // segments because their filtered search opens a near-real-time reader per query. The REQUIRED upsert
+    // doc-ids filter is unaffected -- it bypasses this strategy entirely.
     // backendType and searchParams are passed as null here because at the pre-filter wiring
     // stage we are deciding whether to activate pre-filtering at all, not per-backend tuning.
     // The strategy currently uses only selectivity (numDocs, estimatedFilteredDocs) for this
@@ -533,7 +645,7 @@ public class FilterPlanNode implements PlanNode {
         numDocs, estimatedFilteredDocs,
         /* hasVectorIndex= */ true,
         /* indexSupportsPreFilter= */ true,
-        /* isMutableSegment= */ false,
+        _indexSegment.getSegmentMetadata().isMutableSegment(),
         /* backendType= */ null,
         /* searchParams= */ null);
 

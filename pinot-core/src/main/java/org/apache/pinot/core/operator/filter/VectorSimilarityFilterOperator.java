@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CaseFormat;
 import java.util.Arrays;
 import java.util.List;
@@ -61,6 +62,11 @@ import org.slf4j.LoggerFactory;
 /// - **Pre-filter:** For backends that implement FilterAwareVectorIndexReader, a pre-filter
 ///      bitmap from sibling filter operators can be passed in to improve search quality under
 ///      highly selective filters.
+/// - **Required doc-ids filter:** For upsert tables, the query-scoped doc-ids snapshot can be
+///      passed at construction time as a mandatory candidate filter. Unlike the optional
+///      pre-filter, it is always enforced (never subject to selectivity heuristics), and this
+///      operator refuses to run unfiltered ANN while it is present. When both bitmaps are set,
+///      the ANN search is restricted to their intersection.
 ///
 /// When no query options are specified, behavior is identical to the previous HNSW-only path
 /// (full backward compatibility).
@@ -90,46 +96,68 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
   private ImmutableRoaringBitmap _matches;
   @Nullable
   private volatile ImmutableRoaringBitmap _preFilterBitmap;
+  // Mandatory candidate filter (upsert doc-ids snapshot). Unlike _preFilterBitmap it is never optional:
+  // when set, candidate generation must be restricted to it, and unfiltered ANN is a planning bug.
+  @Nullable
+  private final ImmutableRoaringBitmap _requiredDocIds;
   private volatile VectorSearchMode _vectorSearchMode;
 
   /// Backward-compatible constructor that uses default search params and no forward index.
   /// Existing callers that do not pass query options continue to work unchanged.
   public VectorSimilarityFilterOperator(VectorIndexReader vectorIndexReader, VectorSimilarityPredicate predicate,
       int numDocs) {
-    this(vectorIndexReader, predicate, numDocs, VectorSearchParams.DEFAULT, null, null, false);
+    this(vectorIndexReader, predicate, numDocs, null, VectorSearchSpec.DEFAULT);
   }
 
-  /// Full constructor with query option support.
-  ///
-  /// @param vectorIndexReader the ANN index reader
-  /// @param predicate the vector similarity predicate
-  /// @param numDocs total docs in the segment
-  /// @param searchParams vector search parameters from query options
-  /// @param forwardIndexReader forward index reader for exact rerank (may be null if rerank is not needed)
-  public VectorSimilarityFilterOperator(VectorIndexReader vectorIndexReader, VectorSimilarityPredicate predicate,
+  @VisibleForTesting
+  VectorSimilarityFilterOperator(VectorIndexReader vectorIndexReader, VectorSimilarityPredicate predicate,
       int numDocs, VectorSearchParams searchParams, @Nullable ForwardIndexReader<?> forwardIndexReader) {
-    this(vectorIndexReader, predicate, numDocs, searchParams, forwardIndexReader, null, false);
+    this(vectorIndexReader, predicate, numDocs, forwardIndexReader,
+        new VectorSearchSpec.Builder().withSearchParams(searchParams).build());
   }
 
-  public VectorSimilarityFilterOperator(VectorIndexReader vectorIndexReader, VectorSimilarityPredicate predicate,
+  @VisibleForTesting
+  VectorSimilarityFilterOperator(VectorIndexReader vectorIndexReader, VectorSimilarityPredicate predicate,
       int numDocs, VectorSearchParams searchParams, @Nullable ForwardIndexReader<?> forwardIndexReader,
       @Nullable VectorIndexConfig vectorIndexConfig) {
-    this(vectorIndexReader, predicate, numDocs, searchParams, forwardIndexReader, vectorIndexConfig, false);
+    this(vectorIndexReader, predicate, numDocs, forwardIndexReader,
+        new VectorSearchSpec.Builder().withSearchParams(searchParams).withVectorIndexConfig(vectorIndexConfig)
+            .build());
   }
 
-  /// Full constructor with metadata filter awareness.
+  @VisibleForTesting
+  VectorSimilarityFilterOperator(VectorIndexReader vectorIndexReader, VectorSimilarityPredicate predicate,
+      int numDocs, VectorSearchParams searchParams, @Nullable ForwardIndexReader<?> forwardIndexReader,
+      @Nullable VectorIndexConfig vectorIndexConfig, boolean hasMetadataFilter) {
+    this(vectorIndexReader, predicate, numDocs, forwardIndexReader,
+        new VectorSearchSpec.Builder().withSearchParams(searchParams).withVectorIndexConfig(vectorIndexConfig)
+            .withMetadataFilter(hasMetadataFilter).build());
+  }
+
+  @VisibleForTesting
+  VectorSimilarityFilterOperator(VectorIndexReader vectorIndexReader, VectorSimilarityPredicate predicate,
+      int numDocs, VectorSearchParams searchParams, @Nullable ForwardIndexReader<?> forwardIndexReader,
+      @Nullable VectorIndexConfig vectorIndexConfig, boolean hasMetadataFilter,
+      @Nullable ImmutableRoaringBitmap requiredDocIds) {
+    this(vectorIndexReader, predicate, numDocs, forwardIndexReader,
+        new VectorSearchSpec.Builder().withSearchParams(searchParams).withVectorIndexConfig(vectorIndexConfig)
+            .withMetadataFilter(hasMetadataFilter).withRequiredDocIds(requiredDocIds).build());
+  }
+
+  /// Primary constructor.
   ///
   /// @param vectorIndexReader the ANN index reader
   /// @param predicate the vector similarity predicate
   /// @param numDocs total docs in the segment
-  /// @param searchParams vector search parameters from query options
   /// @param forwardIndexReader forward index reader for exact rerank (may be null if rerank is not needed)
-  /// @param vectorIndexConfig vector index configuration (may be null)
-  /// @param hasMetadataFilter true if this operator is combined with metadata filters in an AND
+  /// @param spec construction-time context: search params, vector index config, metadata-filter awareness
+  ///             and the required doc-ids filter (upsert doc-ids snapshot); when the required filter is
+  ///             non-null the reader must implement [FilterAwareVectorIndexReader] and support pre-filtering
   public VectorSimilarityFilterOperator(VectorIndexReader vectorIndexReader, VectorSimilarityPredicate predicate,
-      int numDocs, VectorSearchParams searchParams, @Nullable ForwardIndexReader<?> forwardIndexReader,
-      @Nullable VectorIndexConfig vectorIndexConfig, boolean hasMetadataFilter) {
+      int numDocs, @Nullable ForwardIndexReader<?> forwardIndexReader, VectorSearchSpec spec) {
     super(numDocs, false);
+    VectorSearchParams searchParams = spec.getSearchParams();
+    VectorIndexConfig vectorIndexConfig = spec.getVectorIndexConfig();
     _vectorIndexReader = vectorIndexReader;
     _predicate = predicate;
     _searchParams = searchParams;
@@ -139,7 +167,7 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
     _distanceFunction = VectorDistanceUtils.resolveDistanceFunction(vectorIndexConfig);
     _requestedExactRerank = searchParams.isExactRerank(_backendType);
     _effectiveExactRerank = _requestedExactRerank && forwardIndexReader != null;
-    _hasMetadataFilter = hasMetadataFilter;
+    _hasMetadataFilter = spec.hasMetadataFilter();
     _hasThresholdPredicate = searchParams.hasDistanceThreshold();
     _distanceThreshold = searchParams.getDistanceThreshold();
     // When metadata filter is present, over-fetch ANN candidates to compensate for filter loss.
@@ -160,6 +188,7 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
       baseSearchCount = predicate.getTopK();
     }
     _effectiveSearchCount = baseSearchCount;
+    _requiredDocIds = spec.getRequiredDocIds();
     refreshExplainContext(null);
     _annCandidateCount = -1;
     _rerankedCandidateCount = -1;
@@ -244,6 +273,9 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
     if (explainContext.getFilterSelectivity() >= 0) {
       sb.append(", filterSelectivity:").append(String.format("%.4f", explainContext.getFilterSelectivity()));
     }
+    if (_requiredDocIds != null) {
+      sb.append(", upsertRequiredDocIdsCardinality:").append(_requiredDocIds.getCardinality());
+    }
     sb.append(')');
     return sb.toString();
   }
@@ -292,6 +324,10 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
     if (explainContext.getFilterSelectivity() >= 0) {
       attributeBuilder.putString("filterSelectivity", String.format("%.4f", explainContext.getFilterSelectivity()));
     }
+    if (_requiredDocIds != null) {
+      attributeBuilder.putBool("upsertRequiredDocIdsApplied", true);
+      attributeBuilder.putLong("upsertRequiredDocIdsCardinality", _requiredDocIds.getCardinality());
+    }
   }
 
   /// Returns true if the underlying vector index reader supports pre-filter ANN search.
@@ -314,22 +350,34 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
       // 2. Determine effective search count (higher if rerank is enabled)
       int searchCount = explainContext.getEffectiveSearchCount();
 
-      // 3. Execute ANN search (with pre-filter if available)
-      ImmutableRoaringBitmap preFilter = _preFilterBitmap;
+      // 3. Execute ANN search, restricted to the effective allowed doc ids when present.
+      //    The required doc ids (upsert snapshot) are a correctness constraint and are always enforced;
+      //    the optional pre-filter bitmap (metadata siblings) is a recall optimization. When both are
+      //    present, the search is restricted to their intersection.
+      ImmutableRoaringBitmap effectiveAllowedDocIds = computeEffectiveAllowedDocIds();
       ImmutableRoaringBitmap annResults;
-      if (preFilter != null && _vectorIndexReader instanceof FilterAwareVectorIndexReader) {
-        FilterAwareVectorIndexReader filterAwareReader = (FilterAwareVectorIndexReader) _vectorIndexReader;
-        if (filterAwareReader.supportsPreFilter()) {
-          _vectorSearchMode = VectorSearchMode.FILTER_THEN_ANN;
-          annResults = filterAwareReader.getDocIds(queryVector, searchCount, preFilter);
-          LOGGER.debug("Pre-filter ANN search on column: {}, filterCardinality: {}, filterSelectivity: {}",
-              column, preFilter.getCardinality(),
-              _numDocs > 0 ? (double) preFilter.getCardinality() / _numDocs : 0.0);
-        } else {
-          _vectorSearchMode = VectorSearchMode.POST_FILTER_ANN;
-          annResults = _vectorIndexReader.getDocIds(queryVector, searchCount);
-        }
+      if (effectiveAllowedDocIds == null) {
+        _vectorSearchMode = VectorSearchMode.POST_FILTER_ANN;
+        annResults = _vectorIndexReader.getDocIds(queryVector, searchCount);
+      } else if (_requiredDocIds != null && effectiveAllowedDocIds.isEmpty()) {
+        // Nothing is allowed to match: return empty without invoking the ANN index
+        _vectorSearchMode = VectorSearchMode.FILTER_THEN_ANN;
+        annResults = new MutableRoaringBitmap();
+      } else if (supportsPreFilter()) {
+        _vectorSearchMode = VectorSearchMode.FILTER_THEN_ANN;
+        annResults = ((FilterAwareVectorIndexReader) _vectorIndexReader).getDocIds(queryVector, searchCount,
+            effectiveAllowedDocIds);
+        LOGGER.debug("Pre-filter ANN search on column: {}, filterCardinality: {}, filterSelectivity: {}",
+            column, effectiveAllowedDocIds.getCardinality(),
+            _numDocs > 0 ? (double) effectiveAllowedDocIds.getCardinality() / _numDocs : 0.0);
+      } else if (_requiredDocIds != null) {
+        // Never silently fall back to unfiltered ANN while a required doc filter is present: obsolete upsert
+        // rows would consume top-K candidate slots. FilterPlanNode routes non-filter-aware readers to the
+        // exact-scan fallback, so reaching this point indicates a planning bug.
+        throw new IllegalStateException("Vector index reader for column: " + column
+            + " cannot enforce the required document filter (upsert doc-ids snapshot); refusing unfiltered ANN");
       } else {
+        // Optional pre-filter only, reader not filter-aware: preserve the adaptive post-filter behavior
         _vectorSearchMode = VectorSearchMode.POST_FILTER_ANN;
         annResults = _vectorIndexReader.getDocIds(queryVector, searchCount);
       }
@@ -387,6 +435,22 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
       refreshExplainContext(null);
       clearBackendParams(column);
     }
+  }
+
+  /// Returns the effective allowed doc ids for candidate generation: the intersection of the required
+  /// doc ids (upsert snapshot -- mandatory) and the optional pre-filter bitmap (metadata siblings), or
+  /// null when neither is present. A fresh bitmap is created for the intersection so neither input is
+  /// mutated.
+  @Nullable
+  private ImmutableRoaringBitmap computeEffectiveAllowedDocIds() {
+    ImmutableRoaringBitmap preFilter = _preFilterBitmap;
+    if (_requiredDocIds == null) {
+      return preFilter;
+    }
+    if (preFilter == null) {
+      return _requiredDocIds;
+    }
+    return ImmutableRoaringBitmap.and(_requiredDocIds, preFilter);
   }
 
   /// Configures backend-specific search parameters on the reader if it supports them.

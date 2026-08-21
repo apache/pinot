@@ -23,6 +23,7 @@ import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredica
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.FilterAwareVectorIndexReader;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
+import org.mockito.ArgumentCaptor;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
@@ -262,6 +263,161 @@ public class FilterAwareVectorSearchTest {
     String explain = operator.toExplainString();
     Assert.assertTrue(explain.contains("searchMode:POST_FILTER_ANN"),
         "Explain should include search mode, got: " + explain);
+  }
+
+  // -----------------------------------------------------------------------
+  // Required doc-ids filter (upsert snapshot) tests
+  // -----------------------------------------------------------------------
+
+  private static VectorSimilarityPredicate createPredicate(float[] queryVector, int topK) {
+    return new VectorSimilarityPredicate(ExpressionContext.forIdentifier("embedding"), queryVector, topK);
+  }
+
+  @Test
+  public void testRequiredDocIdsAlwaysDispatchToFilteredSearch() {
+    // K=2, required snapshot {2, 3}. An unfiltered search would return the obsolete docs {0, 1};
+    // the filtered search returns {2, 3}. No metadata predicate / optional pre-filter involved.
+    FilterAwareVectorIndexReader mockReader = mock(FilterAwareVectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+
+    when(mockReader.supportsPreFilter()).thenReturn(true);
+    when(mockReader.getDocIds(queryVector, 2)).thenReturn(MutableRoaringBitmap.bitmapOf(0, 1));
+    when(mockReader.getDocIds(eq(queryVector), eq(2), any(ImmutableRoaringBitmap.class)))
+        .thenReturn(MutableRoaringBitmap.bitmapOf(2, 3));
+
+    ImmutableRoaringBitmap requiredDocIds = ImmutableRoaringBitmap.bitmapOf(2, 3);
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(
+        mockReader, createPredicate(queryVector, 2), 100, VectorSearchParams.DEFAULT, null, null, false,
+        requiredDocIds);
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result.getCardinality(), 2);
+    Assert.assertTrue(result.contains(2));
+    Assert.assertTrue(result.contains(3));
+
+    // The filtered overload must receive exactly the required doc ids; the unfiltered overload must
+    // never run while a required filter is present
+    ArgumentCaptor<ImmutableRoaringBitmap> bitmapCaptor = ArgumentCaptor.forClass(ImmutableRoaringBitmap.class);
+    verify(mockReader).getDocIds(eq(queryVector), eq(2), bitmapCaptor.capture());
+    Assert.assertEquals(bitmapCaptor.getValue(), requiredDocIds);
+    verify(mockReader, never()).getDocIds(queryVector, 2);
+
+    String explain = operator.toExplainString();
+    Assert.assertTrue(explain.contains("searchMode:FILTER_THEN_ANN"),
+        "Explain should report FILTER_THEN_ANN, got: " + explain);
+    Assert.assertTrue(explain.contains("upsertRequiredDocIdsCardinality:2"),
+        "Explain should report the required doc-ids cardinality, got: " + explain);
+  }
+
+  @Test
+  public void testRequiredDocIdsEmptyReturnsEmptyWithoutReaderInvocation() {
+    FilterAwareVectorIndexReader mockReader = mock(FilterAwareVectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(
+        mockReader, createPredicate(queryVector, 2), 100, VectorSearchParams.DEFAULT, null, null, false,
+        ImmutableRoaringBitmap.bitmapOf());
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result.getCardinality(), 0);
+    verify(mockReader, never()).getDocIds(any(float[].class), anyInt());
+    verify(mockReader, never()).getDocIds(any(float[].class), anyInt(), any(ImmutableRoaringBitmap.class));
+  }
+
+  @Test
+  public void testRequiredDocIdsIntersectedWithOptionalPreFilter() {
+    // required {2, 3, 4} AND optional metadata pre-filter {3, 4, 5} -> reader receives {3, 4}
+    FilterAwareVectorIndexReader mockReader = mock(FilterAwareVectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+
+    when(mockReader.supportsPreFilter()).thenReturn(true);
+    when(mockReader.getDocIds(eq(queryVector), eq(2), any(ImmutableRoaringBitmap.class)))
+        .thenReturn(MutableRoaringBitmap.bitmapOf(3, 4));
+
+    ImmutableRoaringBitmap requiredDocIds = ImmutableRoaringBitmap.bitmapOf(2, 3, 4);
+    ImmutableRoaringBitmap optionalPreFilter = ImmutableRoaringBitmap.bitmapOf(3, 4, 5);
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(
+        mockReader, createPredicate(queryVector, 2), 100, VectorSearchParams.DEFAULT, null, null, true,
+        requiredDocIds);
+    operator.setPreFilterBitmap(optionalPreFilter);
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result.getCardinality(), 2);
+
+    ArgumentCaptor<ImmutableRoaringBitmap> bitmapCaptor = ArgumentCaptor.forClass(ImmutableRoaringBitmap.class);
+    verify(mockReader).getDocIds(eq(queryVector), eq(2), bitmapCaptor.capture());
+    Assert.assertEquals(bitmapCaptor.getValue(), ImmutableRoaringBitmap.bitmapOf(3, 4),
+        "Reader must receive the intersection of the required and optional bitmaps");
+    verify(mockReader, never()).getDocIds(queryVector, 2);
+    // Neither input bitmap may be mutated by the intersection
+    Assert.assertEquals(requiredDocIds, ImmutableRoaringBitmap.bitmapOf(2, 3, 4));
+    Assert.assertEquals(optionalPreFilter, ImmutableRoaringBitmap.bitmapOf(3, 4, 5));
+  }
+
+  @Test
+  public void testRequiredDocIdsEmptyIntersectionSkipsReader() {
+    // required {2, 3} AND optional {4, 5} -> empty intersection -> empty result, no ANN invocation
+    FilterAwareVectorIndexReader mockReader = mock(FilterAwareVectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    when(mockReader.supportsPreFilter()).thenReturn(true);
+
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(
+        mockReader, createPredicate(queryVector, 2), 100, VectorSearchParams.DEFAULT, null, null, true,
+        ImmutableRoaringBitmap.bitmapOf(2, 3));
+    operator.setPreFilterBitmap(ImmutableRoaringBitmap.bitmapOf(4, 5));
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result.getCardinality(), 0);
+    verify(mockReader, never()).getDocIds(any(float[].class), anyInt());
+    verify(mockReader, never()).getDocIds(any(float[].class), anyInt(), any(ImmutableRoaringBitmap.class));
+  }
+
+  @Test
+  public void testRequiredDocIdsWithNonFilterAwareReaderThrows() {
+    // A required doc filter with a reader that cannot honor it must fail rather than silently run
+    // unfiltered ANN (FilterPlanNode routes such readers to the exact-scan fallback instead)
+    VectorIndexReader mockReader = mock(VectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(
+        mockReader, createPredicate(queryVector, 2), 100, VectorSearchParams.DEFAULT, null, null, false,
+        ImmutableRoaringBitmap.bitmapOf(2, 3));
+
+    Assert.expectThrows(IllegalStateException.class, operator::getBitmaps);
+    verify(mockReader, never()).getDocIds(any(float[].class), anyInt());
+  }
+
+  @Test
+  public void testRequiredDocIdsWithPreFilterUnsupportedReaderThrows() {
+    FilterAwareVectorIndexReader mockReader = mock(FilterAwareVectorIndexReader.class);
+    when(mockReader.supportsPreFilter()).thenReturn(false);
+    float[] queryVector = {1.0f, 0.0f};
+
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(
+        mockReader, createPredicate(queryVector, 2), 100, VectorSearchParams.DEFAULT, null, null, false,
+        ImmutableRoaringBitmap.bitmapOf(2, 3));
+
+    Assert.expectThrows(IllegalStateException.class, operator::getBitmaps);
+    verify(mockReader, never()).getDocIds(any(float[].class), anyInt());
+    verify(mockReader, never()).getDocIds(any(float[].class), anyInt(), any(ImmutableRoaringBitmap.class));
+  }
+
+  @Test
+  public void testNullRequiredDocIdsPreservesUnfilteredBehavior() {
+    // Without a required filter (non-upsert segment), the existing unfiltered path is unchanged
+    FilterAwareVectorIndexReader mockReader = mock(FilterAwareVectorIndexReader.class);
+    float[] queryVector = {1.0f, 0.0f};
+    when(mockReader.getDocIds(queryVector, 2)).thenReturn(MutableRoaringBitmap.bitmapOf(0, 1));
+
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(
+        mockReader, createPredicate(queryVector, 2), 100, VectorSearchParams.DEFAULT, null, null, false, null);
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result.getCardinality(), 2);
+    verify(mockReader).getDocIds(queryVector, 2);
+    verify(mockReader, never()).getDocIds(any(float[].class), anyInt(), any(ImmutableRoaringBitmap.class));
+    Assert.assertFalse(operator.toExplainString().contains("upsertRequiredDocIds"),
+        "Explain must not report a required doc-ids filter when none is present");
   }
 
   // -----------------------------------------------------------------------

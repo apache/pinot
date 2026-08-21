@@ -215,6 +215,106 @@ public class ExactVectorScanFilterOperatorTest {
     Assert.assertTrue(result.contains(1), "Missing vector config should continue to use L2 exact-scan ranking");
   }
 
+  // -----------------------------------------------------------------------
+  // Required doc-ids filter (upsert snapshot) tests
+  // -----------------------------------------------------------------------
+
+  /// Physical rows where the upsert-obsoleted rows are the closest: docs 0 and 1 sit at distance 0
+  /// from the query while the valid docs 2 and 3 sit at distance 2. A post-search intersection would
+  /// let the obsolete rows consume both top-K slots and return nothing.
+  private static final float[][] UPSERT_VECTORS = {
+      {1.0f, 0.0f},   // doc 0 - obsolete, distance 0
+      {1.0f, 0.0f},   // doc 1 - obsolete, distance 0
+      {0.0f, 1.0f},   // doc 2 - valid, distance 2
+      {0.0f, -1.0f},  // doc 3 - valid, distance 2
+  };
+  private static final float[] UPSERT_QUERY_VECTOR = {1.0f, 0.0f};
+
+  private ExactVectorScanFilterOperator createUpsertScanOperator(int topK, VectorSearchParams searchParams,
+      ImmutableRoaringBitmap requiredDocIds) {
+    ForwardIndexReader<?> mockReader = createMockForwardIndexReader(UPSERT_VECTORS);
+    ExpressionContext lhs = ExpressionContext.forIdentifier("embedding");
+    VectorSimilarityPredicate predicate = new VectorSimilarityPredicate(lhs, UPSERT_QUERY_VECTOR, topK);
+    return new ExactVectorScanFilterOperator(mockReader, predicate, "embedding", UPSERT_VECTORS.length, null,
+        "upsert_snapshot_vector_index_not_filter_aware", searchParams, requiredDocIds);
+  }
+
+  @Test
+  public void testRequiredDocIdsTopKSelectsOnlyAllowedDocs() {
+    ImmutableRoaringBitmap requiredDocIds = ImmutableRoaringBitmap.bitmapOf(2, 3);
+    ExactVectorScanFilterOperator operator = createUpsertScanOperator(2, VectorSearchParams.DEFAULT, requiredDocIds);
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result.getCardinality(), 2);
+    Assert.assertTrue(result.contains(2));
+    Assert.assertTrue(result.contains(3));
+    Assert.assertFalse(result.contains(0), "Obsolete doc 0 must not consume a top-K slot");
+    Assert.assertFalse(result.contains(1), "Obsolete doc 1 must not consume a top-K slot");
+
+    String explain = operator.toExplainString();
+    Assert.assertTrue(explain.contains("upsertRequiredDocIdsCardinality:2"),
+        "Explain should report the required doc-ids cardinality, got: " + explain);
+    Assert.assertTrue(explain.contains("fallbackReason:upsert_snapshot_vector_index_not_filter_aware"),
+        "Explain should report the fallback reason, got: " + explain);
+  }
+
+  @Test
+  public void testRequiredDocIdsEmptyReturnsEmptyResult() {
+    ExactVectorScanFilterOperator operator =
+        createUpsertScanOperator(2, VectorSearchParams.DEFAULT, ImmutableRoaringBitmap.bitmapOf());
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result.getCardinality(), 0);
+  }
+
+  @Test
+  public void testRequiredDocIdsTopKLargerThanAllowedCardinality() {
+    ImmutableRoaringBitmap requiredDocIds = ImmutableRoaringBitmap.bitmapOf(2, 3);
+    ExactVectorScanFilterOperator operator = createUpsertScanOperator(10, VectorSearchParams.DEFAULT, requiredDocIds);
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result.getCardinality(), 2);
+    Assert.assertTrue(result.contains(2));
+    Assert.assertTrue(result.contains(3));
+  }
+
+  @Test
+  public void testRequiredDocIdsThresholdScanOnlyScansAllowedDocs() {
+    // Threshold 2.5 accepts all four physical rows; the required filter must still exclude docs 0 and 1
+    VectorSearchParams thresholdParams = new VectorSearchParams(null, null, null, 2.5f, null, null, null);
+    ImmutableRoaringBitmap requiredDocIds = ImmutableRoaringBitmap.bitmapOf(2, 3);
+    ExactVectorScanFilterOperator operator = createUpsertScanOperator(4, thresholdParams, requiredDocIds);
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result.getCardinality(), 2);
+    Assert.assertTrue(result.contains(2));
+    Assert.assertTrue(result.contains(3));
+  }
+
+  @Test
+  public void testRequiredDocIdsThresholdScanRespectsThresholdWithinAllowedDocs() {
+    // Threshold 1.0 rejects the valid docs (distance 2), so the result is empty even though the
+    // obsolete docs 0 and 1 are within the threshold
+    VectorSearchParams thresholdParams = new VectorSearchParams(null, null, null, 1.0f, null, null, null);
+    ImmutableRoaringBitmap requiredDocIds = ImmutableRoaringBitmap.bitmapOf(2, 3);
+    ExactVectorScanFilterOperator operator = createUpsertScanOperator(4, thresholdParams, requiredDocIds);
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result.getCardinality(), 0);
+  }
+
+  @Test
+  public void testRequiredDocIdsBeyondNumDocsAreIgnored() {
+    // A doc id past numDocs must never be scanned or returned
+    ImmutableRoaringBitmap requiredDocIds = ImmutableRoaringBitmap.bitmapOf(2, 3, 100);
+    ExactVectorScanFilterOperator operator = createUpsertScanOperator(10, VectorSearchParams.DEFAULT, requiredDocIds);
+
+    ImmutableRoaringBitmap result = operator.getBitmaps().reduce();
+    Assert.assertEquals(result.getCardinality(), 2);
+    Assert.assertTrue(result.contains(2));
+    Assert.assertTrue(result.contains(3));
+  }
+
   @SuppressWarnings({"unchecked", "rawtypes"})
   private ForwardIndexReader<?> createMockForwardIndexReader(float[][] vectors) {
     ForwardIndexReader mockReader = mock(ForwardIndexReader.class);
