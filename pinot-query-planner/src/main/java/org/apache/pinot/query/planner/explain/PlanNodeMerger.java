@@ -38,6 +38,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -434,6 +435,46 @@ class PlanNodeMerger {
         return null;
       }
       if (!node.getConstants().equals(otherNode.getConstants())) {
+        return null;
+      }
+      List<PlanNode> children = mergeChildren(node, context);
+      if (children == null) {
+        return null;
+      }
+      return node.withInputs(children);
+    }
+
+    @Nullable
+    @Override
+    public PlanNode visitMatch(MatchNode node, PlanNode context) {
+      if (context.getClass() != MatchNode.class) {
+        return null;
+      }
+      MatchNode otherNode = (MatchNode) context;
+      // Every field of a MatchNode changes which rows are matched or what is emitted, so all of them must agree
+      // before two nodes can be considered the same plan.
+      if (!node.getPatternSymbols().equals(otherNode.getPatternSymbols())) {
+        return null;
+      }
+      if (!node.getPattern().equals(otherNode.getPattern())) {
+        return null;
+      }
+      if (!node.getMeasures().equals(otherNode.getMeasures())) {
+        return null;
+      }
+      if (!node.getPartitionKeys().equals(otherNode.getPartitionKeys())) {
+        return null;
+      }
+      if (!node.getCollations().equals(otherNode.getCollations())) {
+        return null;
+      }
+      if (node.getAfterMatchSkipMode() != otherNode.getAfterMatchSkipMode()) {
+        return null;
+      }
+      if (node.getAfterMatchSkipToSymbolOrdinal() != otherNode.getAfterMatchSkipToSymbolOrdinal()) {
+        return null;
+      }
+      if (node.getRowsPerMatchMode() != otherNode.getRowsPerMatchMode()) {
         return null;
       }
       List<PlanNode> children = mergeChildren(node, context);
