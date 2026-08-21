@@ -223,11 +223,12 @@ final class GorillaCodecDefinition implements ChunkCodecHandler<GorillaCodecDefi
     int count = src.getInt();
     validateHeader(flag, count, ctx);
     if (count == 0) {
+      ensureFullyConsumed(src);
       return ByteBuffer.allocateDirect(0);
     }
     boolean isLong = flag == 1;
     int elementSize = isLong ? Long.BYTES : Integer.BYTES;
-    ByteBuffer out = ByteBuffer.allocateDirect(count * elementSize);
+    ByteBuffer out = ByteBuffer.allocateDirect(decodedSize(count, elementSize));
     decodeValues(src, count, isLong, out);
     out.flip();
     return out;
@@ -240,6 +241,7 @@ final class GorillaCodecDefinition implements ChunkCodecHandler<GorillaCodecDefi
     int count = src.getInt();
     validateHeader(flag, count, ctx);
     if (count == 0) {
+      ensureFullyConsumed(src);
       dst.flip();
       return;
     }
@@ -290,6 +292,7 @@ final class GorillaCodecDefinition implements ChunkCodecHandler<GorillaCodecDefi
       dst.putInt((int) prev);
     }
     if (count == 1) {
+      ensureFullyConsumed(src);
       return;
     }
 
@@ -338,6 +341,23 @@ final class GorillaCodecDefinition implements ChunkCodecHandler<GorillaCodecDefi
         }
         prev = cur;
       }
+    }
+    reader.ensureFullyConsumed();
+  }
+
+  private static int decodedSize(int count, int elementSize) {
+    long decodedSize = (long) count * elementSize;
+    if (decodedSize > Integer.MAX_VALUE) {
+      throw new IllegalStateException(
+          "GORILLA: decoded size " + decodedSize + " exceeds Integer.MAX_VALUE. Segment may be corrupt.");
+    }
+    return (int) decodedSize;
+  }
+
+  private static void ensureFullyConsumed(ByteBuffer src) {
+    if (src.hasRemaining()) {
+      throw new IllegalStateException(
+          "GORILLA: trailing " + src.remaining() + " byte(s) after frame. Segment may be corrupt.");
     }
   }
 
@@ -410,6 +430,18 @@ final class GorillaCodecDefinition implements ChunkCodecHandler<GorillaCodecDefi
         result |= ((long) readBit()) << b;
       }
       return result;
+    }
+
+    void ensureFullyConsumed() {
+      if (_in.hasRemaining()) {
+        throw new IllegalStateException(
+            "GORILLA: trailing " + _in.remaining() + " byte(s) after bit stream. Segment may be corrupt.");
+      }
+      int paddingMask = (1 << _bitsInAccumulator) - 1;
+      if ((_byteAccumulator & paddingMask) != 0) {
+        throw new IllegalStateException(
+            "GORILLA: non-zero padding bits after bit stream. Segment may be corrupt.");
+      }
     }
   }
 }

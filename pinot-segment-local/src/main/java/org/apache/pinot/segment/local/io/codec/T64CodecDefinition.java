@@ -152,18 +152,6 @@ final class T64CodecDefinition implements ChunkCodecHandler<T64CodecDefinition.O
     int count = remaining / elementSize;
     boolean isLong = dt == DataType.LONG;
 
-    long[] values = new long[count];
-    if (isLong) {
-      for (int i = 0; i < count; i++) {
-        values[i] = src.getLong();
-      }
-    } else {
-      for (int i = 0; i < count; i++) {
-        // Sign-extend INT to LONG so arithmetic uses two's-complement semantics for negative deltas.
-        values[i] = src.getInt();
-      }
-    }
-
     // Worst-case allocation upper bound — see maxEncodedSize.
     int numBlocks = (count + BLOCK_SIZE - 1) / BLOCK_SIZE;
     int worstCase = 1 + Integer.BYTES + numBlocks * (elementSize + 1 + elementSize * BLOCK_SIZE);
@@ -174,13 +162,19 @@ final class T64CodecDefinition implements ChunkCodecHandler<T64CodecDefinition.O
     // Reusable per-encode scratch buffer for packed-bytes; sized for the worst case
     // `elementSize * BLOCK_SIZE` bytes (when bitWidth == elementBits) so it never needs to grow.
     byte[] packedBuf = new byte[elementSize * BLOCK_SIZE];
+    // Decode and pack one block at a time. Retaining the whole chunk in a long[] would add up to
+    // 2 MiB of transient heap for a normal 1 MiB INT chunk, multiplied across concurrent writers.
+    long[] blockValues = new long[BLOCK_SIZE];
 
     for (int blockStart = 0; blockStart < count; blockStart += BLOCK_SIZE) {
       int blockCount = Math.min(BLOCK_SIZE, count - blockStart);
-      long min = values[blockStart];
-      long max = values[blockStart];
-      for (int i = 1; i < blockCount; i++) {
-        long v = values[blockStart + i];
+      long min = Long.MAX_VALUE;
+      long max = Long.MIN_VALUE;
+      for (int i = 0; i < blockCount; i++) {
+        // Sign-extend INT to LONG so arithmetic uses two's-complement semantics for negative
+        // deltas.
+        long v = isLong ? src.getLong() : src.getInt();
+        blockValues[i] = v;
         if (v < min) {
           min = v;
         }
@@ -214,7 +208,7 @@ final class T64CodecDefinition implements ChunkCodecHandler<T64CodecDefinition.O
       }
 
       // Pack BLOCK_SIZE values; missing tail slots get zero (i.e. baseline).
-      packBits(values, blockStart, blockCount, min, bitWidth, out, packedBuf);
+      packBits(blockValues, blockCount, min, bitWidth, out, packedBuf);
     }
 
     out.flip();
@@ -227,11 +221,12 @@ final class T64CodecDefinition implements ChunkCodecHandler<T64CodecDefinition.O
     int count = src.getInt();
     validateHeader(flag, count, ctx);
     if (count == 0) {
+      ensureFullyConsumed(src);
       return ByteBuffer.allocateDirect(0);
     }
     boolean isLong = flag == 1;
     int elementSize = isLong ? Long.BYTES : Integer.BYTES;
-    ByteBuffer out = ByteBuffer.allocateDirect(count * elementSize);
+    ByteBuffer out = ByteBuffer.allocateDirect(decodedSize(count, elementSize));
     decodeBlocks(src, count, isLong, out);
     out.flip();
     return out;
@@ -244,6 +239,7 @@ final class T64CodecDefinition implements ChunkCodecHandler<T64CodecDefinition.O
     int count = src.getInt();
     validateHeader(flag, count, ctx);
     if (count == 0) {
+      ensureFullyConsumed(src);
       dst.flip();
       return;
     }
@@ -293,7 +289,7 @@ final class T64CodecDefinition implements ChunkCodecHandler<T64CodecDefinition.O
   /// `scratch` is a caller-supplied reusable buffer sized for the worst-case packed bytes
   /// per block (i.e. `elementSize * BLOCK_SIZE`); only the first `ceil(bitWidth * BLOCK_SIZE / 8)`
   /// bytes are read.
-  private static void packBits(long[] values, int blockStart, int blockCount, long baseline,
+  private static void packBits(long[] values, int blockCount, long baseline,
       int bitWidth, ByteBuffer out, byte[] scratch) {
     int packedBytes = (bitWidth * BLOCK_SIZE + 7) / 8;
     // Zero out the bytes we'll write into (writeBits OR-merges into existing bits).
@@ -301,7 +297,7 @@ final class T64CodecDefinition implements ChunkCodecHandler<T64CodecDefinition.O
 
     long bitCursor = 0;
     for (int i = 0; i < BLOCK_SIZE; i++) {
-      long value = (i < blockCount) ? (values[blockStart + i] - baseline) : 0L;
+      long value = (i < blockCount) ? (values[i] - baseline) : 0L;
       writeBits(scratch, bitCursor, value, bitWidth);
       bitCursor += bitWidth;
     }
@@ -353,8 +349,35 @@ final class T64CodecDefinition implements ChunkCodecHandler<T64CodecDefinition.O
             bitCursor += bitWidth;
           }
         }
+        // The encoder reserves fixed-width slots for the missing tail of a partial block and
+        // writes them as zero. Reject non-canonical non-zero tail slots rather than silently
+        // accepting alternate bytes for the same value sequence.
+        for (int i = blockCount; i < BLOCK_SIZE; i++) {
+          if (readBits(packedBuf, bitCursor, bitWidth) != 0) {
+            throw new IllegalStateException(
+                "T64: non-zero padding slot in final block. Segment may be corrupt.");
+          }
+          bitCursor += bitWidth;
+        }
       }
       remainingValues -= blockCount;
+    }
+    ensureFullyConsumed(src);
+  }
+
+  private static int decodedSize(int count, int elementSize) {
+    long decodedSize = (long) count * elementSize;
+    if (decodedSize > Integer.MAX_VALUE) {
+      throw new IllegalStateException(
+          "T64: decoded size " + decodedSize + " exceeds Integer.MAX_VALUE. Segment may be corrupt.");
+    }
+    return (int) decodedSize;
+  }
+
+  private static void ensureFullyConsumed(ByteBuffer src) {
+    if (src.hasRemaining()) {
+      throw new IllegalStateException(
+          "T64: trailing " + src.remaining() + " byte(s) after frame. Segment may be corrupt.");
     }
   }
 

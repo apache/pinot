@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.io.codec;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
@@ -55,7 +56,14 @@ public class GorillaCodecDefinitionTest {
     }
     src.flip();
     ByteBuffer encoded = CODEC.encode(OPTS, INT_CTX, src);
-    ByteBuffer decoded = CODEC.decode(OPTS, INT_CTX, encoded);
+    assertDecodedInts(CODEC.decode(OPTS, INT_CTX, encoded.duplicate()), values);
+
+    ByteBuffer dst = ByteBuffer.allocateDirect(values.length * Integer.BYTES);
+    CODEC.decodeInto(OPTS, INT_CTX, encoded.duplicate(), dst);
+    assertDecodedInts(dst, values);
+  }
+
+  private static void assertDecodedInts(ByteBuffer decoded, int[] values) {
     assertEquals(decoded.remaining(), values.length * Integer.BYTES,
         "decoded byte length mismatch");
     for (int i = 0; i < values.length; i++) {
@@ -70,7 +78,14 @@ public class GorillaCodecDefinitionTest {
     }
     src.flip();
     ByteBuffer encoded = CODEC.encode(OPTS, LONG_CTX, src);
-    ByteBuffer decoded = CODEC.decode(OPTS, LONG_CTX, encoded);
+    assertDecodedLongs(CODEC.decode(OPTS, LONG_CTX, encoded.duplicate()), values);
+
+    ByteBuffer dst = ByteBuffer.allocateDirect(values.length * Long.BYTES);
+    CODEC.decodeInto(OPTS, LONG_CTX, encoded.duplicate(), dst);
+    assertDecodedLongs(dst, values);
+  }
+
+  private static void assertDecodedLongs(ByteBuffer decoded, long[] values) {
     assertEquals(decoded.remaining(), values.length * Long.BYTES,
         "decoded byte length mismatch");
     for (int i = 0; i < values.length; i++) {
@@ -197,6 +212,26 @@ public class GorillaCodecDefinitionTest {
     roundTripLong(values);
   }
 
+  @Test
+  public void testMixedExecutorPipeline() throws IOException {
+    long[] values = new long[257];
+    for (int i = 0; i < values.length; i++) {
+      values[i] = 1_700_000_000_000L + (long) i * i * 13L;
+    }
+    ByteBuffer src = ByteBuffer.allocateDirect(values.length * Long.BYTES);
+    for (long value : values) {
+      src.putLong(value);
+    }
+    src.flip();
+
+    CodecPipelineExecutor executor = CodecPipelineExecutor.create(
+        "DELTADELTA,GORILLA,ZSTD(3)", LONG_CTX, CodecRegistry.DEFAULT);
+    ByteBuffer encoded = executor.encode(src.duplicate());
+    ByteBuffer decoded = ByteBuffer.allocateDirect(src.remaining());
+    executor.decode(encoded, decoded, src.remaining());
+    assertDecodedLongs(decoded, values);
+  }
+
   // ---------- Corrupt-segment defenses ----------
 
   @Test
@@ -252,6 +287,69 @@ public class GorillaCodecDefinitionTest {
   }
 
   @Test
+  public void testTrailingBytesRejectedByCodecAndExecutor() {
+    for (int[] values : new int[][]{{}, {42}, {1, 2, 3}}) {
+      ByteBuffer src = ByteBuffer.allocateDirect(values.length * Integer.BYTES);
+      for (int value : values) {
+        src.putInt(value);
+      }
+      src.flip();
+      ByteBuffer withTrailingByte = appendByte(CODEC.encode(OPTS, INT_CTX, src));
+
+      assertThrows(IllegalStateException.class,
+          () -> CODEC.decode(OPTS, INT_CTX, withTrailingByte.duplicate()));
+      assertThrows(IllegalStateException.class,
+          () -> CODEC.decodeInto(OPTS, INT_CTX, withTrailingByte.duplicate(),
+              ByteBuffer.allocateDirect(values.length * Integer.BYTES)));
+
+      CodecPipelineExecutor executor = CodecPipelineExecutor.create("GORILLA", INT_CTX, CodecRegistry.DEFAULT);
+      assertThrows(RuntimeException.class,
+          () -> executor.decode(withTrailingByte.duplicate(),
+              ByteBuffer.allocateDirect(values.length * Integer.BYTES), values.length * Integer.BYTES));
+    }
+  }
+
+  @Test
+  public void testNonZeroPaddingBitsRejected() {
+    ByteBuffer src = ByteBuffer.allocateDirect(2 * Integer.BYTES);
+    src.putInt(7).putInt(7).flip();
+    ByteBuffer encoded = CODEC.encode(OPTS, INT_CTX, src);
+    encoded.put(encoded.limit() - 1, (byte) 1);
+
+    assertThrows(IllegalStateException.class,
+        () -> CODEC.decode(OPTS, INT_CTX, encoded.duplicate()));
+    CodecPipelineExecutor executor = CodecPipelineExecutor.create("GORILLA", INT_CTX, CodecRegistry.DEFAULT);
+    assertThrows(IllegalStateException.class,
+        () -> executor.decode(encoded.duplicate(), ByteBuffer.allocateDirect(2 * Integer.BYTES),
+            2 * Integer.BYTES));
+  }
+
+  /// Decodes fixed INT and LONG frames that are independent of the encoder under test. Both
+  /// represent `[0, 1]` with an explicit one-bit XOR window.
+  @Test
+  public void testKnownGoodDecodeBytes() {
+    byte[] encodedInt = {
+        0,
+        0, 0, 0, 2,
+        0, 0, 0, 0,
+        (byte) 0xFE, 0x08
+    };
+    assertDecodedInts(CODEC.decode(OPTS, INT_CTX, ByteBuffer.wrap(encodedInt)), new int[]{0, 1});
+
+    byte[] encodedLong = {
+        1,
+        0, 0, 0, 2,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        (byte) 0xFF, 0x02
+    };
+    long[] expectedLongs = {0L, 1L};
+    assertDecodedLongs(CODEC.decode(OPTS, LONG_CTX, ByteBuffer.wrap(encodedLong)), expectedLongs);
+    ByteBuffer dst = ByteBuffer.allocateDirect(expectedLongs.length * Long.BYTES);
+    CODEC.decodeInto(OPTS, LONG_CTX, ByteBuffer.wrap(encodedLong), dst);
+    assertDecodedLongs(dst, expectedLongs);
+  }
+
+  @Test
   public void testUnsupportedDataType() {
     assertThrows(IllegalArgumentException.class,
         () -> CODEC.validateContext(OPTS, new CodecContext(DataType.STRING)));
@@ -269,5 +367,11 @@ public class GorillaCodecDefinitionTest {
   public void testMaxEncodedSizeRejectsOverflow() {
     assertThrows(IllegalArgumentException.class,
         () -> CODEC.maxEncodedSize(OPTS, Integer.MAX_VALUE));
+  }
+
+  private static ByteBuffer appendByte(ByteBuffer buffer) {
+    ByteBuffer withTrailingByte = ByteBuffer.allocateDirect(buffer.remaining() + 1);
+    withTrailingByte.put(buffer.duplicate()).put((byte) 1).flip();
+    return withTrailingByte;
   }
 }
