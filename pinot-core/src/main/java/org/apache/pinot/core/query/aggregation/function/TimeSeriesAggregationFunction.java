@@ -144,10 +144,13 @@ public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTi
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     final long[] timeValues = blockValSetMap.get(_timeExpression).getLongValuesSV();
     BlockValSet valueBlockValSet = blockValSetMap.get(_valueExpression);
-    switch (valueBlockValSet.getValueType()) {
-      case DOUBLE:
-      case LONG:
+    // Dispatched on the stored type, so BOOLEAN reads as INT, TIMESTAMP as LONG and JSON as STRING rather than
+    // being rejected as unsupported
+    switch (valueBlockValSet.getValueType().getStoredType()) {
       case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
         aggregateNumericValues(length, timeValues, aggregationResultHolder, valueBlockValSet);
         break;
       case STRING:
@@ -164,10 +167,13 @@ public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTi
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     final long[] timeValues = blockValSetMap.get(_timeExpression).getLongValuesSV();
     BlockValSet valueBlockValSet = blockValSetMap.get(_valueExpression);
-    switch (valueBlockValSet.getValueType()) {
-      case DOUBLE:
-      case LONG:
+    // Dispatched on the stored type, so BOOLEAN reads as INT, TIMESTAMP as LONG and JSON as STRING rather than
+    // being rejected as unsupported
+    switch (valueBlockValSet.getValueType().getStoredType()) {
       case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
         aggregateGroupByNumericValues(length, groupKeyArray, timeValues, groupByResultHolder, valueBlockValSet);
         break;
       case STRING:
