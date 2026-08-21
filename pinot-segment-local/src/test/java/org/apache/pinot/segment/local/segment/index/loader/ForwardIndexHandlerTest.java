@@ -37,7 +37,9 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
+import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriterV7;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.InvertedIndexHandler;
@@ -2832,6 +2834,61 @@ public class ForwardIndexHandlerTest {
         assertEquals(actual.getMaxRowLengthInBytes(), expected.getMaxRowLengthInBytes());
       }
     }
+  }
+
+  /// Reload guard: a V7 codec-pipeline forward index reports `getCodecSpec() != null` and
+  /// `getCompressionType() == null`. `shouldChangeRawCompressionType()` must skip such columns instead of
+  /// tripping its non-null compression-type precondition, so reloading a segment that carries a V7 forward
+  /// index with an unchanged table config is a no-op. Rewrite support for codec-pipeline segments lands in a
+  /// follow-up; until then this guard keeps reload from crashing.
+  @Test
+  public void testComputeOperationNoOpForV7CodecPipelineForwardIndex()
+      throws Exception {
+    // Step 1: write a V7 codec-pipeline forward index over the existing DIM_LZ4_INTEGER column.
+    // DIM_LZ4_INTEGER is SV INT RAW with 1000 docs — exactly what V7 supports.
+    int totalDocs = TEST_DATA.size();
+    File v7TempFile = new File(TEMP_DIR, "v7_guard_fwd_idx");
+    FileUtils.deleteQuietly(v7TempFile);
+
+    CodecPipelineExecutor executor = CodecPipelineExecutor.create("DELTA,LZ4", DataType.INT);
+    try (FixedByteChunkForwardIndexWriterV7 v7Writer =
+        new FixedByteChunkForwardIndexWriterV7(v7TempFile, executor, totalDocs, 1024, Integer.BYTES)) {
+      for (int i = 0; i < totalDocs; i++) {
+        v7Writer.putInt(i);
+      }
+    }
+
+    // Step 2: inject the V7 file into the segment's v3 store, replacing the legacy LZ4 index.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer segmentWriter = segmentDirectory.createWriter()) {
+      segmentWriter.removeIndex(DIM_LZ4_INTEGER, StandardIndexes.forward());
+      LoaderUtils.writeIndexToV3Format(segmentWriter, DIM_LZ4_INTEGER, v7TempFile, StandardIndexes.forward());
+      segmentWriter.save();
+    }
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      // Sanity-check the injection: the column must now be served by the V7 reader, which reports the
+      // canonical codec spec and no legacy compression type.
+      ColumnMetadata metadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(DIM_LZ4_INTEGER);
+      IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+      try (ForwardIndexReader<?> forwardReader =
+          readerFactory.createIndexReader(writer, createFieldIndexConfigsFromMetadata(metadata), metadata)) {
+        assertEquals(forwardReader.getCodecSpec(), "DELTA,LZ4");
+        assertNull(forwardReader.getCompressionType());
+      }
+
+      // Step 3: with the table config unchanged (legacy LZ4 on DIM_LZ4_INTEGER), computing operations must
+      // neither throw nor schedule a rewrite for the V7 column.
+      Map<String, List<ForwardIndexHandler.Operation>> ops = computeOperations();
+      assertFalse(ops.containsKey(DIM_LZ4_INTEGER),
+          "Expected no operation for V7 codec-pipeline column with unchanged config, but got: "
+              + ops.get(DIM_LZ4_INTEGER));
+    }
+    FileUtils.deleteQuietly(v7TempFile);
   }
 
   private FieldIndexConfigs createFieldIndexConfigsFromMetadata(ColumnMetadata columnMetadata) {
