@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.io.codec;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
@@ -191,12 +192,13 @@ public class DeltaCodecRoundTripTest {
 
   private static void assertIntDecodeFixture(String spec, byte[] encoded, int[] expected) throws IOException {
     CodecPipelineExecutor executor = CodecPipelineExecutor.create(spec, INT_CTX, CodecRegistry.DEFAULT);
-    int[] decoded = readInts(executor.decode(ByteBuffer.wrap(encoded)), expected.length);
+    int[] decoded = readInts(
+        executor.decode(ByteBuffer.wrap(encoded).order(ByteOrder.LITTLE_ENDIAN)), expected.length);
     assertTrue(Arrays.equals(decoded, expected),
         describeMismatch(spec, Arrays.toString(expected), Arrays.toString(decoded)));
 
     ByteBuffer dst = ByteBuffer.allocateDirect(expected.length * Integer.BYTES);
-    executor.decode(ByteBuffer.wrap(encoded), dst, dst.capacity());
+    executor.decode(ByteBuffer.wrap(encoded).order(ByteOrder.LITTLE_ENDIAN), dst, dst.capacity());
     int[] decodedInto = readInts(dst, expected.length);
     assertTrue(Arrays.equals(decodedInto, expected),
         describeMismatch(spec, Arrays.toString(expected), Arrays.toString(decodedInto)));
@@ -204,12 +206,13 @@ public class DeltaCodecRoundTripTest {
 
   private static void assertLongDecodeFixture(String spec, byte[] encoded, long[] expected) throws IOException {
     CodecPipelineExecutor executor = CodecPipelineExecutor.create(spec, LONG_CTX, CodecRegistry.DEFAULT);
-    long[] decoded = readLongs(executor.decode(ByteBuffer.wrap(encoded)), expected.length);
+    long[] decoded = readLongs(
+        executor.decode(ByteBuffer.wrap(encoded).order(ByteOrder.LITTLE_ENDIAN)), expected.length);
     assertTrue(Arrays.equals(decoded, expected),
         describeMismatch(spec, Arrays.toString(expected), Arrays.toString(decoded)));
 
     ByteBuffer dst = ByteBuffer.allocateDirect(expected.length * Long.BYTES);
-    executor.decode(ByteBuffer.wrap(encoded), dst, dst.capacity());
+    executor.decode(ByteBuffer.wrap(encoded).order(ByteOrder.LITTLE_ENDIAN), dst, dst.capacity());
     long[] decodedInto = readLongs(dst, expected.length);
     assertTrue(Arrays.equals(decodedInto, expected),
         describeMismatch(spec, Arrays.toString(expected), Arrays.toString(decodedInto)));

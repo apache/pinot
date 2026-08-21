@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.io.codec;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.List;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -89,6 +90,9 @@ abstract class BaseDeltaCodecDefinition<O extends CodecOptions> implements Chunk
 
   @Override
   public final ByteBuffer decode(O options, CodecContext ctx, ByteBuffer src) {
+    // The persisted transform layout is always big-endian, independent of the byte order on a
+    // caller-provided view. duplicate() also keeps the caller's position/limit untouched.
+    src = src.duplicate().order(ByteOrder.BIG_ENDIAN);
     int elementSize = elementSize(ctx, src.remaining());
     int count = src.remaining() / elementSize;
     if (count == 0) {
@@ -99,6 +103,7 @@ abstract class BaseDeltaCodecDefinition<O extends CodecOptions> implements Chunk
 
   @Override
   public final void decodeInto(O options, CodecContext ctx, ByteBuffer src, ByteBuffer dst) {
+    src = src.duplicate().order(ByteOrder.BIG_ENDIAN);
     dst.clear();
     int elementSize = elementSize(ctx, src.remaining());
     int count = src.remaining() / elementSize;
