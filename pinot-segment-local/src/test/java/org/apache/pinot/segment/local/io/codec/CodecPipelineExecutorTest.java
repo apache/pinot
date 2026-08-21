@@ -80,6 +80,27 @@ public class CodecPipelineExecutorTest {
   }
 
   @Test
+  public void testCallerOwnedScratchReusesDirectBuffers()
+      throws Exception {
+    CodecPipelineExecutor executor = CodecPipelineExecutor.create("LZ4,SNAPPY,GZIP", DataType.BYTES);
+    ByteBuffer encoded = executor.encode(inputBuffer(false));
+    int maxIntermediateSize = executor.maxEncodedSize(INPUT.length);
+    try (CodecPipelineExecutor.DecodeScratch scratch = new CodecPipelineExecutor.DecodeScratch()) {
+      ByteBuffer firstDestination = ByteBuffer.allocateDirect(INPUT.length);
+      executor.decode(encoded.duplicate(), firstDestination, INPUT.length, maxIntermediateSize,
+          (long) maxIntermediateSize * 32, scratch);
+      assertBytesEqual(firstDestination);
+      assertEquals(scratch.allocationCount(), 2);
+
+      ByteBuffer secondDestination = ByteBuffer.allocateDirect(INPUT.length);
+      executor.decode(encoded.duplicate(), secondDestination, INPUT.length, maxIntermediateSize,
+          (long) maxIntermediateSize * 32, scratch);
+      assertBytesEqual(secondDestination);
+      assertEquals(scratch.allocationCount(), 2, "Repeated decode must reuse both ping-pong buffers");
+    }
+  }
+
+  @Test
   public void testCanonicalNamesAliasesAndOptions() {
     assertEquals(CodecPipelineExecutor.create("zstd", DataType.INT).getCanonicalSpec(), "ZSTD(3)");
     assertEquals(CodecPipelineExecutor.create("zstandard", DataType.INT).getCanonicalSpec(), "ZSTD(3)");
@@ -187,8 +208,9 @@ public class CodecPipelineExecutorTest {
   }
 
   @Test
-  public void testOnlyExecutorIsPublicRuntimeType() throws ReflectiveOperationException {
+  public void testPublicRuntimeSurfaceIsBounded() throws ReflectiveOperationException {
     assertTrue(Modifier.isPublic(CodecPipelineExecutor.class.getModifiers()));
+    assertTrue(Modifier.isPublic(CodecPipelineExecutor.DecodeScratch.class.getModifiers()));
     for (Class<?> closedType : new Class<?>[]{
         ChunkCodecHandler.class, CodecContext.class, CodecDefinition.class, CodecKind.class, CodecOptions.class,
         CodecRegistry.class, CodecPipelineValidator.class, Lz4CodecDefinition.class, SnappyCodecDefinition.class,
@@ -205,7 +227,10 @@ public class CodecPipelineExecutorTest {
     assertFalse(Modifier.isPublic(allocationReturningDecode.getModifiers()));
     Method boundedDecode = CodecPipelineExecutor.class.getDeclaredMethod("decode", ByteBuffer.class,
         ByteBuffer.class, int.class, int.class, long.class);
-    assertTrue(Modifier.isPublic(boundedDecode.getModifiers()));
+    assertFalse(Modifier.isPublic(boundedDecode.getModifiers()));
+    Method reusableBoundedDecode = CodecPipelineExecutor.class.getDeclaredMethod("decode", ByteBuffer.class,
+        ByteBuffer.class, int.class, int.class, long.class, CodecPipelineExecutor.DecodeScratch.class);
+    assertTrue(Modifier.isPublic(reusableBoundedDecode.getModifiers()));
   }
 
   private static ByteBuffer inputBuffer(boolean direct) {
