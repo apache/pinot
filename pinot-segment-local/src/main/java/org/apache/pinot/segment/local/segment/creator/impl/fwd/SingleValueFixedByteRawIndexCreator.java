@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 
 import java.io.File;
 import java.io.IOException;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriterV7;
@@ -40,6 +41,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class SingleValueFixedByteRawIndexCreator implements CompressionStatsTrackingForwardIndexCreator {
   private final FixedByteChunkWriter _indexWriter;
   private final DataType _valueType;
+  @Nullable
   private final ChunkCompressionType _chunkCompressionType;
 
   /// Constructor for the class
@@ -146,6 +148,7 @@ public class SingleValueFixedByteRawIndexCreator implements CompressionStatsTrac
   }
 
   @Override
+  @Nullable
   public ChunkCompressionType getRawForwardIndexChunkCompressionType() {
     return _chunkCompressionType;
   }

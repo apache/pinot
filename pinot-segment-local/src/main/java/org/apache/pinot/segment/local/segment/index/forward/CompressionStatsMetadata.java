@@ -47,10 +47,12 @@ public final class CompressionStatsMetadata {
     _dictionaryEncodedUncompressedValueSizeInBytes = dictionaryUncompressedValueSizeInBytes;
   }
 
-  /// Creates metadata for a raw forward index, or unavailable metadata when either required value is absent.
+  /// Creates metadata for a raw forward index, or unavailable metadata when the size was not tracked. The
+  /// compression type is nullable because codec-pipeline V7 indexes do not have one legacy
+  /// [ChunkCompressionType]; their uncompressed size is still valid and must remain reportable.
   public static CompressionStatsMetadata forRawForwardIndex(long uncompressedValueSizeInBytes,
       @Nullable ChunkCompressionType chunkCompressionType) {
-    return uncompressedValueSizeInBytes >= 0 && chunkCompressionType != null
+    return uncompressedValueSizeInBytes >= 0
         ? new CompressionStatsMetadata(uncompressedValueSizeInBytes, chunkCompressionType, null) : UNAVAILABLE;
   }
 
