@@ -241,6 +241,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   CORRUPTED_RECORD_COUNT("rows", false),
   OPEN_STRUCT_TYPE_COERCION_FAILURES("values", false,
       "Number of OPEN_STRUCT values dropped because the value could not be coerced to the key's inferred type"),
+  OPEN_STRUCT_IGNORED_KEY_DROPS("values", false,
+      "Number of OPEN_STRUCT map entries dropped at ingestion because the key is listed in the "
+          + "column's ignoredKeys config"),
   // Workload related metrics
   WORKLOAD_BUDGET_EXCEEDED("workloadBudgetExceeded", true, "Number of times workload budget exceeded"),
   WORKLOAD_QUERIES("queries", false),
