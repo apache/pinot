@@ -334,9 +334,11 @@ public class AggregationFunctionFactory {
                 case BIG_DECIMAL:
                   return new ArrayAggDistinctBigDecimalFunction(firstArgument, nullHandlingEnabled);
                 case STRING:
+                case JSON:
                   return new ArrayAggDistinctStringFunction(firstArgument, nullHandlingEnabled);
                 case BYTES:
-                  return new ArrayAggDistinctBytesFunction(firstArgument, nullHandlingEnabled);
+                case UUID:
+                  return new ArrayAggDistinctBytesFunction(firstArgument, dataType, nullHandlingEnabled);
                 default:
                   throw new IllegalArgumentException("Unsupported data type for ARRAY_AGG: " + dataType);
               }
@@ -355,9 +357,11 @@ public class AggregationFunctionFactory {
               case BIG_DECIMAL:
                 return new ArrayAggBigDecimalFunction(firstArgument, nullHandlingEnabled);
               case STRING:
+              case JSON:
                 return new ArrayAggStringFunction(firstArgument, nullHandlingEnabled);
               case BYTES:
-                return new ArrayAggBytesFunction(firstArgument, nullHandlingEnabled);
+              case UUID:
+                return new ArrayAggBytesFunction(firstArgument, dataType, nullHandlingEnabled);
               default:
                 throw new IllegalArgumentException("Unsupported data type for ARRAY_AGG: " + dataType);
             }
