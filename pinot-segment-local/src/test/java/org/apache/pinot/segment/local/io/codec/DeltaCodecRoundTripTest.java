@@ -96,6 +96,33 @@ public class DeltaCodecRoundTripTest {
     }
   }
 
+  /// Decodes fixed byte sequences without consulting either encoder. These fixtures freeze the
+  /// persisted big-endian layout so an encoder/decoder pair cannot drift together unnoticed.
+  @Test
+  public void testStableDecodeFixtures() throws IOException {
+    assertIntDecodeFixture("DELTA", new byte[]{
+        0, 0, 0, 10,
+        0, 0, 0, 3,
+        -1, -1, -1, -5
+    }, new int[]{10, 13, 8});
+    assertLongDecodeFixture("DELTA", new byte[]{
+        0, 0, 0, 0, 0, 0, 0, 10,
+        0, 0, 0, 0, 0, 0, 0, 3,
+        -1, -1, -1, -1, -1, -1, -1, -5
+    }, new long[]{10, 13, 8});
+
+    assertIntDecodeFixture("DELTADELTA", new byte[]{
+        0, 0, 0, 10,
+        0, 0, 0, 3,
+        -1, -1, -1, -2
+    }, new int[]{10, 13, 14});
+    assertLongDecodeFixture("DELTADELTA", new byte[]{
+        0, 0, 0, 0, 0, 0, 0, 10,
+        0, 0, 0, 0, 0, 0, 0, 3,
+        -1, -1, -1, -1, -1, -1, -1, -2
+    }, new long[]{10, 13, 14});
+  }
+
   /// A frame whose byte length is not a whole number of elements is corrupt and must fail closed
   /// on both the encode and the bounded segment-reader decode path.
   @Test
@@ -160,6 +187,32 @@ public class DeltaCodecRoundTripTest {
     long[] decodedInto = readLongs(dst, values.length);
     assertTrue(Arrays.equals(decodedInto, values),
         describeMismatch(spec, Arrays.toString(values), Arrays.toString(decodedInto)));
+  }
+
+  private static void assertIntDecodeFixture(String spec, byte[] encoded, int[] expected) throws IOException {
+    CodecPipelineExecutor executor = CodecPipelineExecutor.create(spec, INT_CTX, CodecRegistry.DEFAULT);
+    int[] decoded = readInts(executor.decode(ByteBuffer.wrap(encoded)), expected.length);
+    assertTrue(Arrays.equals(decoded, expected),
+        describeMismatch(spec, Arrays.toString(expected), Arrays.toString(decoded)));
+
+    ByteBuffer dst = ByteBuffer.allocateDirect(expected.length * Integer.BYTES);
+    executor.decode(ByteBuffer.wrap(encoded), dst, dst.capacity());
+    int[] decodedInto = readInts(dst, expected.length);
+    assertTrue(Arrays.equals(decodedInto, expected),
+        describeMismatch(spec, Arrays.toString(expected), Arrays.toString(decodedInto)));
+  }
+
+  private static void assertLongDecodeFixture(String spec, byte[] encoded, long[] expected) throws IOException {
+    CodecPipelineExecutor executor = CodecPipelineExecutor.create(spec, LONG_CTX, CodecRegistry.DEFAULT);
+    long[] decoded = readLongs(executor.decode(ByteBuffer.wrap(encoded)), expected.length);
+    assertTrue(Arrays.equals(decoded, expected),
+        describeMismatch(spec, Arrays.toString(expected), Arrays.toString(decoded)));
+
+    ByteBuffer dst = ByteBuffer.allocateDirect(expected.length * Long.BYTES);
+    executor.decode(ByteBuffer.wrap(encoded), dst, dst.capacity());
+    long[] decodedInto = readLongs(dst, expected.length);
+    assertTrue(Arrays.equals(decodedInto, expected),
+        describeMismatch(spec, Arrays.toString(expected), Arrays.toString(decodedInto)));
   }
 
   private static int[] readInts(ByteBuffer buffer, int expectedCount) {
