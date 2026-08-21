@@ -39,6 +39,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
+import org.apache.pinot.broker.broker.BrokerDrainManager;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -63,6 +64,9 @@ public class PinotBrokerHealthCheck {
   private BrokerMetrics _brokerMetrics;
 
   @Inject
+  private BrokerDrainManager _brokerDrainManager;
+
+  @Inject
   @Named(BrokerAdminApiApplication.START_TIME)
   private Instant _startTime;
 
@@ -76,6 +80,13 @@ public class PinotBrokerHealthCheck {
       @ApiResponse(code = 503, message = "Broker is not healthy")
   })
   public String getBrokerHealth() {
+    if (_brokerDrainManager.isDraining()) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_BAD_CALLS, 1);
+      String errMessage = "Pinot broker is draining";
+      Response response =
+          Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build();
+      throw new WebApplicationException(errMessage, response);
+    }
     ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
     if (status == ServiceStatus.Status.GOOD) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HEALTHCHECK_OK_CALLS, 1);
