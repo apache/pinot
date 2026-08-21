@@ -112,6 +112,9 @@ public class CodecPipelineValidatorTest {
     // another transform (or each other).
     assertTrue(DeltaCodecDefinition.INSTANCE.preservesTypedValueLayout());
     assertTrue(DeltaDeltaCodecDefinition.INSTANCE.preservesTypedValueLayout());
+    // The packing transforms (T64/GORILLA) emit a headered byte frame, so they must return false.
+    assertFalse(T64CodecDefinition.INSTANCE.preservesTypedValueLayout());
+    assertFalse(GorillaCodecDefinition.INSTANCE.preservesTypedValueLayout());
   }
 
   // -------------------------------------------------------------------------
@@ -170,6 +173,61 @@ public class CodecPipelineValidatorTest {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testDeltaRejectsArguments() {
     validateWithDefaultRegistry("DELTA(1)", DataType.INT);
+  }
+
+  // -------------------------------------------------------------------------
+  // T64 / GORILLA — the real packing transforms, resolved through the
+  // production CodecRegistry.DEFAULT
+  // -------------------------------------------------------------------------
+
+  /// A typed-layout-preserving transform may precede a packing transform, which may precede
+  /// compression(s).
+  @Test
+  public void testTypedLayoutThenPackingThenCompressionAllowed() {
+    validateWithDefaultRegistry("DELTA,T64,LZ4", DataType.INT);
+    validateWithDefaultRegistry("DELTADELTA,GORILLA,ZSTD(3)", DataType.LONG);
+    validateWithDefaultRegistry("DELTA,T64", DataType.LONG);
+  }
+
+  /// A packing transform may stand alone or be followed by any number of compression stages.
+  @Test
+  public void testCompressionAfterPackingAllowed() {
+    validateWithDefaultRegistry("T64", DataType.INT);
+    validateWithDefaultRegistry("GORILLA", DataType.LONG);
+    validateWithDefaultRegistry("T64,ZSTD(3)", DataType.LONG);
+    validateWithDefaultRegistry("GORILLA,SNAPPY", DataType.LONG);
+    validateWithDefaultRegistry("T64,LZ4,GZIP", DataType.INT);
+  }
+
+  /// A packing transform (T64/GORILLA) must be the last transform — another transform may not
+  /// follow it because its output is a bit-packed (non-typed) byte stream.
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*must operate on column values.*")
+  public void testTransformAfterT64Rejected() {
+    validateWithDefaultRegistry("T64,DELTA", DataType.INT);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*must operate on column values.*")
+  public void testT64ThenGorillaRejected() {
+    validateWithDefaultRegistry("T64,GORILLA", DataType.LONG);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*T64 codec only supports INT and LONG.*")
+  public void testT64OnStringColumn() {
+    validateWithDefaultRegistry("T64", DataType.STRING);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*GORILLA codec only supports INT and LONG.*")
+  public void testGorillaOnDoubleColumn() {
+    validateWithDefaultRegistry("GORILLA", DataType.DOUBLE);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testT64RejectsArguments() {
+    validateWithDefaultRegistry("T64(1)", DataType.INT);
   }
 
   private static void validate(String spec, DataType dataType) {
