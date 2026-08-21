@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.readers.forward;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
@@ -37,6 +38,7 @@ public class ChunkReaderContext implements ForwardIndexReaderContext {
   private final ByteBuffer _chunkBuffer;
 
   private int _chunkId;
+  private CodecPipelineExecutor.DecodeScratch _codecDecodeScratch;
 
   private List<ForwardIndexReader.ByteRange> _ranges;
   private boolean _closed;
@@ -53,11 +55,25 @@ public class ChunkReaderContext implements ForwardIndexReaderContext {
       return;
     }
     _closed = true;
+    if (_codecDecodeScratch != null) {
+      _codecDecodeScratch.close();
+      _codecDecodeScratch = null;
+    }
     CleanerUtil.cleanQuietly(_chunkBuffer);
   }
 
   public ByteBuffer getChunkBuffer() {
     return _chunkBuffer;
+  }
+
+  CodecPipelineExecutor.DecodeScratch getCodecDecodeScratch() {
+    if (_closed) {
+      throw new IllegalStateException("ChunkReaderContext is closed");
+    }
+    if (_codecDecodeScratch == null) {
+      _codecDecodeScratch = new CodecPipelineExecutor.DecodeScratch();
+    }
+    return _codecDecodeScratch;
   }
 
   public int getChunkId() {

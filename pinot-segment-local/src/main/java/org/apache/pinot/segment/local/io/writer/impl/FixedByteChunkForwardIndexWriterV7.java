@@ -27,6 +27,7 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
+import org.apache.pinot.segment.spi.codec.CodecSpecParser;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
 
@@ -66,10 +67,9 @@ public class FixedByteChunkForwardIndexWriterV7 implements FixedByteValueWriter 
   public static final int VERSION = ForwardIndexConfig.CODEC_PIPELINE_WRITER_VERSION;
   public static final int FORMAT_MAGIC = 0xC0DEC0DE;
 
-  /// Upper bound for a canonical codec spec embedded in the header. This prevents a corrupt
-  /// header from driving an unbounded allocation in the reader while leaving ample room for
-  /// practical pipelines.
-  public static final int MAX_CODEC_SPEC_LENGTH_BYTES = 64 * 1024;
+  /// Upper bound for the canonical, ASCII-only codec spec embedded in the header. Keep the wire
+  /// limit aligned with the DSL parser so every accepted header is representable by public config.
+  public static final int MAX_CODEC_SPEC_LENGTH_BYTES = CodecSpecParser.MAX_SPEC_LENGTH;
 
   /// Maximum decoded bytes in one V7 chunk. The normal Pinot target is 1 MiB; this 64 MiB ceiling
   /// bounds per-reader direct scratch and intermediate pipeline buffers for corrupt segments.
@@ -101,6 +101,7 @@ public class FixedByteChunkForwardIndexWriterV7 implements FixedByteValueWriter 
   private final int _numDocsPerChunk;
   private final int _sizeOfEntry;
   private final int _chunkFullBytes;
+  private final int _maxFullChunkEncodedSize;
   private final ByteBuffer _header;
   private final ByteBuffer _chunkBuffer;
   private final ByteBuffer _chunkHeaderBuffer = ByteBuffer.allocateDirect(CHUNK_HEADER_BYTES);
@@ -140,7 +141,7 @@ public class FixedByteChunkForwardIndexWriterV7 implements FixedByteValueWriter 
     }
     _chunkFullBytes = (int) chunkSizeLong;
     try {
-      executor.maxEncodedSize(_chunkFullBytes, MAX_ENCODED_CHUNK_SIZE_BYTES,
+      _maxFullChunkEncodedSize = executor.maxEncodedSize(_chunkFullBytes, MAX_ENCODED_CHUNK_SIZE_BYTES,
           MAX_PIPELINE_WORK_SIZE_BYTES);
     } catch (RuntimeException e) {
       throw new IllegalArgumentException(
@@ -195,6 +196,7 @@ public class FixedByteChunkForwardIndexWriterV7 implements FixedByteValueWriter 
     RandomAccessFile raf = new RandomAccessFile(file, "rw");
     FileChannel channel = raf.getChannel();
     try {
+      raf.setLength(0L);
       _chunkBuffer = ByteBuffer.allocateDirect((int) chunkSizeLong);
     } catch (Throwable t) {
       try {
@@ -275,6 +277,13 @@ public class FixedByteChunkForwardIndexWriterV7 implements FixedByteValueWriter 
     try {
       encoded = _executor.encode(_chunkBuffer);
       int encodedSize = encoded.remaining();
+      int maxEncodedSize = decodedSize == _chunkFullBytes ? _maxFullChunkEncodedSize
+          : _executor.maxEncodedSize(decodedSize, MAX_ENCODED_CHUNK_SIZE_BYTES, MAX_PIPELINE_WORK_SIZE_BYTES);
+      if (encodedSize > maxEncodedSize) {
+        throw new IllegalStateException(
+            "Codec pipeline produced " + encodedSize + " bytes for a " + decodedSize
+                + "-byte chunk, exceeding its declared bound " + maxEncodedSize);
+      }
 
       // Per-chunk header: encodedSize (int) + decodedSize (int)
       _chunkHeaderBuffer.clear();

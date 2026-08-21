@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.forward;
 
 import java.io.File;
+import java.io.RandomAccessFile;
 import java.util.Collections;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
@@ -154,6 +155,7 @@ public class CodecPipelineForwardIndexTest implements PinotBuffersAfterMethodChe
       // Verify spec stored in header matches canonical form
       assertNotNull(reader.getCodecSpec());
       assertFalse(reader.getCodecSpec().isBlank());
+      assertEquals(reader.getCodecSpec(), executor.getCanonicalSpec());
 
       // V7 reader contract: getCompressionType() returns null (no legacy enum value),
       // getCodecSpec() returns the canonical spec — these signal "this is a V7 segment" to
@@ -468,5 +470,29 @@ public class CodecPipelineForwardIndexTest implements PinotBuffersAfterMethodChe
         () -> new FixedByteChunkForwardIndexWriterV7(file, executor, 0, 1 << 24, Integer.BYTES));
     assertTrue(error.getMessage().contains("cumulative-work"), error.getMessage());
     assertFalse(file.exists(), "Writer must reject the pipeline before creating an output file");
+  }
+
+  @Test
+  public void testWriterTruncatesExistingFile()
+      throws Exception {
+    File file = new File(TEST_FILE_PREFIX + "_truncate_existing");
+    FileUtils.deleteQuietly(file);
+    try (RandomAccessFile existing = new RandomAccessFile(file, "rw")) {
+      existing.setLength(1_000_000L);
+    }
+
+    CodecPipelineExecutor executor = CodecPipelineExecutor.create("DELTA", DataType.INT);
+    try (FixedByteChunkForwardIndexWriterV7 writer = new FixedByteChunkForwardIndexWriterV7(
+        file, executor, 1, 1, Integer.BYTES)) {
+      writer.putInt(42);
+    }
+
+    assertTrue(file.length() < 1_000_000L, "Writer must remove bytes left by an older, longer file");
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(file);
+        FixedByteChunkSVForwardIndexReaderV7 reader = new FixedByteChunkSVForwardIndexReaderV7(buffer, DataType.INT);
+        ChunkReaderContext context = reader.createContext()) {
+      assertEquals(reader.getInt(0, context), 42);
+    }
+    FileUtils.deleteQuietly(file);
   }
 }

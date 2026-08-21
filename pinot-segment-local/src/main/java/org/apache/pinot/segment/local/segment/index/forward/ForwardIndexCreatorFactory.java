@@ -56,7 +56,7 @@ public class ForwardIndexCreatorFactory {
     String columnName = fieldSpec.getName();
     int numTotalDocs = context.getTotalDocs();
     Preconditions.checkArgument(
-        !indexConfig.hasCodecSpec() || indexConfig.getEncodingType() == FieldConfig.EncodingType.RAW,
+        indexConfig.getCodecSpec() == null || indexConfig.getEncodingType() == FieldConfig.EncodingType.RAW,
         "codecSpec requires RAW forward-index encoding for column: %s", columnName);
 
     if (indexConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY) {
@@ -87,15 +87,12 @@ public class ForwardIndexCreatorFactory {
       // exactly to existing ChunkCompressionType values use the existing raw writers, which support
       // SV/MV and fixed/var-byte values. Every other spec uses the V7 codec-pipeline writer because
       // the legacy raw-index header cannot represent transforms, chains, or non-default options.
-      if (indexConfig.hasCodecSpec()) {
+      if (indexConfig.getCodecSpec() != null) {
         String codecSpec = indexConfig.getCodecSpec();
         chunkCompressionType = CodecSpecUtils.toLegacyChunkCompressionType(codecSpec);
         if (chunkCompressionType == null) {
           // The spec is either a transform or a compression-only spec with arguments that can't be
-          // represented by a legacy ChunkCompressionType (e.g. ZSTD(5)). Both routes need V7. The
-          // closed feature gate in ForwardIndexType.validate/shouldCreateIndex still rejects
-          // codecSpec table configs, so this branch is only reachable through direct factory calls;
-          // these checks are defense-in-depth for such paths.
+          // represented by a legacy ChunkCompressionType (e.g. ZSTD(5)). Both routes need V7.
           Preconditions.checkArgument(fieldSpec.isSingleValueField(),
               "codecSpec '%s' requires the V7 codec-pipeline writer (transform, chain, or non-default options), "
                   + "which only supports single-value columns. Column '%s' is multi-value.",

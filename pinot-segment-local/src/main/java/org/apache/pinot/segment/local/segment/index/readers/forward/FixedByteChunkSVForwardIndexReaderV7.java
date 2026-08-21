@@ -198,20 +198,32 @@ public final class FixedByteChunkSVForwardIndexReaderV7 implements ForwardIndexR
               + "-byte cumulative-work limits. Segment may be corrupt.", e);
     }
 
-    // Validate chunk-offset monotonicity: each offset must be strictly greater than the previous
-    // chunk's start. A non-monotonic table indicates segment corruption (overlapping chunks would
-    // silently return wrong data otherwise).
-    long prevOffset = -1L;
+    // Validate the complete data section up front. Chunk frames must be contiguous: permitting a
+    // gap before/between/after frames would make those bytes unauthenticated trailing data and
+    // could hide a partially overwritten or concatenated segment.
     long dataSectionStart = _dataHeaderStart + (long) _numChunks * Long.BYTES;
     long maxChunkOffset = bufferSize - FixedByteChunkForwardIndexWriterV7.CHUNK_HEADER_BYTES;
+    long expectedChunkOffset = dataSectionStart;
     for (int i = 0; i < _numChunks; i++) {
       long chunkOffset = dataBuffer.getLong(_dataHeaderStart + (long) i * Long.BYTES);
-      if (chunkOffset < dataSectionStart || chunkOffset > maxChunkOffset || chunkOffset <= prevOffset) {
+      if (chunkOffset != expectedChunkOffset || chunkOffset > maxChunkOffset) {
         throw new IllegalArgumentException(
-            "Corrupt chunkOffsets[" + i + "]=" + chunkOffset + ": expected strictly increasing offsets in ["
-                + dataSectionStart + ", " + maxChunkOffset + "]; previous offset was " + prevOffset);
+            "Corrupt chunkOffsets[" + i + "]=" + chunkOffset + ": expected contiguous frame at "
+                + expectedChunkOffset + " within [" + dataSectionStart + ", " + maxChunkOffset + "]");
       }
-      prevOffset = chunkOffset;
+      int encodedSize = dataBuffer.getInt(chunkOffset);
+      long maxPayloadBytes = bufferSize - chunkOffset - FixedByteChunkForwardIndexWriterV7.CHUNK_HEADER_BYTES;
+      if (encodedSize < 0 || encodedSize > maxPayloadBytes) {
+        throw new IllegalArgumentException(
+            "Corrupt per-chunk header for chunk " + i + ": encodedSize=" + encodedSize
+                + ", remainingBuffer=" + maxPayloadBytes);
+      }
+      expectedChunkOffset = chunkOffset + FixedByteChunkForwardIndexWriterV7.CHUNK_HEADER_BYTES + encodedSize;
+    }
+    if (expectedChunkOffset != bufferSize) {
+      throw new IllegalArgumentException(
+          "Corrupt V7 data section: chunk frames end at " + expectedChunkOffset + " but file size is "
+              + bufferSize);
     }
   }
 
@@ -297,10 +309,10 @@ public final class FixedByteChunkSVForwardIndexReaderV7 implements ForwardIndexR
     int decodedSize = _dataBuffer.getInt(chunkStart + Integer.BYTES);
     long chunkEnd = chunkId == _numChunks - 1 ? bufferSize : getChunkOffset(chunkId + 1);
     long maxEncodedRoom = chunkEnd - chunkStart - FixedByteChunkForwardIndexWriterV7.CHUNK_HEADER_BYTES;
-    if (encodedSize < 0 || decodedSize < 0 || encodedSize > maxEncodedRoom) {
+    if (encodedSize < 0 || decodedSize < 0 || encodedSize != maxEncodedRoom) {
       throw new IllegalStateException(
           "Corrupt per-chunk header for chunk " + chunkId + ": encodedSize=" + encodedSize
-              + ", decodedSize=" + decodedSize + ", remainingBuffer=" + maxEncodedRoom);
+              + ", decodedSize=" + decodedSize + ", exactPayloadBytes=" + maxEncodedRoom);
     }
 
     long firstDocId = (long) chunkId * _numDocsPerChunk;
@@ -350,7 +362,7 @@ public final class FixedByteChunkSVForwardIndexReaderV7 implements ForwardIndexR
       // Decode directly into the reusable context buffer — avoids intermediate allocation + copy.
       _executor.decode(encoded, contextBuf, decodedSize,
           FixedByteChunkForwardIndexWriterV7.MAX_ENCODED_CHUNK_SIZE_BYTES,
-          FixedByteChunkForwardIndexWriterV7.MAX_PIPELINE_WORK_SIZE_BYTES);
+          FixedByteChunkForwardIndexWriterV7.MAX_PIPELINE_WORK_SIZE_BYTES, context.getCodecDecodeScratch());
     } catch (IOException e) {
       throw new UncheckedIOException(
           "Failed to decode chunk " + chunkId + " with spec '" + _canonicalSpec + "'", e);

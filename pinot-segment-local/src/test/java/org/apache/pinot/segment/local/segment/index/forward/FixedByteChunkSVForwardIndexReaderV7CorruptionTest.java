@@ -112,11 +112,69 @@ public class FixedByteChunkSVForwardIndexReaderV7CorruptionTest {
       buffer.putInt(firstChunkStart, 5); // only four payload bytes fit before the next chunk
       buffer.putInt(firstChunkStart + Integer.BYTES, Integer.BYTES);
 
-      try (FixedByteChunkSVForwardIndexReaderV7 reader =
-          new FixedByteChunkSVForwardIndexReaderV7(buffer, DataType.INT);
-          ChunkReaderContext context = reader.createContext()) {
-        expectThrows(IllegalStateException.class, () -> reader.getInt(0, context));
-      }
+      expectThrows(IllegalArgumentException.class,
+          () -> new FixedByteChunkSVForwardIndexReaderV7(buffer, DataType.INT));
+    }
+  }
+
+  @Test
+  public void testRejectsGapBeforeFirstChunk()
+      throws IOException {
+    int dataStart = dataSectionStart(1);
+    int chunkStart = dataStart + 1;
+    int bufferSize = chunkStart + FixedByteChunkForwardIndexWriterV7.CHUNK_HEADER_BYTES + Integer.BYTES;
+    try (PinotDataBuffer buffer = newHeader(1, 1, 1, bufferSize)) {
+      buffer.putLong(dataHeaderStart(), chunkStart);
+      buffer.putInt(chunkStart, Integer.BYTES);
+      buffer.putInt(chunkStart + Integer.BYTES, Integer.BYTES);
+
+      expectThrows(IllegalArgumentException.class,
+          () -> new FixedByteChunkSVForwardIndexReaderV7(buffer, DataType.INT));
+    }
+  }
+
+  @Test
+  public void testRejectsGapBetweenChunks()
+      throws IOException {
+    int firstChunkStart = dataSectionStart(2);
+    int secondChunkStart = firstChunkStart + FixedByteChunkForwardIndexWriterV7.CHUNK_HEADER_BYTES
+        + Integer.BYTES + 1;
+    int bufferSize = secondChunkStart + FixedByteChunkForwardIndexWriterV7.CHUNK_HEADER_BYTES + Integer.BYTES;
+    try (PinotDataBuffer buffer = newHeader(2, 1, 2, bufferSize)) {
+      int offsets = dataHeaderStart();
+      buffer.putLong(offsets, firstChunkStart);
+      buffer.putLong(offsets + Long.BYTES, secondChunkStart);
+      buffer.putInt(firstChunkStart, Integer.BYTES);
+      buffer.putInt(firstChunkStart + Integer.BYTES, Integer.BYTES);
+      buffer.putInt(secondChunkStart, Integer.BYTES);
+      buffer.putInt(secondChunkStart + Integer.BYTES, Integer.BYTES);
+
+      expectThrows(IllegalArgumentException.class,
+          () -> new FixedByteChunkSVForwardIndexReaderV7(buffer, DataType.INT));
+    }
+  }
+
+  @Test
+  public void testRejectsTrailingBytesAfterLastChunk()
+      throws IOException {
+    int chunkStart = dataSectionStart(1);
+    int bufferSize = chunkStart + FixedByteChunkForwardIndexWriterV7.CHUNK_HEADER_BYTES + Integer.BYTES + 1;
+    try (PinotDataBuffer buffer = newHeader(1, 1, 1, bufferSize)) {
+      buffer.putLong(dataHeaderStart(), chunkStart);
+      buffer.putInt(chunkStart, Integer.BYTES);
+      buffer.putInt(chunkStart + Integer.BYTES, Integer.BYTES);
+
+      expectThrows(IllegalArgumentException.class,
+          () -> new FixedByteChunkSVForwardIndexReaderV7(buffer, DataType.INT));
+    }
+  }
+
+  @Test
+  public void testRejectsTrailingBytesForEmptyIndex()
+      throws IOException {
+    try (PinotDataBuffer buffer = newHeader(0, 1, 0, dataHeaderStart() + 1)) {
+      expectThrows(IllegalArgumentException.class,
+          () -> new FixedByteChunkSVForwardIndexReaderV7(buffer, DataType.INT));
     }
   }
 
@@ -148,6 +206,8 @@ public class FixedByteChunkSVForwardIndexReaderV7CorruptionTest {
       int offsets = dataHeaderStart();
       buffer.putLong(offsets, firstChunkStart);
       buffer.putLong(offsets + Long.BYTES, secondChunkStart);
+      buffer.putInt(firstChunkStart, Integer.BYTES);
+      buffer.putInt(firstChunkStart + Integer.BYTES, 4 * Integer.BYTES);
       buffer.putInt(secondChunkStart, Integer.BYTES);
       buffer.putInt(secondChunkStart + Integer.BYTES, 4 * Integer.BYTES); // final chunk contains one value
 
