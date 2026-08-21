@@ -21,10 +21,11 @@ package org.apache.pinot.segment.local.io.codec;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.codec.CodecSpecParser;
+import org.apache.pinot.segment.spi.codec.CodecInvocation;
 
 
 /// Registry of known [ChunkCodecHandler] instances, looked up by
@@ -87,12 +88,9 @@ final class CodecRegistry {
       throw new UnsupportedOperationException("CodecRegistry.DEFAULT is immutable");
     }
     String key = codec.name().toUpperCase(Locale.ROOT);
-    // Defense in depth: the DSL parser and CodecInvocation already reserve this name, but a codec
-    // registered under it would be unreachable at best and grammar-ambiguous if the parser ever changed.
-    if (CodecSpecParser.REMOVED_WRAPPER_NAME.equals(key)) {
-      throw new IllegalArgumentException("'" + CodecSpecParser.REMOVED_WRAPPER_NAME
-          + "' is reserved by the removed wrapper syntax and cannot be registered");
-    }
+    // Reuse the public AST node's centralized name validation, including the removed CODEC
+    // wrapper reservation, instead of duplicating grammar constants in the runtime module.
+    new CodecInvocation(key, List.of());
     if (_codecs.containsKey(key)) {
       throw new IllegalArgumentException("A codec named '" + key + "' is already registered");
     }

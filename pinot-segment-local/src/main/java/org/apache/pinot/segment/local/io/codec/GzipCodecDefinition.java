@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.io.codec;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.List;
 import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
@@ -27,7 +28,8 @@ import java.util.zip.Inflater;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
 
 
-/// Compression codec backed by GZIP (DEFLATE via [java.util.zip.Deflater]).
+/// Legacy `GZIP`-named compression codec backed by the default [java.util.zip.Deflater], which
+/// produces a zlib-wrapped DEFLATE stream rather than RFC 1952 `.gz` framing.
 ///
 /// DSL form: `GZIP` — no configuration options.
 ///
@@ -37,9 +39,9 @@ import org.apache.pinot.segment.spi.memory.CleanerUtil;
 /// The name {@value #NAME} is a frozen on-disk API contract stored verbatim in segment file
 /// headers. It must never be changed or reused for a different algorithm.
 ///
-/// Wire format: DEFLATE-compressed payload followed by a 4-byte big-endian footer containing
-/// the uncompressed byte count. The footer allows decompression without knowing the original size
-/// out-of-band.
+/// Wire format: zlib-wrapped DEFLATE payload (including the zlib checksum) followed by a 4-byte
+/// big-endian footer containing the uncompressed byte count. The footer allows decompression
+/// without knowing the original size out-of-band.
 ///
 /// **Performance note:** The JDK [Deflater]/[Inflater] instances are reused per thread and
 /// operate directly on [ByteBuffer] inputs and outputs. For write-intensive workloads prefer
@@ -185,10 +187,12 @@ final class GzipCodecDefinition implements ChunkCodecHandler<GzipCodecDefinition
 
   private static int readDecompressedSize(ByteBuffer src) throws IOException {
     int payloadLimit = src.limit();
-    if (payloadLimit < Integer.BYTES) {
-      throw new IOException("GZIP payload too short to contain uncompressed-size footer: " + payloadLimit + " bytes");
+    int payloadSize = src.remaining();
+    if (payloadSize < Integer.BYTES) {
+      throw new IOException("GZIP payload too short to contain uncompressed-size footer: " + payloadSize + " bytes");
     }
-    int decompressedSize = src.getInt(payloadLimit - Integer.BYTES);
+    int decompressedSize =
+        src.duplicate().order(ByteOrder.BIG_ENDIAN).getInt(payloadLimit - Integer.BYTES);
     if (decompressedSize < 0) {
       throw new IOException("GZIP: invalid decompressed size in footer: " + decompressedSize);
     }
@@ -197,7 +201,6 @@ final class GzipCodecDefinition implements ChunkCodecHandler<GzipCodecDefinition
 
   private static void inflateInto(ByteBuffer src, ByteBuffer dst, int decompressedSize) throws IOException {
     ByteBuffer compressed = src.duplicate();
-    compressed.position(0);
     compressed.limit(src.limit() - Integer.BYTES);
     Inflater inflater = INFLATER.get();
     inflater.reset();
