@@ -173,7 +173,7 @@ public class SegmentValidationUtils {
         controllerMetrics.addMeteredGlobalValue(ControllerMeter.OUT_OF_RETENTION_SEGMENT_UPLOAD_REJECTED, 1L);
       }
       throw new ControllerApplicationException(LOGGER, String.format(
-          "Segment %s of table %s is outside the retention window (%s %s); upload rejected.",
+          "Segment %s of table %s is outside the retention window (%s %s); upload rejected",
           segmentMetadata.getName(), tableConfig.getTableName(), validationConfig.getRetentionTimeValue(),
           validationConfig.getRetentionTimeUnit()),
           Response.Status.FORBIDDEN);
