@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.StringUtil;
 
 
 public class TableNameBuilder {
@@ -131,7 +132,7 @@ public class TableNameBuilder {
     int separatorIndex = tableNameWithType.indexOf('.');
     if (separatorIndex < 0) {
       validateTableResourceName(tableNameWithType);
-      return quoteIdentifier(tableNameWithType);
+      return StringUtil.quoteSqlIdentifier(tableNameWithType);
     }
     if (separatorIndex == 0 || separatorIndex != tableNameWithType.lastIndexOf('.')) {
       throw new IllegalArgumentException("Invalid table name with type");
@@ -139,7 +140,8 @@ public class TableNameBuilder {
 
     String tableResourceName = tableNameWithType.substring(separatorIndex + 1);
     validateTableResourceName(tableResourceName);
-    return quoteIdentifier(tableNameWithType.substring(0, separatorIndex)) + "." + quoteIdentifier(tableResourceName);
+    return StringUtil.quoteSqlIdentifier(tableNameWithType.substring(0, separatorIndex)) + "."
+        + StringUtil.quoteSqlIdentifier(tableResourceName);
   }
 
   private static void validateTableResourceName(String tableResourceName) {
@@ -155,10 +157,6 @@ public class TableNameBuilder {
       }
     }
     return false;
-  }
-
-  private static String quoteIdentifier(String identifier) {
-    return "\"" + identifier.replace("\"", "\"\"") + "\"";
   }
 
   public static Set<String> getTableNameVariations(String tableName) {
