@@ -204,15 +204,9 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
           // Pop processed columns so the post-loop scan only emits defaults for columns with no FieldConfig at all.
           boolean inNoDictionaryList = noDictionaryColumns.remove(column);
 
-          JsonNode forwardIndexNode = fieldConfig.getIndexes().get(INDEX_DISPLAY_NAME);
-
-          // `forwardIndexDisabled` short-circuits everything else. Do not let that legacy flag silently discard a
-          // codecSpec from the modern forward-index config.
+          // `forwardIndexDisabled` short-circuits everything else.
           Map<String, String> properties = fieldConfig.getProperties();
           if (properties != null && isDisabled(properties)) {
-            JsonNode codecSpecNode = forwardIndexNode == null ? null : forwardIndexNode.get("codecSpec");
-            Preconditions.checkState(codecSpecNode == null || codecSpecNode.isNull(),
-                "codecSpec cannot be configured when the forward index is disabled for column: %s", column);
             result.put(column, ForwardIndexConfig.getDisabled());
             continue;
           }
@@ -225,6 +219,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
           FieldConfig.EncodingType encodingType =
               inNoDictionaryList ? FieldConfig.EncodingType.RAW : fieldConfig.getEncodingType();
 
+          JsonNode forwardIndexNode = fieldConfig.getIndexes().get(INDEX_DISPLAY_NAME);
           if (forwardIndexNode != null) {
             Preconditions.checkState(forwardIndexNode.isObject(), "Invalid forward index config for column: %s",
                 column);
@@ -247,14 +242,8 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
                       + "but indexes.forward.compressionCodec=%s", column, fcCodec, inner);
             }
 
-            JsonNode innerCodecSpecNode = forwardIndexNode.get("codecSpec");
-            Preconditions.checkState(fcCodec == null || innerCodecSpecNode == null || innerCodecSpecNode.isNull(),
-                "Conflicting forward-index config for column: %s — FieldConfig.compressionCodec=%s but "
-                    + "indexes.forward.codecSpec is also set", column, fcCodec);
-
             // Inject the resolved encodingType / compressionCodec into the JSON when absent so the resulting
-            // ForwardIndexConfig always matches the column-level signals. codecSpec is configured only within the
-            // indexes.forward block and is parsed directly from this JSON.
+            // ForwardIndexConfig always matches the column-level signals.
             ObjectNode configNode = (ObjectNode) forwardIndexNode.deepCopy();
             if (innerEncodingNode == null || innerEncodingNode.isNull()) {
               configNode.put("encodingType", encodingType.name());
