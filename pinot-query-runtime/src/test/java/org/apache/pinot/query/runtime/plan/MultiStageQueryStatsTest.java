@@ -23,7 +23,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.List;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
@@ -32,6 +31,7 @@ import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OperatorTypeDescriptor;
 import org.apache.pinot.query.runtime.operator.SortOperator;
+import org.apache.pinot.query.runtime.operator.TestOperatorTypeDescriptors;
 import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.testng.Assert;
@@ -65,27 +65,8 @@ public class MultiStageQueryStatsTest {
   /// only travel via stream-mode stats reporting, whose proto carries the id as an int32.
   @Test
   public void testSerializePluginOperatorIdFailsLoudly() {
-    OperatorTypeDescriptor pluginType = new OperatorTypeDescriptor() {
-      @Override
-      public int getId() {
-        return OperatorTypeDescriptor.PLUGIN_ID_FLOOR;
-      }
-
-      @Override
-      public String name() {
-        return "TEST_PLUGIN";
-      }
-
-      @Override
-      @SuppressWarnings("rawtypes")
-      public Class getStatKeyClass() {
-        return AggregateOperator.StatKey.class;
-      }
-
-      @Override
-      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
-      }
-    };
+    OperatorTypeDescriptor pluginType = TestOperatorTypeDescriptors.of(OperatorTypeDescriptor.PLUGIN_ID_FLOOR,
+        "TEST_PLUGIN", AggregateOperator.StatKey.class);
     MultiStageQueryStats.StageStats.Closed closed = new MultiStageQueryStats.StageStats.Closed(
         List.of(pluginType), List.of(new StatMap<>(AggregateOperator.StatKey.class)));
     Assert.assertThrows(IllegalStateException.class,
