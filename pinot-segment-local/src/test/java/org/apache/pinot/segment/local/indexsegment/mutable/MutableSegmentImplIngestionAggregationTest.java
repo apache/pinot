@@ -39,7 +39,6 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -360,7 +359,10 @@ public class MutableSegmentImplIngestionAggregationTest {
   }
 
   @Test
-  public void testBigDecimalTooBig() {
+  public void testBigDecimalTooBigIsFailSoft()
+      throws Exception {
+    // Oversized SUM_PRECISION used to throw mid-row and leave a half-written doc. Fail-soft completes the row
+    // with the aggregator's default initial value so the segment stays sealable.
     String m1 = "sumPrecision1";
     Schema schema = getSchemaBuilder().addMetric(m1, DataType.BIG_DECIMAL).build();
 
@@ -371,14 +373,14 @@ public class MutableSegmentImplIngestionAggregationTest {
         MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(m1), VAR_LENGTH_SET, INVERTED_INDEX_SET,
             List.of(new AggregationConfig(m1, "SUM_PRECISION(metric, 3)")));
 
-    // Make a big decimal larger than 3 precision and try to index it
     BigDecimal large = BigDecimalUtils.generateMaximumNumberWithPrecision(5);
     GenericRow row = getRow(random, 1);
-
     row.putValue("metric", large);
-    assertThrows(IllegalArgumentException.class, () -> {
-      mutableSegmentImpl.index(row, METADATA);
-    });
+    mutableSegmentImpl.index(row, METADATA);
+
+    assertEquals(mutableSegmentImpl.getNumDocsIndexed(), 1);
+    GenericRow result = mutableSegmentImpl.getRecord(0, new GenericRow());
+    assertEquals(result.getValue(m1), BigDecimal.ZERO);
 
     mutableSegmentImpl.destroy();
   }
