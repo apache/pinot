@@ -269,6 +269,17 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     }
     queryContext.setMaxExecutionThreads(maxExecutionThreads);
 
+    // Set streaming selection order-by options (opt-in; gated on selection queries to prevent accidental routing
+    // if a downstream guard is ever missed)
+    if (QueryContextUtils.isSelectionQuery(queryContext)) {
+      queryContext.setSortedSelectionMergeEnabled(QueryOptionsUtils.isSortedSelectionMergeEnabled(queryOptions));
+      Integer sortedSelectionMergeBlockSize =
+          QueryOptionsUtils.getSortedSelectionMergeBlockSize(queryOptions);
+      if (sortedSelectionMergeBlockSize != null) {
+        queryContext.setSortedSelectionMergeBlockSize(sortedSelectionMergeBlockSize);
+      }
+    }
+
     // Set group-by query options
     if (QueryContextUtils.isAggregationQuery(queryContext) && queryContext.getGroupByExpressions() != null) {
       // Set maxInitialResultHolderCapacity

@@ -19,6 +19,8 @@
 package org.apache.pinot.query.runtime.operator.utils;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -58,6 +60,20 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   protected int _lastRead;
   @Nullable
   private E _errorBlock = null;
+
+  /// A consumer instance reads either in round-robin mode (via [#readBlockBlocking()]) or in per-stream mode
+  /// (via [#streamHandles()] / [StreamHandle#readBlocking()]), never both. The mode is latched on first use
+  /// and mixing the two throws [IllegalStateException]. Both modes share the same EOS/error/timeout bookkeeping
+  /// (the abstract hooks below), so stats stay correct regardless of which mode is used.
+  private enum Mode {
+    UNSET, ROUND_ROBIN, PER_STREAM
+  }
+
+  private Mode _mode = Mode.UNSET;
+  /// Lazily built per-stream handles, used only in [Mode#PER_STREAM]. Built once from [#_mailboxes] (which
+  /// the mode guard keeps the round-robin path from mutating) and cached so [#streamHandles()] is idempotent.
+  @Nullable
+  private List<StreamHandle<E>> _handles = null;
 
   public BlockingMultiStreamConsumer(Object id, long deadlineMs, List<? extends AsyncStream<E>> asyncProducers) {
     _id = id;
@@ -169,6 +185,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   ///
   /// This method is called by the consumer thread.
   public E readBlockBlocking() {
+    latchMode(Mode.ROUND_ROBIN);
     if (LOGGER.isTraceEnabled()) {
       String mailboxIds = _mailboxes.stream()
           .map(AsyncStream::getId)
@@ -291,6 +308,204 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
       }
     }
     return null;
+  }
+
+  /// Parks the consumer thread until any stream signals new data or the deadline is reached. Used by the per-stream
+  /// (k-way merge) read mode: after finding every stream momentarily empty, a caller waits here for progress instead of
+  /// committing to a single stream (which would head-of-line block while sibling mailboxes fill up and their senders
+  /// backpressure, deadlocking the pipeline). Returns `null` when woken by new data (the caller should re-poll the
+  /// streams), or the terminal error element (already routed through [#onTimeout()]) when the deadline is
+  /// exceeded.
+  ///
+  /// This method is called by the consumer thread.
+  @Nullable
+  public E awaitDataOrTerminal() {
+    latchMode(Mode.PER_STREAM);
+    if (_errorBlock != null) {
+      return _errorBlock;
+    }
+    try {
+      long timeoutMs = _deadlineMs - System.currentTimeMillis();
+      if (timeoutMs <= 0 || _newDataReady.poll(timeoutMs, TimeUnit.MILLISECONDS) == null) {
+        _errorBlock = onTimeout();
+        return _errorBlock;
+      }
+      return null;
+    } catch (Exception e) {
+      _errorBlock = onException(e);
+      return _errorBlock;
+    }
+  }
+
+  /// Latches the read mode on first use and enforces that a single consumer instance is read in exactly one mode.
+  ///
+  /// @throws IllegalStateException if a different mode was already latched.
+  private void latchMode(Mode mode) {
+    if (_mode == Mode.UNSET) {
+      _mode = mode;
+    } else if (_mode != mode) {
+      throw new IllegalStateException("BlockingMultiStreamConsumer mixes round-robin and per-stream reads");
+    }
+  }
+
+  /// A narrow per-stream handle for the k-way-merge read mode. Returned by [#streamHandles()].
+  ///
+  /// Unlike [#readBlockBlocking()], which reads from all mailboxes in a fair round-robin and hides which mailbox a
+  /// block came from, a handle reads from one specific stream so a caller (the k-way merge) can advance each sender
+  /// independently. All terminal bookkeeping (success EOS, error, timeout, exception) still routes through the same
+  /// hooks the round-robin path uses, so `calculateStats()` stays correct.
+  ///
+  /// All methods are called by the single consumer thread only.
+  ///
+  /// @param <T> the element type, matching the enclosing consumer.
+  public interface StreamHandle<T> {
+    /// The id of the underlying stream. Mostly used for logging.
+    Object getId();
+
+    /// Blocking read of the next element from this stream only. Returns a data element, a success-EOS element (after
+    /// which [#isExhausted()] is true), or an error/timeout element (after which the whole consumer is in error
+    /// and every handle returns that same error element on subsequent calls). Never returns null.
+    T readBlocking();
+
+    /// Non-blocking read of the next element from this stream only. Returns a data element, a success-EOS element
+    /// (after which [#isExhausted()] is true), an error element (after which the whole consumer is in error), or
+    /// `null` when nothing is ready yet. Unlike [#readBlocking()] this never parks the consumer thread, so
+    /// the k-way merge can drain whichever siblings are ready while waiting for the specific stream it needs.
+    @Nullable
+    T poll();
+
+    /// Returns true once this stream has emitted a success EOS, meaning no more data will come from it.
+    boolean isExhausted();
+
+    /// Sets the underlying stream to early-terminate state, asking for the metadata block.
+    void earlyTerminate();
+  }
+
+  /// Returns one [StreamHandle] per mailbox in declaration order (an empty list when there are no mailboxes).
+  ///
+  /// The first call latches this consumer into per-stream mode; subsequent calls to [#readBlockBlocking()] throw.
+  /// The returned list is built once and cached, so repeated calls return the same handles. All returned handles must
+  /// be driven by the single consumer thread (they share this consumer's wakeup and error state with no extra
+  /// synchronization).
+  public List<StreamHandle<E>> streamHandles() {
+    latchMode(Mode.PER_STREAM);
+    if (_handles == null) {
+      List<StreamHandle<E>> handles = new ArrayList<>(_mailboxes.size());
+      for (AsyncStream<E> mailbox : _mailboxes) {
+        handles.add(new Handle(mailbox));
+      }
+      _handles = Collections.unmodifiableList(handles);
+    }
+    return _handles;
+  }
+
+  /// Per-stream handle implementation. Reads from a single captured [AsyncStream] (not an index into the
+  /// round-robin-mutated [#_mailboxes]), reusing the shared [#_newDataReady] wakeup and [#_deadlineMs]
+  /// deadline. A wakeup meant for another stream simply causes a re-poll that returns null and loops, which is correct
+  /// because [AsyncStream#poll()] reads from the per-mailbox queue, not from [#_newDataReady].
+  private class Handle implements StreamHandle<E> {
+    private final AsyncStream<E> _stream;
+    private boolean _exhausted;
+    /// The success-EOS element seen on this stream. Cached so that, once exhausted, we return it without polling an
+    /// already-released mailbox again (and without re-merging its stats).
+    @Nullable
+    private E _eosElement;
+
+    Handle(AsyncStream<E> stream) {
+      _stream = stream;
+    }
+
+    @Override
+    public Object getId() {
+      return _stream.getId();
+    }
+
+    @Override
+    public boolean isExhausted() {
+      return _exhausted;
+    }
+
+    @Override
+    public void earlyTerminate() {
+      _stream.earlyTerminate();
+    }
+
+    @Override
+    public E readBlocking() {
+      if (_errorBlock != null) {
+        // A global error (from this or any other handle) short-circuits every handle.
+        return _errorBlock;
+      }
+      if (_exhausted) {
+        // EOS already seen; do not poll an already-released mailbox again. Stats were merged once when first seen.
+        assert _eosElement != null : "_eosElement must be set whenever _exhausted is true";
+        return _eosElement;
+      }
+      // Mirror the round-robin path (readDroppingSuccessEos): a deadline already in the past times out before any read,
+      // so both modes report a timeout rather than racing a last-moment block.
+      if (System.currentTimeMillis() > _deadlineMs) {
+        _errorBlock = onTimeout();
+        return _errorBlock;
+      }
+      // Optimistic read without waiting.
+      E block = pollThisStream();
+      if (block != null) {
+        return block;
+      }
+      try {
+        while (true) {
+          long timeoutMs = _deadlineMs - System.currentTimeMillis();
+          if (_newDataReady.poll(timeoutMs, TimeUnit.MILLISECONDS) == null) {
+            _errorBlock = onTimeout();
+            return _errorBlock;
+          }
+          block = pollThisStream();
+          if (block != null) {
+            return block;
+          }
+        }
+      } catch (Exception e) {
+        _errorBlock = onException(e);
+        return _errorBlock;
+      }
+    }
+
+    @Nullable
+    @Override
+    public E poll() {
+      if (_errorBlock != null) {
+        // A global error (from this or any other handle) short-circuits every handle.
+        return _errorBlock;
+      }
+      if (_exhausted) {
+        // Success EOS already seen; do not poll an already-released mailbox again.
+        return null;
+      }
+      return pollThisStream();
+    }
+
+    /// Polls this stream once, routing any terminal element through the shared hooks.
+    ///
+    /// @return the element read (data, success EOS, or error), or null if nothing is ready yet.
+    @Nullable
+    private E pollThisStream() {
+      E block = _stream.poll();
+      if (block == null) {
+        return null;
+      }
+      if (isError(block)) {
+        _errorBlock = block;
+        onError(block);
+        return block;
+      }
+      if (isSuccess(block)) {
+        _exhausted = true;
+        _eosElement = block;
+        onMailboxSuccess(block);
+        return block;
+      }
+      return block;
+    }
   }
 
   /// A [BlockingMultiStreamConsumer] that reads [ReceivingMailbox.MseBlockWithStats]s.
