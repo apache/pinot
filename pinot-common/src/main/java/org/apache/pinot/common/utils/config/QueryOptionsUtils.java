@@ -549,6 +549,16 @@ public class QueryOptionsUtils {
     return checkedParseIntNonNegative(QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD, value);
   }
 
+  public static boolean isSortedSelectionMergeEnabled(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SORTED_SELECTION_MERGE_ENABLED));
+  }
+
+  @Nullable
+  public static Integer getSortedSelectionMergeBlockSize(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.SORTED_SELECTION_MERGE_BLOCK_SIZE);
+    return checkedParseIntPositive(QueryOptionKey.SORTED_SELECTION_MERGE_BLOCK_SIZE, value);
+  }
+
   public static boolean isNullHandlingEnabled(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ENABLE_NULL_HANDLING));
   }
