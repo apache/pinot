@@ -120,6 +120,14 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     return _multiConsumer.calculateStats();
   }
 
+  /// Returns one per-sender [BlockingMultiStreamConsumer.StreamHandle] so a subclass can read each sender mailbox
+  /// independently (used by the streaming k-way merge). Latches the underlying consumer into per-stream mode: a
+  /// subclass must use either these handles or `readMseBlockBlocking()`, never both. Returns an empty list when there
+  /// are no mailboxes.
+  protected List<BlockingMultiStreamConsumer.StreamHandle<ReceivingMailbox.MseBlockWithStats>> streamHandles() {
+    return _multiConsumer.streamHandles();
+  }
+
   @Override
   public StatMap<StatKey> copyStatMaps() {
     return new StatMap<>(_statMap);
@@ -246,7 +254,27 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
     /// Time spent on GC while this operator or its children in the same stage were running.
-    GC_TIME_MS(StatMap.Type.LONG);
+    GC_TIME_MS(StatMap.Type.LONG),
+    /// Whether this receive operator served its rows with the streaming k-way merge rather than the
+    /// accumulate-then-sort path.
+    ///
+    /// Only `SortedMailboxReceiveOperator` ever sets this; the unsorted receive operator always leaves it at
+    /// `false`. It is recorded at construction time (not when the first row is merged), so it reports the path
+    /// the operator was configured to take even when the result is empty.
+    ///
+    /// Reporting is presence-based: [StatMap] drops boolean keys whose value is `false`, so this renders
+    /// into the response `stageStats` as `kWayMergeUsed: true` on the merge path and is simply absent on
+    /// the accumulate-then-sort path (and on any server predating this stat).
+    ///
+    /// Do not override `includeDefaultInJson()` to force this key to render as `false`: the guarantee
+    /// that a false value is never written comes entirely from [StatMap]'s boolean `merge()` removing the
+    /// entry, not from this method, and it is load-bearing for mixed-version safety (see
+    /// `STREAMING_SORTED_MAILBOX_RECEIVE` in `CommonConstants`) — it is what keeps this key from ever
+    /// being written to a peer that predates it.
+    ///
+    /// NOTE: this key is intentionally the last constant in this enum. [StatMap] serializes keys by ordinal, so
+    /// new keys must only ever be appended, never inserted or reordered.
+    K_WAY_MERGE_USED(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 

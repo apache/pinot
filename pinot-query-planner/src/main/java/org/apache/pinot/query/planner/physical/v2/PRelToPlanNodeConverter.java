@@ -243,6 +243,10 @@ public class PRelToPlanNodeConverter {
     JoinNode.JoinStrategy joinStrategy;
     if (PinotHintOptions.JoinHintOptions.useLookupJoinStrategy(join)) {
       joinStrategy = JoinNode.JoinStrategy.LOOKUP;
+    } else if (PinotHintOptions.JoinHintOptions.useSortedMergeJoinStrategy(join)) {
+      throw new UnsupportedOperationException(
+          "Sorted merge join (join_strategy='sorted') is not yet supported with the physical optimizer "
+              + "(usePhysicalOptimizer=true). Disable the physical optimizer to use it.");
     } else {
       joinStrategy = JoinNode.JoinStrategy.HASH;
     }
