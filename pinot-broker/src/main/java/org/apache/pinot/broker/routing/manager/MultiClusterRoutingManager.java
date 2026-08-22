@@ -217,6 +217,62 @@ public class MultiClusterRoutingManager implements RoutingManager {
     return combined.isEmpty() ? null : combined;
   }
 
+  /// Combines by *intersection* over the clusters that have routing for the table, which is the opposite of how
+  /// [#getSegments] combines and deliberately so: that returns segments that survive, and a segment survives if any
+  /// cluster keeps it, while this returns segments that are provably eliminated, and a proof only holds if every
+  /// cluster that could route the segment eliminated it. Unioning instead would let one cluster's pruners speak for a
+  /// segment another cluster would still have queried -- silently dropping matching data.
+  ///
+  /// Restricting the intersection to the clusters that have the table is what keeps it useful: the usual case is a
+  /// table in exactly one cluster, where the intersection is that cluster's own verdict. A cluster without the table
+  /// would otherwise contribute an empty set and reduce every answer to "nothing proven".
+  @Nullable
+  @Override
+  public Set<String> getPrunedSegments(BrokerRequest brokerRequest) {
+    String tableNameWithType = brokerRequest.getQuerySource().getTableName();
+    Set<String> combined = intersectPrunedSegments(null, _localClusterRoutingManager, brokerRequest,
+        tableNameWithType);
+    for (BaseBrokerRoutingManager remoteCluster : _remoteClusterRoutingManagers) {
+      combined = intersectPrunedSegments(combined, remoteCluster, brokerRequest, tableNameWithType);
+    }
+    // Still null when no cluster has the table at all, which is what the interface reports for a table that does not
+    // exist -- as opposed to an empty set, which is a cluster that ran the pruners and proved nothing.
+    return combined;
+  }
+
+  /// Folds one cluster's verdict into the running intersection, or returns an empty set to end it: once nothing is
+  /// proven, nothing downstream can make it provable again, and asking the remaining clusters would run a full
+  /// selection and pruner chain each for an answer that is already fixed. `null` means no cluster has answered yet.
+  @Nullable
+  private Set<String> intersectPrunedSegments(@Nullable Set<String> combined, BaseBrokerRoutingManager cluster,
+      BrokerRequest brokerRequest, String tableNameWithType) {
+    if (combined != null && combined.isEmpty()) {
+      return combined;
+    }
+    try {
+      // One lookup rather than routingExists-then-get: a table appearing between the two would let this skip a
+      // cluster that can route it, and the intersection would then claim segments eliminated that nobody asked about.
+      Set<String> prunedSegments = cluster.getPrunedSegments(brokerRequest);
+      if (prunedSegments == null) {
+        // This cluster has no routing for the table, so it eliminates nothing and constrains nothing.
+        return combined;
+      }
+      if (prunedSegments.isEmpty()) {
+        // This cluster proves nothing, so neither does the intersection.
+        return Set.of();
+      }
+      if (combined == null) {
+        return new HashSet<>(prunedSegments);
+      }
+      combined.retainAll(prunedSegments);
+      return combined;
+    } catch (Exception e) {
+      LOGGER.error("Error getting pruned segments from cluster routing manager for table {}", tableNameWithType, e);
+      // A cluster we could not ask may still have routed any of these segments, so prove nothing.
+      return Set.of();
+    }
+  }
+
   /// Returns the partition info only when a single cluster has any, and `null` when more than one does.
   ///
   /// Unlike [#getRoutingTable], [#getSegments] and [#getServingInstances], this cannot union the clusters: the info is
