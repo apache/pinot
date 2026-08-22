@@ -249,6 +249,7 @@ public class PinotHelixResourceManager {
   private final AuthProvider _serverAdminAuthProvider;
 
   private HelixManager _helixZkManager;
+  private String _controllerId;
   private HelixAdmin _helixAdmin;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private HelixDataAccessor _helixDataAccessor;
@@ -312,6 +313,7 @@ public class PinotHelixResourceManager {
   /// reminder to clean up old Zk nodes when the controller starts up.
   public synchronized void start(HelixManager helixZkManager, @Nullable ControllerMetrics controllerMetrics) {
     _helixZkManager = helixZkManager;
+    _controllerId = _helixZkManager.getInstanceName();
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     _propertyStore = _helixZkManager.getHelixPropertyStore();
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
@@ -1956,6 +1958,21 @@ public class PinotHelixResourceManager {
           + "external view");
     }
 
+    // Check if a deletion is in progress for this table
+    // This prevents recreation of a table while deletion is still in progress, which would
+    // otherwise lead to a corrupted state where the new table gets deleted by the in-flight deletion
+    if (ZKMetadataProvider.isValidTableDeletionMarkerExists(_propertyStore, tableNameWithType)) {
+      // CONFLICT rather than a generic failure: this is an expected, retryable race against an in-flight delete,
+      // not a server fault, and callers should not see it as a 500.
+      throw new ControllerApplicationException(LOGGER, String.format(
+          "Cannot create table '%s': a deletion is currently in progress. "
+              + "Please wait for the deletion to complete before attempting to recreate the table. "
+              + "If the deletion appears stuck, the deletion marker will expire after 24 hours, "
+              + "or you can manually clean up the deletion marker from ZK at path: %s/%s",
+          tableNameWithType, ZKMetadataProvider.getPropertyStoreTableDeletionInProgressPrefix(), tableNameWithType),
+          Response.Status.CONFLICT);
+    }
+
     LOGGER.info("Adding table {}: Validate table configs", tableNameWithType);
     validateTableTenantConfig(tableConfig);
 
@@ -2551,6 +2568,8 @@ public class PinotHelixResourceManager {
     // generator would then fail forever on every cycle, and the broker rewrite engine (PR 2)
     // would keep serving the now-orphaned MV partitions as if the base were intact — silent
     // stale data. Force the operator to drop dependent MVs first.
+    // NOTE: This runs before the deletion marker is acquired so that a refused delete does not leave a marker
+    // that would make an unrelated addTable() report a deletion in progress.
     MaterializedViewConsistencyManager mvMgr = _materializedViewConsistencyManager;
     if (mvMgr != null) {
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
@@ -2566,84 +2585,173 @@ public class PinotHelixResourceManager {
       }
     }
 
-    // Remove the table from brokerResource
-    HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, tableNameWithType);
-    LOGGER.info("Deleting table {}: Removed from broker resource", tableNameWithType);
+    // Acquire the deletion marker. It gives concurrent deletes mutual exclusion and makes addTable() refuse to
+    // re-create the table while this deletion is still tearing its metadata down.
+    if (!ZKMetadataProvider.createOrTakeoverTableDeletionMarker(_propertyStore, tableNameWithType, _controllerId)) {
+      // CONFLICT rather than a generic failure: a concurrent delete is an expected, retryable condition.
+      throw new ControllerApplicationException(LOGGER, String.format(
+          "Cannot delete table '%s': a deletion is already in progress. "
+              + "If the previous deletion failed, wait for the deletion marker to expire (24 hours) "
+              + "or manually clean up the deletion marker from ZK at path: %s/%s",
+          tableNameWithType, ZKMetadataProvider.getPropertyStoreTableDeletionInProgressPrefix(), tableNameWithType),
+          Response.Status.CONFLICT);
+    }
+    try {
+      // Remove the table from brokerResource
+      HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, tableNameWithType);
+      LOGGER.info("Deleting table {}: Removed from broker resource", tableNameWithType);
 
-    // Delete the table on servers
-    deleteTableOnServers(tableNameWithType);
+      // Delete the table on servers
+      deleteTableOnServers(tableNameWithType);
 
-    // Remove ideal state
-    _helixDataAccessor.removeProperty(_keyBuilder.idealStates(tableNameWithType));
-    LOGGER.info("Deleting table {}: Removed ideal state", tableNameWithType);
+      // Remove ideal state
+      _helixDataAccessor.removeProperty(_keyBuilder.idealStates(tableNameWithType));
+      LOGGER.info("Deleting table {}: Removed ideal state", tableNameWithType);
 
-    // Remove all stored segments for the table
-    Long retentionPeriodMs = retentionPeriod != null ? TimeUtils.convertPeriodToMillis(retentionPeriod) : null;
-    _segmentDeletionManager.removeSegmentsFromStoreInBatch(tableNameWithType,
-        getSegmentsFromPropertyStore(tableNameWithType),
-        retentionPeriodMs);
-    LOGGER.info("Deleting table {}: Removed stored segments", tableNameWithType);
+      // Remove all stored segments for the table.
+      // Retention precedence: the request's retention parameter, then the table config, then the cluster default
+      // that SegmentDeletionManager applies when this is null. Reuse SegmentDeletionManager's own extraction
+      // helper rather than re-reading the config here: it tolerates an empty or malformed period, which
+      // TimeUtils.convertPeriodToMillis would otherwise throw on and make the table undeletable.
+      Long retentionPeriodMs = retentionPeriod != null ? TimeUtils.convertPeriodToMillis(retentionPeriod)
+          : SegmentDeletionManager.getRetentionMsFromTableConfig(getTableConfig(tableNameWithType));
+      _segmentDeletionManager.removeSegmentsFromStoreInBatch(tableNameWithType,
+          getSegmentsFromPropertyStore(tableNameWithType),
+          retentionPeriodMs);
+      LOGGER.info("Deleting table {}: Removed stored segments", tableNameWithType);
 
-    // Remove segment metadata
-    ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, tableNameWithType);
-    LOGGER.info("Deleting table {}: Removed segment metadata", tableNameWithType);
+      // Remove segment metadata
+      ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, tableNameWithType);
+      LOGGER.info("Deleting table {}: Removed segment metadata", tableNameWithType);
 
-    // Remove COMMITTING segment list
-    if (tableType == TableType.REALTIME) {
-      if (ZKMetadataProvider.removePauselessDebugMetadata(_propertyStore, tableNameWithType)) {
-        LOGGER.info("Deleting table {}: Removed pauseless debug metadata", tableNameWithType);
+      // Remove COMMITTING segment list
+      if (tableType == TableType.REALTIME) {
+        if (ZKMetadataProvider.removePauselessDebugMetadata(_propertyStore, tableNameWithType)) {
+          LOGGER.info("Deleting table {}: Removed pauseless debug metadata", tableNameWithType);
+        } else {
+          LOGGER.info("Deleting table {}: Failed to remove pauseless debug metadata.", tableNameWithType);
+        }
+      }
+
+      // Remove instance partitions
+      if (tableType == TableType.OFFLINE) {
+        InstancePartitionsUtils.removeInstancePartitions(_propertyStore, tableNameWithType);
       } else {
-        LOGGER.info("Deleting table {}: Failed to remove pauseless debug metadata.", tableNameWithType);
+        String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+        InstancePartitionsUtils.removeInstancePartitions(_propertyStore,
+            InstancePartitionsType.CONSUMING.getInstancePartitionsName(rawTableName));
+        InstancePartitionsUtils.removeInstancePartitions(_propertyStore,
+            InstancePartitionsType.COMPLETED.getInstancePartitionsName(rawTableName));
+      }
+      LOGGER.info("Deleting table {}: Removed instance partitions", tableNameWithType);
+
+      // Remove tier instance partitions
+      InstancePartitionsUtils.removeTierInstancePartitions(_propertyStore, tableNameWithType);
+      LOGGER.info("Deleting table {}: Removed tier instance partitions", tableNameWithType);
+
+      // Remove segment lineage
+      SegmentLineageAccessHelper.deleteSegmentLineage(_propertyStore, tableNameWithType);
+      LOGGER.info("Deleting table {}: Removed segment lineage", tableNameWithType);
+
+      // Remove task related metadata
+      MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, tableNameWithType);
+      LOGGER.info("Deleting table {}: Removed all minion task metadata", tableNameWithType);
+
+      // Remove materialized view metadata (if any) and unregister from consistency manager
+      notifyMaterializedViewConsistencyManagerForTableDrop(tableNameWithType);
+      try {
+        MaterializedViewDefinitionMetadataUtils.delete(_propertyStore, tableNameWithType);
+        LOGGER.info("Deleting table {}: Removed MV definition metadata", tableNameWithType);
+      } catch (Exception e) {
+        LOGGER.debug("Deleting table {}: No MV definition metadata to remove or removal failed",
+            tableNameWithType, e);
+      }
+      try {
+        MaterializedViewRuntimeMetadataUtils.delete(_propertyStore, tableNameWithType);
+        LOGGER.info("Deleting table {}: Removed MV runtime metadata", tableNameWithType);
+      } catch (Exception e) {
+        LOGGER.debug("Deleting table {}: No MV runtime metadata to remove or removal failed",
+            tableNameWithType, e);
+      }
+
+      // Remove table config
+      // NOTE: This should always be the last step for deletion to avoid race condition in table re-create
+      ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, tableNameWithType);
+      LOGGER.info("Deleting table {}: Removed table config", tableNameWithType);
+
+      // Audit the property store for metadata that should now be gone, and warn about anything left behind
+      List<String> leftoverMetadata = findLeftoverTableMetadata(tableNameWithType, tableType);
+      if (leftoverMetadata.isEmpty()) {
+        LOGGER.info("Deleting table {}: Verified all audited metadata was removed", tableNameWithType);
+      } else {
+        LOGGER.warn("Deleting table {}: Finished but left {} metadata artifact(s) behind: {}. "
+                + "These need to be cleaned up manually before the table is re-created.", tableNameWithType,
+            leftoverMetadata.size(), leftoverMetadata);
+      }
+
+      LOGGER.info("Deleting table {}: Finish", tableNameWithType);
+    } finally {
+      // Always release the marker, even if the deletion failed, so the deletion can be retried or the table
+      // re-created. Releasing is a no-op if another controller has since taken the marker over.
+      ZKMetadataProvider.removeTableDeletionMarker(_propertyStore, tableNameWithType, _controllerId);
+    }
+  }
+
+  /// Returns the table metadata that [#deleteTable] should have removed but which is still present, so the
+  /// caller can warn an operator about it. An empty list means the audited metadata is all gone.
+  ///
+  /// This deliberately only covers artifacts that `deleteTable` removes with a synchronous ZK write, so a
+  /// leftover here is a real leak rather than a timing artifact. In particular the ExternalView is NOT checked:
+  /// Helix removes it asynchronously via the controller pipeline after the IdealState is dropped, so it is
+  /// routinely still present at this point.
+  ///
+  /// The caller only warns and never throws. By the time this runs the table config is already gone, so the
+  /// delete has succeeded from the caller's point of view; failing the request would report a misleading error
+  /// for a table that no longer exists, and would not make the leftovers go away.
+  ///
+  /// ponytail: tier instance partitions, minion task metadata and materialized view metadata are not audited.
+  /// Tier partitions are named per tier and minion metadata is keyed per task type, so covering them means
+  /// scanning every instance partitions / task znode in the cluster on every delete. If leaks are observed in
+  /// practice, add a targeted child listing for the specific parent path rather than a cluster-wide scan.
+  ///
+  /// @param tableNameWithType The table name with type suffix
+  /// @param tableType The table type
+  /// @return the names of the metadata artifacts still present, empty when nothing was left behind
+  @VisibleForTesting
+  List<String> findLeftoverTableMetadata(String tableNameWithType, TableType tableType) {
+    List<String> remainingArtifacts = new ArrayList<>();
+
+    if (_helixDataAccessor.getProperty(_keyBuilder.idealStates(tableNameWithType)) != null) {
+      remainingArtifacts.add("IdealState");
+    }
+    if (ZKMetadataProvider.isTableConfigExists(_propertyStore, tableNameWithType)) {
+      remainingArtifacts.add("TableConfig");
+    }
+    List<String> segments = ZKMetadataProvider.getSegments(_propertyStore, tableNameWithType);
+    if (segments != null && !segments.isEmpty()) {
+      remainingArtifacts.add(segments.size() + " segment(s) of metadata");
+    }
+    if (SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType) != null) {
+      remainingArtifacts.add("SegmentLineage");
+    }
+
+    // Mirror the instance partitions names that deleteTable removes.
+    if (tableType == TableType.OFFLINE) {
+      if (InstancePartitionsUtils.fetchInstancePartitions(_propertyStore, tableNameWithType) != null) {
+        remainingArtifacts.add("InstancePartitions");
+      }
+    } else {
+      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+      for (InstancePartitionsType type : List.of(InstancePartitionsType.CONSUMING,
+          InstancePartitionsType.COMPLETED)) {
+        String instancePartitionsName = type.getInstancePartitionsName(rawTableName);
+        if (InstancePartitionsUtils.fetchInstancePartitions(_propertyStore, instancePartitionsName) != null) {
+          remainingArtifacts.add(instancePartitionsName);
+        }
       }
     }
 
-    // Remove instance partitions
-    if (tableType == TableType.OFFLINE) {
-      InstancePartitionsUtils.removeInstancePartitions(_propertyStore, tableNameWithType);
-    } else {
-      String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-      InstancePartitionsUtils.removeInstancePartitions(_propertyStore,
-          InstancePartitionsType.CONSUMING.getInstancePartitionsName(rawTableName));
-      InstancePartitionsUtils.removeInstancePartitions(_propertyStore,
-          InstancePartitionsType.COMPLETED.getInstancePartitionsName(rawTableName));
-    }
-    LOGGER.info("Deleting table {}: Removed instance partitions", tableNameWithType);
-
-    // Remove tier instance partitions
-    InstancePartitionsUtils.removeTierInstancePartitions(_propertyStore, tableNameWithType);
-    LOGGER.info("Deleting table {}: Removed tier instance partitions", tableNameWithType);
-
-    // Remove segment lineage
-    SegmentLineageAccessHelper.deleteSegmentLineage(_propertyStore, tableNameWithType);
-    LOGGER.info("Deleting table {}: Removed segment lineage", tableNameWithType);
-
-    // Remove task related metadata
-    MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, tableNameWithType);
-    LOGGER.info("Deleting table {}: Removed all minion task metadata", tableNameWithType);
-
-    // Remove materialized view metadata (if any) and unregister from consistency manager
-    notifyMaterializedViewConsistencyManagerForTableDrop(tableNameWithType);
-    try {
-      MaterializedViewDefinitionMetadataUtils.delete(_propertyStore, tableNameWithType);
-      LOGGER.info("Deleting table {}: Removed MV definition metadata", tableNameWithType);
-    } catch (Exception e) {
-      LOGGER.debug("Deleting table {}: No MV definition metadata to remove or removal failed",
-          tableNameWithType, e);
-    }
-    try {
-      MaterializedViewRuntimeMetadataUtils.delete(_propertyStore, tableNameWithType);
-      LOGGER.info("Deleting table {}: Removed MV runtime metadata", tableNameWithType);
-    } catch (Exception e) {
-      LOGGER.debug("Deleting table {}: No MV runtime metadata to remove or removal failed",
-          tableNameWithType, e);
-    }
-
-    // Remove table config
-    // NOTE: This should always be the last step for deletion to avoid race condition in table re-create
-    ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, tableNameWithType);
-    LOGGER.info("Deleting table {}: Removed table config", tableNameWithType);
-
-    LOGGER.info("Deleting table {}: Finish", tableNameWithType);
+    return remainingArtifacts;
   }
 
   /// Deletes the logical table.

@@ -306,6 +306,8 @@ public class SegmentDeletionManager {
 
     List<URI> filesToDelete = new ArrayList<>();
     List<URI> metadataFilesToDelete = new ArrayList<>();
+    List<URI> filesToMove = new ArrayList<>();
+    List<URI> moveDestinations = new ArrayList<>();
 
     PinotFS pinotFS = PinotFSFactory.create(URIUtils.getUri(_dataDir).getScheme());
 
@@ -324,52 +326,72 @@ public class SegmentDeletionManager {
       if (retentionMs <= 0) {
         filesToDelete.add(fileToDeleteURI);
       } else {
-        moveSegmentsToDeletedDir(segmentId, deletedSegmentsRetentionMs, rawTableName, pinotFS, fileToDeleteURI);
+        // Collect move operations for batched processing
+        String deletedFileName = deletedSegmentsRetentionMs == null ? URIUtils.encode(segmentId)
+            : getDeletedSegmentFileName(URIUtils.encode(segmentId), deletedSegmentsRetentionMs);
+        URI deletedSegmentMoveDestURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName, deletedFileName);
+        filesToMove.add(fileToDeleteURI);
+        moveDestinations.add(deletedSegmentMoveDestURI);
       }
     }
 
     try {
+      // Batch delete segments with retention <= 0
       if (!filesToDelete.isEmpty()) {
         LOGGER.info("Deleting {} segment files", filesToDelete.size());
         pinotFS.deleteBatch(filesToDelete, true);
       }
+
+      // Move the segments to the deleted directory and let the retention manager delete them later.
+      // PinotFS has no batch move, so this is still one move per segment; what this avoids relative to a
+      // per-segment helper is an exists() round trip per segment (move already reports a missing source) and
+      // one log line per segment, both of which dominate when dropping a table with many segments.
+      if (!filesToMove.isEmpty()) {
+        LOGGER.info("Moving {} segment files of table {} to the deleted directory", filesToMove.size(),
+            tableNameWithType);
+        int movedCount = 0;
+        List<URI> failedMoves = new ArrayList<>();
+        for (int i = 0; i < filesToMove.size(); i++) {
+          URI srcUri = filesToMove.get(i);
+          URI destUri = moveDestinations.get(i);
+          try {
+            // Overwrites the file if it already exists in the target directory.
+            if (pinotFS.move(srcUri, destUri, true)) {
+              // Touch is needed so that removeAgedDeletedSegments() sees a fresh last-modified time.
+              // Only touch destinations we actually created: touching a path whose move failed can
+              // materialize an empty object on object stores and leave a phantom deleted segment behind.
+              if (!pinotFS.touch(destUri)) {
+                LOGGER.warn("Could not touch moved segment file at {}, it may be aged out on the wrong schedule",
+                    destUri);
+              }
+              movedCount++;
+            } else {
+              failedMoves.add(srcUri);
+            }
+          } catch (IOException e) {
+            failedMoves.add(srcUri);
+            LOGGER.debug("Could not move segment from {} to {}", srcUri, destUri, e);
+          }
+        }
+        if (failedMoves.isEmpty()) {
+          LOGGER.info("Moved {} segment files of table {} to the deleted directory", movedCount, tableNameWithType);
+        } else {
+          LOGGER.warn("Moved {} of {} segment files of table {} to the deleted directory; {} failed, first few: {}",
+              movedCount, filesToMove.size(), tableNameWithType, failedMoves.size(),
+              failedMoves.subList(0, Math.min(failedMoves.size(), 10)));
+        }
+      }
+
+      // Batch delete metadata files
       if (!metadataFilesToDelete.isEmpty()) {
         LOGGER.info("Deleting {} segment metadata files", metadataFilesToDelete.size());
         pinotFS.deleteBatch(metadataFilesToDelete, true);
       }
     } catch (IOException e) {
-      LOGGER.warn("Could not delete segment/metadata files", e);
+      LOGGER.warn("Could not delete/move segment/metadata files", e);
     }
   }
 
-  private void moveSegmentsToDeletedDir(String segmentId, Long deletedSegmentsRetentionMs, String rawTableName,
-      PinotFS pinotFS,
-      URI fileToDeleteURI) {
-    // move the segment file to deleted segments first and let retention manager handler the deletion
-    String deletedFileName = deletedSegmentsRetentionMs == null ? URIUtils.encode(segmentId)
-        : getDeletedSegmentFileName(URIUtils.encode(segmentId), deletedSegmentsRetentionMs);
-    URI deletedSegmentMoveDestURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName, deletedFileName);
-    try {
-      if (pinotFS.exists(fileToDeleteURI)) {
-        // Overwrites the file if it already exists in the target directory.
-        if (pinotFS.move(fileToDeleteURI, deletedSegmentMoveDestURI, true)) {
-          // Updates last modified.
-          // Touch is needed here so that removeAgedDeletedSegments() works correctly.
-          pinotFS.touch(deletedSegmentMoveDestURI);
-          LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
-              deletedSegmentMoveDestURI.toString());
-        } else {
-          LOGGER.warn("Failed to move segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
-              deletedSegmentMoveDestURI.toString());
-        }
-      } else {
-        LOGGER.warn("Failed to find local segment file for segment {}", fileToDeleteURI.toString());
-      }
-    } catch (IOException e) {
-      LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
-          deletedSegmentMoveDestURI.toString(), e);
-    }
-  }
 
 
   /// Retrieves the URI for segment deletion by checking two possible segment file variants in deep store.
