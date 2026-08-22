@@ -114,15 +114,13 @@ public class ForwardIndexConfig extends IndexConfig {
     // implicit behavior where ForwardIndexConfig had no encoding distinction). Programmatic callers must use
     // Builder(EncodingType) and pass an explicit value, typically from FieldConfig.getEncodingType().
     _encodingType = encodingType == null ? EncodingType.DICTIONARY : encodingType;
-    CompressionCodec actualCompressionCodec =
-        getActualCompressionCodec(compressionCodec, chunkCompressionType, dictIdCompressionType);
-    if (actualCompressionCodec != null && codecSpec != null) {
+    _compressionCodec = getActualCompressionCodec(compressionCodec, chunkCompressionType, dictIdCompressionType);
+    if (_compressionCodec != null && codecSpec != null) {
       throw new IllegalArgumentException("compressionCodec and codecSpec are mutually exclusive");
     }
     if (codecSpec != null && _encodingType != EncodingType.RAW) {
       throw new IllegalArgumentException("codecSpec requires RAW forward-index encoding");
     }
-    _compressionCodec = actualCompressionCodec;
     _codecSpec = codecSpec == null ? null : CodecSpecParser.parse(codecSpec).toDslString();
     _deriveNumDocsPerChunk = Boolean.TRUE.equals(deriveNumDocsPerChunk);
     _rawIndexWriterVersion = rawIndexWriterVersion == null ? _defaultRawIndexWriterVersion : rawIndexWriterVersion;
@@ -178,6 +176,7 @@ public class ForwardIndexConfig extends IndexConfig {
     }
   }
 
+  @Nullable
   public static CompressionCodec getActualCompressionCodec(@Nullable CompressionCodec compressionCodec,
       @Nullable ChunkCompressionType chunkCompressionType, @Nullable DictIdCompressionType dictIdCompressionType) {
     if (compressionCodec != null) {
