@@ -36,14 +36,14 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// framing is what a stream actually carries.
 ///
 /// Because the body is ordinary text JSON, values follow exactly the same type contract as
-/// [TextJsonPayloadParser].
+/// [TextJsonPayloadParser], including `BigDecimal` for floating literals.
 class PostgresJsonbPayloadParser extends JacksonPayloadParser {
 
   /// The only version `jsonb_recv` accepts.
   private static final byte JSONB_VERSION = 1;
 
   PostgresJsonbPayloadParser() {
-    super(JsonUtils.DEFAULT_READER);
+    super(JsonUtils.READER_WITH_BIG_DECIMAL);
   }
 
   @Override
