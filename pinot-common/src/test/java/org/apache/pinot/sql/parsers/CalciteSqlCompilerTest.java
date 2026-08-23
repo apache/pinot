@@ -34,6 +34,7 @@ import org.apache.pinot.common.request.JoinType;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.ParseException;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
@@ -3324,6 +3325,19 @@ public class CalciteSqlCompilerTest {
     PinotQuery defaultCatalogQuery = compileToPinotQuery("SELECT count(*) FROM default.foo");
     Assert.assertEquals(randomCatalogQuery.getDataSource().getTableName(), "rand_catalog.foo");
     Assert.assertEquals(defaultCatalogQuery.getDataSource().getTableName(), "default.foo");
+  }
+
+  @Test
+  public void testQuotedTypedTableNameRoundTrip() {
+    List<String> tableNamesWithType = List.of(
+        "events_OFFLINE",
+        "analytics.events_REALTIME",
+        "db\"name.events\";DROP_TABLE--_OFFLINE");
+    for (String tableNameWithType : tableNamesWithType) {
+      PinotQuery pinotQuery = compileToPinotQuery(
+          "SELECT * FROM " + TableNameBuilder.quoteTableNameWithType(tableNameWithType));
+      Assert.assertEquals(pinotQuery.getDataSource().getTableName(), tableNameWithType);
+    }
   }
 
   @Test
