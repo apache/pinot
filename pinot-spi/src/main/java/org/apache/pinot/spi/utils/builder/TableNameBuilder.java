@@ -22,7 +22,7 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.spi.utils.SqlUtils;
 
 
 public class TableNameBuilder {
@@ -131,21 +131,21 @@ public class TableNameBuilder {
 
     int separatorIndex = tableNameWithType.indexOf('.');
     if (separatorIndex < 0) {
-      validateTableResourceName(tableNameWithType);
-      return StringUtil.quoteSqlIdentifier(tableNameWithType);
+      validateTableNameWithType(tableNameWithType);
+      return SqlUtils.quoteIdentifier(tableNameWithType);
     }
     if (separatorIndex == 0 || separatorIndex != tableNameWithType.lastIndexOf('.')) {
       throw new IllegalArgumentException("Invalid table name with type");
     }
 
-    String tableResourceName = tableNameWithType.substring(separatorIndex + 1);
-    validateTableResourceName(tableResourceName);
-    return StringUtil.quoteSqlIdentifier(tableNameWithType.substring(0, separatorIndex)) + "."
-        + StringUtil.quoteSqlIdentifier(tableResourceName);
+    String tableNameWithTypeWithoutDatabase = tableNameWithType.substring(separatorIndex + 1);
+    validateTableNameWithType(tableNameWithTypeWithoutDatabase);
+    return SqlUtils.quoteIdentifier(tableNameWithType.substring(0, separatorIndex)) + "."
+        + SqlUtils.quoteIdentifier(tableNameWithTypeWithoutDatabase);
   }
 
-  private static void validateTableResourceName(String tableResourceName) {
-    if (!isTableResource(tableResourceName)) {
+  private static void validateTableNameWithType(String tableNameWithType) {
+    if (!isTableResource(tableNameWithType)) {
       throw new IllegalArgumentException("Invalid table name with type");
     }
   }

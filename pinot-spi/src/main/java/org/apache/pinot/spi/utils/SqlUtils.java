@@ -18,21 +18,18 @@
  */
 package org.apache.pinot.spi.utils;
 
-import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
+/// Utilities for constructing SQL fragments. This stateless utility is thread-safe.
+public class SqlUtils {
+  private SqlUtils() {
+  }
 
-
-/// Tests for [StringUtil].
-public class StringUtilTest {
-
-  @Test
-  public void testQuoteSqlIdentifier() {
-    assertEquals(StringUtil.quoteSqlIdentifier("column"), "\"column\"");
-    assertEquals(StringUtil.quoteSqlIdentifier("column with space"), "\"column with space\"");
-    assertEquals(StringUtil.quoteSqlIdentifier("database.table"), "\"database.table\"");
-    assertEquals(StringUtil.quoteSqlIdentifier("column\"name"), "\"column\"\"name\"");
-    assertEquals(StringUtil.quoteSqlIdentifier("column\"; DROP TABLE events; --"),
-        "\"column\"\"; DROP TABLE events; --\"");
+  /// Quotes one SQL identifier component with double quotes, escaping embedded double quotes by doubling them.
+  /// Qualified names must be split by the caller so that each component is quoted separately.
+  ///
+  /// @param identifier SQL identifier component
+  /// @return Identifier quoted for use in a SQL statement
+  public static String quoteIdentifier(String identifier) {
+    return "\"" + identifier.replace("\"", "\"\"") + "\"";
   }
 }

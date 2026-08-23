@@ -36,15 +36,6 @@ public class StringUtil {
     return StringUtils.join(keys, separator);
   }
 
-  /// Quotes one SQL identifier component with double quotes, escaping embedded double quotes by doubling them.
-  /// Qualified names must be split by the caller so that each component is quoted separately.
-  ///
-  /// @param identifier SQL identifier component
-  /// @return Identifier quoted for use in a SQL statement
-  public static String quoteSqlIdentifier(String identifier) {
-    return "\"" + identifier.replace("\"", "\"\"") + "\"";
-  }
-
   /// Splits the given string with the separator, returns an array with the given max length. When max <= 0, no limit is
   /// applied.
   public static String[] split(String str, char separator, int max) {
