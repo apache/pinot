@@ -26,6 +26,12 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 
 
 /// Broadcast blocks to all receiving servers.
+///
+/// The same block instance is routed to every destination, and local (same-JVM) mailboxes deliver it by reference.
+/// This is safe because broadcast edges never carry aggregation intermediate results (those travel on the
+/// hash/singleton edge between the partial and the final aggregation), and downstream operators do not mutate cells
+/// of any other column type. See [SpoolBroadcastExchange] for the multi-stage (spool) fan-out, which does have to
+/// copy such blocks.
 class BroadcastExchange extends BlockExchange {
 
   protected BroadcastExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter) {

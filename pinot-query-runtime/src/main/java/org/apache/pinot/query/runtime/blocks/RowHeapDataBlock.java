@@ -18,13 +18,19 @@
  */
 package org.apache.pinot.query.runtime.blocks;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /// A block that contains data in row heap format.
@@ -100,6 +106,40 @@ public class RowHeapDataBlock implements MseBlock.Data {
   @Override
   public RowHeapDataBlock asRowHeap() {
     return this;
+  }
+
+  /// Returns a copy of this block that does not share any mutable cell values with this block.
+  ///
+  /// Cells of [OBJECT][ColumnDataType#OBJECT] columns hold aggregation intermediate results (e.g. priority queues or
+  /// sketches) that downstream operators mutate in place when merging them or extracting final results. This method
+  /// copies such cells by round-tripping them through the corresponding aggregation function's intermediate result
+  /// serde, which requires the aggregation functions to be attached to this block whenever a non-null OBJECT cell is
+  /// present (the same requirement [DataBlockBuilder] imposes to serialize such blocks). Cells of all other column
+  /// types are effectively immutable and are shared with the returned block.
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public RowHeapDataBlock copy() {
+    ColumnDataType[] storedTypes = _dataSchema.getStoredColumnDataTypes();
+    int numColumns = storedTypes.length;
+    List<Object[]> copiedRows = new ArrayList<>(_rows.size());
+    int numCellsProcessed = 0;
+    for (Object[] row : _rows) {
+      Object[] copiedRow = row.clone();
+      for (int colId = 0; colId < numColumns; colId++) {
+        Object value = copiedRow[colId];
+        if (value != null && storedTypes[colId] == ColumnDataType.OBJECT) {
+          Preconditions.checkState(_aggFunctions != null,
+              "Cannot copy OBJECT column: %s without aggregation functions", _dataSchema.getColumnName(colId));
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numCellsProcessed++, "RowHeapDataBlock#copy");
+          // NOTE: The first (numColumns - numAggFunctions) columns are key columns
+          AggregationFunction aggFunction = _aggFunctions[colId + _aggFunctions.length - numColumns];
+          AggregationFunction.SerializedIntermediateResult serialized = aggFunction.serializeIntermediateResult(value);
+          copiedRow[colId] = aggFunction.deserializeIntermediateResult(
+              new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes())));
+        }
+      }
+      copiedRows.add(copiedRow);
+    }
+    return new RowHeapDataBlock(copiedRows, _dataSchema, _aggFunctions);
   }
 
   @Override

@@ -21,12 +21,15 @@ package org.apache.pinot.integration.tests.custom;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import java.io.File;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.integration.tests.window.utils.WindowFunnelUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 @Test(suiteName = "CustomClusterIntegrationTest")
@@ -1073,6 +1076,75 @@ public class WindowFunnelTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(row.get(7).doubleValue(), 2.5);
     assertEquals(row.get(8).doubleValue(), 2.5);
     assertEquals(row.get(9).doubleValue(), 10.0);
+  }
+
+  /// Regression test for a spooled stage whose output contains funnel intermediate results (priority queues of step
+  /// events): the same stage (scan + partial funnelStepDurationStats aggregation) feeds two different consumer
+  /// stages. Without copying the blocks per receiver stage, the consumers on the same server share (and corrupt) the
+  /// same mutable priority queues when merging them or extracting final results.
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testFunnelStepDurationStatsGroupByQueriesWithSpools(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // The spooled partial aggregation runs in the leaf stage
+    checkSpooledFunnelStepDurationStats(String.format("FROM %s", getTableName()));
+    // The spooled partial aggregation runs in an intermediate stage, on top of a window function CTE
+    checkSpooledFunnelStepDurationStats(String.format(
+        "FROM (SELECT userId, timestampCol, url, ROW_NUMBER() OVER (PARTITION BY url ORDER BY timestampCol) AS occ "
+            + "FROM %s) WHERE occ >= 1", getTableName()));
+  }
+
+  private void checkSpooledFunnelStepDurationStats(String fromClause)
+      throws Exception {
+    String query =
+        "SET useSpools = true; "
+            + "WITH durationStats AS (SELECT "
+            + "userId, funnelStepDurationStats(timestampCol, '1000', 4, "
+            + "url = '/product/search', "
+            + "url = '/cart/add', "
+            + "url = '/checkout/start', "
+            + "url = '/checkout/confirmation', "
+            + "'durationFunctions=count,avg,median' "
+            + ") as stats "
+            + fromClause + " GROUP BY userId) "
+            + "SELECT * FROM "
+            + "(SELECT SUM(arrayElementAtDouble(stats, 1)) AS totalCount FROM durationStats) "
+            + "CROSS JOIN "
+            + "(SELECT AVG(arrayElementAtDouble(stats, 2)) AS avgAvgDuration FROM durationStats)";
+    JsonNode jsonNode = postQuery(query);
+    assertNoError(jsonNode);
+    assertSpooled(jsonNode);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 2);
+    assertEquals(row.get(0).doubleValue(), 40.0);
+    assertEquals(row.get(1).doubleValue(), 2.5);
+  }
+
+  /// Asserts the query actually used a spool: a spooled stage's stats subtree is rendered under each of its receiver
+  /// stages, so its MAILBOX_SEND stage id occurs more than once in the stage stats tree. Without a spool every stage
+  /// has a single parent and occurs exactly once. Guards the spool regression tests against planner changes that stop
+  /// deduplicating the shared subtree (which would make them pass vacuously).
+  private static void assertSpooled(JsonNode jsonNode) {
+    Map<Integer, Integer> sendStageCounts = new HashMap<>();
+    countMailboxSendStages(jsonNode.get("stageStats"), sendStageCounts);
+    assertTrue(sendStageCounts.values().stream().anyMatch(count -> count > 1),
+        "Expected a spooled stage (same MAILBOX_SEND stage under multiple parents), got stage counts: "
+            + sendStageCounts);
+  }
+
+  private static void countMailboxSendStages(JsonNode node, Map<Integer, Integer> sendStageCounts) {
+    if (node == null || (!node.isObject() && !node.isArray())) {
+      return;
+    }
+    if (node.isObject() && node.has("type") && "MAILBOX_SEND".equals(node.get("type").asText())
+        && node.has("stage")) {
+      sendStageCounts.merge(node.get("stage").asInt(), 1, Integer::sum);
+    }
+    for (JsonNode child : node) {
+      countMailboxSendStages(child, sendStageCounts);
+    }
   }
 
   @Override
