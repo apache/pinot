@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
@@ -256,16 +257,18 @@ public class SegmentPreProcessor implements AutoCloseable {
   }
 
   private boolean needProcessStarTrees() {
+    SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
+    List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
     // Check if there is need to create/modify/remove star-trees.
     if (!_indexLoadingConfig.isEnableDynamicStarTreeCreation()) {
-      return false;
+      // Star-trees left unreadable by a column encoding change are still removed, see processStarTrees().
+      return starTreeMetadataList != null && !StarTreeBuilderUtils.findUnloadableDimensions(starTreeMetadataList,
+          segmentMetadata).isEmpty();
     }
 
-    SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
     List<StarTreeV2BuilderConfig> starTreeBuilderConfigs =
         StarTreeBuilderUtils.generateBuilderConfigs(_indexLoadingConfig.getStarTreeIndexConfigs(),
             _indexLoadingConfig.isEnableDefaultStarTree(), segmentMetadata);
-    List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
     // There are existing star-trees, but if they match the builder configs exactly,
     // then there is no need to generate the star-trees
 
@@ -358,19 +361,35 @@ public class SegmentPreProcessor implements AutoCloseable {
   private boolean processStarTrees(File indexDir,
       @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet)
       throws Exception {
-    if (!_indexLoadingConfig.isEnableDynamicStarTreeCreation()) {
-      return false;
-    }
-
     SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
     String segmentName = segmentMetadata.getName();
+    List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
+
+    if (!_indexLoadingConfig.isEnableDynamicStarTreeCreation()) {
+      // A star-tree whose dimension column is no longer dictionary-encoded (e.g. because the column was added to
+      // 'noDictionaryColumns' and re-encoded by the forward index handler above) cannot be read, and fails the whole
+      // segment load. Drop it even here: removing star-trees only deletes files, so unlike rebuilding them it is
+      // cheap enough to do with dynamic star-tree creation disabled. When it is enabled the star-trees are rebuilt by
+      // the regular flow below, because their split order no longer matches the builder configs.
+      Set<String> unloadableDimensions =
+          starTreeMetadataList != null ? StarTreeBuilderUtils.findUnloadableDimensions(starTreeMetadataList,
+              segmentMetadata) : Set.of();
+      if (unloadableDimensions.isEmpty()) {
+        return false;
+      }
+      LOGGER.warn("Removing star-trees from segment: {} because dimension columns: {} are no longer "
+              + "dictionary-encoded. Enable dynamic star-tree creation to have them rebuilt", segmentName,
+          unloadableDimensions);
+      StarTreeBuilderUtils.removeStarTrees(indexDir);
+      return true;
+    }
+
     List<StarTreeV2BuilderConfig> starTreeBuilderConfigs =
         StarTreeBuilderUtils.generateBuilderConfigs(_indexLoadingConfig.getStarTreeIndexConfigs(),
             _indexLoadingConfig.isEnableDefaultStarTree(), segmentMetadata);
 
     boolean shouldGenerateStarTree = !starTreeBuilderConfigs.isEmpty();
     boolean shouldRemoveStarTree = false;
-    List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
     if (starTreeMetadataList != null) {
       // There are existing star-trees
       if (!shouldGenerateStarTree) {
