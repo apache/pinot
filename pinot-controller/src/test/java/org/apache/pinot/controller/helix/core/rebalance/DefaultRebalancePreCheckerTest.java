@@ -176,6 +176,30 @@ public class DefaultRebalancePreCheckerTest {
         THRESHOLD);
   }
 
+  /// `lowDiskMode` is not a blanket guarantee: when the rebalance cannot progress at all within the disk the servers
+  /// start with, it goes over rather than stalling. The pre-check replays the rebalance to find that out instead of
+  /// assuming `lowDiskMode` always avoids the transient usage. No reachable rebalance has been found that trips it -
+  /// see `DefaultRebalancePreChecker#getServersForcedOverDiskBudget` - so the replay is stubbed out here to cover the
+  /// reporting.
+  @Test
+  public void testOverThresholdDuringRebalanceIsAnErrorWhenLowDiskModeCannotAvoidIt() {
+    setDiskUsage(100L, 320L);
+    DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker() {
+      @Override
+      protected Map<String, Long> getServersForcedOverDiskBudget(PreCheckContext preCheckContext) {
+        return Map.of(SERVER_1, 150L);
+      }
+    };
+    RebalancePreCheckerResult result = preChecker.checkDiskUtilization(
+        getPreCheckContext(lowDiskMode(), CURRENT_ASSIGNMENT, TARGET_ASSIGNMENT), THRESHOLD);
+    assertEquals(result.getPreCheckStatus(), PreCheckStatus.ERROR);
+    assertEquals(result.getMessage(),
+        "UNSAFE. Servers with unsafe disk utilization DURING rebalance (>=50%): " + SERVER_1 + " (52%). lowDiskMode "
+            + "cannot avoid it for this target assignment: the rebalance cannot make progress without going over the "
+            + "disk these servers start with, by up to " + SERVER_1 + " (150B). Rebalance to a target assignment that "
+            + "frees up space on them first, or add capacity");
+  }
+
   private static RebalanceConfig lowDiskMode() {
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setLowDiskMode(true);

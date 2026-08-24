@@ -29,9 +29,11 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.util.TableSizeReader;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -202,6 +204,316 @@ public class LowDiskModeRebalanceSimulatorTest {
     assertFalse(result.hasSteadyStateViolation(), "no server may hold more than max(initial, target)");
     assertFalse(result.hasInStepViolation(), "no server may exceed max(initial, target) mid-step either");
     assertTrue(result.relaxedSteps().isEmpty(), "the budget should not have to be relaxed for this shape");
+  }
+
+  /// Exercises the escape hatch: when nothing can move within the budget, the rebalance relaxes it for a step rather
+  /// than stalling, and the replay the pre-check uses reports exactly the servers that go over.
+  ///
+  /// hostA and hostB both start at their ceiling and each has to take on a segment from the other, while the segments
+  /// that would free up their space cannot move at all - single replica, single target instance, so no addition is
+  /// ever attempted for them and `minAvailableReplicas = 1` forbids dropping the only replica.
+  ///
+  /// NOTE: this is not a state a real rebalance reaches. `TableRebalancer#getMinAvailableReplicas` rejects
+  /// `minAvailableReplicas = 1` when a segment being moved has a single target replica, so a rebalance would fail on
+  /// the config before getting here. It is kept because it is the only known way to drive the relaxation, and it
+  /// pins down what the replay reports when it happens.
+  @Test
+  public void testRelaxingTheBudgetIsReportedByTheReplay() {
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    // Each needs a second replica on the other host, which is already at its ceiling
+    currentAssignment.put("needsReplicaOnB", instanceStateMap("hostA"));
+    currentAssignment.put("needsReplicaOnA", instanceStateMap("hostB"));
+    // These would free up the space, but cannot be moved while keeping 1 replica available
+    currentAssignment.put("stuckOnA", instanceStateMap("hostA"));
+    currentAssignment.put("stuckOnB", instanceStateMap("hostB"));
+
+    Map<String, Map<String, String>> targetAssignment = new TreeMap<>();
+    targetAssignment.put("needsReplicaOnB", instanceStateMap("hostA", "hostB"));
+    targetAssignment.put("needsReplicaOnA", instanceStateMap("hostB", "hostA"));
+    targetAssignment.put("stuckOnA", instanceStateMap("hostC"));
+    targetAssignment.put("stuckOnB", instanceStateMap("hostC"));
+
+    SimResult result = simulate(new Scenario("Cannot stay within the disk each server starts with", currentAssignment,
+        targetAssignment, 1, false, RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER));
+    System.out.println(result.report());
+    // hostA and hostB each start with 2 segments and the target places 2 on them, so neither may ever hold 3
+    assertTrue(result.hasSteadyStateViolation(), "expected the rebalance to be forced over the bound");
+    assertEquals(result._maxAfter.get("hostA"), (Long) 3L);
+    assertEquals(result._maxAfter.get("hostB"), (Long) 3L);
+
+    // The pre-check must report exactly those two servers, before anything is moved
+    Map<String, Long> reported = TableRebalancer.getServersForcedOverDiskBudget(currentAssignment, targetAssignment, 1,
+        false, RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, null, LoggerFactory.getLogger(getClass()));
+    System.out.println("Pre-check reports servers forced over their disk budget: " + reported);
+    assertEquals(reported, Map.of("hostA", 1L, "hostB", 1L));
+  }
+
+  private static Map<String, String> instanceStateMap(String... instances) {
+    return SegmentAssignmentUtils.getInstanceStateMap(List.of(instances), ONLINE);
+  }
+
+  /// A strict replica group rebalance that the disk budget genuinely cannot carry out, found by
+  /// [#testStrictReplicaGroupRandomGroupStructureSearch] and pinned here so it stays covered.
+  ///
+  /// At the blocking step `host02` has 318 MiB free under its own ceiling, but the group it has to take on is 6
+  /// segments totalling roughly 1.2 GiB and strict replica group routing requires all of them to move together, so it
+  /// does not fit. Every other movable group is blocked the same way, so the rebalance relaxes the budget rather than
+  /// stalling and `host02` ends up 36% over the disk it started with. Positive-but-insufficient headroom is what makes
+  /// this reachable in strict mode and not in the per-segment case.
+  @Test
+  public void testStrictReplicaGroupCanBeForcedOverTheDiskBudget() {
+    Map<String, Map<String, String>> current = new TreeMap<>();
+    Map<String, Map<String, String>> target = new TreeMap<>();
+    Map<String, Long> sizes = new TreeMap<>();
+    current.put("segment000", instanceStateMap("host02", "host07"));
+    current.put("segment001", instanceStateMap("host02", "host07"));
+    current.put("segment002", instanceStateMap("host02", "host07"));
+    current.put("segment003", instanceStateMap("host00", "host01"));
+    current.put("segment004", instanceStateMap("host00", "host01"));
+    current.put("segment005", instanceStateMap("host00", "host01"));
+    current.put("segment006", instanceStateMap("host00", "host01"));
+    current.put("segment007", instanceStateMap("host00", "host01"));
+    current.put("segment008", instanceStateMap("host04"));
+    current.put("segment009", instanceStateMap("host04"));
+    current.put("segment010", instanceStateMap("host04"));
+    current.put("segment011", instanceStateMap("host04"));
+    current.put("segment012", instanceStateMap("host04"));
+    current.put("segment013", instanceStateMap("host04"));
+    current.put("segment014", instanceStateMap("host04", "host05"));
+    current.put("segment015", instanceStateMap("host04", "host05"));
+    current.put("segment016", instanceStateMap("host04", "host05"));
+    current.put("segment017", instanceStateMap("host04", "host05"));
+    current.put("segment018", instanceStateMap("host04", "host05"));
+    current.put("segment019", instanceStateMap("host04", "host05"));
+    target.put("segment000", instanceStateMap("host00", "host01"));
+    target.put("segment001", instanceStateMap("host00", "host01"));
+    target.put("segment002", instanceStateMap("host00", "host01"));
+    target.put("segment003", instanceStateMap("host02", "host04"));
+    target.put("segment004", instanceStateMap("host02", "host04"));
+    target.put("segment005", instanceStateMap("host02", "host04"));
+    target.put("segment006", instanceStateMap("host02", "host04"));
+    target.put("segment007", instanceStateMap("host02", "host04"));
+    target.put("segment008", instanceStateMap("host00", "host06"));
+    target.put("segment009", instanceStateMap("host00", "host06"));
+    target.put("segment010", instanceStateMap("host00", "host06"));
+    target.put("segment011", instanceStateMap("host00", "host06"));
+    target.put("segment012", instanceStateMap("host00", "host06"));
+    target.put("segment013", instanceStateMap("host00", "host06"));
+    target.put("segment014", instanceStateMap("host00", "host02"));
+    target.put("segment015", instanceStateMap("host00", "host02"));
+    target.put("segment016", instanceStateMap("host00", "host02"));
+    target.put("segment017", instanceStateMap("host00", "host02"));
+    target.put("segment018", instanceStateMap("host00", "host02"));
+    target.put("segment019", instanceStateMap("host00", "host02"));
+    sizes.put("segment000", 1152385024L);
+    sizes.put("segment001", 8388608L);
+    sizes.put("segment002", 1190133760L);
+    sizes.put("segment003", 368050176L);
+    sizes.put("segment004", 28311552L);
+    sizes.put("segment005", 24117248L);
+    sizes.put("segment006", 938475520L);
+    sizes.put("segment007", 12582912L);
+    sizes.put("segment008", 8388608L);
+    sizes.put("segment009", 9437184L);
+    sizes.put("segment010", 20971520L);
+    sizes.put("segment011", 14680064L);
+    sizes.put("segment012", 31457280L);
+    sizes.put("segment013", 14680064L);
+    sizes.put("segment014", 24117248L);
+    sizes.put("segment015", 1207959552L);
+    sizes.put("segment016", 27262976L);
+    sizes.put("segment017", 16777216L);
+    sizes.put("segment018", 17825792L);
+    sizes.put("segment019", 18874368L);
+
+    // The config the rebalance would actually run with, so this is a state a real rebalance can be asked to carry out
+    assertEquals(TableRebalancer.getMinAvailableReplicas(current, target,
+        SegmentAssignmentUtils.getSegmentsToMove(current, target), 1, LoggerFactory.getLogger(getClass())), 1);
+
+    SimResult result = simulate(new Scenario("Strict replica group forced over the disk budget", current, target, 1,
+        true, RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, sizes));
+    System.out.println(result.report());
+    assertTrue(result.hasSteadyStateViolation(), "expected the budget to be relaxed and a server to go over");
+    assertEquals(result._groupSplits, Set.of(), "groups must still be moved together");
+
+    // The pre-check has to report it, before anything is moved
+    Map<String, Long> reported = TableRebalancer.getServersForcedOverDiskBudget(current, target, 1, true,
+        RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, toTableSizeDetails(sizes),
+        LoggerFactory.getLogger(getClass()));
+    System.out.println("Pre-check reports servers forced over their disk budget: " + reported);
+    assertTrue(reported.containsKey("host02"), "expected host02 to be reported, got " + reported);
+  }
+
+  /// The argument that the disk budget can never be the only thing blocking a step does not carry over to strict
+  /// replica group routing: there a whole group of segments has to move at once, so a group can be blocked while the
+  /// server it would move to still has room, which cannot happen when segments are charged one at a time. The sweeps
+  /// above only build groups by round robin, which makes them regular and equally sized, so they say little about it.
+  ///
+  /// Searches randomized group structures - random current and target instance sets, groups of differing sizes,
+  /// segments sitting at differing replica counts, skewed segment sizes - for a strict replica group rebalance the
+  /// budget cannot carry out.
+  @Test
+  public void testStrictReplicaGroupRandomGroupStructureSearch() {
+    Random random = new Random(101);
+    List<SimResult> relaxed = new ArrayList<>();
+    List<SimResult> violations = new ArrayList<>();
+    List<String> splits = new ArrayList<>();
+    List<SimResult> all = new ArrayList<>();
+    int numSkippedAsIllegal = 0;
+    for (int trial = 0; trial < 3000; trial++) {
+      int numServers = 3 + random.nextInt(6);
+      int replication = 2 + random.nextInt(2);
+      int numGroups = 2 + random.nextInt(5);
+      List<String> allServers = servers(0, numServers);
+      Map<String, Map<String, String>> current = new TreeMap<>();
+      Map<String, Map<String, String>> target = new TreeMap<>();
+      int segmentId = 0;
+      for (int group = 0; group < numGroups; group++) {
+        // Segments of a group share one current instance set and one target instance set. Let the current set be
+        // smaller than the replication so that groups part way through a move are covered too.
+        List<String> currentInstances = pickServers(allServers, 1 + random.nextInt(replication), random);
+        List<String> targetInstances = pickServers(allServers, replication, random);
+        int numSegmentsInGroup = 1 + random.nextInt(6);
+        for (int i = 0; i < numSegmentsInGroup; i++) {
+          String segment = String.format("segment%03d", segmentId++);
+          current.put(segment, SegmentAssignmentUtils.getInstanceStateMap(currentInstances, ONLINE));
+          target.put(segment, SegmentAssignmentUtils.getInstanceStateMap(targetInstances, ONLINE));
+        }
+      }
+      // Only run what the rebalance itself would accept
+      if (TableRebalancer.getMinAvailableReplicas(current, target,
+          SegmentAssignmentUtils.getSegmentsToMove(current, target), 1, LoggerFactory.getLogger(getClass()))
+          != 1) {
+        numSkippedAsIllegal++;
+        continue;
+      }
+      String name = String.format("trial %d: servers=%d replication=%d groups=%d segments=%d", trial, numServers,
+          replication, numGroups, current.size());
+      SimResult result = simulate(new Scenario(name, current, target, 1, true,
+          RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, skewedSizes(current.keySet(), random)));
+      all.add(result);
+      if (!result.relaxedSteps().isEmpty()) {
+        relaxed.add(result);
+      }
+      if (result.hasSteadyStateViolation()) {
+        violations.add(result);
+      }
+      result._groupSplits.forEach(split -> splits.add(name + " | " + split));
+    }
+    violations.sort((a, b) -> Double.compare(b.worstAmplification(), a.worstAmplification()));
+    System.out.println();
+    System.out.println(summarize("Strict replica group random group structures", all, violations));
+    System.out.printf("  skipped as illegal minAvailableReplicas: %d%n", numSkippedAsIllegal);
+    if (!relaxed.isEmpty()) {
+      System.out.printf("%nFOUND %d scenarios where the budget had to be relaxed. Worst:%n", relaxed.size());
+      SimResult worst = violations.isEmpty() ? relaxed.get(0) : violations.get(0);
+      System.out.println(worst.report());
+      dumpScenario(worst._scenario);
+    }
+    assertEquals(splits, List.of(), "strict replica group requires every group of segments to be moved together");
+  }
+
+  /// Prints a scenario as Java source, so a case found by the random search can be pinned as a fixed test.
+  private static void dumpScenario(Scenario scenario) {
+    System.out.println("---- scenario as source ----");
+    scenario._currentAssignment.forEach((segment, instanceStateMap) -> System.out.printf(
+        "    current.put(\"%s\", instanceStateMap(%s));%n", segment,
+        instanceStateMap.keySet().stream().map(i -> '"' + i + '"').collect(Collectors.joining(", "))));
+    scenario._targetAssignment.forEach((segment, instanceStateMap) -> System.out.printf(
+        "    target.put(\"%s\", instanceStateMap(%s));%n", segment,
+        instanceStateMap.keySet().stream().map(i -> '"' + i + '"').collect(Collectors.joining(", "))));
+    scenario._segmentSizeBytes.forEach(
+        (segment, sizeBytes) -> System.out.printf("    sizes.put(\"%s\", %dL);%n", segment, sizeBytes));
+    System.out.println("---- end ----");
+  }
+
+  /// Picks `count` distinct servers at random, in a stable order so the assignment is deterministic per seed.
+  private static List<String> pickServers(List<String> allServers, int count, Random random) {
+    List<String> shuffled = new ArrayList<>(allServers);
+    for (int i = shuffled.size() - 1; i > 0; i--) {
+      int j = random.nextInt(i + 1);
+      shuffled.set(i, shuffled.set(j, shuffled.get(i)));
+    }
+    List<String> picked = new ArrayList<>(shuffled.subList(0, Math.min(count, shuffled.size())));
+    picked.sort(null);
+    return picked;
+  }
+
+  /// Sweeps the grid with `batchSizePerServer` set, which is the combination the sweeps above do not cover: batching
+  /// can defer a partition for reasons of its own, and the disk budget can defer the rest, so between them a step can
+  /// end up making no progress at all.
+  @Test
+  public void testSweepWithBatchSizePerServer() {
+    Random random = new Random(31);
+    List<SimResult> violations = new ArrayList<>();
+    List<SimResult> all = new ArrayList<>();
+    for (int numOldServers = 3; numOldServers <= 7; numOldServers++) {
+      for (int shift = 1; shift < numOldServers; shift++) {
+        for (int replication = 2; replication <= 3; replication++) {
+          for (int batchSizePerServer : List.of(1, 2, 5)) {
+            for (boolean enableStrictReplicaGroup : List.of(false, true)) {
+              int numSegments = 12 * replication;
+              List<String> oldServers = servers(0, numOldServers);
+              List<String> newServers = servers(shift, numOldServers);
+              Map<String, Map<String, String>> current = roundRobin(numSegments, replication, oldServers, 0);
+              String name = String.format("old=%d shift=%d replication=%d batchSizePerServer=%d strict=%s",
+                  numOldServers, shift, replication, batchSizePerServer, enableStrictReplicaGroup);
+              all.add(simulate(new Scenario(name, current, roundRobin(numSegments, replication, newServers, 0), 1,
+                  enableStrictReplicaGroup, batchSizePerServer, skewedSizes(current.keySet(), random))));
+            }
+          }
+        }
+      }
+    }
+    List<String> splits = new ArrayList<>();
+    for (SimResult result : all) {
+      if (result.hasSteadyStateViolation()) {
+        violations.add(result);
+      }
+      result._groupSplits.forEach(split -> splits.add(result._scenario._name + " | " + split));
+    }
+    violations.sort((a, b) -> Double.compare(b.worstAmplification(), a.worstAmplification()));
+    System.out.println();
+    System.out.println(summarize("Sweep with batchSizePerServer and skewed sizes", all, violations));
+    for (SimResult result : violations.subList(0, Math.min(5, violations.size()))) {
+      System.out.println(result.report());
+    }
+    assertEquals(splits, List.of(), "strict replica group requires every group of segments to be moved together");
+  }
+
+  /// The pre-check replay must agree with what the rebalance actually does: for every scenario, the servers it
+  /// reports as forced over their disk have to be exactly the ones the simulation observes going over.
+  @Test
+  public void testDiskBudgetReplayMatchesTheRebalance() {
+    Random random = new Random(23);
+    int numChecked = 0;
+    for (int numOldServers = 3; numOldServers <= 7; numOldServers++) {
+      for (int shift = 1; shift < numOldServers; shift++) {
+        for (int replication = 2; replication <= 3; replication++) {
+          for (boolean enableStrictReplicaGroup : List.of(false, true)) {
+            int numSegments = 12 * replication;
+            List<String> oldServers = servers(0, numOldServers);
+            List<String> newServers = servers(shift, numOldServers);
+            Map<String, Map<String, String>> current = roundRobin(numSegments, replication, oldServers, 0);
+            Map<String, Map<String, String>> target = roundRobin(numSegments, replication, newServers, 0);
+            Map<String, Long> segmentSizeBytes = skewedSizes(current.keySet(), random);
+            String name = String.format("old=%d new=%d replication=%d strict=%s", numOldServers, numOldServers,
+                replication, enableStrictReplicaGroup);
+            SimResult result = simulate(new Scenario(name, current, target, 1, enableStrictReplicaGroup,
+                RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, segmentSizeBytes));
+
+            Map<String, Long> reported = TableRebalancer.getServersForcedOverDiskBudget(current, target, 1,
+                enableStrictReplicaGroup, RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER,
+                toTableSizeDetails(segmentSizeBytes), LoggerFactory.getLogger(getClass()));
+            Set<String> observed = new TreeSet<>();
+            result.relaxedSteps().forEach(step -> observed.addAll(step._deferralRelaxedFor));
+            assertEquals(reported.keySet(), observed, name + ": pre-check replay disagrees with the rebalance");
+            numChecked++;
+          }
+        }
+      }
+    }
+    System.out.printf("%nDisk budget replay agreed with the rebalance on all %d scenarios%n%n", numChecked);
   }
 
   /// Sweeps a grid of overlapping old/new server sets and reports the worst amplification found, so the blast

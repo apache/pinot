@@ -17,6 +17,7 @@
  * under the License.
  */
 package org.apache.pinot.controller.helix.core.rebalance;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
@@ -36,12 +38,14 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.ResourceUtilizationInfo;
+import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
+import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
@@ -329,8 +333,60 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     }
     String serversGoingOver = " Servers that would go over it DURING the rebalance: " + String.join(", ",
         serversUnsafeDuringRebalance) + ".";
+    // lowDiskMode bounds the disk each server takes on to what it starts the rebalance with, but when the rebalance
+    // cannot progress at all within those bounds it relaxes them for a step rather than stalling. Replay the rebalance
+    // to find out whether it has to, instead of assuming lowDiskMode always avoids the transient usage
+    Map<String, Long> serversForcedOverBudget = getServersForcedOverDiskBudget(preCheckContext);
+    if (!serversForcedOverBudget.isEmpty()) {
+      return RebalancePreCheckerResult.error(
+          getUnsafeDiskUtilizationMessage("DURING rebalance", serversUnsafeDuringRebalance, threshold)
+              + ". lowDiskMode cannot avoid it for this target assignment: the rebalance cannot make progress without "
+              + "going over the disk these servers start with, by up to " + formatBytesOverBudget(
+              serversForcedOverBudget) + ". Rebalance to a target assignment that frees up space on them first, or "
+              + "add capacity");
+    }
     return RebalancePreCheckerResult.pass(withinThreshold + " AFTER rebalance." + serversGoingOver + " lowDiskMode "
         + "avoids that transient disk usage by deleting segments before adding the new ones");
+  }
+
+  /// Replays the rebalance to find the servers that lowDiskMode cannot keep within the disk they start with. Returns
+  /// an empty map when the replay cannot be run, so that a missing input never turns into a failed pre-check.
+  ///
+  /// No reachable rebalance has been found that ends up here with a non-empty result: at the first step a server is
+  /// only at its ceiling when the target assignment places no more on it than it already hosts, and a rebalance that
+  /// stalls needs every segment to be waiting to gain a replica, which means the target places more in total than the
+  /// current assignment does, so at least one server has room. This is kept as a guard rather than as an assertion
+  /// because the argument does not cover every later step, and going over a server's disk silently is worse than
+  /// reporting a rebalance as unsafe.
+  @VisibleForTesting
+  protected Map<String, Long> getServersForcedOverDiskBudget(PreCheckContext preCheckContext) {
+    Map<String, Map<String, String>> currentAssignment = preCheckContext.getCurrentAssignment();
+    Map<String, Map<String, String>> targetAssignment = preCheckContext.getTargetAssignment();
+    TableConfig tableConfig = preCheckContext.getTableConfig();
+    RebalanceConfig rebalanceConfig = preCheckContext.getRebalanceConfig();
+    Logger tableRebalanceLogger = LoggerFactory.getLogger(getClass().getSimpleName() + '-'
+        + preCheckContext.getTableNameWithType() + '-' + preCheckContext.getRebalanceJobId());
+    List<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
+    int minAvailableReplicas = TableRebalancer.getMinAvailableReplicas(currentAssignment, targetAssignment,
+        segmentsToMove, rebalanceConfig.getMinAvailableReplicas(), tableRebalanceLogger);
+    if (minAvailableReplicas == TableRebalancer.ILLEGAL_MIN_AVAILABLE_REPLICAS) {
+      // The rebalance is going to fail on the config before it moves anything
+      return Map.of();
+    }
+    boolean enableStrictReplicaGroup = tableConfig.getRoutingConfig() != null
+        && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
+        tableConfig.getRoutingConfig().getInstanceSelectorType());
+    return TableRebalancer.getServersForcedOverDiskBudget(currentAssignment, targetAssignment, minAvailableReplicas,
+        enableStrictReplicaGroup, rebalanceConfig.getBatchSizePerServer(),
+        preCheckContext.getTableSubTypeSizeDetails(), tableRebalanceLogger);
+  }
+
+  /// Renders the servers and how far over their disk they would be pushed, largest first.
+  private static String formatBytesOverBudget(Map<String, Long> serverToBytesOverBudget) {
+    return serverToBytesOverBudget.entrySet().stream()
+        .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+        .map(entry -> entry.getKey() + " (" + DataSizeUtils.fromBytes(entry.getValue()) + ")")
+        .collect(Collectors.joining(", "));
   }
 
   private static void addIfOverThreshold(List<String> servers, String server, double utilizationRatio,
