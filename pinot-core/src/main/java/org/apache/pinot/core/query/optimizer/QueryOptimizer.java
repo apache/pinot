@@ -22,6 +22,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.core.query.optimizer.filter.DistributeConjunctsIntoOrFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.FilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.FlattenAndOrFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.IdenticalPredicateFilterOptimizer;
@@ -42,10 +43,13 @@ public class QueryOptimizer {
   //   be merged
   // - TimePredicateFilterOptimizer and MergeRangeFilterOptimizer relies on NumericalFilterOptimizer to convert the
   //   values to the proper format so that they can be properly parsed
+  // - DistributeConjunctsIntoOrFilterOptimizer must run after the merge optimizers so that the merges see the
+  //   original AND/OR structure before EQ/IN conjuncts are distributed into OR branches
   private static final List<FilterOptimizer> FILTER_OPTIMIZERS =
       List.of(new FlattenAndOrFilterOptimizer(), new IdenticalPredicateFilterOptimizer(),
           new MergeEqInFilterOptimizer(), new NumericalFilterOptimizer(), new TimePredicateFilterOptimizer(),
-          new MergeRangeFilterOptimizer(), new TextMatchFilterOptimizer());
+          new MergeRangeFilterOptimizer(), new TextMatchFilterOptimizer(),
+          new DistributeConjunctsIntoOrFilterOptimizer());
 
   private static final List<StatementOptimizer> STATEMENT_OPTIMIZERS =
       List.of(new AggregateFunctionRewriteOptimizer());
