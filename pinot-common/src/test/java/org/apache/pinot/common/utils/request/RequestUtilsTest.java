@@ -122,13 +122,9 @@ public class RequestUtilsTest {
 
     Expression expression = CalciteSqlParser.compileToPinotQuery(
         "SELECT ARRAY[X'00', X'DEADBEEF'] FROM myTable").getSelectList().get(0);
-
-    // Keep the ordinary single-stage query wire compatible with servers whose Literal union predates field 17.
-    assertTrue(expression.isSetFunctionCall());
-    List<Expression> operands = expression.getFunctionCall().getOperands();
-    assertEquals(operands.size(), 2);
-    assertEquals(operands.get(0).getLiteral().getBinaryValue(), expected[0]);
-    assertEquals(operands.get(1).getLiteral().getBinaryValue(), expected[1]);
+    assertTrue(expression.isSetLiteral());
+    assertTrue(expression.getLiteral().isSetBytesArrayValue());
+    assertEquals(RequestUtils.getBytesArrayValue(expression.getLiteral()), expected);
 
     expression = CalciteSqlParser.compileToPinotQuery(
         "SELECT ARRAYS_OVERLAP(ARRAY[X'00', X'0102'], ARRAY[X'03', X'0102'])").getSelectList().get(0);

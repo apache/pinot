@@ -96,8 +96,6 @@ union Literal {
   14: optional list<i32> floatArrayValue;
   15: optional list<double> doubleArrayValue;
   16: optional list<string> stringArrayValue;
-  // Older Literal readers skip field 17 and leave the union unset. The single-stage SQL planner therefore preserves
-  // BYTES_ARRAY constructors as scalar binaryValue operands until the broker can negotiate server capabilities.
   17: optional list<binary> bytesArrayValue;
 }
 

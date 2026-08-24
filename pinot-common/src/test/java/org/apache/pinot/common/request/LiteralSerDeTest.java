@@ -27,24 +27,16 @@ import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TCompactProtocol;
-import org.apache.thrift.protocol.TField;
-import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.protocol.TProtocolFactory;
-import org.apache.thrift.protocol.TProtocolUtil;
-import org.apache.thrift.protocol.TType;
-import org.apache.thrift.transport.TMemoryInputTransport;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/// Verifies the wire representation and compatibility boundary of Thrift literals.
+/// Verifies Thrift literal conversion and wire serialization.
 public class LiteralSerDeTest {
   private static final short BYTES_ARRAY_FIELD_ID = 17;
-  private static final short LEGACY_MAX_FIELD_ID = 16;
 
   @Test
   public void testBytesArrayRoundTrip()
@@ -65,6 +57,7 @@ public class LiteralSerDeTest {
 
         Literal literal = deserialized.getSelectList().get(0).getLiteral();
         assertTrue(literal.isSetBytesArrayValue());
+        assertEquals(literal.getSetField().getThriftFieldId(), BYTES_ARRAY_FIELD_ID);
         assertEquals(RequestUtils.getBytesArrayValue(literal), expected);
       }
     }
@@ -97,47 +90,21 @@ public class LiteralSerDeTest {
   }
 
   @Test
-  public void testNativeBytesArrayArmRequiresUpgradedReader()
-      throws TException {
-    Literal literal = RequestUtils.getLiteral(new byte[][]{{0}, {1, 2}});
-    byte[] serialized = new TSerializer(new TCompactProtocol.Factory()).serialize(literal);
-
-    TProtocol protocol = new TCompactProtocol(new TMemoryInputTransport(serialized));
-    protocol.readStructBegin();
-    TField field = protocol.readFieldBegin();
-    assertEquals(field.id, BYTES_ARRAY_FIELD_ID);
-    assertEquals(field.type, TType.LIST);
-
-    // This mirrors the pre-field-17 generated union reader: unknown fields are skipped and no union arm is selected.
-    Short legacySetField = null;
-    if (field.id <= LEGACY_MAX_FIELD_ID) {
-      legacySetField = field.id;
-    }
-    assertFalse(field.id <= LEGACY_MAX_FIELD_ID);
-    TProtocolUtil.skip(protocol, field.type);
-    protocol.readFieldEnd();
-    assertEquals(protocol.readFieldBegin().type, TType.STOP);
-    protocol.readStructEnd();
-    assertNull(legacySetField);
-  }
-
-  @Test
-  public void testSingleStageQueryUsesLegacyCompatibleLiteralArms()
+  public void testSingleStageQueryUsesNativeBytesArrayLiteral()
       throws TException {
     for (String sql : List.of("SELECT ARRAY[X'00', X'0102'] FROM myTable",
         "SELECT id FROM myTable WHERE ARRAYS_OVERLAP(bytesMV, ARRAY[X'01'])",
         "SELECT ARRAY[X'02'], COUNT(*) FROM myTable GROUP BY ARRAY[X'02']",
         "SELECT COUNT(*) FROM myTable HAVING ARRAYS_OVERLAP(ARRAYAGG(bytesColumn, 'BYTES'), ARRAY[X'03'])",
         "SELECT id FROM myTable "
-            + "ORDER BY CASE WHEN ARRAYS_OVERLAP(bytesMV, ARRAY[X'04']) THEN 1 ELSE 0 END",
-        "SELECT ARRAY_LENGTH(ARRAY[X'05', X'0607']) FROM myTable")) {
+            + "ORDER BY CASE WHEN ARRAYS_OVERLAP(bytesMV, ARRAY[X'04']) THEN 1 ELSE 0 END")) {
       PinotQuery query = CalciteSqlParser.compileToPinotQuery(sql);
-      assertUsesOnlyLegacyLiteralArms(query);
+      assertTrue(containsBytesArrayLiteral(query));
 
       byte[] serialized = new TSerializer(new TCompactProtocol.Factory()).serialize(query);
       PinotQuery deserialized = new PinotQuery();
       new TDeserializer(new TCompactProtocol.Factory()).deserialize(deserialized, serialized);
-      assertUsesOnlyLegacyLiteralArms(deserialized);
+      assertTrue(containsBytesArrayLiteral(deserialized));
     }
 
     PinotQuery nested = CalciteSqlParser.compileToPinotQuery(
@@ -157,35 +124,45 @@ public class LiteralSerDeTest {
     }
   }
 
-  private static void assertUsesOnlyLegacyLiteralArms(Expression expression) {
+  private static boolean containsBytesArrayLiteral(Expression expression) {
     if (expression.isSetLiteral()) {
-      assertTrue(expression.getLiteral().getSetField().getThriftFieldId() <= LEGACY_MAX_FIELD_ID);
+      return expression.getLiteral().isSetBytesArrayValue();
     } else if (expression.isSetFunctionCall()) {
       for (Expression operand : expression.getFunctionCall().getOperands()) {
-        assertUsesOnlyLegacyLiteralArms(operand);
+        if (containsBytesArrayLiteral(operand)) {
+          return true;
+        }
       }
     }
+    return false;
   }
 
-  private static void assertUsesOnlyLegacyLiteralArms(PinotQuery query) {
+  private static boolean containsBytesArrayLiteral(PinotQuery query) {
     for (Expression expression : query.getSelectList()) {
-      assertUsesOnlyLegacyLiteralArms(expression);
+      if (containsBytesArrayLiteral(expression)) {
+        return true;
+      }
     }
-    if (query.isSetFilterExpression()) {
-      assertUsesOnlyLegacyLiteralArms(query.getFilterExpression());
+    if (query.isSetFilterExpression() && containsBytesArrayLiteral(query.getFilterExpression())) {
+      return true;
     }
     if (query.isSetGroupByList()) {
       for (Expression expression : query.getGroupByList()) {
-        assertUsesOnlyLegacyLiteralArms(expression);
+        if (containsBytesArrayLiteral(expression)) {
+          return true;
+        }
       }
     }
-    if (query.isSetHavingExpression()) {
-      assertUsesOnlyLegacyLiteralArms(query.getHavingExpression());
+    if (query.isSetHavingExpression() && containsBytesArrayLiteral(query.getHavingExpression())) {
+      return true;
     }
     if (query.isSetOrderByList()) {
       for (Expression expression : query.getOrderByList()) {
-        assertUsesOnlyLegacyLiteralArms(expression);
+        if (containsBytesArrayLiteral(expression)) {
+          return true;
+        }
       }
     }
+    return false;
   }
 }

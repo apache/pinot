@@ -72,8 +72,9 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
     for (int i = 0; i < numOperands; i++) {
       Expression operand = invokeCompileTimeFunctionExpression(operands.get(i));
       operands.set(i, operand);
-      Pair<ColumnDataType, Object> typeAndValue = compilable ? getLiteralOperandTypeAndValue(operand) : null;
-      if (typeAndValue != null) {
+      Literal literal = operand.getLiteral();
+      if (compilable && literal != null) {
+        Pair<ColumnDataType, Object> typeAndValue = RequestUtils.getLiteralTypeAndValue(literal);
         argumentTypes[i] = typeAndValue.getLeft();
         arguments[i] = typeAndValue.getRight();
       } else {
@@ -99,42 +100,11 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
         invoker.convertTypes(arguments);
         result = invoker.invoke(arguments);
       }
-      // Literal has a BYTES_ARRAY arm for upgraded readers, but ordinary broker-to-server requests must remain
-      // decodable by older servers. Preserve the constructor with scalar BINARY_VALUE operands until the wire has
-      // server capability negotiation.
-      if (result instanceof byte[][]) {
-        return expression;
-      }
       return RequestUtils.getLiteralExpression(result);
     } catch (Exception e) {
       throw new SqlCompilationException(
           "Caught exception while invoking method: " + functionInfo.getMethod().getName() + " with arguments: "
               + Arrays.toString(arguments) + ": " + e.getMessage(), e);
     }
-  }
-
-  // A BYTES array literal stays as ARRAY_VALUE_CONSTRUCTOR on the broker-to-server Thrift path so that older servers
-  // can still decode its scalar BINARY_VALUE operands. Treat that constructor as a literal here so deterministic
-  // parent functions can still be folded at compile time.
-  @Nullable
-  private static Pair<ColumnDataType, Object> getLiteralOperandTypeAndValue(Expression expression) {
-    Literal literal = expression.getLiteral();
-    if (literal != null) {
-      return RequestUtils.getLiteralTypeAndValue(literal);
-    }
-    Function function = expression.getFunctionCall();
-    if (function == null || !function.getOperator().equals("arrayvalueconstructor")) {
-      return null;
-    }
-    List<Expression> operands = function.getOperands();
-    byte[][] bytes = new byte[operands.size()][];
-    for (int i = 0; i < operands.size(); i++) {
-      Literal operand = operands.get(i).getLiteral();
-      if (operand == null || !operand.isSetBinaryValue()) {
-        return null;
-      }
-      bytes[i] = operand.getBinaryValue();
-    }
-    return Pair.of(ColumnDataType.BYTES_ARRAY, bytes);
   }
 }

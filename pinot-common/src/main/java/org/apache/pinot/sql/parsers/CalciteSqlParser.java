@@ -1234,9 +1234,6 @@ public class CalciteSqlParser {
       if (function.getOperator().equals("as")) {
         return isLiteralOnlyExpression(function.getOperands().get(0));
       }
-      if (function.getOperator().equals("arrayvalueconstructor")) {
-        return function.getOperands().stream().allMatch(CalciteSqlParser::isLiteralOnlyExpression);
-      }
       return false;
     }
     return false;
