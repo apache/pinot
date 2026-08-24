@@ -42,8 +42,7 @@ import org.roaringbitmap.RoaringBitmap;
 /// The `DistinctCountBitmapAggregationFunction` calculates the number of distinct values for a given single-value or
 /// multi-value expression using RoaringBitmap. The bitmap stores the actual values for `INT` expression, or hash code
 /// of the values for other data types (values with the same hash code will only be counted once).
-public class DistinctCountBitmapAggregationFunction
-    extends NullableSingleInputAggregationFunction<RoaringBitmap, Integer> {
+public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggregationFunction<RoaringBitmap, Integer> {
 
   public DistinctCountBitmapAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     this(verifySingleArgument(arguments, "DISTINCT_COUNT_BITMAP"), nullHandlingEnabled);

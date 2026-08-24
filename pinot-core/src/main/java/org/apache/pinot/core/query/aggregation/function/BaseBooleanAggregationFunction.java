@@ -30,13 +30,13 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.IntGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 // TODO: change this to implement BaseSingleInputAggregationFunction<Boolean, Boolean> when we get proper
 // handling of booleans in serialization - today this would fail because ColumnDataType#convert assumes
 // that the boolean is encoded as its stored type (an integer)
-public abstract class BaseBooleanAggregationFunction extends NullableSingleInputAggregationFunction<Integer, Integer> {
+public abstract class BaseBooleanAggregationFunction extends BaseSingleInputAggregationFunction<Integer, Integer> {
 
   private final BooleanMerge _merger;
 
@@ -106,7 +106,7 @@ public abstract class BaseBooleanAggregationFunction extends NullableSingleInput
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    if (blockValSet.getValueType() != FieldSpec.DataType.BOOLEAN) {
+    if (blockValSet.getValueType() != DataType.BOOLEAN) {
       throw new IllegalArgumentException("Unsupported data type " + getType().getName() + " for "
           + blockValSet.getValueType());
     }
@@ -150,7 +150,7 @@ public abstract class BaseBooleanAggregationFunction extends NullableSingleInput
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    if (blockValSet.getValueType() != FieldSpec.DataType.BOOLEAN) {
+    if (blockValSet.getValueType() != DataType.BOOLEAN) {
       throw new IllegalArgumentException("Unsupported data type " + getType().getName() + " for "
           + blockValSet.getValueType());
     }

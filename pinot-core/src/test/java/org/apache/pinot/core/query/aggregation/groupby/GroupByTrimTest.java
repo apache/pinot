@@ -43,7 +43,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -174,7 +174,7 @@ public class GroupByTrimTest {
 
     for (int i = 0; i < NUM_COLUMNS; i++) {
       String metricName = METRIC_PREFIX + i;
-      MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, FieldSpec.DataType.DOUBLE);
+      MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, DataType.DOUBLE);
       schema.addField(metricFieldSpec);
       _columns[i] = metricName;
     }

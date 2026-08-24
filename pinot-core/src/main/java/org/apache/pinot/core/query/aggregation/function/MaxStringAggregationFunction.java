@@ -32,7 +32,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
-public class MaxStringAggregationFunction extends NullableSingleInputAggregationFunction<String, String> {
+public class MaxStringAggregationFunction extends BaseSingleInputAggregationFunction<String, String> {
 
   public MaxStringAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     super(verifySingleArgument(arguments, "MAXSTRING"), nullHandlingEnabled);

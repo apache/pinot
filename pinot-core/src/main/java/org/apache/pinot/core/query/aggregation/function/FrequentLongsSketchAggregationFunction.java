@@ -61,7 +61,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 ///
 ///   There is a variation of the function (**FREQUENT_STRINGS_SKETCH**) which accepts STRING type input columns.
 public class FrequentLongsSketchAggregationFunction
-    extends NullableSingleInputAggregationFunction<FrequentLongsSketch, Comparable<?>> {
+    extends BaseSingleInputAggregationFunction<FrequentLongsSketch, Comparable<?>> {
   protected static final int DEFAULT_MAX_MAP_SIZE = 256;
 
   protected int _maxMapSize;
@@ -101,9 +101,6 @@ public class FrequentLongsSketchAggregationFunction
       // The sketch is created inside the range, so a block with no non-null row leaves the holder untouched and
       // extractFinalResult sees the null that means nothing was aggregated
       forEachNotNull(length, valueSet, (from, to) -> {
-        if (to == from) {
-          return;
-        }
         FrequentLongsSketch sketch = getOrCreateSketch(aggregationResultHolder);
         for (int i = from; i < to; i++) {
           sketch.merge(deserializeSketch(bytesValues[i]));
@@ -118,9 +115,6 @@ public class FrequentLongsSketchAggregationFunction
     if (singleValue) {
       long[] longValues = valueSet.getLongValuesSV();
       forEachNotNull(length, valueSet, (from, to) -> {
-        if (to == from) {
-          return;
-        }
         FrequentLongsSketch sketch = getOrCreateSketch(aggregationResultHolder);
         for (int i = from; i < to; i++) {
           sketch.update(longValues[i]);
@@ -129,9 +123,6 @@ public class FrequentLongsSketchAggregationFunction
     } else {
       long[][] longValues = valueSet.getLongValuesMV();
       forEachNotNull(length, valueSet, (from, to) -> {
-        if (to == from) {
-          return;
-        }
         FrequentLongsSketch sketch = getOrCreateSketch(aggregationResultHolder);
         for (int i = from; i < to; i++) {
           for (long value : longValues[i]) {

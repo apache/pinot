@@ -31,13 +31,13 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.function.NullableSingleInputAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.BaseSingleInputAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-public class ListAggFunction extends NullableSingleInputAggregationFunction<ObjectCollection<String>, String> {
+public class ListAggFunction extends BaseSingleInputAggregationFunction<ObjectCollection<String>, String> {
 
   private final String _separator;
 
