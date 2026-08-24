@@ -1375,23 +1375,24 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   ///                     table
   /// @return map from partition group id to its latest [LLCSegmentName]; empty if none of the names are LLC segments
   private static Map<Integer, LLCSegmentName> getLatestLLCSegmentPerPartition(Collection<String> segmentNames) {
-    Map<Integer, LLCSegmentName> partitionGroupIdToLatestSegment = new HashMap<>();
+    Map<Integer, LLCSegmentName> partitionIdToLatestSegment = new HashMap<>();
     for (String segmentName : segmentNames) {
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
       if (llcSegmentName == null) {
         continue;
       }
-      partitionGroupIdToLatestSegment.merge(llcSegmentName.getPartitionGroupId(), llcSegmentName,
+      partitionIdToLatestSegment.merge(llcSegmentName.getPartitionGroupId(), llcSegmentName,
           (existing, candidate) -> candidate.getSequenceNumber() > existing.getSequenceNumber() ? candidate
               : existing);
     }
-    return partitionGroupIdToLatestSegment;
+    return partitionIdToLatestSegment;
   }
 
   private Map<Integer, SegmentZKMetadata> getLatestSegmentZKMetadataMap(String realtimeTableName) {
     Map<Integer, LLCSegmentName> latestLLCSegmentNameMap =
         getLatestLLCSegmentPerPartition(getLLCSegments(realtimeTableName));
-    Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap = new HashMap<>();
+    Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap =
+        Maps.newHashMapWithExpectedSize(latestLLCSegmentNameMap.size());
     for (Map.Entry<Integer, LLCSegmentName> entry : latestLLCSegmentNameMap.entrySet()) {
       SegmentZKMetadata latestSegmentZKMetadata =
           getSegmentZKMetadata(realtimeTableName, entry.getValue().getSegmentName());
