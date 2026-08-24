@@ -124,16 +124,25 @@ public class LiteralSerDeTest {
   @Test
   public void testSingleStageQueryUsesLegacyCompatibleLiteralArms()
       throws TException {
-    PinotQuery query = CalciteSqlParser.compileToPinotQuery(
-        "SELECT ARRAY[X'00', X'0102'] FROM myTable WHERE ARRAYS_OVERLAP(bytesMV, ARRAY[X'01'])");
-    assertUsesOnlyLegacyLiteralArms(query.getSelectList().get(0));
-    assertUsesOnlyLegacyLiteralArms(query.getFilterExpression());
+    for (String sql : List.of("SELECT ARRAY[X'00', X'0102'] FROM myTable",
+        "SELECT id FROM myTable WHERE ARRAYS_OVERLAP(bytesMV, ARRAY[X'01'])",
+        "SELECT ARRAY[X'02'], COUNT(*) FROM myTable GROUP BY ARRAY[X'02']",
+        "SELECT COUNT(*) FROM myTable HAVING ARRAYS_OVERLAP(ARRAYAGG(bytesColumn, 'BYTES'), ARRAY[X'03'])",
+        "SELECT id FROM myTable "
+            + "ORDER BY CASE WHEN ARRAYS_OVERLAP(bytesMV, ARRAY[X'04']) THEN 1 ELSE 0 END",
+        "SELECT ARRAY_LENGTH(ARRAY[X'05', X'0607']) FROM myTable")) {
+      PinotQuery query = CalciteSqlParser.compileToPinotQuery(sql);
+      assertUsesOnlyLegacyLiteralArms(query);
 
-    byte[] serialized = new TSerializer(new TCompactProtocol.Factory()).serialize(query);
-    PinotQuery deserialized = new PinotQuery();
-    new TDeserializer(new TCompactProtocol.Factory()).deserialize(deserialized, serialized);
-    assertUsesOnlyLegacyLiteralArms(deserialized.getSelectList().get(0));
-    assertUsesOnlyLegacyLiteralArms(deserialized.getFilterExpression());
+      byte[] serialized = new TSerializer(new TCompactProtocol.Factory()).serialize(query);
+      PinotQuery deserialized = new PinotQuery();
+      new TDeserializer(new TCompactProtocol.Factory()).deserialize(deserialized, serialized);
+      assertUsesOnlyLegacyLiteralArms(deserialized);
+    }
+
+    PinotQuery nested = CalciteSqlParser.compileToPinotQuery(
+        "SELECT ARRAY_LENGTH(ARRAY[X'05', X'0607']) FROM myTable");
+    assertEquals(nested.getSelectList().get(0).getLiteral().getIntValue(), 2);
   }
 
   @Test
@@ -154,6 +163,28 @@ public class LiteralSerDeTest {
     } else if (expression.isSetFunctionCall()) {
       for (Expression operand : expression.getFunctionCall().getOperands()) {
         assertUsesOnlyLegacyLiteralArms(operand);
+      }
+    }
+  }
+
+  private static void assertUsesOnlyLegacyLiteralArms(PinotQuery query) {
+    for (Expression expression : query.getSelectList()) {
+      assertUsesOnlyLegacyLiteralArms(expression);
+    }
+    if (query.isSetFilterExpression()) {
+      assertUsesOnlyLegacyLiteralArms(query.getFilterExpression());
+    }
+    if (query.isSetGroupByList()) {
+      for (Expression expression : query.getGroupByList()) {
+        assertUsesOnlyLegacyLiteralArms(expression);
+      }
+    }
+    if (query.isSetHavingExpression()) {
+      assertUsesOnlyLegacyLiteralArms(query.getHavingExpression());
+    }
+    if (query.isSetOrderByList()) {
+      for (Expression expression : query.getOrderByList()) {
+        assertUsesOnlyLegacyLiteralArms(expression);
       }
     }
   }

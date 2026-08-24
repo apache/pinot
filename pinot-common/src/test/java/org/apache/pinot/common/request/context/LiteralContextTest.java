@@ -29,6 +29,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.UuidUtils;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -253,6 +254,30 @@ public class LiteralContextTest {
     assertEquals(equalContext, literalContext);
     assertEquals(equalContext.hashCode(), literalContext.hashCode());
     assertNotEquals(new LiteralContext(DataType.BYTES, new byte[][]{{}, {0}, {1, 3}, {(byte) 0xff}}), literalContext);
+  }
+
+  @Test(dataProvider = "arrayBackedValues")
+  public void testArrayBackedEqualityAndHashCode(DataType dataType, Object value, Object equalValue,
+      Object differentValue) {
+    LiteralContext literalContext = new LiteralContext(dataType, value);
+    LiteralContext equalContext = new LiteralContext(dataType, equalValue);
+
+    assertEquals(equalContext, literalContext);
+    assertEquals(equalContext.hashCode(), literalContext.hashCode());
+    assertNotEquals(new LiteralContext(dataType, differentValue), literalContext);
+  }
+
+  @DataProvider(name = "arrayBackedValues")
+  public Object[][] arrayBackedValues() {
+    return new Object[][]{
+        {DataType.INT, new int[]{1, 2}, new int[]{1, 2}, new int[]{1, 3}},
+        {DataType.LONG, new long[]{1L, 2L}, new long[]{1L, 2L}, new long[]{1L, 3L}},
+        {DataType.FLOAT, new float[]{1.0f, 2.0f}, new float[]{1.0f, 2.0f}, new float[]{1.0f, 3.0f}},
+        {DataType.DOUBLE, new double[]{1.0, 2.0}, new double[]{1.0, 2.0}, new double[]{1.0, 3.0}},
+        {DataType.STRING, new String[]{"one", "two"}, new String[]{"one", "two"}, new String[]{"one", "three"}},
+        {DataType.BYTES, new byte[]{1, 2}, new byte[]{1, 2}, new byte[]{1, 3}},
+        {DataType.BYTES, new byte[][]{{1}, {2}}, new byte[][]{{1}, {2}}, new byte[][]{{1}, {3}}}
+    };
   }
 
   @Test

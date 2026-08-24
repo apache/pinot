@@ -302,6 +302,26 @@ public class ArrayFunctions {
     if (arr == null || arr.length == 0) {
       return arr;
     }
+    boolean containsBytes = false;
+    for (Object value : arr) {
+      if (value instanceof byte[]) {
+        containsBytes = true;
+        break;
+      }
+    }
+    if (containsBytes) {
+      byte[][] bytesArr = new byte[arr.length][];
+      for (int i = 0; i < arr.length; i++) {
+        if (arr[i] == null) {
+          throw new IllegalArgumentException("NULL elements are not supported in BYTES arrays");
+        }
+        if (!(arr[i] instanceof byte[])) {
+          throw new IllegalArgumentException("BYTES arrays only support BYTES elements");
+        }
+        bytesArr[i] = (byte[]) arr[i];
+      }
+      return bytesArr;
+    }
     Class<?> clazz = arr[0].getClass();
     if (clazz == Integer.class) {
       int[] intArr = new int[arr.length];
@@ -351,13 +371,6 @@ public class ArrayFunctions {
         strArr[i] = (String) arr[i];
       }
       return strArr;
-    }
-    if (clazz == byte[].class) {
-      byte[][] bytesArr = new byte[arr.length][];
-      for (int i = 0; i < arr.length; i++) {
-        bytesArr[i] = (byte[]) arr[i];
-      }
-      return bytesArr;
     }
     return arr;
   }

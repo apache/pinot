@@ -81,7 +81,7 @@ public class LiteralOnlyBrokerRequestTest {
   }
 
   @Test
-  public void testBytesArrayLiteralBrokerRequestFromSQL()
+  public void testArrayLiteralBrokerRequestFromSQL()
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId",
@@ -89,8 +89,16 @@ public class LiteralOnlyBrokerRequestTest {
             mock(ServerRoutingStatsManager.class), mock(FailureDetector.class),
             ThreadAccountantUtils.getNoOpAccountant(), null, null);
 
-    BrokerResponse brokerResponse = requestHandler.handleRequest("SELECT ARRAY[X'00', X'0102'] AS bytes");
+    BrokerResponse brokerResponse = requestHandler.handleRequest(
+        "SELECT ARRAY[1, 2] AS ints, ARRAY['one', 'two'] AS strings");
     ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT_ARRAY);
+    assertEquals(resultTable.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING_ARRAY);
+    assertEquals((int[]) resultTable.getRows().get(0)[0], new int[]{1, 2});
+    assertEquals((String[]) resultTable.getRows().get(0)[1], new String[]{"one", "two"});
+
+    brokerResponse = requestHandler.handleRequest("SELECT ARRAY[X'00', X'0102'] AS bytes");
+    resultTable = brokerResponse.getResultTable();
     assertEquals(resultTable.getDataSchema().getColumnName(0), "bytes");
     assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.BYTES_ARRAY);
     assertEquals(resultTable.getRows().size(), 1);

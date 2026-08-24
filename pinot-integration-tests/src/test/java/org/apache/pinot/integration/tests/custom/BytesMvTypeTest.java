@@ -203,6 +203,18 @@ public class BytesMvTypeTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testBytesArrayLiteralRejectsUnsupportedElements(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    for (String expression : List.of("ARRAY[X'00', NULL]", "ARRAY[NULL, X'00']", "ARRAY[X'00', 1]",
+        "ARRAY[1, X'00']")) {
+      JsonNode response = postQuery("SELECT " + expression);
+      assertFalse(response.path("exceptions").isEmpty(),
+          "Expected unsupported BYTES array elements to be rejected: " + response.toPrettyString());
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testArraysOverlapWithLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);

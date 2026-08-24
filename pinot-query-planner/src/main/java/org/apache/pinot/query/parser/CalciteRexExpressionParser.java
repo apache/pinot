@@ -146,6 +146,8 @@ public class CalciteRexExpressionParser {
       value = BooleanUtils.isTrueInternalValue(value);
     } else if (dataType == ColumnDataType.BYTES || dataType == ColumnDataType.UUID) {
       value = ((ByteArray) value).getBytes();
+    } else if (dataType == ColumnDataType.BYTES_ARRAY) {
+      value = dataType.toExternal(value);
     }
     return RequestUtils.getLiteral(value);
   }

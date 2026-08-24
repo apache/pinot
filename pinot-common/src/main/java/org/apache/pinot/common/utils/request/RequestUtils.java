@@ -219,9 +219,6 @@ public class RequestUtils {
     if (object instanceof byte[]) {
       return getLiteral((byte[]) object);
     }
-    if (object instanceof byte[][]) {
-      return getLiteral((byte[][]) object);
-    }
     if (object instanceof UUID) {
       return getLiteral(UuidUtils.toBytes((UUID) object));
     }
@@ -239,6 +236,9 @@ public class RequestUtils {
     }
     if (object instanceof String[]) {
       return getLiteral((String[]) object);
+    }
+    if (object instanceof byte[][]) {
+      return getLiteral((byte[][]) object);
     }
     return getLiteral(object.toString());
   }
@@ -324,10 +324,6 @@ public class RequestUtils {
     return getLiteralExpression(getLiteral(value));
   }
 
-  public static Expression getLiteralExpression(byte[][] value) {
-    return getLiteralExpression(getLiteral(value));
-  }
-
   public static Expression getLiteralExpression(int[] value) {
     return getLiteralExpression(getLiteral(value));
   }
@@ -345,6 +341,10 @@ public class RequestUtils {
   }
 
   public static Expression getLiteralExpression(String[] value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(byte[][] value) {
     return getLiteralExpression(getLiteral(value));
   }
 

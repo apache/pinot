@@ -72,8 +72,8 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
     for (int i = 0; i < numOperands; i++) {
       Expression operand = invokeCompileTimeFunctionExpression(operands.get(i));
       operands.set(i, operand);
-      Pair<ColumnDataType, Object> typeAndValue = getCompileTimeValue(operand);
-      if (compilable && typeAndValue != null) {
+      Pair<ColumnDataType, Object> typeAndValue = compilable ? getLiteralOperandTypeAndValue(operand) : null;
+      if (typeAndValue != null) {
         argumentTypes[i] = typeAndValue.getLeft();
         arguments[i] = typeAndValue.getRight();
       } else {
@@ -113,8 +113,11 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
     }
   }
 
+  // A BYTES array literal stays as ARRAY_VALUE_CONSTRUCTOR on the broker-to-server Thrift path so that older servers
+  // can still decode its scalar BINARY_VALUE operands. Treat that constructor as a literal here so deterministic
+  // parent functions can still be folded at compile time.
   @Nullable
-  private static Pair<ColumnDataType, Object> getCompileTimeValue(Expression expression) {
+  private static Pair<ColumnDataType, Object> getLiteralOperandTypeAndValue(Expression expression) {
     Literal literal = expression.getLiteral();
     if (literal != null) {
       return RequestUtils.getLiteralTypeAndValue(literal);

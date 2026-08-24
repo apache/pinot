@@ -154,6 +154,7 @@ public class LiteralContext {
   }
 
   // TODO: Revisit MV support for BOOLEAN, BIG_DECIMAL and UUID.
+  //       https://github.com/apache/pinot/issues/19338
   @Nullable
   private static PinotDataType getPinotDataType(DataType type, @Nullable Object value) {
     if (value == null) {
@@ -341,9 +342,14 @@ public class LiteralContext {
         return "'" + Arrays.toString((double[]) _value) + "'";
       case STRING_ARRAY:
         return "'" + Arrays.toString((String[]) _value) + "'";
-      case BYTES_ARRAY:
-        return "'" + Arrays.toString(
-            Arrays.stream((byte[][]) _value).map(BytesUtils::toHexString).toArray(String[]::new)) + "'";
+      case BYTES_ARRAY: {
+        byte[][] bytesArray = (byte[][]) _value;
+        String[] hexValues = new String[bytesArray.length];
+        for (int i = 0; i < bytesArray.length; i++) {
+          hexValues[i] = BytesUtils.toHexString(bytesArray[i]);
+        }
+        return "'" + Arrays.toString(hexValues) + "'";
+      }
       default:
         throw new IllegalStateException("Unsupported PinotDataType: " + _pinotDataType);
     }

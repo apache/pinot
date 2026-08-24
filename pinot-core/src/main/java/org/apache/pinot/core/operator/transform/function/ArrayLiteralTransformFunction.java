@@ -142,6 +142,19 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       Preconditions.checkState(literalContext.getType() == ExpressionContext.Type.LITERAL,
           "ArrayLiteralTransformFunction only takes literals as arguments, found: %s", literalContext);
     }
+    boolean containsBytes = false;
+    for (ExpressionContext literalContext : literalContexts) {
+      if (literalContext.getLiteral().getType() == DataType.BYTES) {
+        containsBytes = true;
+        break;
+      }
+    }
+    if (containsBytes) {
+      for (ExpressionContext literalContext : literalContexts) {
+        Preconditions.checkState(literalContext.getLiteral().getType() == DataType.BYTES,
+            "BYTES array literals only support non-null BYTES elements, found: %s", literalContext);
+      }
+    }
     _dataType = literalContexts.get(0).getLiteral().getType();
     switch (_dataType) {
       case INT:
