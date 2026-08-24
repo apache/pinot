@@ -1367,12 +1367,13 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.SEGMENT_SIZE_AUTO_REDUCTION, 1L);
   }
 
-  /// Returns the latest LLC realtime segment ZK metadata for each partition.
+  /// Groups the given segment names by partition group id and returns the latest (highest sequence number) LLC
+  /// segment for each. Non-LLC segment names (e.g. uploaded upsert segments, which are never consuming segments) are
+  /// ignored. On equal sequence numbers the first-encountered segment is kept.
   ///
-  /// @param realtimeTableName Realtime table name
-  /// @return Map from partition group id to the latest LLC realtime segment ZK metadata
-  /// Returns the latest (highest sequence number) LLC segment per partition group, parsed from the given segment
-  /// names. Non-LLC segment names (e.g. uploaded upsert segments) are ignored.
+  /// @param segmentNames the segment names to scan, e.g. the ideal-state segment names or all LLC segments of the
+  ///                     table
+  /// @return map from partition group id to its latest [LLCSegmentName]; empty if none of the names are LLC segments
   private static Map<Integer, LLCSegmentName> getLatestLLCSegmentPerPartition(Collection<String> segmentNames) {
     Map<Integer, LLCSegmentName> partitionGroupIdToLatestSegment = new HashMap<>();
     for (String segmentName : segmentNames) {
@@ -1458,8 +1459,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         boolean isTablePaused = isTablePaused(idealState);
         if (isTableEnabled && !isTablePaused) {
           return ensureAllPartitionsConsuming(tableConfig, streamConfigs, idealState,
-              preFetchedOffsets._streamMetadataList, offsetCriteria,
-              preFetchedOffsets._partitionIdToSmallestOffset);
+              preFetchedOffsets.streamMetadataList(), offsetCriteria,
+              preFetchedOffsets.partitionIdToSmallestOffset());
         } else {
           LOGGER.info("Skipping LLC segments validation for table: {}, isTableEnabled: {}, isTablePaused: {}",
               realtimeTableName, isTableEnabled, isTablePaused);
@@ -1531,19 +1532,14 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return false;
   }
 
-  /// Holder for the stream state pre-fetched by [#preFetchOffsets] outside the ideal-state update lock.
-  /// `_partitionIdToSmallestOffset` is null when the smallest offsets were not fetched (see [#preFetchOffsets]).
+  /// Stream state pre-fetched by [#preFetchOffsets] outside the ideal-state update lock.
+  ///
+  /// @param streamMetadataList the latest partition-group metadata (with start offsets) for all streams
+  /// @param partitionIdToSmallestOffset the smallest stream offset per partition, or null when it was not fetched
+  ///        (the offset criteria is SMALLEST, or no partition needed a new CONSUMING segment); see [#preFetchOffsets]
   @VisibleForTesting
-  static class PreFetchedOffsets {
-    final List<StreamMetadata> _streamMetadataList;
-    @Nullable
-    final Map<Integer, StreamPartitionMsgOffset> _partitionIdToSmallestOffset;
-
-    PreFetchedOffsets(List<StreamMetadata> streamMetadataList,
-        @Nullable Map<Integer, StreamPartitionMsgOffset> partitionIdToSmallestOffset) {
-      _streamMetadataList = streamMetadataList;
-      _partitionIdToSmallestOffset = partitionIdToSmallestOffset;
-    }
+  record PreFetchedOffsets(List<StreamMetadata> streamMetadataList,
+      @Nullable Map<Integer, StreamPartitionMsgOffset> partitionIdToSmallestOffset) {
   }
 
   /// Updates ideal state after completion of a realtime segment

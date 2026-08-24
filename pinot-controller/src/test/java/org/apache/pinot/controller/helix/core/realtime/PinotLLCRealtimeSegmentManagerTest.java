@@ -1141,15 +1141,15 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     PinotLLCRealtimeSegmentManager.PreFetchedOffsets healthy = segmentManager.preFetchOffsets(
         segmentManager._streamConfigs, REALTIME_TABLE_NAME, segmentManager._idealState, null);
-    assertNull(healthy._partitionIdToSmallestOffset);
-    assertNotNull(healthy._streamMetadataList);
+    assertNull(healthy.partitionIdToSmallestOffset());
+    assertNotNull(healthy.streamMetadataList());
 
     // Turn all replicas of partition 0's CONSUMING segment OFFLINE - now the smallest offset is needed.
     turnNewConsumingSegmentOffline(segmentManager._idealState.getRecord().getMapFields(),
         new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName());
     PinotLLCRealtimeSegmentManager.PreFetchedOffsets needsRepair = segmentManager.preFetchOffsets(
         segmentManager._streamConfigs, REALTIME_TABLE_NAME, segmentManager._idealState, null);
-    assertNotNull(needsRepair._partitionIdToSmallestOffset);
+    assertNotNull(needsRepair.partitionIdToSmallestOffset());
   }
 
   /// Phase-2: preFetchOffsets temporarily overrides the shared streamConfigs offset criteria; it must restore the
@@ -2703,8 +2703,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       // Mirror the production flow: pre-fetch offsets (gated) outside the ideal-state update, then pass them into the
       // package-private repair method.
       PreFetchedOffsets preFetchedOffsets = preFetchOffsets(_streamConfigs, REALTIME_TABLE_NAME, _idealState, null);
-      ensureAllPartitionsConsuming(_tableConfig, _streamConfigs, _idealState, preFetchedOffsets._streamMetadataList,
-          null, preFetchedOffsets._partitionIdToSmallestOffset);
+      ensureAllPartitionsConsuming(_tableConfig, _streamConfigs, _idealState, preFetchedOffsets.streamMetadataList(),
+          null, preFetchedOffsets.partitionIdToSmallestOffset());
     }
 
     @Override
