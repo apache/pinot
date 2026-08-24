@@ -240,7 +240,12 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   DROPPED_RECORD_COUNT("rows", false),
   CORRUPTED_RECORD_COUNT("rows", false),
   OPEN_STRUCT_TYPE_COERCION_FAILURES("values", false,
-      "Number of OPEN_STRUCT values dropped because the value could not be coerced to the key's inferred type"),
+      "Number of OPEN_STRUCT values dropped because the value could not be coerced to the key's declared or "
+          + "already-established type"),
+  OPEN_STRUCT_TYPE_INFERENCE_FAILURES("values", false,
+      "Number of OPEN_STRUCT values stored as their serialized string form because the value's Java type maps to "
+          + "no Pinot DataType. A value that is instead dropped for failing coercion against a key's "
+          + "already-established non-STRING type is counted by openStructTypeCoercionFailures, not here"),
   // Workload related metrics
   WORKLOAD_BUDGET_EXCEEDED("workloadBudgetExceeded", true, "Number of times workload budget exceeded"),
   WORKLOAD_QUERIES("queries", false),

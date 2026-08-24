@@ -57,6 +57,7 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   private static final Logger LOGGER = LoggerFactory.getLogger(MutableOpenStructIndex.class);
 
   private final String _openStructColumn;
+  private final String _tableNameWithType;
   private final OpenStructIndexConfig _config;
   private final Map<String, FieldSpec> _childFieldSpecs;
   private final PinotDataBufferMemoryManager _memoryManager;
@@ -65,9 +66,10 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   // Volatile for lock-free reader access; writer always holds the consuming-thread lock.
   private volatile Map<String, MutableKeyColumn> _keyColumns = new HashMap<>();
 
-  public MutableOpenStructIndex(String openStructColumn, ComplexFieldSpec fieldSpec,
+  public MutableOpenStructIndex(String openStructColumn, String tableNameWithType, ComplexFieldSpec fieldSpec,
       OpenStructIndexConfig config, PinotDataBufferMemoryManager memoryManager, int capacity) {
     _openStructColumn = openStructColumn;
+    _tableNameWithType = tableNameWithType;
     _config = config;
     _memoryManager = memoryManager;
     _capacity = capacity;
@@ -108,10 +110,7 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
         // build, so no key is dropped during consumption.
         // Resolve stored type and coerce BEFORE allocating a column so a first-row coercion failure
         // does not allocate a column that was never usable.
-        DataType resolvedType = resolveStoredType(key, rawValue);
-        if (resolvedType == null) {
-          continue;
-        }
+        DataType resolvedType = resolveStoredType(key, rawValue, null);
         Object coerced = tryCoerce(key, rawValue, resolvedType);
         if (coerced == null) {
           continue;
@@ -121,7 +120,9 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
         continue;
       }
 
-      DataType storedType = keyCol.getStoredType();
+      // Re-resolve against the established type so a later unmappable value on a STRING key is
+      // metered too; for any other established type this is a no-op returning that type.
+      DataType storedType = resolveStoredType(key, rawValue, keyCol.getStoredType());
       Object coerced = tryCoerce(key, rawValue, storedType);
       if (coerced == null) {
         continue;
@@ -130,29 +131,42 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
     }
   }
 
-  /// Resolves the stored type for a key without allocating any state. Returns null when the type
-  /// cannot be inferred (caller should skip the entry).
-  @Nullable
-  private DataType resolveStoredType(String key, Object rawValue) {
+  /// Resolves the stored type for a key without allocating any state, and meters a value that took
+  /// the STRING fallback. `establishedType` is the key's already-resolved stored type, or `null` on
+  /// first sighting.
+  ///
+  /// The fallback rule (unmappable value → STRING) must match the sealed build path
+  /// ([OpenStructColumnSplitter#addMap]) so a value reads the same before and after seal.
+  private DataType resolveStoredType(String key, Object rawValue, @Nullable DataType establishedType) {
     FieldSpec spec = _childFieldSpecs.get(key);
-    DataType valueType;
     if (spec != null) {
-      valueType = spec.getDataType();
-    } else {
-      valueType = OpenStructTypeInference.inferDataType(rawValue);
-      if (valueType == null) {
-        LOGGER.warn("OPEN_STRUCT '{}': could not infer DataType for key '{}' from value of class '{}'."
-                + " Dropping the entry.",
-            _openStructColumn, key, rawValue.getClass().getName());
-        return null;
-      }
+      return spec.getDataType().getStoredType();
     }
-    return valueType.getStoredType();
+    if (establishedType != null && establishedType != DataType.STRING) {
+      return establishedType;
+    }
+    DataType inferred = OpenStructTypeInference.inferDataType(rawValue);
+    if (inferred == null) {
+      if (establishedType == null) {
+        LOGGER.warn("OPEN_STRUCT '{}': could not infer DataType for key '{}' from value of class '{}'."
+                + " Falling back to STRING.",
+            _openStructColumn, key, rawValue.getClass().getName());
+      }
+      ServerMetrics serverMetrics = ServerMetrics.get();
+      if (serverMetrics != null) {
+        serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
+            ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, 1);
+      }
+      return DataType.STRING;
+    }
+    return establishedType != null ? establishedType : inferred;
   }
 
-  /// Coerces rawValue to storedType. Returns null on failure (logged at WARN); the caller drops
-  /// the entry. Note: a successful coerce of a "null"-shaped raw value would also return null —
-  /// but callers gate on rawValue != null before reaching here.
+  /// Coerces rawValue to storedType. Returns null on failure; the caller drops the entry. Failures
+  /// are reported through [ServerMeter#OPEN_STRUCT_TYPE_COERCION_FAILURES] rather than a log line,
+  /// because this runs per value on the consuming path. Note: a successful coerce of a
+  /// "null"-shaped raw value would also return null — but callers gate on rawValue != null before
+  /// reaching here.
   @Nullable
   private Object tryCoerce(String key, Object rawValue, DataType storedType) {
     try {
@@ -162,7 +176,9 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
     } catch (Exception e) {
       ServerMetrics serverMetrics = ServerMetrics.get();
       if (serverMetrics != null) {
-        serverMetrics.addMeteredGlobalValue(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, 1);
+        // Column-granular for the same reason as the inference meter above.
+        serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
+            ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, 1);
       }
       return null;
     }
