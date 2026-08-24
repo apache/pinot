@@ -144,10 +144,12 @@ public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTi
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     final long[] timeValues = blockValSetMap.get(_timeExpression).getLongValuesSV();
     BlockValSet valueBlockValSet = blockValSetMap.get(_valueExpression);
-    switch (valueBlockValSet.getValueType()) {
-      case DOUBLE:
-      case LONG:
+    switch (valueBlockValSet.getValueType().getStoredType()) {
       case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+      case BIG_DECIMAL:
         aggregateNumericValues(length, timeValues, aggregationResultHolder, valueBlockValSet);
         break;
       case STRING:
@@ -164,10 +166,12 @@ public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTi
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     final long[] timeValues = blockValSetMap.get(_timeExpression).getLongValuesSV();
     BlockValSet valueBlockValSet = blockValSetMap.get(_valueExpression);
-    switch (valueBlockValSet.getValueType()) {
-      case DOUBLE:
-      case LONG:
+    switch (valueBlockValSet.getValueType().getStoredType()) {
       case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+      case BIG_DECIMAL:
         aggregateGroupByNumericValues(length, groupKeyArray, timeValues, groupByResultHolder, valueBlockValSet);
         break;
       case STRING:
