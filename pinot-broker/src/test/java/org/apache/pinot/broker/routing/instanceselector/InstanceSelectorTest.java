@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
@@ -43,6 +44,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.HybridSelector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
@@ -68,9 +70,12 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.Segmen
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -1926,5 +1931,467 @@ public class InstanceSelectorTest {
     expectedSelection.put(segment2, instance4);
 
     assertEquals(selectedResult.getLeft(), expectedSelection);
+  }
+
+  // Replica health metrics
+  //
+  // The scenarios below all use the same three instances and assert on the TableReplicaHealth the
+  // selector derives, since that is what the gauges are emitted from. Each segment's percentage is
+  // measured against the replicas its own ideal state assigns, so segments do not have to be uniformly
+  // replicated for the numbers to make sense.
+
+  private static final String REPLICA_INSTANCE_0 = "instance0";
+  private static final String REPLICA_INSTANCE_1 = "instance1";
+  private static final String REPLICA_INSTANCE_2 = "instance2";
+  private static final Set<String> REPLICA_INSTANCES =
+      ImmutableSet.of(REPLICA_INSTANCE_0, REPLICA_INSTANCE_1, REPLICA_INSTANCE_2);
+
+  /// Returns the ideal state assignment placing the segment on all three instances as ONLINE.
+  private static List<Pair<String, String>> allOnline() {
+    return List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, ONLINE), new ImmutablePair<>(REPLICA_INSTANCE_1, ONLINE),
+        new ImmutablePair<>(REPLICA_INSTANCE_2, ONLINE));
+  }
+
+  /// Returns an assignment placing the segment on two of the three instances as ONLINE.
+  private static List<Pair<String, String>> twoReplicas() {
+    return List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, ONLINE), new ImmutablePair<>(REPLICA_INSTANCE_1, ONLINE));
+  }
+
+  /// Returns an external view assignment where the first `numOnline` of the three instances are ONLINE
+  /// and the rest are OFFLINE, so the segment looks partially loaded.
+  private static List<Pair<String, String>> partiallyOnline(int numOnline) {
+    List<String> instances = List.of(REPLICA_INSTANCE_0, REPLICA_INSTANCE_1, REPLICA_INSTANCE_2);
+    List<Pair<String, String>> assignment = new ArrayList<>(instances.size());
+    for (int i = 0; i < instances.size(); i++) {
+      assignment.add(new ImmutablePair<>(instances.get(i), i < numOnline ? ONLINE : OFFLINE));
+    }
+    return assignment;
+  }
+
+  /// Returns an external view assignment where every instance but `offlineInstance` is ONLINE, so that
+  /// different segments can be made to lose different replicas.
+  private static List<Pair<String, String>> onlineExcept(String offlineInstance) {
+    List<Pair<String, String>> assignment = new ArrayList<>(REPLICA_INSTANCES.size());
+    for (String instance : List.of(REPLICA_INSTANCE_0, REPLICA_INSTANCE_1, REPLICA_INSTANCE_2)) {
+      assignment.add(new ImmutablePair<>(instance, instance.equals(offlineInstance) ? OFFLINE : ONLINE));
+    }
+    return assignment;
+  }
+
+  private BaseInstanceSelector createReplicaHealthSelector(String selectorType, Set<String> enabledInstances,
+      Map<String, List<Pair<String, String>>> idealStateAssignment,
+      Map<String, List<Pair<String, String>>> externalViewAssignment) {
+    // Sorted so that the order the selector looks up segment metadata in is deterministic, which is what
+    // the stub set up by createSegmentCreationTimes matches on
+    return (BaseInstanceSelector) createTestInstanceSelector(selectorType, enabledInstances,
+        createIdealState(idealStateAssignment), createExternalView(externalViewAssignment),
+        new TreeSet<>(externalViewAssignment.keySet()));
+  }
+
+  /// Stubs the segment metadata lookup with the given creation times, in the order the selector reads them.
+  private void createSegmentCreationTimes(Map<String, Long> creationTimeMsBySegment) {
+    List<Pair<String, Long>> creationTimes = new ArrayList<>(creationTimeMsBySegment.size());
+    for (String segment : new TreeSet<>(creationTimeMsBySegment.keySet())) {
+      creationTimes.add(new ImmutablePair<>(segment, creationTimeMsBySegment.get(segment)));
+    }
+    createSegments(creationTimes);
+  }
+
+  /// Marks the given segments as created long enough ago that they are no longer treated as new, so that
+  /// they count towards the replica health even though their external view has not converged.
+  private void createOldSegments(List<String> segments) {
+    long creationTimeMs = _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 1;
+    Map<String, Long> creationTimes = new HashMap<>();
+    for (String segment : segments) {
+      creationTimes.put(segment, creationTimeMs);
+    }
+    createSegmentCreationTimes(creationTimes);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testReplicaHealthFullyReplicated(String selectorType) {
+    // Every segment is ONLINE everywhere the ideal state assigns it
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", allOnline(), "segment1", allOnline()),
+        Map.of("segment0", allOnline(), "segment1", allOnline()));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 100);
+    assertEquals(replicaHealth.getNumUnavailableSegments(), 0);
+    // Every measured segment sits at the minimum when the minimum is 100, so the count is the measured
+    // population rather than 0 - it counts what the percentage speaks for, not what is wrong
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 2);
+    // Nothing is degraded, so no expected replica count has to be remembered
+    assertTrue(selector._oldSegmentExpectedReplicasMap.isEmpty());
+  }
+
+  /// Returns an external view assignment with the first `numOnline` of the three instances ONLINE and the
+  /// rest in ERROR, i.e. replicas that failed their state transition rather than merely being offline.
+  private static List<Pair<String, String>> partiallyOnlineRestInError(int numOnline) {
+    List<String> instances = List.of(REPLICA_INSTANCE_0, REPLICA_INSTANCE_1, REPLICA_INSTANCE_2);
+    List<Pair<String, String>> assignment = new ArrayList<>(instances.size());
+    for (int i = 0; i < instances.size(); i++) {
+      assignment.add(new ImmutablePair<>(instances.get(i), i < numOnline ? ONLINE : ERROR));
+    }
+    return assignment;
+  }
+
+  private static List<Pair<String, String>> singleReplica(String state) {
+    return List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, state));
+  }
+
+  /// Returns an ideal state assignment placing the segment on all three instances as CONSUMING, i.e. a
+  /// segment the controller still considers in progress.
+  private static List<Pair<String, String>> allConsuming() {
+    return List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, CONSUMING),
+        new ImmutablePair<>(REPLICA_INSTANCE_1, CONSUMING), new ImmutablePair<>(REPLICA_INSTANCE_2, CONSUMING));
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testConsumingSegmentMeasuredLikeAnyOther(String selectorType) {
+    // Consuming segments are deliberately not special-cased. A partition whose replicas are all gone will also
+    // raise an ingestion alert, and reconciling that overlap belongs in the alerting pipeline rather than in a
+    // metric that would otherwise stop meaning what its name says.
+    createOldSegments(List.of("segment0"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", allConsuming()), Map.of("segment0", partiallyOnline(0)));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 0);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+    assertEquals(replicaHealth.getNumUnavailableSegments(), 1);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testHealthyConsumingSegmentReportsFullyReplicated(String selectorType) {
+    // The flip side of not excluding them: a partition consuming normally on every replica must read 100%, or
+    // every real-time table would look permanently degraded. CONSUMING counts as serving for routing.
+    createOldSegments(List.of("segment0"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", allConsuming()), Map.of("segment0", allConsuming()));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 100);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+    assertEquals(replicaHealth.getNumUnavailableSegments(), 0);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testCommittedSegmentCountedWhilePeersStillDownloading(String selectorType) {
+    // The exclusion has to end at the commit, not when the last replica finishes downloading. The ideal state
+    // turns ONLINE at commit while peers still report CONSUMING, and that segment is an ordinary immutable
+    // one whose replicas are genuinely missing.
+    createOldSegments(List.of("segment0"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        // Committed: ideal state ONLINE everywhere
+        Map.of("segment0", allOnline()),
+        // Only the committer has it; the peers have dropped out rather than reporting CONSUMING
+        Map.of("segment0", partiallyOnline(1)));
+
+    _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS + 1));
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 33);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testCommittingSegmentStillRoutableFromPeersReportingConsuming(String selectorType) {
+    // The normal commit window: ideal state ONLINE, peers still CONSUMING in the external view. They remain
+    // routable, so nothing is short of replicas and no clock starts.
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", allOnline()),
+        Map.of("segment0", List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, ONLINE),
+            new ImmutablePair<>(REPLICA_INSTANCE_1, CONSUMING), new ImmutablePair<>(REPLICA_INSTANCE_2, CONSUMING))));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 100);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testSegmentsAtMinPercentIgnoresSingleReplicaSegments(String selectorType) {
+    // The count is drawn from the same population as the percentage, so a segment the ideal state assigns one
+    // replica is left out of it too - otherwise a table that is single-replica by design would report every
+    // one of its segments as sitting at the worst level.
+    createOldSegments(List.of("segment0"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", singleReplica(ONLINE)), Map.of("segment0", singleReplica(OFFLINE)));
+
+    _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS * 2));
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 100);
+    // Nothing measured at all, which is the only way the count reaches 0
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 0);
+  }
+
+  @Test
+  public void testSegmentsAtMinPercentCountsOnlyTheWorstLevel() {
+    // segment0 is at 2 of 3 and segment1 at 1 of 3. The count belongs to the percentage that is reported, so
+    // only segment1 is in it - a segment that is degraded but better off than the worst must not inflate the
+    // blast radius the minimum is describing.
+    // Balanced routing only: under strict replica groups segment1's gaps would exclude those groups for
+    // segment0 as well, taking both segments to 1 of 3 and hiding the distinction this asserts on.
+    createOldSegments(List.of("segment0", "segment1"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(BALANCED_INSTANCE_SELECTOR, REPLICA_INSTANCES,
+        Map.of("segment0", allOnline(), "segment1", allOnline()),
+        Map.of("segment0", partiallyOnline(2), "segment1", partiallyOnline(1)));
+
+    _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS * 2));
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 33);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testSegmentsAtMinPercentComparesUnevenlyReplicatedSegments(String selectorType) {
+    // segment0 is down to 1 of its 2 assigned replicas and segment1 to 1 of its 3. Both have lost all but one
+    // replica, yet the percentages differ - 50 against 33 - and it is the percentage that decides membership,
+    // so only segment1 is counted. Measuring each segment against its own assignment is what makes the two
+    // comparable in the first place.
+    createOldSegments(List.of("segment0", "segment1"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", twoReplicas(), "segment1", allOnline()),
+        Map.of("segment0", List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, ONLINE),
+            new ImmutablePair<>(REPLICA_INSTANCE_1, OFFLINE)), "segment1", partiallyOnline(1)));
+
+    _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS * 2));
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    // The percentage reports the worse of the two, which is the 1-of-3 segment
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 33);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testSegmentsAtMinPercentCountsTwoReplicaSegmentWithNoReplicaLeft(String selectorType) {
+    // A two-replica segment is measured like any other, so losing both takes it to 0% and counts it. A rule
+    // keyed on "three or more assigned" would miss a total loss on a two-replica table entirely.
+    createOldSegments(List.of("segment0"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", twoReplicas()),
+        Map.of("segment0", List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, OFFLINE),
+            new ImmutablePair<>(REPLICA_INSTANCE_1, OFFLINE))));
+
+    _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS * 2));
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 0);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+  }
+
+  @Test
+  public void testSegmentsAtMinPercentWatchesReplicatedPartOfMixedTable() {
+    // A real-time table whose consuming segment lives on one replica while its completed segments live on
+    // three. Losing two replicas of the completed segment has to be reported, and the thinly replicated
+    // consuming segment must neither stop that from happening nor be counted alongside it.
+    createOldSegments(List.of("completed"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(BALANCED_INSTANCE_SELECTOR, REPLICA_INSTANCES,
+        Map.of("consuming", List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, CONSUMING)), "completed", allOnline()),
+        Map.of("consuming", List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, CONSUMING)), "completed",
+            partiallyOnline(1)));
+
+    _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS * 2));
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 33);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testReplicaHealthPartiallyReplicated(String selectorType) {
+    // segment0 is only loaded on 1 of its 3 replicas, which is the threshold the low replica alert fires on
+    createOldSegments(List.of("segment0"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", allOnline()), Map.of("segment0", partiallyOnline(1)));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 33);
+    assertEquals(replicaHealth.getNumUnavailableSegments(), 0);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testReplicaHealthUnavailableSegment(String selectorType) {
+    // segment0 is loaded nowhere
+    createOldSegments(List.of("segment0"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", allOnline()), Map.of("segment0", partiallyOnline(0)));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 0);
+    assertEquals(replicaHealth.getNumUnavailableSegments(), 1);
+    // A replicated segment that is unavailable is at 0%, which is as low as the minimum goes, so it is
+    // counted by both gauges rather than moving from one to the other
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+  }
+
+  @Test
+  public void testReplicaHealthReportsWorstSegmentNotAverage() {
+    // segment0 is loaded nowhere while the other two are fully loaded. Reporting the minimum is what keeps
+    // a single unservable segment from being diluted by a large healthy table, and the count says how much
+    // of the table that minimum is speaking for - here one segment out of the three measured.
+    createOldSegments(List.of("segment0"));
+    BaseInstanceSelector selector = createReplicaHealthSelector(BALANCED_INSTANCE_SELECTOR, REPLICA_INSTANCES,
+        Map.of("segment0", allOnline(), "segment1", allOnline(), "segment2", allOnline()),
+        Map.of("segment0", partiallyOnline(0), "segment1", allOnline(), "segment2", allOnline()));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 0);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 1);
+    assertEquals(replicaHealth.getNumUnavailableSegments(), 1);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testReplicaHealthIgnoresNewSegments(String selectorType) {
+    // segment0 was just created and is only loaded on 1 replica. That is expected right after a push, so
+    // it must not drag the percentage down.
+    createSegmentCreationTimes(Map.of("segment0", _mutableClock.millis()));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", allOnline()), Map.of("segment0", partiallyOnline(1)));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 100);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testReplicaHealthAccountsForDisabledInstance(String selectorType) {
+    // A disabled instance reduces the replicas the broker can route to just as much as a missing external
+    // view entry does, and it arrives through onInstancesChange rather than an assignment change.
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", allOnline()), Map.of("segment0", allOnline()));
+    assertEquals(selector.getReplicaHealth().getMinPercentOfReplicas(), 100);
+
+    selector.onInstancesChange(ImmutableSet.of(REPLICA_INSTANCE_0, REPLICA_INSTANCE_1),
+        List.of(REPLICA_INSTANCE_2));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 66);
+    assertEquals(replicaHealth.getNumUnavailableSegments(), 0);
+  }
+
+  @Test
+  public void testReplicaHealthReflectsStrictReplicaGroupKnockout() {
+    // The two segments share an ideal state assignment but are each missing a different instance: segment0
+    // is not loaded on instance2, segment1 is not loaded on instance1. Strict replica group routing takes
+    // both instances out of service for every segment in the group, so each segment is left with instance0
+    // alone. The external view on its own only ever shows two of three replicas missing per segment, so the
+    // group-wide knockout is degradation a metric computed from the external view cannot see.
+    createOldSegments(List.of("segment0", "segment1"));
+    Map<String, List<Pair<String, String>>> idealStateAssignment =
+        Map.of("segment0", allOnline(), "segment1", allOnline());
+    Map<String, List<Pair<String, String>>> externalViewAssignment =
+        Map.of("segment0", onlineExcept(REPLICA_INSTANCE_2), "segment1", onlineExcept(REPLICA_INSTANCE_1));
+
+    BaseInstanceSelector strictSelector =
+        createReplicaHealthSelector(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, REPLICA_INSTANCES,
+            idealStateAssignment, externalViewAssignment);
+    TableReplicaHealth strictReplicaHealth = strictSelector.getReplicaHealth();
+    // 1 of 3, not the 2 of 3 the external view would suggest, and both segments are down to a single replica
+    assertEquals(strictReplicaHealth.getMinPercentOfReplicas(), 33);
+    assertEquals(strictReplicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 2);
+
+    // Without the strict guarantee each segment only loses the replica its own external view is missing
+    BaseInstanceSelector balancedSelector =
+        createReplicaHealthSelector(BALANCED_INSTANCE_SELECTOR, REPLICA_INSTANCES, idealStateAssignment,
+            externalViewAssignment);
+    TableReplicaHealth balancedReplicaHealth = balancedSelector.getReplicaHealth();
+    assertEquals(balancedReplicaHealth.getMinPercentOfReplicas(), 66);
+    // Both segments tie at the milder minimum, so the count stays 2 while the percentage improves: it tracks
+    // whatever level is currently worst, and is only ever read together with that level
+    assertEquals(balancedReplicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 2);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testReplicaHealthWithUnevenlyReplicatedSegments(String selectorType) {
+    // segment0 is deliberately assigned a single replica, as happens when only part of a table's data sits
+    // on a tier with fewer replicas. Measuring it against its own ideal state keeps it at 100 instead of
+    // permanently reporting it as under-replicated.
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, ONLINE)), "segment1", allOnline()),
+        Map.of("segment0", List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, ONLINE)), "segment1", allOnline()));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 100);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testReplicaHealthIgnoresIdealStateOfflineReplicas(String selectorType) {
+    // An instance the ideal state marks OFFLINE is not expected to serve the segment, so it must not count
+    // against the segment either.
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0",
+            List.of(new ImmutablePair<>(REPLICA_INSTANCE_0, ONLINE), new ImmutablePair<>(REPLICA_INSTANCE_1, ONLINE),
+                new ImmutablePair<>(REPLICA_INSTANCE_2, OFFLINE))),
+        Map.of("segment0", allOnline()));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 100);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testReplicaHealthWithNoOldSegments(String selectorType) {
+    // The state right after a table is created: every segment is new, so there is nothing to measure. It
+    // has to read as fully replicated, otherwise it would trip the very alert the gauge exists for.
+    createSegmentCreationTimes(Map.of("segment0", _mutableClock.millis()));
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        Map.of("segment0", allOnline()), Map.of("segment0", partiallyOnline(0)));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 100);
+    // The 100 above is the "nothing to measure" default rather than a measurement, and the count is what
+    // tells the two apart
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 0);
+    assertEquals(replicaHealth.getNumUnavailableSegments(), 0);
+  }
+
+  @Test(dataProvider = "selectorType")
+  public void testReplicaHealthRecoversOnAssignmentChange(String selectorType) {
+    // The expected replica counts are cached until the next assignment change rebuilds them, so a segment
+    // that converges has to stop being reported as degraded.
+    createOldSegments(List.of("segment0"));
+    Map<String, List<Pair<String, String>>> idealStateAssignment = Map.of("segment0", allOnline());
+    BaseInstanceSelector selector = createReplicaHealthSelector(selectorType, REPLICA_INSTANCES,
+        idealStateAssignment, Map.of("segment0", partiallyOnline(1)));
+    assertEquals(selector.getReplicaHealth().getMinPercentOfReplicas(), 33);
+
+    selector.onAssignmentChange(createIdealState(idealStateAssignment),
+        createExternalView(Map.of("segment0", allOnline())), Set.of("segment0"));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 100);
+    // The cached counts have to be dropped on rebuild, or the segment stays degraded forever
+    assertEquals(selector._oldSegmentExpectedReplicasMap, Map.of());
+  }
+
+  @Test
+  public void testReplicaHealthWithUpsertTableAppliesStrictReplicaGroupRules() {
+    // An upsert table gets the strict replica-group treatment even under the plain replica-group selector,
+    // so the group-wide knockout has to be reflected there too.
+    when(_tableConfig.isUpsertEnabled()).thenReturn(true);
+    createOldSegments(List.of("segment0", "segment1"));
+    // Same setup as testReplicaHealthReflectsStrictReplicaGroupKnockout: a different instance missing per
+    // segment, so 33 can only come from the group-wide knockout and not from either segment's own view
+    BaseInstanceSelector selector =
+        createReplicaHealthSelector(REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, REPLICA_INSTANCES,
+            Map.of("segment0", allOnline(), "segment1", allOnline()),
+            Map.of("segment0", onlineExcept(REPLICA_INSTANCE_2), "segment1", onlineExcept(REPLICA_INSTANCE_1)));
+
+    TableReplicaHealth replicaHealth = selector.getReplicaHealth();
+    assertEquals(replicaHealth.getMinPercentOfReplicas(), 33);
+    assertEquals(replicaHealth.getNumSegmentsAtMinPercentOfReplicas(), 2);
+  }
+
+  @Test
+  public void testReplicaHealthMeasuredForDisabledTable() {
+    // The selector measures a disabled table like any other - it cannot tell the difference, and it is the
+    // routing manager that decides a disabled table's gauges should be dropped rather than reported.
+    createOldSegments(List.of("segment0"));
+    IdealState disabledIdealState = createIdealState(Map.of("segment0", allOnline()));
+    disabledIdealState.enable(false);
+    BalancedInstanceSelector selector = new BalancedInstanceSelector();
+    selector.init(_tableConfig, _propertyStore, _brokerMetrics, null, _mutableClock, INSTANCE_SELECTOR_CONFIG,
+        REPLICA_INSTANCES, EMPTY_SERVER_MAP, disabledIdealState,
+        createExternalView(Map.of("segment0", partiallyOnline(0))), Set.of("segment0"));
+
+    assertEquals(selector.getReplicaHealth().getNumUnavailableSegments(), 1);
+    // The selector never touches the replica health gauges itself
+    verify(_brokerMetrics, never()).setValueOfTableGauge(eq(TABLE_NAME), any(BrokerGauge.class), anyLong());
+    verify(_brokerMetrics, never()).removeTableGauge(eq(TABLE_NAME), any(BrokerGauge.class));
   }
 }

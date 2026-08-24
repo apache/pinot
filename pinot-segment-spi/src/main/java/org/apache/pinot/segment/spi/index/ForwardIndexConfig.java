@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.codec.CodecSpecParser;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -81,6 +82,8 @@ public class ForwardIndexConfig extends IndexConfig {
   private final EncodingType _encodingType;
   @Nullable
   private final CompressionCodec _compressionCodec;
+  @Nullable
+  private final String _codecSpec;
   private final boolean _deriveNumDocsPerChunk;
   private final int _rawIndexWriterVersion;
   private final String _targetMaxChunkSize;
@@ -100,6 +103,7 @@ public class ForwardIndexConfig extends IndexConfig {
       @JsonProperty("compressionCodec") @Nullable CompressionCodec compressionCodec,
       @Deprecated @JsonProperty("chunkCompressionType") @Nullable ChunkCompressionType chunkCompressionType,
       @Deprecated @JsonProperty("dictIdCompressionType") @Nullable DictIdCompressionType dictIdCompressionType,
+      @JsonProperty("codecSpec") @Nullable String codecSpec,
       @JsonProperty("deriveNumDocsPerChunk") @Nullable Boolean deriveNumDocsPerChunk,
       @JsonProperty("rawIndexWriterVersion") @Nullable Integer rawIndexWriterVersion,
       @JsonProperty("targetMaxChunkSize") @Nullable String targetMaxChunkSize,
@@ -111,6 +115,13 @@ public class ForwardIndexConfig extends IndexConfig {
     // Builder(EncodingType) and pass an explicit value, typically from FieldConfig.getEncodingType().
     _encodingType = encodingType == null ? EncodingType.DICTIONARY : encodingType;
     _compressionCodec = getActualCompressionCodec(compressionCodec, chunkCompressionType, dictIdCompressionType);
+    if (_compressionCodec != null && codecSpec != null) {
+      throw new IllegalArgumentException("compressionCodec and codecSpec are mutually exclusive");
+    }
+    if (codecSpec != null && _encodingType != EncodingType.RAW) {
+      throw new IllegalArgumentException("codecSpec requires RAW forward-index encoding");
+    }
+    _codecSpec = codecSpec == null ? null : CodecSpecParser.parse(codecSpec).toDslString();
     _deriveNumDocsPerChunk = Boolean.TRUE.equals(deriveNumDocsPerChunk);
     _rawIndexWriterVersion = rawIndexWriterVersion == null ? _defaultRawIndexWriterVersion : rawIndexWriterVersion;
     _targetMaxChunkSize = targetMaxChunkSize == null ? _defaultTargetMaxChunkSize : targetMaxChunkSize;
@@ -165,6 +176,7 @@ public class ForwardIndexConfig extends IndexConfig {
     }
   }
 
+  @Nullable
   public static CompressionCodec getActualCompressionCodec(@Nullable CompressionCodec compressionCodec,
       @Nullable ChunkCompressionType chunkCompressionType, @Nullable DictIdCompressionType dictIdCompressionType) {
     if (compressionCodec != null) {
@@ -205,6 +217,12 @@ public class ForwardIndexConfig extends IndexConfig {
   @Nullable
   public CompressionCodec getCompressionCodec() {
     return _compressionCodec;
+  }
+
+  /// Returns the structurally normalized codec specification, or `null` for the legacy compression path.
+  @Nullable
+  public String getCodecSpec() {
+    return _codecSpec;
   }
 
   public boolean isDeriveNumDocsPerChunk() {
@@ -262,15 +280,18 @@ public class ForwardIndexConfig extends IndexConfig {
       return false;
     }
     ForwardIndexConfig that = (ForwardIndexConfig) o;
-    return _compressionCodec == that._compressionCodec && _deriveNumDocsPerChunk == that._deriveNumDocsPerChunk
-        && _rawIndexWriterVersion == that._rawIndexWriterVersion && Objects.equals(_targetMaxChunkSize,
-        that._targetMaxChunkSize) && _targetDocsPerChunk == that._targetDocsPerChunk
+    return _compressionCodec == that._compressionCodec
+        && Objects.equals(_codecSpec, that._codecSpec)
+        && _deriveNumDocsPerChunk == that._deriveNumDocsPerChunk
+        && _rawIndexWriterVersion == that._rawIndexWriterVersion
+        && Objects.equals(_targetMaxChunkSize, that._targetMaxChunkSize)
+        && _targetDocsPerChunk == that._targetDocsPerChunk
         && _encodingType == that._encodingType;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(), _compressionCodec, _deriveNumDocsPerChunk, _rawIndexWriterVersion,
+    return Objects.hash(super.hashCode(), _compressionCodec, _codecSpec, _deriveNumDocsPerChunk, _rawIndexWriterVersion,
         _targetMaxChunkSize, _targetDocsPerChunk, _encodingType);
   }
 
@@ -279,6 +300,8 @@ public class ForwardIndexConfig extends IndexConfig {
     private final EncodingType _encodingType;
     @Nullable
     private CompressionCodec _compressionCodec;
+    @Nullable
+    private String _codecSpec;
     private boolean _deriveNumDocsPerChunk = false;
     private int _rawIndexWriterVersion = _defaultRawIndexWriterVersion;
     private String _targetMaxChunkSize = _defaultTargetMaxChunkSize;
@@ -302,6 +325,7 @@ public class ForwardIndexConfig extends IndexConfig {
       _disabled = other.isDisabled();
       _encodingType = Preconditions.checkNotNull(encodingType, "encodingType must not be null");
       _compressionCodec = other._compressionCodec;
+      _codecSpec = other._codecSpec;
       _deriveNumDocsPerChunk = other._deriveNumDocsPerChunk;
       _rawIndexWriterVersion = other._rawIndexWriterVersion;
       _targetMaxChunkSize = other._targetMaxChunkSize;
@@ -314,8 +338,24 @@ public class ForwardIndexConfig extends IndexConfig {
       return this;
     }
 
-    public Builder withCompressionCodec(CompressionCodec compressionCodec) {
+    /// Selects the legacy compression path. A non-null value clears the codec-spec setting; `null` clears only the
+    /// legacy codec and leaves any codec specification unchanged.
+    public Builder withCompressionCodec(@Nullable CompressionCodec compressionCodec) {
       _compressionCodec = compressionCodec;
+      if (compressionCodec != null) {
+        _codecSpec = null;
+      }
+      return this;
+    }
+
+    /// Selects the codec-spec path. A non-null value clears the legacy compression codec; `null` clears only the codec
+    /// specification and leaves any legacy compression codec unchanged. Thus the last non-null compression setting
+    /// selects the active path.
+    public Builder withCodecSpec(@Nullable String codecSpec) {
+      _codecSpec = codecSpec;
+      if (codecSpec != null) {
+        _compressionCodec = null;
+      }
       return this;
     }
 
@@ -344,6 +384,7 @@ public class ForwardIndexConfig extends IndexConfig {
       if (chunkCompressionType == null) {
         return this;
       }
+      _codecSpec = null;
       switch (chunkCompressionType) {
         case LZ4:
         case LZ4_LENGTH_PREFIXED:
@@ -372,6 +413,7 @@ public class ForwardIndexConfig extends IndexConfig {
       Preconditions.checkArgument(dictIdCompressionType == DictIdCompressionType.MV_ENTRY_DICT,
           "Unsupported dictionary compression type: " + dictIdCompressionType);
       _compressionCodec = CompressionCodec.MV_ENTRY_DICT;
+      _codecSpec = null;
       return this;
     }
 
@@ -398,8 +440,8 @@ public class ForwardIndexConfig extends IndexConfig {
     }
 
     public ForwardIndexConfig build() {
-      return new ForwardIndexConfig(_disabled, _encodingType, _compressionCodec, null, null, _deriveNumDocsPerChunk,
-          _rawIndexWriterVersion, _targetMaxChunkSize, _targetDocsPerChunk, _configs);
+      return new ForwardIndexConfig(_disabled, _encodingType, _compressionCodec, null, null, _codecSpec,
+          _deriveNumDocsPerChunk, _rawIndexWriterVersion, _targetMaxChunkSize, _targetDocsPerChunk, _configs);
     }
   }
 }

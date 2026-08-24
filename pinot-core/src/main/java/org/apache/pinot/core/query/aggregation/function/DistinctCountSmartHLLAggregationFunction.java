@@ -62,8 +62,8 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
   private final int _log2m;
   private final int _dictIdCardinalityThreshold;
 
-  public DistinctCountSmartHLLAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments.get(0));
+  public DistinctCountSmartHLLAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments.get(0), nullHandlingEnabled);
 
     if (arguments.size() > 1) {
       Parameters parameters = new Parameters(arguments.get(1).getLiteral().getStringValue());
@@ -126,16 +126,20 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
                                        int length) {
     if (blockValSet.isSingleValue()) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
-      for (int i = 0; i < length; i++) {
-        hyperLogLog.offer(dictionary.get(dictIds[i]));
-      }
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          hyperLogLog.offer(dictionary.get(dictIds[i]));
+        }
+      });
     } else {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
-      for (int i = 0; i < length; i++) {
-        for (int dictId : dictIds[i]) {
-          hyperLogLog.offer(dictionary.get(dictId));
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          for (int dictId : dictIds[i]) {
+            hyperLogLog.offer(dictionary.get(dictId));
+          }
         }
-      }
+      });
     }
   }
 
@@ -143,12 +147,14 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
   private void aggregateDictIdsIntoBitmap(RoaringBitmap dictIdBitmap, BlockValSet blockValSet, int length) {
     if (blockValSet.isSingleValue()) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
-      dictIdBitmap.addN(dictIds, 0, length);
+      forEachNotNull(length, blockValSet, (from, to) -> dictIdBitmap.addN(dictIds, from, to - from));
     } else {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
-      for (int i = 0; i < length; i++) {
-        dictIdBitmap.add(dictIds[i]);
-      }
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          dictIdBitmap.add(dictIds[i]);
+        }
+      });
     }
   }
 
@@ -167,39 +173,51 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
       switch (storedType) {
         case INT:
           int[] intValues = blockValSet.getIntValuesSV();
-          for (int i = 0; i < length; i++) {
-            hll.offer(intValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              hll.offer(intValues[i]);
+            }
+          });
           break;
         case LONG:
           long[] longValues = blockValSet.getLongValuesSV();
-          for (int i = 0; i < length; i++) {
-            hll.offer(longValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              hll.offer(longValues[i]);
+            }
+          });
           break;
         case FLOAT:
           float[] floatValues = blockValSet.getFloatValuesSV();
-          for (int i = 0; i < length; i++) {
-            hll.offer(floatValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              hll.offer(floatValues[i]);
+            }
+          });
           break;
         case DOUBLE:
           double[] doubleValues = blockValSet.getDoubleValuesSV();
-          for (int i = 0; i < length; i++) {
-            hll.offer(doubleValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              hll.offer(doubleValues[i]);
+            }
+          });
           break;
         case STRING:
           String[] stringValues = blockValSet.getStringValuesSV();
-          for (int i = 0; i < length; i++) {
-            hll.offer(stringValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              hll.offer(stringValues[i]);
+            }
+          });
           break;
         case BYTES:
           byte[][] bytesValues = blockValSet.getBytesValuesSV();
-          for (int i = 0; i < length; i++) {
-            hll.offer(bytesValues[i]);
-          }
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              hll.offer(bytesValues[i]);
+            }
+          });
           break;
         default:
           throw getIllegalDataTypeException(valueType, true);
@@ -208,43 +226,53 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
       switch (storedType) {
         case INT:
           int[][] intValues = blockValSet.getIntValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (int value : intValues[i]) {
-              hll.offer(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (int value : intValues[i]) {
+                hll.offer(value);
+              }
             }
-          }
+          });
           break;
         case LONG:
           long[][] longValues = blockValSet.getLongValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (long value : longValues[i]) {
-              hll.offer(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (long value : longValues[i]) {
+                hll.offer(value);
+              }
             }
-          }
+          });
           break;
         case FLOAT:
           float[][] floatValues = blockValSet.getFloatValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (float value : floatValues[i]) {
-              hll.offer(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (float value : floatValues[i]) {
+                hll.offer(value);
+              }
             }
-          }
+          });
           break;
         case DOUBLE:
           double[][] doubleValues = blockValSet.getDoubleValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (double value : doubleValues[i]) {
-              hll.offer(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (double value : doubleValues[i]) {
+                hll.offer(value);
+              }
             }
-          }
+          });
           break;
         case STRING:
           String[][] stringValues = blockValSet.getStringValuesMV();
-          for (int i = 0; i < length; i++) {
-            for (String value : stringValues[i]) {
-              hll.offer(value);
+          forEachNotNull(length, blockValSet, (from, to) -> {
+            for (int i = from; i < to; i++) {
+              for (String value : stringValues[i]) {
+                hll.offer(value);
+              }
             }
-          }
+          });
           break;
         default:
           throw getIllegalDataTypeException(valueType, false);

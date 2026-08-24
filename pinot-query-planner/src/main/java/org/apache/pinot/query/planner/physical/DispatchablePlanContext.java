@@ -60,6 +60,7 @@ public class DispatchablePlanContext {
 
   private final Map<Integer, DispatchablePlanMetadata> _dispatchablePlanMetadataMap = new HashMap<>();
   private final Map<Integer, PlanNode> _dispatchablePlanStageRootMap = new HashMap<>();
+  private final Map<String, WorkerManager.PartitionTableInfo> _partitionTableInfoCache = new HashMap<>();
   private long _numSegmentsPrunedByBroker;
   private int _leafStagesAssigned;
   private int _leafStagesEmpty;
@@ -131,6 +132,13 @@ public class DispatchablePlanContext {
 
   public Map<Integer, PlanNode> getDispatchablePlanStageRootMap() {
     return _dispatchablePlanStageRootMap;
+  }
+
+  /// The partition layout of each partitioned table scanned by this query, keyed by table name. Read from the routing
+  /// manager once per table so that the colocation pre-pass and every leaf stage scanning the same table (e.g. both
+  /// sides of a self-join) see one snapshot. The value is opaque here: [WorkerManager] builds and interprets it.
+  public Map<String, WorkerManager.PartitionTableInfo> getPartitionTableInfoCache() {
+    return _partitionTableInfoCache;
   }
 
   public long getNumSegmentsPrunedByBroker() {

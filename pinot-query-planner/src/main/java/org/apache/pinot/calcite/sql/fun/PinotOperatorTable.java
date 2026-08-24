@@ -324,7 +324,10 @@ public class PinotOperatorTable implements SqlOperatorTable {
           List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.ANY),
           i -> i > 1)),
 
-      new PinotSqlFunction("NOW", ReturnTypes.TIMESTAMP, OperandTypes.NILADIC)
+      // Deterministic so PinotEvaluateLiteralRule folds it once at plan time, but volatile so it is never
+      // re-evaluated at a different point in the plan. This entry shadows the FunctionRegistry one (see
+      // registerScalarFunctions), so the volatility has to be repeated here.
+      new PinotSqlFunction("NOW", ReturnTypes.TIMESTAMP, OperandTypes.NILADIC, true, true)
   );
 
   private static final List<Pair<SqlOperator, List<String>>> PINOT_OPERATORS_WITH_ALIASES = List.of(

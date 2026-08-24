@@ -383,6 +383,15 @@ public class CommonConstants {
         "pinot.broker.query.log.sqlRedaction";
     public static final String DEFAULT_BROKER_QUERY_LOG_SQL_REDACTION = "none";
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING = "pinot.broker.query.enable.null.handling";
+    /// How query option keys supplied through SQL `SET` / `OPTION(...)` on DQL queries are validated.
+    /// Broker config key: `pinot.broker.query.option.validationMode`.
+    /// One of `QueryOptionsUtils.SqlQueryOptionValidationMode`: `NONE` (default, unknown keys are
+    /// preserved silently, as they always have been), `WARN` (preserved, logged once per distinct
+    /// unknown key) or `REJECT` (query fails). Plugins can allowlist their own keys for `REJECT` via
+    /// `QueryOptionsUtils.registerSqlQueryOptionKey`.
+    public static final String CONFIG_OF_BROKER_QUERY_OPTION_VALIDATION_MODE =
+        "pinot.broker.query.option.validationMode";
+    public static final String DEFAULT_BROKER_QUERY_OPTION_VALIDATION_MODE = "NONE";
     /// When true, the broker initializes the materialized view metadata cache and query rewrite
     /// engine.  When false (default), MV rewrite is disabled regardless of per-MV
     /// `rewriteEnabled` setting.
@@ -862,6 +871,8 @@ public class CommonConstants {
 
         public static final String IN_PREDICATE_PRE_SORTED = "inPredicatePreSorted";
         public static final String IN_PREDICATE_LOOKUP_ALGORITHM = "inPredicateLookupAlgorithm";
+        /// Query-level override for `inpredicate.threshold`. Negative means always prune.
+        public static final String IN_PREDICATE_PRUNING_THRESHOLD = "inPredicatePruningThreshold";
 
         // When evaluating REGEXP_LIKE predicate on a dictionary encoded column:
         // - If dictionary size is smaller than this threshold, scan the dictionary to get the matching dictionary ids
@@ -1503,6 +1514,8 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.server.crypter";
     public static final String CONFIG_OF_VALUE_PRUNER_IN_PREDICATE_THRESHOLD =
         "pinot.server.query.executor.pruner.columnvaluesegmentpruner.inpredicate.threshold";
+    /// Default IN-pruning threshold. Negative means always prune.
+    /// Can be overridden per query via [Request.QueryOptionKey#IN_PREDICATE_PRUNING_THRESHOLD].
     public static final int DEFAULT_VALUE_PRUNER_IN_PREDICATE_THRESHOLD = 10;
 
     /// Service token for accessing protected controller APIs.

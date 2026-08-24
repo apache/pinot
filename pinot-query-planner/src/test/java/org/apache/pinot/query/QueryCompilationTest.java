@@ -434,6 +434,34 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
+  /// [org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule] refuses to push a volatile filter below a join. `now()`
+  /// is volatile, but [org.apache.pinot.calcite.rel.rules.PinotEvaluateLiteralRule] folds it to a literal first, so
+  /// the common time-filter-over-a-join pattern must still reach the leaf scan.
+  ///
+  /// Asserted here rather than in JoinPlans.json because the folded epoch literal differs on every run.
+  @Test
+  public void testVolatileNowFilterIsStillPushedBelowJoin() {
+    String query =
+        "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.ts > now() - 86400000";
+
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    // now() folds to the current epoch millis, so mask the literal before comparing.
+    String normalized = explain.replaceAll("(?<=\\$7, )\\d+", "<EPOCH>");
+    //@formatter:off
+    assertEquals(normalized,
+        "Execution Plan\n"
+        + "LogicalProject(col1=[$0], col2=[$2])\n"
+        + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
+        + "    PinotLogicalExchange(distribution=[hash[0]])\n"
+        + "      LogicalProject(col1=[$0])\n"
+        + "        LogicalFilter(condition=[>($7, <EPOCH>)])\n"
+        + "          PinotLogicalTableScan(table=[[default, a]])\n"
+        + "    PinotLogicalExchange(distribution=[hash[0]])\n"
+        + "      LogicalProject(col1=[$0], col2=[$1])\n"
+        + "        PinotLogicalTableScan(table=[[default, b]])\n");
+    //@formatter:on
+  }
+
   @Test
   public void testAggregateCaseToFilter() {
     // Tests that queries like "SELECT SUM(CASE WHEN col1 = 'a' THEN 1 ELSE 0 END) FROM a" are rewritten to
@@ -742,6 +770,55 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         assertTrue(plan.equals(plans.get(0)));
       }
     }
+  }
+
+  /// `ProjectAggregateMergeRule` rebuilds the aggregate with a `RelBuilder`, and Calcite's automatic hint
+  /// propagation only restores the hints of the node the rule matched on -- the `Project`, which never carries
+  /// `aggOptions`. Without [org.apache.pinot.calcite.rel.rules.PinotProjectAggregateMergeRule] the aggregate's
+  /// hints are dropped and the aggregate is split into LEAF + exchange + FINAL despite the colocation hint.
+  ///
+  /// A `Project` lands directly above the aggregate here because the `SUM` argument is nullable:
+  /// `PinotAggregateReduceFunctionsRule` rewrites `SUM(x)` into `$SUM0(x) + COUNT(x)` plus a
+  /// `CASE(COUNT(x) = 0, NULL, $SUM0(x))` project. With a non-nullable argument the reduction collapses to a
+  /// bare `$SUM0` with no project, the rule does not match, and the hint survives either way.
+  @Test
+  public void testAggregateHintSurvivesProjectAggregateMerge() {
+    String query = "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ "
+        + "col1, SUM(CASE WHEN col3 > 5 THEN col3 ELSE NULL END) FROM b GROUP BY col1";
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("aggType=[DIRECT]"),
+        "is_partitioned_by_group_by_keys should produce a DIRECT aggregate, but got:\n" + explain);
+    assertFalse(explain.contains("PinotLogicalExchange"),
+        "A colocated aggregate must not have an exchange below it, but got:\n" + explain);
+  }
+
+  /// Same defect reached through a window function, which is how it shows up in practice: `LAG` is nullable, so
+  /// any expression derived from it is nullable, so the `SUM` over it takes the reduction path above. The window
+  /// itself is colocated by `windowOptions`; only the aggregate above it used to lose its hint.
+  @Test
+  public void testAggregateHintSurvivesProjectAggregateMergeAboveWindow() {
+    String query = "EXPLAIN PLAN FOR WITH w AS ("
+        + "SELECT /*+ windowOptions(is_partitioned_by_window_keys='true') */ col1, col3, ts, "
+        + "LAG(col3, 1) OVER (PARTITION BY col1 ORDER BY ts) AS prev FROM b) "
+        + "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ "
+        + "col1, SUM(CASE WHEN prev IS NULL THEN 0 ELSE col3 - prev END) FROM w GROUP BY col1";
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("aggType=[DIRECT]"),
+        "is_partitioned_by_group_by_keys should produce a DIRECT aggregate, but got:\n" + explain);
+  }
+
+  /// The other `aggOptions` options travel on the same hint and were lost the same way.
+  /// `is_skip_leaf_stage_group_by` must still push the aggregate above the exchange.
+  @Test
+  public void testSkipLeafStageGroupByHintSurvivesProjectAggregateMerge() {
+    String query = "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ "
+        + "col1, SUM(CASE WHEN col3 > 5 THEN col3 ELSE NULL END) FROM b GROUP BY col1";
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    assertTrue(explain.contains("aggType=[DIRECT]"),
+        "is_skip_leaf_stage_group_by should produce a single DIRECT aggregate above the exchange, but got:\n"
+            + explain);
+    assertFalse(explain.contains("aggType=[LEAF]"),
+        "is_skip_leaf_stage_group_by must not leave a LEAF aggregate, but got:\n" + explain);
   }
 
   @Test

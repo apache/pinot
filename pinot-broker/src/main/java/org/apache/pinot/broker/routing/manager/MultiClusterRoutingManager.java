@@ -217,8 +217,37 @@ public class MultiClusterRoutingManager implements RoutingManager {
     return combined.isEmpty() ? null : combined;
   }
 
+  /// Returns the partition info only when a single cluster has any, and `null` when more than one does.
+  ///
+  /// Unlike [#getRoutingTable], [#getSegments] and [#getServingInstances], this cannot union the clusters: the info is
+  /// a per-partition array of the servers holding every segment of that partition, and no server holds the segments
+  /// that live in another cluster. One cluster's array would make a partition served only by another cluster look like
+  /// a partition holding no data, and a colocated join treats such a partition as empty and silently drops its rows. So
+  /// a table spread over several clusters reports nothing and its callers fail. Expressing it properly needs the array
+  /// to carry each partition's cluster, which the current shape cannot do.
   @Override
   public TablePartitionReplicatedServersInfo getTablePartitionReplicatedServersInfo(String tableNameWithType) {
-    return findFirst(mgr -> mgr.getTablePartitionReplicatedServersInfo(tableNameWithType), tableNameWithType);
+    TablePartitionReplicatedServersInfo partitionInfo =
+        _localClusterRoutingManager.getTablePartitionReplicatedServersInfo(tableNameWithType);
+    for (BaseBrokerRoutingManager remoteCluster : _remoteClusterRoutingManagers) {
+      TablePartitionReplicatedServersInfo remotePartitionInfo;
+      try {
+        remotePartitionInfo = remoteCluster.getTablePartitionReplicatedServersInfo(tableNameWithType);
+      } catch (Exception e) {
+        LOGGER.error("Error getting table partition info from remote cluster routing manager for table {}",
+            tableNameWithType, e);
+        continue;
+      }
+      if (remotePartitionInfo == null) {
+        continue;
+      }
+      if (partitionInfo != null) {
+        LOGGER.warn("Found table partition info in multiple clusters for table: {}, returning null so that "
+            + "partition-aware routing is not attempted on a partial view", tableNameWithType);
+        return null;
+      }
+      partitionInfo = remotePartitionInfo;
+    }
+    return partitionInfo;
   }
 }

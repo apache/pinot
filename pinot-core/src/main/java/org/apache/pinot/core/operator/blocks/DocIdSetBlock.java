@@ -27,6 +27,13 @@ import org.apache.pinot.core.common.Block;
 /// Each `BaseDocIdSetOperator` can return multiple `DocIdSetBlock`s and each block contains an array of
 /// document ids.
 ///
+/// **IMPORTANT**: The document id array may be a scratch buffer owned and reused by the producing operator, in which
+/// case its contents are invalidated by the next `nextBlock()` call on that operator. Consumers that hold on to a
+/// block across pulls (e.g. projection operators that prefetch multiple blocks ahead) must copy the array, and must
+/// not share other per-block scratch state across the retained blocks (e.g. they need a dedicated
+/// [org.apache.pinot.core.common.DataBlockCache] per retained block rather than the single shared instance the
+/// default projection operator uses).
+///
 /// Do not confuse this class with [org.apache.pinot.core.common.BlockDocIdSet], which is returned by
 /// the filter operator and contains a set of document ids that can be iterated through.
 public class DocIdSetBlock implements Block {

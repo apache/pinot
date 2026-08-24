@@ -38,14 +38,19 @@ import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexUtil;
+import org.apache.calcite.rex.RexVisitorImpl;
 import org.apache.calcite.rex.RexWindowBound;
 import org.apache.calcite.rex.RexWindowBounds;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
+import org.apache.calcite.util.Util;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
+import org.apache.pinot.common.function.sql.PinotSqlFunction;
 
 
 public class PinotRuleUtils {
@@ -130,6 +135,49 @@ public class PinotRuleUtils {
   public static String extractFunctionName(RexCall function) {
     SqlKind funcSqlKind = function.getOperator().getKind();
     return funcSqlKind == SqlKind.OTHER_FUNCTION ? function.getOperator().getName() : funcSqlKind.name();
+  }
+
+  /// Returns whether `node` evaluates to the same result no matter where in the plan it sits, and can therefore be
+  /// relocated -- pushed below a join, duplicated onto another input, and so on.
+  ///
+  /// An expression must be clear of three axes of variability:
+  ///
+  /// - [SqlOperator#isDeterministic()] -- `false` for `rand()`, `UUID_V4`, `UUID_V7` and Calcite's own `RAND` /
+  ///   `RAND_INTEGER`. Delegated to `RexUtil#isDeterministic` so this half tracks upstream automatically.
+  /// - [SqlOperator#isDynamicFunction()] -- Calcite's own "fold once per query, never re-evaluate" marker, used by
+  ///   `CURRENT_TIMESTAMP` and friends.
+  /// - [PinotSqlFunction#isVolatile()] -- Pinot's equivalent marker, `true` for `FunctionVolatility.VOLATILE`
+  ///   functions such as `now()`, `ago()` and `stageId()`. These deliberately stay `isDeterministic() == true` so that
+  ///   [PinotEvaluateLiteralRule] can still fold them once at plan time, which is precisely why
+  ///   `RexUtil#isDeterministic` alone does not catch them.
+  ///
+  /// Relocating an expression that fails this check changes how many times, and in what context, it is evaluated --
+  /// which changes query results. `FunctionVolatility.STABLE` deliberately passes: it is constant within a single
+  /// query, so moving it is safe.
+  ///
+  /// Note this is a predicate that callers must apply; it is not enforced globally. Only [PinotFilterJoinRule]
+  /// consults it today, so other rules that relocate expressions can still move volatile ones.
+  public static boolean isRelocatable(RexNode node) {
+    if (!RexUtil.isDeterministic(node)) {
+      return false;
+    }
+    try {
+      node.accept(new RexVisitorImpl<Void>(true) {
+        @Override
+        public Void visitCall(RexCall call) {
+          SqlOperator operator = call.getOperator();
+          if (operator.isDynamicFunction()
+              || (operator instanceof PinotSqlFunction && ((PinotSqlFunction) operator).isVolatile())) {
+            throw Util.FoundOne.NULL;
+          }
+          return super.visitCall(call);
+        }
+      });
+      return true;
+    } catch (Util.FoundOne e) {
+      Util.swallow(e, null);
+      return false;
+    }
   }
 
   public static class WindowUtils {

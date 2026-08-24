@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -156,8 +160,8 @@ public class AggregationFunctionNullContractTest {
   ///
   /// Returning is not enough to prove the `null` was resolved: a function can wrap the `null` in a serializer that only
   /// dereferences it when the value is rendered, which moves the failure out of this method and into the response path.
-  /// [ColumnDataType#convert] is the step that threw in production, so it is exercised alongside `toString`; a
-  /// serializer wrapping a `null` can survive one and fail the other.
+  /// [org.apache.pinot.common.utils.DataSchema.ColumnDataType#convert] is the step that threw in production, so it is
+  /// exercised alongside `toString`; a serializer wrapping a `null` can survive one and fail the other.
   private static void render(AggregationFunction function, @Nullable Object finalResult) {
     if (finalResult != null) {
       finalResult.toString();
@@ -191,6 +195,27 @@ public class AggregationFunctionNullContractTest {
     assertEquals(create("DISTINCTCOUNTBITMAP", "(column)", true).extractFinalResult(null), 0);
   }
 
+  /// A funnel over no events completed no steps, so every one of them answers zero rather than `NULL`.
+  ///
+  /// They belong with the counting functions above rather than the value functions below: the answer is a count, or
+  /// a per-step vector of counts, and zero is the meaningful value for it. Pinned because the whole family renders
+  /// this from an initial accumulator rather than from a branch in `extractFinalResult`, so it would move quietly.
+  @Test
+  public void testFunnelFunctionsReturnZeroWhenNothingAggregated() {
+    String steps = "(column, '1000', 2, column2 = 'a', column2 = 'b')";
+    assertEquals(create("FUNNELMAXSTEP", steps, true).extractFinalResult(null), 0);
+    assertEquals(create("FUNNELCOMPLETECOUNT", steps, true).extractFinalResult(null), 0);
+    assertEquals(create("FUNNELSTEPDURATIONSTATS",
+            "(column, '1000', 2, column2 = 'a', column2 = 'b', 'durationFunctions=count')", true)
+        .extractFinalResult(null), new DoubleArrayList());
+    assertEquals(create("FUNNELMATCHSTEP", steps, true).extractFinalResult(null), new IntArrayList(new int[]{0, 0}));
+    assertEquals(create("FUNNELEVENTSFUNCTIONEVAL",
+            "(column, '1000', 2, column2 = 'a', column2 = 'b', 2, column, column2)", true)
+        .extractFinalResult(null), new ObjectArrayList<String>());
+    assertEquals(create("FUNNELCOUNT", "(STEPS(column2 = 'a', column2 = 'b'), CORRELATE_BY(column))", true)
+        .extractFinalResult(null), new LongArrayList(new long[]{0L, 0L}));
+  }
+
   /// The functions that return SQL `NULL` when nothing was aggregated.
   ///
   /// Both representations of that state are checked. A `null` intermediate result is the obvious one, but several of
@@ -203,7 +228,13 @@ public class AggregationFunctionNullContractTest {
         AggregationFunctionType.AVG, AggregationFunctionType.MINMAXRANGE, AggregationFunctionType.VARPOP,
         AggregationFunctionType.STDDEVPOP, AggregationFunctionType.PERCENTILE,
         AggregationFunctionType.PERCENTILEEST, AggregationFunctionType.PERCENTILETDIGEST,
-        AggregationFunctionType.PERCENTILEKLL, AggregationFunctionType.PERCENTILESMARTTDIGEST}) {
+        AggregationFunctionType.PERCENTILEKLL, AggregationFunctionType.PERCENTILESMARTTDIGEST,
+        // These carry a legacy sentinel with the option disabled - NaN, the empty point, an all-zero histogram, an
+        // empty id set - so only the enabled answer is NULL, and only the enabled answer is checked here
+        AggregationFunctionType.IDSET, AggregationFunctionType.HISTOGRAM, AggregationFunctionType.SKEWNESS,
+        AggregationFunctionType.KURTOSIS, AggregationFunctionType.STUNION,
+        // These two answer NULL in both modes, which is why neither needs a mode-aware branch
+        AggregationFunctionType.SUMARRAYLONG, AggregationFunctionType.SUMARRAYDOUBLE}) {
       // Built through the shared argument shapes: the percentile families disagree on whether the percentile is a
       // name suffix or an argument, and only some accept both
       AggregationFunction function = tryCreate(type, true);
@@ -223,9 +254,13 @@ public class AggregationFunctionNullContractTest {
   /// which functions the option actually reaches.
   ///
   /// The raw variants reach the option through the function they delegate to, so threading it into one of those
-  /// changes the raw variant alongside it. Absence is as meaningful as presence: a function missing from here either
-  /// never receives the option, which is the first known deviation on [AggregationFunction], or does not skip null
-  /// rows.
+  /// changes the raw variant alongside it.
+  ///
+  /// Absence no longer means a function was left out of the contract. Every user-facing aggregation now receives the
+  /// option, so a function missing from here is one this harness cannot drive — see
+  /// [#NOT_EXERCISABLE_BY_SYNTHETIC_BLOCK], which lists where each of those is covered instead — or one that
+  /// genuinely answers the same in both modes, as the counting functions do when the empty answer is `0` either
+  /// way.
   ///
   /// Two bounds on how much this set proves. It only covers what the harness can drive — see
   /// [#NOT_EXERCISABLE_BY_SYNTHETIC_BLOCK] — and it compares the **rendered** answers, because several functions
@@ -241,7 +276,9 @@ public class AggregationFunctionNullContractTest {
       AggregationFunctionType.PERCENTILETDIGEST, AggregationFunctionType.PERCENTILERAWTDIGEST,
       AggregationFunctionType.PERCENTILESMARTTDIGEST, AggregationFunctionType.PERCENTILEKLL,
       AggregationFunctionType.PERCENTILERAWKLL, AggregationFunctionType.VARPOP, AggregationFunctionType.VARSAMP,
-      AggregationFunctionType.STDDEVPOP, AggregationFunctionType.STDDEVSAMP, AggregationFunctionType.MINMV,
+      AggregationFunctionType.STDDEVPOP, AggregationFunctionType.STDDEVSAMP,
+      // Both are the same PinotFourthMoment accumulator, so threading the option into it moves the pair
+      AggregationFunctionType.SKEWNESS, AggregationFunctionType.KURTOSIS, AggregationFunctionType.MINMV,
       AggregationFunctionType.MAXMV, AggregationFunctionType.SUMMV, AggregationFunctionType.AVGMV,
       AggregationFunctionType.MINMAXRANGEMV, AggregationFunctionType.DISTINCTCOUNTMV,
       AggregationFunctionType.DISTINCTSUMMV, AggregationFunctionType.DISTINCTAVGMV,
@@ -252,27 +289,49 @@ public class AggregationFunctionNullContractTest {
       AggregationFunctionType.MINLONG, AggregationFunctionType.MAXLONG, AggregationFunctionType.SUMINT,
       AggregationFunctionType.SUMLONG, AggregationFunctionType.SUMPRECISION, AggregationFunctionType.FIRSTWITHTIME,
       AggregationFunctionType.LASTWITHTIME, AggregationFunctionType.ARRAYAGG, AggregationFunctionType.LISTAGG,
+      AggregationFunctionType.IDSET, AggregationFunctionType.HISTOGRAM,
       // Given the option so they can skip null rows; a row counts only when both input columns are non-null
       AggregationFunctionType.COVARPOP, AggregationFunctionType.COVARSAMP,
       // Given the option so they can skip null rows. These two were in this set once before, on the strength of an
       // identity comparison that reported every serializer-valued function as honouring it; they belong here now
       // because they genuinely do.
-      AggregationFunctionType.FREQUENTSTRINGSSKETCH, AggregationFunctionType.FREQUENTLONGSSKETCH
+      AggregationFunctionType.FREQUENTSTRINGSSKETCH, AggregationFunctionType.FREQUENTLONGSSKETCH,
+      // Given the option so they can skip null rows. A distinct count over nothing is 0 in every one of these, so
+      // the empty-input answer is unchanged; what changed is that a null row no longer contributes the column default.
+      AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT, AggregationFunctionType.DISTINCTCOUNTBITMAP,
+      AggregationFunctionType.DISTINCTCOUNTHLL, AggregationFunctionType.DISTINCTCOUNTRAWHLL,
+      AggregationFunctionType.DISTINCTCOUNTSMARTHLL, AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
+      AggregationFunctionType.DISTINCTCOUNTRAWHLLPLUS, AggregationFunctionType.DISTINCTCOUNTSMARTHLLPLUS,
+      AggregationFunctionType.DISTINCTCOUNTULL, AggregationFunctionType.DISTINCTCOUNTRAWULL,
+      AggregationFunctionType.DISTINCTCOUNTSMARTULL, AggregationFunctionType.DISTINCTCOUNTTHETASKETCH,
+      AggregationFunctionType.DISTINCTCOUNTRAWTHETASKETCH, AggregationFunctionType.DISTINCTCOUNTCPCSKETCH,
+      AggregationFunctionType.DISTINCTCOUNTRAWCPCSKETCH, AggregationFunctionType.DISTINCTCOUNTBITMAPMV,
+      AggregationFunctionType.DISTINCTCOUNTHLLMV, AggregationFunctionType.DISTINCTCOUNTRAWHLLMV,
+      AggregationFunctionType.DISTINCTCOUNTHLLPLUSMV, AggregationFunctionType.DISTINCTCOUNTRAWHLLPLUSMV,
+      // Reached once the multi-value shapes were added below; the array sums take only an array column
+      AggregationFunctionType.SUMARRAYLONG, AggregationFunctionType.SUMARRAYDOUBLE
   );
 
   /// Functions this test cannot drive with a one-column synthetic block, pinned so that a silent drop-out is always a
   /// reviewed decision. Derived from a run rather than predicted.
   ///
-  /// The block implements only single-value `long` and `double`, so a function lands here when it reads another value
-  /// type, needs a multi-value block, or takes more than the one input column the shared argument shapes supply. The
-  /// exclusion is scoped to this test: the rest of the contract is still checked against these functions, since the
-  /// other cases construct them and call [AggregationFunction#extractFinalResult] without aggregating first.
+  /// [#BLOCK_SHAPES] supplies one column at a time — `double`, `long`, `int`, `String` or `byte[]`, single-value,
+  /// plus multi-value `long`, `double` and `int` — and gives every input expression the same shape. A function
+  /// lands here when it needs a value type outside that list, a payload the shape cannot fabricate (a serialized
+  /// sketch or geometry rather than an empty `byte[]`), a dictionary, or two input columns of different types. That
+  /// last one is what rules out the funnels: their timestamp is a `long` and their steps are `int` predicates, and
+  /// no single shape is both.
+  ///
+  /// The exclusion is scoped to this one check. The rest of the contract is still enforced against these functions
+  /// here, since the other cases construct them and call [AggregationFunction#extractFinalResult] without
+  /// aggregating first, and their null-row skipping is covered by a test built for the shape each one needs:
+  /// `DistinctCountSketchNullHandlingTest`, `FrequentSketchNullHandlingTest`, `ValueAggregationNullHandlingTest`
+  /// and `FunnelNullHandlingTest`. So membership here means "checked elsewhere", not "unchecked".
   private static final Set<AggregationFunctionType> NOT_EXERCISABLE_BY_SYNTHETIC_BLOCK = Set.of(
       AggregationFunctionType.FASTHLL, AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH,
       AggregationFunctionType.DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
       AggregationFunctionType.SUMVALUESINTEGERSUMTUPLESKETCH, AggregationFunctionType.AVGVALUEINTEGERSUMTUPLESKETCH,
       AggregationFunctionType.STUNION, AggregationFunctionType.BOOLAND, AggregationFunctionType.BOOLOR,
-      AggregationFunctionType.SUMARRAYLONG, AggregationFunctionType.SUMARRAYDOUBLE,
       AggregationFunctionType.FUNNELMAXSTEP, AggregationFunctionType.FUNNELCOMPLETECOUNT,
       AggregationFunctionType.FUNNELSTEPDURATIONSTATS, AggregationFunctionType.FUNNELMATCHSTEP,
       AggregationFunctionType.FUNNELEVENTSFUNCTIONEVAL, AggregationFunctionType.FUNNELCOUNT
@@ -370,12 +429,39 @@ public class AggregationFunctionNullContractTest {
   ///
   /// Probed rather than pinned per function: which value type an accumulator reads is an implementation detail that
   /// changes, and a hard-coded mapping silently drops a function out of the census when it feeds the wrong width.
+  private static int[][] mvInts() {
+    int[][] rows = new int[NUM_DOCS][];
+    for (int i = 0; i < NUM_DOCS; i++) {
+      rows[i] = new int[]{0};
+    }
+    return rows;
+  }
+
+  private static long[][] mvLongs() {
+    long[][] rows = new long[NUM_DOCS][];
+    for (int i = 0; i < NUM_DOCS; i++) {
+      rows[i] = new long[]{0L};
+    }
+    return rows;
+  }
+
+  private static double[][] mvDoubles() {
+    double[][] rows = new double[NUM_DOCS][];
+    for (int i = 0; i < NUM_DOCS; i++) {
+      rows[i] = new double[]{0.0};
+    }
+    return rows;
+  }
+
   private static final List<Supplier<BlockValSet>> BLOCK_SHAPES = List.of(
-      () -> SyntheticBlockValSets.Double.create(NUM_DOCS, allNullBitmap(), () -> 0.0),
-      () -> SyntheticBlockValSets.Long.create(NUM_DOCS, allNullBitmap(), () -> 0L),
       () -> SyntheticBlockValSets.Int.create(NUM_DOCS, allNullBitmap(), () -> 0),
+      () -> SyntheticBlockValSets.Long.create(NUM_DOCS, allNullBitmap(), () -> 0L),
+      () -> SyntheticBlockValSets.Double.create(NUM_DOCS, allNullBitmap(), () -> 0.0),
       () -> SyntheticBlockValSets.Str.create(NUM_DOCS, allNullBitmap(), () -> ""),
-      () -> SyntheticBlockValSets.Bytes.create(NUM_DOCS, allNullBitmap(), () -> new byte[0])
+      () -> SyntheticBlockValSets.Bytes.create(NUM_DOCS, allNullBitmap(), () -> new byte[0]),
+      () -> SyntheticBlockValSets.IntMV.create(allNullBitmap(), mvInts()),
+      () -> SyntheticBlockValSets.LongMV.create(allNullBitmap(), mvLongs()),
+      () -> SyntheticBlockValSets.DoubleMV.create(allNullBitmap(), mvDoubles())
   );
 
   private static RoaringBitmap allNullBitmap() {
