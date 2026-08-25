@@ -637,7 +637,6 @@ public class S3PinotFS extends BasePinotFS {
       return true;
     }
     if (!isDirectory(srcUri)) {
-      delete(dstUri, true);
       return copyFile(srcUri, dstUri);
     }
     dstUri = normalizeToDirectoryUri(dstUri);
