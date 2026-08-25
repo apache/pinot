@@ -30,15 +30,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.upload.SegmentMetadataInfo;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.crypt.NoOpPinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.glassfish.jersey.media.multipart.BodyPart;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
@@ -258,6 +262,62 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
 
     // validate – should not throw exception
     PinotSegmentUploadDownloadRestletResource.validateMultiPartForBatchSegmentUpload(bodyParts);
+  }
+
+  @Test
+  public void testResolveDestinationTableName() {
+    HttpHeaders headers = mock(HttpHeaders.class);
+
+    assertEquals(PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        TABLE_NAME, TABLE_NAME + "_OFFLINE", TABLE_NAME, TableType.OFFLINE, headers, true), TABLE_NAME);
+    assertEquals(PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        null, null, TABLE_NAME, TableType.OFFLINE, headers, true), TABLE_NAME);
+
+    // V2 keeps its request-table override behavior because the request table is already the authorized destination.
+    assertEquals(PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        TABLE_NAME, null, "source_table", TableType.OFFLINE, headers, false), TABLE_NAME);
+
+    when(headers.getHeaderString(CommonConstants.DATABASE)).thenReturn("testDatabase");
+    assertEquals(PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        TABLE_NAME, TABLE_NAME, TABLE_NAME, TableType.OFFLINE, headers, true), "testDatabase." + TABLE_NAME);
+    assertEquals(PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        TABLE_NAME, null, "sourceDatabase." + TABLE_NAME, TableType.OFFLINE, headers, false),
+        "testDatabase." + TABLE_NAME);
+  }
+
+  @Test
+  public void testRejectMissingOrMismatchedDestinationTableName() {
+    HttpHeaders headers = mock(HttpHeaders.class);
+
+    assertBadRequest(() -> PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        null, null, null, TableType.OFFLINE, headers, true), "Table name is required");
+    assertBadRequest(() -> PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        " ", null, TABLE_NAME, TableType.OFFLINE, headers, true), "Invalid request tableName");
+    assertBadRequest(() -> PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        TABLE_NAME, "\t", TABLE_NAME, TableType.OFFLINE, headers, true),
+        "Invalid " + CommonConstants.Controller.TABLE_NAME_HTTP_HEADER + " header");
+    assertBadRequest(() -> PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        TABLE_NAME, null, " ", TableType.OFFLINE, headers, true), "Invalid segment metadata table name");
+    assertBadRequest(() -> PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        TABLE_NAME, "other_table", TABLE_NAME, TableType.OFFLINE, headers, true),
+        CommonConstants.Controller.TABLE_NAME_HTTP_HEADER + " header");
+    assertBadRequest(() -> PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        TABLE_NAME, null, "other_table", TableType.OFFLINE, headers, true), "segment metadata table name");
+    assertBadRequest(() -> PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        TABLE_NAME + "_REALTIME", null, TABLE_NAME, TableType.OFFLINE, headers, true),
+        "does not match table type");
+
+    when(headers.getHeaderString(CommonConstants.DATABASE)).thenReturn("databaseA");
+    assertBadRequest(() -> PinotSegmentUploadDownloadRestletResource.resolveDestinationTableName(
+        "databaseB." + TABLE_NAME, null, "databaseB." + TABLE_NAME, TableType.OFFLINE, headers, true),
+        "does not match database name");
+  }
+
+  private static void assertBadRequest(Runnable runnable, String expectedMessage) {
+    ControllerApplicationException exception =
+        Assert.expectThrows(ControllerApplicationException.class, () -> runnable.run());
+    assertEquals(exception.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    Assert.assertTrue(exception.getMessage().contains(expectedMessage), exception.getMessage());
   }
 
   @Test
