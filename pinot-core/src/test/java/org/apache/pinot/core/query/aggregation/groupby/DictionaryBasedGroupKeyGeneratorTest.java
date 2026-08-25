@@ -45,7 +45,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
@@ -116,12 +116,12 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
     // Create an index segment with the random values
     Schema schema = new Schema();
-    schema.addField(new DimensionFieldSpec(FILTER_COLUMN, FieldSpec.DataType.INT, true));
+    schema.addField(new DimensionFieldSpec(FILTER_COLUMN, DataType.INT, true));
     for (String singleValueColumn : SV_COLUMNS) {
-      schema.addField(new DimensionFieldSpec(singleValueColumn, FieldSpec.DataType.INT, true));
+      schema.addField(new DimensionFieldSpec(singleValueColumn, DataType.INT, true));
     }
     for (String multiValueColumn : MV_COLUMNS) {
-      schema.addField(new DimensionFieldSpec(multiValueColumn, FieldSpec.DataType.INT, false));
+      schema.addField(new DimensionFieldSpec(multiValueColumn, DataType.INT, false));
     }
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();

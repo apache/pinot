@@ -96,7 +96,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 ///     )
 @SuppressWarnings({"rawtypes"})
 public class IntegerTupleSketchAggregationFunction
-    extends NullableSingleInputAggregationFunction<TupleIntSketchAccumulator, Comparable> {
+    extends BaseSingleInputAggregationFunction<TupleIntSketchAccumulator, Comparable> {
   private static final int DEFAULT_ACCUMULATOR_THRESHOLD = 2;
   final ExpressionContext _expressionContext;
   final IntegerSummarySetOperations _setOps;
@@ -162,9 +162,6 @@ public class IntegerTupleSketchAggregationFunction
     forEachNotNull(length, blockValSet, (from, to) -> {
       // An empty range still reaches here, for a zero-length block. Creating the accumulator for it would mark
       // the holder as aggregated and lose the signal this whole arrangement exists to carry.
-      if (to == from) {
-        return;
-      }
       TupleIntSketchAccumulator tupleIntSketchAccumulator = getAccumulator(aggregationResultHolder);
       for (int i = from; i < to; i++) {
         tupleIntSketchAccumulator.apply(deserializeSketch(bytesValues[i]));

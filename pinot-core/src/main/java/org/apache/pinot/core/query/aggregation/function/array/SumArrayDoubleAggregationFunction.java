@@ -29,14 +29,14 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.function.NullableSingleInputAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.BaseSingleInputAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class SumArrayDoubleAggregationFunction
-    extends NullableSingleInputAggregationFunction<DoubleArrayList, DoubleArrayList> {
+    extends BaseSingleInputAggregationFunction<DoubleArrayList, DoubleArrayList> {
 
   public SumArrayDoubleAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     super(verifySingleArgument(arguments, "SUM_ARRAY"), nullHandlingEnabled);
@@ -65,9 +65,6 @@ public class SumArrayDoubleAggregationFunction
     // The accumulator is created inside the range, so a block with no non-null row leaves the holder untouched and
     // extractFinalResult sees the null that means nothing was aggregated
     forEachNotNull(length, blockValSet, (from, to) -> {
-      if (to == from) {
-        return;
-      }
       DoubleArrayList result = aggregationResultHolder.getResult();
       if (result == null) {
         result = new DoubleArrayList();

@@ -30,22 +30,25 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.BaseAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.spi.query.QueryThreadContext;
-import org.roaringbitmap.RoaringBitmap;
 
 
+/// Only the timestamp decides whether a row is skipped when null handling is on.
+///
+/// A step expression is a predicate, and a predicate over a null operand is UNKNOWN, which SQL treats as not
+/// satisfied wherever a boolean is consumed, so a null step already means that step did not match and the row still
+/// belongs to the funnel. A null timestamp is different: the event has no position in the window, and an aggregate
+/// ignores a row whose input is null.
 public abstract class FunnelBaseAggregationFunction<F extends Comparable>
-    implements AggregationFunction<PriorityQueue<FunnelStepEvent>, F> {
-  protected final boolean _nullHandlingEnabled;
+    extends BaseAggregationFunction<PriorityQueue<FunnelStepEvent>, F> {
   protected final ExpressionContext _timestampExpression;
   protected final long _windowSize;
   protected final List<ExpressionContext> _stepExpressions;
@@ -55,7 +58,7 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
   protected final Map<String, String> _extraArguments = new HashMap<>();
 
   public FunnelBaseAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
-    _nullHandlingEnabled = nullHandlingEnabled;
+    super(nullHandlingEnabled);
     int numArguments = arguments.size();
     Preconditions.checkArgument(numArguments > 3,
         "FUNNEL_AGG_FUNC expects >= 4 arguments, got: %s. The function can be used as "
@@ -125,26 +128,6 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
     return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
   }
 
-  /// Runs the consumer over each range of rows whose timestamp is not null, or over the whole block when the
-  /// option is disabled.
-  ///
-  /// Only the timestamp is consulted. A step expression is a predicate, and a predicate over a null operand is
-  /// UNKNOWN, which SQL treats as not satisfied wherever a boolean is consumed, so a null step already means that
-  /// step did not match and the row still belongs to the funnel. A null timestamp is different: the event has no
-  /// position in the window, and an aggregate ignores a row whose input is null.
-  private void forEachNotNullTimestamp(int length, BlockValSet timestampBlockValSet,
-      RoaringBitmapUtils.BatchConsumer consumer) {
-    RoaringBitmap nullBitmap = _nullHandlingEnabled ? timestampBlockValSet.getNullBitmap() : null;
-    if (nullBitmap == null) {
-      consumer.consume(0, length);
-      return;
-    }
-    // Skip if the entire block is null
-    if (!nullBitmap.contains(0, length)) {
-      RoaringBitmapUtils.forEachUnset(length, nullBitmap.getIntIterator(), consumer);
-    }
-  }
-
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
@@ -160,7 +143,7 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
       aggregationResultHolder.setValue(existing);
     }
     PriorityQueue<FunnelStepEvent> stepEvents = existing;
-    forEachNotNullTimestamp(length, timestampBlockValSet, (from, to) -> {
+    forEachNotNull(length, timestampBlockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         boolean stepFound = false;
         for (int j = 0; j < _numSteps; j++) {
@@ -187,7 +170,7 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
     for (ExpressionContext stepExpression : _stepExpressions) {
       stepBlocks.add(blockValSetMap.get(stepExpression).getIntValuesSV());
     }
-    forEachNotNullTimestamp(length, timestampBlockValSet, (from, to) -> {
+    forEachNotNull(length, timestampBlockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         int groupKey = groupKeyArray[i];
         boolean stepFound = false;
@@ -217,7 +200,7 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
     for (ExpressionContext stepExpression : _stepExpressions) {
       stepBlocks.add(blockValSetMap.get(stepExpression).getIntValuesSV());
     }
-    forEachNotNullTimestamp(length, timestampBlockValSet, (from, to) -> {
+    forEachNotNull(length, timestampBlockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         int[] groupKeys = groupKeysArray[i];
         boolean stepFound = false;

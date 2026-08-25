@@ -19,7 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import org.apache.pinot.queries.FluentQueryTest;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -34,12 +34,12 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
   @DataProvider(name = "scenarios")
   Object[] scenarios() {
     return new Object[] {
-        new DataTypeScenario(FieldSpec.DataType.STRING),
-        new DataTypeScenario(FieldSpec.DataType.INT),
-        new DataTypeScenario(FieldSpec.DataType.LONG),
-        new DataTypeScenario(FieldSpec.DataType.FLOAT),
-        new DataTypeScenario(FieldSpec.DataType.DOUBLE),
-        new DataTypeScenario(FieldSpec.DataType.BOOLEAN),
+        new DataTypeScenario(DataType.STRING),
+        new DataTypeScenario(DataType.INT),
+        new DataTypeScenario(DataType.LONG),
+        new DataTypeScenario(DataType.FLOAT),
+        new DataTypeScenario(DataType.DOUBLE),
+        new DataTypeScenario(DataType.BOOLEAN),
     };
   }
 
@@ -112,8 +112,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
   // Test for different data types with specific values
   @Test
   void testIntegerDataType() {
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.INT)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.INT).getDeclaringTable(true)
         .onFirstInstance("myField", "100", "null", "100") // Same non-null values
         .andOnSecondInstance("myField", "null", "100", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -123,8 +122,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
 
   @Test
   void testLongDataType() {
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.LONG)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.LONG).getDeclaringTable(true)
         .onFirstInstance("myField", "1000", "null", "1000") // Same non-null values
         .andOnSecondInstance("myField", "null", "1000", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -134,8 +132,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
 
   @Test
   void testFloatDataType() {
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.FLOAT)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.FLOAT).getDeclaringTable(true)
         .onFirstInstance("myField", "3.14", "null", "3.14") // Same non-null values
         .andOnSecondInstance("myField", "null", "3.14", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -145,8 +142,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
 
   @Test
   void testDoubleDataType() {
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.DOUBLE)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.DOUBLE).getDeclaringTable(true)
         .onFirstInstance("myField", "2.718", "null", "2.718") // Same non-null values
         .andOnSecondInstance("myField", "null", "2.718", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -156,8 +152,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
 
   @Test
   void testBooleanDataType() {
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.BOOLEAN)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.BOOLEAN).getDeclaringTable(true)
         .onFirstInstance("myField", "1", "null", "1") // Use 1/0 for boolean, same values
         .andOnSecondInstance("myField", "null", "1", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -168,8 +163,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
   // Edge case tests
   @Test
   void testAllNullValues() {
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.STRING)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.STRING).getDeclaringTable(true)
         .onFirstInstance("myField", "null", "null", "null")
         .andOnSecondInstance("myField", "null", "null", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -179,8 +173,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
 
   @Test
   void testSingleNonNullValue() {
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.STRING)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.STRING).getDeclaringTable(true)
         .onFirstInstance("myField", "null", "null", "null")
         .andOnSecondInstance("myField", "null", "unique_value", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -193,8 +186,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
   void testGroupByWithMultipleGroups() {
     // ANY_VALUE can return any of the values (value1, value2, value3)
     // This test has mixed values, so ANY_VALUE could return any of them
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.STRING)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.STRING).getDeclaringTable(true)
         .onFirstInstance("myField", "value1", "value1", "value2")
         .andOnSecondInstance("myField", "value2", "value3", "value3")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -206,8 +198,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
   void testGroupByWithNullsInGroups() {
     // ANY_VALUE can return any non-null value (100, 200, or 300)
     // This test has mixed values, so ANY_VALUE could return any of them
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.INT)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.INT).getDeclaringTable(true)
         .onFirstInstance("myField", "100", "null", "200")
         .andOnSecondInstance("myField", "null", "300", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -220,22 +211,21 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
   void testPerformanceWithLargeDataset() {
     // ANY_VALUE can return any of the values in the dataset
     // This test has mixed values, so ANY_VALUE could return any of them
-    DataTypeScenario scenario = new DataTypeScenario(FieldSpec.DataType.STRING);
+    DataTypeScenario scenario = new DataTypeScenario(DataType.STRING);
     FluentQueryTest.DeclaringTable table = scenario.getDeclaringTable(true);
 
     // Create a large dataset where ANY_VALUE can return any value
-    FluentQueryTest.QueryExecuted result = table
-        .onFirstInstance("myField", "first_value", "value_1", "value_2", "value_3", "value_4")
-        .andOnSecondInstance("myField", "value_5", "value_6", "value_7", "value_8", "value_9")
-        .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
+    FluentQueryTest.QueryExecuted result =
+        table.onFirstInstance("myField", "first_value", "value_1", "value_2", "value_3", "value_4")
+            .andOnSecondInstance("myField", "value_5", "value_6", "value_7", "value_8", "value_9")
+            .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
     validateAnyValueBehavior(result, true); // Should return non-null (many values available)
   }
 
   // Test serialization/deserialization behavior
   @Test
   void testSerializationWithComplexValues() {
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.STRING)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.STRING).getDeclaringTable(true)
         .onFirstInstance("myField", "test_value", "null", "test_value") // Same values for deterministic results
         .andOnSecondInstance("myField", "null", "test_value", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -246,8 +236,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
   // Test numeric edge cases
   @Test
   void testNumericEdgeCases() {
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.DOUBLE)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.DOUBLE).getDeclaringTable(true)
         .onFirstInstance("myField", "0.0", "null", "0.0") // Same values
         .andOnSecondInstance("myField", "null", "0.0", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -256,7 +245,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
   }
 
   // Helper methods to handle different data types in parameterized tests
-  private String getTestValueForDataType(FieldSpec.DataType dataType) {
+  private String getTestValueForDataType(DataType dataType) {
     switch (dataType) {
       case STRING:
         return "test_value";
@@ -277,7 +266,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
     }
   }
 
-  private String getExpectedResultForDataType(FieldSpec.DataType dataType, String testValue) {
+  private String getExpectedResultForDataType(DataType dataType, String testValue) {
     switch (dataType) {
       case BOOLEAN:
         return "1"; // Boolean values are stored as integers in Pinot, so ANY_VALUE returns "1"
