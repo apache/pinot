@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.helix.HelixManager;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -30,6 +31,7 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.util.TestUtils;
 
 import static org.testng.Assert.assertEquals;
 
@@ -43,6 +45,29 @@ public class PauselessRealtimeTestUtils {
     IdealState idealState = HelixHelper.getTableIdealState(helixManager, tableName);
     Map<String, Map<String, String>> segmentAssignment = idealState.getRecord().getMapFields();
     assertEquals(segmentAssignment.size(), numSegmentsExpected);
+  }
+
+  /// Waits until the external view of the given table converges to its ideal state, i.e. every instance of every
+  /// segment in the ideal state reaches the prescribed state in the external view.
+  ///
+  /// The segment repair performed by the validation task discovers segment replicas through the external view, so a
+  /// test that relies on a single validation run must wait for convergence before triggering it: a still-pending
+  /// `CONSUMING -> ONLINE` transition would make the one-shot repair permanently miss the segment.
+  public static void waitForExternalViewToConverge(PinotHelixResourceManager helixResourceManager,
+      String tableNameWithType, long timeoutMs) {
+    TestUtils.waitForCondition(aVoid -> {
+      IdealState idealState = helixResourceManager.getTableIdealState(tableNameWithType);
+      ExternalView externalView = helixResourceManager.getTableExternalView(tableNameWithType);
+      if (idealState == null || externalView == null) {
+        return false;
+      }
+      for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+        if (!entry.getValue().equals(externalView.getStateMap(entry.getKey()))) {
+          return false;
+        }
+      }
+      return true;
+    }, 1000, timeoutMs, "External view failed to converge to ideal state for table: " + tableNameWithType);
   }
 
   /// Marks all current segments of the given table as exceeding the max segment completion time, making them
