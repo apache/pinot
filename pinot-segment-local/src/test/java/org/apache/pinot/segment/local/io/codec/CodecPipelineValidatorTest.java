@@ -30,8 +30,9 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
-/// Tests for [CodecPipelineValidator]. Synthetic transform handlers keep this layer independent
-/// from the concrete transform implementations introduced by later stacked pull requests.
+/// Tests for [CodecPipelineValidator]. Synthetic transform handlers keep the structural rules
+/// testable independently of the concrete transforms; the DELTA/DELTADELTA scenarios exercise the
+/// real typed-layout-preserving transforms against [CodecRegistry#DEFAULT].
 public class CodecPipelineValidatorTest {
   private static final TestCodecHandler TYPED_TRANSFORM =
       new TestCodecHandler("TYPED", CodecKind.TRANSFORM, true);
@@ -107,11 +108,78 @@ public class CodecPipelineValidatorTest {
     assertTrue(TYPED_TRANSFORM.preservesTypedValueLayout());
     assertFalse(PACKING_TRANSFORM.preservesTypedValueLayout());
     assertFalse(Lz4CodecDefinition.INSTANCE.preservesTypedValueLayout());
+    // DELTA/DELTADELTA output a same-width typed value array, so they may be chained ahead of
+    // another transform (or each other).
+    assertTrue(DeltaCodecDefinition.INSTANCE.preservesTypedValueLayout());
+    assertTrue(DeltaDeltaCodecDefinition.INSTANCE.preservesTypedValueLayout());
+  }
+
+  // -------------------------------------------------------------------------
+  // DELTA / DELTADELTA — the real typed-layout-preserving transforms, resolved
+  // through the production CodecRegistry.DEFAULT
+  // -------------------------------------------------------------------------
+
+  @Test
+  public void testDeltaPipelinesAreValid() {
+    validateWithDefaultRegistry("DELTA", DataType.INT);
+    validateWithDefaultRegistry("DELTA", DataType.LONG);
+    validateWithDefaultRegistry("DELTADELTA", DataType.INT);
+    validateWithDefaultRegistry("DELTADELTA", DataType.LONG);
+    validateWithDefaultRegistry("DELTA,LZ4", DataType.INT);
+    validateWithDefaultRegistry("DELTA,ZSTD(3)", DataType.INT);
+    validateWithDefaultRegistry("DELTADELTA,SNAPPY", DataType.LONG);
+    validateWithDefaultRegistry("DELTADELTA,ZSTD(8)", DataType.LONG);
+  }
+
+  /// Typed-layout-preserving transforms may be chained in any order, including with themselves,
+  /// optionally followed by any number of compression stages.
+  @Test
+  public void testTypedLayoutTransformChainingAllowed() {
+    validateWithDefaultRegistry("DELTA,DELTADELTA,LZ4", DataType.INT);
+    validateWithDefaultRegistry("DELTA,DELTA,LZ4", DataType.INT);
+    validateWithDefaultRegistry("DELTA,DELTADELTA", DataType.INT);
+    validateWithDefaultRegistry("DELTADELTA,DELTA,ZSTD(3)", DataType.LONG);
+    validateWithDefaultRegistry("DELTA,LZ4,ZSTD(3)", DataType.INT);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*must operate on column values.*")
+  public void testDeltaAfterCompressionRejected() {
+    // ZSTD before DELTA is wrong: DELTA cannot consume compressed bytes
+    validateWithDefaultRegistry("ZSTD(3),DELTA", DataType.INT);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*DELTA codec only supports INT and LONG.*")
+  public void testDeltaOnStringColumn() {
+    validateWithDefaultRegistry("DELTA", DataType.STRING);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*DELTA codec only supports INT and LONG.*")
+  public void testDeltaOnDoubleColumn() {
+    validateWithDefaultRegistry("DELTA", DataType.DOUBLE);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*DELTADELTA codec only supports INT and LONG.*")
+  public void testDeltaDeltaOnStringColumn() {
+    validateWithDefaultRegistry("DELTADELTA", DataType.STRING);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testDeltaRejectsArguments() {
+    validateWithDefaultRegistry("DELTA(1)", DataType.INT);
   }
 
   private static void validate(String spec, DataType dataType) {
     CodecPipeline pipeline = CodecSpecParser.parse(spec);
     CodecPipelineValidator.validate(pipeline, REGISTRY, new CodecContext(dataType));
+  }
+
+  private static void validateWithDefaultRegistry(String spec, DataType dataType) {
+    CodecPipeline pipeline = CodecSpecParser.parse(spec);
+    CodecPipelineValidator.validate(pipeline, CodecRegistry.DEFAULT, new CodecContext(dataType));
   }
 
   private static final class TestCodecHandler implements ChunkCodecHandler<CodecOptions> {

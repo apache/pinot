@@ -36,13 +36,14 @@ import static org.testng.Assert.expectThrows;
 public class CodecRegistryTest {
 
   @Test
-  public void testDefaultRegistryContainsOnlyCompressionHandlersAndAlias() {
+  public void testDefaultRegistryContainsBuiltInHandlersAndAlias() {
     assertSame(CodecRegistry.DEFAULT.get("lz4"), Lz4CodecDefinition.INSTANCE);
     assertSame(CodecRegistry.DEFAULT.get("SNAPPY"), SnappyCodecDefinition.INSTANCE);
     assertSame(CodecRegistry.DEFAULT.get("gzip"), GzipCodecDefinition.INSTANCE);
     assertSame(CodecRegistry.DEFAULT.get("zstd"), ZstdCodecDefinition.INSTANCE);
     assertSame(CodecRegistry.DEFAULT.get("zstandard"), ZstdCodecDefinition.INSTANCE);
-    assertNull(CodecRegistry.DEFAULT.get("DELTA"));
+    assertSame(CodecRegistry.DEFAULT.get("delta"), DeltaCodecDefinition.INSTANCE);
+    assertSame(CodecRegistry.DEFAULT.get("DELTADELTA"), DeltaDeltaCodecDefinition.INSTANCE);
     assertNull(CodecRegistry.DEFAULT.get("T64"));
   }
 
