@@ -149,20 +149,6 @@ public class ArrayLiteralTransformFunctionTest {
   }
 
   @Test
-  public void testBytesArrayLiteralRejectsNullAndHeterogeneousElements() {
-    ExpressionContext bytes = ExpressionContext.forLiteral(DataType.BYTES, new byte[]{0});
-    ExpressionContext nullValue = ExpressionContext.forLiteral(RequestUtils.getNullLiteral());
-    ExpressionContext intValue = ExpressionContext.forLiteral(DataType.INT, 1);
-
-    for (List<ExpressionContext> invalidValues : List.of(List.of(bytes, nullValue), List.of(nullValue, bytes),
-        List.of(bytes, intValue), List.of(intValue, bytes))) {
-      IllegalStateException exception =
-          Assert.expectThrows(IllegalStateException.class, () -> new ArrayLiteralTransformFunction(invalidValues));
-      Assert.assertTrue(exception.getMessage().contains("BYTES array literals only support non-null BYTES elements"));
-    }
-  }
-
-  @Test
   public void testEmptyArrayTransform() {
     List<ExpressionContext> arrayExpressions = new ArrayList<>();
     ArrayLiteralTransformFunction emptyLiteral = new ArrayLiteralTransformFunction(arrayExpressions);

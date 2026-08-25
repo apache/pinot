@@ -232,6 +232,23 @@ public class DataSchemaTest {
     Assert.assertEquals(BYTES.format(bytesValue), BytesUtils.toHexString(bytesValue));
   }
 
+  @Test
+  public void testObjectToInternalBytesArray() {
+    Assert.assertEquals((ByteArray[]) OBJECT.toInternal(new byte[0][]), new ByteArray[0]);
+
+    byte[][] externalBytesArray = {{}, {0}, {1, 2, (byte) 0xFF}};
+    ByteArray[] expected = {new ByteArray(externalBytesArray[0]), new ByteArray(externalBytesArray[1]),
+        new ByteArray(externalBytesArray[2])};
+    Assert.assertEquals((ByteArray[]) OBJECT.toInternal(externalBytesArray), expected);
+  }
+
+  @Test
+  public void testObjectToInternalUuidArray() {
+    java.util.UUID[] externalUuidArray = {JAVA_UUID, JAVA_UUID_2};
+    ByteArray[] expected = {new ByteArray(UuidUtils.toBytes(JAVA_UUID)), new ByteArray(UuidUtils.toBytes(JAVA_UUID_2))};
+    Assert.assertEquals((ByteArray[]) OBJECT.toInternal(externalUuidArray), expected);
+  }
+
   /// The null placeholder must be resolved on the *logical* type. UUID is the only type whose placeholder differs
   /// from its stored type's: it needs the 16-byte nil UUID, while BYTES supplies a zero-length one. Every other
   /// logical type must agree with its stored type, otherwise callers that resolve the stored type (DataBlockBuilder,
