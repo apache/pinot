@@ -22,7 +22,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Strings;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -314,18 +313,8 @@ public class PinotTableReloadService {
       Map<String, ServerSegmentsReloadCheckResponse> serverResponses = new HashMap<>();
       if (verbose) {
         for (Map.Entry<String, JsonNode> entry : needReloadMetadata.entrySet()) {
-          JsonNode body = entry.getValue();
-          JsonNode names = body.get("segmentsNeedingReload");
-          List<String> segmentsNeedingReload = null;
-          if (names != null && names.isArray()) {
-            segmentsNeedingReload = new ArrayList<>(names.size());
-            for (JsonNode name : names) {
-              segmentsNeedingReload.add(name.asText());
-            }
-          }
           serverResponses.put(entry.getKey(),
-              new ServerSegmentsReloadCheckResponse(body.get("needReload").booleanValue(),
-                  body.get("instanceId").asText(), segmentsNeedingReload));
+              JsonUtils.jsonNodeToObject(entry.getValue(), ServerSegmentsReloadCheckResponse.class));
         }
       }
       return JsonUtils.objectToPrettyString(new TableSegmentsReloadCheckResponse(needReload, serverResponses));
