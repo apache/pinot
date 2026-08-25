@@ -41,6 +41,7 @@ import org.apache.pinot.plugin.stream.kafka.KafkaAdminClientManager;
 import org.apache.pinot.plugin.stream.kafka.KafkaConfigUtils;
 import org.apache.pinot.plugin.stream.kafka.KafkaPartitionLevelStreamConfig;
 import org.apache.pinot.plugin.stream.kafka.KafkaSSLUtils;
+import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
@@ -89,6 +90,8 @@ public abstract class KafkaPartitionLevelConnectionHandler {
   private Properties buildProperties(StreamConfig streamConfig) {
     Properties consumerProp = new Properties();
     consumerProp.putAll(streamConfig.getStreamConfigsMap());
+    consumerProp.putIfAbsent(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG,
+        KafkaStreamConfigProperties.AUTO_OFFSET_RESET_DEFAULT);
     consumerProp.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, _config.getBootstrapHosts());
     consumerProp.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, BytesDeserializer.class.getName());
     consumerProp.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, BytesDeserializer.class.getName());
