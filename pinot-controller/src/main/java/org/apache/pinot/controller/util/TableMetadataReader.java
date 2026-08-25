@@ -73,12 +73,13 @@ public class TableMetadataReader {
     return getServerCheckSegmentsReloadMetadata(tableNameWithType, timeoutMs, false);
   }
 
-  /// Verbose overload: each server response also lists the segments on it that require reload.
+  /// When {@code includeSegmentNames} is true, each server response also lists the segments on it
+  /// that require reload (server walks all segments instead of short-circuiting).
   public TableReloadJsonResponse getServerCheckSegmentsReloadMetadata(String tableNameWithType,
-      int timeoutMs, boolean verbose)
+      int timeoutMs, boolean includeSegmentNames)
       throws InvalidConfigException, IOException {
     ServerSegmentMetadataReader.TableReloadResponse segmentsMetadataResponse = getReloadCheckResponses(
-        tableNameWithType, timeoutMs, verbose);
+        tableNameWithType, timeoutMs, includeSegmentNames);
     return processSegmentMetadataReloadResponse(segmentsMetadataResponse);
   }
 
@@ -91,13 +92,13 @@ public class TableMetadataReader {
   }
 
   public ServerSegmentMetadataReader.TableReloadResponse getReloadCheckResponses(String tableNameWithType,
-      int timeoutMs, boolean verbose) throws InvalidConfigException {
+      int timeoutMs, boolean includeSegmentNames) throws InvalidConfigException {
     ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
     Set<String> serverInstanceSet = new HashSet<>();
     if (externalView != null) {
       serverInstanceSet = getCurrentlyAssignedServersFromExternalView(externalView);
     }
-    return getServerSetReloadCheckResponses(tableNameWithType, timeoutMs, serverInstanceSet, verbose);
+    return getServerSetReloadCheckResponses(tableNameWithType, timeoutMs, serverInstanceSet, includeSegmentNames);
   }
 
   private Set<String> getCurrentlyAssignedServersFromExternalView(ExternalView externalView) {
@@ -122,13 +123,13 @@ public class TableMetadataReader {
   }
 
   public ServerSegmentMetadataReader.TableReloadResponse getServerSetReloadCheckResponses(String tableNameWithType,
-      int timeoutMs, Set<String> serverInstanceSet, boolean verbose) throws InvalidConfigException {
+      int timeoutMs, Set<String> serverInstanceSet, boolean includeSegmentNames) throws InvalidConfigException {
     BiMap<String, String> endpoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverInstanceSet);
     ServerSegmentMetadataReader serverSegmentMetadataReader =
         new ServerSegmentMetadataReader(_executor, _connectionManager,
             _pinotHelixResourceManager.getServerAdminAuthProvider());
     return serverSegmentMetadataReader.getCheckReloadSegmentsFromServer(tableNameWithType, serverInstanceSet, endpoints,
-        timeoutMs, verbose);
+        timeoutMs, includeSegmentNames);
   }
 
   private TableReloadJsonResponse processSegmentMetadataReloadResponse(

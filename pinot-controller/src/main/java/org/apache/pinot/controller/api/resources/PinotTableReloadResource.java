@@ -178,7 +178,10 @@ public class PinotTableReloadResource {
       @ApiParam(value = "Table name with type suffix", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Include detailed server responses", defaultValue = "false") @QueryParam("verbose")
-      @DefaultValue("false") boolean verbose, @Context HttpHeaders headers) {
-    return _service.needReload(tableNameWithType, verbose, headers);
+      @DefaultValue("false") boolean verbose,
+      @ApiParam(value = "Include names of segments that need reload; forces servers to walk all segments",
+          defaultValue = "false") @QueryParam("includeSegmentNames") @DefaultValue("false") boolean includeSegmentNames,
+      @Context HttpHeaders headers) {
+    return _service.needReload(tableNameWithType, verbose, includeSegmentNames, headers);
   }
 }

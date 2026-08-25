@@ -299,19 +299,27 @@ public class PinotTableReloadService {
 
 
   public String needReload(String tableNameWithType, boolean verbose, HttpHeaders headers) {
+    return needReload(tableNameWithType, verbose, false, headers);
+  }
+
+  public String needReload(String tableNameWithType, boolean verbose, boolean includeSegmentNames,
+      HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
-    LOG.info("Received a request to check reload for all servers hosting segments for table {} (verbose={})",
-        tableNameWithType, verbose);
+    LOG.info("Received a request to check reload for all servers hosting segments for table {} "
+        + "(verbose={}, includeSegmentNames={})", tableNameWithType, verbose, includeSegmentNames);
     try {
       TableMetadataReader tableMetadataReader =
           new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
       Map<String, JsonNode> needReloadMetadata =
           tableMetadataReader.getServerCheckSegmentsReloadMetadata(tableNameWithType,
-              _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000, verbose).getServerReloadJsonResponses();
+              _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000, includeSegmentNames)
+              .getServerReloadJsonResponses();
       boolean needReload =
           needReloadMetadata.values().stream().anyMatch(value -> value.get("needReload").booleanValue());
       Map<String, ServerSegmentsReloadCheckResponse> serverResponses = new HashMap<>();
-      if (verbose) {
+      // Populate per-server responses when either flag asks for detail. includeSegmentNames implies
+      // per-server data since names are only meaningful when grouped by server.
+      if (verbose || includeSegmentNames) {
         for (Map.Entry<String, JsonNode> entry : needReloadMetadata.entrySet()) {
           serverResponses.put(entry.getKey(),
               JsonUtils.jsonNodeToObject(entry.getValue(), ServerSegmentsReloadCheckResponse.class));

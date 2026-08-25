@@ -249,15 +249,16 @@ public class ServerSegmentMetadataReader {
     return getCheckReloadSegmentsFromServer(tableNameWithType, serverInstances, endpoints, timeoutMs, false);
   }
 
-  /// When {@code verbose} is true, each server response also names the segments needing reload.
+  /// When {@code includeSegmentNames} is true, each server response also names the segments needing
+  /// reload (server walks all segments instead of short-circuiting).
   public TableReloadResponse getCheckReloadSegmentsFromServer(String tableNameWithType,
-      Set<String> serverInstances, BiMap<String, String> endpoints, int timeoutMs, boolean verbose) {
-    LOGGER.debug("Checking if reload is needed on segments from servers for table {} (verbose={}).",
-        tableNameWithType, verbose);
+      Set<String> serverInstances, BiMap<String, String> endpoints, int timeoutMs, boolean includeSegmentNames) {
+    LOGGER.debug("Checking if reload is needed on segments from servers for table {} (includeSegmentNames={}).",
+        tableNameWithType, includeSegmentNames);
     List<String> serverURLs = new ArrayList<>();
     for (String serverInstance : serverInstances) {
       String url = generateCheckReloadSegmentsServerURL(tableNameWithType, endpoints.get(serverInstance));
-      serverURLs.add(verbose ? url + "?verbose=true" : url);
+      serverURLs.add(includeSegmentNames ? url + "?includeSegmentNames=true" : url);
     }
     BiMap<String, String> endpointsToServers = endpoints.inverse();
     CompletionServiceHelper completionServiceHelper =
