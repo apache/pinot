@@ -357,7 +357,7 @@ public final class CodecPipelineExecutor {
   public void decode(ByteBuffer src, ByteBuffer dst, int expectedDecodedSize, int maxIntermediateSize,
       long maxCumulativeSize, DecodeScratch scratch)
       throws IOException {
-    Preconditions.checkNotNull(scratch, "scratch").ensureOpen();
+    scratch.ensureOpen();
     Preconditions.checkArgument(!_requiresDirectDstBuffer || dst.isDirect(),
         "decode(src, dst) requires a direct ByteBuffer for pipeline: %s", _canonicalSpec);
     Preconditions.checkArgument(expectedDecodedSize >= 0 && expectedDecodedSize <= dst.capacity(),

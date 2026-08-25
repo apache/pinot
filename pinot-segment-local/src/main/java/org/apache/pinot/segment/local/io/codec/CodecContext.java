@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.io.codec;
 
-import java.util.Objects;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -30,7 +29,7 @@ final class CodecContext {
   private final DataType _dataType;
 
   CodecContext(DataType dataType) {
-    _dataType = Objects.requireNonNull(dataType, "dataType");
+    _dataType = dataType;
   }
 
   /// Returns the stored [DataType] of the column being indexed.

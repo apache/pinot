@@ -26,13 +26,13 @@ import org.apache.pinot.segment.spi.memory.CleanerUtil;
 /// Package-private buffer helpers shared across codec handler implementations.
 final class CodecBufferUtils {
 
+  private CodecBufferUtils() {
+  }
+
   /// Sanity cap (1 GiB) on any decompressed size declared by untrusted encoded segment data. A
   /// corrupt or hostile declaration must never drive a giant pre-allocation; 1 GiB is well above
   /// any realistic chunk size.
   static final long MAX_DECLARED_DECOMPRESSED_SIZE = 1L << 30;
-
-  private CodecBufferUtils() {
-  }
 
   /// Validates a decompressed size declared by untrusted segment data and returns it when in range.
   ///

@@ -196,11 +196,13 @@ final class ZstdCodecDefinition implements ChunkCodecHandler<ZstdCodecDefinition
     dst.clear();
     ByteBuffer directSrc = CodecBufferUtils.toDirectBuffer(src);
     try {
-      long decompressedSize = Zstd.getFrameContentSize(directSrc);
+      long declaredDecompressedSize = Zstd.getFrameContentSize(directSrc);
       // As in decode(), zero is a valid known size; only Zstd's negative sentinel values are errors.
-      if (decompressedSize < 0) {
+      if (declaredDecompressedSize < 0) {
         throw new IOException("Zstd: cannot determine decompressed size from frame header");
       }
+      int decompressedSize = CodecBufferUtils.checkDeclaredDecompressedSize(
+          declaredDecompressedSize, "Zstd", "frame header");
       if (decompressedSize > dst.capacity()) {
         throw new IllegalArgumentException(
             "Zstd: decompressed size " + decompressedSize + " exceeds dst capacity " + dst.capacity());

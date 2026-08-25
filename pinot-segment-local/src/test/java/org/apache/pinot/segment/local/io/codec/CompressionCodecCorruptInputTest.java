@@ -62,6 +62,26 @@ public class CompressionCodecCorruptInputTest {
   }
 
   @Test
+  public void testZstdDecodeIntoRejectsOversizedDeclaredSize() {
+    // decodeInto must apply the shared sanity cap before its later destination-capacity check.
+    ByteBuffer dst = ByteBuffer.allocateDirect(16);
+    IOException exception = expectThrows(IOException.class,
+        () -> ZstdCodecDefinition.INSTANCE.decodeInto(
+            ZstdCodecDefinition.INSTANCE.parseOptions(List.of()), CTX, oversizedZstdFrame(), dst));
+    assertTrue(exception.getMessage().contains("out of range"), exception.getMessage());
+  }
+
+  /// Frame header whose content-size field declares (1 << 30) + 1 decompressed bytes.
+  private static ByteBuffer oversizedZstdFrame() {
+    ByteBuffer frame = ByteBuffer.allocateDirect(9);
+    frame.put(new byte[]{
+        0x28, (byte) 0xB5, 0x2F, (byte) 0xFD, (byte) 0xA0, 0x01, 0x00, 0x00, 0x40
+    });
+    frame.flip();
+    return frame;
+  }
+
+  @Test
   public void testSnappyDecodeRejectsGarbage() {
     assertThrows(Exception.class,
         () -> SnappyCodecDefinition.INSTANCE.decode(SnappyCodecDefinition.OPTIONS, CTX, garbage(64)));
