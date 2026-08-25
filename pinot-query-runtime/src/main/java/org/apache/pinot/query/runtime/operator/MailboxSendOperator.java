@@ -247,6 +247,10 @@ public class MailboxSendOperator extends MultiStageOperator {
     MultiStageQueryStats stats = null;
     List<DataBuffer> serializedStats;
     if (_context.isSendStats()) {
+      // The stats are serialized into the block this method is about to send, so what this operator has spent in
+      // the getNextBlock() call it is running has to be accounted before they are collected. Otherwise this
+      // operator reports less than the input whose call it contains, and the stage renders a negative self time.
+      registerExecutionSoFar();
       stats = calculateStats();
       try {
         serializedStats = stats.serialize();
