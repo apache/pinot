@@ -1039,10 +1039,13 @@ public class JsonFunctionsTest {
   public void testReadJsonPathInternalAcceptsStringBytesAndParsedObject() {
     String json = "{\"i\":42}";
     JsonPath compiled = JsonPathCache.INSTANCE.getOrCompute("$.i");
-    assertEquals(JsonFunctions.readJsonPathInternal(json, "$.i", JsonFunctions.PARSE_CONTEXT), 42);
-    assertEquals(JsonFunctions.readJsonPathInternal(json.getBytes(StandardCharsets.UTF_8), compiled,
-        JsonFunctions.PARSE_CONTEXT), 42);
-    assertEquals(JsonFunctions.readJsonPathInternal(Map.of("i", 42), "$.i", JsonFunctions.PARSE_CONTEXT), 42);
+    Object fromString = JsonFunctions.readJsonPathInternal(json, "$.i", JsonFunctions.PARSE_CONTEXT);
+    Object fromBytes = JsonFunctions.readJsonPathInternal(json.getBytes(StandardCharsets.UTF_8), compiled,
+        JsonFunctions.PARSE_CONTEXT);
+    Object fromParsed = JsonFunctions.readJsonPathInternal(Map.of("i", 42), "$.i", JsonFunctions.PARSE_CONTEXT);
+    assertEquals(fromString, 42);
+    assertEquals(fromBytes, 42);
+    assertEquals(fromParsed, 42);
   }
 
   /// Unparseable bytes must behave exactly like an unresolved path: the default when one is supplied, otherwise the
