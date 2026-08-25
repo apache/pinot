@@ -85,6 +85,42 @@ public class FineGrainedAuthUtilsTest {
       Assert.fail("Expected WebApplicationException");
     } catch (WebApplicationException e) {
       Assert.assertTrue(e.getMessage().contains("Could not find paramName"));
+      Assert.assertEquals(e.getResponse().getStatus(),
+          FineGrainedAuthUtils.UNBOUND_TABLE_PARAM_STATUS.getStatusCode());
+      Assert.assertEquals(e.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
+    }
+    Mockito.verify(ac, Mockito.never())
+        .hasAccess(Mockito.any(HttpHeaders.class), Mockito.any(), Mockito.any(), Mockito.any());
+  }
+
+  @Test
+  public void testUnboundTableParamExceptionRevertsToInternalServerError() {
+    URI requestUri = URI.create("http://localhost/tables");
+    WebApplicationException current = FineGrainedAuthUtils.unboundTableParamException("tableName", requestUri);
+    Assert.assertEquals(current.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
+
+    // Revert path: passing the previous status restores the 500 that this case used to pin.
+    WebApplicationException reverted = FineGrainedAuthUtils.unboundTableParamException("tableName", requestUri,
+        Response.Status.INTERNAL_SERVER_ERROR);
+    Assert.assertTrue(reverted.getMessage().contains("Could not find paramName"));
+    Assert.assertEquals(reverted.getResponse().getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
+    Assert.assertEquals(reverted.getMessage(), current.getMessage());
+  }
+
+  @Test
+  public void testValidateFineGrainedAuthEmptyParamNameStaysInternalServerError()
+      throws Exception {
+    FineGrainedAccessControl ac = Mockito.mock(FineGrainedAccessControl.class);
+    UriInfo mockUriInfo = Mockito.mock(UriInfo.class);
+    Mockito.when(mockUriInfo.getRequestUri()).thenReturn(URI.create("http://localhost/tables/foo/copy"));
+    HttpHeaders mockHttpHeaders = Mockito.mock(HttpHeaders.class);
+
+    Method copyTableLike = TestResource.class.getDeclaredMethod("copyTableWithoutParamName");
+    try {
+      FineGrainedAuthUtils.validateFineGrainedAuth(copyTableLike, mockUriInfo, mockHttpHeaders, ac);
+      Assert.fail("Expected WebApplicationException");
+    } catch (WebApplicationException e) {
+      Assert.assertTrue(e.getMessage().contains("paramName not found for table level authorization"));
       Assert.assertEquals(e.getResponse().getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
     }
     Mockito.verify(ac, Mockito.never())
@@ -170,6 +206,10 @@ public class FineGrainedAuthUtilsTest {
 
     @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "getTable")
     void getTableByQuery(@QueryParam("tableName") String tableName) {
+    }
+
+    @Authorize(targetType = TargetType.TABLE, action = "createTable")
+    void copyTableWithoutParamName() {
     }
   }
 

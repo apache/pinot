@@ -21,6 +21,7 @@ package org.apache.pinot.core.auth;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.net.URI;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -39,12 +40,30 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// Utility methods to share in Broker and Controller request filters related to fine grain authorization.
+/// Shared broker and controller helpers for fine-grained authorization.
+///
+/// The broker request filter calls [#validateFineGrainedAuth], so tightening target resolution
+/// here applies to both roles. Every in-tree broker `@Authorize(targetType = TargetType.TABLE)`
+/// endpoint (`PinotBrokerDebug`, `PinotBrokerRouting`) binds `tableName` as a `@PathParam` inside
+/// its own `@Path` template, so the declared-query-param filter does not change broker resolution.
+///
+/// [#findRawTargetId] is public. It previously took 3 arguments (`Authorize`, path map, query
+/// map) and now takes 4 (`Authorize`, `Method`, path map, query map). There is no overload: the
+/// `Method` is required to apply the declared-parameter filter. A plugin calling the old
+/// signature will fail to link.
 public class FineGrainedAuthUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FineGrainedAuthUtils.class);
   /// Memoizes [#declaredQueryParams(Method)]; bounded by the number of endpoints.
   private static final Map<Method, Set<String>> DECLARED_QUERY_PARAMS = new ConcurrentHashMap<>();
+
+  /// Status when `@Authorize(TABLE)` names a parameter the endpoint never binds.
+  ///
+  /// Historically [Response.Status#INTERNAL_SERVER_ERROR], which pages on error-rate alerts and
+  /// reads as a controller bug. [Response.Status#FORBIDDEN] is the authorization outcome.
+  /// Restore `INTERNAL_SERVER_ERROR` here — or pass it to [#unboundTableParamException] — to
+  /// revert to the previous status. Tests pin both directions.
+  static final Response.Status UNBOUND_TABLE_PARAM_STATUS = Response.Status.FORBIDDEN;
 
   private FineGrainedAuthUtils() {
   }
@@ -78,6 +97,9 @@ public class FineGrainedAuthUtils {
   ///
   /// Path parameters are template variables of the endpoint's own `@Path` and are always trusted. Query parameters
   /// are caller-supplied, so only a name the method binds as `@QueryParam` may identify the table.
+  ///
+  /// This is a public signature change from 3 arguments to 4: callers must pass `endpointMethod`.
+  /// There is no 3-argument overload.
   ///
   /// @param auth annotation identifying the authorization target
   /// @param endpointMethod the resource method, used to decide which query parameters are declared
@@ -122,6 +144,9 @@ public class FineGrainedAuthUtils {
       if (auth.targetType() == TargetType.TABLE) {
         // paramName is mandatory for table level authorization
         if (StringUtils.isEmpty(auth.paramName())) {
+          // TODO: PinotTableRestletResource#copyTable declares @Authorize(TABLE) with no paramName
+          // and already 500s here. Prefer startup-time validation of the resource model (or 403)
+          // so a misannotation is not an error-rate page.
           throw new WebApplicationException(
               "paramName not found for table level authorization in API: " + uriInfo.getRequestUri(),
               Response.Status.INTERNAL_SERVER_ERROR);
@@ -133,9 +158,7 @@ public class FineGrainedAuthUtils {
         targetId = findRawTargetId(auth, endpointMethod, uriInfo.getPathParameters(), uriInfo.getQueryParameters());
 
         if (StringUtils.isEmpty(targetId)) {
-          throw new WebApplicationException(
-              "Could not find paramName " + auth.paramName() + " in path or query params of the API: "
-                  + uriInfo.getRequestUri(), Response.Status.INTERNAL_SERVER_ERROR);
+          throw unboundTableParamException(auth.paramName(), uriInfo.getRequestUri());
         }
 
         // Table name may contain type, hence get raw table name for checking access
@@ -169,5 +192,21 @@ public class FineGrainedAuthUtils {
     } else if (!accessControl.defaultAccess(httpHeaders)) {
       throw new WebApplicationException("Access denied - default authorization failed", Response.Status.FORBIDDEN);
     }
+  }
+
+  /// Fail-closed exception when `@Authorize(TABLE)` names a parameter the endpoint never binds.
+  ///
+  /// Uses [#UNBOUND_TABLE_PARAM_STATUS] ([Response.Status#FORBIDDEN]). Pass
+  /// [Response.Status#INTERNAL_SERVER_ERROR] to restore the previous 500.
+  static WebApplicationException unboundTableParamException(String paramName, URI requestUri) {
+    return unboundTableParamException(paramName, requestUri, UNBOUND_TABLE_PARAM_STATUS);
+  }
+
+  /// Same as [#unboundTableParamException(String, URI)] with an explicit status so the 500 path
+  /// can be restored without rewriting the message.
+  static WebApplicationException unboundTableParamException(String paramName, URI requestUri,
+      Response.Status status) {
+    return new WebApplicationException(
+        "Could not find paramName " + paramName + " in path or query params of the API: " + requestUri, status);
   }
 }

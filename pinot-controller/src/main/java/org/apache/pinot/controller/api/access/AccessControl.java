@@ -25,6 +25,15 @@ import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
+/// Controller access-control SPI.
+///
+/// Custom implementations should audit two resolution changes from apache/pinot#18975:
+/// 1. A table name appended as an undeclared query parameter no longer reaches
+///    [#hasAccess(String, AccessType, HttpHeaders, String)]; the request arrives with a `null`
+///    table name and must be treated as cluster-wide.
+/// 2. [org.apache.pinot.core.auth.FineGrainedAuthUtils#findRawTargetId] changed from 3 arguments
+///    (`Authorize`, path map, query map) to 4 by adding the resource `Method`. There is no
+///    overload; a plugin calling the old signature will fail to link.
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface AccessControl extends FineGrainedAccessControl {
