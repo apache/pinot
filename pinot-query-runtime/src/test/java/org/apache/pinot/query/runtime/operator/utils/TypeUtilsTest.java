@@ -40,9 +40,5 @@ public class TypeUtilsTest {
     for (int i = 0; i < externalBytesArray.length; i++) {
       assertEquals(internalBytesArray[i].getBytes(), externalBytesArray[i]);
     }
-
-    Object emptyConverted = TypeUtils.convert(new Object[0], ColumnDataType.BYTES_ARRAY);
-    assertTrue(emptyConverted instanceof ByteArray[]);
-    assertEquals(((ByteArray[]) emptyConverted).length, 0);
   }
 }

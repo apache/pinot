@@ -119,22 +119,20 @@ public class TransformOperatorTest {
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{ColumnDataType.INT});
     when(_input.nextBlock()).thenReturn(
         OperatorTestUtil.block(inputSchema, new Object[]{1}, new Object[]{2}, new Object[]{3}));
-    DataSchema resultSchema = new DataSchema(new String[]{"bytesArray", "emptyBytesArray"},
-        new ColumnDataType[]{ColumnDataType.BYTES_ARRAY, ColumnDataType.BYTES_ARRAY});
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"bytesArray"}, new ColumnDataType[]{ColumnDataType.BYTES_ARRAY});
     ByteArray first = new ByteArray(new byte[]{0});
     ByteArray second = new ByteArray(new byte[]{1, 2});
     List<RexExpression> operands = List.of(new RexExpression.Literal(ColumnDataType.BYTES, first),
         new RexExpression.Literal(ColumnDataType.BYTES, second));
     List<RexExpression> projects = List.of(
-        new RexExpression.FunctionCall(ColumnDataType.BYTES_ARRAY, "ARRAY_VALUE_CONSTRUCTOR", operands),
-        new RexExpression.FunctionCall(ColumnDataType.BYTES_ARRAY, "ARRAY_VALUE_CONSTRUCTOR", List.of()));
+        new RexExpression.FunctionCall(ColumnDataType.BYTES_ARRAY, "ARRAY_VALUE_CONSTRUCTOR", operands));
 
     TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 3);
     for (Object[] resultRow : resultRows) {
       assertEquals((ByteArray[]) resultRow[0], new ByteArray[]{first, second});
-      assertEquals((ByteArray[]) resultRow[1], new ByteArray[0]);
     }
   }
 

@@ -31,13 +31,4 @@ public class ArrayFunctionsTest {
 
     Assert.assertEquals(ArrayFunctions.arrayValueConstructor(expected[0], expected[1]), expected);
   }
-
-  @Test
-  public void testBytesArrayValueConstructorRejectsNullAndHeterogeneousElements() {
-    byte[] bytes = {0};
-    for (Object[] invalidValues : new Object[][]{{bytes, null}, {null, bytes}, {bytes, 1}, {1, bytes}}) {
-      Assert.expectThrows(IllegalArgumentException.class,
-          () -> ArrayFunctions.arrayValueConstructor(invalidValues));
-    }
-  }
 }

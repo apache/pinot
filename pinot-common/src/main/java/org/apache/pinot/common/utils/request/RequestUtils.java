@@ -156,14 +156,6 @@ public class RequestUtils {
     return Literal.binaryValue(value);
   }
 
-  public static Literal getLiteral(byte[][] value) {
-    List<ByteBuffer> bytesArray = new ArrayList<>(value.length);
-    for (byte[] bytes : value) {
-      bytesArray.add(ByteBuffer.wrap(bytes.clone()));
-    }
-    return Literal.bytesArrayValue(bytesArray);
-  }
-
   public static Literal getLiteral(int[] value) {
     return Literal.intArrayValue(IntArrayList.wrap(value));
   }
@@ -186,6 +178,14 @@ public class RequestUtils {
 
   public static Literal getLiteral(String[] value) {
     return Literal.stringArrayValue(Arrays.asList(value));
+  }
+
+  public static Literal getLiteral(byte[][] value) {
+    List<ByteBuffer> bytesArray = new ArrayList<>(value.length);
+    for (byte[] bytes : value) {
+      bytesArray.add(ByteBuffer.wrap(bytes.clone()));
+    }
+    return Literal.bytesArrayValue(bytesArray);
   }
 
   public static Literal getLiteral(@Nullable Object object) {
