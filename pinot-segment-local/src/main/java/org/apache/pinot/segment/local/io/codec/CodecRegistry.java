@@ -52,6 +52,8 @@ final class CodecRegistry {
     Map<String, ChunkCodecHandler<?>> m = new LinkedHashMap<>();
     m.put(DeltaCodecDefinition.INSTANCE.name().toUpperCase(Locale.ROOT), DeltaCodecDefinition.INSTANCE);
     m.put(DeltaDeltaCodecDefinition.INSTANCE.name().toUpperCase(Locale.ROOT), DeltaDeltaCodecDefinition.INSTANCE);
+    m.put(T64CodecDefinition.INSTANCE.name().toUpperCase(Locale.ROOT), T64CodecDefinition.INSTANCE);
+    m.put(GorillaCodecDefinition.INSTANCE.name().toUpperCase(Locale.ROOT), GorillaCodecDefinition.INSTANCE);
     m.put(ZstdCodecDefinition.INSTANCE.name().toUpperCase(Locale.ROOT), ZstdCodecDefinition.INSTANCE);
     // Accept the legacy enum spelling ZSTANDARD as an alias for ZSTD so users familiar with
     // FieldConfig.CompressionCodec.ZSTANDARD aren't blocked. Canonicalization still emits "ZSTD",
