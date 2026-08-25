@@ -606,11 +606,14 @@ public class JsonFunctions {
 
   /// Reads `jsonPath` from a JSON `String`, UTF-8 `byte[]`, or already-parsed document.
   /// Shared with `JsonExtractScalarTransformFunction` so both stay on the same input dispatch.
+  /// A missing path returns `null` (`Option.SUPPRESS_EXCEPTIONS`). Malformed input throws.
+  @Nullable
   public static <T> T readJsonPathInternal(Object jsonInput, String jsonPath, ParseContext parseContext) {
     return parseJsonDocument(jsonInput, parseContext).read(jsonPath, NO_PREDICATES);
   }
 
   /// Compiled-path counterpart of [#readJsonPathInternal(Object, String, ParseContext)].
+  @Nullable
   public static <T> T readJsonPathInternal(Object jsonInput, JsonPath jsonPath, ParseContext parseContext) {
     return parseJsonDocument(jsonInput, parseContext).read(jsonPath);
   }

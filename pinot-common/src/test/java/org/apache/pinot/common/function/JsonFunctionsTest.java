@@ -1046,6 +1046,9 @@ public class JsonFunctionsTest {
     assertEquals(fromString, 42);
     assertEquals(fromBytes, 42);
     assertEquals(fromParsed, 42);
+    assertNull(JsonFunctions.readJsonPathInternal(json, "$.missing", JsonFunctions.PARSE_CONTEXT));
+    expectThrows(Exception.class,
+        () -> JsonFunctions.readJsonPathInternal("not json", "$.i", JsonFunctions.PARSE_CONTEXT));
   }
 
   /// Unparseable bytes must behave exactly like an unresolved path: the default when one is supplied, otherwise the
