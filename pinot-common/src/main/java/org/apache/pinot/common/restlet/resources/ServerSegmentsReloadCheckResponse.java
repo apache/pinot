@@ -20,12 +20,14 @@ package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
+import javax.annotation.Nullable;
 
 
-/// This class gives the data of a server if there exists any segments that need to be reloaded
-///
-/// It has details of server id and returns true/false if there are any segments to be reloaded or not.
+/// Server response for /segments/needReload. `segmentsNeedingReload` is populated only when the
+/// endpoint is invoked with `verbose=true`.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ServerSegmentsReloadCheckResponse {
   @JsonProperty("needReload")
@@ -33,6 +35,11 @@ public class ServerSegmentsReloadCheckResponse {
 
   @JsonProperty("instanceId")
   private final String _instanceId;
+
+  @Nullable
+  @JsonProperty("segmentsNeedingReload")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private final List<String> _segmentsNeedingReload;
 
   public boolean isNeedReload() {
     return _needReload;
@@ -42,10 +49,21 @@ public class ServerSegmentsReloadCheckResponse {
     return _instanceId;
   }
 
+  @Nullable
+  public List<String> getSegmentsNeedingReload() {
+    return _segmentsNeedingReload;
+  }
+
   @JsonCreator
   public ServerSegmentsReloadCheckResponse(@JsonProperty("needReload") boolean needReload,
-      @JsonProperty("instanceId") String instanceId) {
+      @JsonProperty("instanceId") String instanceId,
+      @JsonProperty("segmentsNeedingReload") @Nullable List<String> segmentsNeedingReload) {
     _needReload = needReload;
     _instanceId = instanceId;
+    _segmentsNeedingReload = segmentsNeedingReload;
+  }
+
+  public ServerSegmentsReloadCheckResponse(boolean needReload, String instanceId) {
+    this(needReload, instanceId, null);
   }
 }

@@ -244,16 +244,20 @@ public class ServerSegmentMetadataReader {
     return segmentsMetadata;
   }
 
-  /// This method is called when the API request is to fetch data about segment reload of the table.
-  /// This method makes a MultiGet call to all servers that host their respective segments and gets the results.
-  /// This method will return metadata of all the servers along with need reload flag.
-  /// In future additional details like segments list can also be added
   public TableReloadResponse getCheckReloadSegmentsFromServer(String tableNameWithType,
       Set<String> serverInstances, BiMap<String, String> endpoints, int timeoutMs) {
-    LOGGER.debug("Checking if reload is needed on segments from servers for table {}.", tableNameWithType);
+    return getCheckReloadSegmentsFromServer(tableNameWithType, serverInstances, endpoints, timeoutMs, false);
+  }
+
+  /// When {@code verbose} is true, each server response also names the segments needing reload.
+  public TableReloadResponse getCheckReloadSegmentsFromServer(String tableNameWithType,
+      Set<String> serverInstances, BiMap<String, String> endpoints, int timeoutMs, boolean verbose) {
+    LOGGER.debug("Checking if reload is needed on segments from servers for table {} (verbose={}).",
+        tableNameWithType, verbose);
     List<String> serverURLs = new ArrayList<>();
     for (String serverInstance : serverInstances) {
-      serverURLs.add(generateCheckReloadSegmentsServerURL(tableNameWithType, endpoints.get(serverInstance)));
+      String url = generateCheckReloadSegmentsServerURL(tableNameWithType, endpoints.get(serverInstance));
+      serverURLs.add(verbose ? url + "?verbose=true" : url);
     }
     BiMap<String, String> endpointsToServers = endpoints.inverse();
     CompletionServiceHelper completionServiceHelper =

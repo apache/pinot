@@ -1659,9 +1659,21 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public boolean needReloadSegments()
       throws Exception {
+    return !findSegmentsNeedingReload(true).isEmpty();
+  }
+
+  @Override
+  public List<String> getSegmentNamesNeedingReload()
+      throws Exception {
+    return findSegmentsNeedingReload(false);
+  }
+
+  /// When {@code shortCircuit} is true, stops after the first match — same cost as the boolean check.
+  private List<String> findSegmentsNeedingReload(boolean shortCircuit)
+      throws Exception {
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
     List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
-    boolean needReload = false;
+    List<String> segmentsNeedingReload = new ArrayList<>();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         IndexSegment segment = segmentDataManager.getSegment();
@@ -1669,8 +1681,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
           ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
           indexLoadingConfig.setSegmentTier(immutableSegment.getTier());
           if (immutableSegment.isReloadNeeded(indexLoadingConfig)) {
-            needReload = true;
-            break;
+            segmentsNeedingReload.add(immutableSegment.getSegmentName());
+            if (shortCircuit) {
+              break;
+            }
           }
         }
       }
@@ -1679,7 +1693,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         releaseSegment(segmentDataManager);
       }
     }
-    return needReload;
+    return segmentsNeedingReload;
   }
 
   @Override

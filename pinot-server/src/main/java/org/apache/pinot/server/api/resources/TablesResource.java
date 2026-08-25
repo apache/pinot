@@ -1221,24 +1221,32 @@ public class TablesResource {
   @Path("/tables/{tableName}/segments/needReload")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Checks if reload is needed on any segment", notes = "Returns true if reload is required on"
-      + " any segment in this server")
+      + " any segment in this server. When verbose=true, also lists the segments that need reload.")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success", response = TableSegments.class), @ApiResponse(code = 500,
       message = "Internal Server error", response = ErrorInfo.class)
   })
   public String checkSegmentsReload(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Include names of segments that need reload in the response")
+      @QueryParam("verbose") @DefaultValue("false") boolean verbose,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
-    boolean needReload = false;
+    ServerSegmentsReloadCheckResponse response;
     try {
-      needReload = tableDataManager.needReloadSegments();
+      if (verbose) {
+        List<String> segmentsNeedingReload = tableDataManager.getSegmentNamesNeedingReload();
+        response = new ServerSegmentsReloadCheckResponse(!segmentsNeedingReload.isEmpty(),
+            tableDataManager.getInstanceId(), segmentsNeedingReload);
+      } else {
+        response = new ServerSegmentsReloadCheckResponse(tableDataManager.needReloadSegments(),
+            tableDataManager.getInstanceId());
+      }
     } catch (Exception e) {
       throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
     }
-    return ResourceUtils.convertToJsonString(
-        new ServerSegmentsReloadCheckResponse(needReload, tableDataManager.getInstanceId()));
+    return ResourceUtils.convertToJsonString(response);
   }
 
   @GET

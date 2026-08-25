@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Strings;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -300,28 +301,34 @@ public class PinotTableReloadService {
 
   public String needReload(String tableNameWithType, boolean verbose, HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
-    LOG.info("Received a request to check reload for all servers hosting segments for table {}", tableNameWithType);
+    LOG.info("Received a request to check reload for all servers hosting segments for table {} (verbose={})",
+        tableNameWithType, verbose);
     try {
       TableMetadataReader tableMetadataReader =
           new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
       Map<String, JsonNode> needReloadMetadata =
           tableMetadataReader.getServerCheckSegmentsReloadMetadata(tableNameWithType,
-              _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000).getServerReloadJsonResponses();
+              _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000, verbose).getServerReloadJsonResponses();
       boolean needReload =
           needReloadMetadata.values().stream().anyMatch(value -> value.get("needReload").booleanValue());
       Map<String, ServerSegmentsReloadCheckResponse> serverResponses = new HashMap<>();
-      TableSegmentsReloadCheckResponse tableNeedReloadResponse;
       if (verbose) {
         for (Map.Entry<String, JsonNode> entry : needReloadMetadata.entrySet()) {
+          JsonNode body = entry.getValue();
+          JsonNode names = body.get("segmentsNeedingReload");
+          List<String> segmentsNeedingReload = null;
+          if (names != null && names.isArray()) {
+            segmentsNeedingReload = new ArrayList<>(names.size());
+            for (JsonNode name : names) {
+              segmentsNeedingReload.add(name.asText());
+            }
+          }
           serverResponses.put(entry.getKey(),
-              new ServerSegmentsReloadCheckResponse(entry.getValue().get("needReload").booleanValue(),
-                  entry.getValue().get("instanceId").asText()));
+              new ServerSegmentsReloadCheckResponse(body.get("needReload").booleanValue(),
+                  body.get("instanceId").asText(), segmentsNeedingReload));
         }
-        tableNeedReloadResponse = new TableSegmentsReloadCheckResponse(needReload, serverResponses);
-      } else {
-        tableNeedReloadResponse = new TableSegmentsReloadCheckResponse(needReload, serverResponses);
       }
-      return JsonUtils.objectToPrettyString(tableNeedReloadResponse);
+      return JsonUtils.objectToPrettyString(new TableSegmentsReloadCheckResponse(needReload, serverResponses));
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOG, e.getMessage(), Response.Status.BAD_REQUEST);
     } catch (IOException ioe) {

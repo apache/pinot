@@ -133,6 +133,12 @@ public interface TableDataManager {
   boolean needReloadSegments()
       throws Exception;
 
+  /// Non-short-circuiting variant of [#needReloadSegments] that names every segment needing reload.
+  default List<String> getSegmentNamesNeedingReload()
+      throws Exception {
+    return List.of();
+  }
+
   /// Downloads a segment and loads it into the table.
   /// NOTE: This method is part of the implementation detail of [#addOnlineSegment(String)].
   void downloadAndLoadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
