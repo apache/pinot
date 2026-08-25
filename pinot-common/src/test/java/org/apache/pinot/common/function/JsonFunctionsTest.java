@@ -20,6 +20,7 @@ package org.apache.pinot.common.function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.jayway.jsonpath.InvalidJsonException;
+import com.jayway.jsonpath.JsonPath;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -1032,6 +1033,16 @@ public class JsonFunctionsTest {
         // 0xC3 starts a two-byte sequence that 0x28 cannot continue.
         {new byte[]{(byte) 0xC3, (byte) 0x28}}
     };
+  }
+
+  @Test
+  public void testReadJsonPathInternalAcceptsStringBytesAndParsedObject() {
+    String json = "{\"i\":42}";
+    JsonPath compiled = JsonPathCache.INSTANCE.getOrCompute("$.i");
+    assertEquals(JsonFunctions.readJsonPathInternal(json, "$.i", JsonFunctions.PARSE_CONTEXT), 42);
+    assertEquals(JsonFunctions.readJsonPathInternal(json.getBytes(StandardCharsets.UTF_8), compiled,
+        JsonFunctions.PARSE_CONTEXT), 42);
+    assertEquals(JsonFunctions.readJsonPathInternal(Map.of("i", 42), "$.i", JsonFunctions.PARSE_CONTEXT), 42);
   }
 
   /// Unparseable bytes must behave exactly like an unresolved path: the default when one is supplied, otherwise the

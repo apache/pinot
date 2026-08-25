@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.jayway.jsonpath.Configuration;
+import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.ParseContext;
@@ -71,14 +72,18 @@ public class JsonFunctions {
 
   private static final Object[] EMPTY = new Object[0];
   private static final Predicate[] NO_PREDICATES = new Predicate[0];
-  private static final ParseContext PARSE_CONTEXT = JsonPath.using(
+
+  /// Jayway context used by `jsonPath*` and `jsonExtractScalar`.
+  /// `JsonExtractScalarTransformFunction` uses this same instance so the transform and scalar stay on one
+  /// configuration. `ArrayAwareJacksonJsonProvider` treats already-parsed `Object[]` values as JSON arrays.
+  public static final ParseContext PARSE_CONTEXT = JsonPath.using(
       new Configuration.ConfigurationBuilder().jsonProvider(new ArrayAwareJacksonJsonProvider())
           .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS)
           .build());
 
-  // Mirrors JsonExtractScalarTransformFunction's BigDecimal-preserving parser: BIG_DECIMAL / STRING / JSON
-  // extraction reads JSON floats as BigDecimal to avoid precision loss.
-  private static final ParseContext PARSE_CONTEXT_WITH_BIG_DECIMAL = JsonPath.using(
+  /// BigDecimal-preserving Jayway context for `BIG_DECIMAL` / `STRING` / `JSON` extraction, so JSON floats
+  /// are not rounded through `Double`. Shared with `JsonExtractScalarTransformFunction`.
+  public static final ParseContext PARSE_CONTEXT_WITH_BIG_DECIMAL = JsonPath.using(
       new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonProvider(
               new ObjectMapper().configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true)))
           .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS).build());
@@ -599,22 +604,36 @@ public class JsonFunctions {
     return coerceScalarArray(readJsonPathArray(jsonInput, jsonPath, useBigDecimal), dataType, defaultValue);
   }
 
+  /// Reads `jsonPath` from a JSON `String`, UTF-8 `byte[]`, or already-parsed document.
+  /// Shared with `JsonExtractScalarTransformFunction` so both stay on the same input dispatch.
+  public static <T> T readJsonPathInternal(Object jsonInput, String jsonPath, ParseContext parseContext) {
+    return parseJsonDocument(jsonInput, parseContext).read(jsonPath, NO_PREDICATES);
+  }
+
+  /// Compiled-path counterpart of [#readJsonPathInternal(Object, String, ParseContext)].
+  public static <T> T readJsonPathInternal(Object jsonInput, JsonPath jsonPath, ParseContext parseContext) {
+    return parseJsonDocument(jsonInput, parseContext).read(jsonPath);
+  }
+
+  private static DocumentContext parseJsonDocument(Object jsonInput, ParseContext parseContext) {
+    if (jsonInput instanceof String) {
+      return parseContext.parse((String) jsonInput);
+    }
+    if (jsonInput instanceof byte[]) {
+      // BYTES columns carry the raw UTF-8 document; parse(Object) would treat the array as already parsed.
+      return parseContext.parseUtf8((byte[]) jsonInput);
+    }
+    return parseContext.parse(jsonInput);
+  }
+
   @Nullable
   private static Object readJsonPathValue(@Nullable Object jsonInput, String jsonPath, boolean useBigDecimal) {
     if (jsonInput == null) {
       return null;
     }
     try {
-      ParseContext parseContext = useBigDecimal ? PARSE_CONTEXT_WITH_BIG_DECIMAL : PARSE_CONTEXT;
-      if (jsonInput instanceof String) {
-        return parseContext.parse((String) jsonInput).read(jsonPath, NO_PREDICATES);
-      }
-      if (jsonInput instanceof byte[]) {
-        // BYTES columns carry the raw UTF-8 document; parse(Object) would treat the array as an already-parsed
-        // document, so decode it explicitly like JsonExtractScalarTransformFunction does.
-        return parseContext.parseUtf8((byte[]) jsonInput).read(jsonPath, NO_PREDICATES);
-      }
-      return parseContext.parse(jsonInput).read(jsonPath, NO_PREDICATES);
+      return readJsonPathInternal(jsonInput, jsonPath,
+          useBigDecimal ? PARSE_CONTEXT_WITH_BIG_DECIMAL : PARSE_CONTEXT);
     } catch (Exception e) {
       // Malformed JSON (e.g. a plain-text row) is treated as unresolved, mirroring the transform which swallows
       // per-row extraction errors; the caller then applies the default or throws.
@@ -628,16 +647,8 @@ public class JsonFunctions {
       return null;
     }
     try {
-      ParseContext parseContext = useBigDecimal ? PARSE_CONTEXT_WITH_BIG_DECIMAL : PARSE_CONTEXT;
-      Object read;
-      if (jsonInput instanceof String) {
-        read = parseContext.parse((String) jsonInput).read(jsonPath, NO_PREDICATES);
-      } else if (jsonInput instanceof byte[]) {
-        read = parseContext.parseUtf8((byte[]) jsonInput).read(jsonPath, NO_PREDICATES);
-      } else {
-        read = parseContext.parse(jsonInput).read(jsonPath, NO_PREDICATES);
-      }
-      return convertObjectToArray(read);
+      return convertObjectToArray(readJsonPathInternal(jsonInput, jsonPath,
+          useBigDecimal ? PARSE_CONTEXT_WITH_BIG_DECIMAL : PARSE_CONTEXT));
     } catch (Exception e) {
       return null;
     }

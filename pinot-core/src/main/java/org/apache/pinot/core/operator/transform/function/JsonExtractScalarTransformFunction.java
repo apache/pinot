@@ -19,14 +19,8 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
-import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.ParseContext;
-import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
-import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FastJsonPathExtractor;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.common.function.SimpleJsonPath;
+import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -96,9 +91,8 @@ import org.roaringbitmap.RoaringBitmap;
 /// - `STRING` returns `String` values as-is; other JSON values are serialized via
 ///   [JsonUtils#objectToString].
 /// - `BYTES` decodes a Base64-encoded JSON string, matching [PinotDataType#JSON].
-/// - `BIG_DECIMAL` and `STRING` paths use a BigDecimal-preserving JSON parser
-///   (`JSON_PARSER_CONTEXT_WITH_BIG_DECIMAL`) to avoid precision loss on numeric values; other paths use
-///   the default parser.
+/// - `BIG_DECIMAL` and `STRING` paths use [JsonFunctions#PARSE_CONTEXT_WITH_BIG_DECIMAL] to avoid
+///   precision loss on numeric values; other paths use [JsonFunctions#PARSE_CONTEXT].
 /// - Other types coerce via `Number` cast (preserved as the canonical primitive form) or
 ///   `parse*(toString())`.
 public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
@@ -111,18 +105,6 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     FAST,
     FIRST_MATCH
   }
-
-  // This ObjectMapper requires special configurations, hence we can't use pinot JsonUtils here.
-  private static final ObjectMapper OBJECT_MAPPER_WITH_BIG_DECIMAL =
-      new ObjectMapper().configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
-
-  private static final ParseContext JSON_PARSER_CONTEXT_WITH_BIG_DECIMAL = JsonPath.using(
-      new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonProvider(OBJECT_MAPPER_WITH_BIG_DECIMAL))
-          .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS).build());
-
-  private static final ParseContext JSON_PARSER_CONTEXT = JsonPath.using(
-      new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonProvider())
-          .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS).build());
 
   private final String _functionName;
   private final ExtractionMode _extractionMode;
@@ -801,7 +783,8 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       boolean useBigDecimal) {
     if (_jsonFieldTransformFunction.getResultMetadata().getDataType() == DataType.BYTES) {
       byte[][] jsonBytes = _jsonFieldTransformFunction.transformToBytesValuesSV(valueBlock);
-      IntFunction<T> jaywayExtractor = i -> parseContext.parseUtf8(jsonBytes[i]).read(_jsonPath);
+      IntFunction<T> jaywayExtractor =
+          i -> JsonFunctions.readJsonPathInternal(jsonBytes[i], _jsonPath, parseContext);
       if (_simpleJsonPath == null) {
         return jaywayExtractor;
       }
@@ -821,7 +804,8 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       };
     } else {
       String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(valueBlock);
-      IntFunction<T> jaywayExtractor = i -> parseContext.parse(jsonStrings[i]).read(_jsonPath);
+      IntFunction<T> jaywayExtractor =
+          i -> JsonFunctions.readJsonPathInternal(jsonStrings[i], _jsonPath, parseContext);
       if (_simpleJsonPath == null) {
         return jaywayExtractor;
       }
@@ -843,10 +827,10 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   private <T> IntFunction<T> getResultExtractor(ValueBlock valueBlock) {
-    return getResultExtractor(valueBlock, JSON_PARSER_CONTEXT, false);
+    return getResultExtractor(valueBlock, JsonFunctions.PARSE_CONTEXT, false);
   }
 
   private <T> IntFunction<T> getResultExtractorWithBigDecimal(ValueBlock valueBlock) {
-    return getResultExtractor(valueBlock, JSON_PARSER_CONTEXT_WITH_BIG_DECIMAL, true);
+    return getResultExtractor(valueBlock, JsonFunctions.PARSE_CONTEXT_WITH_BIG_DECIMAL, true);
   }
 }
