@@ -230,6 +230,12 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
         .orElse(MultiStageQueryStats.emptyStats(_context.getStageId()));
   }
 
+  /// Returns the stats to report for this operator, as a copy that the caller is free to merge into.
+  ///
+  /// Implementations may derive extra stats here instead of only copying the ones they accumulated while running,
+  /// but this method is called several times per opchain and every call must return the same values: deriving a
+  /// stat whose merge function is not idempotent (a sum, for instance) must be done on the returned copy, never on
+  /// the stat map the operator keeps.
   public abstract StatMap<?> copyStatMaps();
 
   // TODO: Ideally close() call should finish within request deadline.

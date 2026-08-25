@@ -143,6 +143,41 @@ public class MailboxReceiveOperatorTest {
     }
   }
 
+  /// A mailbox receive operator is idle on the workers where it received nothing, which is what tells a worker
+  /// that was handed no data apart from one that was handed data and filtered it away downstream.
+  @Test
+  public void shouldNotReportIdleWorkerWhenRowsAreReceived() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, new Object[]{1, 1}),
+        OperatorTestUtil.eosWithEmptyStats());
+    try (MailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON)) {
+      drain(operator);
+      assertEquals(operator.copyStatMaps().getInt(BaseMailboxReceiveOperator.StatKey.NON_ACTIVE_WORKERS), 0,
+          "expected receiving a row to keep this worker out of the idle count");
+    }
+  }
+
+  @Test
+  public void shouldReportIdleWorkerWhenNoRowIsReceived() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.eosWithEmptyStats());
+    try (MailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON)) {
+      drain(operator);
+      // Collected more than once, as the runtime does, so a derivation moved onto the shared stat map would show up
+      // here as a doubled count.
+      operator.copyStatMaps();
+      assertEquals(operator.copyStatMaps().getInt(BaseMailboxReceiveOperator.StatKey.NON_ACTIVE_WORKERS), 1,
+          "expected a worker that received no row to be counted as idle");
+    }
+  }
+
+  private static void drain(MailboxReceiveOperator operator) {
+    MseBlock block = operator.nextBlock();
+    while (block.isData()) {
+      block = operator.nextBlock();
+    }
+  }
+
   @Test
   public void shouldReceiveSingletonErrorMailbox() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
