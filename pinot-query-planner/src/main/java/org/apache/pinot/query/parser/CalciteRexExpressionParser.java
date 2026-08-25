@@ -139,13 +139,20 @@ public class CalciteRexExpressionParser {
       return RequestUtils.getNullLiteral();
     }
     // NOTE: Value is stored in internal format in RexExpression.Literal.
-    //       Do not convert TIMESTAMP/BOOLEAN_ARRAY/TIMESTAMP_ARRAY to external format because they are not explicitly
-    //       supported in single-stage engine Literal.
+    //       Do not convert TIMESTAMP/BOOLEAN_ARRAY/TIMESTAMP_ARRAY/UUID_ARRAY to external format because they are not
+    //       explicitly supported in single-stage engine Literal.
     ColumnDataType dataType = literal.getDataType();
     if (dataType == ColumnDataType.BOOLEAN) {
       value = BooleanUtils.isTrueInternalValue(value);
     } else if (dataType == ColumnDataType.BYTES || dataType == ColumnDataType.UUID) {
       value = ((ByteArray) value).getBytes();
+    } else if (dataType == ColumnDataType.BYTES_ARRAY) {
+      ByteArray[] byteArrays = (ByteArray[]) value;
+      byte[][] bytes = new byte[byteArrays.length][];
+      for (int i = 0; i < byteArrays.length; i++) {
+        bytes[i] = byteArrays[i].getBytes();
+      }
+      value = bytes;
     }
     return RequestUtils.getLiteral(value);
   }
