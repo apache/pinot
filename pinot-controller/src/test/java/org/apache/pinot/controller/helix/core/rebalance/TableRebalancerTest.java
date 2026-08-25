@@ -573,7 +573,7 @@ public class TableRebalancerTest {
     }
     Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap = new HashMap<>();
     return TableRebalancer.getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap,
-        minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap);
+        minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap, null);
   }
 
   @Test

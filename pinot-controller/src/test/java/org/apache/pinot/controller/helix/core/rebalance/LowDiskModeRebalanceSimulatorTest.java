@@ -252,16 +252,226 @@ public class LowDiskModeRebalanceSimulatorTest {
     return SegmentAssignmentUtils.getInstanceStateMap(List.of(instances), ONLINE);
   }
 
-  /// A strict replica group rebalance that the disk budget genuinely cannot carry out, found by
-  /// [#testStrictReplicaGroupRandomGroupStructureSearch] and pinned here so it stays covered.
+  /// Searches broadly for rebalances the disk budget cannot carry out, i.e. the ones the disk utilization pre-check
+  /// has to report. Randomizes everything that feeds the budget: strict and non strict routing, batching on and off,
+  /// the minimum available replicas, how many replicas a group currently sits at, group sizes, and four different
+  /// segment size distributions including one where a single segment dominates its whole group.
   ///
-  /// At the blocking step `host02` has 318 MiB free under its own ceiling, but the group it has to take on is 6
-  /// segments totalling roughly 1.2 GiB and strict replica group routing requires all of them to move together, so it
-  /// does not fit. Every other movable group is blocked the same way, so the rebalance relaxes the budget rather than
-  /// stalling and `host02` ends up 36% over the disk it started with. Positive-but-insufficient headroom is what makes
-  /// this reachable in strict mode and not in the per-segment case.
+  /// The property asserted is not that a rebalance can always stay within the budget - it cannot, and relaxing the
+  /// budget rather than stalling is the deliberate behaviour - but that the pre-check replay reports exactly the
+  /// servers that end up over. A relaxation the pre-check does not predict would be a silent over-allocation.
   @Test
-  public void testStrictReplicaGroupCanBeForcedOverTheDiskBudget() {
+  public void testSearchForRebalancesTheBudgetCannotCarryOut() {
+    Random random = new Random(2027);
+    List<SimResult> relaxed = new ArrayList<>();
+    List<String> mismatches = new ArrayList<>();
+    int numTrials = 30000;
+    int numRun = 0;
+    for (int trial = 0; trial < numTrials; trial++) {
+      int numServers = 3 + random.nextInt(8);
+      int replication = 2 + random.nextInt(3);
+      int minAvailableReplicas = 1 + random.nextInt(replication - 1);
+      int numGroups = 2 + random.nextInt(7);
+      boolean enableStrictReplicaGroup = random.nextBoolean();
+      int batchSizePerServer = List.of(RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, 1, 2, 5, 20)
+          .get(random.nextInt(5));
+      int sizeRegime = random.nextInt(4);
+      List<String> allServers = servers(0, numServers);
+
+      Map<String, Map<String, String>> current = new TreeMap<>();
+      Map<String, Map<String, String>> target = new TreeMap<>();
+      Map<String, Long> sizes = new TreeMap<>();
+      int segmentId = 0;
+      for (int group = 0; group < numGroups; group++) {
+        // A group that already sits at the minimum available replicas cannot drop anything, which is what forces it
+        // to depend on an addition landing somewhere
+        int numCurrentInstances = minAvailableReplicas + random.nextInt(replication - minAvailableReplicas + 1);
+        List<String> currentInstances = pickServers(allServers, numCurrentInstances, random);
+        List<String> targetInstances = pickServers(allServers, replication, random);
+        int numSegmentsInGroup = 1 + random.nextInt(10);
+        List<String> groupSegments = new ArrayList<>();
+        for (int i = 0; i < numSegmentsInGroup; i++) {
+          String segment = String.format("segment%04d", segmentId++);
+          groupSegments.add(segment);
+          current.put(segment, SegmentAssignmentUtils.getInstanceStateMap(currentInstances, ONLINE));
+          target.put(segment, SegmentAssignmentUtils.getInstanceStateMap(targetInstances, ONLINE));
+        }
+        sizes.putAll(sizesForRegime(groupSegments, sizeRegime, random));
+      }
+      List<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(current, target);
+      if (segmentsToMove.isEmpty() || TableRebalancer.getMinAvailableReplicas(current, target, segmentsToMove,
+          minAvailableReplicas, LoggerFactory.getLogger(getClass())) != minAvailableReplicas) {
+        continue;
+      }
+      numRun++;
+
+      String name = String.format(
+          "trial %d: servers=%d replication=%d minAvail=%d groups=%d strict=%s batch=%d sizes=%d", trial, numServers,
+          replication, minAvailableReplicas, numGroups, enableStrictReplicaGroup, batchSizePerServer, sizeRegime);
+      SimResult result = simulate(new Scenario(name, current, target, minAvailableReplicas, enableStrictReplicaGroup,
+          batchSizePerServer, sizes));
+      Set<String> observed = new TreeSet<>();
+      result.relaxedSteps().forEach(step -> observed.addAll(step._deferralRelaxedFor));
+      if (observed.isEmpty()) {
+        continue;
+      }
+      relaxed.add(result);
+      // The pre-check has to predict it, from the same starting point, before anything moves
+      Map<String, Long> reported = TableRebalancer.getServersForcedOverDiskBudget(current, target,
+          minAvailableReplicas, enableStrictReplicaGroup, batchSizePerServer, toTableSizeDetails(sizes),
+          LoggerFactory.getLogger(getClass()));
+      if (!reported.keySet().equals(observed)) {
+        mismatches.add(name + ": rebalance went over on " + observed + " but the pre-check reported " + reported);
+      }
+    }
+
+    System.out.printf("%nSearched %d of %d generated scenarios (the rest were configs the rebalance would reject)%n",
+        numRun, numTrials);
+    System.out.printf("  rebalances the budget could not carry out: %d%n", relaxed.size());
+    if (!relaxed.isEmpty()) {
+      relaxed.sort((a, b) -> Double.compare(b.worstAmplification(), a.worstAmplification()));
+      System.out.printf("  worst amplification among them: %.2fx%n", relaxed.get(0).worstAmplification());
+      for (SimResult result : relaxed.subList(0, Math.min(8, relaxed.size()))) {
+        System.out.printf("    %-92s worst %s: bound %s, peak %s%n", result._scenario._name, result.worstServer(),
+            formatUnits(result.bound(result.worstServer()), result._scenario),
+            formatUnits(result._maxAfter.get(result.worstServer()), result._scenario));
+      }
+      System.out.println(relaxed.get(0).report());
+      dumpScenario(relaxed.get(0)._scenario);
+    }
+    assertEquals(mismatches, List.of(), "the pre-check must report every rebalance that goes over the disk budget");
+  }
+
+  /// Enumerates every small rebalance exhaustively, rather than sampling. A rebalance the budget cannot carry out is
+  /// a rare structure, so random generation is the wrong instrument for it: if a minimal one exists it should show up
+  /// among 4 servers, 3 groups sitting at the minimum available replicas, and a handful of group sizes.
+  @Test
+  public void testExhaustiveSmallSearchForRebalancesTheBudgetCannotCarryOut() {
+    List<String> allServers = servers(0, 4);
+    List<Long> groupSizes = List.of(1L, 3L, 10L, 40L);
+    List<SimResult> relaxed = new ArrayList<>();
+    List<String> mismatches = new ArrayList<>();
+    int numRun = 0;
+    for (int replication : List.of(2, 3)) {
+      // Every (single current instance, target instance set) a group can have
+      List<List<List<String>>> groupShapes = new ArrayList<>();
+      for (String currentInstance : allServers) {
+        for (List<String> targetInstances : combinations(allServers, replication)) {
+          groupShapes.add(List.of(List.of(currentInstance), targetInstances));
+        }
+      }
+      int numShapes = groupShapes.size();
+      for (int a = 0; a < numShapes; a++) {
+        for (int b = a; b < numShapes; b++) {
+          for (int c = b; c < numShapes; c++) {
+            for (long sizeA : groupSizes) {
+              for (long sizeB : groupSizes) {
+                for (long sizeC : groupSizes) {
+                  List<List<List<String>>> shapes = List.of(groupShapes.get(a), groupShapes.get(b),
+                      groupShapes.get(c));
+                  List<Long> sizesPerGroup = List.of(sizeA, sizeB, sizeC);
+                  Map<String, Map<String, String>> current = new TreeMap<>();
+                  Map<String, Map<String, String>> target = new TreeMap<>();
+                  Map<String, Long> sizes = new TreeMap<>();
+                  for (int group = 0; group < 3; group++) {
+                    String segment = "segment" + group;
+                    current.put(segment,
+                        SegmentAssignmentUtils.getInstanceStateMap(shapes.get(group).get(0), ONLINE));
+                    target.put(segment,
+                        SegmentAssignmentUtils.getInstanceStateMap(shapes.get(group).get(1), ONLINE));
+                    sizes.put(segment, sizesPerGroup.get(group));
+                  }
+                  List<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(current, target);
+                  if (segmentsToMove.isEmpty() || TableRebalancer.getMinAvailableReplicas(current, target,
+                      segmentsToMove, 1, LoggerFactory.getLogger(getClass())) != 1) {
+                    continue;
+                  }
+                  for (boolean enableStrictReplicaGroup : List.of(false, true)) {
+                    numRun++;
+                    String name = String.format("replication=%d shapes=%s sizes=%s strict=%s", replication, shapes,
+                        sizesPerGroup, enableStrictReplicaGroup);
+                    SimResult result = simulate(new Scenario(name, current, target, 1, enableStrictReplicaGroup,
+                        RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, sizes));
+                    Set<String> observed = new TreeSet<>();
+                    result.relaxedSteps().forEach(step -> observed.addAll(step._deferralRelaxedFor));
+                    if (observed.isEmpty()) {
+                      continue;
+                    }
+                    relaxed.add(result);
+                    Map<String, Long> reported = TableRebalancer.getServersForcedOverDiskBudget(current, target, 1,
+                        enableStrictReplicaGroup, RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER,
+                        toTableSizeDetails(sizes), LoggerFactory.getLogger(getClass()));
+                    if (!reported.keySet().equals(observed)) {
+                      mismatches.add(name + ": went over on " + observed + " but pre-check reported " + reported);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    System.out.printf("%nExhaustively ran %d small rebalances%n", numRun);
+    System.out.printf("  rebalances the budget could not carry out: %d%n", relaxed.size());
+    if (!relaxed.isEmpty()) {
+      relaxed.sort((a, b) -> Double.compare(b.worstAmplification(), a.worstAmplification()));
+      System.out.println(relaxed.get(0).report());
+      dumpScenario(relaxed.get(0)._scenario);
+    }
+    assertEquals(mismatches, List.of(), "the pre-check must report every rebalance that goes over the disk budget");
+  }
+
+  /// All the subsets of `items` of exactly `size`, in a stable order.
+  private static List<List<String>> combinations(List<String> items, int size) {
+    List<List<String>> combinations = new ArrayList<>();
+    if (size == 0) {
+      combinations.add(List.of());
+      return combinations;
+    }
+    for (int i = 0; i <= items.size() - size; i++) {
+      for (List<String> rest : combinations(items.subList(i + 1, items.size()), size - 1)) {
+        List<String> combination = new ArrayList<>();
+        combination.add(items.get(i));
+        combination.addAll(rest);
+        combinations.add(combination);
+      }
+    }
+    return combinations;
+  }
+
+  /// Segment sizes under one of several distributions, so that the search is not limited to one shape of skew.
+  private static Map<String, Long> sizesForRegime(List<String> segments, int sizeRegime, Random random) {
+    Map<String, Long> sizes = new TreeMap<>();
+    long mib = 1024L * 1024;
+    switch (sizeRegime) {
+      case 0 -> segments.forEach(segment -> sizes.put(segment, 64 * mib));
+      case 1 -> segments.forEach(segment -> sizes.put(segment,
+          random.nextInt(10) < 8 ? (8 + random.nextInt(24)) * mib : (320 + random.nextInt(960)) * mib));
+      case 2 -> {
+        // One segment dominates the group, so the group only fits where there is a lot of room
+        segments.forEach(segment -> sizes.put(segment, (4 + random.nextInt(12)) * mib));
+        sizes.put(segments.get(random.nextInt(segments.size())), (1024 + random.nextInt(3072)) * mib);
+      }
+      default -> segments.forEach(
+          segment -> sizes.put(segment, (long) Math.pow(2, 3 + random.nextInt(9)) * mib));
+    }
+    return sizes;
+  }
+
+  /// Regression test for a strict replica group rebalance that used to be pushed over the disk budget, found by
+  /// [#testStrictReplicaGroupRandomGroupStructureSearch].
+  ///
+  /// Before the instances to add were picked with the budget in mind, this stalled at a step where three of the four
+  /// groups still had an instance in their target assignment with room for them - `host01` had exactly the 2242 MiB
+  /// that one group needed, `host04` had room for another and `host00` for the third - but the instances were picked
+  /// purely on the number of segments to offload, which landed on `host00` (2186 MiB free, 56 MiB short), `host02`
+  /// (318 MiB free) and `host02` again. All three were rejected by the budget, none of the instances that fit was
+  /// tried, and with nothing able to move the budget was relaxed and `host02` went 36% over the disk it started with.
+  ///
+  /// A correct sequence existed the whole time; only the choice of instance was blind to the budget.
+  @Test
+  public void testStrictReplicaGroupStaysWithinTheDiskBudget() {
     Map<String, Map<String, String>> current = new TreeMap<>();
     Map<String, Map<String, String>> target = new TreeMap<>();
     Map<String, Long> sizes = new TreeMap<>();
@@ -330,18 +540,18 @@ public class LowDiskModeRebalanceSimulatorTest {
     assertEquals(TableRebalancer.getMinAvailableReplicas(current, target,
         SegmentAssignmentUtils.getSegmentsToMove(current, target), 1, LoggerFactory.getLogger(getClass())), 1);
 
-    SimResult result = simulate(new Scenario("Strict replica group forced over the disk budget", current, target, 1,
-        true, RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, sizes));
+    SimResult result = simulate(new Scenario("Strict replica group within the disk budget", current, target, 1, true,
+        RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, sizes));
     System.out.println(result.report());
-    assertTrue(result.hasSteadyStateViolation(), "expected the budget to be relaxed and a server to go over");
+    assertFalse(result.hasSteadyStateViolation(), "no server may hold more than max(initial, target)");
+    assertFalse(result.hasInStepViolation(), "no server may exceed max(initial, target) mid-step either");
+    assertTrue(result.relaxedSteps().isEmpty(), "the budget should not have to be relaxed for this assignment");
     assertEquals(result._groupSplits, Set.of(), "groups must still be moved together");
 
-    // The pre-check has to report it, before anything is moved
-    Map<String, Long> reported = TableRebalancer.getServersForcedOverDiskBudget(current, target, 1, true,
+    // And the pre-check must agree that it is safe
+    assertEquals(TableRebalancer.getServersForcedOverDiskBudget(current, target, 1, true,
         RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, toTableSizeDetails(sizes),
-        LoggerFactory.getLogger(getClass()));
-    System.out.println("Pre-check reports servers forced over their disk budget: " + reported);
-    assertTrue(reported.containsKey("host02"), "expected host02 to be reported, got " + reported);
+        LoggerFactory.getLogger(getClass())), Map.of());
   }
 
   /// The argument that the disk budget can never be the only thing blocking a step does not carry over to strict
@@ -360,7 +570,7 @@ public class LowDiskModeRebalanceSimulatorTest {
     List<String> splits = new ArrayList<>();
     List<SimResult> all = new ArrayList<>();
     int numSkippedAsIllegal = 0;
-    for (int trial = 0; trial < 3000; trial++) {
+    for (int trial = 0; trial < 20000; trial++) {
       int numServers = 3 + random.nextInt(6);
       int replication = 2 + random.nextInt(2);
       int numGroups = 2 + random.nextInt(5);
@@ -403,6 +613,7 @@ public class LowDiskModeRebalanceSimulatorTest {
     violations.sort((a, b) -> Double.compare(b.worstAmplification(), a.worstAmplification()));
     System.out.println();
     System.out.println(summarize("Strict replica group random group structures", all, violations));
+    assertEquals(relaxed.size(), 0, "the budget should not have to be relaxed for any of these assignments");
     System.out.printf("  skipped as illegal minAvailableReplicas: %d%n", numSkippedAsIllegal);
     if (!relaxed.isEmpty()) {
       System.out.printf("%nFOUND %d scenarios where the budget had to be relaxed. Worst:%n", relaxed.size());

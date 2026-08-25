@@ -1835,7 +1835,18 @@ public class TableRebalancer {
             Math.max(_initialServerBytes.getOrDefault(server, 0L), targetBytes.getOrDefault(server, 0L));
         remainingBytes.put(server, Math.max(0L, ceilingBytes - hostedBytes.getOrDefault(server, 0L)));
       }
-      return new StepDiskBudget(this, remainingBytes);
+      // Segments that share a current and target instance pair are all assigned the same instances, so a newly added
+      // instance takes on all of them. Total their size up so that the instances to add can be picked with that in
+      // mind rather than only on the number of segments to offload
+      Map<Pair<Set<String>, Set<String>>, Long> instancePairToRequiredBytes = new HashMap<>();
+      for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
+        Map<String, String> targetInstanceStateMap = targetAssignment.get(entry.getKey());
+        if (targetInstanceStateMap != null) {
+          instancePairToRequiredBytes.merge(Pair.of(entry.getValue().keySet(), targetInstanceStateMap.keySet()),
+              getSegmentSizeBytes(entry.getKey()), Long::sum);
+        }
+      }
+      return new StepDiskBudget(this, remainingBytes, instancePairToRequiredBytes);
     }
   }
 
@@ -1844,10 +1855,41 @@ public class TableRebalancer {
   static class StepDiskBudget {
     private final DiskUsageBudget _budget;
     private final Map<String, Long> _remainingBytes;
+    private final Map<Pair<Set<String>, Set<String>>, Long> _instancePairToRequiredBytes;
 
-    private StepDiskBudget(DiskUsageBudget budget, Map<String, Long> remainingBytes) {
+    private StepDiskBudget(DiskUsageBudget budget, Map<String, Long> remainingBytes,
+        Map<Pair<Set<String>, Set<String>>, Long> instancePairToRequiredBytes) {
       _budget = budget;
       _remainingBytes = remainingBytes;
+      _instancePairToRequiredBytes = instancePairToRequiredBytes;
+    }
+
+    /// Moves the instances that cannot take on all the segments sharing this current and target instance pair to the
+    /// back of the list, keeping the order within each part.
+    ///
+    /// `numSegmentsToOffloadMap`, which orders the list to begin with, counts segments while the budget counts bytes.
+    /// With unevenly sized segments the instance that is due to receive the most segments is regularly the one with
+    /// the least room, so picking purely on that count lands on an instance the budget then has to reject - and
+    /// rejecting it strands whatever room the other instances of the target assignment have. Ordering by what fits
+    /// first is what lets those instances be used.
+    ///
+    /// The instances that do not fit are kept at the back rather than dropped, so that an assignment is still produced
+    /// when none of them fits and the budget stays the only thing that decides whether it is applied.
+    List<Triple<String, String, Integer>> sortInstancesThatFitFirst(
+        List<Triple<String, String, Integer>> instancesInfo, Set<String> currentInstances,
+        Set<String> targetInstances) {
+      long requiredBytes = _instancePairToRequiredBytes.getOrDefault(Pair.of(currentInstances, targetInstances), 0L);
+      List<Triple<String, String, Integer>> fits = new ArrayList<>(instancesInfo.size());
+      List<Triple<String, String, Integer>> doesNotFit = new ArrayList<>();
+      for (Triple<String, String, Integer> instanceInfo : instancesInfo) {
+        if (_remainingBytes.getOrDefault(instanceInfo.getLeft(), 0L) >= requiredBytes) {
+          fits.add(instanceInfo);
+        } else {
+          doesNotFit.add(instanceInfo);
+        }
+      }
+      fits.addAll(doesNotFit);
+      return fits;
     }
 
     Map<String, Long> getRemainingBytes() {
@@ -1919,7 +1961,7 @@ public class TableRebalancer {
         Map<String, String> firstEntryInstanceStateMap = firstEntry.getValue();
         SingleSegmentAssignment firstAssignment =
             getNextSingleSegmentAssignment(firstEntryInstanceStateMap, targetAssignment.get(firstEntry.getKey()),
-                minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap);
+                minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap, stepBudget);
         Set<String> serversAdded = getServersAddedInSingleSegmentAssignment(firstEntryInstanceStateMap,
             firstAssignment._instanceStateMap);
         boolean anyServerExhaustedBatchSize = false;
@@ -1982,7 +2024,7 @@ public class TableRebalancer {
         Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
         SingleSegmentAssignment assignment =
             getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, minAvailableReplicas,
-                lowDiskMode, numSegmentsToOffloadMap, assignmentMap);
+                lowDiskMode, numSegmentsToOffloadMap, assignmentMap, stepBudget);
         Set<String> assignedInstances = assignment._instanceStateMap.keySet();
         Set<String> availableInstances = assignment._availableInstances;
         // Strict replica group routing requires every segment that shares the same current and target instances to
@@ -2227,7 +2269,7 @@ public class TableRebalancer {
       Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
       Map<String, String> nextInstanceStateMap =
           getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, minAvailableReplicas,
-              lowDiskMode, numSegmentsToOffloadMap, assignmentMap)._instanceStateMap;
+              lowDiskMode, numSegmentsToOffloadMap, assignmentMap, stepBudget)._instanceStateMap;
       Set<String> serversAddedForSegment = getServersAddedInSingleSegmentAssignment(currentInstanceStateMap,
           nextInstanceStateMap);
       boolean anyServerExhaustedBatchSize = false;
@@ -2432,7 +2474,8 @@ public class TableRebalancer {
   @VisibleForTesting
   static SingleSegmentAssignment getNextSingleSegmentAssignment(Map<String, String> currentInstanceStateMap,
       Map<String, String> targetInstanceStateMap, int minAvailableReplicas, boolean lowDiskMode,
-      Map<String, Integer> numSegmentsToOffloadMap, Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap) {
+      Map<String, Integer> numSegmentsToOffloadMap, Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap,
+      @Nullable StepDiskBudget stepBudget) {
     Map<String, String> nextInstanceStateMap = new TreeMap<>();
 
     // Assign the segment the same way as other segments if the current and target instances are the same. We need this
@@ -2495,6 +2538,9 @@ public class TableRebalancer {
         List<Triple<String, String, Integer>> instancesInfo =
             getSortedInstancesOnNumSegmentsToOffload(targetInstanceStateMap, nextInstanceStateMap,
                 numSegmentsToOffloadMap);
+        if (stepBudget != null) {
+          instancesInfo = stepBudget.sortInstancesThatFitFirst(instancesInfo, currentInstances, targetInstances);
+        }
         for (int i = 0; i < numInstancesToAdd; i++) {
           Triple<String, String, Integer> instanceInfo = instancesInfo.get(i);
           nextInstanceStateMap.put(instanceInfo.getLeft(), instanceInfo.getMiddle());
