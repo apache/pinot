@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.util.TableSizeReader;
@@ -250,6 +251,309 @@ public class LowDiskModeRebalanceSimulatorTest {
 
   private static Map<String, String> instanceStateMap(String... instances) {
     return SegmentAssignmentUtils.getInstanceStateMap(List.of(instances), ONLINE);
+  }
+
+  /// The disk budget holds a total per pair of current and target instances, used to pick which instance to add. It
+  /// is tempting to charge a strict replica group move by looking that total up, but the two are different totals when
+  /// batching is enabled: `updateNextAssignmentForPartitionIdStrictReplicaGroup` is then called once per partition,
+  /// while the step-wide total spans every partition sharing the pair. Looking it up would charge the whole pair for
+  /// each partition, over-charging by the number of partitions that share it.
+  ///
+  /// Several partitions sharing one pair of instances is the normal shape for a replica group table, where partitions
+  /// per replica group is exactly that multiple.
+  @Test
+  public void testStrictReplicaGroupChargesPerPartitionNotPerInstancePair() {
+    long mib = 1024L * 1024;
+    Map<String, Map<String, String>> current = new TreeMap<>();
+    Map<String, Map<String, String>> target = new TreeMap<>();
+    Map<String, Long> sizes = new TreeMap<>();
+    for (int partition = 0; partition < 2; partition++) {
+      for (int sequence = 0; sequence < 2; sequence++) {
+        String segment = "myTable__" + partition + "__" + sequence + "__20240101T0000Z";
+        current.put(segment, instanceStateMap("hostA", "hostB"));
+        target.put(segment, instanceStateMap("hostC", "hostD"));
+        sizes.put(segment, 100 * mib);
+      }
+    }
+    TableRebalancer.StepDiskBudget stepBudget =
+        TableRebalancer.DiskUsageBudget.create(current, toTableSizeDetails(sizes)).forStep(current, target);
+
+    // All four segments share one pair of instances, so the step-wide map holds a single total covering both partitions
+    Map<Pair<Set<String>, Set<String>>, Long> stepWide = stepBudget.getInstancePairToBytes(current, target);
+    assertEquals(stepWide.size(), 1);
+    long stepWideBytes = stepWide.values().iterator().next();
+
+    // What one call is handed once batching has grouped by pair and then by partition
+    Map<String, Map<String, String>> onePartition = new TreeMap<>();
+    current.forEach((segment, instanceStateMap) -> {
+      if (segment.startsWith("myTable__0__")) {
+        onePartition.put(segment, instanceStateMap);
+      }
+    });
+    long onePartitionBytes = stepBudget.getInstancePairToBytes(onePartition, target).values().iterator().next();
+
+    System.out.printf("%n  step-wide total for the pair: %s, what one call is handed: %s%n",
+        formatMib(stepWideBytes), formatMib(onePartitionBytes));
+    assertEquals(onePartitionBytes, 200 * mib);
+    assertEquals(stepWideBytes, 2 * onePartitionBytes,
+        "the step-wide total spans both partitions, so charging it per partition would double count");
+  }
+
+  /// Where a segment added mid-rebalance costs headroom, and where it does not.
+  ///
+  /// The new segment is credited to the anchor of the servers hosting it, so `ceiling` becomes
+  /// `max(initial + upload, target)`. That covers the upload whenever the anchor side of the max wins - which it
+  /// always does on a server whose net change is a loss. On a server that is growing, the target side wins and the
+  /// credit is swallowed by the max, so the upload eats headroom.
+  ///
+  /// It only costs anything at all when the target assignment does not place the segment where it landed. When it
+  /// does, the target rises by the same amount and the cost cancels out wherever it fell. That is the case strict
+  /// replica group assignment cannot give us: `BaseStrictRealtimeSegmentAssignment` overrides a new segment onto its
+  /// partition's existing placement to keep the partition collocated, which mid-rebalance is the placement the
+  /// rebalance is moving away from.
+  @Test
+  public void testWhereMidRebalanceUploadsCostHeadroom() {
+    long mib = 1024L * 1024;
+    System.out.printf("%n  %-34s %12s %12s %10s%n", "case", "control", "with upload", "cost");
+    for (boolean netLoss : List.of(true, false)) {
+      for (boolean targetAgrees : List.of(true, false)) {
+        long control = remainingOnFocus(netLoss, null, 0, mib);
+        long withUpload = remainingOnFocus(netLoss, targetAgrees ? "focus" : "elsewhere", 300 * mib, mib);
+        System.out.printf("  %-34s %12s %12s %10s%n",
+            (netLoss ? "net loss, " : "net gain,  ") + (targetAgrees ? "target agrees" : "target elsewhere"),
+            formatMib(control), formatMib(withUpload), formatMib(control - withUpload));
+        if (netLoss || targetAgrees) {
+          assertEquals(withUpload, control, "this placement must not cost the rebalance any headroom");
+        } else {
+          // The one combination that costs anything: on a growing server the target side of the max wins, so the
+          // credit for the new segment is swallowed, and the target does not carry it either. The cost is exactly the
+          // segment that appeared, which bounds it - pinned so that a change widening it fails here
+          assertEquals(control - withUpload, 300 * mib,
+              "the cost must stay bounded by the size of the segment that appeared");
+        }
+      }
+    }
+  }
+
+  /// Headroom on `focus` in a mid-rebalance state, optionally with a segment that appeared after the anchor was taken.
+  /// `netLoss` picks whether `focus` is shedding bytes overall or taking them on.
+  private static long remainingOnFocus(boolean netLoss, String uploadedOn, long uploadSizeBytes, long mib) {
+    Map<String, Map<String, String>> initialAssignment = new TreeMap<>();
+    Map<String, Map<String, String>> current = new TreeMap<>();
+    Map<String, Map<String, String>> target = new TreeMap<>();
+    Map<String, Long> sizes = new TreeMap<>();
+
+    if (netLoss) {
+      // focus starts on 1000M and the target places 600M, so the anchor side of the max wins
+      addSegment(initialAssignment, current, target, sizes, "kept", List.of("focus"), List.of("focus"),
+          List.of("focus"), 500 * mib);
+      addSegment(initialAssignment, current, target, sizes, "dropped", List.of("focus"), List.of("other"),
+          List.of("other"), 500 * mib);
+      addSegment(initialAssignment, current, target, sizes, "arriving", List.of("other"), List.of("other"),
+          List.of("focus"), 100 * mib);
+    } else {
+      // focus starts on 100M and the target places 1000M, so the target side of the max wins
+      addSegment(initialAssignment, current, target, sizes, "kept", List.of("focus"), List.of("focus"),
+          List.of("focus"), 100 * mib);
+      addSegment(initialAssignment, current, target, sizes, "arriving", List.of("other"), List.of("other"),
+          List.of("focus"), 900 * mib);
+    }
+    if (uploadedOn != null) {
+      // Appeared after the anchor was taken, so it is absent from initialAssignment
+      current.put("uploaded", instanceStateMap("focus"));
+      target.put("uploaded", instanceStateMap(uploadedOn));
+      sizes.put("uploaded", uploadSizeBytes);
+    }
+    return TableRebalancer.DiskUsageBudget.create(initialAssignment, toTableSizeDetails(sizes))
+        .forStep(current, target).getRemainingBytes().getOrDefault("focus", 0L);
+  }
+
+  private static void addSegment(Map<String, Map<String, String>> initialAssignment,
+      Map<String, Map<String, String>> current, Map<String, Map<String, String>> target, Map<String, Long> sizes,
+      String segment, List<String> initialInstances, List<String> currentInstances, List<String> targetInstances,
+      long sizeBytes) {
+    initialAssignment.put(segment, SegmentAssignmentUtils.getInstanceStateMap(initialInstances, ONLINE));
+    current.put(segment, SegmentAssignmentUtils.getInstanceStateMap(currentInstances, ONLINE));
+    target.put(segment, SegmentAssignmentUtils.getInstanceStateMap(targetInstances, ONLINE));
+    sizes.put(segment, sizeBytes);
+  }
+
+  /// A segment uploaded onto a server that the target assignment also places it on is not automatically harmless.
+  ///
+  /// The ceiling is `max(frozen initial bytes, target bytes)`. Where a server's net change is a gain, the upload
+  /// raises the target side of that max by as much as it raises what the server hosts, so the headroom is untouched.
+  /// Where the net change is a loss the ceiling is pinned to the frozen initial bytes, which the upload cannot raise,
+  /// so an upload accounted for there would consume headroom outright. The budget therefore accounts only for the
+  /// segments the rebalance started with, which keeps the headroom of a net-loss server intact.
+  ///
+  /// `host0` below hosts 1000M and the target places 600M on it, a net loss of 400M. It has to drop a 500M segment and
+  /// take on a 100M one, so once the drop lands it has 500M of headroom for a 100M arrival.
+  @Test
+  public void testUploadOntoNetLossServerEatsHeadroom() {
+    long mib = 1024L * 1024;
+    System.out.printf("%n  %-10s %10s %10s %10s %10s %10s   %s%n", "upload", "ceiling", "hosted", "remaining",
+        "needs", "margin", "verdict");
+    long marginWithoutUpload = -1;
+    for (long uploadMib : List.of(0L, 100L, 200L, 400L, 700L)) {
+      // The state after host0 has dropped its outgoing segment, which is where its headroom opens up
+      Map<String, Map<String, String>> current = new TreeMap<>();
+      Map<String, Map<String, String>> target = new TreeMap<>();
+      Map<String, Long> sizes = new TreeMap<>();
+      Map<String, Map<String, String>> initialAssignment = new TreeMap<>();
+
+      // kept by host0
+      initialAssignment.put("kept", instanceStateMap("host0", "host1"));
+      current.put("kept", instanceStateMap("host0", "host1"));
+      target.put("kept", instanceStateMap("host0", "host1"));
+      sizes.put("kept", 500 * mib);
+      // dropped by host0 — present when the rebalance started, already gone in this state
+      initialAssignment.put("dropped", instanceStateMap("host0", "host1"));
+      current.put("dropped", instanceStateMap("host1"));
+      target.put("dropped", instanceStateMap("host1", "host2"));
+      sizes.put("dropped", 500 * mib);
+      // still to arrive on host0
+      initialAssignment.put("arriving", instanceStateMap("host1", "host2"));
+      current.put("arriving", instanceStateMap("host1"));
+      target.put("arriving", instanceStateMap("host0", "host1"));
+      sizes.put("arriving", 100 * mib);
+
+      if (uploadMib > 0) {
+        // Uploaded after the rebalance started, so absent from the anchor, and placed on host0 by both assignments
+        current.put("uploaded", instanceStateMap("host0"));
+        target.put("uploaded", instanceStateMap("host0"));
+        sizes.put("uploaded", uploadMib * mib);
+      }
+
+      TableRebalancer.DiskUsageBudget budget =
+          TableRebalancer.DiskUsageBudget.create(initialAssignment, toTableSizeDetails(sizes));
+      long remaining = budget.forStep(current, target).getRemainingBytes().getOrDefault("host0", 0L);
+      long hosted = hostedBytesOf(current, sizes).getOrDefault("host0", 0L);
+      // The ceiling the budget is actually working to, which the credit for the uploaded segment raises
+      long ceiling = hosted + remaining;
+      long needs = 100 * mib;
+      long margin = remaining - needs;
+      if (uploadMib == 0) {
+        marginWithoutUpload = margin;
+      }
+      System.out.printf("  %-10s %10s %10s %10s %10s %10s   %s%n", uploadMib == 0 ? "none" : uploadMib + "M",
+          formatMib(ceiling), formatMib(hosted), formatMib(remaining), formatMib(needs), formatMib(margin),
+          margin < 0 ? "BLOCKED" : margin == 0 ? "exact fit, no slack" : "fits");
+      if (uploadMib > 0) {
+        assertEquals(margin, marginWithoutUpload,
+            uploadMib + "M upload must not consume headroom the rebalance needs");
+      }
+    }
+    System.out.println("\n  The margin that absorbs group granularity is unaffected by the upload, because the"
+        + " budget accounts\n  only for the segments the rebalance started with.");
+  }
+
+  /// Segments can be added to a table while a rebalance is running - an uploaded segment, or a new consuming segment.
+  /// The budget is anchored once, before the first step, so it has never heard of them: they are absent from
+  /// `initialServerBytes` and from the per-segment sizes, while they do count towards what a server hosts now and
+  /// towards the recalculated target. Drives that directly, holding the budget across the injection the way
+  /// `doRebalance` does.
+  @Test
+  public void testSegmentsAddedDuringTheRebalance() {
+    List<String> oldServers = List.of("host1", "host2", "host3");
+    List<String> newServers = List.of("host2", "host3", "host4");
+    Map<String, Map<String, String>> current = roundRobin(12, 2, oldServers, 0);
+    Map<String, Map<String, String>> target = roundRobin(12, 2, newServers, 0);
+    Map<String, Long> sizes = new TreeMap<>();
+    current.keySet().forEach(segment -> sizes.put(segment, 100L * 1024 * 1024));
+
+    // The budget the controller builds once, before the first step
+    TableRebalancer.DiskUsageBudget diskUsageBudget =
+        TableRebalancer.DiskUsageBudget.create(current, toTableSizeDetails(sizes));
+    Map<String, Long> frozenCeiling = new TreeMap<>();
+    Map<String, Long> initialBytes = hostedBytesOf(current, sizes);
+    hostedBytesOf(target, sizes).forEach(
+        (server, bytes) -> frozenCeiling.put(server, Math.max(initialBytes.getOrDefault(server, 0L), bytes)));
+    initialBytes.forEach((server, bytes) -> frozenCeiling.merge(server, bytes, Math::max));
+
+    Map<String, Long> peak = new TreeMap<>(initialBytes);
+    int numRelaxedSteps = 0;
+    boolean converged = false;
+    for (int step = 1; step <= 40; step++) {
+      // Segments uploaded part way through, placed by the instance partitions in force at upload time - the old
+      // servers - while the recalculated target places them on the new servers. The overlap servers therefore host
+      // them without the target assignment accounting for them
+      if (step == 3) {
+        for (int i = 0; i < 4; i++) {
+          String uploaded = "uploaded" + i;
+          current.put(uploaded, SegmentAssignmentUtils.getInstanceStateMap(List.of("host1", "host2"), ONLINE));
+          target.put(uploaded, SegmentAssignmentUtils.getInstanceStateMap(List.of("host3", "host4"), ONLINE));
+          sizes.put(uploaded, 400L * 1024 * 1024);
+        }
+        System.out.println("  step 3: 4 uploaded segments of 400M landed on host1/host2, target says host3/host4");
+      }
+      Map<String, Long> allowed = diskUsageBudget.forStep(current, target).getRemainingBytes();
+      // A new segment is credited to the anchor once, so asking again must give the same answer. If it were credited
+      // per call, the rebalance could raise its own ceiling simply by taking another step
+      assertEquals(diskUsageBudget.forStep(current, target).getRemainingBytes(), allowed,
+          "crediting a new segment to the anchor must be idempotent");
+      Map<String, Map<String, String>> next =
+          TableRebalancer.getNextAssignment(current, target, 1, false, true,
+              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
+              NO_DATA_LOSS_RISK, diskUsageBudget);
+      if (next.equals(current)) {
+        break;
+      }
+      // Measured against what the budget accounts for: segments added while the rebalance runs are outside it, so
+      // the bytes they bring are not the rebalance going over its budget
+      Map<String, Long> added = new TreeMap<>();
+      for (Map.Entry<String, Map<String, String>> entry : next.entrySet()) {
+        Map<String, String> currentInstanceStateMap = current.get(entry.getKey());
+        long budgetedBytes = diskUsageBudget.getSegmentSizeBytes(entry.getKey());
+        for (String instance : entry.getValue().keySet()) {
+          if (currentInstanceStateMap == null || !currentInstanceStateMap.containsKey(instance)) {
+            added.merge(instance, budgetedBytes, Long::sum);
+          }
+        }
+      }
+      for (Map.Entry<String, Long> entry : added.entrySet()) {
+        if (entry.getValue() > allowed.getOrDefault(entry.getKey(), 0L)) {
+          numRelaxedSteps++;
+          System.out.printf("  step %d: budget relaxed - %s took %s but was allowed %s%n", step, entry.getKey(),
+              formatMib(entry.getValue()), formatMib(allowed.getOrDefault(entry.getKey(), 0L)));
+          break;
+        }
+      }
+      current = next;
+      hostedBytesOf(current, sizes).forEach((server, bytes) -> peak.merge(server, bytes, Math::max));
+      if (current.equals(target)) {
+        converged = true;
+        break;
+      }
+    }
+
+    System.out.printf("%nconverged=%s, steps where the rebalance exceeded its budget=%d%n", converged,
+        numRelaxedSteps);
+    System.out.println("  peak below counts every segment on the server, including the uploaded ones the budget does"
+        + " not account for");
+    Map<String, Long> finalBytes = hostedBytesOf(target, sizes);
+    System.out.printf("  %-8s %10s %10s %12s %10s%n", "server", "initial", "final", "frozenCeil", "peak");
+    for (String server : peak.keySet()) {
+      System.out.printf("  %-8s %10s %10s %12s %10s%s%n", server,
+          formatMib(initialBytes.getOrDefault(server, 0L)), formatMib(finalBytes.getOrDefault(server, 0L)),
+          formatMib(frozenCeiling.getOrDefault(server, 0L)), formatMib(peak.get(server)),
+          peak.get(server) > Math.max(frozenCeiling.getOrDefault(server, 0L),
+              finalBytes.getOrDefault(server, 0L)) ? "   above the ceiling, carrying uploaded segments" : "");
+    }
+    assertTrue(converged, "the rebalance must still converge when segments are added while it runs");
+    assertEquals(numRelaxedSteps, 0,
+        "segments added while the rebalance runs must not push it outside the budget it started with");
+  }
+
+  private static Map<String, Long> hostedBytesOf(Map<String, Map<String, String>> assignment,
+      Map<String, Long> sizes) {
+    Map<String, Long> bytes = new TreeMap<>();
+    assignment.forEach((segment, instanceStateMap) -> instanceStateMap.keySet()
+        .forEach(instance -> bytes.merge(instance, sizes.get(segment), Long::sum)));
+    return bytes;
+  }
+
+  private static String formatMib(long bytes) {
+    return (bytes / (1024 * 1024)) + "M";
   }
 
   /// Searches broadly for rebalances the disk budget cannot carry out, i.e. the ones the disk utilization pre-check
