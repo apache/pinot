@@ -23,8 +23,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
+import org.apache.pinot.segment.local.segment.index.readers.NullValueVectorReaderImpl;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.segment.local.startree.OffHeapStarTree;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
@@ -34,6 +36,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTree;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
@@ -80,6 +83,7 @@ public class StarTreeLoaderUtils {
       StarTree starTree = new OffHeapStarTree(indexReader.getIndexFor(String.valueOf(i), StandardIndexes.inverted()));
 
       int numDocs = starTreeMetadata.getNumDocs();
+      boolean nullHandlingEnabled = starTreeMetadata.isNullHandlingEnabled();
       Map<String, DataSource> dataSourceMap = new HashMap<>();
 
       // Load dimension forward indexes
@@ -89,7 +93,8 @@ public class StarTreeLoaderUtils {
         FixedBitSVForwardIndexReaderV2 forwardIndex =
             new FixedBitSVForwardIndexReaderV2(forwardIndexDataBuffer, numDocs, columnMetadata.getBitsPerElement());
         dataSourceMap.put(dimension, new StarTreeDataSource(columnMetadata.getFieldSpec(), numDocs, forwardIndex,
-            indexContainerMap.get(dimension).getIndex(StandardIndexes.dictionary())));
+            indexContainerMap.get(dimension).getIndex(StandardIndexes.dictionary()),
+            loadNullValueVector(indexReader, dimension, nullHandlingEnabled)));
       }
 
       // Load metric (function-column pair) forward indexes
@@ -100,7 +105,8 @@ public class StarTreeLoaderUtils {
         FieldSpec fieldSpec = new MetricFieldSpec(metric, dataType);
         ForwardIndexReader<?> forwardIndex = ForwardIndexReaderFactory.getInstance()
             .createRawIndexReader(forwardIndexDataBuffer, dataType.getStoredType(), true);
-        dataSourceMap.put(metric, new StarTreeDataSource(fieldSpec, numDocs, forwardIndex, null));
+        dataSourceMap.put(metric, new StarTreeDataSource(fieldSpec, numDocs, forwardIndex, null,
+            loadNullValueVector(indexReader, metric, nullHandlingEnabled)));
       }
 
       starTrees.add(new StarTreeV2() {
@@ -131,5 +137,19 @@ public class StarTreeLoaderUtils {
       });
     }
     return starTrees;
+  }
+
+  /// Returns the null value vector of a null-aware star-tree column, or `null` when the column has none.
+  ///
+  /// A regular star-tree never stores one, and a null-aware star-tree only stores one for columns that actually
+  /// contain null values.
+  @Nullable
+  private static NullValueVectorReader loadNullValueVector(SegmentDirectory.Reader indexReader, String column,
+      boolean nullHandlingEnabled)
+      throws IOException {
+    if (!nullHandlingEnabled || !indexReader.hasIndexFor(column, StandardIndexes.nullValueVector())) {
+      return null;
+    }
+    return new NullValueVectorReaderImpl(indexReader.getIndexFor(column, StandardIndexes.nullValueVector()));
   }
 }
