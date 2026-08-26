@@ -246,6 +246,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
       "Number of OPEN_STRUCT values stored as their serialized string form because the value's Java type maps to "
           + "no Pinot DataType. A value that is instead dropped for failing coercion against a key's "
           + "already-established non-STRING type is counted by openStructTypeCoercionFailures, not here"),
+  OPEN_STRUCT_IGNORED_KEY_DROPS("values", false,
+      "Number of OPEN_STRUCT map entries dropped at ingestion because the key is listed in the "
+          + "column's ignoredKeys config"),
   // Workload related metrics
   WORKLOAD_BUDGET_EXCEEDED("workloadBudgetExceeded", true, "Number of times workload budget exceeded"),
   WORKLOAD_QUERIES("queries", false),

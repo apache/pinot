@@ -65,6 +65,10 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
 
   // Volatile for lock-free reader access; writer always holds the consuming-thread lock.
   private volatile Map<String, MutableKeyColumn> _keyColumns = new HashMap<>();
+  // Single-writer (see #index), but close() may run on a different thread, so volatile for
+  // visibility; flushed to ServerMetrics on close() to avoid a metered-value call on every
+  // ignored key of every consumed row.
+  private volatile long _ignoredKeyDropCount;
 
   public MutableOpenStructIndex(String openStructColumn, String tableNameWithType, ComplexFieldSpec fieldSpec,
       OpenStructIndexConfig config, PinotDataBufferMemoryManager memoryManager, int capacity) {
@@ -100,6 +104,10 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
       String key = entry.getKey();
       Object rawValue = entry.getValue();
       if (rawValue == null) {
+        continue;
+      }
+      if (_config.isIgnoredKey(key)) {
+        _ignoredKeyDropCount++;
         continue;
       }
 
@@ -282,6 +290,13 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   @Override
   public void close()
       throws IOException {
+    if (_ignoredKeyDropCount > 0) {
+      ServerMetrics serverMetrics = ServerMetrics.get();
+      if (serverMetrics != null) {
+        serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
+            ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS, _ignoredKeyDropCount);
+      }
+    }
     for (MutableKeyColumn keyCol : _keyColumns.values()) {
       keyCol.close();
     }

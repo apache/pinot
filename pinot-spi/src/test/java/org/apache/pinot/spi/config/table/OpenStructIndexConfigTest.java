@@ -301,4 +301,32 @@ public class OpenStructIndexConfigTest {
         JsonUtils.stringToObject(JsonUtils.objectToString(config), OpenStructIndexConfig.class);
     assertTrue(reparsed.isSparseJsonIndex());
   }
+
+  @Test
+  public void testIgnoredKeysDefaultsToEmpty() {
+    assertTrue(OpenStructIndexConfig.DEFAULT.getIgnoredKeys().isEmpty());
+    assertFalse(OpenStructIndexConfig.DEFAULT.isIgnoredKey("anything"));
+  }
+
+  @Test
+  public void testIgnoredKeysRoundTripsFromJson()
+      throws Exception {
+    String json = "{\"ignoredKeys\": [\"debug_payload\", \"internal_trace_id\"]}";
+    OpenStructIndexConfig config = JsonUtils.stringToObject(json, OpenStructIndexConfig.class);
+    assertEquals(config.getIgnoredKeys(), Set.of("debug_payload", "internal_trace_id"));
+    assertTrue(config.isIgnoredKey("debug_payload"));
+    assertFalse(config.isIgnoredKey("clicks"));
+
+    String reJson = JsonUtils.objectToString(config);
+    OpenStructIndexConfig reDeserialized = JsonUtils.stringToObject(reJson, OpenStructIndexConfig.class);
+    assertEquals(reDeserialized.getIgnoredKeys(), Set.of("debug_payload", "internal_trace_id"));
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testDeprecatedSevenArgConstructorDefaultsIgnoredKeysToEmpty() {
+    OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, -1, null, 0.5, null, true);
+    assertTrue(config.getIgnoredKeys().isEmpty());
+    assertTrue(config.isSparseJsonIndex());
+  }
 }

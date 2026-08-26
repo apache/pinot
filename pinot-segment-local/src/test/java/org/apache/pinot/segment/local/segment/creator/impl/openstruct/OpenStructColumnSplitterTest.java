@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.math.BigDecimal;
 import java.nio.file.Files;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +57,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -588,6 +590,74 @@ public class OpenStructColumnSplitterTest {
     }
   }
 
+  @Test
+  public void testIgnoredKeyNeverMaterializedDenseOrSparse()
+      throws Exception {
+    // "debug" has a fill rate far below the default denseKeyMinFillRate (0.5), so if it were not
+    // dropped by ignoredKeys it would land in the sparse manifest (see testRareKeyDroppedFromDense).
+    // This is what makes the sparse-manifest assertion below meaningful rather than vacuous.
+    OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, -1, null, 0.5, null, null, null,
+        Set.of("debug"));
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(), cfg);
+    s.add(Map.of("debug", "noise", "clicks", 0L), 0);
+    for (int d = 1; d < 100; d++) {
+      s.add(Map.of("clicks", (long) d), d);
+    }
+    s.seal();
+
+    Set<String> dense = s.getResolvedDenseKeys();
+    assertFalse(dense.contains("debug"));
+    assertTrue(dense.contains("clicks"));
+
+    PropertiesConfiguration parentProps = s.getMaterializedColumnMetadata().get("metrics");
+    assertNotNull(parentProps);
+    assertFalse(parentProps.containsKey(
+        V1Constants.MetadataKeys.Column.getKeyFor("metrics", V1Constants.MetadataKeys.Column.SPARSE_KEYS)));
+  }
+
+  @Test
+  public void testIgnoredKeyMeteredOnSeal()
+      throws Exception {
+    OpenStructIndexConfig cfg = JsonUtils.stringToObject(
+        "{\"ignoredKeys\": [\"debug\"]}", OpenStructIndexConfig.class);
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
+          cfg);
+      s.add(Map.of("debug", "a"), 0);
+      s.add(Map.of("debug", "b", "clicks", 1L), 1);
+      s.seal();
+
+      verify(metrics, times(1)).addMeteredTableValue("testTable_OFFLINE", "metrics",
+          ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS, 2L);
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  @Test
+  public void testIgnoredKeyWithNullValueNotMetered()
+      throws Exception {
+    OpenStructIndexConfig cfg = JsonUtils.stringToObject(
+        "{\"ignoredKeys\": [\"debug\"]}", OpenStructIndexConfig.class);
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
+          cfg);
+      Map<String, Object> row = new HashMap<>();
+      row.put("debug", null);
+      s.add(row, 0);
+      s.seal();
+
+      verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+          eq(ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS), anyLong());
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
   /// A value that cannot be mapped to a DataType but lands on a key whose type is already
   /// established as something other than STRING is dropped by coercion, not stored as STRING. It
   /// must be counted once, against the coercion meter only — counting it as an inference failure
@@ -788,6 +858,24 @@ public class OpenStructColumnSplitterTest {
       verify(metrics, never()).setOrUpdateTableGauge(
           eq("testTable_OFFLINE"), eq(OpenStructNaming.materializedColumnName("metrics", rawKey)),
           eq(ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT), anyLong());
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  @Test
+  public void testNoIgnoredKeyDropsNotMetered()
+      throws Exception {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
+          config(0.5, -1, null));
+      s.add(Map.of("clicks", 1L), 0);
+      s.seal();
+
+      verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+          eq(ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS), anyLong());
     } finally {
       ServerMetrics.deregister();
     }

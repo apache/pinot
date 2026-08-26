@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.openstruct.OpenStructColumnSplitter;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -43,6 +44,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
@@ -85,6 +87,7 @@ public class OpenStructIndexType
           "OPEN_STRUCT index can only be created on single-value columns, but column '%s' is multi-value",
           fieldSpec.getName());
       validatePerKeyIndexes(config);
+      validateIgnoredKeys(config, fieldSpec);
     }
   }
 
@@ -107,6 +110,28 @@ public class OpenStructIndexType
         Preconditions.checkState(OpenStructSupportedIndexes.ALLOWED_PRETTY_NAMES.contains(indexName),
             "OPEN_STRUCT key '%s' declares unsupported index '%s'; supported indexes are %s",
             fieldConfig.getName(), indexName, OpenStructSupportedIndexes.ALLOWED_PRETTY_NAMES);
+      }
+    }
+  }
+
+  private void validateIgnoredKeys(OpenStructIndexConfig config, FieldSpec fieldSpec) {
+    Set<String> ignoredKeys = config.getIgnoredKeys();
+    if (ignoredKeys.isEmpty()) {
+      return;
+    }
+    for (String key : ignoredKeys) {
+      Preconditions.checkState(!config.getDenseKeys().contains(key),
+          "OPEN_STRUCT column '%s': key '%s' is in both ignoredKeys and denseKeys", fieldSpec.getName(), key);
+      Preconditions.checkState(config.getValueFieldConfig(key) == null,
+          "OPEN_STRUCT column '%s': key '%s' is in ignoredKeys but also has a valueFieldConfigs entry",
+          fieldSpec.getName(), key);
+    }
+    if (fieldSpec instanceof ComplexFieldSpec) {
+      Map<String, FieldSpec> childFieldSpecs = ((ComplexFieldSpec) fieldSpec).getChildFieldSpecs();
+      for (String key : ignoredKeys) {
+        Preconditions.checkState(childFieldSpecs == null || !childFieldSpecs.containsKey(key),
+            "OPEN_STRUCT column '%s': key '%s' is in ignoredKeys but also declared in childFieldSpecs",
+            fieldSpec.getName(), key);
       }
     }
   }
