@@ -24,13 +24,13 @@ import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public abstract class BaseArrayAggDoubleFunction<I extends DoubleCollection>
     extends BaseArrayAggFunction<I, DoubleArrayList> {
   public BaseArrayAggDoubleFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression, FieldSpec.DataType.DOUBLE, nullHandlingEnabled);
+    super(expression, DataType.DOUBLE, nullHandlingEnabled);
   }
 
   abstract void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, double value);

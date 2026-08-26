@@ -132,14 +132,19 @@ public class FineGrainedAuthUtils {
         // ?tableName=<a table it is scoped to> and have a cluster-wide request authorized as table-scoped.
         targetId = findRawTargetId(auth, endpointMethod, uriInfo.getPathParameters(), uriInfo.getQueryParameters());
 
-        if (StringUtils.isEmpty(targetId)) {
+        if (StringUtils.isBlank(targetId)) {
           throw new WebApplicationException(
-              "Could not find paramName " + auth.paramName() + " in path or query params of the API: "
-                  + uriInfo.getRequestUri(), Response.Status.INTERNAL_SERVER_ERROR);
+              "Missing required table parameter '" + auth.paramName() + "' for API: " + uriInfo.getRequestUri(),
+              Response.Status.BAD_REQUEST);
         }
 
         // Table name may contain type, hence get raw table name for checking access
-        targetId = DatabaseUtils.translateTableName(TableNameBuilder.extractRawTableName(targetId), httpHeaders);
+        try {
+          targetId = DatabaseUtils.translateTableName(TableNameBuilder.extractRawTableName(targetId), httpHeaders);
+        } catch (RuntimeException e) {
+          throw new WebApplicationException("Invalid table parameter '" + auth.paramName() + "': " + e.getMessage(),
+              e, Response.Status.BAD_REQUEST);
+        }
 
         accessDeniedMsg = "Access denied to " + auth.action() + " for table: " + targetId;
       } else if (auth.targetType() == TargetType.CLUSTER) {

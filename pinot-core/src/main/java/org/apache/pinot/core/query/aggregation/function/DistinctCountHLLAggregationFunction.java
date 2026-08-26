@@ -41,7 +41,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public class DistinctCountHLLAggregationFunction extends NullableSingleInputAggregationFunction<HyperLogLog, Long> {
+public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, Long> {
   protected final int _log2m;
 
   public DistinctCountHLLAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {

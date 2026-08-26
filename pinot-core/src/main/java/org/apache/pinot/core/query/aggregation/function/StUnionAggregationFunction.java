@@ -39,7 +39,7 @@ import org.locationtech.jts.geom.util.GeometryCombiner;
 import org.locationtech.jts.operation.union.UnaryUnionOp;
 
 
-public class StUnionAggregationFunction extends NullableSingleInputAggregationFunction<Geometry, ByteArray> {
+public class StUnionAggregationFunction extends BaseSingleInputAggregationFunction<Geometry, ByteArray> {
 
   public StUnionAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     super(verifySingleArgument(arguments, "ST_UNION"), nullHandlingEnabled);
@@ -76,9 +76,6 @@ public class StUnionAggregationFunction extends NullableSingleInputAggregationFu
     // The holder is written only from inside the range, so a block with no non-null row leaves it untouched and
     // extractFinalResult sees the null that means nothing was aggregated
     forEachNotNull(length, blockValSet, (from, to) -> {
-      if (to == from) {
-        return;
-      }
       Geometry geometry = aggregationResultHolder.getResult();
       for (int i = from; i < to; i++) {
         geometry = union(geometry, GeometrySerializer.deserialize(bytesArray[i]));
@@ -91,9 +88,6 @@ public class StUnionAggregationFunction extends NullableSingleInputAggregationFu
   private void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
     byte[][][] bytesArrays = blockValSet.getBytesValuesMV();
     forEachNotNull(length, blockValSet, (from, to) -> {
-      if (to == from) {
-        return;
-      }
       Geometry geometry = aggregationResultHolder.getResult();
       for (int i = from; i < to; i++) {
         for (byte[] bytes : bytesArrays[i]) {

@@ -30,6 +30,7 @@ import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
@@ -108,6 +109,27 @@ public class RequestUtilsTest {
 
     assertTrue(expression.isSetLiteral());
     assertEquals(expression.getLiteral().getBinaryValue(), UuidUtils.toBytes(uuid));
+  }
+
+  @Test
+  public void testBytesArrayLiteralRepresentations() {
+    byte[][] expected = {{0}, {(byte) 0xde, (byte) 0xad, (byte) 0xbe, (byte) 0xef}};
+    Literal nativeLiteral = RequestUtils.getLiteral(expected);
+    assertTrue(nativeLiteral.isSetBytesArrayValue());
+    assertEquals(RequestUtils.getBytesArrayValue(nativeLiteral), expected);
+    assertEquals(RequestUtils.getLiteralTypeAndValue(nativeLiteral).getLeft(), ColumnDataType.BYTES_ARRAY);
+    assertEquals(RequestUtils.prettyPrint(nativeLiteral), "[X'00', X'deadbeef']");
+
+    Expression expression = CalciteSqlParser.compileToPinotQuery(
+        "SELECT ARRAY[X'00', X'DEADBEEF'] FROM myTable").getSelectList().get(0);
+    assertTrue(expression.isSetLiteral());
+    assertTrue(expression.getLiteral().isSetBytesArrayValue());
+    assertEquals(RequestUtils.getBytesArrayValue(expression.getLiteral()), expected);
+
+    expression = CalciteSqlParser.compileToPinotQuery(
+        "SELECT ARRAYS_OVERLAP(ARRAY[X'00', X'0102'], ARRAY[X'03', X'0102'])").getSelectList().get(0);
+    assertTrue(expression.isSetLiteral());
+    assertTrue(expression.getLiteral().getBoolValue());
   }
 
   @Test

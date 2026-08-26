@@ -26,13 +26,14 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.common.utils.RoaringBitmapUtils.BatchConsumer;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.utils.NullSkippingUtils;
 import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxMeasuringValSetWrapper;
 import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxObject;
 import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxProjectionValSetWrapper;
@@ -56,7 +57,6 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
   private final int _numMeasuringColumns;
   // number of columns that we project based on the min/max value
   private final int _numProjectionColumns;
-  private final boolean _nullHandlingEnabled;
 
   // The following variable need to be initialized
 
@@ -74,9 +74,8 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
   public ParentExprMinMaxAggregationFunction(List<ExpressionContext> arguments, boolean isMax,
       boolean nullHandlingEnabled) {
 
-    super(arguments);
+    super(arguments, nullHandlingEnabled);
     _isMax = isMax;
-    _nullHandlingEnabled = nullHandlingEnabled;
     _functionIdContext = arguments.get(0);
 
     _numMeasuringColumnContext = arguments.get(1);
@@ -168,16 +167,8 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
   /// row, so a null there does not disqualify it. With the option disabled the whole block is one range, which is what
   /// this function did unconditionally before.
   private void forEachNotNullMeasuring(int length, Map<ExpressionContext, BlockValSet> blockValSetMap,
-      RoaringBitmapUtils.BatchConsumer consumer) {
-    RoaringBitmap nullBitmap = measuringNullBitmap(blockValSetMap);
-    if (nullBitmap == null) {
-      consumer.consume(0, length);
-      return;
-    }
-    // Skip if the entire block is null
-    if (!nullBitmap.contains(0, length)) {
-      RoaringBitmapUtils.forEachUnset(length, nullBitmap.getIntIterator(), consumer);
-    }
+      BatchConsumer consumer) {
+    NullSkippingUtils.forEachNotNull(_nullHandlingEnabled, length, measuringNullBitmap(blockValSetMap), consumer);
   }
 
   /// Returns the union of the measuring columns' null bitmaps, or `null` when no row is null.

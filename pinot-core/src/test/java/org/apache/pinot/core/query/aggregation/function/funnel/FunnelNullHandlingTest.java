@@ -49,7 +49,7 @@ import static org.testng.Assert.assertNull;
 /// Null handling for the window funnel functions.
 ///
 /// A funnel reads more than one column per row, so it never received the option through
-/// [org.apache.pinot.core.query.aggregation.function.NullableSingleInputAggregationFunction] and is invisible to
+/// [org.apache.pinot.core.query.aggregation.function.BaseSingleInputAggregationFunction] and is invisible to
 /// [org.apache.pinot.core.query.aggregation.function.AggregationFunctionNullContractTest], whose synthetic block
 /// supplies a single column.
 ///

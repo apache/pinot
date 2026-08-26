@@ -55,7 +55,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /// - fpp: Desired false positive probability for the BloomFilter, must be positive and less than 1.0. (Default 0.03)
 ///
 /// Example: IDSET(col, 'sizeThresholdInBytes=1000;expectedInsertions=10000;fpp=0.03')
-public class IdSetAggregationFunction extends NullableSingleInputAggregationFunction<IdSet, String> {
+public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction<IdSet, String> {
   private static final char PARAMETER_DELIMITER = ';';
   private static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';
   private static final String UPPER_CASE_SIZE_THRESHOLD_IN_BYTES = "SIZETHRESHOLDINBYTES";
@@ -140,9 +140,6 @@ public class IdSetAggregationFunction extends NullableSingleInputAggregationFunc
       case INT:
         int[] intValuesSV = blockValSet.getIntValuesSV();
         forEachNotNull(length, blockValSet, (from, to) -> {
-          if (to == from) {
-            return;
-          }
           IdSet idSet = getIdSet(aggregationResultHolder, storedType);
           for (int i = from; i < to; i++) {
             idSet.add(intValuesSV[i]);
@@ -152,9 +149,6 @@ public class IdSetAggregationFunction extends NullableSingleInputAggregationFunc
       case LONG:
         long[] longValuesSV = blockValSet.getLongValuesSV();
         forEachNotNull(length, blockValSet, (from, to) -> {
-          if (to == from) {
-            return;
-          }
           IdSet idSet = getIdSet(aggregationResultHolder, storedType);
           for (int i = from; i < to; i++) {
             idSet.add(longValuesSV[i]);
@@ -164,9 +158,6 @@ public class IdSetAggregationFunction extends NullableSingleInputAggregationFunc
       case FLOAT:
         float[] floatValuesSV = blockValSet.getFloatValuesSV();
         forEachNotNull(length, blockValSet, (from, to) -> {
-          if (to == from) {
-            return;
-          }
           IdSet idSet = getIdSet(aggregationResultHolder, storedType);
           for (int i = from; i < to; i++) {
             idSet.add(floatValuesSV[i]);
@@ -176,9 +167,6 @@ public class IdSetAggregationFunction extends NullableSingleInputAggregationFunc
       case DOUBLE:
         double[] doubleValuesSV = blockValSet.getDoubleValuesSV();
         forEachNotNull(length, blockValSet, (from, to) -> {
-          if (to == from) {
-            return;
-          }
           IdSet idSet = getIdSet(aggregationResultHolder, storedType);
           for (int i = from; i < to; i++) {
             idSet.add(doubleValuesSV[i]);
@@ -188,9 +176,6 @@ public class IdSetAggregationFunction extends NullableSingleInputAggregationFunc
       case STRING:
         String[] stringValuesSV = blockValSet.getStringValuesSV();
         forEachNotNull(length, blockValSet, (from, to) -> {
-          if (to == from) {
-            return;
-          }
           IdSet idSet = getIdSet(aggregationResultHolder, storedType);
           for (int i = from; i < to; i++) {
             idSet.add(stringValuesSV[i]);
@@ -200,9 +185,6 @@ public class IdSetAggregationFunction extends NullableSingleInputAggregationFunc
       case BYTES:
         byte[][] bytesValuesSV = blockValSet.getBytesValuesSV();
         forEachNotNull(length, blockValSet, (from, to) -> {
-          if (to == from) {
-            return;
-          }
           IdSet idSet = getIdSet(aggregationResultHolder, storedType);
           for (int i = from; i < to; i++) {
             idSet.add(bytesValuesSV[i]);
@@ -220,9 +202,6 @@ public class IdSetAggregationFunction extends NullableSingleInputAggregationFunc
       case INT:
         int[][] intValuesMV = blockValSet.getIntValuesMV();
         forEachNotNull(length, blockValSet, (from, to) -> {
-          if (to == from) {
-            return;
-          }
           IdSet idSet = getIdSet(aggregationResultHolder, storedType);
           for (int i = from; i < to; i++) {
             for (int intValue : intValuesMV[i]) {
@@ -234,9 +213,6 @@ public class IdSetAggregationFunction extends NullableSingleInputAggregationFunc
       case LONG:
         long[][] longValuesMV = blockValSet.getLongValuesMV();
         forEachNotNull(length, blockValSet, (from, to) -> {
-          if (to == from) {
-            return;
-          }
           IdSet idSet = getIdSet(aggregationResultHolder, storedType);
           for (int i = from; i < to; i++) {
             for (long longValue : longValuesMV[i]) {
@@ -248,9 +224,6 @@ public class IdSetAggregationFunction extends NullableSingleInputAggregationFunc
       case FLOAT:
         float[][] floatValuesMV = blockValSet.getFloatValuesMV();
         forEachNotNull(length, blockValSet, (from, to) -> {
-          if (to == from) {
-            return;
-          }
           IdSet idSet = getIdSet(aggregationResultHolder, storedType);
           for (int i = from; i < to; i++) {
             for (float floatValue : floatValuesMV[i]) {
@@ -262,9 +235,6 @@ public class IdSetAggregationFunction extends NullableSingleInputAggregationFunc
       case DOUBLE:
         double[][] doubleValuesMV = blockValSet.getDoubleValuesMV();
         forEachNotNull(length, blockValSet, (from, to) -> {
-          if (to == from) {
-            return;
-          }
           IdSet idSet = getIdSet(aggregationResultHolder, storedType);
           for (int i = from; i < to; i++) {
             for (double doubleValue : doubleValuesMV[i]) {
@@ -276,9 +246,6 @@ public class IdSetAggregationFunction extends NullableSingleInputAggregationFunc
       case STRING:
         String[][] stringValuesMV = blockValSet.getStringValuesMV();
         forEachNotNull(length, blockValSet, (from, to) -> {
-          if (to == from) {
-            return;
-          }
           IdSet idSet = getIdSet(aggregationResultHolder, storedType);
           for (int i = from; i < to; i++) {
             for (String stringValue : stringValuesMV[i]) {
@@ -290,9 +257,6 @@ public class IdSetAggregationFunction extends NullableSingleInputAggregationFunc
       case BYTES:
         byte[][][] bytesValuesMV = blockValSet.getBytesValuesMV();
         forEachNotNull(length, blockValSet, (from, to) -> {
-          if (to == from) {
-            return;
-          }
           IdSet idSet = getIdSet(aggregationResultHolder, storedType);
           for (int i = from; i < to; i++) {
             for (byte[] bytesValue : bytesValuesMV[i]) {

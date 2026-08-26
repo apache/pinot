@@ -16,34 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.aggregation.function;
+package org.apache.pinot.common.function.scalar;
 
-import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
-public class PercentileEstAggregationFunctionTest extends AbstractPercentileAggregationFunctionTest {
-  @Override
-  public String callStr(String column, int percent) {
-    return "PERCENTILEEST(" + column + ", " + percent + ")";
-  }
+/// Tests array construction behavior that depends on runtime Java element types.
+public class ArrayFunctionsTest {
 
-  @Override
-  public String getFinalResultColumnType() {
-    return "LONG";
-  }
+  @Test
+  public void testBytesArrayValueConstructor() {
+    byte[][] expected = {{0}, {1, 2}};
 
-  String minValue(DataType dataType) {
-    switch (dataType) {
-      case INT:
-        return "-2147483648";
-      case LONG:
-        return "-9223372036854775808";
-      case FLOAT:
-        return "-9223372036854775808";
-      case DOUBLE:
-        return "-9223372036854775808";
-      default:
-        throw new IllegalArgumentException("Unexpected type " + dataType);
-    }
+    Assert.assertEquals(ArrayFunctions.arrayValueConstructor(expected[0], expected[1]), expected);
   }
 }

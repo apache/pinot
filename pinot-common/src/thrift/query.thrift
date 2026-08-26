@@ -96,6 +96,7 @@ union Literal {
   14: optional list<i32> floatArrayValue;
   15: optional list<double> doubleArrayValue;
   16: optional list<string> stringArrayValue;
+  17: optional list<binary> bytesArrayValue;
 }
 
 struct Identifier {

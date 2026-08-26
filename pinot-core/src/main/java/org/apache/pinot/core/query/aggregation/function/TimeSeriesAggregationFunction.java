@@ -33,7 +33,6 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
@@ -74,7 +73,11 @@ import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactoryProvider;
 /// ```
 /// timeReferencePointInSeconds = firstBucketValue - bucketSizeInSeconds
 /// ```
-public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTimeSeriesBuilder, DoubleArrayList> {
+///
+/// Both the value and the timestamp gate a row when null handling is on. A null value has nothing to add to its
+/// bucket, and a null timestamp leaves the point with no bucket to land in, so either one makes the row
+/// uncountable rather than merely incomplete.
+public class TimeSeriesAggregationFunction extends BaseAggregationFunction<BaseTimeSeriesBuilder, DoubleArrayList> {
   private final TimeSeriesBuilderFactory _factory;
   private final AggInfo _aggInfo;
   private final ExpressionContext _valueExpression;
@@ -83,7 +86,6 @@ public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTi
   private final long _timeReferencePoint;
   private final long _timeOffset;
   private final long _timeBucketDivisor;
-  private final boolean _nullHandlingEnabled;
 
   /// Arguments are as shown below:
   ///
@@ -92,6 +94,7 @@ public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTi
   ///     bucketLenSeconds, numBuckets, "aggParam1=value1")
   /// ```
   public TimeSeriesAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(nullHandlingEnabled);
     // Initialize temporary variables.
     Preconditions.checkArgument(arguments.size() == 10, "Expected 10 arguments for time-series agg");
     String language = arguments.get(0).getLiteral().getStringValue();
@@ -114,7 +117,6 @@ public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTi
     _timeReferencePoint = timeUnit.convert(Duration.ofSeconds(firstBucketValue - bucketWindowSeconds));
     _timeOffset = timeUnit.convert(Duration.ofSeconds(offsetSeconds));
     _timeBucketDivisor = timeUnit.convert(_timeBuckets.getBucketSize());
-    _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   @Override
@@ -234,18 +236,6 @@ public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTi
   @Override
   public String toExplainString() {
     return "TIME_SERIES";
-  }
-
-  /// Runs `consumer` over the row ranges where both the value and the timestamp are non-null.
-  ///
-  /// Both columns gate the row. A null value has nothing to add to its bucket, and a null timestamp leaves the point
-  /// with no bucket to land in, so either one makes the row uncountable rather than merely incomplete. With the option
-  /// disabled the whole block is one range, which is what this function did unconditionally before.
-  private void forEachNotNull(int length, BlockValSet valueBlockValSet, BlockValSet timeBlockValSet,
-      RoaringBitmapUtils.BatchConsumer consumer) {
-    RoaringBitmapUtils.forEachUnset(length,
-        NullableSingleInputAggregationFunction.orNullIterator(_nullHandlingEnabled, valueBlockValSet, timeBlockValSet),
-        consumer);
   }
 
   /// Returns the holder's series builder, creating and storing one on first use.

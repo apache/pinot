@@ -32,25 +32,33 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.BaseAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEventWithExtraFields;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.query.QueryThreadContext;
-import org.roaringbitmap.RoaringBitmap;
 
 
+/// Only the timestamp decides whether a row is skipped when null handling is on.
+///
+/// A step expression is a predicate, and a predicate over a null operand is UNKNOWN, which SQL treats as not
+/// satisfied wherever a boolean is consumed, so a null step already means that step did not match and the row still
+/// belongs to the funnel. A null timestamp is different: the event has no position in the window, and an aggregate
+/// ignores a row whose input is null.
+///
+/// An extra field is neither. It is payload carried alongside a matched event, so a null one does not make the event
+/// invalid and dropping the row would lose an event that really happened. It is therefore not gated on, with one
+/// known limitation: the value is read positionally and a null row yields the column default, so a null extra field
+/// renders as `0` or the empty string rather than as NULL.
 public class FunnelEventsFunctionEvalAggregationFunction
-    implements AggregationFunction<PriorityQueue<FunnelStepEventWithExtraFields>, ObjectArrayList<String>> {
+    extends BaseAggregationFunction<PriorityQueue<FunnelStepEventWithExtraFields>, ObjectArrayList<String>> {
   private final static int INTERMEDIATE_RESULT_SERDE_VERSION = 0;
 
-  protected final boolean _nullHandlingEnabled;
   protected final ExpressionContext _timestampExpression;
   protected final long _windowSize;
   protected final List<ExpressionContext> _stepExpressions;
@@ -62,7 +70,7 @@ public class FunnelEventsFunctionEvalAggregationFunction
 
   public FunnelEventsFunctionEvalAggregationFunction(List<ExpressionContext> arguments,
       boolean nullHandlingEnabled) {
-    _nullHandlingEnabled = nullHandlingEnabled;
+    super(nullHandlingEnabled);
     int numArguments = arguments.size();
     Preconditions.checkArgument(numArguments > 3,
         "FUNNEL_EVENTS_FUNCTION_EVAL expects >= 4 arguments, got: %s. The function can be used as "
@@ -146,33 +154,6 @@ public class FunnelEventsFunctionEvalAggregationFunction
     return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
   }
 
-  /// Runs the consumer over each range of rows whose timestamp is not null, or over the whole block when the
-  /// option is disabled.
-  ///
-  /// Only the timestamp is consulted, of the three kinds of column this function reads.
-  ///
-  /// A step expression is a predicate, and a predicate over a null operand is UNKNOWN, which SQL treats as not
-  /// satisfied wherever a boolean is consumed, so a null step already means that step did not match and the row
-  /// still belongs to the funnel. A null timestamp is different: the event has no position in the window, and an
-  /// aggregate ignores a row whose input is null.
-  ///
-  /// An extra field is neither. It is payload carried alongside a matched event, so a null one does not make the
-  /// event invalid and dropping the row would lose an event that really happened. It is therefore not gated on,
-  /// with one known limitation: the value is read positionally and a null row yields the column default, so a null
-  /// extra field renders as `0` or the empty string rather than as NULL.
-  private void forEachNotNullTimestamp(int length, BlockValSet timestampBlockValSet,
-      RoaringBitmapUtils.BatchConsumer consumer) {
-    RoaringBitmap nullBitmap = _nullHandlingEnabled ? timestampBlockValSet.getNullBitmap() : null;
-    if (nullBitmap == null) {
-      consumer.consume(0, length);
-      return;
-    }
-    // Skip if the entire block is null
-    if (!nullBitmap.contains(0, length)) {
-      RoaringBitmapUtils.forEachUnset(length, nullBitmap.getIntIterator(), consumer);
-    }
-  }
-
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
@@ -189,7 +170,7 @@ public class FunnelEventsFunctionEvalAggregationFunction
     }
     PriorityQueue<FunnelStepEventWithExtraFields> stepEvents = existing;
     List<Object> extraFieldsBlocks = getExtraFieldsBlocks(blockValSetMap);
-    forEachNotNullTimestamp(length, timestampBlockValSet, (from, to) -> {
+    forEachNotNull(length, timestampBlockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         boolean stepFound = false;
         for (int j = 0; j < _numSteps; j++) {
@@ -284,7 +265,7 @@ public class FunnelEventsFunctionEvalAggregationFunction
       stepBlocks.add(blockValSetMap.get(stepExpression).getIntValuesSV());
     }
     List<Object> extraFieldsBlocks = getExtraFieldsBlocks(blockValSetMap);
-    forEachNotNullTimestamp(length, timestampBlockValSet, (from, to) -> {
+    forEachNotNull(length, timestampBlockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         int groupKey = groupKeyArray[i];
         boolean stepFound = false;
@@ -318,7 +299,7 @@ public class FunnelEventsFunctionEvalAggregationFunction
       stepBlocks.add(blockValSetMap.get(stepExpression).getIntValuesSV());
     }
     List<Object> extraFieldsBlocks = getExtraFieldsBlocks(blockValSetMap);
-    forEachNotNullTimestamp(length, timestampBlockValSet, (from, to) -> {
+    forEachNotNull(length, timestampBlockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         int[] groupKeys = groupKeysArray[i];
         boolean stepFound = false;
