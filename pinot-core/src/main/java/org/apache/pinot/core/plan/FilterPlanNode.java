@@ -384,7 +384,7 @@ public class FilterPlanNode implements PlanNode {
     Preconditions.checkState(forwardIndexReader != null,
         "Cannot apply VECTOR_SIMILARITY on column: %s -- no vector index and no forward index available", column);
     return new ExactVectorScanFilterOperator(forwardIndexReader, predicate, column, numDocs, vectorIndexConfig,
-        getVectorFallbackReason(vectorIndexConfig, isMutableSegment), searchParams);
+        getVectorFallbackReason(vectorIndexConfig, isMutableSegment), searchParams, null);
   }
 
   /// Constructs a vector operator for a VECTOR_SIMILARITY predicate that is part of an AND
