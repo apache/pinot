@@ -81,17 +81,6 @@ public abstract class BlockExchange implements AutoCloseable {
     return getExchange(sendingMailboxes, distributionType, keys, splitter, RANDOM_INDEX_CHOOSER, hashFunction);
   }
 
-  /// Factory method to create a BlockExchange for a multi-send (spool) node that fans blocks out to the exchanges of
-  /// each receiver stage, each of them wrapped as a [SendingMailbox] via [#asSendingMailbox].
-  ///
-  /// Unlike a regular broadcast, blocks that carry mutable cells (aggregation intermediate results) are copied so
-  /// that no two receiver stages share them. See [SpoolBroadcastExchange].
-  /// @param statsIndexChooser a function to choose the mailbox index to send stats to.
-  public static BlockExchange getSpoolExchange(List<SendingMailbox> perStageSendingMailboxes, BlockSplitter splitter,
-      Function<List<SendingMailbox>, Integer> statsIndexChooser) {
-    return new SpoolBroadcastExchange(perStageSendingMailboxes, splitter, statsIndexChooser);
-  }
-
   protected BlockExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
       Function<List<SendingMailbox>, Integer> statsIndexChooser) {
     _sendingMailboxes = sendingMailboxes;

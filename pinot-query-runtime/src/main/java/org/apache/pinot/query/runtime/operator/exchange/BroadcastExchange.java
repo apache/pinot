@@ -23,15 +23,22 @@ import java.util.function.Function;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 
 
-/// Broadcast blocks to all receiving servers.
+/// Broadcast blocks to all the destinations.
 ///
-/// The same block instance is routed to every destination, and local (same-JVM) mailboxes deliver it by reference.
-/// This is safe because broadcast edges never carry aggregation intermediate results (those travel on the
-/// hash/singleton edge between the partial and the final aggregation), and downstream operators do not mutate cells
-/// of any other column type. See [SpoolBroadcastExchange] for the multi-stage (spool) fan-out, which does have to
-/// copy such blocks.
+/// This is the only exchange that routes the same block to more than one destination, and local (same-JVM) mailboxes
+/// deliver on-heap blocks by reference. Blocks that
+/// [carry aggregation intermediate results][RowHeapDataBlock#containsObjectColumns()] cannot be shared this way:
+/// downstream operators mutate those objects in place when they merge them or extract final results, so two
+/// receivers on the same server would corrupt them. For such blocks, [#route] gives every local destination except
+/// the first its own [copy][RowHeapDataBlock#copyObjectColumns()]. Remote destinations only read the block to
+/// serialize it, before any local receiver can mutate it, so they do not need copies. Blocks without OBJECT columns
+/// are shared by reference with all the destinations.
+///
+/// This also protects multi-send (spool) nodes, which fan each block out to the exchanges of their receiver stages
+/// through this exchange (see [BlockExchange#asSendingMailbox]).
 class BroadcastExchange extends BlockExchange {
 
   protected BroadcastExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter) {
@@ -45,8 +52,34 @@ class BroadcastExchange extends BlockExchange {
 
   @Override
   protected void route(List<SendingMailbox> destinations, MseBlock.Data block) {
+    // Serialized blocks are read-only (every receiver deserializes its own copy of the data), so they are always
+    // safe to share
+    if (destinations.size() == 1 || !block.isRowHeap() || !block.asRowHeap().containsObjectColumns()) {
+      for (SendingMailbox mailbox : destinations) {
+        sendBlock(mailbox, block);
+      }
+      return;
+    }
+    // Send a copy to every active local destination except the first one, which receives the original block without
+    // copying. Remote destinations serialize the original block on this thread, and the copies are also made on this
+    // thread, so all reads of the original block finish before it is handed to a local receiver that can start
+    // mutating it.
+    RowHeapDataBlock rowHeapBlock = block.asRowHeap();
+    SendingMailbox firstLocalDestination = null;
     for (SendingMailbox mailbox : destinations) {
-      sendBlock(mailbox, block);
+      if (mailbox.isEarlyTerminated()) {
+        continue;
+      }
+      if (!mailbox.isLocal()) {
+        sendBlock(mailbox, block);
+      } else if (firstLocalDestination == null) {
+        firstLocalDestination = mailbox;
+      } else {
+        sendBlock(mailbox, rowHeapBlock.copyObjectColumns());
+      }
+    }
+    if (firstLocalDestination != null) {
+      sendBlock(firstLocalDestination, block);
     }
   }
 }

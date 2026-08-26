@@ -108,16 +108,32 @@ public class RowHeapDataBlock implements MseBlock.Data {
     return this;
   }
 
-  /// Returns a copy of this block that does not share any mutable cell values with this block.
+  /// Returns whether this block contains [OBJECT][ColumnDataType#OBJECT] columns, which hold mutable aggregation
+  /// intermediate results — the only cell values downstream operators mutate in place. Blocks that contain them must
+  /// not be shared by reference across receivers; see [#copyObjectColumns()]. Extend both methods if operators ever
+  /// start to mutate other cell types.
+  public boolean containsObjectColumns() {
+    for (ColumnDataType storedType : _dataSchema.getStoredColumnDataTypes()) {
+      if (storedType == ColumnDataType.OBJECT) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Returns a copy of this block whose [OBJECT][ColumnDataType#OBJECT] cells do not share state with this block.
   ///
-  /// Cells of [OBJECT][ColumnDataType#OBJECT] columns hold aggregation intermediate results (e.g. priority queues or
-  /// sketches) that downstream operators mutate in place when merging them or extracting final results. This method
-  /// copies such cells by round-tripping them through the corresponding aggregation function's intermediate result
-  /// serde, which requires the aggregation functions to be attached to this block whenever a non-null OBJECT cell is
-  /// present (the same requirement [DataBlockBuilder] imposes to serialize such blocks). Cells of all other column
-  /// types are effectively immutable and are shared with the returned block.
+  /// OBJECT cells hold aggregation intermediate results (e.g. priority queues or sketches) that downstream operators
+  /// mutate in place when they merge them or extract final results, so the same instance must not reach two
+  /// receivers. This method copies them by round-tripping them through the corresponding aggregation function's
+  /// intermediate result serde, which requires the aggregation functions to be attached to this block whenever a
+  /// non-null OBJECT cell is present (the same requirement [DataBlockBuilder] imposes to serialize such blocks).
+  ///
+  /// The row arrays are cloned, but cells of all other column types are shared with the returned block, even though
+  /// some of them are backed by mutable objects (maps, arrays, byte arrays): downstream operators do not mutate
+  /// them. Extend this method if that ever changes.
   @SuppressWarnings({"rawtypes", "unchecked"})
-  public RowHeapDataBlock copy() {
+  public RowHeapDataBlock copyObjectColumns() {
     ColumnDataType[] storedTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = storedTypes.length;
     List<Object[]> copiedRows = new ArrayList<>(_rows.size());
@@ -129,7 +145,8 @@ public class RowHeapDataBlock implements MseBlock.Data {
         if (value != null && storedTypes[colId] == ColumnDataType.OBJECT) {
           Preconditions.checkState(_aggFunctions != null,
               "Cannot copy OBJECT column: %s without aggregation functions", _dataSchema.getColumnName(colId));
-          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numCellsProcessed++, "RowHeapDataBlock#copy");
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numCellsProcessed++,
+              "RowHeapDataBlock#copyObjectColumns");
           // NOTE: The first (numColumns - numAggFunctions) columns are key columns
           AggregationFunction aggFunction = _aggFunctions[colId + _aggFunctions.length - numColumns];
           AggregationFunction.SerializedIntermediateResult serialized = aggFunction.serializeIntermediateResult(value);
