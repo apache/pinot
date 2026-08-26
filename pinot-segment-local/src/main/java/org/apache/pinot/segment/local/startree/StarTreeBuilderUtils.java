@@ -263,6 +263,10 @@ public class StarTreeBuilderUtils {
       if (builderConfig.getMaxLeafRecords() != metadata.getMaxLeafRecords()) {
         return true;
       }
+      // Switching null handling on or off changes how the whole star-tree is pre-aggregated, so it has to be rebuilt
+      if (builderConfig.isNullHandlingEnabled() != metadata.isNullHandlingEnabled()) {
+        return true;
+      }
       TreeMap<AggregationFunctionColumnPair, AggregationSpec> newSpecs = builderConfig.getAggregationSpecs();
       TreeMap<AggregationFunctionColumnPair, AggregationSpec> existingSpecs = metadata.getAggregationSpecs();
       if (newSpecs.size() != existingSpecs.size()) {

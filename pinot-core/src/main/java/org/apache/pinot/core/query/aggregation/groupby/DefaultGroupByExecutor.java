@@ -69,11 +69,6 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   }
 
   public DefaultGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
-      ExpressionContext[] groupByExpressions, BaseProjectOperator<?> projectOperator) {
-    this(queryContext, aggregationFunctions, groupByExpressions, projectOperator, null);
-  }
-
-  public DefaultGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
       ExpressionContext[] groupByExpressions, BaseProjectOperator<?> projectOperator,
       @Nullable GroupKeyGenerator groupKeyGenerator) {
     _aggregationFunctions = aggregationFunctions;
@@ -90,8 +85,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       // isDictionaryEncoded() flag rather than gating on dictionary nullness alone.
       hasNoDictionaryGroupByExpression |= !columnContext.isDictionaryEncoded();
     }
-    /// Grouping-set queries expand each row into one group per grouping set, so they always use the
-    /// multi-value (int[][]) executor path even though the union group-by columns are single-valued.
+    // Grouping-set queries expand each row into one group per grouping set, so they always use the
+    // multi-value (int[][]) executor path even though the union group-by columns are single-valued.
     boolean groupingSets = queryContext.isGroupingSets();
     _hasMVGroupByExpression = hasMVGroupByExpression || groupingSets;
 

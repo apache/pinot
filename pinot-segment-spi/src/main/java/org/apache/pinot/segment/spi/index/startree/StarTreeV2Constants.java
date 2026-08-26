@@ -47,6 +47,8 @@ public class StarTreeV2Constants {
     public static final String FUNCTION_COLUMN_PAIRS = "function.column.pairs";
     public static final String MAX_LEAF_RECORDS = "max.leaf.records";
     public static final String SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS = "skip.star.node.creation";
+    // Absent for star-trees built before null-aware star-trees were introduced, which read back as not null-aware
+    public static final String NULL_HANDLING_ENABLED = "null.handling.enabled";
     public static final String AGGREGATION_COUNT = "aggregation.count";
     public static final String AGGREGATION_PREFIX = "aggregation.";
     public static final String FUNCTION_TYPE = "function.type";
