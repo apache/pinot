@@ -37,7 +37,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.SerializedFrequentStringsSketch;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 ///  `FrequentStringsSketchAggregationFunction` provides an approximate FrequentItems aggregation function based
@@ -67,8 +67,9 @@ public class FrequentStringsSketchAggregationFunction
 
   protected int _maxMapSize;
 
-  public FrequentStringsSketchAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments.get(0));
+  public FrequentStringsSketchAggregationFunction(List<ExpressionContext> arguments,
+      boolean nullHandlingEnabled) {
+    super(arguments.get(0), nullHandlingEnabled);
     int numArguments = arguments.size();
     Preconditions.checkArgument(numArguments == 1 || numArguments == 2,
         "Expecting 1 or 2 arguments for FrequentItemsSketch function: FREQUENTSTRINGSSKETCH(column, maxMapSize");
@@ -94,23 +95,40 @@ public class FrequentStringsSketchAggregationFunction
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet valueSet = blockValSetMap.get(_expression);
-    FieldSpec.DataType valueType = valueSet.getValueType();
-
-    FrequentItemsSketch<String> sketch = getOrCreateSketch(aggregationResultHolder);
-
-    if (valueType == FieldSpec.DataType.BYTES) {
+    DataType dataType = valueSet.getValueType();
+    boolean singleValue = valueSet.isSingleValue();
+    if (dataType == DataType.BYTES && singleValue) {
       // Assuming the column contains serialized data sketch
-      FrequentItemsSketch<String>[] deserializedSketches =
-          deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
-      sketch = getOrCreateSketch(aggregationResultHolder);
+      byte[][] bytesValues = valueSet.getBytesValuesSV();
+      // The sketch is created inside the range, so a block with no non-null row leaves the holder untouched and
+      // extractFinalResult sees the null that means nothing was aggregated
+      forEachNotNull(length, valueSet, (from, to) -> {
+        FrequentItemsSketch<String> sketch = getOrCreateSketch(aggregationResultHolder);
+        for (int i = from; i < to; i++) {
+          sketch.merge(deserializeSketch(bytesValues[i]));
+        }
+      });
+      return;
+    }
 
-      for (FrequentItemsSketch<String> colSketch : deserializedSketches) {
-        sketch.merge(colSketch);
-      }
+    if (singleValue) {
+      String[] values = valueSet.getStringValuesSV();
+      forEachNotNull(length, valueSet, (from, to) -> {
+        FrequentItemsSketch<String> sketch = getOrCreateSketch(aggregationResultHolder);
+        for (int i = from; i < to; i++) {
+          sketch.update(values[i]);
+        }
+      });
     } else {
-      for (String val : valueSet.getStringValuesSV()) {
-        sketch.update(val);
-      }
+      String[][] values = valueSet.getStringValuesMV();
+      forEachNotNull(length, valueSet, (from, to) -> {
+        FrequentItemsSketch<String> sketch = getOrCreateSketch(aggregationResultHolder);
+        for (int i = from; i < to; i++) {
+          for (String value : values[i]) {
+            sketch.update(value);
+          }
+        }
+      });
     }
   }
 
@@ -118,22 +136,36 @@ public class FrequentStringsSketchAggregationFunction
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet valueSet = blockValSetMap.get(_expression);
-    FieldSpec.DataType valueType = valueSet.getValueType();
-
-    if (valueType == FieldSpec.DataType.BYTES) {
+    DataType dataType = valueSet.getValueType();
+    boolean singleValue = valueSet.isSingleValue();
+    if (dataType == DataType.BYTES && singleValue) {
       // serialized sketch
-      FrequentItemsSketch<String>[] deserializedSketches =
-          deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
-      for (int i = 0; i < length; i++) {
-        FrequentItemsSketch<String> sketch = getOrCreateSketch(groupByResultHolder, groupKeyArray[i]);
-        sketch.merge(deserializedSketches[i]);
-      }
-    } else {
+      byte[][] bytesValues = valueSet.getBytesValuesSV();
+      forEachNotNull(length, valueSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          getOrCreateSketch(groupByResultHolder, groupKeyArray[i]).merge(deserializeSketch(bytesValues[i]));
+        }
+      });
+      return;
+    }
+
+    if (singleValue) {
       String[] values = valueSet.getStringValuesSV();
-      for (int i = 0; i < length; i++) {
-        FrequentItemsSketch<String> sketch = getOrCreateSketch(groupByResultHolder, groupKeyArray[i]);
-        sketch.update(values[i]);
-      }
+      forEachNotNull(length, valueSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          getOrCreateSketch(groupByResultHolder, groupKeyArray[i]).update(values[i]);
+        }
+      });
+    } else {
+      String[][] values = valueSet.getStringValuesMV();
+      forEachNotNull(length, valueSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          FrequentItemsSketch<String> sketch = getOrCreateSketch(groupByResultHolder, groupKeyArray[i]);
+          for (String value : values[i]) {
+            sketch.update(value);
+          }
+        }
+      });
     }
   }
 
@@ -141,26 +173,45 @@ public class FrequentStringsSketchAggregationFunction
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet valueSet = blockValSetMap.get(_expression);
-    FieldSpec.DataType valueType = valueSet.getValueType();
-
-    if (valueType == FieldSpec.DataType.BYTES) {
+    DataType dataType = valueSet.getValueType();
+    boolean singleValue = valueSet.isSingleValue();
+    if (dataType == DataType.BYTES && singleValue) {
       // serialized sketch
-      FrequentItemsSketch<String>[] deserializedSketches =
-          deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
-      for (int i = 0; i < length; i++) {
-        for (int groupKey : groupKeysArray[i]) {
-          FrequentItemsSketch<String> sketch = getOrCreateSketch(groupByResultHolder, groupKey);
-          sketch.merge(deserializedSketches[i]);
+      byte[][] bytesValues = valueSet.getBytesValuesSV();
+      forEachNotNull(length, valueSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          // Deserialized once per row, not once per group key the row belongs to
+          FrequentItemsSketch<String> rowSketch = deserializeSketch(bytesValues[i]);
+          for (int groupKey : groupKeysArray[i]) {
+            getOrCreateSketch(groupByResultHolder, groupKey).merge(rowSketch);
+          }
         }
-      }
-    } else {
+      });
+      return;
+    }
+
+    if (singleValue) {
       String[] values = valueSet.getStringValuesSV();
-      for (int i = 0; i < length; i++) {
-        for (int groupKey : groupKeysArray[i]) {
-          FrequentItemsSketch<String> sketch = getOrCreateSketch(groupByResultHolder, groupKey);
-          sketch.update(values[i]);
+      forEachNotNull(length, valueSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            getOrCreateSketch(groupByResultHolder, groupKey).update(values[i]);
+          }
         }
-      }
+      });
+    } else {
+      String[][] values = valueSet.getStringValuesMV();
+      forEachNotNull(length, valueSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          String[] rowValues = values[i];
+          for (int groupKey : groupKeysArray[i]) {
+            FrequentItemsSketch<String> sketch = getOrCreateSketch(groupByResultHolder, groupKey);
+            for (String value : rowValues) {
+              sketch.update(value);
+            }
+          }
+        }
+      });
     }
   }
 
@@ -185,14 +236,9 @@ public class FrequentStringsSketchAggregationFunction
     return sketch;
   }
 
-  /// Deserializes the sketches from the bytes.
-  protected FrequentItemsSketch<String>[] deserializeSketches(byte[][] serializedSketches) {
-    FrequentItemsSketch<String>[] sketches = new FrequentItemsSketch[serializedSketches.length];
-    for (int i = 0; i < serializedSketches.length; i++) {
-      sketches[i] =
-          FrequentItemsSketch.getInstance(MemorySegment.ofArray(serializedSketches[i]), new ArrayOfStringsSerDe());
-    }
-    return sketches;
+  /// Deserializes a single serialized sketch, so a row that is skipped as null is never deserialized.
+  protected FrequentItemsSketch<String> deserializeSketch(byte[] serializedSketch) {
+    return FrequentItemsSketch.getInstance(MemorySegment.ofArray(serializedSketch), new ArrayOfStringsSerDe());
   }
 
   @Nullable
@@ -245,7 +291,9 @@ public class FrequentStringsSketchAggregationFunction
   @Nullable
   @Override
   public Comparable<?> extractFinalResult(@Nullable FrequentItemsSketch<String> sketch) {
-    // A null intermediate result means nothing was aggregated, and there is no sketch to serialize
+    // A null intermediate result means nothing was aggregated, and there is no sketch to serialize. This function
+    // has never substituted an empty accumulator during extraction, so NULL is the answer in both modes and there is
+    // no disabled-mode identity to preserve here.
     return sketch != null ? new SerializedFrequentStringsSketch(sketch) : null;
   }
 }

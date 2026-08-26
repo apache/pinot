@@ -41,8 +41,8 @@ public class FastHLLAggregationFunction extends BaseSingleInputAggregationFuncti
   public static final int DEFAULT_LOG2M = 8;
   private static final int BYTE_TO_CHAR_OFFSET = 129;
 
-  public FastHLLAggregationFunction(List<ExpressionContext> arguments) {
-    super(verifySingleArgument(arguments, "FAST_HLL"));
+  public FastHLLAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(verifySingleArgument(arguments, "FAST_HLL"), nullHandlingEnabled);
   }
 
   @Override
@@ -63,65 +63,75 @@ public class FastHLLAggregationFunction extends BaseSingleInputAggregationFuncti
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    String[] values = blockValSetMap.get(_expression).getStringValuesSV();
-    try {
-      HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
-      if (hyperLogLog != null) {
-        for (int i = 0; i < length; i++) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    String[] values = blockValSet.getStringValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      try {
+        int i = from;
+        HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
+        if (hyperLogLog == null) {
+          if (i == to) {
+            return;
+          }
+          // The first HyperLogLog read becomes the accumulator instead of being merged into a fresh one
+          hyperLogLog = convertStringToHLL(values[i++]);
+          aggregationResultHolder.setValue(hyperLogLog);
+        }
+        for (; i < to; i++) {
           hyperLogLog.addAll(convertStringToHLL(values[i]));
         }
-      } else {
-        hyperLogLog = convertStringToHLL(values[0]);
-        aggregationResultHolder.setValue(hyperLogLog);
-        for (int i = 1; i < length; i++) {
-          hyperLogLog.addAll(convertStringToHLL(values[i]));
-        }
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
       }
-    } catch (Exception e) {
-      throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
-    }
+    });
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    String[] values = blockValSetMap.get(_expression).getStringValuesSV();
-    try {
-      for (int i = 0; i < length; i++) {
-        HyperLogLog value = convertStringToHLL(values[i]);
-        int groupKey = groupKeyArray[i];
-        HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
-        if (hyperLogLog != null) {
-          hyperLogLog.addAll(value);
-        } else {
-          groupByResultHolder.setValueForKey(groupKey, value);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    String[] values = blockValSet.getStringValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      try {
+        for (int i = from; i < to; i++) {
+          HyperLogLog value = convertStringToHLL(values[i]);
+          int groupKey = groupKeyArray[i];
+          HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
+          if (hyperLogLog != null) {
+            hyperLogLog.addAll(value);
+          } else {
+            groupByResultHolder.setValueForKey(groupKey, value);
+          }
         }
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
       }
-    } catch (Exception e) {
-      throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
-    }
+    });
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    String[] values = blockValSetMap.get(_expression).getStringValuesSV();
-    try {
-      for (int i = 0; i < length; i++) {
-        HyperLogLog value = convertStringToHLL(values[i]);
-        for (int groupKey : groupKeysArray[i]) {
-          HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
-          if (hyperLogLog != null) {
-            hyperLogLog.addAll(value);
-          } else {
-            // Create a new HyperLogLog for the group
-            groupByResultHolder.setValueForKey(groupKey, convertStringToHLL(values[i]));
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    String[] values = blockValSet.getStringValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      try {
+        for (int i = from; i < to; i++) {
+          HyperLogLog value = convertStringToHLL(values[i]);
+          for (int groupKey : groupKeysArray[i]) {
+            HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
+            if (hyperLogLog != null) {
+              hyperLogLog.addAll(value);
+            } else {
+              // Create a new HyperLogLog for the group
+              groupByResultHolder.setValueForKey(groupKey, convertStringToHLL(values[i]));
+            }
           }
         }
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
       }
-    } catch (Exception e) {
-      throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
-    }
+    });
   }
 
   @Override

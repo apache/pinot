@@ -109,6 +109,7 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
+import org.apache.pinot.server.api.ServerDataAccess;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -562,6 +563,7 @@ public class TablesResource {
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Path("/segments/{tableNameWithType}/{segmentName}")
+  @ServerDataAccess
   @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.DOWNLOAD_SEGMENT)
   @ApiOperation(value = "Download an immutable segment", notes = "Download an immutable segment in zipped tar format.")
   public Response downloadSegment(
@@ -618,6 +620,7 @@ public class TablesResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableNameWithType}/{segmentName}/validDocIdsBitmap")
+  @ServerDataAccess
   @ApiOperation(value = "Download validDocIds bitmap for an REALTIME immutable segment", notes =
       "Download validDocIds for " + "an immutable segment in bitmap format.")
   public ValidDocIdsBitmapResponse downloadValidDocIdsBitmap(

@@ -47,6 +47,28 @@ public class OpenStructIndexConfigTest {
   }
 
   @Test
+  public void testPerKeyMetricsDefaultsToFalse() {
+    // 7-arg constructor (pre-existing callers) — must default to false.
+    OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, -1, null, 0.5, null, null);
+    assertFalse(config.isPerKeyMetricsEnabled());
+    // DEFAULT constant.
+    assertFalse(OpenStructIndexConfig.DEFAULT.isPerKeyMetricsEnabled());
+  }
+
+  @Test
+  public void testPerKeyMetricsRoundTripsFromJson()
+      throws Exception {
+    String json = "{\"perKeyMetricsEnabled\": true, \"denseKeys\": [\"clicks\"]}";
+    OpenStructIndexConfig config = JsonUtils.stringToObject(json, OpenStructIndexConfig.class);
+    assertTrue(config.isPerKeyMetricsEnabled());
+    assertEquals(config.getDenseKeys(), Set.of("clicks"));
+
+    // Absent field → false.
+    OpenStructIndexConfig noFlag = JsonUtils.stringToObject("{}", OpenStructIndexConfig.class);
+    assertFalse(noFlag.isPerKeyMetricsEnabled());
+  }
+
+  @Test
   public void testDisabledConfig() {
     OpenStructIndexConfig config = OpenStructIndexConfig.DISABLED;
     assertFalse(config.isEnabled());
@@ -278,5 +300,33 @@ public class OpenStructIndexConfigTest {
     OpenStructIndexConfig reparsed =
         JsonUtils.stringToObject(JsonUtils.objectToString(config), OpenStructIndexConfig.class);
     assertTrue(reparsed.isSparseJsonIndex());
+  }
+
+  @Test
+  public void testIgnoredKeysDefaultsToEmpty() {
+    assertTrue(OpenStructIndexConfig.DEFAULT.getIgnoredKeys().isEmpty());
+    assertFalse(OpenStructIndexConfig.DEFAULT.isIgnoredKey("anything"));
+  }
+
+  @Test
+  public void testIgnoredKeysRoundTripsFromJson()
+      throws Exception {
+    String json = "{\"ignoredKeys\": [\"debug_payload\", \"internal_trace_id\"]}";
+    OpenStructIndexConfig config = JsonUtils.stringToObject(json, OpenStructIndexConfig.class);
+    assertEquals(config.getIgnoredKeys(), Set.of("debug_payload", "internal_trace_id"));
+    assertTrue(config.isIgnoredKey("debug_payload"));
+    assertFalse(config.isIgnoredKey("clicks"));
+
+    String reJson = JsonUtils.objectToString(config);
+    OpenStructIndexConfig reDeserialized = JsonUtils.stringToObject(reJson, OpenStructIndexConfig.class);
+    assertEquals(reDeserialized.getIgnoredKeys(), Set.of("debug_payload", "internal_trace_id"));
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testDeprecatedSevenArgConstructorDefaultsIgnoredKeysToEmpty() {
+    OpenStructIndexConfig config = new OpenStructIndexConfig(false, null, -1, null, 0.5, null, true);
+    assertTrue(config.getIgnoredKeys().isEmpty());
+    assertTrue(config.isSparseJsonIndex());
   }
 }

@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -44,7 +45,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
@@ -62,7 +63,8 @@ import static org.testng.Assert.assertTrue;
 
 public class DictionaryBasedGroupKeyGeneratorTest {
   private static final String SEGMENT_NAME = "testSegment";
-  private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME;
+  private static final String INDEX_DIR_PATH =
+      FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME + "-" + UUID.randomUUID();
   private static final int NUM_ROWS = 1000;
   private static final int UNIQUE_ROWS = 100;
   private static final int MAX_STEP_LENGTH = 1000;
@@ -114,12 +116,12 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
     // Create an index segment with the random values
     Schema schema = new Schema();
-    schema.addField(new DimensionFieldSpec(FILTER_COLUMN, FieldSpec.DataType.INT, true));
+    schema.addField(new DimensionFieldSpec(FILTER_COLUMN, DataType.INT, true));
     for (String singleValueColumn : SV_COLUMNS) {
-      schema.addField(new DimensionFieldSpec(singleValueColumn, FieldSpec.DataType.INT, true));
+      schema.addField(new DimensionFieldSpec(singleValueColumn, DataType.INT, true));
     }
     for (String multiValueColumn : MV_COLUMNS) {
-      schema.addField(new DimensionFieldSpec(multiValueColumn, FieldSpec.DataType.INT, false));
+      schema.addField(new DimensionFieldSpec(multiValueColumn, DataType.INT, false));
     }
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();

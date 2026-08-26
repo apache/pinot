@@ -20,6 +20,7 @@ package org.apache.pinot.broker.routing.manager;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -60,6 +61,7 @@ import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSele
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelectorFactory;
 import org.apache.pinot.broker.routing.instanceselector.InstanceSelector;
 import org.apache.pinot.broker.routing.instanceselector.InstanceSelectorFactory;
+import org.apache.pinot.broker.routing.instanceselector.TableReplicaHealth;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetchListener;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetcher;
 import org.apache.pinot.broker.routing.segmentpartition.SegmentPartitionMetadataManager;
@@ -73,6 +75,7 @@ import org.apache.pinot.broker.routing.tablesampler.TableSampler;
 import org.apache.pinot.broker.routing.tablesampler.TableSamplerFactory;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -381,6 +384,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
         LOGGER.error("Caught unexpected exception while updating routing entry on segment assignment change for "
             + "table: {}", tableNameWithType, e);
       }
+      updateReplicaHealthMetrics(routingEntry);
       return true;
     }
     return false;
@@ -478,7 +482,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       try {
         Object tableLock = getRoutingTableBuildLock(tableNameWithType);
         synchronized (tableLock) {
-          routingEntry.onInstancesChange(_routableServerInstanceMap.keySet(), changedServers);
+          updateRoutingEntryOnInstancesChange(routingEntry, _routableServerInstanceMap.keySet(), changedServers);
         }
       } catch (Exception e) {
         LOGGER.error("Caught unexpected exception while updating routing entry on instances change for table: {}",
@@ -553,7 +557,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       try {
         Object tableLock = getRoutingTableBuildLock(tableNameWithType);
         synchronized (tableLock) {
-          routingEntry.onInstancesChange(_routableServerInstanceMap.keySet(), changedServers);
+          updateRoutingEntryOnInstancesChange(routingEntry, _routableServerInstanceMap.keySet(), changedServers);
         }
       } catch (Exception e) {
         LOGGER.error("Caught unexpected exception while updating routing entry when excluding server: {} for table: {}",
@@ -600,7 +604,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       try {
         Object tableLock = getRoutingTableBuildLock(tableNameWithType);
         synchronized (tableLock) {
-          routingEntry.onInstancesChange(_routableServerInstanceMap.keySet(), changedServers);
+          updateRoutingEntryOnInstancesChange(routingEntry, _routableServerInstanceMap.keySet(), changedServers);
         }
       } catch (Exception e) {
         LOGGER.error("Caught unexpected exception while updating routing entry when including server: {} for table: {}",
@@ -696,6 +700,68 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     } finally {
       _globalLock.readLock().unlock();
     }
+  }
+
+  /// Applies an instance change to the routing entry and re-reports its replica health gauges.
+  ///
+  /// The single entry point for the instance change paths, so that none of them can apply the change without
+  /// refreshing the gauges it moves. Callers must hold the table's routing build lock.
+  private void updateRoutingEntryOnInstancesChange(RoutingEntry routingEntry, Set<String> enabledInstances,
+      List<String> changedInstances) {
+    try {
+      routingEntry.onInstancesChange(enabledInstances, changedInstances);
+    } finally {
+      // See processAssignmentChangeForTable for why the report is in a finally block. It cannot be folded into
+      // the callers' own try/catch the way it is there: theirs wraps the synchronized block rather than sitting
+      // inside it, and this must run under the table lock.
+      updateReplicaHealthMetrics(routingEntry);
+    }
+  }
+
+  /// Reports the table's replica health gauges from what its own instance selector currently measures.
+  /// Called after every change that can move those numbers, so the gauges track the routing rather than a
+  /// sampling interval.
+  ///
+  /// Only the routing entry's own selector is asked. The per-sampler selectors see a subset of the table's
+  /// segments and share its name, so reporting from them would overwrite the table's real values with
+  /// numbers measured over that subset. They still measure their own subset - the wasted work is a counter
+  /// per sampled segment, cheap enough not to be worth a switch that could be set wrong.
+  ///
+  /// Callers must hold the table's routing build lock: that is what makes the `_disabled` read below see the
+  /// value written by the assignment change, and what keeps two changes from interleaving a report with a
+  /// removal.
+  private void updateReplicaHealthMetrics(RoutingEntry routingEntry) {
+    String tableNameWithType = routingEntry.getTableNameWithType();
+    if (routingEntry.isDisabled()) {
+      // A disabled table has every replica driven OFFLINE on purpose, so reporting it as unavailable would
+      // be a false alarm. Drop the gauges instead, so the series disappears rather than reading as an
+      // outage, and reappears when the table is enabled again.
+      removeReplicaHealthMetrics(tableNameWithType);
+      return;
+    }
+    TableReplicaHealth replicaHealth = routingEntry._instanceSelector.getReplicaHealth();
+    if (replicaHealth == null) {
+      // A custom instance selector that does not measure replica health. Drop rather than leave whatever a
+      // previous selector reported, so that swapping the table to such a selector ends the series instead of
+      // freezing it.
+      removeReplicaHealthMetrics(tableNameWithType);
+      return;
+    }
+    // All three are plain values: nothing here depends on the clock, so a snapshot is the whole truth
+    _brokerMetrics.setValueOfTableGauge(tableNameWithType, BrokerGauge.PERCENT_OF_REPLICAS,
+        replicaHealth.getMinPercentOfReplicas());
+    _brokerMetrics.setValueOfTableGauge(tableNameWithType, BrokerGauge.SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS,
+        replicaHealth.getNumSegmentsAtMinPercentOfReplicas());
+    _brokerMetrics.setValueOfTableGauge(tableNameWithType, BrokerGauge.UNAVAILABLE_SEGMENTS,
+        replicaHealth.getNumUnavailableSegments());
+  }
+
+  /// Stops reporting the table's replica health gauges, so that they do not keep being exported frozen at a
+  /// value that no longer describes the table.
+  private void removeReplicaHealthMetrics(String tableNameWithType) {
+    _brokerMetrics.removeTableGauge(tableNameWithType, BrokerGauge.PERCENT_OF_REPLICAS);
+    _brokerMetrics.removeTableGauge(tableNameWithType, BrokerGauge.UNAVAILABLE_SEGMENTS);
+    _brokerMetrics.removeTableGauge(tableNameWithType, BrokerGauge.SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS);
   }
 
   private void buildRoutingInternal(String tableNameWithType) {
@@ -892,6 +958,10 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       } else {
         LOGGER.info("Rebuilt routing for table: {}", tableNameWithType);
       }
+      // Reported only once the entry is stored, so that a build that failed earlier cannot leave gauges
+      // behind with no routing entry to ever clean them up. The IS / EV re-check below reports again if it
+      // ends up updating the entry.
+      updateReplicaHealthMetrics(routingEntry);
 
       // Check for updates to the IS / EV after adding the routing entry, as it is possible that the
       // processSegmentAssignmentChange() may have run and missed updating this newly added entry. Only update
@@ -972,6 +1042,10 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
 
       if (_routingEntryMap.remove(tableNameWithType) != null) {
         LOGGER.info("Removed routing for table: {}", tableNameWithType);
+
+        // Stop reporting the table level gauges owned by the routing, otherwise they keep being exported
+        // for a table this broker no longer serves
+        removeReplicaHealthMetrics(tableNameWithType);
 
         // Remove time boundary manager for the offline part routing if the removed routing is the real-time part of a
         // hybrid table
@@ -1160,6 +1234,16 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       return null;
     }
     return routingEntry.getSegments(brokerRequest, samplerName);
+  }
+
+  @Nullable
+  @Override
+  public Set<String> getPrunedSegments(BrokerRequest brokerRequest) {
+    RoutingEntry routingEntry = _routingEntryMap.get(brokerRequest.getQuerySource().getTableName());
+    if (routingEntry == null) {
+      return null;
+    }
+    return routingEntry.getPrunedSegments(brokerRequest, extractSamplerName(brokerRequest));
   }
 
   private static String normalizeSamplerName(String samplerName) {
@@ -1404,6 +1488,10 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     // inconsistency between components, which is fine because the inconsistency only exists for the newly changed
     // segments and only lasts for a very short time.
     void onAssignmentChange(IdealState idealState, ExternalView externalView) {
+      // Derived purely from the ideal state, so it is set up front: a component failing partway through the
+      // update must not leave this reading the previous ideal state, since the replica health reporting
+      // decides from it whether the table's gauges are reported or dropped
+      _disabled = !idealState.isEnabled();
       Set<String> onlineSegments = getOnlineSegments(idealState);
       Set<String> preSelectedOnlineSegments = _segmentPreSelector.preSelect(onlineSegments);
       _segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, preSelectedOnlineSegments);
@@ -1415,7 +1503,6 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       updateSamplerInfos(idealState, externalView, preSelectedOnlineSegments);
       _lastUpdateIdealStateVersion = idealState.getStat().getVersion();
       _lastUpdateExternalViewVersion = externalView.getStat().getVersion();
-      _disabled = !idealState.isEnabled();
     }
 
     void onInstancesChange(Set<String> enabledInstances, List<String> changedInstances) {
@@ -1434,22 +1521,33 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       }
     }
 
+    /// Runs selection and then the pruner chain, which is the one place that decides what a query sees. Every caller
+    /// goes through here on purpose: the routing table, the plain segment list and the planner's emptiness proof must
+    /// all be judged by the same selector and the same pruners. A second copy of this sequence that drifted would let
+    /// the planner prove a partition empty that a real query would still have scanned, and that loses rows with no
+    /// error anywhere.
+    private SelectedSegments selectThenPrune(BrokerRequest brokerRequest, @Nullable SamplerInfo samplerInfo) {
+      SegmentSelector segmentSelector = samplerInfo != null ? samplerInfo._segmentSelector : _segmentSelector;
+      Set<String> selectedSegments = segmentSelector.select(brokerRequest);
+      Set<String> survivingSegments = selectedSegments;
+      if (!selectedSegments.isEmpty()) {
+        for (SegmentPruner segmentPruner : _segmentPruners) {
+          survivingSegments = segmentPruner.prune(brokerRequest, survivingSegments);
+        }
+      }
+      return new SelectedSegments(selectedSegments, survivingSegments);
+    }
+
     InstanceSelector.SelectionResult calculateRouting(BrokerRequest brokerRequest, long requestId,
         @Nullable String samplerName) {
       SamplerInfo samplerInfo = getSamplerInfo(samplerName);
-      SegmentSelector segmentSelector = samplerInfo != null ? samplerInfo._segmentSelector : _segmentSelector;
       InstanceSelector instanceSelector = samplerInfo != null ? samplerInfo._instanceSelector : _instanceSelector;
-      Set<String> selectedSegments = segmentSelector.select(brokerRequest);
-      int numTotalSelectedSegments = selectedSegments.size();
-      if (!selectedSegments.isEmpty()) {
-        for (SegmentPruner segmentPruner : _segmentPruners) {
-          selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
-        }
-      }
-      int numPrunedSegments = numTotalSelectedSegments - selectedSegments.size();
-      if (!selectedSegments.isEmpty()) {
+      SelectedSegments selectedSegments = selectThenPrune(brokerRequest, samplerInfo);
+      Set<String> survivingSegments = selectedSegments._surviving;
+      int numPrunedSegments = selectedSegments.getNumPruned();
+      if (!survivingSegments.isEmpty()) {
         InstanceSelector.SelectionResult selectionResult =
-            instanceSelector.select(brokerRequest, new ArrayList<>(selectedSegments), requestId);
+            instanceSelector.select(brokerRequest, new ArrayList<>(survivingSegments), requestId);
         selectionResult.setNumPrunedSegments(numPrunedSegments);
         return selectionResult;
       } else {
@@ -1459,15 +1557,47 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     }
 
     List<String> getSegments(BrokerRequest brokerRequest, @Nullable String samplerName) {
-      SamplerInfo samplerInfo = getSamplerInfo(samplerName);
-      SegmentSelector segmentSelector = samplerInfo != null ? samplerInfo._segmentSelector : _segmentSelector;
-      Set<String> selectedSegments = segmentSelector.select(brokerRequest);
-      if (!selectedSegments.isEmpty()) {
-        for (SegmentPruner segmentPruner : _segmentPruners) {
-          selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
+      return new ArrayList<>(selectThenPrune(brokerRequest, getSamplerInfo(samplerName))._surviving);
+    }
+
+    /// See [RoutingManager#getPrunedSegments]. The sampler is honoured for the same reason the query path honours it:
+    /// a narrower selection only ever shrinks what this can prove, never widens it.
+    ///
+    /// The pruners return a new set rather than editing the one they are handed, so taking the difference costs
+    /// nothing unless something was actually pruned. If one ever did edit in place the two sets would be the same
+    /// object, the difference would come out empty, and this would fall back to proving nothing -- the safe direction.
+    Set<String> getPrunedSegments(BrokerRequest brokerRequest, @Nullable String samplerName) {
+      SelectedSegments selectedSegments = selectThenPrune(brokerRequest, getSamplerInfo(samplerName));
+      int numPruned = selectedSegments.getNumPruned();
+      if (numPruned == 0) {
+        return Set.of();
+      }
+      // Built up rather than copied down: the count is already known and is usually a small fraction of the table's
+      // segments, so copying every selected segment only to remove most of them again would size the allocation to
+      // the table instead of to the answer.
+      Set<String> prunedSegments = Sets.newHashSetWithExpectedSize(numPruned);
+      for (String segment : selectedSegments._selected) {
+        if (!selectedSegments._surviving.contains(segment)) {
+          prunedSegments.add(segment);
         }
       }
-      return new ArrayList<>(selectedSegments);
+      return prunedSegments;
+    }
+  }
+
+  /// What one run of [RoutingEntry#selectThenPrune] decided: the segments selection offered, and the ones the pruners
+  /// left. Both are needed because the difference between them is the only sound proof that a segment cannot match.
+  private static class SelectedSegments {
+    final Set<String> _selected;
+    final Set<String> _surviving;
+
+    SelectedSegments(Set<String> selected, Set<String> surviving) {
+      _selected = selected;
+      _surviving = surviving;
+    }
+
+    int getNumPruned() {
+      return _selected.size() - _surviving.size();
     }
   }
 }

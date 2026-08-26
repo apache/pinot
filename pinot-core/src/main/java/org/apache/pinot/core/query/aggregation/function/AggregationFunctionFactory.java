@@ -299,9 +299,9 @@ public class AggregationFunctionFactory {
             return new ListAggFunction(arguments.get(0), separator, nullHandlingEnabled);
           }
           case SUMARRAYLONG:
-            return new SumArrayLongAggregationFunction(arguments);
+            return new SumArrayLongAggregationFunction(arguments, nullHandlingEnabled);
           case SUMARRAYDOUBLE:
-            return new SumArrayDoubleAggregationFunction(arguments);
+            return new SumArrayDoubleAggregationFunction(arguments, nullHandlingEnabled);
           case ARRAYAGG: {
             Preconditions.checkArgument(numArguments >= 2,
                 "ARRAY_AGG expects 2 or 3 arguments, got: %s. The function can be used as "
@@ -334,9 +334,11 @@ public class AggregationFunctionFactory {
                 case BIG_DECIMAL:
                   return new ArrayAggDistinctBigDecimalFunction(firstArgument, nullHandlingEnabled);
                 case STRING:
+                case JSON:
                   return new ArrayAggDistinctStringFunction(firstArgument, nullHandlingEnabled);
                 case BYTES:
-                  return new ArrayAggDistinctBytesFunction(firstArgument, nullHandlingEnabled);
+                case UUID:
+                  return new ArrayAggDistinctBytesFunction(firstArgument, dataType, nullHandlingEnabled);
                 default:
                   throw new IllegalArgumentException("Unsupported data type for ARRAY_AGG: " + dataType);
               }
@@ -355,9 +357,11 @@ public class AggregationFunctionFactory {
               case BIG_DECIMAL:
                 return new ArrayAggBigDecimalFunction(firstArgument, nullHandlingEnabled);
               case STRING:
+              case JSON:
                 return new ArrayAggStringFunction(firstArgument, nullHandlingEnabled);
               case BYTES:
-                return new ArrayAggBytesFunction(firstArgument, nullHandlingEnabled);
+              case UUID:
+                return new ArrayAggBytesFunction(firstArgument, dataType, nullHandlingEnabled);
               default:
                 throw new IllegalArgumentException("Unsupported data type for ARRAY_AGG: " + dataType);
             }
@@ -396,31 +400,31 @@ public class AggregationFunctionFactory {
           case DISTINCTCOUNTOFFHEAP:
             return new DistinctCountOffHeapAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTBITMAP:
-            return new DistinctCountBitmapAggregationFunction(arguments);
+            return new DistinctCountBitmapAggregationFunction(arguments, nullHandlingEnabled);
           case SEGMENTPARTITIONEDDISTINCTCOUNT:
-            return new SegmentPartitionedDistinctCountAggregationFunction(arguments);
+            return new SegmentPartitionedDistinctCountAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTHLL:
-            return new DistinctCountHLLAggregationFunction(arguments);
+            return new DistinctCountHLLAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWHLL:
-            return new DistinctCountRawHLLAggregationFunction(arguments);
+            return new DistinctCountRawHLLAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTSMARTHLL:
-            return new DistinctCountSmartHLLAggregationFunction(arguments);
+            return new DistinctCountSmartHLLAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTSMARTHLLPLUS:
-            return new DistinctCountSmartHLLPlusAggregationFunction(arguments);
+            return new DistinctCountSmartHLLPlusAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTSMARTULL:
-            return new DistinctCountSmartULLAggregationFunction(arguments);
+            return new DistinctCountSmartULLAggregationFunction(arguments, nullHandlingEnabled);
           case FASTHLL:
-            return new FastHLLAggregationFunction(arguments);
+            return new FastHLLAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTTHETASKETCH:
-            return new DistinctCountThetaSketchAggregationFunction(arguments);
+            return new DistinctCountThetaSketchAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWTHETASKETCH:
-            return new DistinctCountRawThetaSketchAggregationFunction(arguments);
+            return new DistinctCountRawThetaSketchAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTSUM:
             return new DistinctSumAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTAVG:
             return new DistinctAvgAggregationFunction(arguments, nullHandlingEnabled);
           case IDSET:
-            return new IdSetAggregationFunction(arguments);
+            return new IdSetAggregationFunction(arguments, nullHandlingEnabled);
           case COUNTMV:
             return new CountMVAggregationFunction(arguments, nullHandlingEnabled);
           case MINMV:
@@ -436,31 +440,31 @@ public class AggregationFunctionFactory {
           case DISTINCTCOUNTMV:
             return new DistinctCountMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTBITMAPMV:
-            return new DistinctCountBitmapMVAggregationFunction(arguments);
+            return new DistinctCountBitmapMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTHLLMV:
-            return new DistinctCountHLLMVAggregationFunction(arguments);
+            return new DistinctCountHLLMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWHLLMV:
-            return new DistinctCountRawHLLMVAggregationFunction(arguments);
+            return new DistinctCountRawHLLMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTHLLPLUS:
-            return new DistinctCountHLLPlusAggregationFunction(arguments);
+            return new DistinctCountHLLPlusAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWHLLPLUS:
-            return new DistinctCountRawHLLPlusAggregationFunction(arguments);
+            return new DistinctCountRawHLLPlusAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTHLLPLUSMV:
-            return new DistinctCountHLLPlusMVAggregationFunction(arguments);
+            return new DistinctCountHLLPlusMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWHLLPLUSMV:
-            return new DistinctCountRawHLLPlusMVAggregationFunction(arguments);
+            return new DistinctCountRawHLLPlusMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTSUMMV:
             return new DistinctSumMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTAVGMV:
             return new DistinctAvgMVAggregationFunction(arguments, nullHandlingEnabled);
           case STUNION:
-            return new StUnionAggregationFunction(arguments);
+            return new StUnionAggregationFunction(arguments, nullHandlingEnabled);
           case HISTOGRAM:
-            return new HistogramAggregationFunction(arguments);
+            return new HistogramAggregationFunction(arguments, nullHandlingEnabled);
           case COVARPOP:
-            return new CovarianceAggregationFunction(arguments, false);
+            return new CovarianceAggregationFunction(arguments, false, nullHandlingEnabled);
           case COVARSAMP:
-            return new CovarianceAggregationFunction(arguments, true);
+            return new CovarianceAggregationFunction(arguments, true, nullHandlingEnabled);
           case BOOLAND:
             return new BooleanAndAggregationFunction(arguments, nullHandlingEnabled);
           case BOOLOR:
@@ -474,24 +478,30 @@ public class AggregationFunctionFactory {
           case STDDEVSAMP:
             return new VarianceAggregationFunction(arguments, true, true, nullHandlingEnabled);
           case SKEWNESS:
-            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.SKEWNESS);
+            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.SKEWNESS,
+                nullHandlingEnabled);
           case KURTOSIS:
-            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.KURTOSIS);
+            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.KURTOSIS,
+                nullHandlingEnabled);
           case FOURTHMOMENT:
-            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.MOMENT);
+            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.MOMENT,
+                nullHandlingEnabled);
           case DISTINCTCOUNTTUPLESKETCH:
             // mode actually doesn't matter here because we only care about keys, not values
-            return new DistinctCountIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+            return new DistinctCountIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum,
+                nullHandlingEnabled);
           case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
-            return new IntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+            return new IntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum, nullHandlingEnabled);
           case SUMVALUESINTEGERSUMTUPLESKETCH:
-            return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+            return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum,
+                nullHandlingEnabled);
           case AVGVALUEINTEGERSUMTUPLESKETCH:
-            return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
+            return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum,
+                nullHandlingEnabled);
           case PINOTPARENTAGGEXPRMAX:
-            return new ParentExprMinMaxAggregationFunction(arguments, true);
+            return new ParentExprMinMaxAggregationFunction(arguments, true, nullHandlingEnabled);
           case PINOTPARENTAGGEXPRMIN:
-            return new ParentExprMinMaxAggregationFunction(arguments, false);
+            return new ParentExprMinMaxAggregationFunction(arguments, false, nullHandlingEnabled);
           case PINOTCHILDAGGEXPRMAX:
             return new ChildExprMinMaxAggregationFunction(arguments, true);
           case PINOTCHILDAGGEXPRMIN:
@@ -501,31 +511,31 @@ public class AggregationFunctionFactory {
             throw new IllegalArgumentException(
                 "Aggregation function: " + functionType + " is only supported in selection without alias.");
           case FUNNELCOUNT:
-            return new FunnelCountAggregationFunctionFactory(arguments).get();
+            return new FunnelCountAggregationFunctionFactory(arguments, nullHandlingEnabled).get();
           case FUNNELMAXSTEP:
-            return new FunnelMaxStepAggregationFunction(arguments);
+            return new FunnelMaxStepAggregationFunction(arguments, nullHandlingEnabled);
           case FUNNELMATCHSTEP:
-            return new FunnelMatchStepAggregationFunction(arguments);
+            return new FunnelMatchStepAggregationFunction(arguments, nullHandlingEnabled);
           case FUNNELCOMPLETECOUNT:
-            return new FunnelCompleteCountAggregationFunction(arguments);
+            return new FunnelCompleteCountAggregationFunction(arguments, nullHandlingEnabled);
           case FUNNELSTEPDURATIONSTATS:
-            return new FunnelStepDurationStatsAggregationFunction(arguments);
+            return new FunnelStepDurationStatsAggregationFunction(arguments, nullHandlingEnabled);
           case FUNNELEVENTSFUNCTIONEVAL:
-            return new FunnelEventsFunctionEvalAggregationFunction(arguments);
+            return new FunnelEventsFunctionEvalAggregationFunction(arguments, nullHandlingEnabled);
           case FREQUENTSTRINGSSKETCH:
-            return new FrequentStringsSketchAggregationFunction(arguments);
+            return new FrequentStringsSketchAggregationFunction(arguments, nullHandlingEnabled);
           case FREQUENTLONGSSKETCH:
-            return new FrequentLongsSketchAggregationFunction(arguments);
+            return new FrequentLongsSketchAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTCPCSKETCH:
-            return new DistinctCountCPCSketchAggregationFunction(arguments);
+            return new DistinctCountCPCSketchAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWCPCSKETCH:
-            return new DistinctCountRawCPCSketchAggregationFunction(arguments);
+            return new DistinctCountRawCPCSketchAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTULL:
-            return new DistinctCountULLAggregationFunction(arguments);
+            return new DistinctCountULLAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTRAWULL:
-            return new DistinctCountRawULLAggregationFunction(arguments);
+            return new DistinctCountRawULLAggregationFunction(arguments, nullHandlingEnabled);
           case TIMESERIESAGGREGATE:
-            return new TimeSeriesAggregationFunction(arguments);
+            return new TimeSeriesAggregationFunction(arguments, nullHandlingEnabled);
           default:
             throw new IllegalArgumentException("Unsupported aggregation function type: " + functionType);
         }

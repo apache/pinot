@@ -41,8 +41,8 @@ import org.locationtech.jts.operation.union.UnaryUnionOp;
 
 public class StUnionAggregationFunction extends BaseSingleInputAggregationFunction<Geometry, ByteArray> {
 
-  public StUnionAggregationFunction(List<ExpressionContext> arguments) {
-    super(verifySingleArgument(arguments, "ST_UNION"));
+  public StUnionAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(verifySingleArgument(arguments, "ST_UNION"), nullHandlingEnabled);
   }
 
   @Override
@@ -63,49 +63,136 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    byte[][] bytesArray = blockValSetMap.get(_expression).getBytesValuesSV();
-    Geometry geometry = aggregationResultHolder.getResult();
-    for (int i = 0; i < length; i++) {
-      geometry = union(geometry, GeometrySerializer.deserialize(bytesArray[i]));
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    if (blockValSet.isSingleValue()) {
+      aggregateSV(length, aggregationResultHolder, blockValSet);
+    } else {
+      aggregateMV(length, aggregationResultHolder, blockValSet);
     }
-    aggregationResultHolder.setValue(geometry);
+  }
+
+  private void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
+    byte[][] bytesArray = blockValSet.getBytesValuesSV();
+    // The holder is written only from inside the range, so a block with no non-null row leaves it untouched and
+    // extractFinalResult sees the null that means nothing was aggregated
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      Geometry geometry = aggregationResultHolder.getResult();
+      for (int i = from; i < to; i++) {
+        geometry = union(geometry, GeometrySerializer.deserialize(bytesArray[i]));
+      }
+      aggregationResultHolder.setValue(geometry);
+    });
+  }
+
+  /// Every geometry of a multi-value row is folded into the same union, so a row contributes once per value.
+  private void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
+    byte[][][] bytesArrays = blockValSet.getBytesValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      Geometry geometry = aggregationResultHolder.getResult();
+      for (int i = from; i < to; i++) {
+        for (byte[] bytes : bytesArrays[i]) {
+          geometry = union(geometry, GeometrySerializer.deserialize(bytes));
+        }
+      }
+      aggregationResultHolder.setValue(geometry);
+    });
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    byte[][] bytesArray = blockValSetMap.get(_expression).getBytesValuesSV();
-    for (int i = 0; i < length; i++) {
-      int groupKey = groupKeyArray[i];
-      Geometry value = GeometrySerializer.deserialize(bytesArray[i]);
-      Geometry geometry = groupByResultHolder.getResult(groupKey);
-      groupByResultHolder.setValueForKey(groupKey, union(geometry, value));
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet);
+    } else {
+      aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet);
     }
+  }
+
+  private void aggregateSVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    byte[][] bytesArray = blockValSet.getBytesValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        int groupKey = groupKeyArray[i];
+        Geometry value = GeometrySerializer.deserialize(bytesArray[i]);
+        groupByResultHolder.setValueForKey(groupKey, union(groupByResultHolder.getResult(groupKey), value));
+      }
+    });
+  }
+
+  private void aggregateMVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    byte[][][] bytesArrays = blockValSet.getBytesValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        int groupKey = groupKeyArray[i];
+        for (byte[] bytes : bytesArrays[i]) {
+          Geometry value = GeometrySerializer.deserialize(bytes);
+          groupByResultHolder.setValueForKey(groupKey, union(groupByResultHolder.getResult(groupKey), value));
+        }
+      }
+    });
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    byte[][] bytesArray = blockValSetMap.get(_expression).getBytesValuesSV();
-    for (int i = 0; i < length; i++) {
-      Geometry value = GeometrySerializer.deserialize(bytesArray[i]);
-      for (int groupKey : groupKeysArray[i]) {
-        Geometry geometry = groupByResultHolder.getResult(groupKey);
-        groupByResultHolder.setValueForKey(groupKey, union(geometry, value));
-      }
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet);
+    } else {
+      aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet);
     }
   }
 
+  private void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    byte[][] bytesArray = blockValSet.getBytesValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        // Deserialized once per row, not once per group key the row belongs to
+        Geometry value = GeometrySerializer.deserialize(bytesArray[i]);
+        for (int groupKey : groupKeysArray[i]) {
+          groupByResultHolder.setValueForKey(groupKey, union(groupByResultHolder.getResult(groupKey), value));
+        }
+      }
+    });
+  }
+
+  private void aggregateMVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    byte[][][] bytesArrays = blockValSet.getBytesValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        for (byte[] bytes : bytesArrays[i]) {
+          Geometry value = GeometrySerializer.deserialize(bytes);
+          for (int groupKey : groupKeysArray[i]) {
+            groupByResultHolder.setValueForKey(groupKey, union(groupByResultHolder.getResult(groupKey), value));
+          }
+        }
+      }
+    });
+  }
+
+  @Nullable
   @Override
   public Geometry extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     Geometry geometry = aggregationResultHolder.getResult();
-    return geometry == null ? GeometryUtils.EMPTY_POINT : geometry;
+    if (geometry != null) {
+      return geometry;
+    }
+    // With the option disabled an untouched holder still renders the empty accumulator, which is the
+    // intermediate this mode has always emitted; with it enabled the null is the signal that nothing was
+    // aggregated.
+    return _nullHandlingEnabled ? null : GeometryUtils.EMPTY_POINT;
   }
 
+  @Nullable
   @Override
   public Geometry extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     Geometry geometry = groupByResultHolder.getResult(groupKey);
-    return geometry == null ? GeometryUtils.EMPTY_POINT : geometry;
+    return geometry != null ? geometry : (_nullHandlingEnabled ? null : GeometryUtils.EMPTY_POINT);
   }
 
   @Override
@@ -137,8 +224,13 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
   @Nullable
   @Override
   public ByteArray extractFinalResult(@Nullable Geometry geometry) {
-    // A null intermediate result means nothing was aggregated; the union of no geometries is NULL, matching ST_Union
-    return geometry != null ? new ByteArray(GeometrySerializer.serialize(geometry)) : null;
+    if (geometry == null) {
+      // A null intermediate result means nothing was aggregated. With null handling enabled the union of no
+      // geometries is NULL, matching ST_Union; with it disabled it is the empty point, which is the answer this mode
+      // has always given.
+      return _nullHandlingEnabled ? null : new ByteArray(GeometrySerializer.serialize(GeometryUtils.EMPTY_POINT));
+    }
+    return new ByteArray(GeometrySerializer.serialize(geometry));
   }
 
   /// Returns the union of the supplied geometries.

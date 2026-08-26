@@ -62,7 +62,7 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
   }
 
   @Override
-  protected boolean isApplicableToPredicate(Predicate predicate) {
+  protected boolean isApplicableToPredicate(Predicate predicate, Map<String, String> queryOptions) {
     // Only prune columns
     if (predicate.getLhs().getType() != ExpressionContext.Type.IDENTIFIER) {
       return false;
@@ -73,9 +73,8 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
     }
     if (predicateType == Predicate.Type.IN) {
       List<String> values = ((InPredicate) predicate).getValues();
-      // Skip pruning when there are too many values in the IN predicate
       //noinspection RedundantIfStatement
-      if (values.size() <= _inPredicateThreshold) {
+      if (shouldPruneInPredicate(values.size(), queryOptions)) {
         return true;
       }
     }
@@ -206,7 +205,7 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
     if (predicateType == Predicate.Type.EQ) {
       return pruneEqPredicate(segment, (EqPredicate) predicate, dataSourceCache, cachedValues);
     } else if (predicateType == Predicate.Type.IN) {
-      return pruneInPredicate(segment, (InPredicate) predicate, dataSourceCache, cachedValues);
+      return pruneInPredicate(segment, (InPredicate) predicate, dataSourceCache, cachedValues, query);
     } else {
       return false;
     }
@@ -230,12 +229,10 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
   }
 
   /// For IN predicate, prune the segments based on column bloom filter.
-  /// NOTE: segments will not be pruned if the number of values is greater than the threshold.
   private boolean pruneInPredicate(IndexSegment segment, InPredicate inPredicate,
-      Map<String, DataSource> dataSourceCache, ValueCache valueCache) {
+      Map<String, DataSource> dataSourceCache, ValueCache valueCache, QueryContext query) {
     List<String> values = inPredicate.getValues();
-    // Skip pruning when there are too many values in the IN predicate
-    if (values.size() > _inPredicateThreshold) {
+    if (!shouldPruneInPredicate(values.size(), query.getQueryOptions())) {
       return false;
     }
     String column = inPredicate.getLhs().getIdentifier();

@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import javax.ws.rs.NotFoundException;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
@@ -326,8 +327,18 @@ public class MinionTaskUtils {
     return defaultValue;
   }
 
-  /// Returns the validDocIds bitmap from server(s). `comparisonMode` is the task config value: UNSAFE,
-  /// EQUAL (default), or MOST_VALID_DOCS.
+  /// Returns the validDocIds bitmap for the segment resolved across the server(s) hosting it, per the consensus mode
+  /// (`comparisonModeStr` is the task config value):
+  /// - `UNSAFE`: the first usable server bitmap; servers that fail, mismatch the CRC, or are not READY are skipped.
+  /// - `EQUAL` (default): the bitmap every server agrees on.
+  /// - `MOST_VALID_DOCS`: the bitmap with the highest valid-doc count.
+  ///
+  /// Returns null when no server produced a usable bitmap (no server hosts the segment, or every server was skipped
+  /// in `UNSAFE` mode). In the non-`UNSAFE` modes any failure throws instead of being skipped:
+  /// - [NotFoundException] when a server has no validDocIds for the segment (e.g. the snapshot is not written yet, or
+  ///   the segment is not hosted) — a distinct condition that callers may handle with a documented fallback.
+  /// - [IllegalStateException] for any other fetch failure, a CRC mismatch (typically the server still reloading the
+  ///   segment), a server not in GOOD status, or an `EQUAL`-mode consensus failure.
   @Nullable
   public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
       String validDocIdsType, MinionContext minionContext, String expectedCrc, String comparisonModeStr) {
@@ -335,7 +346,9 @@ public class MinionTaskUtils {
         expectedCrc, null, comparisonModeStr);
   }
 
-  /// Variant that also matches on the expected data CRC; see [#crcMatches].
+  /// Variant that also matches on the expected data CRC (see [#crcMatches]), with the same return and exception
+  /// contract as [#getValidDocIdFromServerMatchingCrc(String, String, String, MinionContext, String, String)].
+  @Nullable
   public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
       String validDocIdsType, MinionContext minionContext, String expectedCrc, @Nullable String expectedDataCrc,
       String comparisonModeStr) {
@@ -356,14 +369,18 @@ public class MinionTaskUtils {
             serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint,
                 validDocIdsType, 60_000);
       } catch (Exception e) {
+        String errorMessage =
+            "Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: " + endpoint;
         if (consensusMode == MinionConstants.ValidDocIdsConsensusMode.UNSAFE) {
-          LOGGER.warn(
-              "Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: " + endpoint, e);
+          LOGGER.warn(errorMessage, e);
           continue;
-        } else {
-          throw new IllegalStateException(
-              "Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: " + endpoint, e);
         }
+        if (e instanceof NotFoundException) {
+          // Preserve the type: a 404 means the server has no validDocIds for the segment (e.g. a not-yet-written
+          // snapshot), which callers may handle with a documented fallback, unlike infrastructure failures.
+          throw new NotFoundException(errorMessage, e);
+        }
+        throw new IllegalStateException(errorMessage, e);
       }
 
       String crcFromValidDocIdsBitmap = validDocIdsBitmapResponse.getSegmentCrc();

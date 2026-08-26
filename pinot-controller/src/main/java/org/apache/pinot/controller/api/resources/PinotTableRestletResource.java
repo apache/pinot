@@ -1098,7 +1098,7 @@ public class PinotTableRestletResource {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Authenticate(AccessType.UPDATE)
+  @Authenticate(AccessType.READ)
   @Path("/rebalanceStatus/{jobId}")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_REBALANCE_STATUS)
   @ApiOperation(value = "Gets detailed stats of a rebalance operation",
@@ -1430,7 +1430,8 @@ public class PinotTableRestletResource {
     BiMap<String, String> serverEndPoints =
         _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
+        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints,
+            _pinotHelixResourceManager.getServerAdminAuthProvider());
 
     List<String> serverUrls = new ArrayList<>();
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
@@ -1598,7 +1599,8 @@ public class PinotTableRestletResource {
     BiMap<String, String> serverEndPoints =
         _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
+        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints,
+            _pinotHelixResourceManager.getServerAdminAuthProvider());
     List<String> serverUrls = new ArrayList<>();
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     for (String endpoint : endpointsToServers.keySet()) {

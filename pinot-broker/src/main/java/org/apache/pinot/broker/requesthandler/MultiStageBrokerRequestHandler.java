@@ -881,6 +881,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       }
 
       brokerResponse.setTimeUsedMs(totalTimeMs);
+      // Surface any generic response metadata registered during query handling (e.g. a
+      // degraded-engine note) into the response. Entries are registered via
+      // QueryThreadContext#addResponseBrokerMetadata; the core engine attaches no semantics to them.
+      // The sink is broker-local for now, so this only picks up entries registered on the broker.
+      QueryThreadContext queryThreadContext = QueryThreadContext.getIfAvailable();
+      if (queryThreadContext != null) {
+        queryThreadContext.getExecutionContext().getResponseMetadata().forEach(brokerResponse::putResponseMetadata);
+      }
       augmentStatistics(requestContext, brokerResponse);
       if (QueryOptionsUtils.shouldDropResults(query.getOptions())) {
         brokerResponse.setResultTable(null);

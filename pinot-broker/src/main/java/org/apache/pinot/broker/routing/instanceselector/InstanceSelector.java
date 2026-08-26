@@ -72,6 +72,22 @@ public interface InstanceSelector {
   /// Returns the enabled server instances currently serving the table.
   Set<String> getServingInstances();
 
+  /// Returns how well the table's segments are replicated across the instances this selector can route to,
+  /// or `null` if this selector does not measure it. The routing manager reads this after each assignment
+  /// and instance change and publishes it as the table's replica health gauges.
+  ///
+  /// Implementations must:
+  /// - Measure the table's whole segment set, not a subset. The values are published under table level
+  ///   gauges, so numbers derived from a subset would be read as the table's own.
+  /// - Return an immutable snapshot, recomputed in [#onAssignmentChange] and [#onInstancesChange] and
+  ///   published so that the manager's subsequent read observes it, rather than a live view.
+  /// - Return `null` consistently rather than only sometimes: a selector that stops measuring has its
+  ///   gauges dropped, so alternating would make the series flicker.
+  @Nullable
+  default TableReplicaHealth getReplicaHealth() {
+    return null;
+  }
+
   class SelectionResult {
     private final Pair<Map<String, String>, Map<String, String>/*optional segments*/> _segmentToInstanceMap;
     private final List<String> _unavailableSegments;

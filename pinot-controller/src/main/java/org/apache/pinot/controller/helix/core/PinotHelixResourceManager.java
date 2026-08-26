@@ -92,6 +92,7 @@ import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.config.provider.ZkTableCache;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -171,6 +172,7 @@ import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMeta
 import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadataUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceConfigValidatorRegistry;
@@ -244,6 +246,7 @@ public class PinotHelixResourceManager {
   private final boolean _enableTieredSegmentAssignment;
   @Nullable
   private final ControllerConf _controllerConf;
+  private final AuthProvider _serverAdminAuthProvider;
 
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
@@ -274,6 +277,8 @@ public class PinotHelixResourceManager {
     _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
     _enableTieredSegmentAssignment = enableTieredSegmentAssignment;
     _controllerConf = controllerConf;
+    _serverAdminAuthProvider =
+        AuthProviderUtils.extractAuthProvider(controllerConf, ControllerConf.CONTROLLER_SERVER_ADMIN_AUTH_PREFIX);
     _instanceAdminEndpointCache =
         CacheBuilder.newBuilder().expireAfterWrite(CACHE_ENTRY_EXPIRE_TIME_HOURS, TimeUnit.HOURS)
             .build(new CacheLoader<>() {
@@ -1049,6 +1054,15 @@ public class PinotHelixResourceManager {
 
   public List<SegmentZKMetadata> getSegmentsZKMetadata(String tableNameWithType) {
     return ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, tableNameWithType);
+  }
+
+  /// Reads the ZK metadata of the named segments in a single batched request, index-aligned with `segmentNames` and
+  /// holding `null` for segments whose znode could not be read. See
+  /// [ZKMetadataProvider#getSegmentsZKMetadata(ZkHelixPropertyStore, String, List, List)] for the full contract,
+  /// including the `stats` out-parameter that carries the znodes' modification times.
+  public List<SegmentZKMetadata> getSegmentsZKMetadata(String tableNameWithType,
+      List<String> segmentNames, @Nullable List<Stat> stats) {
+    return ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, tableNameWithType, segmentNames, stats);
   }
 
   public Collection<String> getLastLLCCompletedSegments(String tableNameWithType) {
@@ -4262,6 +4276,13 @@ public class PinotHelixResourceManager {
       endpointToInstance.put(instance, instanceAdminEndpoint);
     }
     return endpointToInstance;
+  }
+
+  /// Returns the service identity provider used for outbound Server admin API requests.
+  ///
+  /// Callers must resolve the headers for each request so providers that rotate credentials are honored.
+  public AuthProvider getServerAdminAuthProvider() {
+    return _serverAdminAuthProvider;
   }
 
   /// Helper method to return a list of tables that exists and matches the given table name and type, or throws

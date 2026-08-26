@@ -222,6 +222,19 @@ public class MultipleTreesBuilder implements Closeable {
         _buildMode);
 
     File starTreeV2IndexFile = new File(_segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME);
+    // When _separator is null, metadata has no star-tree, so any leftover files on disk are orphaned
+    // (e.g. from a previous build killed before the metadata save). Delete them so the combiner opens.
+    if (_separator == null) {
+      File starTreeV2IndexMapFile = new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME);
+      File existingSeparatorDir = new File(_segmentDirectory, StarTreeV2Constants.EXISTING_STAR_TREE_TEMP_DIR);
+      if (starTreeV2IndexFile.exists() || starTreeV2IndexMapFile.exists() || existingSeparatorDir.exists()) {
+        LOGGER.warn("Cleaning up stale star-tree artifacts in {} from a prior incomplete build",
+            _segmentDirectory);
+        FileUtils.deleteQuietly(starTreeV2IndexFile);
+        FileUtils.deleteQuietly(starTreeV2IndexMapFile);
+        FileUtils.deleteQuietly(existingSeparatorDir);
+      }
+    }
     try (StarTreeIndexCombiner indexCombiner = new StarTreeIndexCombiner(starTreeV2IndexFile)) {
       File starTreeIndexDir = new File(_segmentDirectory, StarTreeV2Constants.STAR_TREE_TEMP_DIR);
       FileUtils.forceMkdir(starTreeIndexDir);

@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.datasketches.kll.KllDoublesSketch;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -66,7 +67,8 @@ import static org.testng.Assert.assertNotNull;
 /// - Compares the results for PERCENTILE_KLL on double column and KLL column with results for PERCENTILE on
 ///   double column
 public class PercentileKLLQueriesTest extends BaseQueriesTest {
-  protected static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "PercentileKllQueriesTest");
+  protected static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectory(), "PercentileKllQueriesTest-" + UUID.randomUUID());
   protected static final String TABLE_NAME = "testTable";
   protected static final String SEGMENT_NAME = "testSegment";
 

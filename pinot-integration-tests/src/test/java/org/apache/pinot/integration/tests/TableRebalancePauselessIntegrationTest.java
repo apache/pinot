@@ -82,7 +82,6 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     startServer();
     createServerTenant(getServerTenant(), 0, 1);
     createBrokerTenant(getBrokerTenant(), 1);
-    setMaxSegmentCompletionTimeMillis();
     setupNonPauselessTable();
     injectFailure();
     setupPauselessTable();

@@ -165,13 +165,33 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       }
     }
     long offsetOfNextBatch = _nextReadOffset;
-    // For read_uncommitted (the default), a non-contiguous returned batch implies data
-    // loss (records dropped before being read). For read_committed the offset gap is
-    // expected because the broker filters aborted transactional records, so we don't flag
-    // it as data loss.
-    boolean hasDataLoss = !_isReadCommitted && firstOffset > startOffset;
+    // A gap between the requested startOffset and the first returned offset does NOT by itself
+    // imply data loss. Transactional producers write commit/abort control records that occupy
+    // offsets but are never delivered to the consumer (even under read_uncommitted), so a
+    // contiguous stream of user records legitimately has offset gaps. Real data loss only
+    // happens when the requested startOffset is below the log's start offset, i.e. the broker
+    // has already deleted (via retention or truncation) records at or after startOffset. For
+    // read_committed we never flag loss because aborted-record gaps are always expected.
+    boolean hasDataLoss = false;
+    if (!_isReadCommitted && firstOffset > startOffset) {
+      hasDataLoss = getLogStartOffset(timeoutMs) > startOffset;
+    }
     return new KafkaMessageBatch(filteredRecords, records.size(), offsetOfNextBatch, firstOffset, lastMessageMetadata,
         hasDataLoss, batchSizeInBytes);
+  }
+
+  /// Returns the log start (earliest available) offset for the partition, bounded by the same
+  /// timeout as [#poll]. Returns [Long#MIN_VALUE] when it cannot be determined so the caller
+  /// treats an offset gap as expected (no data loss) rather than raising a false positive.
+  private long getLogStartOffset(int timeoutMs) {
+    try {
+      return _consumer.beginningOffsets(List.of(_topicPartition), Duration.ofMillis(timeoutMs))
+          .getOrDefault(_topicPartition, Long.MIN_VALUE);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to read log start offset for {}; treating the offset gap as no data loss "
+          + "(this can mask genuine data loss if it persists)", _topicPartition, e);
+      return Long.MIN_VALUE;
+    }
   }
 
   private static boolean isReadCommitted(KafkaPartitionLevelStreamConfig config) {

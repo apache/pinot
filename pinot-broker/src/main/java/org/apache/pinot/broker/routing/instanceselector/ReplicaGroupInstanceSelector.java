@@ -191,6 +191,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
   void updateSegmentMapsForUpsertTable(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
       Map<String, Long> newSegmentCreationTimeMap) {
     _oldSegmentCandidatesMap.clear();
+    _oldSegmentExpectedReplicasMap.clear();
     int newSegmentMapCapacity = HashUtil.getHashMapCapacity(newSegmentCreationTimeMap.size());
     _newSegmentStateMap = new HashMap<>(newSegmentMapCapacity);
 
@@ -256,7 +257,9 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
         }
         idealStateReplicaId++;
       }
-      _oldSegmentCandidatesMap.put(segment, candidates);
+      // Instances taken out of service for the whole replica group are excluded above, so measuring against
+      // the ideal state count is what makes the replica health metrics reflect a group-wide knockout.
+      putOldSegment(segment, candidates, idealStateInstanceStateMap);
     }
 
     for (Map.Entry<String, Set<String>> entry : newSegmentToOnlineInstancesMap.entrySet()) {

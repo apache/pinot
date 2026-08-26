@@ -382,6 +382,7 @@ public class FastJsonPathExtractorTest {
     assertEquals(invoke("jsonPathStringFast", json, "$.user.country", "DEFAULT"), "US");
     assertEquals(invoke("jsonPathStringFirstMatch", json, "$.user.country", "DEFAULT"), "US");
     assertEquals(invoke("jsonPathStringFast", json, "$.missing", "DEFAULT"), "DEFAULT");
+    assertEquals(invoke("jsonPathLongFast", json, "$.user.age", -7L), 41L);
     assertEquals(invoke("jsonPathLongFirstMatch", json, "$.user.age", -7L), 41L);
     assertEquals(invoke("jsonPathDoubleFast", json, "$.user.score", -7.5d), 9.5d);
     /// A complex path must still resolve through the function by falling back to Jayway, i.e. produce exactly

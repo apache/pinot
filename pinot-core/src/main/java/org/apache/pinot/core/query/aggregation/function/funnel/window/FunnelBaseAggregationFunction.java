@@ -34,15 +34,21 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.BaseAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
+/// Only the timestamp decides whether a row is skipped when null handling is on.
+///
+/// A step expression is a predicate, and a predicate over a null operand is UNKNOWN, which SQL treats as not
+/// satisfied wherever a boolean is consumed, so a null step already means that step did not match and the row still
+/// belongs to the funnel. A null timestamp is different: the event has no position in the window, and an aggregate
+/// ignores a row whose input is null.
 public abstract class FunnelBaseAggregationFunction<F extends Comparable>
-    implements AggregationFunction<PriorityQueue<FunnelStepEvent>, F> {
+    extends BaseAggregationFunction<PriorityQueue<FunnelStepEvent>, F> {
   protected final ExpressionContext _timestampExpression;
   protected final long _windowSize;
   protected final List<ExpressionContext> _stepExpressions;
@@ -51,7 +57,8 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
   protected long _maxStepDuration = 0L;
   protected final Map<String, String> _extraArguments = new HashMap<>();
 
-  public FunnelBaseAggregationFunction(List<ExpressionContext> arguments) {
+  public FunnelBaseAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(nullHandlingEnabled);
     int numArguments = arguments.size();
     Preconditions.checkArgument(numArguments > 3,
         "FUNNEL_AGG_FUNC expects >= 4 arguments, got: %s. The function can be used as "
@@ -124,88 +131,98 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    long[] timestampBlock = blockValSetMap.get(_timestampExpression).getLongValuesSV();
+    BlockValSet timestampBlockValSet = blockValSetMap.get(_timestampExpression);
+    long[] timestampBlock = timestampBlockValSet.getLongValuesSV();
     List<int[]> stepBlocks = new ArrayList<>(_numSteps);
     for (ExpressionContext stepExpression : _stepExpressions) {
       stepBlocks.add(blockValSetMap.get(stepExpression).getIntValuesSV());
     }
-    PriorityQueue<FunnelStepEvent> stepEvents = aggregationResultHolder.getResult();
-    if (stepEvents == null) {
-      stepEvents = new PriorityQueue<>();
-      aggregationResultHolder.setValue(stepEvents);
+    PriorityQueue<FunnelStepEvent> existing = aggregationResultHolder.getResult();
+    if (existing == null) {
+      existing = new PriorityQueue<>();
+      aggregationResultHolder.setValue(existing);
     }
-    for (int i = 0; i < length; i++) {
-      boolean stepFound = false;
-      for (int j = 0; j < _numSteps; j++) {
-        if (stepBlocks.get(j)[i] == 1) {
-          stepEvents.add(new FunnelStepEvent(timestampBlock[i], j));
-          stepFound = true;
-          break;
+    PriorityQueue<FunnelStepEvent> stepEvents = existing;
+    forEachNotNull(length, timestampBlockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        boolean stepFound = false;
+        for (int j = 0; j < _numSteps; j++) {
+          if (stepBlocks.get(j)[i] == 1) {
+            stepEvents.add(new FunnelStepEvent(timestampBlock[i], j));
+            stepFound = true;
+            break;
+          }
+        }
+        // If the mode is KEEP_ALL and no step is found, add a dummy step event with step -1
+        if (_modes.hasKeepAll() && !stepFound) {
+          stepEvents.add(new FunnelStepEvent(timestampBlock[i], -1));
         }
       }
-      // If the mode is KEEP_ALL and no step is found, add a dummy step event with step -1
-      if (_modes.hasKeepAll() && !stepFound) {
-        stepEvents.add(new FunnelStepEvent(timestampBlock[i], -1));
-      }
-    }
+    });
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    long[] timestampBlock = blockValSetMap.get(_timestampExpression).getLongValuesSV();
+    BlockValSet timestampBlockValSet = blockValSetMap.get(_timestampExpression);
+    long[] timestampBlock = timestampBlockValSet.getLongValuesSV();
     List<int[]> stepBlocks = new ArrayList<>(_numSteps);
     for (ExpressionContext stepExpression : _stepExpressions) {
       stepBlocks.add(blockValSetMap.get(stepExpression).getIntValuesSV());
     }
-    for (int i = 0; i < length; i++) {
-      int groupKey = groupKeyArray[i];
-      boolean stepFound = false;
-      for (int j = 0; j < _numSteps; j++) {
-        if (stepBlocks.get(j)[i] == 1) {
+    forEachNotNull(length, timestampBlockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        int groupKey = groupKeyArray[i];
+        boolean stepFound = false;
+        for (int j = 0; j < _numSteps; j++) {
+          if (stepBlocks.get(j)[i] == 1) {
+            PriorityQueue<FunnelStepEvent> stepEvents = getFunnelStepEvents(groupByResultHolder, groupKey);
+            stepEvents.add(new FunnelStepEvent(timestampBlock[i], j));
+            stepFound = true;
+            break;
+          }
+        }
+        // If the mode is KEEP_ALL and no step is found, add a dummy step event with step -1
+        if (_modes.hasKeepAll() && !stepFound) {
           PriorityQueue<FunnelStepEvent> stepEvents = getFunnelStepEvents(groupByResultHolder, groupKey);
-          stepEvents.add(new FunnelStepEvent(timestampBlock[i], j));
-          stepFound = true;
-          break;
+          stepEvents.add(new FunnelStepEvent(timestampBlock[i], -1));
         }
       }
-      // If the mode is KEEP_ALL and no step is found, add a dummy step event with step -1
-      if (_modes.hasKeepAll() && !stepFound) {
-        PriorityQueue<FunnelStepEvent> stepEvents = getFunnelStepEvents(groupByResultHolder, groupKey);
-        stepEvents.add(new FunnelStepEvent(timestampBlock[i], -1));
-      }
-    }
+    });
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    long[] timestampBlock = blockValSetMap.get(_timestampExpression).getLongValuesSV();
+    BlockValSet timestampBlockValSet = blockValSetMap.get(_timestampExpression);
+    long[] timestampBlock = timestampBlockValSet.getLongValuesSV();
     List<int[]> stepBlocks = new ArrayList<>(_numSteps);
     for (ExpressionContext stepExpression : _stepExpressions) {
       stepBlocks.add(blockValSetMap.get(stepExpression).getIntValuesSV());
     }
-    for (int i = 0; i < length; i++) {
-      int[] groupKeys = groupKeysArray[i];
-      boolean stepFound = false;
-      for (int j = 0; j < _numSteps; j++) {
-        if (stepBlocks.get(j)[i] == 1) {
+    forEachNotNull(length, timestampBlockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        int[] groupKeys = groupKeysArray[i];
+        boolean stepFound = false;
+        for (int j = 0; j < _numSteps; j++) {
+          if (stepBlocks.get(j)[i] == 1) {
+            for (int groupKey : groupKeys) {
+              PriorityQueue<FunnelStepEvent> stepEvents = getFunnelStepEvents(groupByResultHolder, groupKey);
+              stepEvents.add(new FunnelStepEvent(timestampBlock[i], j));
+            }
+            stepFound = true;
+            break;
+          }
+        }
+        // If the mode is KEEP_ALL and no step is found, add a dummy step event with step -1
+        if (_modes.hasKeepAll() && !stepFound) {
           for (int groupKey : groupKeys) {
             PriorityQueue<FunnelStepEvent> stepEvents = getFunnelStepEvents(groupByResultHolder, groupKey);
-            stepEvents.add(new FunnelStepEvent(timestampBlock[i], j));
+            stepEvents.add(new FunnelStepEvent(timestampBlock[i], -1));
           }
-          stepFound = true;
-          break;
         }
       }
-      // If the mode is KEEP_ALL and no step is found, add a dummy step event with step -1
-      if (_modes.hasKeepAll() && !stepFound) {
-        for (int groupKey : groupKeys) {
-          PriorityQueue<FunnelStepEvent> stepEvents = getFunnelStepEvents(groupByResultHolder, groupKey);
-          stepEvents.add(new FunnelStepEvent(timestampBlock[i], -1));
-        }
-      }
-    }
+    });
   }
 
   private static PriorityQueue<FunnelStepEvent> getFunnelStepEvents(GroupByResultHolder groupByResultHolder,

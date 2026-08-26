@@ -29,6 +29,7 @@ import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -179,6 +180,14 @@ public class RequestUtils {
     return Literal.stringArrayValue(Arrays.asList(value));
   }
 
+  public static Literal getLiteral(byte[][] value) {
+    List<ByteBuffer> bytesArray = new ArrayList<>(value.length);
+    for (byte[] bytes : value) {
+      bytesArray.add(ByteBuffer.wrap(bytes.clone()));
+    }
+    return Literal.bytesArrayValue(bytesArray);
+  }
+
   public static Literal getLiteral(@Nullable Object object) {
     if (object == null) {
       return getNullLiteral();
@@ -228,6 +237,9 @@ public class RequestUtils {
     if (object instanceof String[]) {
       return getLiteral((String[]) object);
     }
+    if (object instanceof byte[][]) {
+      return getLiteral((byte[][]) object);
+    }
     return getLiteral(object.toString());
   }
 
@@ -254,6 +266,9 @@ public class RequestUtils {
       switch (node.getTypeName()) {
         case BOOLEAN:
           literal.setBoolValue(node.booleanValue());
+          break;
+        case BINARY:
+          literal.setBinaryValue(node.getValueAs(byte[].class));
           break;
         case NULL:
           literal.setNullValue(true);
@@ -329,6 +344,10 @@ public class RequestUtils {
     return getLiteralExpression(getLiteral(value));
   }
 
+  public static Expression getLiteralExpression(byte[][] value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
   public static Expression getLiteralExpression(SqlLiteral node) {
     return getLiteralExpression(getLiteral(node));
   }
@@ -370,6 +389,8 @@ public class RequestUtils {
         return getDoubleArrayValue(literal);
       case STRING_ARRAY_VALUE:
         return getStringArrayValue(literal);
+      case BYTES_ARRAY_VALUE:
+        return getBytesArrayValue(literal);
       default:
         throw new IllegalStateException("Unsupported field type: " + type);
     }
@@ -419,6 +440,19 @@ public class RequestUtils {
     return literal.getStringArrayValue().toArray(new String[0]);
   }
 
+  public static byte[][] getBytesArrayValue(Literal literal) {
+    List<ByteBuffer> list = literal.getBytesArrayValue();
+    int size = list.size();
+    byte[][] array = new byte[size][];
+    for (int i = 0; i < size; i++) {
+      ByteBuffer buffer = list.get(i).duplicate();
+      byte[] bytes = new byte[buffer.remaining()];
+      buffer.get(bytes);
+      array[i] = bytes;
+    }
+    return array;
+  }
+
   public static Pair<ColumnDataType, Object> getLiteralTypeAndValue(Literal literal) {
     Literal._Fields type = literal.getSetField();
     switch (type) {
@@ -450,6 +484,8 @@ public class RequestUtils {
         return Pair.of(ColumnDataType.DOUBLE_ARRAY, getDoubleArrayValue(literal));
       case STRING_ARRAY_VALUE:
         return Pair.of(ColumnDataType.STRING_ARRAY, getStringArrayValue(literal));
+      case BYTES_ARRAY_VALUE:
+        return Pair.of(ColumnDataType.BYTES_ARRAY, getBytesArrayValue(literal));
       default:
         throw new IllegalStateException("Unsupported field type: " + type);
     }
@@ -659,6 +695,9 @@ public class RequestUtils {
       case STRING_ARRAY_VALUE:
         return literal.getStringArrayValue().stream().map(value -> "'" + value + "'").collect(Collectors.toList())
             .toString();
+      case BYTES_ARRAY_VALUE:
+        return Arrays.stream(getBytesArrayValue(literal)).map(value -> "X'" + BytesUtils.toHexString(value) + "'")
+            .collect(Collectors.toList()).toString();
       default:
         throw new IllegalStateException("Unsupported field type: " + type);
     }

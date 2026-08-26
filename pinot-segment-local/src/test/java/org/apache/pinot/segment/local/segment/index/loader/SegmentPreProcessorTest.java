@@ -1093,7 +1093,15 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
 
     // Create inverted index the second time.
     checkInvertedIndexCreation(true);
-    assertEquals(Files.getLastModifiedTime(singleFileIndex.toPath()), newLastModifiedTime);
+    // The second (no-op) creation must not rewrite the file. Assert the mtime did not advance
+    // meaningfully rather than requiring exact equality: the 2s sleeps above guarantee a real
+    // rewrite would move the mtime by ~2000ms, whereas an untouched file can still report a
+    // sub-millisecond-to-millisecond delta between two getLastModifiedTime reads (filesystem
+    // timestamp granularity / metadata flush), which made exact equality flaky under CPU load.
+    long mtimeDeltaMs =
+        Files.getLastModifiedTime(singleFileIndex.toPath()).toMillis() - newLastModifiedTime.toMillis();
+    assertTrue(Math.abs(mtimeDeltaMs) < 1000,
+        "columns.psf was rewritten by the no-op index recreation (mtime moved " + mtimeDeltaMs + " ms)");
     assertEquals(singleFileIndex.length(), newFileSize);
   }
 
