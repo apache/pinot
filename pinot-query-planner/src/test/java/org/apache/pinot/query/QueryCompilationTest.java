@@ -567,9 +567,11 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   public void testJoinPushTransitivePredicateLookupJoin() {
     // PinotJoinPushTransitivePredicatesRule
     // should not push to the right under lookup join hint
+    // NOTE: Selects explicit columns because `*` leaves no Project at all over the right table scan, which a lookup
+    // join requires (see RelToPlanNodeConverter#convertLogicalJoin). That case is covered in JoinPlans.json.
     String query = "EXPLAIN PLAN FOR\n"
         + "SELECT /*+ joinOptions(join_strategy='lookup') */ \n"
-        + "* FROM a\n"
+        + "a.col1, b.col2 FROM a\n"
         + "JOIN b\n"
         + "ON a.col1 = b.col1\n"
         + "WHERE a.col1 = 1;\n";
@@ -578,11 +580,14 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     //@formatter:off
     assertEquals(explain,
         "Execution Plan\n"
-            + "LogicalJoin(condition=[=($0, $9)], joinType=[inner])\n"
-            + "  PinotLogicalExchange(distribution=[single])\n"
-            + "    LogicalFilter(condition=[=(CAST($0):INTEGER NOT NULL, 1)])\n"
-            + "      PinotLogicalTableScan(table=[[default, a]])\n"
-            + "  PinotLogicalTableScan(table=[[default, b]])\n");
+            + "LogicalProject(col1=[$0], col2=[$2])\n"
+            + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
+            + "    PinotLogicalExchange(distribution=[single])\n"
+            + "      LogicalProject(col1=[$0])\n"
+            + "        LogicalFilter(condition=[=(CAST($0):INTEGER NOT NULL, 1)])\n"
+            + "          PinotLogicalTableScan(table=[[default, a]])\n"
+            + "    LogicalProject(col1=[$0], col2=[$1])\n"
+            + "      PinotLogicalTableScan(table=[[default, b]])\n");
     //@formatter:on
   }
 
