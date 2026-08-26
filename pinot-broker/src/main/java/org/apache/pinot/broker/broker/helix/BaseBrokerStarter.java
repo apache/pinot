@@ -65,6 +65,7 @@ import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandl
 import org.apache.pinot.broker.requesthandler.TimeSeriesRequestHandler;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.tablesampler.TableSamplerFactory;
+import org.apache.pinot.broker.stats.BrokerStatisticsProvider;
 import org.apache.pinot.broker.stats.BrokerTableStatsManager;
 import org.apache.pinot.broker.stats.SqliteStatsStoreProvider;
 import org.apache.pinot.broker.stats.StatsStoreFactory;
@@ -107,6 +108,7 @@ import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsMa
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.materializedview.handler.MaterializedViewHandler;
+import org.apache.pinot.query.planner.spi.stats.PinotStatisticsProvider;
 import org.apache.pinot.query.planner.spi.stats.StatsStore;
 import org.apache.pinot.query.planner.spi.stats.StatsStoreException;
 import org.apache.pinot.query.routing.WorkerManager;
@@ -302,6 +304,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   /// Override to supply a custom [MultiStageBrokerRequestHandler] subclass (e.g. one that
   /// overrides `onQueryCompletion(RequestContext, BrokerResponse)` for async query logging).
   /// The default implementation returns a plain [MultiStageBrokerRequestHandler].
+  ///
+  /// `statisticsProvider` is a parameter rather than something this method resolves for itself:
+  /// resolving it inside the body would let an existing override keep compiling while silently
+  /// dropping the statistics wiring, so an operator setting `pinot.broker.stats.enabled=true`
+  /// would pay the collection cost, change no plan, and get no signal at all. Breaking the
+  /// signature is the point.
   protected MultiStageBrokerRequestHandler createMultiStageBrokerRequestHandler(
       PinotConfiguration config, String brokerId, BrokerRequestIdGenerator requestIdGenerator,
       RoutingManager routingManager, AccessControlFactory accessControlFactory,
@@ -309,11 +317,33 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       MultiStageQueryThrottler multiStageQueryThrottler, FailureDetector failureDetector,
       ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext,
       WorkerManager workerManager, WorkerManager multiClusterWorkerManager,
-      ServerRoutingStatsManager serverRoutingStatsManager) {
+      ServerRoutingStatsManager serverRoutingStatsManager,
+      @Nullable PinotStatisticsProvider statisticsProvider) {
     return new MultiStageBrokerRequestHandler(config, brokerId, requestIdGenerator, routingManager,
         accessControlFactory, queryQuotaManager, tableCache, multiStageQueryThrottler, failureDetector,
         threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager,
-        serverRoutingStatsManager);
+        serverRoutingStatsManager, statisticsProvider);
+  }
+
+  /// Returns the statistics provider the multi-stage planner should use, or `null` to leave it on
+  /// Calcite's heuristics.
+  ///
+  /// Logged at startup because both ways of ending up without one — collection disabled, or
+  /// collection enabled but consumption switched off — are otherwise invisible: the feature simply
+  /// produces the same plans as before, with nothing saying why.
+  @Nullable
+  protected PinotStatisticsProvider createStatisticsProvider() {
+    if (_statsManager == null) {
+      LOGGER.info("Statistics collection is not active; multi-stage planning will use heuristics");
+      return null;
+    }
+    if (!_brokerConf.getProperty(Broker.CONFIG_OF_USE_STATISTICS, Broker.DEFAULT_USE_STATISTICS)) {
+      LOGGER.info("Broker statistics are being collected but not used for planning ({}=false)",
+          Broker.CONFIG_OF_USE_STATISTICS);
+      return null;
+    }
+    LOGGER.info("Multi-stage query planning will use broker-collected statistics");
+    return new BrokerStatisticsProvider(_statsManager);
   }
 
   private void setupHelixSystemProperties() {
@@ -571,7 +601,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
           createMultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _multiStageQueryThrottler, _failureDetector,
               _threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager,
-              _serverRoutingStatsManager);
+              _serverRoutingStatsManager, createStatisticsProvider());
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
       _routingManager.setServerReenableCallback(
           serverInstance -> finalHandler.getQueryDispatcher().resetClientConnectionBackoff(serverInstance));

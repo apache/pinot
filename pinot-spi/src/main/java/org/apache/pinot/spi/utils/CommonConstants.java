@@ -623,11 +623,15 @@ public class CommonConstants {
     /// [EXPERIMENTAL] When `true`, the broker collects per-segment statistics into the store
     /// selected by [#CONFIG_OF_STATS_STORE]. Disabled by default.
     ///
-    /// Collection only. Nothing consults these statistics yet, so enabling this changes no query
-    /// plan and no query result: it buys the collection cost, and a database file for the `sqlite`
-    /// store. The multi-stage planner starts reading them in a later change, at which point
-    /// enabling this will change the row-count and selectivity ESTIMATES every planner rule sees
-    /// — plans, and therefore performance characteristics, may change, though never correctness.
+    /// Enabling this changes the row-count and selectivity ESTIMATES the multi-stage planner sees:
+    /// any rule consulting cardinality metadata observes statistics-backed numbers instead of
+    /// Calcite's defaults. Query results never change, but plans — and therefore performance
+    /// characteristics — may. Statistics whose confidence is LOW or UNKNOWN are treated as absent,
+    /// so a table whose raw counts are known to be biased keeps the previous heuristic behaviour.
+    ///
+    /// To stop the planner using them without losing the collected store, set
+    /// [#CONFIG_OF_USE_STATISTICS] to `false` rather than turning this off. Enable on a canary
+    /// broker first.
     public static final String CONFIG_OF_STATS_ENABLED = "pinot.broker.stats.enabled";
     public static final boolean DEFAULT_STATS_ENABLED = false;
 
@@ -672,6 +676,20 @@ public class CommonConstants {
     /// This value can always be overridden by [Request.QueryOptionKey#USE_PHYSICAL_OPTIMIZER] query option
     public static final String CONFIG_OF_USE_PHYSICAL_OPTIMIZER = "pinot.broker.multistage.use.physical.optimizer";
     public static final boolean DEFAULT_USE_PHYSICAL_OPTIMIZER = false;
+
+    /// [EXPERIMENTAL] Whether the multi-stage planner consults the statistics collected under
+    /// [#CONFIG_OF_STATS_ENABLED]. Enabled by default, so turning collection on gives the whole
+    /// feature; this exists as a kill switch.
+    ///
+    /// Separate from collection on purpose. If statistics-backed plans regress, the alternative
+    /// would be turning collection off — which also discards the store the broker spent time
+    /// warming, and has to be re-collected before the feature can be tried again. Setting this to
+    /// `false` returns planning to Calcite's heuristics while the store stays warm, which also
+    /// makes "collect, observe, then enable" a usable rollout order.
+    ///
+    /// Ignored when [#CONFIG_OF_STATS_ENABLED] is `false`: there are no statistics to consult.
+    public static final String CONFIG_OF_USE_STATISTICS = "pinot.broker.multistage.use.statistics";
+    public static final boolean DEFAULT_USE_STATISTICS = true;
 
     /// Whether to use lite mode by default.
     /// This value can always be overridden by [Request.QueryOptionKey#USE_LITE_MODE] query option
