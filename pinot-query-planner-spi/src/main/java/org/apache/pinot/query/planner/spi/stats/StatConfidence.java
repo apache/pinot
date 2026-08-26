@@ -43,5 +43,14 @@ public enum StatConfidence {
   LOW,
 
   /// No information available.
-  UNKNOWN
+  UNKNOWN;
+
+  /// Whether a statistic carrying this confidence may be used to cost a plan.
+  ///
+  /// Allow-list rather than deny-list: this enum is append-only, so a tier added later must
+  /// default to being rejected. A new low-trust value that was silently trusted would degrade
+  /// plans with no signal.
+  public boolean isUsableForCosting() {
+    return this == EXACT || this == ESTIMATED;
+  }
 }
