@@ -151,13 +151,14 @@ public interface RexExpression {
         return false;
       }
       FunctionCall that = (FunctionCall) o;
-      return _isDistinct == that._isDistinct && _dataType == that._dataType && Objects.equals(_functionName,
-          that._functionName) && Objects.equals(_functionOperands, that._functionOperands);
+      return _isDistinct == that._isDistinct && _ignoreNulls == that._ignoreNulls && _dataType == that._dataType
+          && Objects.equals(_functionName, that._functionName)
+          && Objects.equals(_functionOperands, that._functionOperands);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(_dataType, _functionName, _functionOperands, _isDistinct);
+      return Objects.hash(_dataType, _functionName, _functionOperands, _isDistinct, _ignoreNulls);
     }
   }
 }
