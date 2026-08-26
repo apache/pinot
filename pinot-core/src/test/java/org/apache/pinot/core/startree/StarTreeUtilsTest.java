@@ -25,12 +25,12 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
-import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.filter.predicate.BaseRawValueBasedPredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.EqualsPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.plan.FilterPlanNode;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.AggregationInfo;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -216,7 +216,7 @@ public class StarTreeUtilsTest {
 
   /// End-to-end assertion equivalent to `EXPLAIN PLAN` showing a `STAR_TREE` node:
   /// a filter query returning `COUNT(*)` from a RAW-forward + separated-dictionary star-tree dimension is served
-  /// via the star-tree operator (non-null result from `createStarTreeBasedProjectOperator`) and reads a single
+  /// via the star-tree operator (non-null result from `createStarTreeBasedAggregationInfo`) and reads a single
   /// aggregated record per matching path — same as a `DICTIONARY`-encoded dim would.
   @Test
   public void testStarTreeAcceleratesEqualityFilterOnRawWithDictionary() {
@@ -226,13 +226,14 @@ public class StarTreeUtilsTest {
     FilterPlanNode filterPlanNode = new FilterPlanNode(new SegmentContext(_segment), queryContext);
     filterPlanNode.run();
 
-    BaseProjectOperator<?> operator = StarTreeUtils.createStarTreeBasedProjectOperator(_segment, queryContext,
-        queryContext.getAggregationFunctions(), queryContext.getFilter(),
-        filterPlanNode.getPredicateEvaluators());
-    assertNotNull(operator, "Star-tree plan expected for EQ on RAW+dict dimension");
+    AggregationInfo aggregationInfo =
+        StarTreeUtils.createStarTreeBasedAggregationInfo(_segment, queryContext,
+            queryContext.getAggregationFunctions(), queryContext.getFilter(),
+            filterPlanNode.getPredicateEvaluators());
+    assertNotNull(aggregationInfo, "Star-tree plan expected for EQ on RAW+dict dimension");
 
     // Traversal must not throw; before the fix, StarTreeFilterOperator.getMatchingDictIds threw UOE here.
-    ValueBlock block = operator.nextBlock();
+    ValueBlock block = aggregationInfo.getProjectOperator().nextBlock();
     assertNotNull(block, "Star-tree traversal returned no block");
 
     // Star-tree yields one aggregated document per matching path — same behavior as DICTIONARY-encoded columns.

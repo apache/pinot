@@ -26,19 +26,26 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class StarTreeDataSource extends BaseDataSource {
 
+  /// Creates a data source over a star-tree column.
+  ///
+  /// `nullValueVector` is only non-null for a null-aware star-tree column that contains null values. Dimensions need
+  /// one just as metrics do: a null is stored in the forward index as the column's default null value, which is
+  /// indistinguishable from a genuine occurrence of that value, so the query side recognizes nulls from the vector.
   public StarTreeDataSource(FieldSpec fieldSpec, int numDocs, ForwardIndexReader<?> forwardIndex,
-      @Nullable Dictionary dictionary) {
+      @Nullable Dictionary dictionary, @Nullable NullValueVectorReader nullValueVector) {
     super(
         new StarTreeDataSourceMetadata(fieldSpec, numDocs),
         new ColumnIndexContainer.FromMap.Builder()
             .with(StandardIndexes.forward(), forwardIndex)
             .with(StandardIndexes.dictionary(), dictionary)
+            .with(StandardIndexes.nullValueVector(), nullValueVector)
             .build());
   }
 
