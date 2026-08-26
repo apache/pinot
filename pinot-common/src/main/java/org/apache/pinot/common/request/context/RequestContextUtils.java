@@ -20,7 +20,6 @@ package org.apache.pinot.common.request.context;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.request.Expression;
@@ -51,9 +50,7 @@ public class RequestContextUtils {
   private RequestContextUtils() {
   }
 
-  /**
-   * Converts the given string expression into an {@link ExpressionContext}.
-   */
+  /// Converts the given string expression into an {@link ExpressionContext}.
   public static ExpressionContext getExpression(String expression) {
     if (expression.equals("*")) {
       // For 'SELECT *' and 'SELECT COUNT(*)'
@@ -63,9 +60,7 @@ public class RequestContextUtils {
     }
   }
 
-  /**
-   * Converts the given Thrift {@link Expression} into an {@link ExpressionContext}.
-   */
+  /// Converts the given Thrift {@link Expression} into an {@link ExpressionContext}.
   public static ExpressionContext getExpression(Expression thriftExpression) {
     switch (thriftExpression.getType()) {
       case LITERAL:
@@ -79,9 +74,7 @@ public class RequestContextUtils {
     }
   }
 
-  /**
-   * Converts the given Thrift {@link Function} into a {@link FunctionContext}.
-   */
+  /// Converts the given Thrift {@link Function} into a {@link FunctionContext}.
   public static FunctionContext getFunction(Function thriftFunction) {
     String functionName = thriftFunction.getOperator();
     FunctionContext.Type functionType =
@@ -95,16 +88,15 @@ public class RequestContextUtils {
       }
       return new FunctionContext(functionType, functionName, arguments);
     } else {
-      return new FunctionContext(functionType, functionName, Collections.emptyList());
+      return new FunctionContext(functionType, functionName, List.of());
     }
   }
 
-  /**
-   * Converts the given Thrift {@link Expression} into a {@link FilterContext}.
-   * <p>NOTE: Currently the query engine only accepts string literals as the right-hand side of the predicate, so we
-   *          always convert the right-hand side expressions into strings. We also update boolean predicates that are
-   *          missing an EQUALS filter operator.
-   */
+  /// Converts the given Thrift {@link Expression} into a {@link FilterContext}.
+  ///
+  /// NOTE: Currently the query engine only accepts string literals as the right-hand side of the predicate, so we
+  ///          always convert the right-hand side expressions into strings. We also update boolean predicates that are
+  ///          missing an EQUALS filter operator.
   public static FilterContext getFilter(Expression thriftExpression) {
     Function function = thriftExpression.getFunctionCall();
     // Trim off outer IS_TRUE function as it is redundant
@@ -296,12 +288,11 @@ public class RequestContextUtils {
     return RequestUtils.getLiteralString(literal);
   }
 
-  /**
-   * Converts the given filter {@link ExpressionContext} into a {@link FilterContext}.
-   * <p>NOTE: Currently the query engine only accepts string literals as the right-hand side of the predicate, so we
-   *          always convert the right-hand side expressions into strings. We also update boolean predicates that are
-   *          missing an EQUALS filter operator.
-   */
+  /// Converts the given filter {@link ExpressionContext} into a {@link FilterContext}.
+  ///
+  /// NOTE: Currently the query engine only accepts string literals as the right-hand side of the predicate, so we
+  ///          always convert the right-hand side expressions into strings. We also update boolean predicates that are
+  ///          missing an EQUALS filter operator.
   public static FilterContext getFilter(ExpressionContext filterExpression) {
     FunctionContext function = filterExpression.getFunction();
     // Trim off outer IS_TRUE function as it is redundant

@@ -82,12 +82,11 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 
-/**
- * The class <code>PinotTaskManager</code> is the component inside Pinot Controller to periodically check the Pinot
- * cluster status and schedule new tasks.
- * <p><code>PinotTaskManager</code> is also responsible for checking the health status on each type of tasks, detect and
- * fix issues accordingly.
- */
+/// The class `PinotTaskManager` is the component inside Pinot Controller to periodically check the Pinot
+/// cluster status and schedule new tasks.
+///
+/// `PinotTaskManager` is also responsible for checking the health status on each type of tasks, detect and
+/// fix issues accordingly.
 public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTaskManager.class);
 
@@ -305,20 +304,16 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     return responseMap;
   }
 
-  /**
-   * This method performs the following validations:
-   * <ul>
-   *   <li>Checks if the number of generated tasks exceeds the maximum allowed subtasks per task
-   *       (controlled by {@link MinionConstants#MAX_ALLOWED_SUB_TASKS_KEY} cluster config)</li>
-   *   <li>For user-triggered tasks: If the limit is exceeded, clears all task configs and throws
-   *       a {@link RuntimeException} to notify the user immediately</li>
-   *   <li>For scheduled tasks: If the limit is exceeded, logs a warning and limits the number of
-   *       tasks to the maximum allowed by taking only the first N tasks (where N is the maximum)</li>
-   *   <li>Adds metadata to each task config indicating the maximum number of subtasks that were
-   *       used (via {@link MinionConstants#TABLE_MAX_NUM_TASKS_KEY}) when tasks are limited</li>
-   * </ul>
-   *
-   */
+  /// This method performs the following validations:
+  ///
+  /// - Checks if the number of generated tasks exceeds the maximum allowed subtasks per task
+  ///      (controlled by [MinionConstants#MAX_ALLOWED_SUB_TASKS_KEY] cluster config)
+  /// - For user-triggered tasks: If the limit is exceeded, clears all task configs and throws
+  ///      a [RuntimeException] to notify the user immediately
+  /// - For scheduled tasks: If the limit is exceeded, logs a warning and limits the number of
+  ///      tasks to the maximum allowed by taking only the first N tasks (where N is the maximum)
+  /// - Adds metadata to each task config indicating the maximum number of subtasks that were
+  ///      used (via [MinionConstants#TABLE_MAX_NUM_TASKS_KEY]) when tasks are limited
   protected static List<PinotTaskConfig> validatePinotTaskConfigs(String taskType, String tableNameWithType,
       PinotTaskGenerator taskGenerator, List<PinotTaskConfig> pinotTaskConfigs, String triggeredBy) {
     int maxNumberOfSubTasks = taskGenerator.getMaxAllowedSubTasksPerTask();
@@ -344,26 +339,23 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     return pinotTaskConfigs;
   }
 
-  /**
-   * Acquires a distributed lock for the given table to prevent concurrent task generation.
-   * <p>
-   * The lock protects against:
-   * <ul>
-   *   <li>Race conditions with periodic task generation</li>
-   *   <li>Multiple simultaneous ad-hoc requests</li>
-   *   <li>Leadership changes during task generation</li>
-   * </ul>
-   *
-   * @param taskType The type of task being generated
-   * @param tableNameWithType The table name with type for which to acquire the lock
-   * @param flowName The flow name (e.g., "ad-hoc", "scheduled") for logging purposes
-   * @return A {@link DistributedTaskLockManager.TaskLock} if the lock is successfully acquired,
-   *         or {@code null} if distributed locking is disabled (when
-   *         {@code _distributedTaskLockManager} is {@code null})
-   * @throws RuntimeException If distributed locking is enabled but the lock cannot be acquired
-   *                          (typically because another controller is already generating tasks
-   *                          for this table).
-   */
+  /// Acquires a distributed lock for the given table to prevent concurrent task generation.
+  ///
+  /// The lock protects against:
+  ///
+  /// - Race conditions with periodic task generation
+  /// - Multiple simultaneous ad-hoc requests
+  /// - Leadership changes during task generation
+  ///
+  /// @param taskType The type of task being generated
+  /// @param tableNameWithType The table name with type for which to acquire the lock
+  /// @param flowName The flow name (e.g., "ad-hoc", "scheduled") for logging purposes
+  /// @return A [DistributedTaskLockManager.TaskLock] if the lock is successfully acquired,
+  ///         or `null` if distributed locking is disabled (when
+  ///         `_distributedTaskLockManager` is `null`)
+  /// @throws RuntimeException If distributed locking is enabled but the lock cannot be acquired
+  ///                          (typically because another controller is already generating tasks
+  ///                          for this table).
   protected @Nullable DistributedTaskLockManager.TaskLock acquireTaskLock(String taskType, String tableNameWithType,
       String flowName) {
     DistributedTaskLockManager.TaskLock lock = null;
@@ -722,47 +714,41 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     return taskToCronExpressionMap;
   }
 
-  /**
-   * Returns the cluster info accessor.
-   * <p>Cluster info accessor can be used to initialize the task generator.
-   */
+  /// Returns the cluster info accessor.
+  ///
+  /// Cluster info accessor can be used to initialize the task generator.
   public ClusterInfoAccessor getClusterInfoAccessor() {
     return _clusterInfoAccessor;
   }
 
-  /**
-   * Returns the task generator registry.
-   */
+  /// Returns the task generator registry.
   public TaskGeneratorRegistry getTaskGeneratorRegistry() {
     return _taskGeneratorRegistry;
   }
 
-  /**
-   * Registers a task generator.
-   * <p>This method can be used to plug in custom task generators.
-   */
+  /// Registers a task generator.
+  ///
+  /// This method can be used to plug in custom task generators.
   public void registerTaskGenerator(PinotTaskGenerator taskGenerator) {
     _taskGeneratorRegistry.registerTaskGenerator(taskGenerator);
   }
 
-  /**
-   * Helper method to schedule tasks (all task types) for the given tables that have the tasks enabled.
-   * Returns a map from the task type to the {@link TaskSchedulingInfo} of the tasks scheduled.
-   *
-   * <p>Dispatches between two paths based on the resolved concurrent-scheduling flag (cluster
-   * default, optionally overridden per table):
-   * <ul>
-   *   <li><b>Legacy path</b> ({@code concurrentSchedulingEnabled = false}): the call runs under a
-   *       global {@code synchronized(this)} — same mutual exclusion the method had before this
-   *       refactor.</li>
-   *   <li><b>Concurrent path</b> ({@code concurrentSchedulingEnabled = true}): the call holds no
-   *       controller-wide monitor. Task generation for different tables proceeds in parallel;
-   *       same-table concurrency is coordinated by the distributed ZK lock (enabling
-   *       {@link ControllerConf.ControllerPeriodicTasksConf#ENABLE_DISTRIBUTED_LOCKING} is
-   *       strongly recommended when opting into this path).</li>
-   * </ul>
-   * Both paths share the same underlying body in {@link #doScheduleTasks}.
-   */
+  /// Helper method to schedule tasks (all task types) for the given tables that have the tasks enabled.
+  /// Returns a map from the task type to the [TaskSchedulingInfo] of the tasks scheduled.
+  ///
+  /// Dispatches between two paths based on the resolved concurrent-scheduling flag (cluster
+  /// default, optionally overridden per table):
+  ///
+  /// - **Legacy path** (`concurrentSchedulingEnabled = false`): the call runs under a
+  ///      global `synchronized(this)` — same mutual exclusion the method had before this
+  ///      refactor.
+  /// - **Concurrent path** (`concurrentSchedulingEnabled = true`): the call holds no
+  ///      controller-wide monitor. Task generation for different tables proceeds in parallel;
+  ///      same-table concurrency is coordinated by the distributed ZK lock (enabling
+  ///      [ControllerConf.ControllerPeriodicTasksConf#ENABLE_DISTRIBUTED_LOCKING] is
+  ///      strongly recommended when opting into this path).
+  ///
+  /// Both paths share the same underlying body in [#doScheduleTasks].
   public Map<String, TaskSchedulingInfo> scheduleTasks(TaskSchedulingContext context) {
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
     if (shouldUseConcurrentPath(context)) {
@@ -773,13 +759,11 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  /**
-   * Resolves whether the concurrent scheduling path should be used for the given scheduling request.
-   * A request uses the concurrent path only when every targeted table opts in (explicitly via
-   * {@link TableTaskConfig#getConcurrentSchedulingEnabled()} or implicitly via the cluster default).
-   * If no specific tables are targeted (i.e., "schedule for every table"), the check iterates the full
-   * table list so that per-table opt-outs are still honored.
-   */
+  /// Resolves whether the concurrent scheduling path should be used for the given scheduling request.
+  /// A request uses the concurrent path only when every targeted table opts in (explicitly via
+  /// [TableTaskConfig#getConcurrentSchedulingEnabled()] or implicitly via the cluster default).
+  /// If no specific tables are targeted (i.e., "schedule for every table"), the check iterates the full
+  /// table list so that per-table opt-outs are still honored.
   protected boolean shouldUseConcurrentPath(TaskSchedulingContext context) {
     Set<String> targetTables = context.getTablesToSchedule();
     Set<String> targetDatabases = context.getDatabasesToSchedule();
@@ -809,10 +793,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     return checkedAnyTable || _clusterConcurrentSchedulingEnabled;
   }
 
-  /**
-   * Resolves the effective concurrent-scheduling flag for a single table: table-level override if
-   * set, otherwise the cluster-level default.
-   */
+  /// Resolves the effective concurrent-scheduling flag for a single table: table-level override if
+  /// set, otherwise the cluster-level default.
   protected boolean resolveConcurrentScheduling(TableConfig tableConfig) {
     TableTaskConfig taskConfig = tableConfig.getTaskConfig();
     if (taskConfig != null) {
@@ -824,10 +806,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     return _clusterConcurrentSchedulingEnabled;
   }
 
-  /**
-   * Shared body used by both the legacy (synchronized) and concurrent paths. The caller decides
-   * whether to wrap this call in {@code synchronized(this)}.
-   */
+  /// Shared body used by both the legacy (synchronized) and concurrent paths. The caller decides
+  /// whether to wrap this call in `synchronized(this)`.
   private Map<String, TaskSchedulingInfo> doScheduleTasks(TaskSchedulingContext context) {
     Map<String, List<TableConfig>> enabledTableConfigMap = new HashMap<>();
     Set<String> targetTables = context.getTablesToSchedule();
@@ -915,21 +895,17 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     return tasksScheduled;
   }
 
-  /**
-   * Extracts table names from a list of table configs.
-   */
+  /// Extracts table names from a list of table configs.
   protected static List<String> getTableNames(List<TableConfig> tableConfigs) {
     return tableConfigs.stream().map(TableConfig::getTableName).collect(Collectors.toList());
   }
 
-  /**
-   * Helper method to schedule task with the given task generator for the given tables that have the task enabled.
-   * Returns
-   *  - list of scheduled task names (empty list if nothing to schedule),
-   *    or {@code null} if no task is scheduled due to scheduling errors.
-   *  - list of task generation errors if any
-   *  - list of task scheduling errors if any
-   */
+  /// Helper method to schedule task with the given task generator for the given tables that have the task enabled.
+  /// Returns
+  ///  - list of scheduled task names (empty list if nothing to schedule),
+  ///    or `null` if no task is scheduled due to scheduling errors.
+  ///  - list of task generation errors if any
+  ///  - list of task scheduling errors if any
   protected TaskSchedulingInfo scheduleTask(PinotTaskGenerator taskGenerator, List<TableConfig> enabledTableConfigs,
       boolean isLeader, @Nullable String minionInstanceTagForTask, String triggeredBy,
       Map<String, DistributedTaskLockManager.TaskLock> acquiredTaskLocks) {
@@ -1089,6 +1065,26 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     LOGGER.info("Cleaning up all task generators");
     for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
       _taskGeneratorRegistry.getTaskGenerator(taskType).nonLeaderCleanUp();
+    }
+  }
+
+  /// Shuts down the cron scheduler started by [#init()], its counterpart in the controller shutdown sequence.
+  ///
+  /// Must be called before the controller tears down Helix. The scheduler's worker threads are not daemons and keep
+  /// firing jobs until it is shut down, so otherwise the cron jobs keep running against a closed `ZkClient` and the
+  /// threads outlive the controller.
+  ///
+  /// Waits for the jobs already in flight, so a task generation in progress is not cut off midway. Safe to call more
+  /// than once, and a no-op when the scheduler is disabled.
+  public void stopScheduler() {
+    if (_scheduler == null) {
+      return;
+    }
+    try {
+      LOGGER.info("Shutting down the task scheduler");
+      _scheduler.shutdown(true);
+    } catch (SchedulerException e) {
+      LOGGER.error("Caught exception while shutting down the task scheduler", e);
     }
   }
 

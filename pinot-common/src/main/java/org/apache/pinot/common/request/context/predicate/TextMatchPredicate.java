@@ -23,9 +23,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 
 
-/**
- * Predicate for TEXT_MATCH.
- */
+/// Predicate for TEXT_MATCH.
 public class TextMatchPredicate extends BasePredicate {
   private final String _value;
   private final String _options;

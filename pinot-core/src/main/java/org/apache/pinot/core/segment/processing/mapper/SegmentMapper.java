@@ -57,14 +57,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Mapper phase of the SegmentProcessorFramework.
- * Reads the input records and creates partitioned generic row files.
- * Performs:
- * - record filtering
- * - column transformations
- * - partitioning
- */
+/// Mapper phase of the SegmentProcessorFramework.
+/// Reads the input records and creates partitioned generic row files.
+/// Performs:
+/// - record filtering
+/// - column transformations
+/// - partitioning
 public class SegmentMapper {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMapper.class);
   private final ThrottledLogger _throttledLogger;
@@ -73,6 +71,7 @@ public class SegmentMapper {
   private final List<FieldSpec> _fieldSpecs;
   private final boolean _includeNullFields;
   private final int _numSortFields;
+  private final boolean _includeOriginalTimeField;
   private final TransformPipeline _transformPipeline;
   private final TimeHandler _timeHandler;
   private final Partitioner[] _partitioners;
@@ -109,8 +108,9 @@ public class SegmentMapper {
 
     TableConfig tableConfig = processorConfig.getTableConfig();
     Schema schema = processorConfig.getSchema();
+    _includeOriginalTimeField = processorConfig.requiresOriginalTimeOrdering();
     Pair<List<FieldSpec>, Integer> pair = SegmentProcessorUtils.getFieldSpecs(schema, processorConfig.getMergeType(),
-        tableConfig.getIndexingConfig().getSortedColumn());
+        tableConfig.getIndexingConfig().getSortedColumn(), _includeOriginalTimeField);
     _fieldSpecs = pair.getLeft();
     _numSortFields = pair.getRight();
     _includeNullFields =
@@ -132,10 +132,8 @@ public class SegmentMapper {
             processorConfig.getSegmentConfig().getMaxDiskUsagePercentage(), mapperOutputDir);
   }
 
-  /**
-   * Reads the input records and generates partitioned generic row files into the mapper output directory.
-   * Records for each partition are put into a directory of the partition name within the mapper output directory.
-   */
+  /// Reads the input records and generates partitioned generic row files into the mapper output directory.
+  /// Records for each partition are put into a directory of the partition name within the mapper output directory.
   public Map<String, GenericRowFileManager> map()
       throws Exception {
     try {
@@ -274,7 +272,8 @@ public class SegmentMapper {
     if (fileManager == null) {
       File partitionOutputDir = new File(_mapperOutputDir, partition);
       FileUtils.forceMkdir(partitionOutputDir);
-      fileManager = new GenericRowFileManager(partitionOutputDir, _fieldSpecs, _includeNullFields, _numSortFields);
+      fileManager = new GenericRowFileManager(partitionOutputDir, _fieldSpecs, _includeNullFields, _numSortFields,
+          _includeOriginalTimeField);
       _partitionToFileManagerMap.put(partition, fileManager);
     }
 

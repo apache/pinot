@@ -28,34 +28,28 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 
 public interface SegmentFetcher {
 
-  /**
-   * Initializes the segment fetcher.
-   */
+  /// Initializes the segment fetcher.
   void init(PinotConfiguration config);
 
-  /**
-   * Fetches a segment from URI location to local.
-   */
+  /// Fetches a segment from URI location to local.
   void fetchSegmentToLocal(URI uri, File dest)
       throws Exception;
 
-  /**
-   * Fetches a segment from URI location and untar to local in a streamed manner
-   */
+  /// Fetches a segment from URI location and untar to local in a streamed manner
   File fetchUntarSegmentToLocalStreamed(URI uri, File dest, long rateLimit, AtomicInteger attempts)
       throws Exception;
 
-  /**
-   * Fetches a segment to local from any uri in the given list.
-   */
+  /// Fetches a segment to local from any uri in the given list.
   void fetchSegmentToLocal(List<URI> uri, File dest)
       throws Exception;
 
-  /**
-   * @param segmentName the segment name to fetch.
-   * @param uriSupplier the supplier to the list of segment download uris.
-   * @param dest        The destination to put the downloaded segment.
-   * @throws Exception when the segment fetch fails after all attempts are exhausted or other runtime exceptions occur.
-   */
+  /// @param segmentName the segment name to fetch.
+  /// @param uriSupplier the supplier to the list of segment download uris.
+  /// @param dest        The destination to put the downloaded segment.
+  /// @throws Exception when the segment fetch fails after all attempts are exhausted or other runtime exceptions occur.
   void fetchSegmentToLocal(String segmentName, Supplier<List<URI>> uriSupplier, File dest) throws Exception;
+
+  /// Fetches a segment from any uri in the given supplier's list, and untars it to local in a streamed manner.
+  File fetchUntarSegmentToLocalStreamed(String segmentName, Supplier<List<URI>> uriSupplier, File dest,
+      long maxStreamRateInByte) throws Exception;
 }

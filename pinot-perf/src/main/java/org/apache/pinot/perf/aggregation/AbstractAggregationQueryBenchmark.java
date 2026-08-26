@@ -30,9 +30,7 @@ import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.infra.Blackhole;
 
-/**
- * Base class for aggregation query benchmarks.
- */
+/// Base class for aggregation query benchmarks.
 public abstract class AbstractAggregationQueryBenchmark {
 
   private File _baseDir;
@@ -80,9 +78,7 @@ public abstract class AbstractAggregationQueryBenchmark {
 
   protected abstract TableConfig createTableConfig();
 
-  /**
-   * Returns a list of segments to be created on the servers. The first list is the list of segments to be
-   * created on the first server and the second list is the segments to be created on the second server.
-   */
+  /// Returns a list of segments to be created on the servers. The first list is the list of segments to be
+  /// created on the first server and the second list is the segments to be created on the second server.
   protected abstract List<List<Object[][]>> createSegmentsPerServer();
 }

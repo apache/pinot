@@ -31,9 +31,7 @@ import org.apache.pinot.query.runtime.operator.window.range.RankBasedWindowFunct
 import org.apache.pinot.query.runtime.operator.window.value.ValueWindowFunction;
 
 
-/**
- * Factory class to construct WindowFunction instances.
- */
+/// Factory class to construct WindowFunction instances.
 public class WindowFunctionFactory {
   private WindowFunctionFactory() {
   }

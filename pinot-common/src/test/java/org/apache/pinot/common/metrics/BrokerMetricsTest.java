@@ -24,9 +24,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
-/**
- * Unit tests for {@link BrokerMetrics}
- */
+/// Unit tests for [BrokerMetrics]
 public class BrokerMetricsTest {
 
   @Test

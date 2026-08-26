@@ -116,6 +116,7 @@ public final class PropertyMapping {
     keys.add("deletedsegmentsretentionperiod");
     keys.add("segmentversion");
     keys.add("aggregatemetrics");
+    keys.add("compressionstatsenabled");
     keys.add("description");
     keys.add("tags");
     keys.add("replicasperpartition");
@@ -350,6 +351,9 @@ public final class PropertyMapping {
       case "aggregatemetrics":
         builder.setAggregateMetrics(parseBool(lowerKey, value));
         return true;
+      case "compressionstatsenabled":
+        builder.setCompressionStatsEnabled(parseBool(lowerKey, value));
+        return true;
       case "description":
         builder.setDescription(value);
         return true;
@@ -488,7 +492,7 @@ public final class PropertyMapping {
 
   private static List<String> splitCsv(String value) {
     if (value == null || value.isEmpty()) {
-      return Collections.emptyList();
+      return List.of();
     }
     String[] parts = value.split(",");
     List<String> result = new ArrayList<>(parts.length);

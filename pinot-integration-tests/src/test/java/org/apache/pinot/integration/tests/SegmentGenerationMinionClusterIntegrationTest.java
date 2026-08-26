@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -94,7 +93,7 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
         if (getTotalDocs(tableName) < rowCnt) {
           // To avoid the NoTaskScheduledException after all files are ingested.
           sendPostRequest(url, JsonUtils.objectToString(adhocTaskConfig),
-              Collections.singletonMap("accept", "application/json"));
+              Map.of("accept", "application/json"));
         }
         return getTotalDocs(tableName) == rowCnt;
       } catch (Exception e) {

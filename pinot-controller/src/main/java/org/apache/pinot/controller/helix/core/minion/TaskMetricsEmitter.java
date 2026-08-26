@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -39,12 +38,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class emits task metrics for each type of minion task that is set up in
- * a Pinot cluster. It is intended to be scheduled with a fairly high frequency,
- * of the order of minutes.
- * See ControllerConf class for the default value.
- */
+/// This class emits task metrics for each type of minion task that is set up in
+/// a Pinot cluster. It is intended to be scheduled with a fairly high frequency,
+/// of the order of minutes.
+/// See ControllerConf class for the default value.
 public class TaskMetricsEmitter extends BasePeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(TaskMetricsEmitter.class);
   private final static String TASK_NAME = "TaskMetricsEmitter";
@@ -119,7 +116,7 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
 
         // Get tasks that were in-progress during the previous collection cycle
         Set<String> previouslyInProgressTasks =
-            _previousInProgressTasks.getOrDefault(taskType, Collections.emptySet());
+            _previousInProgressTasks.getOrDefault(taskType, Set.of());
 
         // Get in-progress tasks and all tasks to report (including short-lived) in a single Helix call
         TasksByStatus taskResult = _helixTaskResourceManager.getTasksByStatus(taskType, previousExecutionTimestamp);

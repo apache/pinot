@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
@@ -59,15 +58,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Use mmap to load the segment and perform all pre-processing steps. (This can be slow)
- * <p>Pre-processing steps include:
- * <ul>
- *   <li>Use {@link InvertedIndexHandler} to create inverted indices</li>
- *   <li>Use {@link DefaultColumnHandler} to update auto-generated default columns</li>
- *   <li>Use {@link ColumnMinMaxValueGenerator} to add min/max value to column metadata</li>
- * </ul>
- */
+/// Use mmap to load the segment and perform all pre-processing steps. (This can be slow)
+///
+/// Pre-processing steps include:
+///
+/// - Use [InvertedIndexHandler] to create inverted indices
+/// - Use [DefaultColumnHandler] to update auto-generated default columns
+/// - Use [ColumnMinMaxValueGenerator] to add min/max value to column metadata
 public class SegmentPreProcessor implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreProcessor.class);
 
@@ -125,6 +122,11 @@ public class SegmentPreProcessor implements AutoCloseable {
               segmentWriter);
       defaultColumnHandler.updateDefaultColumns();
       _segmentDirectory.reloadMetadata();
+
+      // Resolve per-key index configs for OPEN_STRUCT child columns so index handlers don't strip
+      // inverted/range indexes that the OpenStructColumnSplitter wrote during segment creation.
+      _indexLoadingConfig.addOpenStructChildConfigs(
+          (SegmentMetadataImpl) _segmentDirectory.getSegmentMetadata());
 
       // Update single-column indices, like inverted index, json index etc.
       List<IndexHandler> indexHandlers = new ArrayList<>();
@@ -194,11 +196,9 @@ public class SegmentPreProcessor implements AutoCloseable {
         _tableConfig);
   }
 
-  /**
-   * This method checks if there is any discrepancy between the segment and current table config and schema.
-   * If so, it returns true indicating the segment needs to be reprocessed. Right now, the default columns,
-   * all types of indices and column min/max values are checked against what's set in table config and schema.
-   */
+  /// This method checks if there is any discrepancy between the segment and current table config and schema.
+  /// If so, it returns true indicating the segment needs to be reprocessed. Right now, the default columns,
+  /// all types of indices and column min/max values are checked against what's set in table config and schema.
   public boolean needProcess()
       throws Exception {
     SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
@@ -248,7 +248,7 @@ public class SegmentPreProcessor implements AutoCloseable {
     ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode =
         _indexLoadingConfig.getColumnMinMaxValueGeneratorMode();
     if (columnMinMaxValueGeneratorMode == ColumnMinMaxValueGeneratorMode.NONE) {
-      return Collections.emptyList();
+      return List.of();
     }
     ColumnMinMaxValueGenerator columnMinMaxValueGenerator =
         new ColumnMinMaxValueGenerator(_segmentDirectory.getSegmentMetadata(), null, columnMinMaxValueGeneratorMode);
@@ -425,10 +425,8 @@ public class SegmentPreProcessor implements AutoCloseable {
     return true;
   }
 
-  /**
-   * Remove all the existing inverted index temp files before loading segments, by looking
-   * for all files in the directory and remove the ones with  '.bitmap.inv.tmp' extension.
-   */
+  /// Remove all the existing inverted index temp files before loading segments, by looking
+  /// for all files in the directory and remove the ones with  '.bitmap.inv.tmp' extension.
   private void removeInvertedIndexTempFiles(File indexDir) {
     File[] directoryListing = indexDir.listFiles();
     if (directoryListing == null) {

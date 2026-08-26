@@ -39,15 +39,14 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.common.config.ConfigTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * SSL utils class which helps in initialization of Kafka client SSL configuration. The class can install the
- * provided server certificate enabling one-way SSL or it can install the server certificate and the
- * client certificates enabling two-way SSL.
- */
+/// SSL utils class which helps in initialization of Kafka client SSL configuration. The class can install the
+/// provided server certificate enabling one-way SSL or it can install the server certificate and the
+/// client certificates enabling two-way SSL.
 public class KafkaSSLUtils {
 
   private KafkaSSLUtils() {
@@ -83,6 +82,17 @@ public class KafkaSSLUtils {
     String trustStoreLocation = consumerProps.getProperty(SSL_TRUSTSTORE_LOCATION);
     String trustStorePassword = consumerProps.getProperty(SSL_TRUSTSTORE_PASSWORD);
     String serverCertificate = consumerProps.getProperty(STREAM_KAFKA_SSL_SERVER_CERTIFICATE);
+    if (StringUtils.isNotEmpty(serverCertificate)) {
+      validateAutoSslProperties(consumerProps, SSL_TRUSTSTORE_LOCATION, SSL_TRUSTSTORE_PASSWORD,
+          STREAM_KAFKA_SSL_SERVER_CERTIFICATE, STREAM_KAFKA_SSL_CERTIFICATE_TYPE, SSL_TRUSTSTORE_TYPE);
+
+      String clientCertificate = consumerProps.getProperty(STREAM_KAFKA_SSL_CLIENT_CERTIFICATE);
+      if (StringUtils.isNotEmpty(clientCertificate)) {
+        validateAutoSslProperties(consumerProps, SSL_KEYSTORE_LOCATION, SSL_KEYSTORE_PASSWORD, SSL_KEY_PASSWORD,
+            STREAM_KAFKA_SSL_CLIENT_CERTIFICATE, STREAM_KAFKA_SSL_CLIENT_KEY,
+            STREAM_KAFKA_SSL_CLIENT_KEY_ALGORITHM, SSL_KEYSTORE_TYPE);
+      }
+    }
     if (StringUtils.isAnyEmpty(trustStoreLocation, trustStorePassword, serverCertificate)) {
       LOGGER.info("Skipping auto SSL server validation since it's not configured.");
       return;
@@ -107,6 +117,16 @@ public class KafkaSSLUtils {
     }
     if (shouldRenewKeyStore(consumerProps)) {
       initKeyStore(consumerProps);
+    }
+  }
+
+  private static void validateAutoSslProperties(Properties consumerProps, String... propertyNames) {
+    for (String propertyName : propertyNames) {
+      String value = consumerProps.getProperty(propertyName);
+      if (value != null && ConfigTransformer.DEFAULT_PATTERN.matcher(value).find()) {
+        throw new IllegalArgumentException("Kafka ConfigProvider references are not supported for '" + propertyName
+            + "' when Pinot auto-generates Kafka SSL stores; use a prebuilt keystore or truststore file instead");
+      }
     }
   }
 

@@ -18,23 +18,23 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.function.NullableSingleInputAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.BaseSingleInputAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public abstract class BaseArrayAggFunction<I, F extends Comparable>
-    extends NullableSingleInputAggregationFunction<I, F> {
+public abstract class BaseArrayAggFunction<I, F extends Comparable> extends BaseSingleInputAggregationFunction<I, F> {
 
   private final DataSchema.ColumnDataType _resultColumnType;
 
-  public BaseArrayAggFunction(ExpressionContext expression, FieldSpec.DataType dataType, boolean nullHandlingEnabled) {
+  public BaseArrayAggFunction(ExpressionContext expression, DataType dataType, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
     _resultColumnType = DataSchema.ColumnDataType.fromDataTypeMV(dataType);
   }
@@ -64,11 +64,13 @@ public abstract class BaseArrayAggFunction<I, F extends Comparable>
     return _resultColumnType;
   }
 
+  @Nullable
   @Override
   public I extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public I extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);

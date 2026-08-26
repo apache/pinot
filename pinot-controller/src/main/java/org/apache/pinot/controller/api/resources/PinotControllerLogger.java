@@ -54,6 +54,7 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.core5.http.HttpVersion;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LoggerUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
@@ -66,13 +67,12 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-/**
- * Logger resource.
- */
+/// Logger resource.
 @Api(tags = "Logger", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY,
@@ -141,7 +141,7 @@ public class PinotControllerLogger {
   @Path("/loggers/download")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOG_FILE)
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
-  @Authenticate(AccessType.DELETE)
+  @Authenticate(AccessType.READ)
   @ApiOperation(value = "Download a log file")
   public Response downloadLogFile(
       @ApiParam(value = "Log file path", required = true) @QueryParam("filePath") String filePath) {
@@ -185,8 +185,9 @@ public class PinotControllerLogger {
       @ApiParam(value = "Instance Name", required = true) @PathParam("instanceName") String instanceName) {
     try {
       URI uri = new URI(getInstanceBaseUri(instanceName) + "/loggers/files");
-      Map<String, String> headers = new HashMap<>();
-      if (authorization != null) {
+      Map<String, String> headers =
+          new HashMap<>(getServerAdminAuthHeaders(instanceName));
+      if (headers.isEmpty() && authorization != null) {
         headers.put(HttpHeaders.AUTHORIZATION, authorization);
       }
       SimpleHttpResponse simpleHttpResponse = _fileUploadDownloadClient.getHttpClient().sendGetRequest(uri, headers);
@@ -206,7 +207,7 @@ public class PinotControllerLogger {
   @Path("/loggers/instances/{instanceName}/download")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOG_FILE)
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
-  @Authenticate(AccessType.DELETE)
+  @Authenticate(AccessType.READ)
   @ApiOperation(value = "Download a log file from a given instance")
   public Response downloadLogFileFromInstance(
       @HeaderParam(HttpHeaders.AUTHORIZATION) String authorization,
@@ -216,14 +217,18 @@ public class PinotControllerLogger {
     URI uri = UriBuilder.fromUri(getInstanceBaseUri(instanceName)).path("/loggers/download")
         .queryParam("filePath", filePath).build();
     ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+    Map<String, String> serviceAuthHeaders = getServerAdminAuthHeaders(instanceName);
     if (MapUtils.isNotEmpty(headers)) {
       for (Map.Entry<String, String> header : headers.entrySet()) {
-        requestBuilder.addHeader(header.getKey(), header.getValue());
+        if (serviceAuthHeaders.isEmpty() || !HttpHeaders.AUTHORIZATION.equalsIgnoreCase(header.getKey())) {
+          requestBuilder.addHeader(header.getKey(), header.getValue());
+        }
       }
     }
-    if (authorization != null) {
+    if (serviceAuthHeaders.isEmpty() && authorization != null) {
       requestBuilder.addHeader(HttpHeaders.AUTHORIZATION, authorization);
     }
+    serviceAuthHeaders.forEach(requestBuilder::setHeader);
 
     StreamingOutput streamingOutput = output -> {
       try (CloseableHttpResponse response = _fileUploadDownloadClient.getHttpClient().execute(requestBuilder.build());
@@ -245,5 +250,10 @@ public class PinotControllerLogger {
 
   private String getInstanceBaseUri(String instanceName) {
     return InstanceUtils.getInstanceBaseUri(_pinotHelixResourceManager.getHelixInstanceConfig(instanceName));
+  }
+
+  private Map<String, String> getServerAdminAuthHeaders(String instanceName) {
+    return InstanceTypeUtils.isServer(instanceName)
+        ? AuthProviderUtils.makeAuthHeadersMap(_pinotHelixResourceManager.getServerAdminAuthProvider()) : Map.of();
   }
 }

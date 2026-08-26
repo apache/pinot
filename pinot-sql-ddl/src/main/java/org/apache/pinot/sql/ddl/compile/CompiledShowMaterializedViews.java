@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.sql.ddl.compile;
 
-import java.util.Collections;
+import java.util.List;
 import javax.annotation.Nullable;
 
 
@@ -27,6 +27,6 @@ import javax.annotation.Nullable;
 /// raw MV names. Catalog-listing mirror of [CompiledShowTables].
 public final class CompiledShowMaterializedViews extends CompiledDdl {
   public CompiledShowMaterializedViews(@Nullable String databaseName) {
-    super(DdlOperation.SHOW_MATERIALIZED_VIEWS, databaseName, Collections.emptyList());
+    super(DdlOperation.SHOW_MATERIALIZED_VIEWS, databaseName, List.of());
   }
 }

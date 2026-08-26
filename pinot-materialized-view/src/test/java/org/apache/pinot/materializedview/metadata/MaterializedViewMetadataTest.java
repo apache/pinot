@@ -19,8 +19,8 @@
 package org.apache.pinot.materializedview.metadata;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata.MaterializedViewSplitSpec;
@@ -74,15 +74,15 @@ public class MaterializedViewMetadataTest {
   public void testDefinitionWithNoSplitSpec() {
     MaterializedViewDefinitionMetadata metadata = new MaterializedViewDefinitionMetadata(
         "mv_OFFLINE",
-        Collections.singletonList("src_OFFLINE"),
+        List.of("src_OFFLINE"),
         null,
-        Collections.emptyMap(),
+        Map.of(),
         null);
 
     ZNRecord znRecord = metadata.toZNRecord();
     MaterializedViewDefinitionMetadata restored = MaterializedViewDefinitionMetadata.fromZNRecord(znRecord);
 
-    assertEquals(restored.getBaseTables(), Collections.singletonList("src_OFFLINE"));
+    assertEquals(restored.getBaseTables(), List.of("src_OFFLINE"));
     assertNull(restored.getDefinedSql());
     assertTrue(restored.getPartitionExprMaps().isEmpty());
     assertNull(restored.getSplitSpec());
@@ -177,10 +177,10 @@ public class MaterializedViewMetadataTest {
         new MaterializedViewSplitSpec("ts", "1:MILLISECONDS:TIMESTAMP", "ts",
             "1:MILLISECONDS:TIMESTAMP", 86400000L);
     MaterializedViewDefinitionMetadata a = new MaterializedViewDefinitionMetadata(
-        "mv_OFFLINE", Collections.singletonList("orders"),
+        "mv_OFFLINE", List.of("orders"),
         "SELECT ts FROM orders", partitionExprMaps, splitSpec, 0L, true);
     MaterializedViewDefinitionMetadata b = new MaterializedViewDefinitionMetadata(
-        "mv_OFFLINE", Collections.singletonList("orders"),
+        "mv_OFFLINE", List.of("orders"),
         "SELECT ts FROM orders", new HashMap<>(partitionExprMaps),
         new MaterializedViewSplitSpec("ts", "1:MILLISECONDS:TIMESTAMP", "ts",
             "1:MILLISECONDS:TIMESTAMP", 86400000L),
@@ -192,41 +192,41 @@ public class MaterializedViewMetadataTest {
     // omits a field. Use a fresh `a` baseline for each delta so order in the chain doesn't
     // matter.
     MaterializedViewDefinitionMetadata diffName = new MaterializedViewDefinitionMetadata(
-        "mv_other_OFFLINE", Collections.singletonList("orders"),
+        "mv_other_OFFLINE", List.of("orders"),
         "SELECT ts FROM orders", partitionExprMaps, splitSpec, 0L, true);
     assertNotEquals(a, diffName);
 
     MaterializedViewDefinitionMetadata diffBase = new MaterializedViewDefinitionMetadata(
-        "mv_OFFLINE", Collections.singletonList("products"),
+        "mv_OFFLINE", List.of("products"),
         "SELECT ts FROM orders", partitionExprMaps, splitSpec, 0L, true);
     assertNotEquals(a, diffBase);
 
     MaterializedViewDefinitionMetadata diffSql = new MaterializedViewDefinitionMetadata(
-        "mv_OFFLINE", Collections.singletonList("orders"),
+        "mv_OFFLINE", List.of("orders"),
         "SELECT ts FROM other", partitionExprMaps, splitSpec, 0L, true);
     assertNotEquals(a, diffSql);
 
     Map<String, String> diffExprMap = new HashMap<>();
     diffExprMap.put("ts", "renamed_ts");
     MaterializedViewDefinitionMetadata diffExpr = new MaterializedViewDefinitionMetadata(
-        "mv_OFFLINE", Collections.singletonList("orders"),
+        "mv_OFFLINE", List.of("orders"),
         "SELECT ts FROM orders", diffExprMap, splitSpec, 0L, true);
     assertNotEquals(a, diffExpr);
 
     MaterializedViewSplitSpec diffSpec =
         new MaterializedViewSplitSpec("ts", "1:HOURS:EPOCH", "ts", "1:HOURS:EPOCH", 86400000L);
     MaterializedViewDefinitionMetadata diffSplit = new MaterializedViewDefinitionMetadata(
-        "mv_OFFLINE", Collections.singletonList("orders"),
+        "mv_OFFLINE", List.of("orders"),
         "SELECT ts FROM orders", partitionExprMaps, diffSpec, 0L, true);
     assertNotEquals(a, diffSplit);
 
     MaterializedViewDefinitionMetadata diffStaleness = new MaterializedViewDefinitionMetadata(
-        "mv_OFFLINE", Collections.singletonList("orders"),
+        "mv_OFFLINE", List.of("orders"),
         "SELECT ts FROM orders", partitionExprMaps, splitSpec, 60000L, true);
     assertNotEquals(a, diffStaleness);
 
     MaterializedViewDefinitionMetadata diffRewrite = new MaterializedViewDefinitionMetadata(
-        "mv_OFFLINE", Collections.singletonList("orders"),
+        "mv_OFFLINE", List.of("orders"),
         "SELECT ts FROM orders", partitionExprMaps, splitSpec, 0L, false);
     assertNotEquals(a, diffRewrite);
   }

@@ -42,11 +42,9 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
 
-/**
- * Unit-tests the public entry points of {@link PageCacheWarmupServerQueryExecutor}
- * without executing real queries.  Heavy behaviour is stubbed by spying the
- * {@code warmupTable(..)} private method.
- */
+/// Unit-tests the public entry points of {@link PageCacheWarmupServerQueryExecutor}
+/// without executing real queries.  Heavy behaviour is stubbed by spying the
+/// {@code warmupTable(..)} private method.
 public class PageCacheWarmupServerQueryExecutorTest {
 
   private InstanceDataManager _instanceMgr;
@@ -72,7 +70,7 @@ public class PageCacheWarmupServerQueryExecutorTest {
         _instanceMgr, _queryScheduler, cfg, mock(HelixManager.class)));
   }
 
-  /** Table enables warm‑up; verify computed per‑replica QPS for both restart and refresh. */
+  /// Table enables warm‑up; verify computed per‑replica QPS for both restart and refresh.
   @Test
   public void testWarmupEnabling() throws Exception {
     String table = "testTable";
@@ -117,9 +115,7 @@ public class PageCacheWarmupServerQueryExecutorTest {
         "Refresh QPS should be (maxQPS / replication) * rateLimit (1.0)");
   }
 
-  /**
-   * warmupTable() completes within the configured timeout.
-   */
+  /// warmupTable() completes within the configured timeout.
   @Test
   public void testRateLimiterCompletesWithinTimeout() throws Exception {
     String table = "testTable";

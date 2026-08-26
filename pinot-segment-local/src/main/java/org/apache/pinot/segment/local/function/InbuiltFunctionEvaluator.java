@@ -19,16 +19,14 @@
 package org.apache.pinot.segment.local.function;
 
 
-/**
- * Deprecated forwarding wrapper for the legacy inbuilt evaluator type name.
- *
- * <p>Instances inherit the thread-safety characteristics of
- * {@link org.apache.pinot.common.evaluator.InbuiltFunctionEvaluator}.
- *
- * <p>TODO: Delete this shim after Pinot 1.6.0 is released.
- *
- * @deprecated Use {@link org.apache.pinot.common.evaluator.InbuiltFunctionEvaluator} instead.
- */
+/// Deprecated forwarding wrapper for the legacy inbuilt evaluator type name.
+///
+/// Instances inherit the thread-safety characteristics of
+/// [org.apache.pinot.common.evaluator.InbuiltFunctionEvaluator].
+///
+/// TODO: Delete this shim after Pinot 1.6.0 is released.
+///
+/// @deprecated Use [org.apache.pinot.common.evaluator.InbuiltFunctionEvaluator] instead.
 @Deprecated
 public class InbuiltFunctionEvaluator extends org.apache.pinot.common.evaluator.InbuiltFunctionEvaluator
     implements FunctionEvaluator {

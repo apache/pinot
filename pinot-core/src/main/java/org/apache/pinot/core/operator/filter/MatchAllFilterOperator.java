@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.CaseFormat;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.ExplainPlanRows;
@@ -48,7 +47,7 @@ public class MatchAllFilterOperator extends BaseFilterOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override

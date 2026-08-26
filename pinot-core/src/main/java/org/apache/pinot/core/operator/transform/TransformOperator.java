@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.transform;
 
 import com.google.common.base.CaseFormat;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,9 +39,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.trace.Tracing;
 
 
-/**
- * Class for evaluating transform expressions.
- */
+/// Class for evaluating transform expressions.
 public class TransformOperator extends BaseProjectOperator<TransformBlock> {
   private static final String EXPLAIN_NAME = "TRANSFORM";
 
@@ -110,7 +107,7 @@ public class TransformOperator extends BaseProjectOperator<TransformBlock> {
 
   @Override
   public List<BaseProjectOperator<?>> getChildOperators() {
-    return Collections.singletonList(_projectOperator);
+    return List.of(_projectOperator);
   }
 
   @Override

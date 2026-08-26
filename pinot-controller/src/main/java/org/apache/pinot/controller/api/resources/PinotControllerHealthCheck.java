@@ -29,7 +29,6 @@ import io.swagger.annotations.SwaggerDefinition;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
-import java.util.Collections;
 import java.util.Map;
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -129,7 +128,7 @@ public class PinotControllerHealthCheck {
   public Response getConfigWarnings() {
     Map<String, String> warnings = _controllerConf.getInvalidConfigs();
     if (warnings.isEmpty()) {
-      return Response.ok(Collections.emptyMap()).build();
+      return Response.ok(Map.of()).build();
     }
 
     return Response.ok(warnings).build();

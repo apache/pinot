@@ -21,10 +21,20 @@ package org.apache.pinot.controller.api;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.entity.mime.FileBody;
+import org.apache.hc.client5.http.entity.mime.MultipartEntityBuilder;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.ParseException;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
@@ -43,10 +53,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for the ingestion restlet
- *
- */
+/// Tests for the ingestion restlet
 @Test(groups = "stateless")
 public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
   private static final String TABLE_NAME = "testTable";
@@ -57,9 +64,7 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
   public void setUp()
       throws Exception {
     startZk();
-    Map<String, Object> controllerConfig = getDefaultControllerConfiguration();
-    controllerConfig.put(ControllerConf.INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM, true);
-    startController(controllerConfig);
+    startController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
     addFakeServerInstancesToAutoJoinHelixCluster(1, true);
 
@@ -97,22 +102,64 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
     Map<String, String> batchConfigMap = new HashMap<>();
     batchConfigMap.put(BatchConfigProperties.INPUT_FORMAT, "csv");
     batchConfigMap.put(String.format("%s.delimiter", BatchConfigProperties.RECORD_READER_PROP_PREFIX), "|");
+
+    // Local URI validation happens before any working directory or segment is created, and the response does not
+    // expose the submitted path.
+    String sensitivePathToken = "controller-secret-ingest-source.csv";
+    String localUriResponse = sendHttpPost(adminClient.getFileIngestClient()
+        .buildIngestFromUriUrl(TABLE_NAME_WITH_TYPE, batchConfigMap, "file:///private/" + sensitivePathToken), 400);
+    assertFalse(localUriResponse.contains(sensitivePathToken));
+
+    String malformedUriToken = "malformed-controller-secret.csv";
+    String malformedUriResponse = sendHttpPost(adminClient.getFileIngestClient()
+        .buildIngestFromUriUrl(TABLE_NAME_WITH_TYPE, batchConfigMap, "file:///%" + malformedUriToken), 400);
+    assertFalse(malformedUriResponse.contains(malformedUriToken));
+    assertFalse(ingestionDir.exists());
+    segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false);
+    assertEquals(segments.size(), 0);
+
     assertEquals(adminClient.getFileIngestClient().ingestFromFile(TABLE_NAME_WITH_TYPE, batchConfigMap, _inputFile),
         200);
     segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false);
     assertEquals(segments.size(), 1);
 
-    // ingest from URI
-    assertEquals(adminClient.getFileIngestClient()
-            .ingestFromUri(TABLE_NAME_WITH_TYPE, batchConfigMap,
-                String.format("file://%s", _inputFile.getAbsolutePath()), _inputFile),
-        200);
-    segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false);
-    assertEquals(segments.size(), 2);
+    // The compatibility option explicitly restores local URI ingestion.
+    _controllerConfig.setProperty(ControllerConf.INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM, true);
+    try {
+      assertEquals(adminClient.getFileIngestClient()
+              .ingestFromUri(TABLE_NAME_WITH_TYPE, batchConfigMap,
+                  String.format("file://%s", _inputFile.getAbsolutePath()), _inputFile),
+          200);
+      segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false);
+      assertEquals(segments.size(), 2);
+    } finally {
+      _controllerConfig.setProperty(ControllerConf.INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM, false);
+    }
 
     // the ingestion dir exists after ingesting files. We check the existence to make sure this dir is created under
     // _controllerConfig.getLocalTempDir()
     assertTrue(ingestionDir.exists());
+  }
+
+  private String sendHttpPost(String uri, int expectedStatusCode)
+      throws IOException {
+    HttpPost httpPost = new HttpPost(uri);
+    HttpEntity reqEntity =
+        MultipartEntityBuilder.create().addPart("file", new FileBody(_inputFile.getAbsoluteFile())).build();
+    httpPost.setEntity(reqEntity);
+    try (CloseableHttpClient httpClient = HttpClientBuilder.create().build()) {
+      return httpClient.execute(httpPost, response -> {
+        String responseBody;
+        try {
+          responseBody = response.getEntity() != null
+              ? EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8) : "";
+        } catch (ParseException e) {
+          throw new IOException(e);
+        }
+        assertEquals(response.getCode(), expectedStatusCode, responseBody);
+        return responseBody;
+      });
+    }
   }
 
   @AfterClass

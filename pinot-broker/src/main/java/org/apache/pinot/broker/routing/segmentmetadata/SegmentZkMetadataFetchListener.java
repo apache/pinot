@@ -24,33 +24,26 @@ import javax.annotation.Nullable;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 
 
-/**
- * Interface to register with {@link SegmentZkMetadataFetcher}.
- *
- * <p>When registered, SegmentZKMetadataFetcher will fetch {@link ZNRecord} for associated {@code onlineSegments} list
- * or refreshed {@code segment}. Thus batch up all ZK access for segment metadata.
- */
+/// Interface to register with [SegmentZkMetadataFetcher].
+///
+/// When registered, SegmentZKMetadataFetcher will fetch [ZNRecord] for associated `onlineSegments` list
+/// or refreshed `segment`. Thus batch up all ZK access for segment metadata.
 public interface SegmentZkMetadataFetchListener {
 
-  /**
-   * Initializes the segment pruner with the ideal state, external view and online segments (segments with
-   * ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}). Should be called
-   * only once before calling other methods.
-   */
+  /// Initializes the segment pruner with the ideal state, external view and online segments (segments with
+  /// ONLINE/CONSUMING instances in the ideal state and pre-selected by the
+  /// [org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector]). Should be called only once before
+  /// calling other methods.
   void init(IdealState idealState, ExternalView externalView, List<String> onlineSegments, List<ZNRecord> znRecords);
 
-  /**
-   * Processes the segment assignment (ideal state or external view) change based on the given online segments (segments
-   * with ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}).
-   */
+  /// Processes the segment assignment (ideal state or external view) change based on the given online segments
+  /// (segments with ONLINE/CONSUMING instances in the ideal state and pre-selected by the
+  /// [org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector]).
   void onAssignmentChange(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
       List<String> pulledSegments, List<ZNRecord> znRecords);
 
-  /**
-   * Refreshes the metadata for the given segment (called when segment is getting refreshed).
-   */
+  /// Refreshes the metadata for the given segment (called when segment is getting refreshed).
   void refreshSegment(String segment, @Nullable ZNRecord znRecord);
 }

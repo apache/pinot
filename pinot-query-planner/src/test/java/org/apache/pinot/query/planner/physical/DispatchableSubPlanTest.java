@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.query.planner.physical;
 
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.calcite.runtime.PairList;
 import org.apache.pinot.common.utils.DataSchema;
@@ -29,6 +29,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
@@ -39,16 +40,16 @@ public class DispatchableSubPlanTest {
   @Test
   public void testIsAllLeafStagesEmptyTrue() {
     DispatchableSubPlan plan = new DispatchableSubPlan(
-        PairList.of(0, "col1"), Collections.emptyMap(), Set.of("testTable"),
-        Collections.emptyMap(), 5, true);
+        PairList.of(0, "col1"), Map.of(), Set.of("testTable"),
+        Map.of(), 5, true);
     assertTrue(plan.isAllLeafStagesEmpty());
   }
 
   @Test
   public void testIsAllLeafStagesEmptyFalse() {
     DispatchableSubPlan plan = new DispatchableSubPlan(
-        PairList.of(0, "col1"), Collections.emptyMap(), Set.of("testTable"),
-        Collections.emptyMap(), 3, false);
+        PairList.of(0, "col1"), Map.of(), Set.of("testTable"),
+        Map.of(), 3, false);
     assertFalse(plan.isAllLeafStagesEmpty());
   }
 
@@ -56,8 +57,8 @@ public class DispatchableSubPlanTest {
   public void testIsAllLeafStagesEmptyDefaultFalse() {
     // 5-arg constructor defaults to false
     DispatchableSubPlan plan = new DispatchableSubPlan(
-        PairList.of(0, "col1"), Collections.emptyMap(), Set.of("testTable"),
-        Collections.emptyMap(), 5);
+        PairList.of(0, "col1"), Map.of(), Set.of("testTable"),
+        Map.of(), 5);
     assertFalse(plan.isAllLeafStagesEmpty());
   }
 
@@ -65,24 +66,27 @@ public class DispatchableSubPlanTest {
   public void testIsAllLeafStagesEmptyNoTables() {
     // Constant expression query (no tables) — flag can still be false
     DispatchableSubPlan plan = new DispatchableSubPlan(
-        PairList.of(0, "col1"), Collections.emptyMap(), Collections.emptySet(),
-        Collections.emptyMap(), 0, false);
+        PairList.of(0, "col1"), Map.of(), Set.of(),
+        Map.of(), 0, false);
     assertFalse(plan.isAllLeafStagesEmpty());
   }
 
   @Test
-  public void testCopyWithRootPreservesFragmentId() {
+  public void testCopyWithRootPreservesFragmentIdAndSegmentsMap() {
     ValueNode oldRoot = new ValueNode(0, new DataSchema(new String[0], new ColumnDataType[0]),
         PlanNode.NodeHint.EMPTY, List.of(), List.of());
     PlanFragment fragment = new PlanFragment(0, oldRoot, List.of());
     DispatchablePlanFragment original = new DispatchablePlanFragment(fragment);
+    Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = Map.of(0, Map.of("OFFLINE", List.of("segment0")));
+    original.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
 
     ValueNode newRoot = new ValueNode(0, new DataSchema(new String[0], new ColumnDataType[0]),
         PlanNode.NodeHint.EMPTY, List.of(), List.of());
     DispatchablePlanFragment copy = DispatchablePlanFragment.copyWithRoot(original, newRoot);
 
-    org.testng.Assert.assertEquals(copy.getPlanFragment().getFragmentId(), 0);
+    assertEquals(copy.getPlanFragment().getFragmentId(), 0);
     assertSame(copy.getPlanFragment().getFragmentRoot(), newRoot);
     assertSame(original.getPlanFragment().getFragmentRoot(), oldRoot);
+    assertEquals(copy.getWorkerIdToSegmentsMap(), workerIdToSegmentsMap);
   }
 }

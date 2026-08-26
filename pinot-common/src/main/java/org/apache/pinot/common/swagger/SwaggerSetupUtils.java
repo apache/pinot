@@ -18,16 +18,24 @@
  */
 package org.apache.pinot.common.swagger;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.swagger.jaxrs.config.BeanConfig;
+import io.swagger.models.SecurityRequirement;
+import io.swagger.models.Swagger;
+import io.swagger.models.auth.ApiKeyAuthDefinition;
+import io.swagger.models.auth.In;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.function.UnaryOperator;
+import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.PinotStaticHttpHandler;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
+import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 
 
@@ -37,6 +45,32 @@ public class SwaggerSetupUtils {
 
   public static void setupSwagger(String componentType, String resourcePackage, boolean useHttps, String basePath,
       HttpServer httpServer) {
+    setupSwagger(componentType, resourcePackage, useHttps, basePath, httpServer, UnaryOperator.identity());
+  }
+
+  /// Sets up the Swagger resources, applying the given wrapper to each directly registered Grizzly handler.
+  ///
+  /// @param httpHandlerWrapper wrapper for component-specific request handling such as access control
+  public static void setupSwagger(String componentType, String resourcePackage, boolean useHttps, String basePath,
+      HttpServer httpServer, UnaryOperator<HttpHandler> httpHandlerWrapper) {
+    BeanConfig beanConfig = buildSwaggerConfig(componentType, resourcePackage, useHttps, basePath);
+    beanConfig.setScan(true);
+
+    ClassLoader classLoader = SwaggerSetupUtils.class.getClassLoader();
+    CLStaticHttpHandler staticHttpHandler = new CLStaticHttpHandler(classLoader, "/api/");
+    // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
+    httpServer.getServerConfiguration().addHttpHandler(httpHandlerWrapper.apply(staticHttpHandler), "/api/", "/help/");
+
+    String swaggerVersion = findSwaggerVersion(classLoader);
+    URL swaggerDistLocation = classLoader.getResource(
+            CommonConstants.CONFIG_OF_SWAGGER_RESOURCES_PATH + swaggerVersion + "/");
+    CLStaticHttpHandler swaggerDist = new PinotStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
+    httpServer.getServerConfiguration().addHttpHandler(httpHandlerWrapper.apply(swaggerDist), "/swaggerui-dist/");
+  }
+
+  @VisibleForTesting
+  static BeanConfig buildSwaggerConfig(String componentType, String resourcePackage, boolean useHttps,
+      String basePath) {
     BeanConfig beanConfig = new BeanConfig();
     beanConfig.setTitle(String.format("Pinot %s API", componentType));
     beanConfig.setDescription(String.format("APIs for accessing Pinot %s information", componentType));
@@ -50,18 +84,16 @@ public class SwaggerSetupUtils {
     }
     beanConfig.setBasePath(basePath);
     beanConfig.setResourcePackage(resourcePackage);
-    beanConfig.setScan(true);
+    addAuthorizationHeaderSecurity(beanConfig.getSwagger());
+    return beanConfig;
+  }
 
-    ClassLoader classLoader = SwaggerSetupUtils.class.getClassLoader();
-    CLStaticHttpHandler staticHttpHandler = new CLStaticHttpHandler(classLoader, "/api/");
-    // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
-    httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/api/", "/help/");
-
-    String swaggerVersion = findSwaggerVersion(classLoader);
-    URL swaggerDistLocation = classLoader.getResource(
-            CommonConstants.CONFIG_OF_SWAGGER_RESOURCES_PATH + swaggerVersion + "/");
-    CLStaticHttpHandler swaggerDist = new PinotStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
-    httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
+  private static void addAuthorizationHeaderSecurity(Swagger swagger) {
+    ApiKeyAuthDefinition authorizationHeader =
+        new ApiKeyAuthDefinition(HttpHeaders.AUTHORIZATION, In.HEADER);
+    authorizationHeader.setDescription("Pinot authentication token. Use \"Basic <token>\" or \"Bearer <token>\".");
+    swagger.securityDefinition(CommonConstants.SWAGGER_AUTHORIZATION_KEY, authorizationHeader);
+    swagger.security(new SecurityRequirement().requirement(CommonConstants.SWAGGER_AUTHORIZATION_KEY));
   }
 
   private static String findSwaggerVersion(ClassLoader classLoader) {

@@ -25,7 +25,7 @@
   <parent>
     <groupId>org.apache</groupId>
     <artifactId>apache</artifactId>
-    <version>38</version>
+    <version>39</version>
     <relativePath />
   </parent>
 
@@ -59,6 +59,7 @@
     <module>pinot-connectors</module>
     <module>pinot-segment-local</module>
     <module>pinot-compatibility-verifier</module>
+    <module>pinot-java11-client-verifier</module>
     <module>pinot-query-planner-spi</module>
     <module>pinot-query-planner</module>
     <module>pinot-query-runtime</module>
@@ -115,12 +116,12 @@
     <pinot.root>${basedir}</pinot.root>
     <build.profile.id>dev</build.profile.id>
     <!--
-      Pinot services build against Java 21 by default. SPI/client modules consumed
+      Pinot services build against Java 25 by default. SPI/client modules consumed
       by external JVMs (pinot-spi, pinot-segment-spi, pinot-timeseries-spi,
       pinot-common, pinot-java-client, pinot-jdbc-client) hard-code Java 11
       bytecode in their own maven-compiler-plugin configuration.
     -->
-    <jdk.version>21</jdk.version>
+    <jdk.version>25</jdk.version>
     <!-- OS classifier for platform-specific protoc/grpc binaries, overridden by OS detection profiles -->
     <os.detected.classifier>linux-x86_64</os.detected.classifier>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -138,9 +139,36 @@
     <!-- Only unit tests are run by default. -->
     <skip.integration.tests>true</skip.integration.tests>
     <skip.unit.tests>false</skip.unit.tests>
+    <!--
+      Per-fork heap for unit tests. Defaults to 4g to preserve historical behavior. When
+      running multiple parallel forks (unit.test.fork.count > 1) CI lowers this so that
+      N forks * heap + the Maven JVM stay within the runner's memory.
+    -->
+    <unit.test.fork.heap>4g</unit.test.fork.heap>
     <!-- Sets the VM argument line used when unit tests are run. -->
-    <argLine>-Xms4g -Xmx4g</argLine>
+    <argLine>-Xms${unit.test.fork.heap} -Xmx${unit.test.fork.heap}</argLine>
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
+    <!--
+      Number of parallel JVM forks used by surefire for unit tests. Defaults to 1 to
+      preserve the historical single-fork behavior for local/dev builds. CI overrides
+      this (e.g. -Dunit.test.fork.count=3) to run test classes in parallel forks and
+      shorten the unit-test phase. Must be a positive integer.
+    -->
+    <unit.test.fork.count>1</unit.test.fork.count>
+    <!--
+      Number of times surefire retries a failing unit test before failing the build. Defaults to
+      0 (no retry) so local/dev behavior is unchanged; CI raises it to absorb a few pre-existing
+      load-sensitive flaky tests exposed by parallel forks. A test passing only on retry is
+      reported as flaky, not silently passed.
+    -->
+    <unit.test.rerun.count>0</unit.test.rerun.count>
+    <!--
+      Suffix for the JaCoCo exec file name. Empty by default so coverage writes the
+      historical target/jacoco.exec (used by report / report-aggregate everywhere). The
+      unit-test script sets this to -${surefire.forkNumber} so parallel forks each write a
+      distinct jacoco-<n>.exec instead of appending to one shared file.
+    -->
+    <jacoco.exec.suffix></jacoco.exec.suffix>
 
     <!-- Checkstyle violation prop.-->
     <checkstyle.violation.severity>warning</checkstyle.violation.severity>
@@ -155,19 +183,21 @@
     <pinot.skip.remote.resources>false</pinot.skip.remote.resources>
 
     <arrow.version>19.0.0</arrow.version>
-    <avro.version>1.12.1</avro.version>
-    <parquet.version>1.17.1</parquet.version>
-    <orc.version>1.9.8</orc.version>
-    <hive.version>2.8.1</hive.version>
-    <helix.version>2.0.0</helix.version>
+    <avro.version>1.12.2</avro.version>
+    <bson.version>5.10.0</bson.version>
+    <parquet.version>1.18.0</parquet.version>
+    <orc.version>1.9.9</orc.version>
+    <hive.version>4.2.1</hive.version>
+    <helix.version>2.0.1</helix.version>
     <zkclient.version>0.11</zkclient.version>
-    <jackson.version>2.22.0</jackson.version>
+    <jackson.version>2.22.2</jackson.version>
+    <fory.version>1.6.1</fory.version>
     <zookeeper.version>3.9.5</zookeeper.version>
-    <async-http-client.version>3.0.11</async-http-client.version>
+    <async-http-client.version>3.0.13</async-http-client.version>
     <jersey.version>2.48</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.16</swagger.version>
-    <swagger-ui.version>5.32.6</swagger-ui.version>
+    <swagger-ui.version>5.32.14</swagger-ui.version>
     <hadoop.version>3.4.3</hadoop.version>
     <jsonpath.version>2.10.0</jsonpath.version>
     <jsonsmart.version>2.6.0</jsonsmart.version>
@@ -182,59 +212,59 @@
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.39</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.8</snappy-java.version>
-    <zstd-jni.version>1.5.7-11</zstd-jni.version>
-    <lz4-java.version>1.11.0</lz4-java.version>
-    <libthrift.version>0.23.0</libthrift.version>
-    <log4j.version>2.26.0</log4j.version>
+    <zstd-jni.version>1.5.7-15</zstd-jni.version>
+    <lz4-java.version>1.11.2</lz4-java.version>
+    <libthrift.version>0.24.0</libthrift.version>
+    <log4j.version>2.26.1</log4j.version>
     <slf4j.version>2.0.18</slf4j.version>
-    <netty.version>4.1.135.Final</netty.version>
+    <netty.version>4.1.137.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.20.0</jts.version>
-    <h3.version>4.4.0</h3.version>
+    <h3.version>4.5.0</h3.version>
     <ipaddress.version>5.6.2</ipaddress.version>
     <openhft.chronicle-bom.version>2.27ea100</openhft.chronicle-bom.version>
     <jmh.version>1.37</jmh.version>
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.3.0</stax2-api.version>
-    <aws.sdk.version>2.46.13</aws.sdk.version>
+    <aws.sdk.version>2.54.2</aws.sdk.version>
     <azure.sdk.version>1.3.7</azure.sdk.version>
-    <azure.msal4j.version>1.25.0</azure.msal4j.version>
-    <joda-time.version>2.14.2</joda-time.version>
+    <azure.msal4j.version>1.26.0</azure.msal4j.version>
+    <joda-time.version>2.14.3</joda-time.version>
     <janino.version>3.1.12</janino.version>
-    <ayza.version>10.0.5</ayza.version>
+    <ayza.version>10.0.6</ayza.version>
     <jbcrypt.version>0.4</jbcrypt.version>
     <scala-xml.version>2.4.0</scala-xml.version>
-    <plexus-classworlds.version>2.12.0</plexus-classworlds.version>
+    <plexus-classworlds.version>2.12.1</plexus-classworlds.version>
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
-    <checker-qual.version>4.2.0</checker-qual.version>
+    <checker-qual.version>4.2.2</checker-qual.version>
     <groovy.version>3.0.25</groovy.version>
     <xml-apis.version>2.0.2</xml-apis.version>
-    <roaring-bitmap.version>1.6.14</roaring-bitmap.version>
+    <roaring-bitmap.version>1.6.20</roaring-bitmap.version>
     <prometheus.jmx-exporter.version>1.6.0</prometheus.jmx-exporter.version>
     <prometheus.metrics.version>1.8.0</prometheus.metrics.version>
-    <fastutil.version>8.5.18</fastutil.version>
+    <fastutil.version>8.5.19</fastutil.version>
     <disruptor.version>4.0.0</disruptor.version>
     <snakeyaml.version>2.6</snakeyaml.version>
     <hadoop-shaded-protobuf_3_25.version>1.5.0</hadoop-shaded-protobuf_3_25.version>
     <clearspring-stream-lib.version>2.9.8</clearspring-stream-lib.version>
-    <datasketches-java.version>6.2.0</datasketches-java.version>
-    <t-digest.version>3.2</t-digest.version>
+    <datasketches-java.version>9.0.0</datasketches-java.version>
+    <t-digest.version>3.3</t-digest.version>
     <picocli.version>4.7.7</picocli.version>
     <tyrus-standalone-client.version>2.2.2</tyrus-standalone-client.version>
     <jopt-simple.version>5.0.4</jopt-simple.version>
 
-    <spark3.version>3.5.8</spark3.version>
+    <spark3.version>3.5.9</spark3.version>
     <kafka3.version>3.9.2</kafka3.version>
     <kafka4.version>4.2.0</kafka4.version>
     <confluent.version>8.2.0</confluent.version>
-    <pulsar.version>4.0.11</pulsar.version>
-    <flink.version>2.2.1</flink.version>
+    <pulsar.version>4.0.13</pulsar.version>
+    <flink.version>2.3.0</flink.version>
 
     <!-- Apache Commons Libraries -->
     <commons-lang3.version>3.20.0</commons-lang3.version>
-    <commons-collections4.version>4.5.0</commons-collections4.version>
+    <commons-collections4.version>4.6.0</commons-collections4.version>
     <commons-text.version>1.15.0</commons-text.version>
     <commons-compress.version>1.28.0</commons-compress.version>
     <commons-math3.version>3.6.1</commons-math3.version>
@@ -242,10 +272,10 @@
     <commons-configuration2.version>2.15.1</commons-configuration2.version>
     <commons-beanutils.version>1.11.0</commons-beanutils.version>
     <commons-io.version>2.22.0</commons-io.version>
-    <commons-codec.version>1.22.0</commons-codec.version>
+    <commons-codec.version>1.22.1</commons-codec.version>
     <commons-cli.version>1.11.0</commons-cli.version>
     <commons-net.version>3.13.0</commons-net.version>
-    <commons-validator.version>1.10.1</commons-validator.version>
+    <commons-validator.version>1.11.0</commons-validator.version>
 
     <!-- Java EE Libraries -->
     <!-- Include both newer jakarta ones and older javax ones, but not migrate to Jakarta EE yet -->
@@ -265,14 +295,14 @@
     <!-- HTTP Components Libraries -->
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <httpclient5.version>5.6.1</httpclient5.version>
-    <httpcore5.version>5.4.2</httpcore5.version>
+    <httpclient5.version>5.6.4</httpclient5.version>
+    <httpcore5.version>5.4.3</httpcore5.version>
 
     <!-- Google Libraries -->
-    <protobuf.version>4.35.1</protobuf.version>
-    <grpc.version>1.82.0</grpc.version>
-    <google.cloud.libraries.version>26.84.0</google.cloud.libraries.version>
-    <opentelemetry.gcp.resources.version>1.57.0-alpha</opentelemetry.gcp.resources.version>
+    <protobuf.version>4.36.0</protobuf.version>
+    <grpc.version>1.83.1</grpc.version>
+    <google.cloud.libraries.version>26.86.0</google.cloud.libraries.version>
+    <opentelemetry.gcp.resources.version>1.59.0-alpha</opentelemetry.gcp.resources.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.50.0</google.errorprone.version>
@@ -289,38 +319,38 @@
     <enforcer-api.version>3.6.3</enforcer-api.version>
     <maven.version>3.9.16</maven.version>
     <jdom2.version>2.0.6.1</jdom2.version>
-    <plexus-utils.version>4.0.3</plexus-utils.version>
-    <plexus-xml.version>3.0.2</plexus-xml.version>
+    <plexus-utils.version>4.1.0</plexus-utils.version>
+    <plexus-xml.version>3.1.0</plexus-xml.version>
 
     <!-- For maven-antrun-plugin -->
     <fmpp.version>0.9.16</fmpp.version>
 
     <!-- Solve conflicts and vulnerabilities -->
-    <kerby.version>2.1.1</kerby.version>
-    <jline.version>4.2.1</jline.version>
+    <kerby.version>2.1.2</kerby.version>
+    <jline.version>4.3.1</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
-    <jettison.version>1.5.6</jettison.version>
+    <jettison.version>1.5.7</jettison.version>
     <nimbus-jose-jwt.version>10.9.1</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.5</dnsjava.version>
     <eclipse.jetty.version>9.4.58.v20250814</eclipse.jetty.version>
-    <woodstox.version>7.2.1</woodstox.version>
+    <woodstox.version>7.2.2</woodstox.version>
     <curator.version>5.9.0</curator.version>
-    <javassist.version>3.31.0-GA</javassist.version>
-    <bouncycastle.version>1.84</bouncycastle.version>
+    <javassist.version>3.32.0-GA</javassist.version>
+    <bouncycastle.version>1.85</bouncycastle.version>
     <aircompressor.version>2.0.3</aircompressor.version>
     <jna.version>5.19.1</jna.version>
-    <jnr-ffi.version>2.2.19</jnr-ffi.version>
-    <jnr-constants.version>0.10.4</jnr-constants.version>
+    <jnr-ffi.version>2.3.1</jnr-ffi.version>
+    <jnr-constants.version>0.11.0</jnr-constants.version>
     <asm.version>9.10.1</asm.version>
     <paranamer.version>2.8.3</paranamer.version>
-    <kotlin.stdlib.version>2.4.0</kotlin.stdlib.version>
+    <kotlin.stdlib.version>2.4.10</kotlin.stdlib.version>
     <jetbrains.annotations.version>26.1.0</jetbrains.annotations.version>
-    <okio.version>3.17.0</okio.version>
+    <okio.version>3.18.1</okio.version>
     <kryo.version>2.24.0</kryo.version>
-    <objenesis.version>3.5</objenesis.version>
+    <objenesis.version>3.6</objenesis.version>
     <chill.version>0.10.0</chill.version>
     <HikariCP-java7.version>2.4.13</HikariCP-java7.version>
-    <ivy.version>2.5.3</ivy.version>
+    <ivy.version>2.6.0</ivy.version>
     <c3p0.version>0.14.1</c3p0.version>
     <mchange-commons-java.version>0.6.1</mchange-commons-java.version>
     <animal-sniffer-annotations.version>1.27</animal-sniffer-annotations.version>
@@ -332,7 +362,7 @@
     <equalsverifier.version>3.19.4</equalsverifier.version>
     <testcontainers.version>2.0.5</testcontainers.version>
     <h2.version>2.4.240</h2.version>
-    <jnr-posix.version>3.1.22</jnr-posix.version>
+    <jnr-posix.version>3.2.2</jnr-posix.version>
     <scalatest.version>3.2.20</scalatest.version>
     <assertj.version>3.27.7</assertj.version>
 
@@ -555,7 +585,9 @@
         <activeByDefault>false</activeByDefault>
       </activation>
       <properties>
-        <argLine>-Xms4g -Xmx4g -Dlog4j2.configurationFile=log4j2.xml</argLine>
+        <!-- Inherits unit.test.fork.heap from the global properties (overridable via
+             -Dunit.test.fork.heap); adds the log4j2 config used under github-actions. -->
+        <argLine>-Xms${unit.test.fork.heap} -Xmx${unit.test.fork.heap} -Dlog4j2.configurationFile=log4j2.xml</argLine>
       </properties>
     </profile>
     <profile>
@@ -576,6 +608,13 @@
                   <includes>
                     <include>org/apache/pinot/**/*</include>
                   </includes>
+                  <!-- Exec file suffix defaults to empty, keeping the historical
+                       target/jacoco.exec used by report / report-aggregate everywhere (incl.
+                       the integration lanes). The unit-test script sets jacoco.exec.suffix to
+                       -${surefire.forkNumber} so parallel forks (forkCount > 1) each write a
+                       distinct jacoco-<n>.exec instead of appending to one shared file; it
+                       then aggregates with a matching jacoco-*.exec glob. -->
+                  <destFile>${project.build.directory}/jacoco${jacoco.exec.suffix}.exec</destFile>
                 </configuration>
               </execution>
             </executions>
@@ -776,6 +815,11 @@
         <groupId>org.apache.avro</groupId>
         <artifactId>avro</artifactId>
         <version>${avro.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mongodb</groupId>
+        <artifactId>bson</artifactId>
+        <version>${bson.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.avro</groupId>
@@ -1388,6 +1432,11 @@
         <groupId>com.jayway.jsonpath</groupId>
         <artifactId>json-path</artifactId>
         <version>${jsonpath.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.fory</groupId>
+        <artifactId>fory-json</artifactId>
+        <version>${fory.version}</version>
       </dependency>
       <dependency>
         <groupId>net.minidev</groupId>
@@ -2148,8 +2197,6 @@
           <configuration>
             <archive>
               <manifestEntries>
-                <Build-Time>${maven.build.timestamp}</Build-Time>
-                <Implementation-Branch>${scmBranch}</Implementation-Branch>
                 <Implementation-Title>${project.artifactId}</Implementation-Title>
                 <Implementation-Version>${project.version}-${buildNumber}</Implementation-Version>
                 <Implementation-Vendor-Id>${project.groupId}</Implementation-Vendor-Id>
@@ -2162,13 +2209,20 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
           <configuration>
-            <forkCount>1</forkCount>
+            <!-- Overridable via -Dunit.test.fork.count (defaults to 1); see the property
+                 definition for details. -->
+            <forkCount>${unit.test.fork.count}</forkCount>
             <reuseForks>false</reuseForks>
+            <!-- Retries a failing test up to N times (default 0); see property definition. -->
+            <rerunFailingTestsCount>${unit.test.rerun.count}</rerunFailingTestsCount>
             <!-- 60 minutes -->
             <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
             <!-- Disable zookeeper force sync -->
             <systemPropertyVariables>
               <zookeeper.forceSync>no</zookeeper.forceSync>
+              <!-- Expose the 1-based fork index so tests can offset port bases / temp dirs per
+                   fork (1 even at forkCount=1, 1..N under parallel forks). -->
+              <surefire.forkNumber>$${surefire.forkNumber}</surefire.forkNumber>
             </systemPropertyVariables>
             <trimStackTrace>false</trimStackTrace>
             <reportFormat>plain</reportFormat>
@@ -2242,7 +2296,7 @@
         <plugin>
           <groupId>com.mycila</groupId>
           <artifactId>license-maven-plugin</artifactId>
-          <version>5.0.0</version>
+          <version>5.1.2</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
@@ -2429,7 +2483,7 @@
         <plugin>
           <groupId>org.eclipse.sisu</groupId>
           <artifactId>sisu-maven-plugin</artifactId>
-          <version>1.0.0</version>
+          <version>1.1.0</version>
           <executions>
             <execution>
               <goals>
@@ -2455,8 +2509,8 @@
             <configuration>
               <rules>
                 <requireJavaVersion>
-                  <version>[21,)</version>
-                  <message>Apache Pinot requires JDK 21 or newer to build.</message>
+                  <version>[25,)</version>
+                  <message>Apache Pinot requires JDK 25 or newer to build.</message>
                 </requireJavaVersion>
               </rules>
               <fail>true</fail>
@@ -2480,7 +2534,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>10.26.1</version>
+            <version>14.0.0</version>
           </dependency>
         </dependencies>
         <executions>
@@ -2508,8 +2562,32 @@
           <excludes>
             <exclude>**/*IT.java</exclude>
           </excludes>
-          <forkCount>1</forkCount>
+          <!-- forkCount is overridable via -Dunit.test.fork.count (defaults to 1). Each
+               fork runs a distinct test class (reuseForks=false), so raising the count
+               parallelizes classes across JVMs while preserving class-level isolation. -->
+          <forkCount>${unit.test.fork.count}</forkCount>
           <reuseForks>false</reuseForks>
+          <!-- Retries a failing test up to N times before marking it failed (default 0 = no
+               retry). CI sets this to tolerate a handful of pre-existing load-sensitive flaky
+               tests (Lucene NRT refresh, filesystem mtime) that surface only when many parallel
+               forks saturate the runner; a test that passes on retry is reported as flaky, not
+               green-washed. -->
+          <rerunFailingTestsCount>${unit.test.rerun.count}</rerunFailingTestsCount>
+          <properties>
+            <!-- Surefire is the default report writer; modules can explicitly opt into an isolated
+                 reporter. TestNG's native HTML/XML reporters write shared files and assets, which
+                 race when multiple forks use one module. -->
+            <property>
+              <name>usedefaultlisteners</name>
+              <value>false</value>
+            </property>
+          </properties>
+          <systemPropertyVariables>
+            <!-- Expose the 1-based fork index (1 even at forkCount=1, 1..N under parallel forks)
+                 so tests can offset port bases / temp dirs per fork (see ZkStarter.FORK_PORT_OFFSET,
+                 ControllerTest port bases). -->
+            <surefire.forkNumber>$${surefire.forkNumber}</surefire.forkNumber>
+          </systemPropertyVariables>
         </configuration>
         <executions>
           <execution>

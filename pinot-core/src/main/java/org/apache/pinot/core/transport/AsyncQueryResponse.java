@@ -33,9 +33,7 @@ import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsMa
 import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
-/**
- * The {@code AsyncQueryResponse} class represents an asynchronous query response.
- */
+/// The `AsyncQueryResponse` class represents an asynchronous query response.
 @ThreadSafe
 public class AsyncQueryResponse implements QueryResponse {
   private final QueryRouter _queryRouter;
@@ -198,10 +196,8 @@ public class AsyncQueryResponse implements QueryResponse {
     }
   }
 
-  /**
-   * NOTE: the server might not be hit by the query. Only fail the query if the query was sent to the server and the
-   * server hasn't responded yet.
-   */
+  /// NOTE: the server might not be hit by the query. Only fail the query if the query was sent to the server and the
+  /// server hasn't responded yet.
   void markServerDown(ServerRoutingInstance serverRoutingInstance, Exception exception) {
     ServerResponse serverResponse = _responseMap.get(serverRoutingInstance);
     if (serverResponse != null && serverResponse.getDataTable() == null) {
@@ -209,10 +205,8 @@ public class AsyncQueryResponse implements QueryResponse {
     }
   }
 
-  /**
-   * Wait for one less server response. This is used when the server is skipped, as
-   * query submission will have failed we do not want to wait for the response.
-   */
+  /// Wait for one less server response. This is used when the server is skipped, as
+  /// query submission will have failed we do not want to wait for the response.
   void skipServerResponse() {
     _countDownLatch.countDown();
   }

@@ -29,7 +29,6 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -153,7 +152,7 @@ public class PinotLeadControllerRestletResource {
     String leadControllerId =
         getParticipantInstanceIdFromExternalView(leadControllerResourceExternalView, partitionName);
     LeadControllerEntry leadControllerEntry =
-        new LeadControllerEntry(leadControllerId, Collections.singletonList(tableName));
+        new LeadControllerEntry(leadControllerId, List.of(tableName));
     leadControllerEntryMap.put(partitionName, leadControllerEntry);
     return new LeadControllerResponse(true, leadControllerEntryMap);
   }

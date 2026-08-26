@@ -45,10 +45,8 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 
 
-/**
- * The {@code BloomFilterSegmentPruner} prunes segments based on bloom filter for EQUALITY filter. Because the access
- * to bloom filter data is required, segment pruning is done in parallel when the number of segments is large.
- */
+/// The `BloomFilterSegmentPruner` prunes segments based on bloom filter for EQUALITY filter. Because the access
+/// to bloom filter data is required, segment pruning is done in parallel when the number of segments is large.
 public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
   // Try to schedule 10 segments for each thread, or evenly distribute them to all MAX_NUM_THREADS_PER_QUERY threads.
   // TODO: make this threshold configurable? threshold 10 is also used in CombinePlanNode, which accesses the
@@ -64,7 +62,7 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
   }
 
   @Override
-  protected boolean isApplicableToPredicate(Predicate predicate) {
+  protected boolean isApplicableToPredicate(Predicate predicate, Map<String, String> queryOptions) {
     // Only prune columns
     if (predicate.getLhs().getType() != ExpressionContext.Type.IDENTIFIER) {
       return false;
@@ -75,9 +73,8 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
     }
     if (predicateType == Predicate.Type.IN) {
       List<String> values = ((InPredicate) predicate).getValues();
-      // Skip pruning when there are too many values in the IN predicate
       //noinspection RedundantIfStatement
-      if (values.size() <= _inPredicateThreshold) {
+      if (shouldPruneInPredicate(values.size(), queryOptions)) {
         return true;
       }
     }
@@ -208,15 +205,13 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
     if (predicateType == Predicate.Type.EQ) {
       return pruneEqPredicate(segment, (EqPredicate) predicate, dataSourceCache, cachedValues);
     } else if (predicateType == Predicate.Type.IN) {
-      return pruneInPredicate(segment, (InPredicate) predicate, dataSourceCache, cachedValues);
+      return pruneInPredicate(segment, (InPredicate) predicate, dataSourceCache, cachedValues, query);
     } else {
       return false;
     }
   }
 
-  /**
-   * For EQ predicate, prune the segments based on column bloom filter.
-   */
+  /// For EQ predicate, prune the segments based on column bloom filter.
   private boolean pruneEqPredicate(IndexSegment segment, EqPredicate eqPredicate,
       Map<String, DataSource> dataSourceCache, ValueCache valueCache) {
     String column = eqPredicate.getLhs().getIdentifier();
@@ -233,15 +228,11 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
     return bloomFilter != null && !cachedValue.mightBeContained(bloomFilter);
   }
 
-  /**
-   * For IN predicate, prune the segments based on column bloom filter.
-   * NOTE: segments will not be pruned if the number of values is greater than the threshold.
-   */
+  /// For IN predicate, prune the segments based on column bloom filter.
   private boolean pruneInPredicate(IndexSegment segment, InPredicate inPredicate,
-      Map<String, DataSource> dataSourceCache, ValueCache valueCache) {
+      Map<String, DataSource> dataSourceCache, ValueCache valueCache, QueryContext query) {
     List<String> values = inPredicate.getValues();
-    // Skip pruning when there are too many values in the IN predicate
-    if (values.size() > _inPredicateThreshold) {
+    if (!shouldPruneInPredicate(values.size(), query.getQueryOptions())) {
       return false;
     }
     String column = inPredicate.getLhs().getIdentifier();

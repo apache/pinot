@@ -362,7 +362,7 @@ public class CanonicalDdlEmitterMaterializedViewTest {
         .setRetentionTimeValue("365")
         .setBrokerTenant("DefaultTenant")
         .setServerTenant("DefaultTenant")
-        .setTaskConfig(new TableTaskConfig(java.util.Collections.singletonMap(
+        .setTaskConfig(new TableTaskConfig(Map.of(
             MaterializedViewTask.TASK_TYPE, mvTask)))
         .build();
 

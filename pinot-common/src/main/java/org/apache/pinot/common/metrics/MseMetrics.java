@@ -19,8 +19,8 @@
 package org.apache.pinot.common.metrics;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.Collections;
 import java.util.EnumMap;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
@@ -125,7 +125,7 @@ public class MseMetrics
   private final EnumMap<MseMeter, PinotMeter> _dualMeterCache;
 
   public MseMetrics(MseMetricsMode mode, PinotMetricsRegistry metricsRegistry) {
-    super(METRIC_PREFIX, metricsRegistry, MseMetrics.class, false, Collections.emptySet());
+    super(METRIC_PREFIX, metricsRegistry, MseMetrics.class, false, Set.of());
     _mode = mode;
     _dualMeterCache = mode == MseMetricsMode.DUAL ? new EnumMap<>(MseMeter.class) : null;
   }

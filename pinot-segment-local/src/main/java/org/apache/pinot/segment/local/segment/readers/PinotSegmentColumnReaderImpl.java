@@ -25,18 +25,16 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.MultiValueResult;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/**
- * Implementation of ColumnReader for Pinot segments.
- *
- * <p>This class wraps the existing PinotSegmentColumnReader and provides the ColumnReader interface
- * for columnar segment building. It handles:
- * <ul>
- *   <li>Reading column values from Pinot segments</li>
- *   <li>Resource cleanup</li>
- * </ul>
- */
+/// Implementation of ColumnReader for Pinot segments.
+///
+/// This class wraps the existing PinotSegmentColumnReader and provides the ColumnReader interface
+/// for columnar segment building. It handles:
+///
+/// - Reading column values from Pinot segments
+/// - Resource cleanup
 public class PinotSegmentColumnReaderImpl implements ColumnReader {
   private final PinotSegmentColumnReader _segmentColumnReader;
   private final String _columnName;
@@ -44,27 +42,21 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   private final DataType _dataType;
   private final boolean _skipDefaultNullValues;
 
-  private int _nextDocId;
-
-  /**
-   * Create a PinotSegmentColumnReaderImpl for an existing column in the segment.
-   *
-   * @param indexSegment Source segment to read from
-   * @param columnName Name of the column
-   */
+  /// Create a PinotSegmentColumnReaderImpl for an existing column in the segment.
+  ///
+  /// @param indexSegment Source segment to read from
+  /// @param columnName Name of the column
   public PinotSegmentColumnReaderImpl(IndexSegment indexSegment, String columnName) {
     this(indexSegment, columnName, false);
   }
 
-  /**
-   * Create a PinotSegmentColumnReaderImpl for an existing column in the segment.
-   *
-   * @param indexSegment Source segment to read from
-   * @param columnName Name of the column
-   * @param skipDefaultNullValues Whether to skip reading default null values from the record.
-   *                              If true, null values return null. If false, null values return
-   *                              the segment's stored value (which contains the default).
-   */
+  /// Create a PinotSegmentColumnReaderImpl for an existing column in the segment.
+  ///
+  /// @param indexSegment Source segment to read from
+  /// @param columnName Name of the column
+  /// @param skipDefaultNullValues Whether to skip reading default null values from the record.
+  ///                              If true, null values return null. If false, null values return
+  ///                              the segment's stored value (which contains the default).
   public PinotSegmentColumnReaderImpl(IndexSegment indexSegment, String columnName,
       boolean skipDefaultNullValues) {
     this(new PinotSegmentColumnReader(indexSegment, columnName), columnName,
@@ -73,17 +65,15 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
         skipDefaultNullValues);
   }
 
-  /**
-   * Constructor for subclasses that need to provide their own PinotSegmentColumnReader.
-   *
-   * @param segmentColumnReader The segment column reader
-   * @param columnName Name of the column
-   * @param numDocs Total number of documents
-   * @param dataType The data type of the column
-   * @param skipDefaultNullValues Whether to skip reading default null values from the record.
-   *                              If true, null values return null. If false, null values return
-   *                              the segment's stored value (which contains the default).
-   */
+  /// Constructor for subclasses that need to provide their own PinotSegmentColumnReader.
+  ///
+  /// @param segmentColumnReader The segment column reader
+  /// @param columnName Name of the column
+  /// @param numDocs Total number of documents
+  /// @param dataType The data type of the column
+  /// @param skipDefaultNullValues Whether to skip reading default null values from the record.
+  ///                              If true, null values return null. If false, null values return
+  ///                              the segment's stored value (which contains the default).
   public PinotSegmentColumnReaderImpl(PinotSegmentColumnReader segmentColumnReader, String columnName,
       int numDocs, DataType dataType, boolean skipDefaultNullValues) {
     _segmentColumnReader = segmentColumnReader;
@@ -94,207 +84,14 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   }
 
   @Override
-  public boolean hasNext() {
-    return _nextDocId < _numDocs;
-  }
-
-  @Override
-  @Nullable
-  public Object next()
-      throws IOException {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-
-    // Return null if the value is null and skipDefaultNullValues is true
-    if (_skipDefaultNullValues && _segmentColumnReader.isNull(_nextDocId)) {
-      _nextDocId++;
-      return null;
-    }
-
-    return _segmentColumnReader.getValue(_nextDocId++);
-  }
-
-  @Override
-  public boolean isNextNull() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.isNull(_nextDocId);
-  }
-
-  @Override
-  public void skipNext() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    _nextDocId++;
-  }
-
-  @Override
-  public boolean isSingleValue() {
-    return _segmentColumnReader.isSingleValue();
-  }
-
-  @Override
-  public boolean isInt() {
-    return _dataType == DataType.INT;
-  }
-
-  @Override
-  public boolean isLong() {
-    return _dataType == DataType.LONG;
-  }
-
-  @Override
-  public boolean isFloat() {
-    return _dataType == DataType.FLOAT;
-  }
-
-  @Override
-  public boolean isDouble() {
-    return _dataType == DataType.DOUBLE;
-  }
-
-  @Override
-  public boolean isBigDecimal() {
-    return _dataType == DataType.BIG_DECIMAL;
-  }
-
-  @Override
-  public boolean isString() {
-    return _dataType == DataType.STRING;
-  }
-
-  @Override
-  public boolean isBytes() {
-    return _dataType == DataType.BYTES;
-  }
-
-  @Override
-  public int nextInt() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getInt(_nextDocId++);
-  }
-
-  @Override
-  public long nextLong() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getLong(_nextDocId++);
-  }
-
-  @Override
-  public float nextFloat() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getFloat(_nextDocId++);
-  }
-
-  @Override
-  public double nextDouble() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getDouble(_nextDocId++);
-  }
-
-  @Override
-  public BigDecimal nextBigDecimal() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getBigDecimal(_nextDocId++);
-  }
-
-  @Override
-  public String nextString() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getString(_nextDocId++);
-  }
-
-  @Override
-  public byte[] nextBytes() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getBytes(_nextDocId++);
-  }
-
-  // For all multi-value primitive type methods (nextIntMV, nextLongMV, nextFloatMV, nextDoubleMV,
-  // getIntMV, getLongMV, getFloatMV, getDoubleMV), we pass null for the validity bitset since
-  // multi-value primitive types cannot have null elements. Nulls are removed by NullValueTransformer
-  @Override
-  public MultiValueResult<int[]> nextIntMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return MultiValueResult.of(_segmentColumnReader.getIntMV(_nextDocId++), null);
-  }
-
-  @Override
-  public MultiValueResult<long[]> nextLongMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return MultiValueResult.of(_segmentColumnReader.getLongMV(_nextDocId++), null);
-  }
-
-  @Override
-  public MultiValueResult<float[]> nextFloatMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return MultiValueResult.of(_segmentColumnReader.getFloatMV(_nextDocId++), null);
-  }
-
-  @Override
-  public MultiValueResult<double[]> nextDoubleMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return MultiValueResult.of(_segmentColumnReader.getDoubleMV(_nextDocId++), null);
-  }
-
-  @Override
-  public BigDecimal[] nextBigDecimalMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getBigDecimalMV(_nextDocId++);
-  }
-
-  @Override
-  public String[] nextStringMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getStringMV(_nextDocId++);
-  }
-
-  @Override
-  public byte[][] nextBytesMV() {
-    if (!hasNext()) {
-      throw new IllegalStateException("No more values available");
-    }
-    return _segmentColumnReader.getBytesMV(_nextDocId++);
-  }
-
-  @Override
-  public void rewind()
-      throws IOException {
-    _nextDocId = 0;
-  }
-
-  @Override
   public String getColumnName() {
     return _columnName;
+  }
+
+  @Nullable
+  @Override
+  public PinotDataType getValueType() {
+    return ColumnReader.toValueType(_dataType, _segmentColumnReader.isSingleValue());
   }
 
   @Override
@@ -306,6 +103,18 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
   public boolean isNull(int docId) {
     validateDocId(docId);
     return _segmentColumnReader.isNull(docId);
+  }
+
+  @Override
+  public Object getValue(int docId)
+      throws IOException {
+    // Return null if the value is null and skipDefaultNullValues is true
+    if (_skipDefaultNullValues && _segmentColumnReader.isNull(docId)) {
+      return null;
+    }
+    // The segment stores physical values (e.g. int for BOOLEAN, long for TIMESTAMP); surface the logical object per
+    // the getValue() contract. Null entries return the segment's stored default, also converted to the logical type.
+    return ColumnReader.toLogicalValue(_segmentColumnReader.getValue(docId), _dataType);
   }
 
   // Single-value accessors
@@ -345,19 +154,11 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     return _segmentColumnReader.getBytes(docId);
   }
 
-  @Override
-  public Object getValue(int docId)
-      throws IOException {
-    // Return null if the value is null and skipDefaultNullValues is true
-    if (_skipDefaultNullValues && _segmentColumnReader.isNull(docId)) {
-      return null;
-    }
-    // Return the segment value (which contains the default for null entries)
-    return _segmentColumnReader.getValue(docId);
-  }
-
   // Multi-value accessors
 
+  // For all multi-value primitive type methods (getIntMV, getLongMV, getFloatMV, getDoubleMV), we pass null for
+  // the validity bitset since multi-value primitive types cannot have null elements. Nulls are removed by
+  // NullValueTransformer
   @Override
   public MultiValueResult<int[]> getIntMV(int docId) {
     return MultiValueResult.of(_segmentColumnReader.getIntMV(docId), null);
@@ -393,12 +194,10 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
     return _segmentColumnReader.getBytesMV(docId);
   }
 
-  /**
-   * Validate that the document ID is within valid range.
-   *
-   * @param docId Document ID to validate
-   * @throws IndexOutOfBoundsException if docId is out of range
-   */
+  /// Validate that the document ID is within valid range.
+  ///
+  /// @param docId Document ID to validate
+  /// @throws IndexOutOfBoundsException if docId is out of range
   private void validateDocId(int docId) {
     if (docId < 0 || docId >= _numDocs) {
       throw new IndexOutOfBoundsException(

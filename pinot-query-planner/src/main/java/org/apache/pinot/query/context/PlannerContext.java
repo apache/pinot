@@ -19,8 +19,8 @@
 package org.apache.pinot.query.context;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.Context;
@@ -39,16 +39,14 @@ import org.apache.pinot.query.planner.logical.LogicalPlanner;
 import org.apache.pinot.query.validate.Validator;
 
 
-/**
- * Holds all per-query contextual information used during the planning phase.
- *
- * <p>This class implements {@link Context} so that Calcite rules can retrieve it directly from the
- * planner: {@code call.getPlanner().getContext().unwrap(PlannerContext.class)}. Both the opt planner
- * and the trait planner expose this instance as their context.
- *
- * <p>Callers may also unwrap {@link QueryEnvironment.Config} to access broker-wide defaults:
- * {@code call.getPlanner().getContext().unwrap(QueryEnvironment.Config.class)}.
- */
+/// Holds all per-query contextual information used during the planning phase.
+///
+/// This class implements [Context] so that Calcite rules can retrieve it directly from the
+/// planner: `call.getPlanner().getContext().unwrap(PlannerContext.class)`. Both the opt planner
+/// and the trait planner expose this instance as their context.
+///
+/// Callers may also unwrap [QueryEnvironment.Config] to access broker-wide defaults:
+/// `call.getPlanner().getContext().unwrap(QueryEnvironment.Config.class)`.
 public class PlannerContext implements AutoCloseable, Context {
   private final PlannerImpl _planner;
 
@@ -73,24 +71,20 @@ public class PlannerContext implements AutoCloseable, Context {
     _envConfig = envConfig;
     _relOptPlanner = new LogicalPlanner(optProgram, this, config.getTraitDefs());
     _relTraitPlanner = new LogicalPlanner(traitProgram, this,
-        Collections.singletonList(RelDistributionTraitDef.INSTANCE));
+        List.of(RelDistributionTraitDef.INSTANCE));
     _plannerOutput = new HashMap<>();
     _sqlExplainFormat = sqlExplainFormat;
     _physicalPlannerContext = physicalPlannerContext;
   }
 
-  /**
-   * Test factory: creates a minimal {@link PlannerContext} without going through
-   * {@link org.apache.pinot.query.QueryEnvironment}, suitable for unit tests.
-   */
+  /// Test factory: creates a minimal [PlannerContext] without going through
+  /// [org.apache.pinot.query.QueryEnvironment], suitable for unit tests.
   @VisibleForTesting
   public static PlannerContext forTesting(Map<String, String> options, QueryEnvironment.Config envConfig) {
     return new PlannerContext(options, envConfig);
   }
 
-  /**
-   * Minimal constructor for use in unit tests. Creates no-op planners backed by an empty HEP program.
-   */
+  /// Minimal constructor for use in unit tests. Creates no-op planners backed by an empty HEP program.
   @VisibleForTesting
   PlannerContext(Map<String, String> options, QueryEnvironment.Config envConfig) {
     _planner = null;
@@ -129,11 +123,9 @@ public class PlannerContext implements AutoCloseable, Context {
     return _envConfig;
   }
 
-  /**
-   * Unwraps this context. Returns {@code this} when asked for {@link PlannerContext} or
-   * {@link Context}, and delegates to {@link #_envConfig} when asked for
-   * {@link QueryEnvironment.Config} so that existing rules remain compatible.
-   */
+  /// Unwraps this context. Returns `this` when asked for [PlannerContext] or
+  /// [Context], and delegates to [#_envConfig] when asked for
+  /// [QueryEnvironment.Config] so that existing rules remain compatible.
   @Override
   @Nullable
   public <C> C unwrap(Class<C> clazz) {

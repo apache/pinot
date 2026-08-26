@@ -25,6 +25,7 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -32,26 +33,33 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 @ThreadSafe
 public interface QueryExecutor {
 
-  /**
-   * Initializes the query executor.
-   * <p>Should be called only once and before calling any other method.
-   * <p>NOTE: The config is the subset of server config with prefix 'pinot.server.query.executor'
-   */
+  /// Initializes the query executor.
+  ///
+  /// Should be called only once and before calling any other method.
+  ///
+  /// NOTE: The config is the subset of server config with prefix 'pinot.server.query.executor'
   void init(PinotConfiguration config, InstanceDataManager instanceDataManager, ServerMetrics serverMetrics)
       throws ConfigurationException;
 
   InstanceDataManager getInstanceDataManager();
 
-  /**
-   * Starts the query executor.
-   * <p>Should be called only once after query executor gets initialized but before calling any other method.
-   */
+  /// Returns the configuration this executor was initialized with (the subset of server config with
+  /// prefix `pinot.server.query.executor`). Callers that build a per-execution [PlanMaker] override
+  /// can initialize it with the same settings the executor's own plan maker uses, so the override
+  /// honors limits such as `max.execution.threads` and the group-by trim sizes. The default returns
+  /// an empty configuration for implementations that do not track their init config.
+  default PinotConfiguration getQueryExecutorConfig() {
+    return new PinotConfiguration();
+  }
+
+  /// Starts the query executor.
+  ///
+  /// Should be called only once after query executor gets initialized but before calling any other method.
   void start();
 
-  /**
-   * Shuts down the query executor.
-   * <p>Should be called only once. After calling shut down, no other method should be called.
-   */
+  /// Shuts down the query executor.
+  ///
+  /// Should be called only once. After calling shut down, no other method should be called.
   void shutDown();
 
   /// Executes the non-streaming query with the given [ExecutorService].
@@ -66,9 +74,22 @@ public interface QueryExecutor {
   /// This [ExecutorService] must be wrapped with
   /// [org.apache.pinot.spi.query.QueryThreadContext#contextAwareExecutorService].
   /// [org.apache.pinot.spi.query.QueryThreadContext] must already be set up before calling this method.
-  /// - For streaming request, the returned {@link InstanceResponseBlock} contains only the metadata. The response is
+  /// - For streaming request, the returned [InstanceResponseBlock] contains only the metadata. The response is
   ///   streamed back via the observer.
-  /// - For non-streaming request, the returned {@link InstanceResponseBlock} contains both data and metadata.
+  /// - For non-streaming request, the returned [InstanceResponseBlock] contains both data and metadata.
   InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer);
+
+  /// Executes the query with a caller-supplied [PlanMaker] override instead of the executor's
+  /// configured one, letting a caller plug in alternate segment-level plan nodes/operators for this
+  /// single execution (e.g. to produce a different result-block representation). Passing `null` uses
+  /// the configured plan maker, i.e. it is equivalent to [#execute(ServerQueryRequest, ExecutorService,
+  /// ResultsBlockStreamer)].
+  ///
+  /// The default implementation ignores the override (preserving behavior for implementations that do
+  /// not support it); [org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl] honors it.
+  default InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
+      @Nullable ResultsBlockStreamer streamer, @Nullable PlanMaker planMakerOverride) {
+    return execute(queryRequest, executorService, streamer);
+  }
 }

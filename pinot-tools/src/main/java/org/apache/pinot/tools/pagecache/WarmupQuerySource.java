@@ -38,35 +38,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Supplies page-cache warm-up query candidates for a set of tables. Implementations read from a
- * particular origin (broker query logs, a query-statistics Pinot table, a curated file) and emit
- * source-agnostic {@link Candidate}s that {@link WarmupQueryUtils#select} then ranks.
- */
+/// Supplies page-cache warm-up query candidates for a set of tables. Implementations read from a
+/// particular origin (broker query logs, a query-statistics Pinot table, a curated file) and emit
+/// source-agnostic {@link Candidate}s that {@link WarmupQueryUtils#select} then ranks.
 public interface WarmupQuerySource {
 
-  /**
-   * Fetches candidate queries for the requested raw table names.
-   *
-   * @return a map from raw table name to its candidate queries; tables with no candidates may be omitted
-   */
+  /// Fetches candidate queries for the requested raw table names.
+  ///
+  /// @return a map from raw table name to its candidate queries; tables with no candidates may be omitted
   Map<String, List<Candidate>> fetchCandidatesByTable(Set<String> rawTableNames)
       throws Exception;
 
-  /**
-   * Collects candidates by parsing broker query-log files — the zero-extra-infrastructure source, since
-   * every deployment already produces broker query logs. All files are scanned once and lines grouped by
-   * the (raw) table they targeted; truncated, errored, multi-stage or unparseable lines are skipped.
-   */
+  /// Collects candidates by parsing broker query-log files — the zero-extra-infrastructure source, since
+  /// every deployment already produces broker query logs. All files are scanned once and lines grouped by
+  /// the (raw) table they targeted; truncated, errored, multi-stage or unparseable lines are skipped.
   class QueryLog implements WarmupQuerySource {
     private static final Logger LOGGER = LoggerFactory.getLogger(QueryLog.class);
     private final List<File> _logFiles;
     private final int _maxQueryLengthToLog;
 
-    /**
-     * @param maxQueryLengthToLog the broker's {@code pinot.broker.query.log.length}; queries at this
-     *                            length are treated as truncated. Pass {@code 0} to disable the check.
-     */
+    /// @param maxQueryLengthToLog the broker's {@code pinot.broker.query.log.length}; queries at this
+    ///                            length are treated as truncated. Pass {@code 0} to disable the check.
     public QueryLog(List<File> logFiles, int maxQueryLengthToLog) {
       _logFiles = logFiles;
       _maxQueryLengthToLog = maxQueryLengthToLog;
@@ -96,12 +88,10 @@ public interface WarmupQuerySource {
     }
   }
 
-  /**
-   * Collects candidates by querying a user-supplied query-statistics Pinot table (the OSS generalization
-   * of an internal "query stats" table). For each target table it pulls a bounded, recent, error-free
-   * sample of observed queries with their latency, scan and timestamp statistics. Column names are
-   * configurable so any stats-table layout can be used.
-   */
+  /// Collects candidates by querying a user-supplied query-statistics Pinot table (the OSS generalization
+  /// of an internal "query stats" table). For each target table it pulls a bounded, recent, error-free
+  /// sample of observed queries with their latency, scan and timestamp statistics. Column names are
+  /// configurable so any stats-table layout can be used.
   class PinotTable implements WarmupQuerySource {
     private static final Logger LOGGER = LoggerFactory.getLogger(PinotTable.class);
     private final Connection _connection;
@@ -195,11 +185,9 @@ public interface WarmupQuerySource {
     }
   }
 
-  /**
-   * Reads warm-up queries verbatim from a file, one SQL statement per line, all attributed to a single
-   * target table — the manual-override source. Blank lines and {@code --} comments are ignored;
-   * candidates carry no statistics, so selection effectively de-duplicates and caps them in file order.
-   */
+  /// Reads warm-up queries verbatim from a file, one SQL statement per line, all attributed to a single
+  /// target table — the manual-override source. Blank lines and {@code --} comments are ignored;
+  /// candidates carry no statistics, so selection effectively de-duplicates and caps them in file order.
   class QueryFile implements WarmupQuerySource {
     private final File _queryFile;
     private final String _rawTableName;

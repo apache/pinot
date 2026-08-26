@@ -110,6 +110,19 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
+  public void shouldReadInPredicatePruningThresholdOption() {
+    // Any integer is accepted; a negative value means always attempt IN-predicate pruning
+    assertEquals(QueryOptionsUtils.getInPredicatePruningThreshold(Map.of(IN_PREDICATE_PRUNING_THRESHOLD, "20")), 20);
+    assertEquals(QueryOptionsUtils.getInPredicatePruningThreshold(Map.of(IN_PREDICATE_PRUNING_THRESHOLD, "-1")), -1);
+    assertNull(QueryOptionsUtils.getInPredicatePruningThreshold(Map.of()));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void shouldRejectInvalidInPredicatePruningThreshold() {
+    QueryOptionsUtils.getInPredicatePruningThreshold(Map.of(IN_PREDICATE_PRUNING_THRESHOLD, "invalid"));
+  }
+
+  @Test
   public void testSkipIndexesParsing() {
     String skipIndexesStr = "col1=inverted,range&col2=sorted";
     Map<String, String> queryOptions = Map.of(SKIP_INDEXES, skipIndexesStr);

@@ -107,9 +107,10 @@ public class PinotSchemaRestletResourceTest {
     // Update the schema with addSchema api and override on
     expectValidationException(() -> adminClient.getSchemaClient().createSchema(schema.toSingleLineJsonString()));
 
-    // Update the schema with updateSchema api
-    expectValidationException(
-        () -> adminClient.getSchemaClient().updateSchema(schemaName, schema.toSingleLineJsonString()));
+    // Update the schema with updateSchema api - verify the error message includes the actual reason
+    expectValidationExceptionWithMessage(
+        () -> adminClient.getSchemaClient().updateSchema(schemaName, schema.toSingleLineJsonString()),
+        "Incompatible field specifications");
 
     // Change the column data type from STRING to BOOLEAN
     newColumnFieldSpec.setDataType(DataType.BOOLEAN);
@@ -260,6 +261,47 @@ public class PinotSchemaRestletResourceTest {
   }
 
   @Test
+  public void testNonDeterministicSchemaTransformCreateAndLegacyUpdate()
+      throws Exception {
+    PinotAdminClient adminClient = TEST_INSTANCE.getOrCreateAdminClient();
+    String schemaName = "legacyNonDeterministicSchemaTransform";
+    Schema schema = TEST_INSTANCE.createDummySchema(schemaName);
+    DimensionFieldSpec eventTimeField = new DimensionFieldSpec("eventTimeMs", DataType.LONG, true);
+    eventTimeField.setTransformFunction("now()");
+    schema.addField(eventTimeField);
+    try {
+      expectValidationExceptionWithMessage(
+          () -> adminClient.getSchemaClient().createSchema(schema.toSingleLineJsonString()),
+          "Function 'now' has VOLATILE volatility");
+      expectValidationExceptionWithMessage(
+          () -> adminClient.getSchemaClient().validateSchema(schema.toSingleLineJsonString()),
+          "Function 'now' has VOLATILE volatility");
+
+      // Seed below the REST validation layer to model a schema persisted before this validation existed.
+      TEST_INSTANCE.getHelixResourceManager().addSchema(schema, false, false);
+
+      Schema update = adminClient.getSchemaClient().getSchemaObject(schemaName);
+      update.addField(new DimensionFieldSpec("newColumn", DataType.STRING, true));
+      adminClient.getSchemaClient().validateSchema(update.toSingleLineJsonString());
+      adminClient.getSchemaClient().updateSchema(schemaName, update.toSingleLineJsonString());
+
+      Schema stored = adminClient.getSchemaClient().getSchemaObject(schemaName);
+      assertTrue(stored.hasColumn("newColumn"));
+      assertEquals(stored.getFieldSpecFor("eventTimeMs").getTransformFunction(), "now()");
+
+      update.getFieldSpecFor("eventTimeMs").setTransformFunction("plus(now(), 1)");
+      expectValidationExceptionWithMessage(
+          () -> adminClient.getSchemaClient().validateSchema(update.toSingleLineJsonString()),
+          "Function 'now' has VOLATILE volatility");
+      expectValidationExceptionWithMessage(
+          () -> adminClient.getSchemaClient().updateSchema(schemaName, update.toSingleLineJsonString()),
+          "Function 'now' has VOLATILE volatility");
+    } finally {
+      TEST_INSTANCE.getHelixResourceManager().deleteSchema(schemaName);
+    }
+  }
+
+  @Test
   public void testSchemaDeletionWithLogicalTable()
       throws Exception {
     String logicalTableName = "logical_table";
@@ -306,6 +348,15 @@ public class PinotSchemaRestletResourceTest {
         expectThrows(RuntimeException.class, () -> runUnchecked(runnable));
     Throwable cause = unwrap(runtimeException);
     assertTrue(cause instanceof PinotAdminValidationException, "Unexpected exception: " + cause);
+  }
+
+  private void expectValidationExceptionWithMessage(ThrowingRunnable runnable, String expectedMessageSubstring) {
+    RuntimeException runtimeException =
+        expectThrows(RuntimeException.class, () -> runUnchecked(runnable));
+    Throwable cause = unwrap(runtimeException);
+    assertTrue(cause instanceof PinotAdminValidationException, "Unexpected exception: " + cause);
+    assertTrue(cause.getMessage().contains(expectedMessageSubstring),
+        "Expected message to contain '" + expectedMessageSubstring + "' but was: " + cause.getMessage());
   }
 
   private void expectNotFoundException(ThrowingRunnable runnable) {

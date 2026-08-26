@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation;
 
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
@@ -29,8 +30,19 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 public class DefaultAggregationExecutor implements AggregationExecutor {
   protected final AggregationFunction[] _aggregationFunctions;
   protected final AggregationResultHolder[] _aggregationResultHolders;
+  @Nullable
+  protected final Object[] _nonScanResults;
 
-  public DefaultAggregationExecutor(AggregationFunction[] aggregationFunctions) {
+  /// Creates an executor that skips functions with a non-scan result (resolved from the column dictionary or
+  /// metadata). For each index {@code i} where {@code nonScanResults[i]} is non-null, the function is not aggregated
+  /// over the scanned blocks and the resolved value is emitted directly in the results. A {@code null} array disables
+  /// this behavior and all functions are computed by scanning.
+  ///
+  /// @param nonScanResults per-function results resolved without scanning (from the column dictionary or metadata),
+  ///     or {@code null} if none are resolved
+  public DefaultAggregationExecutor(AggregationFunction[] aggregationFunctions,
+      @Nullable Object[] nonScanResults) {
+    _nonScanResults = nonScanResults;
     _aggregationFunctions = aggregationFunctions;
     int numAggregationFunctions = aggregationFunctions.length;
     _aggregationResultHolders = new AggregationResultHolder[numAggregationFunctions];
@@ -39,11 +51,18 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
     }
   }
 
+  public DefaultAggregationExecutor(AggregationFunction[] aggregationFunctions) {
+    this(aggregationFunctions, null);
+  }
+
   @Override
   public void aggregate(ValueBlock valueBlock) {
     int numAggregationFunctions = _aggregationFunctions.length;
     int length = valueBlock.getNumDocs();
     for (int i = 0; i < numAggregationFunctions; i++) {
+      if (_nonScanResults != null && _nonScanResults[i] != null) {
+        continue; // skip — already resolved without scanning (dictionary/metadata)
+      }
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
       aggregationFunction.aggregate(length, _aggregationResultHolders[i],
           AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, valueBlock));
@@ -55,7 +74,11 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
     int numFunctions = _aggregationFunctions.length;
     List<Object> aggregationResults = new ArrayList<>(numFunctions);
     for (int i = 0; i < numFunctions; i++) {
-      aggregationResults.add(_aggregationFunctions[i].extractAggregationResult(_aggregationResultHolders[i]));
+      if (_nonScanResults != null && _nonScanResults[i] != null) {
+        aggregationResults.add(_nonScanResults[i]);
+      } else {
+        aggregationResults.add(_aggregationFunctions[i].extractAggregationResult(_aggregationResultHolders[i]));
+      }
     }
     return aggregationResults;
   }

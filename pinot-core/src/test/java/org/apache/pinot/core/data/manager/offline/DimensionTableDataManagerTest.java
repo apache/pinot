@@ -24,7 +24,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
@@ -66,6 +65,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -125,6 +125,23 @@ public class DimensionTableDataManagerTest {
     _segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
   }
 
+  @AfterMethod(alwaysRun = true)
+  public void tearDownMethod() {
+    // DimensionTableDataManager is a process-wide singleton keyed by table name (see the static
+    // INSTANCES map in DimensionTableDataManager). Every test method loads the same
+    // dimBaseballTeams_OFFLINE table, so without an explicit teardown the singleton (and its
+    // property-store mock, loaded segments, and reload executor) leaks from one method into the
+    // next. A stale async reload from a prior method could then read a _propertyStore that a
+    // concurrent init() had swapped out, surfacing as an intermittent
+    // "Failed to find schema for table: dimBaseballTeams_OFFLINE". Shutting the singleton down
+    // removes it from INSTANCES so each method starts from a clean, freshly-initialized instance.
+    DimensionTableDataManager tableDataManager =
+        DimensionTableDataManager.getInstanceByTableName(OFFLINE_TABLE_NAME);
+    if (tableDataManager != null) {
+      tableDataManager.shutDown();
+    }
+  }
+
   @AfterClass
   public void tearDown() {
     FileUtils.deleteQuietly(TEMP_DIR);
@@ -143,7 +160,7 @@ public class DimensionTableDataManagerTest {
         .setSchemaName("dimBaseballTeams")
         .addSingleValueDimension("teamID", DataType.STRING)
         .addSingleValueDimension("teamName", DataType.STRING)
-        .setPrimaryKeyColumns(Collections.singletonList("teamID"))
+        .setPrimaryKeyColumns(List.of("teamID"))
         .build();
   }
 
@@ -152,7 +169,7 @@ public class DimensionTableDataManagerTest {
         .addSingleValueDimension("teamID", DataType.STRING)
         .addSingleValueDimension("teamName", DataType.STRING)
         .addSingleValueDimension("teamCity", DataType.STRING)
-        .setPrimaryKeyColumns(Collections.singletonList("teamID"))
+        .setPrimaryKeyColumns(List.of("teamID"))
         .build();
   }
 
@@ -250,7 +267,7 @@ public class DimensionTableDataManagerTest {
 
     // Confirm we can read primary column list
     List<String> pkColumns = tableDataManager.getPrimaryKeyColumns();
-    assertEquals(pkColumns, Collections.singletonList("teamID"), "Should return PK column list");
+    assertEquals(pkColumns, List.of("teamID"), "Should return PK column list");
 
     // Remove the segment
     List<SegmentDataManager> segmentManagers = tableDataManager.acquireAllSegments();
@@ -347,7 +364,7 @@ public class DimensionTableDataManagerTest {
 
     // Confirm we can read primary column list
     List<String> pkColumns = tableDataManager.getPrimaryKeyColumns();
-    assertEquals(pkColumns, Collections.singletonList("teamID"), "Should return PK column list");
+    assertEquals(pkColumns, List.of("teamID"), "Should return PK column list");
 
     // Remove the segment
     List<SegmentDataManager> segmentManagers = tableDataManager.acquireAllSegments();

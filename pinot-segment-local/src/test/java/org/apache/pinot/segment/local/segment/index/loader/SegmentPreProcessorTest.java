@@ -136,6 +136,8 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   private static final String NEW_COLUMNS_SCHEMA_WITH_FST = "data/newColumnsSchemaWithFST.json";
   private static final String NEW_COLUMNS_SCHEMA_WITH_TEXT = "data/newColumnsSchemaWithText.json";
   private static final String NEW_COLUMNS_SCHEMA_WITH_H3_JSON = "data/newColumnsSchemaWithH3Json.json";
+  private static final String NEW_COLUMNS_SCHEMA_WITH_H3_EMPTY_DEFAULT =
+      "data/newColumnsSchemaWithH3EmptyDefault.json";
   private static final String NEW_COLUMNS_SCHEMA_WITH_NO_FORWARD_INDEX =
       "data/newColumnsSchemaWithForwardIndexDisabled.json";
   private static final String NEW_INT_METRIC_COLUMN_NAME = "newIntMetric";
@@ -164,6 +166,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   private final Schema _newColumnsSchemaWithFST;
   private final Schema _newColumnsSchemaWithText;
   private final Schema _newColumnsSchemaWithH3Json;
+  private final Schema _newColumnsSchemaWithH3EmptyDefault;
   private final Schema _newColumnsSchemaWithForwardIndexDisabled;
 
   private Set<String> _noDictionaryColumns;
@@ -176,6 +179,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   private Map<String, JsonIndexConfig> _jsonIndexConfigs;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private boolean _enableDefaultStarTree;
+  private boolean _compressionStatsEnabled;
 
   public SegmentPreProcessorTest()
       throws IOException {
@@ -207,6 +211,9 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA_WITH_H3_JSON);
     assertNotNull(resourceUrl);
     _newColumnsSchemaWithH3Json = Schema.fromFile(new File(resourceUrl.getFile()));
+    resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA_WITH_H3_EMPTY_DEFAULT);
+    assertNotNull(resourceUrl);
+    _newColumnsSchemaWithH3EmptyDefault = Schema.fromFile(new File(resourceUrl.getFile()));
     resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA_WITH_NO_FORWARD_INDEX);
     assertNotNull(resourceUrl);
     _newColumnsSchemaWithForwardIndexDisabled = Schema.fromFile(new File(resourceUrl.getFile()));
@@ -245,6 +252,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _jsonIndexConfigs = null;
     _starTreeIndexConfigs = null;
     _enableDefaultStarTree = false;
+    _compressionStatsEnabled = false;
   }
 
   @AfterMethod
@@ -304,6 +312,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     }
     indexingConfig.setBloomFilterConfigs(_bloomFilterConfigs);
     indexingConfig.setJsonIndexConfigs(_jsonIndexConfigs);
+    indexingConfig.setCompressionStatsEnabled(_compressionStatsEnabled);
     if (_starTreeIndexConfigs != null || _enableDefaultStarTree) {
       indexingConfig.setEnableDynamicStarTreeCreation(true);
       indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
@@ -334,14 +343,25 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     return new SegmentVersion[][]{{SegmentVersion.v1}, {SegmentVersion.v3}};
   }
 
-  /**
-   * Test to check for default column handling and text index creation during
-   * segment load after a new raw column is added to the schema with text index
-   * creation enabled.
-   * This will exercise both code paths in SegmentPreprocessor (segment load):
-   * (1) Default column handler to add forward index and dictionary
-   * (2) Text index handler to add text index
-   */
+  /// Cartesian product of segment version (v1/v3) and geo-column encoding (DICTIONARY/RAW), so the H3 reload test
+  /// exercises both [org.apache.pinot.segment.local.segment.index.loader.invertedindex.H3IndexHandler]
+  /// paths: the dictionary path and the raw `forwardIndexReader.getBytes(...)` path.
+  @DataProvider(name = "h3VersionAndEncoding")
+  public Object[][] h3VersionAndEncoding() {
+    return new Object[][]{
+        {SegmentVersion.v1, FieldConfig.EncodingType.DICTIONARY},
+        {SegmentVersion.v3, FieldConfig.EncodingType.DICTIONARY},
+        {SegmentVersion.v1, FieldConfig.EncodingType.RAW},
+        {SegmentVersion.v3, FieldConfig.EncodingType.RAW}
+    };
+  }
+
+  /// Test to check for default column handling and text index creation during
+  /// segment load after a new raw column is added to the schema with text index
+  /// creation enabled.
+  /// This will exercise both code paths in SegmentPreprocessor (segment load):
+  /// (1) Default column handler to add forward index and dictionary
+  /// (2) Text index handler to add text index
   @Test(dataProvider = "bothV1AndV3")
   public void testEnableTextIndexOnNewColumnRaw(SegmentVersion segmentVersion)
       throws Exception {
@@ -664,7 +684,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
 
     // (1) Auto-enable dictionary by adding an inverted index. ForwardIndexHandler now queues
     // ENABLE_DICTIONARY because the inverted index requires a dictionary. The range index must be rebuilt
-    // against dict ids — its on-disk size therefore changes.
+    // against dict ids — its forward-index storage size therefore changes.
     _invertedIndexColumns.add(EXISTING_INT_COL_RAW);
     runPreProcessor(_schema);
     SegmentMetadataImpl afterAutoEnable = new SegmentMetadataImpl(INDEX_DIR);
@@ -799,14 +819,12 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         false, 4, 106688, 13, false, ChunkCompressionType.ZSTANDARD);
   }
 
-  /**
-   * Test to check for default column handling and text index creation during
-   * segment load after a new dictionary encoded column is added to the schema
-   * with text index creation enabled.
-   * This will exercise both code paths in SegmentPreprocessor (segment load):
-   * (1) Default column handler to add forward index and dictionary
-   * (2) Text index handler to add text index
-   */
+  /// Test to check for default column handling and text index creation during
+  /// segment load after a new dictionary encoded column is added to the schema
+  /// with text index creation enabled.
+  /// This will exercise both code paths in SegmentPreprocessor (segment load):
+  /// (1) Default column handler to add forward index and dictionary
+  /// (2) Text index handler to add text index
   @Test(dataProvider = "bothV1AndV3")
   public void testEnableTextIndexOnNewColumnDictEncoded(SegmentVersion segmentVersion)
       throws Exception {
@@ -822,11 +840,9 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         100000, 1, true, null, false);
   }
 
-  /**
-   * Test to check text index creation during segment load after text index
-   * creation is enabled on an existing raw column.
-   * This will exercise the SegmentPreprocessor code path during segment load
-   */
+  /// Test to check text index creation during segment load after text index
+  /// creation is enabled on an existing raw column.
+  /// This will exercise the SegmentPreprocessor code path during segment load
   @Test(dataProvider = "bothV1AndV3")
   public void testEnableTextIndexOnExistingRawColumn(SegmentVersion segmentVersion)
       throws Exception {
@@ -838,11 +854,9 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     checkTextIndexCreation(_schema, EXISTING_STRING_COL_RAW, approxCardinalityStr, false, false, 4, false);
   }
 
-  /**
-   * Test to check text index creation during segment load after text index
-   * creation is enabled on an existing dictionary encoded column.
-   * This will exercise the SegmentPreprocessor code path during segment load
-   */
+  /// Test to check text index creation during segment load after text index
+  /// creation is enabled on an existing dictionary encoded column.
+  /// This will exercise the SegmentPreprocessor code path during segment load
   @Test(dataProvider = "bothV1AndV3")
   public void testEnableTextIndexOnExistingDictEncodedColumn(SegmentVersion segmentVersion)
       throws Exception {
@@ -1079,7 +1093,15 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
 
     // Create inverted index the second time.
     checkInvertedIndexCreation(true);
-    assertEquals(Files.getLastModifiedTime(singleFileIndex.toPath()), newLastModifiedTime);
+    // The second (no-op) creation must not rewrite the file. Assert the mtime did not advance
+    // meaningfully rather than requiring exact equality: the 2s sleeps above guarantee a real
+    // rewrite would move the mtime by ~2000ms, whereas an untouched file can still report a
+    // sub-millisecond-to-millisecond delta between two getLastModifiedTime reads (filesystem
+    // timestamp granularity / metadata flush), which made exact equality flaky under CPU load.
+    long mtimeDeltaMs =
+        Files.getLastModifiedTime(singleFileIndex.toPath()).toMillis() - newLastModifiedTime.toMillis();
+    assertTrue(Math.abs(mtimeDeltaMs) < 1000,
+        "columns.psf was rewritten by the no-op index recreation (mtime moved " + mtimeDeltaMs + " ms)");
     assertEquals(singleFileIndex.length(), newFileSize);
   }
 
@@ -1157,6 +1179,44 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     expectedDefaultValue = new ByteArray((byte[]) tDigestMetricFieldSpec.getDefaultNullValue());
     assertEquals(tDigestMetricMetadata.getMinValue(), expectedDefaultValue);
     assertEquals(tDigestMetricMetadata.getMaxValue(), expectedDefaultValue);
+  }
+
+  @Test(dataProvider = "bothV1AndV3")
+  public void testCompressionStatsForDefaultAndDerivedColumns(SegmentVersion segmentVersion)
+      throws Exception {
+    _compressionStatsEnabled = true;
+    buildSegment(segmentVersion);
+
+    _noDictionaryColumns.add(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
+    _ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)"),
+            new TransformConfig(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME, "reverse(column3)")));
+    runPreProcessor(_newColumnsSchema1);
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata defaultInt = segmentMetadata.getColumnMetadataFor(NEW_INT_METRIC_COLUMN_NAME);
+    assertTrue(defaultInt.hasDictionary());
+    assertEquals(defaultInt.getDictionaryEncodedUncompressedValueSizeInBytes(), 100000L * Integer.BYTES,
+        "Default fixed-width columns should report one raw value per row");
+    assertEquals(defaultInt.getRawForwardIndexUncompressedValueSizeInBytes(), ColumnMetadata.UNAVAILABLE);
+
+    ColumnMetadata defaultStringMv = segmentMetadata.getColumnMetadataFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME);
+    assertTrue(defaultStringMv.hasDictionary());
+    assertEquals(defaultStringMv.getDictionaryEncodedUncompressedValueSizeInBytes(), 100000L * "null".length(),
+        "Default MV columns should report the raw bytes for their single default entry per row");
+
+    ColumnMetadata derivedInt = segmentMetadata.getColumnMetadataFor(NEW_INT_SV_DIMENSION_COLUMN_NAME);
+    assertTrue(derivedInt.hasDictionary());
+    assertEquals(derivedInt.getDictionaryEncodedUncompressedValueSizeInBytes(), 100000L * Integer.BYTES,
+        "Dictionary-encoded derived columns should persist uncompressed value bytes");
+
+    ColumnMetadata derivedRawString =
+        segmentMetadata.getColumnMetadataFor(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
+    assertFalse(derivedRawString.hasDictionary());
+    assertEquals(derivedRawString.getRawForwardIndexChunkCompressionType(), ChunkCompressionType.LZ4);
+    assertTrue(derivedRawString.getRawForwardIndexUncompressedValueSizeInBytes() > 0,
+        "Raw derived columns should persist their exact writer input size");
+    assertEquals(derivedRawString.getDictionaryEncodedUncompressedValueSizeInBytes(), ColumnMetadata.UNAVAILABLE);
   }
 
   private void checkUpdateDefaultColumns()
@@ -1622,6 +1682,59 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     resetIndexConfigs();
     runPreProcessor(_newColumnsSchemaWithH3Json);
     assertEquals(singleFileIndex.length(), initFileSize);
+  }
+
+  /// Regression test for the H3 index builder crashing a segment on empty/default geometry values,
+  /// covering both the dictionary and the raw reload paths across v1/v3 segments.
+  ///
+  /// When a geo column is added to the schema after a segment was built, old segments have no source
+  /// data to derive it from, so the derived BYTES column is filled with its default null value -- the
+  /// empty byte array. Building an H3 index over those rows used to call
+  /// [org.apache.pinot.segment.local.utils.GeometrySerializer#deserialize(byte\[\])] directly on the
+  /// empty bytes, throwing a `BufferUnderflowException` that propagated out of the reload and parked
+  /// the segment in an ERROR state. The handler now routes through the creator's tolerant path, which
+  /// fast-paths the empty default value and skips undeserializable values when `continueOnError` is
+  /// enabled (set by [#resetIndexConfigs()]), exactly like the segment-creation path.
+  ///
+  /// The `DICTIONARY` case is the empty-default column itself (auto-generated columns are always
+  /// dictionary-encoded, so their `cardinality == 1` value cannot be stored raw). The `RAW` case
+  /// derives a non-dictionary BYTES column holding values that are not decodable as geometry, so the
+  /// raw `forwardIndexReader.getBytes(...)` path is exercised and its values are tolerated (skipped)
+  /// the same way empty defaults are.
+  @Test(dataProvider = "h3VersionAndEncoding")
+  public void testH3IndexCreationOnEmptyDefaultValue(SegmentVersion segmentVersion,
+      FieldConfig.EncodingType encodingType)
+      throws Exception {
+    buildSegment(segmentVersion);
+
+    boolean rawEncoding = encodingType == FieldConfig.EncodingType.RAW;
+    if (rawEncoding) {
+      // Auto-generated empty-default columns are always dictionary-encoded, so to exercise the raw reload path
+      // derive newH3Col from an existing column as raw BYTES. The values are not valid serialized geometry, so the
+      // handler must skip them (like empty defaults) rather than fail.
+      _noDictionaryColumns.add("newH3Col");
+      _ingestionConfig.setTransformConfigs(List.of(new TransformConfig("newH3Col", "toUtf8(column3)")));
+    }
+
+    // Add newH3Col. For DICTIONARY it is a pure default column whose default null value is the empty byte array (no
+    // explicit defaultNullValue in the schema), mirroring old segments reloaded after a geo column was added.
+    runPreProcessor(_newColumnsSchemaWithH3EmptyDefault);
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata newH3ColMetadata = segmentMetadata.getColumnMetadataFor("newH3Col");
+    assertNotNull(newH3ColMetadata);
+    assertEquals(newH3ColMetadata.hasDictionary(), !rawEncoding);
+
+    // Build the H3 index over the values. This must not throw and must produce the index.
+    _fieldConfigMap.put("newH3Col",
+        new FieldConfig("newH3Col", encodingType, List.of(FieldConfig.IndexType.H3), null,
+            Map.of("resolutions", "5")));
+    runPreProcessor(_newColumnsSchemaWithH3EmptyDefault);
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      assertTrue(reader.hasIndexFor("newH3Col", StandardIndexes.h3()));
+      assertEquals(reader.hasIndexFor("newH3Col", StandardIndexes.dictionary()), !rawEncoding);
+    }
   }
 
   @Test(dataProvider = "bothV1AndV3")
@@ -2161,9 +2274,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     SegmentMetadataUtils.savePropertiesConfiguration(configuration, INDEX_DIR);
   }
 
-  /**
-   * Test to check the behavior of the forward index disabled feature when enabled on a new SV column
-   */
+  /// Test to check the behavior of the forward index disabled feature when enabled on a new SV column
   @Test(dataProvider = "bothV1AndV3")
   public void testForwardIndexDisabledOnNewColumnsSV(SegmentVersion segmentVersion)
       throws Exception {
@@ -2205,9 +2316,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         true);
   }
 
-  /**
-   * Test to check the behavior of the forward index disabled feature when enabled on a new MV column
-   */
+  /// Test to check the behavior of the forward index disabled feature when enabled on a new MV column
   @Test(dataProvider = "bothV1AndV3")
   public void testForwardIndexDisabledOnNewColumnsMV(SegmentVersion segmentVersion)
       throws Exception {

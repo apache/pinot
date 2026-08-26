@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.controller.validation;
 
-import java.util.Collections;
+import java.util.Map;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
@@ -205,7 +205,7 @@ public class StorageQuotaCheckerTest {
       throws InvalidConfigException {
     TableSizeReader.TableSubTypeSizeDetails tableSizeResult = new TableSizeReader.TableSubTypeSizeDetails();
     tableSizeResult._estimatedSizeInBytes = tableSizeInBytes;
-    tableSizeResult._segments = Collections.emptyMap();
+    tableSizeResult._segments = Map.of();
     tableSizeResult._missingSegments = numMissingSegments;
     when(_tableSizeReader.getTableSubtypeSize(tableName, 1000, true)).thenReturn(tableSizeResult);
   }

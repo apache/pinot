@@ -31,25 +31,20 @@ import org.apache.pulsar.client.api.Authentication;
 import org.apache.pulsar.client.api.AuthenticationFactory;
 import org.apache.pulsar.client.api.ClientBuilder;
 import org.apache.pulsar.client.api.PulsarClient;
-import org.apache.pulsar.client.api.Reader;
 import org.apache.pulsar.client.impl.auth.oauth2.AuthenticationFactoryOAuth2;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
 
-/**
- * Manages the Pulsar client connection, given the partition id and {@link PulsarConfig}
- */
+/// Manages the Pulsar client connection, given the partition id and [PulsarConfig]
 public class PulsarPartitionLevelConnectionHandler implements Closeable {
   protected final PulsarConfig _config;
   protected final String _clientId;
   protected final PulsarClient _pulsarClient;
 
-  /**
-   * Creates a new instance of {@link PulsarClient} and {@link Reader}
-   */
+  /// Creates a new instance of [PulsarClient] and [org.apache.pulsar.client.api.Reader]
   protected PulsarPartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig) {
-    _config = new PulsarConfig(streamConfig, clientId);
+    _config = new PulsarConfig(streamConfig);
     _clientId = clientId;
     _pulsarClient = createPulsarClient();
   }
@@ -83,11 +78,9 @@ public class PulsarPartitionLevelConnectionHandler implements Closeable {
     }
   }
 
-  /**
-   * Creates and returns an {@link Authentication} object based on the configuration.
-   *
-   * @return an Authentication object
-   */
+  /// Creates and returns an [Authentication] object based on the configuration.
+  ///
+  /// @return an Authentication object
   private Authentication authenticationConfig()
       throws MalformedURLException {
     String authenticationToken = _config.getAuthenticationToken();
@@ -98,11 +91,9 @@ public class PulsarPartitionLevelConnectionHandler implements Closeable {
     }
   }
 
-  /**
-   * Creates and returns an OAuth2 {@link Authentication} object.
-   *
-   * @return an OAuth2 Authentication object
-   */
+  /// Creates and returns an OAuth2 [Authentication] object.
+  ///
+  /// @return an OAuth2 Authentication object
   private Authentication oAuth2AuthenticationConfig()
       throws MalformedURLException {
     String issuerUrl = _config.getIssuerUrl();

@@ -283,6 +283,9 @@ public final class PropertyExtractor {
     if (i.isAggregateMetrics()) {
       props.put("aggregateMetrics", "true");
     }
+    if (i.isCompressionStatsEnabled()) {
+      props.put("compressionStatsEnabled", "true");
+    }
     // Stream configs are routed verbatim with their original keys (stream.* / realtime.*).
     Map<String, String> streamConfigs = i.getStreamConfigs();
     if (streamConfigs != null) {

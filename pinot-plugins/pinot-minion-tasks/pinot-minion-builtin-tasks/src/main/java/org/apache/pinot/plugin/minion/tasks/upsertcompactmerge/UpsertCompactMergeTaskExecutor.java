@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.minion.tasks.upsertcompactmerge;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -53,11 +52,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Minion task that compacts and merges multiple segments of an upsert table and uploads it back as one single
- * segment. This helps in keeping the segment count in check and also prevents a lot of small segments created over
- * time.
- */
+/// Minion task that compacts and merges multiple segments of an upsert table and uploads it back as one single
+/// segment. This helps in keeping the segment count in check and also prevents a lot of small segments created over
+/// time.
 public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversionExecutor {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactMergeTaskExecutor.class);
@@ -119,7 +116,7 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
 
     List<RecordReader> recordReaders = segmentMetadataList.stream().map(x -> {
       RoaringBitmap validDocIds = MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, x.getName(),
-          ValidDocIdsType.SNAPSHOT.name(), MINION_CONTEXT, x.getCrc(), consensusMode);
+          ValidDocIdsType.SNAPSHOT.name(), MINION_CONTEXT, x.getCrc(), x.getDataCrc(), consensusMode);
       if (validDocIds == null) {
         // no valid crc match found or no validDocIds obtained from all servers
         // error out the task instead of silently failing so that we can track it via task-error metrics
@@ -151,7 +148,7 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     List<File> outputSegmentDirs;
     _eventObserver.notifyProgress(_pinotTaskConfig, "Generating segments");
     SegmentProcessorFramework framework = new SegmentProcessorFramework(segmentProcessorConfig, workingDir,
-        recordReaderFileConfigs, Collections.emptyList(), new DefaultSegmentNumRowProvider(Integer.parseInt(
+        recordReaderFileConfigs, List.of(), new DefaultSegmentNumRowProvider(Integer.parseInt(
         configs.get(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY))));
     outputSegmentDirs = framework.process();
     _eventObserver.notifyProgress(_pinotTaskConfig,
@@ -215,13 +212,11 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     }
   }
 
-  /**
-   * Retrieves the max ZK creation time from task configuration with proper null handling.
-   *
-   * @param configs Task configuration map
-   * @return Max ZK creation time in milliseconds
-   * @throws IllegalStateException if the configuration value is invalid
-   */
+  /// Retrieves the max ZK creation time from task configuration with proper null handling.
+  ///
+  /// @param configs Task configuration map
+  /// @return Max ZK creation time in milliseconds
+  /// @throws IllegalStateException if the configuration value is invalid
   long getMaxZKCreationTimeFromConfig(Map<String, String> configs) {
     String maxCreationTimeStr = configs.get(MinionConstants.UpsertCompactMergeTask.MAX_ZK_CREATION_TIME_MILLIS_KEY);
     if (maxCreationTimeStr == null) {

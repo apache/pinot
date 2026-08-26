@@ -21,7 +21,6 @@ package org.apache.pinot.queries;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -564,7 +563,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     insertRow(null);
     insertRow(1);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setNoDictionaryColumns(Collections.singletonList(COLUMN1)).build();
+        .setNoDictionaryColumns(List.of(COLUMN1)).build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType).build();
     setUpSegments(tableConfig, schema);
     String query = String.format("SELECT DISTINCTCOUNT(%s) FROM testTable", COLUMN1);
@@ -602,7 +601,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     insertRowWithTwoColumns(null, "key");
     insertRowWithTwoColumns(1, "key");
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setNoDictionaryColumns(Collections.singletonList(COLUMN1)).build();
+        .setNoDictionaryColumns(List.of(COLUMN1)).build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType)
         .addSingleValueDimension(COLUMN2, FieldSpec.DataType.STRING).build();
     setUpSegments(tableConfig, schema);
@@ -623,7 +622,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     insertRowWithTwoColumns(1, new String[]{"key1", "key2"});
     insertRowWithTwoColumns(2, new String[]{"key2"});
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setNoDictionaryColumns(Collections.singletonList(COLUMN1)).build();
+        .setNoDictionaryColumns(List.of(COLUMN1)).build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType)
         .addMultiValueDimension(COLUMN2, FieldSpec.DataType.STRING).build();
     setUpSegments(tableConfig, schema);
@@ -906,7 +905,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     insertRow(false);
     insertRow(true);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setInvertedIndexColumns(Collections.singletonList(COLUMN1)).build();
+        .setInvertedIndexColumns(List.of(COLUMN1)).build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN).build();
     setUpSegments(tableConfig, schema);
     String query =
@@ -1088,7 +1087,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     insertRow(false);
     insertRow(true);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setInvertedIndexColumns(Collections.singletonList(COLUMN1)).build();
+        .setInvertedIndexColumns(List.of(COLUMN1)).build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN).build();
     setUpSegments(tableConfig, schema);
     String query = String.format("SELECT * FROM testTable WHERE NOT(%s = false)", COLUMN1);
@@ -1479,6 +1478,68 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 1);
     assertEquals(rows.get(0)[0], 0.5);
+  }
+
+  /// A covariance pairs a value from each column, so a row counts only when both are present.
+  @Test
+  public void testCovarPopSkipsRowsWhereEitherColumnIsNull()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(1, 10);
+    insertRowWithTwoColumns(null, 20);
+    insertRowWithTwoColumns(3, null);
+    insertRowWithTwoColumns(4, 40);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT COVAR_POP(%s, %s) FROM testTable", COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    List<Object[]> rows = brokerResponse.getResultTable().getRows();
+    assertEquals(rows.size(), 1);
+    // Only rows 0 and 3 contribute: mean(xy) - mean(x)mean(y) = 85 - 2.5 * 25
+    assertEquals(rows.get(0)[0], 22.5);
+  }
+
+  @Test
+  public void testCovarPopOverAllNullInputIsNull()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, 10);
+    insertRowWithTwoColumns(null, 20);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT COVAR_POP(%s, %s) FROM testTable", COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    List<Object[]> rows = brokerResponse.getResultTable().getRows();
+    assertEquals(rows.size(), 1);
+    assertNull(rows.get(0)[0]);
+  }
+
+  /// With the option off, null rows are read as the column default and folded in, as they always have been.
+  @Test
+  public void testCovarPopFoldsNullRowsWhenOptionDisabled()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, 10);
+    insertRowWithTwoColumns(null, 20);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT COVAR_POP(%s, %s) FROM testTable", COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+
+    List<Object[]> rows = brokerResponse.getResultTable().getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0)[0], 0.0);
   }
 
   @Test(dataProvider = "NumberTypes")

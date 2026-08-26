@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.filter;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.OptionalInt;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -53,21 +52,21 @@ public class FilterOperatorUtilsTest {
   @Test
   public void testGetAndFilterOperator() {
     BaseFilterOperator filterOperator =
-        FilterOperatorUtils.getAndFilterOperator(QUERY_CONTEXT, Collections.emptyList(), NUM_DOCS);
+        FilterOperatorUtils.getAndFilterOperator(QUERY_CONTEXT, List.of(), NUM_DOCS);
     assertTrue(filterOperator instanceof MatchAllFilterOperator);
 
     filterOperator =
-        FilterOperatorUtils.getAndFilterOperator(QUERY_CONTEXT, Collections.singletonList(EMPTY_FILTER_OPERATOR),
+        FilterOperatorUtils.getAndFilterOperator(QUERY_CONTEXT, List.of(EMPTY_FILTER_OPERATOR),
             NUM_DOCS);
     assertTrue(filterOperator instanceof EmptyFilterOperator);
 
     filterOperator =
-        FilterOperatorUtils.getAndFilterOperator(QUERY_CONTEXT, Collections.singletonList(MATCH_ALL_FILTER_OPERATOR),
+        FilterOperatorUtils.getAndFilterOperator(QUERY_CONTEXT, List.of(MATCH_ALL_FILTER_OPERATOR),
             NUM_DOCS);
     assertTrue(filterOperator instanceof MatchAllFilterOperator);
 
     filterOperator =
-        FilterOperatorUtils.getAndFilterOperator(QUERY_CONTEXT, Collections.singletonList(REGULAR_FILTER_OPERATOR),
+        FilterOperatorUtils.getAndFilterOperator(QUERY_CONTEXT, List.of(REGULAR_FILTER_OPERATOR),
             NUM_DOCS);
     assertTrue(filterOperator instanceof TestFilterOperator);
 
@@ -87,21 +86,21 @@ public class FilterOperatorUtilsTest {
   @Test
   public void testGetOrFilterOperator() {
     BaseFilterOperator filterOperator =
-        FilterOperatorUtils.getOrFilterOperator(QUERY_CONTEXT, Collections.emptyList(), NUM_DOCS);
+        FilterOperatorUtils.getOrFilterOperator(QUERY_CONTEXT, List.of(), NUM_DOCS);
     assertTrue(filterOperator instanceof EmptyFilterOperator);
 
     filterOperator =
-        FilterOperatorUtils.getOrFilterOperator(QUERY_CONTEXT, Collections.singletonList(EMPTY_FILTER_OPERATOR),
+        FilterOperatorUtils.getOrFilterOperator(QUERY_CONTEXT, List.of(EMPTY_FILTER_OPERATOR),
             NUM_DOCS);
     assertTrue(filterOperator instanceof EmptyFilterOperator);
 
     filterOperator =
-        FilterOperatorUtils.getOrFilterOperator(QUERY_CONTEXT, Collections.singletonList(MATCH_ALL_FILTER_OPERATOR),
+        FilterOperatorUtils.getOrFilterOperator(QUERY_CONTEXT, List.of(MATCH_ALL_FILTER_OPERATOR),
             NUM_DOCS);
     assertTrue(filterOperator instanceof MatchAllFilterOperator);
 
     filterOperator =
-        FilterOperatorUtils.getOrFilterOperator(QUERY_CONTEXT, Collections.singletonList(REGULAR_FILTER_OPERATOR),
+        FilterOperatorUtils.getOrFilterOperator(QUERY_CONTEXT, List.of(REGULAR_FILTER_OPERATOR),
             NUM_DOCS);
     assertTrue(filterOperator instanceof TestFilterOperator);
 

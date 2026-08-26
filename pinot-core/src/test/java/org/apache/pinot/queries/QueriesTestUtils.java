@@ -19,7 +19,6 @@
 package org.apache.pinot.queries;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.Function;
@@ -83,7 +82,7 @@ public class QueriesTestUtils {
   }
 
   public static void testInterSegmentsResult(BrokerResponseNative brokerResponse, Object[] expectedResults) {
-    testInterSegmentsResult(brokerResponse, Collections.singletonList(expectedResults));
+    testInterSegmentsResult(brokerResponse, List.<Object[]>of(expectedResults));
   }
 
   public static void testInterSegmentsResult(BrokerResponseNative brokerResponse, List<Object[]> expectedRows) {
@@ -103,7 +102,7 @@ public class QueriesTestUtils {
       long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
       Object[] expectedResults) {
     testInterSegmentsResult(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,
-        expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, Collections.singletonList(expectedResults));
+        expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, List.<Object[]>of(expectedResults));
   }
 
   public static void testInterSegmentsResult(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,

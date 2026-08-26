@@ -25,9 +25,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * A class to generate data for a time column
- */
+/// A class to generate data for a time column
 public class TimeGenerator implements Generator {
   private static final double DEFAULT_NUMBER_OF_VALUES_PER_ENTRY = 1;
 

@@ -54,7 +54,6 @@ import org.slf4j.LoggerFactory;
 ///   - `/CONFIGS/MATERIALIZED_VIEW/RUNTIME` — high-frequency changes only update mutable
 ///       runtime state (watermarkMs, partitions map) without any SQL parsing
 ///
-///
 /// Thread-safety: all mutations go through synchronized ZK listener callbacks;
 /// reads use a [ConcurrentHashMap] and are lock-free.
 public class MaterializedViewMetadataCache {
@@ -491,7 +490,7 @@ public class MaterializedViewMetadataCache {
     public void handleChildChange(String path, List<String> children) {
       synchronized (_cacheLock) {
         Set<String> newChildSet = CollectionUtils.isNotEmpty(children)
-            ? new HashSet<>(children) : Collections.emptySet();
+            ? new HashSet<>(children) : Set.of();
 
         /// Evict entries that are no longer present in ZK (MV table deleted).
         for (String existing : new ArrayList<>(_materializedViewEntryMap.keySet())) {
@@ -542,7 +541,7 @@ public class MaterializedViewMetadataCache {
     public void handleChildChange(String path, List<String> children) {
       synchronized (_cacheLock) {
         Set<String> newChildSet = CollectionUtils.isNotEmpty(children)
-            ? new HashSet<>(children) : Collections.emptySet();
+            ? new HashSet<>(children) : Set.of();
 
         /// Unsubscribe data listeners for runtime nodes that are no longer present.
         for (String viewTableName : _materializedViewEntryMap.keySet()) {

@@ -20,7 +20,6 @@ package org.apache.pinot.tsdb.m3ql;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -94,7 +93,7 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
         case "max":
           Preconditions.checkState(commandId == 1, "Aggregation should be the second command (fetch should be first)");
           Preconditions.checkState(aggInfo == null, "Aggregation already set. Only single agg allowed.");
-          aggInfo = new AggInfo(command.toUpperCase(Locale.ENGLISH), false, Collections.emptyMap());
+          aggInfo = new AggInfo(command.toUpperCase(Locale.ENGLISH), false, Map.of());
           if (commands.get(commandId).size() > 1) {
             String[] cols = commands.get(commandId).get(1).split(",");
             groupByColumns = Stream.of(cols).map(String::trim).collect(Collectors.toList());

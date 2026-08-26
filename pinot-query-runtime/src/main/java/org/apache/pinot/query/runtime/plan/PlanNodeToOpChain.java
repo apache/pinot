@@ -25,6 +25,8 @@ import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.request.context.GroupingSets;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -50,6 +52,7 @@ import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.operator.RepeatOperator;
 import org.apache.pinot.query.runtime.operator.SortOperator;
 import org.apache.pinot.query.runtime.operator.SortedMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.TransformOperator;
@@ -67,16 +70,14 @@ import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
-/**
- * A class used to transform PlanNodes (considered logical) into MultiStageOperator (considered physical).
- *
- * Note that this works only for the intermediate stage nodes, leaf stage nodes are expected to compile into
- * v1 operators at this point in time.
- *
- * <p><b>Notice</b>: Here <em>physical</em> is used in the context of multi-stage engine, which means it transforms
- * logical PlanNodes into MultiStageOperator.
- * Probably another adjective should be used given physical means different things for Calcite and single-stage</p>
- */
+/// A class used to transform PlanNodes (considered logical) into MultiStageOperator (considered physical).
+///
+/// Note that this works only for the intermediate stage nodes, leaf stage nodes are expected to compile into
+/// v1 operators at this point in time.
+///
+/// **Notice**: Here _physical_ is used in the context of multi-stage engine, which means it transforms
+/// logical PlanNodes into MultiStageOperator.
+/// Probably another adjective should be used given physical means different things for Calcite and single-stage
 public class PlanNodeToOpChain {
 
   private PlanNodeToOpChain() {
@@ -88,12 +89,10 @@ public class PlanNodeToOpChain {
     });
   }
 
-  /**
-   * Like {@link #convert(PlanNode, OpChainExecutionContext, BiConsumer)} but keeps tracking of the original
-   * PlanNode that created each MultiStageOperator
-   * @param tracker a consumer that will be called each time a MultiStageOperator is created.
-   * @return
-   */
+  /// Like [#convert(PlanNode, OpChainExecutionContext, BiConsumer)] but keeps tracking of the original
+  /// PlanNode that created each MultiStageOperator
+  /// @param tracker a consumer that will be called each time a MultiStageOperator is created.
+  /// @return
   public static OpChain convert(PlanNode node, OpChainExecutionContext context,
       BiConsumer<PlanNode, MultiStageOperator> tracker) {
     // Assign deterministic stage-scoped ids to every PlanNode reachable from the root before constructing operators,
@@ -113,9 +112,7 @@ public class PlanNodeToOpChain {
     return new OpChain(context, root);
   }
 
-  /**
-   * Pre-order walk that assigns each PlanNode in the sub-tree a sequential integer id, recorded on the context.
-   */
+  /// Pre-order walk that assigns each PlanNode in the sub-tree a sequential integer id, recorded on the context.
   private static void assignPlanNodeIds(PlanNode root, OpChainExecutionContext context) {
     assignPlanNodeIds(root, context, new int[]{0});
   }
@@ -127,14 +124,12 @@ public class PlanNodeToOpChain {
     }
   }
 
-  /**
-   * Recursively collects all PlanNodes in the sub-tree rooted at {@code root} (including {@code root} itself), in
-   * pre-order (root first, then children left-to-right).
-   * <p>
-   * Used to record the leaf operator's full one-to-many mapping: the leaf operator's tracker fires once with the
-   * leaf-stage boundary PlanNode, but the leaf actually represents the whole sub-tree of v1 plan nodes below that
-   * boundary. We walk the boundary's sub-tree once at construction and store the full list on the operator.
-   */
+  /// Recursively collects all PlanNodes in the sub-tree rooted at `root` (including `root` itself), in
+  /// pre-order (root first, then children left-to-right).
+  ///
+  /// Used to record the leaf operator's full one-to-many mapping: the leaf operator's tracker fires once with the
+  /// leaf-stage boundary PlanNode, but the leaf actually represents the whole sub-tree of v1 plan nodes below that
+  /// boundary. We walk the boundary's sub-tree once at construction and store the full list on the operator.
   private static void collectPlanNodeSubTree(PlanNode root, List<PlanNode> out) {
     out.add(root);
     for (PlanNode child : root.getInputs()) {
@@ -174,13 +169,12 @@ public class PlanNodeToOpChain {
       return result;
     }
 
-    /**
-     * Records the operator-to-PlanNode mapping on the execution context. For non-leaf operators this is a 1:1 mapping
-     * to {@code node}. For the leaf operator we walk the sub-tree below the leaf-stage boundary and record every
-     * PlanNode encountered (one-to-many: a leaf operator owns the whole v1 sub-plan below it).
-     * <p>No-op outside stream-mode stats reporting (the only consumer of this mapping) — avoids the O(depth) sub-tree
-     * walk on the legacy hot path. See {@link OpChainExecutionContext#isStreamStatsReporting()}.
-     */
+    /// Records the operator-to-PlanNode mapping on the execution context. For non-leaf operators this is a 1:1 mapping
+    /// to `node`. For the leaf operator we walk the sub-tree below the leaf-stage boundary and record every
+    /// PlanNode encountered (one-to-many: a leaf operator owns the whole v1 sub-plan below it).
+    ///
+    /// No-op outside stream-mode stats reporting (the only consumer of this mapping) — avoids the O(depth) sub-tree
+    /// walk on the legacy hot path. See [OpChainExecutionContext#isStreamStatsReporting()].
     void record(PlanNode node, MultiStageOperator operator) {
       if (!_context.isStreamStatsReporting()) {
         return;
@@ -220,12 +214,70 @@ public class PlanNodeToOpChain {
       try {
         PlanNode input = node.getInputs().get(0);
         child = visit(input, context);
+        /// GROUP BY GROUPING SETS / ROLLUP / CUBE in the multi-stage runtime: expand each input row across the
+        /// grouping sets via a RepeatOperator — appending per-set group-key copies (NULL where rolled up) and the
+        /// $groupingId ordinal while leaving the original input columns untouched (aggregation arguments may
+        /// reference a grouping column) — then hand the factory an ordinary GROUP BY over the appended key copies
+        /// plus $groupingId. Wrapping here — rather than inside a specific AggregateOperator implementation — means
+        /// every AggregateOperatorFactory receives already-expanded input and needs no grouping-set awareness. This
+        /// path handles grouping sets over any input (e.g. above a JOIN); when the aggregate sits directly on a
+        /// table scan the whole expansion is pushed down to the single-stage leaf instead and the plan reaching here
+        /// has no grouping sets.
+        if (node.isGroupingSets()) {
+          child = new RepeatOperator(context, child, groupKeyIds(node.getGroupKeys()), node.getGroupingSets(),
+              repeatResultSchema(input.getDataSchema(), node.getGroupKeys()));
+          node = asPlainGroupByOverExpandedInput(node, input.getDataSchema().size());
+        }
         AggregateOperatorFactory aggregateOperatorFactory =
             context.getQueryOperatorFactoryProvider().getAggregateOperatorFactory();
         return aggregateOperatorFactory.createAggregateOperator(context, child, input, node);
       } catch (Exception e) {
         return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
       }
+    }
+
+    /// Output schema of the [RepeatOperator] that feeds a grouping-set aggregate: the aggregate input schema
+    /// with one group-key copy column per union group-by column and the synthetic `$groupingId` INT
+    /// discriminator column appended.
+    private static DataSchema repeatResultSchema(DataSchema inputSchema, List<Integer> unionGroupKeyIds) {
+      int numInputColumns = inputSchema.size();
+      int numUnionKeys = unionGroupKeyIds.size();
+      String[] columnNames = new String[numInputColumns + numUnionKeys + 1];
+      DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numInputColumns + numUnionKeys + 1];
+      for (int i = 0; i < numInputColumns; i++) {
+        columnNames[i] = inputSchema.getColumnName(i);
+        columnDataTypes[i] = inputSchema.getColumnDataType(i);
+      }
+      for (int i = 0; i < numUnionKeys; i++) {
+        columnNames[numInputColumns + i] = GroupingSets.GROUPING_SET_KEY_COLUMN_PREFIX + i;
+        columnDataTypes[numInputColumns + i] = inputSchema.getColumnDataType(unionGroupKeyIds.get(i));
+      }
+      columnNames[numInputColumns + numUnionKeys] = GroupingSets.GROUPING_ID_COLUMN;
+      columnDataTypes[numInputColumns + numUnionKeys] = DataSchema.ColumnDataType.INT;
+      return new DataSchema(columnNames, columnDataTypes);
+    }
+
+    /// The equivalent plain GROUP BY over the RepeatOperator-expanded input: the group keys are the appended
+    /// group-key copies plus the $groupingId column (the original input columns are left untouched for aggregation
+    /// arguments), and the grouping sets are cleared.
+    private static AggregateNode asPlainGroupByOverExpandedInput(AggregateNode node, int numInputColumns) {
+      int numUnionKeys = node.getGroupKeys().size();
+      List<Integer> groupKeys = new ArrayList<>(numUnionKeys + 1);
+      for (int i = 0; i <= numUnionKeys; i++) {
+        groupKeys.add(numInputColumns + i);
+      }
+      return new AggregateNode(node.getStageId(), node.getDataSchema(), node.getNodeHint(), node.getInputs(),
+          node.getAggCalls(), node.getFilterArgs(), groupKeys, node.getAggType(), node.isLeafReturnFinalResult(),
+          node.getCollations(), node.getLimit());
+    }
+
+    private static int[] groupKeyIds(List<Integer> groupKeys) {
+      int numKeys = groupKeys.size();
+      int[] groupKeyIds = new int[numKeys];
+      for (int i = 0; i < numKeys; i++) {
+        groupKeyIds[i] = groupKeys.get(i);
+      }
+      return groupKeyIds;
     }
 
     @Override
@@ -308,6 +360,7 @@ public class PlanNodeToOpChain {
       }
     }
 
+    @Deprecated(forRemoval = true, since = "1.6.0")
     @Override
     public MultiStageOperator visitEnrichedJoin(EnrichedJoinNode node, OpChainExecutionContext context) {
       MultiStageOperator leftOperator = null;

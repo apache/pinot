@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.realtime.impl.forward;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.MutableOffHeapByteArrayStore;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -28,14 +29,13 @@ import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.MapUtils;
+import org.apache.pinot.spi.utils.MapUtils.PreparedMapKey;
 import org.apache.pinot.spi.utils.Utf8Utils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * Single-value forward index reader-writer for variable length values (STRING and BYTES).
- */
+/// Single-value forward index reader-writer for variable length values (STRING and BYTES).
 public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
   private final DataType _storedType;
   private final MutableOffHeapByteArrayStore _byteArrayStore;
@@ -100,6 +100,23 @@ public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
   @Override
   public Map<String, Object> getMap(int docId, ForwardIndexReaderContext context) {
     return MapUtils.deserializeMap(getBytes(docId));
+  }
+
+  @Nullable
+  @Override
+  public Object getMapEntryValue(int docId, ForwardIndexReaderContext context, PreparedMapKey key) {
+    return MapUtils.deserializeMapEntryValue(_byteArrayStore.getByteBuffer(docId), key);
+  }
+
+  @Override
+  public String getMapAsJsonString(int docId, ForwardIndexReaderContext context) {
+    return MapUtils.frameToJsonString(getBytes(docId));
+  }
+
+  @Override
+  @Nullable
+  public String getMapEntryValueAsString(int docId, ForwardIndexReaderContext context, PreparedMapKey key) {
+    return MapUtils.deserializeMapEntryValueAsString(_byteArrayStore.getByteBuffer(docId), key);
   }
 
   @Override

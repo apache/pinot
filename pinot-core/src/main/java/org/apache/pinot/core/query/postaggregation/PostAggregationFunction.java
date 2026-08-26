@@ -29,9 +29,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/**
- * Post-aggregation function on the annotated scalar function.
- */
+/// Post-aggregation function on the annotated scalar function.
 public class PostAggregationFunction {
   private final QueryFunctionInvoker _functionInvoker;
   private final ColumnDataType _resultType;
@@ -73,17 +71,13 @@ public class PostAggregationFunction {
     }
   }
 
-  /**
-   * Returns the ColumnDataType of the result.
-   */
+  /// Returns the ColumnDataType of the result.
   public ColumnDataType getResultType() {
     return _resultType;
   }
 
-  /**
-   * Invoke the function with the given arguments.
-   * NOTE: The passed in arguments could be modified during the type conversion.
-   */
+  /// Invoke the function with the given arguments.
+  /// NOTE: The passed in arguments could be modified during the type conversion.
   public Object invoke(Object[] arguments) {
     Object result;
     if (_functionInvoker.getMethod().isVarArgs()) {

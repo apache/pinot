@@ -57,14 +57,12 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
-/**
- * REST endpoint that manages page‑cache warm‑up query files.
- *
- * <p>This resource lets callers list, create, overwrite, and delete warm‑up query
- * files stored under {@code controllerConf.pageCacheWarmupDataDir}. Pinot servers
- * read these files on startup to pre‑warm the OS page cache.</p>
- *
- */
+/// REST endpoint that manages page‑cache warm‑up query files.
+///
+/// <p>This resource lets callers list, create, overwrite, and delete warm‑up query
+/// files stored under {@code controllerConf.pageCacheWarmupDataDir}. Pinot servers
+/// read these files on startup to pre‑warm the OS page cache.</p>
+///
 @Api(tags = Constants.PAGE_CACHE_WARMUP_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
     @Authorization(value = DATABASE)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
@@ -89,23 +87,21 @@ public class PageCacheWarmupRestletResource {
     _pinotFS = PinotFSFactory.create(URIUtils.getUri(_pageCacheWarmupDataDir).getScheme());
   }
 
-  /**
-   * Retrieves the warm‑up query list for the specified table and type.
-   *
-   * <p>If {@code queryFileName} is omitted the default file
-   * {@value #DEFAULT_QUERY_FILE_NAME} is used.</p>
-   *
-   * <pre>{@code
-   * GET /pagecache/queries/myTable?tableType=OFFLINE
-   * Response: ["SELECT COUNT(*) FROM myTable", "SELECT SUM(col) FROM myTable"]
-   * }</pre>
-   *
-   * @param tableName           table name (no type suffix)
-   * @param tableType           table type: {@code OFFLINE} or {@code REALTIME}
-   * @param queryFileNameParam  optional custom file name
-   * @return 200 OK with a JSON array containing SQL query strings
-   * @throws ControllerApplicationException if validation fails or the file cannot be found
-   */
+  /// Retrieves the warm‑up query list for the specified table and type.
+  ///
+  /// <p>If {@code queryFileName} is omitted the default file
+  /// {@value #DEFAULT_QUERY_FILE_NAME} is used.</p>
+  ///
+  /// <pre>{@code
+  /// GET /pagecache/queries/myTable?tableType=OFFLINE
+  /// Response: ["SELECT COUNT(*) FROM myTable", "SELECT SUM(col) FROM myTable"]
+  /// }</pre>
+  ///
+  /// @param tableName           table name (no type suffix)
+  /// @param tableType           table type: {@code OFFLINE} or {@code REALTIME}
+  /// @param queryFileNameParam  optional custom file name
+  /// @return 200 OK with a JSON array containing SQL query strings
+  /// @throws ControllerApplicationException if validation fails or the file cannot be found
   @GET
   @Path("/pagecache/queries/{tableName}")
   @Produces(MediaType.APPLICATION_JSON)
@@ -161,24 +157,22 @@ public class PageCacheWarmupRestletResource {
     }
   }
 
-  /**
-   * Stores (or overwrites) the warm‑up query file for the given table and type.
-   *
-   * <p>The request body must be a JSON array of SQL strings. The write is performed
-   * atomically by first writing to a temporary file and then moving it into place.</p>
-   *
-   * <pre>{@code
-   * POST /pagecache/queries/myTable?tableType=OFFLINE&queryFileName=custom.txt
-   * Body: ["SELECT ...", "SELECT ..."]
-   * }</pre>
-   *
-   * @param tableName           table name
-   * @param tableType           table type: {@code OFFLINE} or {@code REALTIME}
-   * @param queryFileNameParam  optional custom file name
-   * @param requestString       JSON array containing SQL queries
-   * @return 200 OK with a human‑readable confirmation message
-   * @throws ControllerApplicationException if validation fails or the file cannot be written
-   */
+  /// Stores (or overwrites) the warm‑up query file for the given table and type.
+  ///
+  /// <p>The request body must be a JSON array of SQL strings. The write is performed
+  /// atomically by first writing to a temporary file and then moving it into place.</p>
+  ///
+  /// <pre>{@code
+  /// POST /pagecache/queries/myTable?tableType=OFFLINE&queryFileName=custom.txt
+  /// Body: ["SELECT ...", "SELECT ..."]
+  /// }</pre>
+  ///
+  /// @param tableName           table name
+  /// @param tableType           table type: {@code OFFLINE} or {@code REALTIME}
+  /// @param queryFileNameParam  optional custom file name
+  /// @param requestString       JSON array containing SQL queries
+  /// @return 200 OK with a human‑readable confirmation message
+  /// @throws ControllerApplicationException if validation fails or the file cannot be written
   @POST
   @Path("/pagecache/queries/{tableName}")
   @Consumes(MediaType.APPLICATION_JSON)
@@ -248,19 +242,17 @@ public class PageCacheWarmupRestletResource {
           String.format("Failed to write queries to file for table: %s, exception: %s", tableNameWithType, e), 500);
     }
   }
-  /**
-   * Deletes the warm‑up query file for the specified table and type.
-   *
-   * <pre>{@code
-   * DELETE /pagecache/queries/myTable?tableType=OFFLINE
-   * }</pre>
-   *
-   * @param tableName           table name
-   * @param tableType           table type: {@code OFFLINE} or {@code REALTIME}
-   * @param queryFileNameParam  optional custom file name
-   * @return 200 OK with a confirmation message (even if the file did not exist)
-   * @throws ControllerApplicationException on unexpected I/O errors
-   */
+  /// Deletes the warm‑up query file for the specified table and type.
+  ///
+  /// <pre>{@code
+  /// DELETE /pagecache/queries/myTable?tableType=OFFLINE
+  /// }</pre>
+  ///
+  /// @param tableName           table name
+  /// @param tableType           table type: {@code OFFLINE} or {@code REALTIME}
+  /// @param queryFileNameParam  optional custom file name
+  /// @return 200 OK with a confirmation message (even if the file did not exist)
+  /// @throws ControllerApplicationException on unexpected I/O errors
   @DELETE
   @Path("/pagecache/queries/{tableName}")
   @Produces(MediaType.APPLICATION_JSON)

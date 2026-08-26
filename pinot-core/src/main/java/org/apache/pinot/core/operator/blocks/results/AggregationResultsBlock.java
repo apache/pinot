@@ -25,7 +25,6 @@ import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
@@ -39,12 +38,9 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Results block for aggregation queries.
- */
+/// Results block for aggregation queries.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class AggregationResultsBlock extends BaseResultsBlock {
   private final AggregationFunction[] _aggregationFunctions;
@@ -97,7 +93,20 @@ public class AggregationResultsBlock extends BaseResultsBlock {
 
   @Override
   public List<Object[]> getRows() {
-    return Collections.singletonList(_results.toArray());
+    if (!_queryContext.isServerReturnFinalResult()) {
+      return List.<Object[]>of(_results.toArray());
+    }
+    // When the server is requested to return the final result (e.g. a single-server colocated DIRECT aggregate in the
+    // multi-stage engine), getDataSchema() reports the final column types. Finalize the intermediate results here so
+    // that the rows are consistent with the schema; otherwise an intermediate object (e.g. a HyperLogLogPlus) would be
+    // left in a column typed as its final type (e.g. LONG) and fail when the block is serialized. This mirrors the
+    // finalization done in getDataTable() and in GroupByCombineOperator for the group-by case.
+    int numColumns = _results.size();
+    Object[] row = new Object[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      row[i] = _aggregationFunctions[i].extractFinalResult(_results.get(i));
+    }
+    return List.<Object[]>of(row);
   }
 
   @Override
@@ -114,73 +123,32 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       return dataTableBuilder.build();
     }
 
-    boolean returnFinalResult = _queryContext.isServerReturnFinalResult();
-    if (_queryContext.isNullHandlingEnabled()) {
-      RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
+    // NOTE: Nulls are serialized through the builder's null-aware path regardless of the query's null-handling
+    // option. Aggregation functions whose accumulator has no identity element (MINSTRING, MAXSTRING, ANYVALUE)
+    // return a null intermediate result in both modes, and their result column type is not OBJECT.
+    dataTableBuilder.startRow();
+    if (_queryContext.isServerReturnFinalResult()) {
       for (int i = 0; i < numColumns; i++) {
-        nullBitmaps[i] = new RoaringBitmap();
-      }
-      dataTableBuilder.startRow();
-      if (returnFinalResult) {
-        for (int i = 0; i < numColumns; i++) {
-          Object result = _aggregationFunctions[i].extractFinalResult(_results.get(i));
-          if (result == null) {
-            result = columnDataTypes[i].getNullPlaceholder();
-            nullBitmaps[i].add(0);
-          }
-          assert result != null;
+        Object result = _aggregationFunctions[i].extractFinalResult(_results.get(i));
+        if (result == null) {
+          dataTableBuilder.setNull(i);
+        } else {
           setFinalResult(dataTableBuilder, columnDataTypes, i, result);
         }
-      } else {
-        for (int i = 0; i < numColumns; i++) {
-          Object result = _results.get(i);
-          if (columnDataTypes[i] == ColumnDataType.OBJECT) {
-            if (result == null) {
-              dataTableBuilder.setNull(i);
-            } else {
-              dataTableBuilder.setColumn(i, _aggregationFunctions[i].serializeIntermediateResult(result));
-            }
-          } else {
-            if (result == null) {
-              result = columnDataTypes[i].getNullPlaceholder();
-              nullBitmaps[i].add(0);
-            }
-            assert result != null;
-            AggregationFunctionUtils.setIntermediateResult(dataTableBuilder, columnDataTypes[i], i, result);
-          }
-        }
-      }
-      dataTableBuilder.finishRow();
-      for (RoaringBitmap nullBitmap : nullBitmaps) {
-        dataTableBuilder.setNullRowIds(nullBitmap);
       }
     } else {
-      dataTableBuilder.startRow();
-      if (returnFinalResult) {
-        for (int i = 0; i < numColumns; i++) {
-          Object result = _aggregationFunctions[i].extractFinalResult(_results.get(i));
-          if (result == null) {
-            dataTableBuilder.setNull(i);
-          } else {
-            setFinalResult(dataTableBuilder, columnDataTypes, i, result);
-          }
-        }
-      } else {
-        for (int i = 0; i < numColumns; i++) {
-          Object result = _results.get(i);
-          if (result == null) {
-            dataTableBuilder.setNull(i);
-          } else {
-            if (columnDataTypes[i] == ColumnDataType.OBJECT) {
-              dataTableBuilder.setColumn(i, _aggregationFunctions[i].serializeIntermediateResult(result));
-            } else {
-              AggregationFunctionUtils.setIntermediateResult(dataTableBuilder, columnDataTypes[i], i, result);
-            }
-          }
+      for (int i = 0; i < numColumns; i++) {
+        Object result = _results.get(i);
+        if (result == null) {
+          dataTableBuilder.setNull(i);
+        } else if (columnDataTypes[i] == ColumnDataType.OBJECT) {
+          dataTableBuilder.setColumn(i, _aggregationFunctions[i].serializeIntermediateResult(result));
+        } else {
+          AggregationFunctionUtils.setIntermediateResult(dataTableBuilder, columnDataTypes[i], i, result);
         }
       }
-      dataTableBuilder.finishRow();
     }
+    dataTableBuilder.finishRow();
     return dataTableBuilder.build();
   }
 

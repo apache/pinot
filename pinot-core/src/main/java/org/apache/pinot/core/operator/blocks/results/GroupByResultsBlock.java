@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.blocks.results;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -39,12 +38,9 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
-import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Results block for group-by queries.
- */
+/// Results block for group-by queries.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class GroupByResultsBlock extends BaseResultsBlock {
   private final DataSchema _dataSchema;
@@ -59,9 +55,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   private int _numResizes;
   private long _resizeTimeMs;
 
-  /**
-   * For segment level group-by results.
-   */
+  /// For segment level group-by results.
   public GroupByResultsBlock(DataSchema dataSchema, AggregationGroupByResult aggregationGroupByResult,
       QueryContext queryContext) {
     _dataSchema = dataSchema;
@@ -71,9 +65,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     _queryContext = queryContext;
   }
 
-  /**
-   * For segment level group-by results.
-   */
+  /// For segment level group-by results.
   public GroupByResultsBlock(DataSchema dataSchema, List<IntermediateRecord> intermediateRecords,
       QueryContext queryContext) {
     _dataSchema = dataSchema;
@@ -83,9 +75,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     _queryContext = queryContext;
   }
 
-  /**
-   * For instance level group-by results.
-   */
+  /// For instance level group-by results.
   public GroupByResultsBlock(Table table, QueryContext queryContext) {
     _dataSchema = table.getDataSchema();
     _aggregationGroupByResult = null;
@@ -94,9 +84,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     _queryContext = queryContext;
   }
 
-  /**
-   * For instance level empty group-by results.
-   */
+  /// For instance level empty group-by results.
   public GroupByResultsBlock(DataSchema dataSchema, QueryContext queryContext) {
     _dataSchema = dataSchema;
     _aggregationGroupByResult = null;
@@ -185,7 +173,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   @Override
   public List<Object[]> getRows() {
     if (_table == null) {
-      return Collections.emptyList();
+      return List.of();
     }
     List<Object[]> rows = new ArrayList<>(_table.size());
     Iterator<Record> iterator = _table.iterator();
@@ -207,63 +195,31 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
     List<ExpressionContext> groupByExpressions = _queryContext.getGroupByExpressions();
     assert aggregationFunctions != null && groupByExpressions != null;
-    int numKeyColumns = groupByExpressions.size();
+    /// Key columns (group-by union columns + the synthetic $groupingId discriminator for grouping sets)
+    /// precede the aggregation columns.
+    int numKeyColumns = _queryContext.getNumGroupByKeyColumns();
     Iterator<Record> iterator = _table.iterator();
     int numRowsAdded = 0;
-    if (_queryContext.isNullHandlingEnabled()) {
-      RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
-      Object[] nullPlaceholders = new Object[numColumns];
-      for (int colId = 0; colId < numColumns; colId++) {
-        nullBitmaps[colId] = new RoaringBitmap();
-        nullPlaceholders[colId] = storedColumnDataTypes[colId].getNullPlaceholder();
-      }
-      int rowId = 0;
-      while (iterator.hasNext()) {
-        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numRowsAdded, "GroupByResultsBlock#getDataTable");
-        dataTableBuilder.startRow();
-        Object[] values = iterator.next().getValues();
-        for (int i = 0; i < numColumns; i++) {
-          Object value = values[i];
-          if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
-            if (value == null) {
-              dataTableBuilder.setNull(i);
-            } else {
-              dataTableBuilder.setColumn(i, aggregationFunctions[i - numKeyColumns].serializeIntermediateResult(value));
-            }
-          } else {
-            if (value == null) {
-              value = nullPlaceholders[i];
-              nullBitmaps[i].add(rowId);
-            }
-            assert value != null;
-            DataTableBuilderUtils.setColumn(dataTableBuilder, storedColumnDataTypes[i], i, value);
-          }
+    // NOTE: Nulls are serialized through the builder's null-aware path regardless of the query's null-handling
+    // option. Grouping sets produce NULL group keys for rolled-up columns, and aggregation functions whose
+    // accumulator has no identity element (MINSTRING, MAXSTRING, ANYVALUE) produce null intermediate results, in
+    // both modes.
+    while (iterator.hasNext()) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numRowsAdded, "GroupByResultsBlock#getDataTable");
+      dataTableBuilder.startRow();
+      Object[] values = iterator.next().getValues();
+      for (int i = 0; i < numColumns; i++) {
+        Object value = values[i];
+        if (value == null) {
+          dataTableBuilder.setNull(i);
+        } else if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
+          dataTableBuilder.setColumn(i, aggregationFunctions[i - numKeyColumns].serializeIntermediateResult(value));
+        } else {
+          DataTableBuilderUtils.setColumn(dataTableBuilder, storedColumnDataTypes[i], i, value);
         }
-        dataTableBuilder.finishRow();
-        numRowsAdded++;
-        rowId++;
       }
-      for (RoaringBitmap nullBitmap : nullBitmaps) {
-        dataTableBuilder.setNullRowIds(nullBitmap);
-      }
-    } else {
-      while (iterator.hasNext()) {
-        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numRowsAdded, "GroupByResultsBlock#getDataTable");
-        dataTableBuilder.startRow();
-        Object[] values = iterator.next().getValues();
-        for (int i = 0; i < numColumns; i++) {
-          Object value = values[i];
-          if (value == null) {
-            dataTableBuilder.setNull(i);
-          } else if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
-            dataTableBuilder.setColumn(i, aggregationFunctions[i - numKeyColumns].serializeIntermediateResult(value));
-          } else {
-            DataTableBuilderUtils.setColumn(dataTableBuilder, storedColumnDataTypes[i], i, value);
-          }
-        }
-        dataTableBuilder.finishRow();
-        numRowsAdded++;
-      }
+      dataTableBuilder.finishRow();
+      numRowsAdded++;
     }
     return dataTableBuilder.build();
   }

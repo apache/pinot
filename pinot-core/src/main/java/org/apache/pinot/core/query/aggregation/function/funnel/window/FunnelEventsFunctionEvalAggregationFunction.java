@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function.funnel.window;
 
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -27,13 +28,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.BaseAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEventWithExtraFields;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -42,8 +44,19 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
+/// Only the timestamp decides whether a row is skipped when null handling is on.
+///
+/// A step expression is a predicate, and a predicate over a null operand is UNKNOWN, which SQL treats as not
+/// satisfied wherever a boolean is consumed, so a null step already means that step did not match and the row still
+/// belongs to the funnel. A null timestamp is different: the event has no position in the window, and an aggregate
+/// ignores a row whose input is null.
+///
+/// An extra field is neither. It is payload carried alongside a matched event, so a null one does not make the event
+/// invalid and dropping the row would lose an event that really happened. It is therefore not gated on, with one
+/// known limitation: the value is read positionally and a null row yields the column default, so a null extra field
+/// renders as `0` or the empty string rather than as NULL.
 public class FunnelEventsFunctionEvalAggregationFunction
-    implements AggregationFunction<PriorityQueue<FunnelStepEventWithExtraFields>, ObjectArrayList<String>> {
+    extends BaseAggregationFunction<PriorityQueue<FunnelStepEventWithExtraFields>, ObjectArrayList<String>> {
   private final static int INTERMEDIATE_RESULT_SERDE_VERSION = 0;
 
   protected final ExpressionContext _timestampExpression;
@@ -55,7 +68,9 @@ public class FunnelEventsFunctionEvalAggregationFunction
   protected final List<ExpressionContext> _extraExpressions;
   protected long _maxStepDuration = 0L;
 
-  public FunnelEventsFunctionEvalAggregationFunction(List<ExpressionContext> arguments) {
+  public FunnelEventsFunctionEvalAggregationFunction(List<ExpressionContext> arguments,
+      boolean nullHandlingEnabled) {
+    super(nullHandlingEnabled);
     int numArguments = arguments.size();
     Preconditions.checkArgument(numArguments > 3,
         "FUNNEL_EVENTS_FUNCTION_EVAL expects >= 4 arguments, got: %s. The function can be used as "
@@ -142,45 +157,48 @@ public class FunnelEventsFunctionEvalAggregationFunction
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    long[] timestampBlock = blockValSetMap.get(_timestampExpression).getLongValuesSV();
+    BlockValSet timestampBlockValSet = blockValSetMap.get(_timestampExpression);
+    long[] timestampBlock = timestampBlockValSet.getLongValuesSV();
     List<int[]> stepBlocks = new ArrayList<>(_numSteps);
     for (ExpressionContext stepExpression : _stepExpressions) {
       stepBlocks.add(blockValSetMap.get(stepExpression).getIntValuesSV());
     }
-    PriorityQueue<FunnelStepEventWithExtraFields> stepEvents = aggregationResultHolder.getResult();
-    if (stepEvents == null) {
-      stepEvents = new PriorityQueue<>();
-      aggregationResultHolder.setValue(stepEvents);
+    PriorityQueue<FunnelStepEventWithExtraFields> existing = aggregationResultHolder.getResult();
+    if (existing == null) {
+      existing = new PriorityQueue<>();
+      aggregationResultHolder.setValue(existing);
     }
+    PriorityQueue<FunnelStepEventWithExtraFields> stepEvents = existing;
     List<Object> extraFieldsBlocks = getExtraFieldsBlocks(blockValSetMap);
-    for (int i = 0; i < length; i++) {
-      boolean stepFound = false;
-      for (int j = 0; j < _numSteps; j++) {
-        if (stepBlocks.get(j)[i] == 1) {
+    forEachNotNull(length, timestampBlockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        boolean stepFound = false;
+        for (int j = 0; j < _numSteps; j++) {
+          if (stepBlocks.get(j)[i] == 1) {
+            List<Object> extraFields = extractExtraFields(extraFieldsBlocks, i);
+            stepEvents.add(new FunnelStepEventWithExtraFields(new FunnelStepEvent(timestampBlock[i], j), extraFields));
+            stepFound = true;
+            break;
+          }
+        }
+        // If the mode is KEEP_ALL and no step is found, add a dummy step event with step -1
+        if (_modes.hasKeepAll() && !stepFound) {
           List<Object> extraFields = extractExtraFields(extraFieldsBlocks, i);
-          stepEvents.add(new FunnelStepEventWithExtraFields(new FunnelStepEvent(timestampBlock[i], j), extraFields));
-          stepFound = true;
-          break;
+          stepEvents.add(new FunnelStepEventWithExtraFields(new FunnelStepEvent(timestampBlock[i], -1), extraFields));
         }
       }
-      // If the mode is KEEP_ALL and no step is found, add a dummy step event with step -1
-      if (_modes.hasKeepAll() && !stepFound) {
-        List<Object> extraFields = extractExtraFields(extraFieldsBlocks, i);
-        stepEvents.add(new FunnelStepEventWithExtraFields(new FunnelStepEvent(timestampBlock[i], -1), extraFields));
-      }
-    }
+    });
   }
 
   private List<Object> getExtraFieldsBlocks(Map<ExpressionContext, BlockValSet> blockValSetMap) {
     List<Object> extraFieldsBlocks = new ArrayList<>(_numExtraFields);
     for (ExpressionContext extraExpression : _extraExpressions) {
       BlockValSet blockValSet = blockValSetMap.get(extraExpression);
-      switch (blockValSet.getValueType()) {
+      switch (blockValSet.getValueType().getStoredType()) {
         case INT:
           extraFieldsBlocks.add(blockValSet.getIntValuesSV());
           break;
         case LONG:
-        case TIMESTAMP:
           extraFieldsBlocks.add(blockValSet.getLongValuesSV());
           break;
         case FLOAT:
@@ -189,9 +207,15 @@ public class FunnelEventsFunctionEvalAggregationFunction
         case DOUBLE:
           extraFieldsBlocks.add(blockValSet.getDoubleValuesSV());
           break;
+        case BIG_DECIMAL:
+          extraFieldsBlocks.add(blockValSet.getBigDecimalValuesSV());
+          break;
         case STRING:
           extraFieldsBlocks.add(blockValSet.getStringValuesSV());
           break;
+        // TODO: Support BYTES extra fields.
+        //   The events are rendered as strings, so a byte array needs an agreed encoding - hex or base64 - before
+        //   it can be carried here, which is a format decision rather than a missing getter.
         default:
           throw new IllegalArgumentException("Unsupported data type for extra field: " + extraExpression + " - "
               + blockValSet.getValueType());
@@ -216,6 +240,9 @@ public class FunnelEventsFunctionEvalAggregationFunction
         case "double":
           extraFields.add(((double[]) extraFieldsBlock)[i]);
           break;
+        case "BigDecimal":
+          extraFields.add(((BigDecimal[]) extraFieldsBlock)[i]);
+          break;
         case "String":
           extraFields.add(((String[]) extraFieldsBlock)[i]);
           break;
@@ -231,66 +258,75 @@ public class FunnelEventsFunctionEvalAggregationFunction
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    long[] timestampBlock = blockValSetMap.get(_timestampExpression).getLongValuesSV();
+    BlockValSet timestampBlockValSet = blockValSetMap.get(_timestampExpression);
+    long[] timestampBlock = timestampBlockValSet.getLongValuesSV();
     List<int[]> stepBlocks = new ArrayList<>(_numSteps);
     for (ExpressionContext stepExpression : _stepExpressions) {
       stepBlocks.add(blockValSetMap.get(stepExpression).getIntValuesSV());
     }
     List<Object> extraFieldsBlocks = getExtraFieldsBlocks(blockValSetMap);
-    for (int i = 0; i < length; i++) {
-      int groupKey = groupKeyArray[i];
-      boolean stepFound = false;
-      for (int j = 0; j < _numSteps; j++) {
-        if (stepBlocks.get(j)[i] == 1) {
-          PriorityQueue<FunnelStepEventWithExtraFields> stepEvents = getFunnelStepEvents(groupByResultHolder, groupKey);
-          List<Object> extraFields = extractExtraFields(extraFieldsBlocks, i);
-          stepEvents.add(new FunnelStepEventWithExtraFields(new FunnelStepEvent(timestampBlock[i], j), extraFields));
-          stepFound = true;
-          break;
-        }
-      }
-      // If the mode is KEEP_ALL and no step is found, add a dummy step event with step -1
-      if (_modes.hasKeepAll() && !stepFound) {
-        PriorityQueue<FunnelStepEventWithExtraFields> stepEvents = getFunnelStepEvents(groupByResultHolder, groupKey);
-        List<Object> extraFields = extractExtraFields(extraFieldsBlocks, i);
-        stepEvents.add(new FunnelStepEventWithExtraFields(new FunnelStepEvent(timestampBlock[i], -1), extraFields));
-      }
-    }
-  }
-
-  @Override
-  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    long[] timestampBlock = blockValSetMap.get(_timestampExpression).getLongValuesSV();
-    List<int[]> stepBlocks = new ArrayList<>(_numSteps);
-    for (ExpressionContext stepExpression : _stepExpressions) {
-      stepBlocks.add(blockValSetMap.get(stepExpression).getIntValuesSV());
-    }
-    List<Object> extraFieldsBlocks = getExtraFieldsBlocks(blockValSetMap);
-    for (int i = 0; i < length; i++) {
-      int[] groupKeys = groupKeysArray[i];
-      boolean stepFound = false;
-      for (int j = 0; j < _numSteps; j++) {
-        if (stepBlocks.get(j)[i] == 1) {
-          for (int groupKey : groupKeys) {
+    forEachNotNull(length, timestampBlockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        int groupKey = groupKeyArray[i];
+        boolean stepFound = false;
+        for (int j = 0; j < _numSteps; j++) {
+          if (stepBlocks.get(j)[i] == 1) {
             PriorityQueue<FunnelStepEventWithExtraFields> stepEvents =
                 getFunnelStepEvents(groupByResultHolder, groupKey);
             List<Object> extraFields = extractExtraFields(extraFieldsBlocks, i);
             stepEvents.add(new FunnelStepEventWithExtraFields(new FunnelStepEvent(timestampBlock[i], j), extraFields));
+            stepFound = true;
+            break;
           }
-          stepFound = true;
-          break;
         }
-      }
-      // If the mode is KEEP_ALL and no step is found, add a dummy step event with step -1
-      if (_modes.hasKeepAll() && !stepFound) {
-        for (int groupKey : groupKeys) {
+        // If the mode is KEEP_ALL and no step is found, add a dummy step event with step -1
+        if (_modes.hasKeepAll() && !stepFound) {
           PriorityQueue<FunnelStepEventWithExtraFields> stepEvents = getFunnelStepEvents(groupByResultHolder, groupKey);
           List<Object> extraFields = extractExtraFields(extraFieldsBlocks, i);
           stepEvents.add(new FunnelStepEventWithExtraFields(new FunnelStepEvent(timestampBlock[i], -1), extraFields));
         }
       }
+    });
+  }
+
+  @Override
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    BlockValSet timestampBlockValSet = blockValSetMap.get(_timestampExpression);
+    long[] timestampBlock = timestampBlockValSet.getLongValuesSV();
+    List<int[]> stepBlocks = new ArrayList<>(_numSteps);
+    for (ExpressionContext stepExpression : _stepExpressions) {
+      stepBlocks.add(blockValSetMap.get(stepExpression).getIntValuesSV());
     }
+    List<Object> extraFieldsBlocks = getExtraFieldsBlocks(blockValSetMap);
+    forEachNotNull(length, timestampBlockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        int[] groupKeys = groupKeysArray[i];
+        boolean stepFound = false;
+        for (int j = 0; j < _numSteps; j++) {
+          if (stepBlocks.get(j)[i] == 1) {
+            for (int groupKey : groupKeys) {
+              PriorityQueue<FunnelStepEventWithExtraFields> stepEvents =
+                  getFunnelStepEvents(groupByResultHolder, groupKey);
+              List<Object> extraFields = extractExtraFields(extraFieldsBlocks, i);
+              stepEvents.add(
+                  new FunnelStepEventWithExtraFields(new FunnelStepEvent(timestampBlock[i], j), extraFields));
+            }
+            stepFound = true;
+            break;
+          }
+        }
+        // If the mode is KEEP_ALL and no step is found, add a dummy step event with step -1
+        if (_modes.hasKeepAll() && !stepFound) {
+          for (int groupKey : groupKeys) {
+            PriorityQueue<FunnelStepEventWithExtraFields> stepEvents =
+                getFunnelStepEvents(groupByResultHolder, groupKey);
+            List<Object> extraFields = extractExtraFields(extraFieldsBlocks, i);
+            stepEvents.add(new FunnelStepEventWithExtraFields(new FunnelStepEvent(timestampBlock[i], -1), extraFields));
+          }
+        }
+      }
+    });
   }
 
   private static PriorityQueue<FunnelStepEventWithExtraFields> getFunnelStepEvents(
@@ -304,12 +340,14 @@ public class FunnelEventsFunctionEvalAggregationFunction
     return stepEvents;
   }
 
+  @Nullable
   @Override
   public PriorityQueue<FunnelStepEventWithExtraFields> extractAggregationResult(
       AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public PriorityQueue<FunnelStepEventWithExtraFields> extractGroupByResult(GroupByResultHolder groupByResultHolder,
       int groupKey) {
@@ -320,12 +358,6 @@ public class FunnelEventsFunctionEvalAggregationFunction
   public PriorityQueue<FunnelStepEventWithExtraFields> merge(
       PriorityQueue<FunnelStepEventWithExtraFields> intermediateResult1,
       PriorityQueue<FunnelStepEventWithExtraFields> intermediateResult2) {
-    if (intermediateResult1 == null) {
-      return intermediateResult2;
-    }
-    if (intermediateResult2 == null) {
-      return intermediateResult1;
-    }
     intermediateResult1.addAll(intermediateResult2);
     return intermediateResult1;
   }
@@ -386,14 +418,12 @@ public class FunnelEventsFunctionEvalAggregationFunction
     throw new IllegalArgumentException("Unsupported serialized intermediate result version: " + customObject.getType());
   }
 
-  /**
-   * Fill the sliding window with the events that fall into the window.
-   * Note that the events from stepEvents are dequeued and added to the sliding window.
-   * This method ensure the first event from the sliding window is the first step event.
-   *
-   * @param stepEvents    The priority queue of step events
-   * @param slidingWindow The sliding window with events that fall into the window
-   */
+  /// Fill the sliding window with the events that fall into the window.
+  /// Note that the events from stepEvents are dequeued and added to the sliding window.
+  /// This method ensure the first event from the sliding window is the first step event.
+  ///
+  /// @param stepEvents    The priority queue of step events
+  /// @param slidingWindow The sliding window with events that fall into the window
   protected void fillWindow(PriorityQueue<FunnelStepEventWithExtraFields> stepEvents,
       ArrayDeque<FunnelStepEventWithExtraFields> slidingWindow) {
     // Ensure for the sliding window, the first event is the first step
@@ -453,7 +483,8 @@ public class FunnelEventsFunctionEvalAggregationFunction
   }
 
   @Override
-  public ObjectArrayList<String> extractFinalResult(PriorityQueue<FunnelStepEventWithExtraFields> stepEvents) {
+  public ObjectArrayList<String> extractFinalResult(
+      @Nullable PriorityQueue<FunnelStepEventWithExtraFields> stepEvents) {
     ObjectArrayList<String> finalResults = new ObjectArrayList<>();
     List<List<Object[]>> matchedFunnelEventsExtraFields = new ArrayList<>(_numExtraFields);
     if (stepEvents == null || stepEvents.isEmpty()) {
@@ -554,12 +585,6 @@ public class FunnelEventsFunctionEvalAggregationFunction
   @Override
   public ObjectArrayList<String> mergeFinalResult(ObjectArrayList<String> finalResult1,
       ObjectArrayList<String> finalResult2) {
-    if (finalResult1 == null) {
-      return finalResult2;
-    }
-    if (finalResult2 == null) {
-      return finalResult1;
-    }
     finalResult1.addAll(finalResult2);
     return finalResult1;
   }

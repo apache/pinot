@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index;
 
 import java.io.File;
 import java.net.URL;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -268,7 +267,7 @@ public class ColumnMetadataTest {
     functionConfig.put("columnValues", "P,w,L");
     functionConfig.put("columnValuesDelimiter", ",");
     SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(
-        Collections.singletonMap("column3", new ColumnPartitionConfig("BoundedColumnValue", 4, functionConfig)));
+        Map.of("column3", new ColumnPartitionConfig("BoundedColumnValue", 4, functionConfig)));
     config.setSegmentPartitionConfig(segmentPartitionConfig);
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);

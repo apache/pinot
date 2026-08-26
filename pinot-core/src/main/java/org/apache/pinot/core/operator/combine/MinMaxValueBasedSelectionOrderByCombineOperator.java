@@ -43,16 +43,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Optimized combine operator for selection order-by queries.
- * <p>When the first order-by expression is an identifier (column), skip processing the segments if possible based on
- * the column min/max value and keep enough documents to fulfill the LIMIT and OFFSET requirement.
- * <ul>
- *   <li>1. Sort all the segments by the column min/max value</li>
- *   <li>2. Keep processing segments until we get enough documents to fulfill the LIMIT and OFFSET requirement</li>
- *   <li>3. Skip processing the segments that cannot add values to the final result</li>
- * </ul>
- */
+/// Optimized combine operator for selection order-by queries.
+///
+/// When the first order-by expression is an identifier (column), skip processing the segments if possible based on
+/// the column min/max value and keep enough documents to fulfill the LIMIT and OFFSET requirement.
+///
+/// - 1. Sort all the segments by the column min/max value
+/// - 2. Keep processing segments until we get enough documents to fulfill the LIMIT and OFFSET requirement
+/// - 3. Skip processing the segments that cannot add values to the final result
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MinMaxValueBasedSelectionOrderByCombineOperator
     extends BaseSingleBlockCombineOperator<SelectionResultsBlock> {
@@ -120,13 +118,11 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
     return EXPLAIN_NAME;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * <p> Execute query on one or more segments in a single thread, and store multiple intermediate result blocks
-   * into BlockingQueue, skip processing the segments if possible based on the column min/max value and keep enough
-   * documents to fulfill the LIMIT and OFFSET requirement.
-   */
+  /// {@inheritDoc}
+  ///
+  /// Execute query on one or more segments in a single thread, and store multiple intermediate result blocks
+  /// into BlockingQueue, skip processing the segments if possible based on the column min/max value and keep enough
+  /// documents to fulfill the LIMIT and OFFSET requirement.
   @Override
   protected void processSegments() {
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
@@ -236,19 +232,12 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
     }
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * <p>Combines intermediate selection result blocks from underlying operators and returns a merged one.
-   * <ul>
-   *   <li>
-   *     Merges multiple intermediate selection result blocks as a merged one.
-   *   </li>
-   *   <li>
-   *     Set all exceptions encountered during execution into the merged result block
-   *   </li>
-   * </ul>
-   */
+  /// {@inheritDoc}
+  ///
+  /// Combines intermediate selection result blocks from underlying operators and returns a merged one.
+  ///
+  /// - Merges multiple intermediate selection result blocks as a merged one.
+  /// - Set all exceptions encountered during execution into the merged result block
   @Override
   protected BaseResultsBlock mergeResults()
       throws Exception {

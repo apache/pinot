@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -44,7 +45,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
@@ -62,7 +63,8 @@ import static org.testng.Assert.assertTrue;
 
 public class DictionaryBasedGroupKeyGeneratorTest {
   private static final String SEGMENT_NAME = "testSegment";
-  private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME;
+  private static final String INDEX_DIR_PATH =
+      FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME + "-" + UUID.randomUUID();
   private static final int NUM_ROWS = 1000;
   private static final int UNIQUE_ROWS = 100;
   private static final int MAX_STEP_LENGTH = 1000;
@@ -114,12 +116,12 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
     // Create an index segment with the random values
     Schema schema = new Schema();
-    schema.addField(new DimensionFieldSpec(FILTER_COLUMN, FieldSpec.DataType.INT, true));
+    schema.addField(new DimensionFieldSpec(FILTER_COLUMN, DataType.INT, true));
     for (String singleValueColumn : SV_COLUMNS) {
-      schema.addField(new DimensionFieldSpec(singleValueColumn, FieldSpec.DataType.INT, true));
+      schema.addField(new DimensionFieldSpec(singleValueColumn, DataType.INT, true));
     }
     for (String multiValueColumn : MV_COLUMNS) {
-      schema.addField(new DimensionFieldSpec(multiValueColumn, FieldSpec.DataType.INT, false));
+      schema.addField(new DimensionFieldSpec(multiValueColumn, DataType.INT, false));
     }
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
@@ -250,12 +252,10 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     assertEquals(DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_INT_ARRAY_MAP.get().size(), 0);
   }
 
-  /**
-   * Helper method to compare the values inside the single value group key buffer.
-   *
-   * All odd number index values should be the same, all even number index values should be the same.
-   * Odd number index values should be different from even number index values.
-   */
+  /// Helper method to compare the values inside the single value group key buffer.
+  ///
+  /// All odd number index values should be the same, all even number index values should be the same.
+  /// Odd number index values should be different from even number index values.
   private void compareSingleValueBuffer() {
     assertTrue(SV_GROUP_KEY_BUFFER[0] != SV_GROUP_KEY_BUFFER[1], _errorMessage);
     for (int i = 2; i < NUM_GROUPS; i += 2) {
@@ -408,12 +408,10 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     return expressions;
   }
 
-  /**
-   * Helper method to compare the values inside the multi value group key buffer.
-   *
-   * All odd number index values should be the same, all even number index values should be the same.
-   * Odd number index values should be different from even number index values.
-   */
+  /// Helper method to compare the values inside the multi value group key buffer.
+  ///
+  /// All odd number index values should be the same, all even number index values should be the same.
+  /// Odd number index values should be different from even number index values.
   private void compareMultiValueBuffer() {
     assertFalse(Arrays.equals(MV_GROUP_KEY_BUFFER[0], MV_GROUP_KEY_BUFFER[1]), _errorMessage);
     for (int i = 2; i < NUM_GROUPS; i += 2) {
@@ -422,12 +420,10 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     }
   }
 
-  /**
-   * Helper method to test the group key iterator returned by getGroupKeys().
-   *
-   * @param groupKeyIterator group key iterator.
-   * @param numUniqueKeys number of unique keys.
-   */
+  /// Helper method to test the group key iterator returned by getGroupKeys().
+  ///
+  /// @param groupKeyIterator group key iterator.
+  /// @param numUniqueKeys number of unique keys.
   private void testGetGroupKeys(Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator, int numUniqueKeys) {
     int count = 0;
     Set<Integer> idSet = new HashSet<>();

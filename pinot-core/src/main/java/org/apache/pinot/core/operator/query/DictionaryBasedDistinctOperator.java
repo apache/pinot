@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
@@ -43,9 +42,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
-/**
- * Operator which executes DISTINCT operation based on dictionary
- */
+/// Operator which executes DISTINCT operation based on dictionary
 public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResultsBlock> {
   private static final String EXPLAIN_NAME = "DISTINCT_DICTIONARY";
 
@@ -381,7 +378,7 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override

@@ -20,17 +20,15 @@ package org.apache.pinot.segment.local.segment.index.readers.vector;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.function.scalar.VectorFunctions;
+import org.apache.pinot.segment.local.segment.index.vector.IvfCombinedBuffers;
 import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
 import org.apache.pinot.segment.local.segment.index.vector.VectorQuantizationUtils;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
@@ -39,28 +37,27 @@ import org.apache.pinot.segment.spi.index.reader.ApproximateRadiusVectorIndexRea
 import org.apache.pinot.segment.spi.index.reader.FilterAwareVectorIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NprobeAware;
 import org.apache.pinot.segment.spi.index.reader.VectorQuantizer;
-import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Disk-backed reader for IVF_FLAT index files using FileChannel-based random-access I/O.
- *
- * <p>Unlike {@link IvfFlatVectorIndexReader} which loads all data into heap, this reader
- * keeps the index file open and performs positional reads via {@link FileChannel}.
- * Centroids are always loaded into heap for fast probe selection; inverted list data
- * (doc IDs and vectors) is read on demand from the file.</p>
- *
- * <p>This reader can read standard IVF_FLAT index files (magic 0x49564646). The on-disk
- * format is identical — only the runtime access pattern differs.</p>
- *
- * <h3>Thread safety</h3>
- * <p>Thread-safe for concurrent reads. Query-scoped nprobe overrides use ThreadLocal.
- * FileChannel positional reads are thread-safe; each read specifies an absolute offset.</p>
- */
+/// Disk-backed reader for IVF_FLAT index files using positional buffer reads.
+///
+/// Unlike [IvfFlatVectorIndexReader] which loads all data into heap, this reader
+/// keeps the backing [PinotDataBuffer] open and performs positional reads on demand.
+/// Centroids are always loaded into heap for fast probe selection; inverted list data
+/// (doc IDs and vectors) is read on demand from the buffer.
+///
+/// This reader can read standard IVF_FLAT index files (magic 0x49564646). The on-disk
+/// format is identical — only the runtime access pattern differs.
+///
+/// ## Thread safety
+///
+/// Thread-safe for concurrent reads. Query-scoped nprobe overrides use ThreadLocal.
+/// Positional buffer reads are thread-safe; each read specifies an absolute offset.
 public class IvfOnDiskVectorIndexReader
     implements FilterAwareVectorIndexReader, ApproximateRadiusVectorIndexReader, NprobeAware {
   private static final Logger LOGGER = LoggerFactory.getLogger(IvfOnDiskVectorIndexReader.class);
@@ -82,13 +79,15 @@ public class IvfOnDiskVectorIndexReader
   // Centroids in heap for fast probe selection
   private final float[][] _centroids;
 
-  // FileChannel for random-access reads of inverted list data (avoids MappedByteBuffer 2GB limit)
-  private final RandomAccessFile _raf;
-  private final FileChannel _channel;
+  // Backing buffer for random-access reads of inverted list data. Closed by this reader only
+  // when {@code _ownsBuffer} is true (combined mmap); borrowed buffers (segment-directory owned)
+  // outlive the reader. The buffer is mapped BIG_ENDIAN to match the IVF_FLAT on-disk format.
+  private final PinotDataBuffer _buffer;
+  private final boolean _ownsBuffer;
 
   // Offsets to each inverted list in the file
   private final long[] _listOffsets;
-  // Cached list sizes (loaded at init to avoid repeated mmap reads for sizes)
+  // Cached list sizes (loaded at init to avoid repeated buffer reads for sizes)
   private final int[] _listSizes;
 
   // Observability: per-centroid access count
@@ -99,114 +98,97 @@ public class IvfOnDiskVectorIndexReader
 
   private final ThreadLocal<Integer> _nprobeOverride = new ThreadLocal<>();
 
-  /**
-   * Opens an IVF_FLAT index file for FileChannel-based random-access reading.
-   *
-   * @param column   the column name
-   * @param indexDir the segment index directory
-   * @param config   the vector index configuration
-   */
-  public IvfOnDiskVectorIndexReader(String column, File indexDir, VectorIndexConfig config) {
-    _column = column;
+  /// Opens an IVF_FLAT index from the given buffer for on-demand positional reads. The reader
+  /// takes ownership of the buffer and closes it in [#close()]; use the four-arg overload
+  /// to pass a borrowed buffer (e.g. one owned by the segment directory).
+  public IvfOnDiskVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config) {
+    this(column, buffer, config, /* ownsBuffer */ true);
+  }
 
-    File indexFile = SegmentDirectoryPaths.findVectorIndexIndexFile(indexDir, column, config);
-    if (indexFile == null || !indexFile.exists()) {
-      throw new IllegalStateException(
-          "Failed to find IVF index file for column: " + column + " in dir: " + indexDir);
-    }
+  /// Opens an IVF_FLAT index from the given buffer for on-demand positional reads.
+  ///
+  /// The buffer must be mapped [java.nio.ByteOrder#BIG_ENDIAN] (the IVF_FLAT on-disk byte order)
+  /// and must remain valid for the lifetime of the reader (positional reads at query time).
+  ///
+  /// @param column      the column name
+  /// @param buffer      the IVF_FLAT index buffer (BIG_ENDIAN)
+  /// @param config      the vector index configuration
+  /// @param ownsBuffer  when `true`, the reader closes the buffer in [#close()] (or
+  ///                    on constructor failure). Pass `false` when the buffer is owned by
+  ///                    the segment directory.
+  public IvfOnDiskVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config,
+      boolean ownsBuffer) {
+    _column = column;
+    _buffer = buffer;
+    _ownsBuffer = ownsBuffer;
 
     try {
-      _raf = new RandomAccessFile(indexFile, "r");
-      _channel = _raf.getChannel();
-
-      // --- Read Header via FileChannel (6 ints = 24 bytes) ---
-      ByteBuffer headerBuf = ByteBuffer.allocate(24);
-      readFully(_channel, headerBuf, 0);
-      headerBuf.flip();
-
-      int magic = headerBuf.getInt();
+      // --- Read Header (6 ints = 24 bytes) ---
+      int magic = _buffer.getInt(0);
       Preconditions.checkState(magic == IvfFlatVectorIndexCreator.MAGIC,
           "Invalid IVF magic: 0x%s, expected 0x%s",
           Integer.toHexString(magic), Integer.toHexString(IvfFlatVectorIndexCreator.MAGIC));
 
-      int version = headerBuf.getInt();
+      int version = _buffer.getInt(4);
       Preconditions.checkState(version == IvfFlatVectorIndexCreator.FORMAT_VERSION,
           "Unsupported IVF format version: %s, expected: %s",
           version, IvfFlatVectorIndexCreator.FORMAT_VERSION);
       _indexFormatVersion = version;
 
-      _dimension = headerBuf.getInt();
-      _numVectors = headerBuf.getInt();
-      _nlist = headerBuf.getInt();
-      int distanceFunctionOrdinal = headerBuf.getInt();
+      _dimension = _buffer.getInt(8);
+      _numVectors = _buffer.getInt(12);
+      _nlist = _buffer.getInt(16);
+      int distanceFunctionOrdinal = _buffer.getInt(20);
       VectorIndexConfig.VectorDistanceFunction[] allFunctions = VectorIndexConfig.VectorDistanceFunction.values();
       Preconditions.checkState(distanceFunctionOrdinal >= 0 && distanceFunctionOrdinal < allFunctions.length,
           "Invalid distance function ordinal: %s", distanceFunctionOrdinal);
       _distanceFunction = allFunctions[distanceFunctionOrdinal];
 
-      long centroidsOffset = 24;
-      ByteBuffer quantizerHeader = ByteBuffer.allocate(8);
-      readFully(_channel, quantizerHeader, 24);
-      quantizerHeader.flip();
-
-      int quantizerTypeOrdinal = quantizerHeader.getInt();
+      int quantizerTypeOrdinal = _buffer.getInt(24);
       VectorQuantizerType[] allQuantizerTypes = VectorQuantizerType.values();
       Preconditions.checkState(quantizerTypeOrdinal >= 0 && quantizerTypeOrdinal < allQuantizerTypes.length,
           "Invalid quantizer type ordinal: %s", quantizerTypeOrdinal);
       _quantizerType = allQuantizerTypes[quantizerTypeOrdinal];
 
-      int quantizerParamsLength = quantizerHeader.getInt();
+      int quantizerParamsLength = _buffer.getInt(28);
       Preconditions.checkState(quantizerParamsLength >= 0,
           "Invalid quantizer params length: %s", quantizerParamsLength);
       byte[] quantizerParams = new byte[quantizerParamsLength];
       if (quantizerParamsLength > 0) {
-        ByteBuffer quantizerParamsBuf = ByteBuffer.wrap(quantizerParams);
-        readFully(_channel, quantizerParamsBuf, 32);
+        _buffer.copyTo(32L, quantizerParams, 0, quantizerParamsLength);
       }
       _quantizer = VectorQuantizationUtils.createReadQuantizer(_quantizerType, _dimension, quantizerParams);
       _encodedBytesPerVector = _quantizer.getEncodedBytesPerVector();
-      centroidsOffset = 32L + quantizerParamsLength;
+      long centroidsOffset = 32L + quantizerParamsLength;
 
       _defaultNprobe = Math.min(DEFAULT_NPROBE, _nlist);
 
-      // --- Read Centroids into heap via FileChannel ---
-      int centroidsBytesTotal = _nlist * _dimension * Float.BYTES;
-      ByteBuffer centroidsBuf = ByteBuffer.allocate(centroidsBytesTotal);
-      readFully(_channel, centroidsBuf, centroidsOffset);
-      centroidsBuf.flip();
-
+      // --- Read Centroids into heap ---
       _centroids = new float[_nlist][_dimension];
+      long centroidPos = centroidsOffset;
       for (int c = 0; c < _nlist; c++) {
         for (int d = 0; d < _dimension; d++) {
-          _centroids[c][d] = centroidsBuf.getFloat();
+          _centroids[c][d] = _buffer.getFloat(centroidPos);
+          centroidPos += Float.BYTES;
         }
       }
 
-      // --- Read inverted list offsets from footer via FileChannel ---
+      // --- Read inverted list offsets from footer ---
       // Footer: last 8 bytes = offsetToOffsets
-      long fileSize = _channel.size();
-      ByteBuffer footerBuf = ByteBuffer.allocate(8);
-      readFully(_channel, footerBuf, fileSize - 8);
-      footerBuf.flip();
-      long offsetToOffsets = footerBuf.getLong();
-
-      ByteBuffer offsetsBuf = ByteBuffer.allocate(_nlist * Long.BYTES);
-      readFully(_channel, offsetsBuf, offsetToOffsets);
-      offsetsBuf.flip();
+      long fileSize = _buffer.size();
+      long offsetToOffsets = _buffer.getLong(fileSize - 8);
 
       _listOffsets = new long[_nlist];
+      long offsetsCursor = offsetToOffsets;
       for (int c = 0; c < _nlist; c++) {
-        _listOffsets[c] = offsetsBuf.getLong();
+        _listOffsets[c] = _buffer.getLong(offsetsCursor);
+        offsetsCursor += Long.BYTES;
       }
 
-      // --- Pre-read list sizes via FileChannel ---
+      // --- Pre-read list sizes ---
       _listSizes = new int[_nlist];
-      ByteBuffer sizeBuf = ByteBuffer.allocate(4);
       for (int c = 0; c < _nlist; c++) {
-        sizeBuf.clear();
-        readFully(_channel, sizeBuf, _listOffsets[c]);
-        sizeBuf.flip();
-        _listSizes[c] = sizeBuf.getInt();
+        _listSizes[c] = _buffer.getInt(_listOffsets[c]);
       }
 
       // --- Init observability ---
@@ -215,18 +197,18 @@ public class IvfOnDiskVectorIndexReader
         _centroidAccessCounts[c] = new AtomicLong(0);
       }
 
-      LOGGER.info("Opened IVF_ON_DISK index for column: {}: {} vectors, {} centroids, dim={}, file={}, "
+      LOGGER.info("Opened IVF_ON_DISK index for column: {}: {} vectors, {} centroids, dim={}, "
               + "formatVersion={}, quantizer={}",
-          column, _numVectors, _nlist, _dimension, indexFile.getAbsolutePath(), _indexFormatVersion, _quantizerType);
+          column, _numVectors, _nlist, _dimension, _indexFormatVersion, _quantizerType);
     } catch (Exception e) {
-      // Close resources if construction fails partway through (e.g., IllegalStateException
-      // from Preconditions.checkState is not caught by IOException alone)
-      closeQuietly();
-      if (e instanceof IOException) {
-        throw new RuntimeException(
-            "Failed to open IVF index for column: " + column + " from dir: " + indexDir, e);
+      // Close the buffer to avoid leaking the mmap when the caller never receives a reader to
+      // close — but only if we own it. Borrowed buffers (segment-directory owned) are released
+      // by their owner.
+      if (_ownsBuffer) {
+        IvfCombinedBuffers.closeQuietly(_buffer);
       }
-      throw e instanceof RuntimeException ? (RuntimeException) e : new RuntimeException(e);
+      throw e instanceof RuntimeException ? (RuntimeException) e
+          : new RuntimeException("Failed to open IVF index for column: " + column, e);
     }
   }
 
@@ -308,18 +290,16 @@ public class IvfOnDiskVectorIndexReader
     return result;
   }
 
-  /**
-   * Reads and scans an inverted list from the file via FileChannel.
-   *
-   * <p>Uses a ThreadLocal ByteBuffer to avoid per-call heap allocation for the list data,
-   * and reuses a single float[] for reading each document vector.</p>
-   *
-   * @param centroidIdx index of the centroid
-   * @param query query vector
-   * @param topK max results to keep
-   * @param maxHeap priority queue for top-K tracking
-   * @param preFilterBitmap optional filter bitmap; if non-null, only matching docs are scored
-   */
+  /// Reads and scans an inverted list from the backing buffer.
+  ///
+  /// Uses a ThreadLocal ByteBuffer to avoid per-call heap allocation for the list data,
+  /// and reuses a single float\[\] for reading each document vector.
+  ///
+  /// @param centroidIdx index of the centroid
+  /// @param query query vector
+  /// @param topK max results to keep
+  /// @param maxHeap priority queue for top-K tracking
+  /// @param preFilterBitmap optional filter bitmap; if non-null, only matching docs are scored
   private void scanInvertedList(int centroidIdx, float[] query, int topK,
       PriorityQueue<ScoredDoc> maxHeap, ImmutableRoaringBitmap preFilterBitmap) {
     int listSize = _listSizes[centroidIdx];
@@ -330,16 +310,12 @@ public class IvfOnDiskVectorIndexReader
     // Position after the listSize int
     long dataOffset = _listOffsets[centroidIdx] + 4;
 
-    // Read entire inverted list data via FileChannel: docIds (int[]) + encoded vectors
+    // Read entire inverted list data into a thread-local heap buffer: docIds (int[]) + encoded vectors
     int listBytes = listSize * (Integer.BYTES + _encodedBytesPerVector);
     ByteBuffer buf = getOrResizeThreadLocalBuffer(listBytes);
-    try {
-      readFully(_channel, buf, dataOffset);
-    } catch (IOException e) {
-      throw new RuntimeException(
-          "Failed to read inverted list for centroid " + centroidIdx + " in column: " + _column, e);
-    }
-    buf.flip();
+    _buffer.copyTo(dataOffset, buf.array(), 0, listBytes);
+    buf.position(0);
+    buf.limit(listBytes);
 
     // Read doc IDs
     int[] docIds = new int[listSize];
@@ -375,13 +351,9 @@ public class IvfOnDiskVectorIndexReader
     long dataOffset = _listOffsets[centroidIdx] + 4;
     int listBytes = listSize * (Integer.BYTES + _encodedBytesPerVector);
     ByteBuffer buf = getOrResizeThreadLocalBuffer(listBytes);
-    try {
-      readFully(_channel, buf, dataOffset);
-    } catch (IOException e) {
-      throw new RuntimeException(
-          "Failed to read inverted list for centroid " + centroidIdx + " in column: " + _column, e);
-    }
-    buf.flip();
+    _buffer.copyTo(dataOffset, buf.array(), 0, listBytes);
+    buf.position(0);
+    buf.limit(listBytes);
 
     int[] docIds = new int[listSize];
     for (int i = 0; i < listSize; i++) {
@@ -413,11 +385,9 @@ public class IvfOnDiskVectorIndexReader
   private static final int MAX_THREAD_LOCAL_BUFFER_SIZE = 4 * 1024 * 1024; // 4 MB
   private static final ThreadLocal<ByteBuffer> SCAN_BUFFER = new ThreadLocal<>();
 
-  /**
-   * Returns a ByteBuffer of at least the given capacity, cleared and ready for use.
-   * Uses a thread-local buffer when the required capacity is within the size cap.
-   * Allocates a fresh buffer for oversized requests to avoid pinning large allocations.
-   */
+  /// Returns a ByteBuffer of at least the given capacity, cleared and ready for use.
+  /// Uses a thread-local buffer when the required capacity is within the size cap.
+  /// Allocates a fresh buffer for oversized requests to avoid pinning large allocations.
   private static ByteBuffer getOrResizeThreadLocalBuffer(int requiredCapacity) {
     if (requiredCapacity > MAX_THREAD_LOCAL_BUFFER_SIZE) {
       // Allocate a fresh buffer for oversized requests — do not cache in ThreadLocal
@@ -456,27 +426,6 @@ public class IvfOnDiskVectorIndexReader
   public int getNprobe() {
     Integer override = _nprobeOverride.get();
     return override != null ? override : _defaultNprobe;
-  }
-
-  // -----------------------------------------------------------------------
-  // I/O helpers
-  // -----------------------------------------------------------------------
-
-  /**
-   * Reads a ByteBuffer fully from the FileChannel at the given position.
-   * Unlike {@link FileChannel#read(ByteBuffer, long)}, this method retries until
-   * the buffer is completely filled or EOF is reached.
-   */
-  private static void readFully(FileChannel channel, ByteBuffer buf, long position)
-      throws IOException {
-    long pos = position;
-    while (buf.hasRemaining()) {
-      int bytesRead = channel.read(buf, pos);
-      if (bytesRead < 0) {
-        throw new IOException("Unexpected end of file at position " + pos);
-      }
-      pos += bytesRead;
-    }
   }
 
   // -----------------------------------------------------------------------
@@ -550,7 +499,7 @@ public class IvfOnDiskVectorIndexReader
     info.put("filteredSearches", _filteredSearches.get());
     info.put("unfilteredSearches", _unfilteredSearches.get());
     info.put("supportsPreFilter", true);
-    info.put("storageMode", "fileChannel");
+    info.put("storageMode", "pinotDataBuffer");
 
     // Compute cache warmth estimate: fraction of centroids accessed at least once
     long accessedCentroids = 0;
@@ -584,27 +533,8 @@ public class IvfOnDiskVectorIndexReader
   @Override
   public void close() throws IOException {
     clearNprobe();
-    _channel.close();
-    _raf.close();
-  }
-
-  /**
-   * Best-effort cleanup of I/O resources. Used during constructor failure to prevent resource leaks.
-   */
-  private void closeQuietly() {
-    try {
-      if (_channel != null) {
-        _channel.close();
-      }
-    } catch (Exception ignored) {
-      // best-effort
-    }
-    try {
-      if (_raf != null) {
-        _raf.close();
-      }
-    } catch (Exception ignored) {
-      // best-effort
+    if (_ownsBuffer && _buffer != null) {
+      _buffer.close();
     }
   }
 

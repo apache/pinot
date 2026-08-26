@@ -19,213 +19,163 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.io.File;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
-import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
-import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
+import java.util.Locale;
+import org.apache.pinot.integration.tests.SharedHybridClusterIntegrationTestSuite.HybridScenarioLease;
+import org.apache.pinot.integration.tests.SharedHybridClusterIntegrationTestSuite.SharedHybridSuiteLease;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
-/**
- * Tests ingestion configs on a hybrid table
- */
-public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegrationTest {
-  private static final int NUM_OFFLINE_SEGMENTS = 8;
-  private static final int NUM_REALTIME_SEGMENTS = 6;
-  private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
-  // query result of SELECT COUNT(*) FROM mytable WHERE AirlineID != 19393 AND ArrDelayMinutes > 5 on unfiltered data
-  private static final long FILTERED_COUNT_STAR_RESULT = 24047L;
 
-  @Override
-  protected String getTimeColumnName() {
-    return TIME_COLUMN_NAME;
-  }
+/// Tests batch and stream ingestion configs on a hybrid table without repeating generic hybrid query coverage.
+public class IngestionConfigHybridIntegrationTest {
+  private static final String TABLE_NAME = "mytableIngestionConfig";
+  private static final String TOPIC_NAME = "IngestionConfigHybridIntegrationTest";
 
-  protected long getCountStarResult() {
-    return FILTERED_COUNT_STAR_RESULT;
-  }
+  private SharedHybridSuiteLease _suiteLease;
+  private SharedHybridClusterIntegrationTestSuite _owner;
+  private HybridScenarioLease _scenario;
 
-  @Override
-  protected IngestionConfig getIngestionConfig() {
-    IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setStreamIngestionConfig(
-        new StreamIngestionConfig(Collections.singletonList(getStreamConfigMap())));
-    FilterConfig filterConfig =
-        new FilterConfig("Groovy({AirlineID == 19393 || ArrDelayMinutes <= 5 }, AirlineID, ArrDelayMinutes)");
-    ingestionConfig.setFilterConfig(filterConfig);
-    List<TransformConfig> transformConfigs = Arrays.asList(
-        new TransformConfig("AmPm", "Groovy({DepTime < 1200 ? \"AM\": \"PM\"}, DepTime)"),
-        new TransformConfig("millisSinceEpoch", "fromEpochDays(DaysSinceEpoch)"),
-        new TransformConfig("lowerCaseDestCityName", "lower(DestCityName)"));
-    ingestionConfig.setTransformConfigs(transformConfigs);
-    return ingestionConfig;
-  }
-
-  @Override
-  protected Map<String, String> getStreamConfigs() {
-    return null;
-  }
-
-  @Override
-  protected Schema createSchema() {
-    return new Schema.SchemaBuilder().setSchemaName(DEFAULT_SCHEMA_NAME)
-        .addSingleValueDimension("AirlineID", FieldSpec.DataType.LONG)
-        .addSingleValueDimension("DepTime", FieldSpec.DataType.INT)
-        .addSingleValueDimension("AmPm", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("lowerCaseDestCityName", FieldSpec.DataType.STRING)
-        .addMetric("ArrDelayMinutes", FieldSpec.DataType.DOUBLE)
-        .addDateTime("millisSinceEpoch", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:DAYS").build();
-  }
-
-  @Override
-  protected String getSortedColumn() {
-    return null;
-  }
-
-  @Override
-  protected List<String> getInvertedIndexColumns() {
-    return null;
-  }
-
-  @Override
-  protected List<String> getNoDictionaryColumns() {
-    return null;
-  }
-
-  @Override
-  protected List<String> getRangeIndexColumns() {
-    return null;
-  }
-
-  @Override
-  protected List<String> getBloomFilterColumns() {
-    return null;
-  }
-
-  @BeforeClass
+  @BeforeClass(alwaysRun = true)
   public void setUp()
-      throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
-    // Start Zk and Kafka
-    startZk();
-    startKafka();
-
-    // Start the Pinot cluster
-    startController();
-    startBroker();
-    startServer();
-
-    List<File> avroFiles = getAllAvroFiles();
-    List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles, NUM_OFFLINE_SEGMENTS);
-    List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles, NUM_REALTIME_SEGMENTS);
-
-    // Create and upload the schema and table config
-    Schema schema = createSchema();
-    addSchema(schema);
-    TableConfig offlineTableConfig = createOfflineTableConfig();
-    addTableConfig(offlineTableConfig);
-    addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
-
-    // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir,
-        _tarDir);
-    uploadSegments(getTableName(), _tarDir);
-
-    // Push data into Kafka
-    pushAvroIntoKafka(realtimeAvroFiles);
-
-    // Wait for all documents loaded
-    waitForAllDocsLoaded(600_000L);
+      throws Throwable {
+    Throwable primaryFailure = null;
+    try {
+      _suiteLease = SharedHybridClusterIntegrationTestSuite.acquireSharedSuite();
+      _owner = _suiteLease.getOwner();
+      _scenario = _owner.newScenario(TABLE_NAME, TOPIC_NAME);
+      _owner.setUpIngestionConfigScenario(_scenario);
+    } catch (Throwable t) {
+      primaryFailure = t;
+      throw t;
+    } finally {
+      if (primaryFailure != null) {
+        if (_scenario != null) {
+          try {
+            _owner.closeScenario(_scenario, primaryFailure);
+          } finally {
+            _scenario = null;
+          }
+        }
+        if (_suiteLease != null) {
+          try {
+            _suiteLease.close(primaryFailure);
+          } finally {
+            _suiteLease = null;
+            _owner = null;
+          }
+        }
+      }
+    }
   }
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    // Select column created with transform function
-    String sqlQuery = "Select millisSinceEpoch from " + DEFAULT_TABLE_NAME;
-    JsonNode response = postQuery(sqlQuery);
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "millisSinceEpoch");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG");
+    try {
+      JsonNode response = _owner.queryScenario("SELECT COUNT(*) FROM " + TABLE_NAME, useMultiStageQueryEngine);
+      assertNoQueryExceptions(response);
+      assertEquals(response.get("resultTable").get("rows").get(0).get(0).asLong(),
+          SharedHybridClusterIntegrationTestSuite.FILTERED_HYBRID_COUNT);
 
-    // Select column created with transform function
-    sqlQuery = "Select AmPm, DepTime from " + DEFAULT_TABLE_NAME;
-    response = postQuery(sqlQuery);
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "AmPm");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(1).asText(), "DepTime");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(1).asText(), "INT");
-    for (int i = 0; i < response.get("resultTable").get("rows").size(); i++) {
-      String amPm = response.get("resultTable").get("rows").get(i).get(0).asText();
-      int depTime = response.get("resultTable").get("rows").get(i).get(1).asInt();
-      Assert.assertEquals(amPm, (depTime < 1200) ? "AM" : "PM");
+      response = _owner.queryScenario("SELECT millisSinceEpoch FROM " + TABLE_NAME, useMultiStageQueryEngine);
+      assertNoQueryExceptions(response);
+      assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(),
+          "millisSinceEpoch");
+      assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG");
+
+      for (String tableName : new String[]{TABLE_NAME, TABLE_NAME + "_OFFLINE", TABLE_NAME + "_REALTIME"}) {
+        assertAmPmTransform(_owner, tableName, useMultiStageQueryEngine);
+        assertLowerCaseTransform(_owner, tableName, useMultiStageQueryEngine);
+        assertFilteredRowsAbsent(_owner, tableName, useMultiStageQueryEngine);
+      }
+    } finally {
+      _owner.resetQueryEngine();
     }
-
-    // Select column created with transform function - offline table
-    sqlQuery = "Select AmPm, DepTime from " + DEFAULT_TABLE_NAME + "_OFFLINE";
-    response = postQuery(sqlQuery);
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "AmPm");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(1).asText(), "DepTime");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(1).asText(), "INT");
-    for (int i = 0; i < response.get("resultTable").get("rows").size(); i++) {
-      String amPm = response.get("resultTable").get("rows").get(i).get(0).asText();
-      int depTime = response.get("resultTable").get("rows").get(i).get(1).asInt();
-      Assert.assertEquals(amPm, (depTime < 1200) ? "AM" : "PM");
-    }
-
-    // Select column created with transform - realtime table
-    sqlQuery = "Select AmPm, DepTime from " + DEFAULT_TABLE_NAME + "_REALTIME";
-    response = postQuery(sqlQuery);
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "AmPm");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(1).asText(), "DepTime");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(1).asText(), "INT");
-    for (int i = 0; i < response.get("resultTable").get("rows").size(); i++) {
-      String amPm = response.get("resultTable").get("rows").get(i).get(0).asText();
-      int depTime = response.get("resultTable").get("rows").get(i).get(1).asInt();
-      Assert.assertEquals(amPm, (depTime < 1200) ? "AM" : "PM");
-    }
-
-    // Check there's no values that should've been filtered
-    sqlQuery = "Select * from " + DEFAULT_TABLE_NAME + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
-    response = postQuery(sqlQuery);
-    Assert.assertEquals(response.get("resultTable").get("rows").size(), 0);
-
-    // Check there's no values that should've been filtered - realtime table
-    sqlQuery =
-        "Select * from " + DEFAULT_TABLE_NAME + "_REALTIME" + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
-    response = postQuery(sqlQuery);
-    Assert.assertEquals(response.get("resultTable").get("rows").size(), 0);
-
-    // Check there's no values that should've been filtered - offline table
-    sqlQuery = "Select * from " + DEFAULT_TABLE_NAME + "_OFFLINE" + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
-    response = postQuery(sqlQuery);
-    Assert.assertEquals(response.get("resultTable").get("rows").size(), 0);
   }
 
-  @AfterClass
-  public void tearDown()
+  private static void assertAmPmTransform(SharedHybridClusterIntegrationTestSuite owner, String tableName,
+      boolean useMultiStageQueryEngine)
       throws Exception {
-    dropOfflineTable(getTableName());
-    dropRealtimeTable(getTableName());
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
+    JsonNode response = owner.queryScenario("SELECT AmPm, DepTime FROM " + tableName, useMultiStageQueryEngine);
+    assertNoQueryExceptions(response);
+    JsonNode resultTable = response.get("resultTable");
+    assertEquals(resultTable.get("dataSchema").get("columnNames").get(0).asText(), "AmPm");
+    assertEquals(resultTable.get("dataSchema").get("columnNames").get(1).asText(), "DepTime");
+    assertEquals(resultTable.get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
+    assertEquals(resultTable.get("dataSchema").get("columnDataTypes").get(1).asText(), "INT");
+    assertFalse(resultTable.get("rows").isEmpty());
+    for (JsonNode row : resultTable.get("rows")) {
+      assertEquals(row.get(0).asText(), row.get(1).asInt() < 1200 ? "AM" : "PM");
+    }
+  }
+
+  private static void assertLowerCaseTransform(SharedHybridClusterIntegrationTestSuite owner, String tableName,
+      boolean useMultiStageQueryEngine)
+      throws Exception {
+    JsonNode response =
+        owner.queryScenario("SELECT lowerCaseDestCityName FROM " + tableName, useMultiStageQueryEngine);
+    assertNoQueryExceptions(response);
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertFalse(rows.isEmpty());
+    for (JsonNode row : rows) {
+      String cityName = row.get(0).asText();
+      assertEquals(cityName, cityName.toLowerCase(Locale.ROOT));
+    }
+  }
+
+  private static void assertFilteredRowsAbsent(SharedHybridClusterIntegrationTestSuite owner, String tableName,
+      boolean useMultiStageQueryEngine)
+      throws Exception {
+    JsonNode response = owner.queryScenario(
+        "SELECT * FROM " + tableName + " WHERE AirlineID = 19393 OR ArrDelayMinutes <= 5",
+        useMultiStageQueryEngine);
+    assertNoQueryExceptions(response);
+    assertTrue(response.get("resultTable").get("rows").isEmpty(), response.toString());
+  }
+
+  private static void assertNoQueryExceptions(JsonNode response) {
+    assertNotNull(response);
+    assertTrue(response.has("exceptions"), response.toString());
+    assertTrue(response.get("exceptions").isEmpty(), response.toString());
+  }
+
+  @DataProvider(name = "useBothQueryEngines")
+  public static Object[][] useBothQueryEngines() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @AfterClass(alwaysRun = true)
+  public void tearDown()
+      throws Throwable {
+    Throwable cleanupFailure = null;
+    if (_scenario != null) {
+      try {
+        _owner.closeScenario(_scenario, null);
+      } catch (Throwable t) {
+        cleanupFailure = SharedHybridClusterIntegrationTestSuite.appendCleanupFailure(cleanupFailure, t);
+      } finally {
+        _scenario = null;
+      }
+    }
+    if (_suiteLease != null) {
+      try {
+        _suiteLease.close(null);
+      } catch (Throwable t) {
+        cleanupFailure = SharedHybridClusterIntegrationTestSuite.appendCleanupFailure(cleanupFailure, t);
+      } finally {
+        _suiteLease = null;
+        _owner = null;
+      }
+    }
+    if (cleanupFailure != null) {
+      throw cleanupFailure;
+    }
   }
 }

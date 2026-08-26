@@ -31,31 +31,32 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.memory.DataBufferPinotInputStream;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
-/**
- * On-disk codec for IVF_PQ segment indexes.
- *
- * <p>This class centralizes the stable file format so creator and reader evolve together.</p>
- */
+/// On-disk codec for IVF_PQ segment indexes.
+///
+/// This class centralizes the stable file format so creator and reader evolve together.
 public final class IvfPqIndexFormat {
-  /** Magic bytes identifying an IVF_PQ index file: ASCII "IVPQ". */
+  /// Magic bytes identifying an IVF_PQ index file: ASCII "IVPQ".
   public static final int MAGIC = 0x49565051;
   private static final byte[] MAGIC_BYTES = new byte[]{'I', 'V', 'P', 'Q'};
 
-  /** Legacy big-endian format version. */
+  /// Legacy big-endian format version.
   private static final int LEGACY_BIG_ENDIAN_FORMAT_VERSION = 1;
 
-  /** Current file format version. Version 2 writes numeric fields in little-endian order. */
+  /// Current file format version. Version 2 writes numeric fields in little-endian order.
   public static final int FORMAT_VERSION = 2;
 
-  /** On-disk file extension for the IVF_PQ index. */
+  /// On-disk file extension for the IVF_PQ index.
   public static final String INDEX_FILE_EXTENSION = V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION;
 
   private IvfPqIndexFormat() {
@@ -93,28 +94,44 @@ public final class IvfPqIndexFormat {
   public static IndexData read(File indexFile)
       throws IOException {
     try (BufferedInputStream bufferedIn = new BufferedInputStream(new FileInputStream(indexFile), 1 << 16)) {
-      byte[] magicBytes = readRequiredBytes(bufferedIn, MAGIC_BYTES.length, "magic");
-      Preconditions.checkState(Arrays.equals(magicBytes, MAGIC_BYTES), "Invalid IVF_PQ magic: %s, expected %s",
-          Arrays.toString(magicBytes), Arrays.toString(MAGIC_BYTES));
-
-      byte[] versionBytes = readRequiredBytes(bufferedIn, Integer.BYTES, "format version");
-      int legacyBigEndianVersion = ByteBuffer.wrap(versionBytes).order(ByteOrder.BIG_ENDIAN).getInt();
-      int littleEndianVersion = ByteBuffer.wrap(versionBytes).order(ByteOrder.LITTLE_ENDIAN).getInt();
-      if (legacyBigEndianVersion == LEGACY_BIG_ENDIAN_FORMAT_VERSION) {
-        try (DataInputStream in = new DataInputStream(bufferedIn)) {
-          return readPayload(in, LEGACY_BIG_ENDIAN_FORMAT_VERSION);
-        }
-      }
-      if (littleEndianVersion == FORMAT_VERSION) {
-        try (LittleEndianDataInputStream in = new LittleEndianDataInputStream(bufferedIn)) {
-          return readPayload(in, FORMAT_VERSION);
-        }
-      }
-      throw new IllegalStateException(String.format(
-          "Unsupported IVF_PQ format version: headerBytes=%s, legacyBigEndian=%s, littleEndian=%s, supported=[%s,%s]",
-          Arrays.toString(versionBytes), legacyBigEndianVersion, littleEndianVersion,
-          LEGACY_BIG_ENDIAN_FORMAT_VERSION, FORMAT_VERSION));
+      return readFromStream(bufferedIn);
     }
+  }
+
+  /// Reads an IVF_PQ index from a [PinotDataBuffer]. Used by the buffer-based reader factory
+  /// (combined mmap today; column-buffer in tiered/storeInSegment scenarios).
+  ///
+  /// The caller retains ownership of `buffer`; this method does not close it.
+  public static IndexData read(PinotDataBuffer buffer)
+      throws IOException {
+    try (DataBufferPinotInputStream pinotIn = new DataBufferPinotInputStream(buffer)) {
+      return readFromStream(pinotIn);
+    }
+  }
+
+  private static IndexData readFromStream(InputStream in)
+      throws IOException {
+    byte[] magicBytes = readRequiredBytes(in, MAGIC_BYTES.length, "magic");
+    Preconditions.checkState(Arrays.equals(magicBytes, MAGIC_BYTES), "Invalid IVF_PQ magic: %s, expected %s",
+        Arrays.toString(magicBytes), Arrays.toString(MAGIC_BYTES));
+
+    byte[] versionBytes = readRequiredBytes(in, Integer.BYTES, "format version");
+    int legacyBigEndianVersion = ByteBuffer.wrap(versionBytes).order(ByteOrder.BIG_ENDIAN).getInt();
+    int littleEndianVersion = ByteBuffer.wrap(versionBytes).order(ByteOrder.LITTLE_ENDIAN).getInt();
+    if (legacyBigEndianVersion == LEGACY_BIG_ENDIAN_FORMAT_VERSION) {
+      // Do not close the DataInputStream wrapper: it would close the underlying stream, which the
+      // caller owns (BufferedInputStream over the file, or DataBufferPinotInputStream over the buffer).
+      DataInputStream dataIn = new DataInputStream(in);
+      return readPayload(dataIn, LEGACY_BIG_ENDIAN_FORMAT_VERSION);
+    }
+    if (littleEndianVersion == FORMAT_VERSION) {
+      LittleEndianDataInputStream dataIn = new LittleEndianDataInputStream(in);
+      return readPayload(dataIn, FORMAT_VERSION);
+    }
+    throw new IllegalStateException(String.format(
+        "Unsupported IVF_PQ format version: headerBytes=%s, legacyBigEndian=%s, littleEndian=%s, supported=[%s,%s]",
+        Arrays.toString(versionBytes), legacyBigEndianVersion, littleEndianVersion,
+        LEGACY_BIG_ENDIAN_FORMAT_VERSION, FORMAT_VERSION));
   }
 
   private static void writePayload(DataOutput out, int dimension, int numVectors, int effectiveNlist, int pqM,
@@ -280,7 +297,7 @@ public final class IvfPqIndexFormat {
         distanceFunction, centroids, codebooks, listDocIds, listCodes, subvectorLengths);
   }
 
-  private static byte[] readRequiredBytes(BufferedInputStream in, int length, String description)
+  private static byte[] readRequiredBytes(InputStream in, int length, String description)
       throws IOException {
     byte[] bytes = in.readNBytes(length);
     if (bytes.length != length) {
@@ -289,9 +306,7 @@ public final class IvfPqIndexFormat {
     return bytes;
   }
 
-  /**
-   * Maps a distance function to a stable on-disk ID that is independent of enum ordinal order.
-   */
+  /// Maps a distance function to a stable on-disk ID that is independent of enum ordinal order.
   public static int distanceFunctionToStableId(VectorIndexConfig.VectorDistanceFunction distanceFunction) {
     switch (distanceFunction) {
       case EUCLIDEAN:
@@ -309,9 +324,7 @@ public final class IvfPqIndexFormat {
     }
   }
 
-  /**
-   * Maps a stable on-disk ID back to the corresponding distance function.
-   */
+  /// Maps a stable on-disk ID back to the corresponding distance function.
   public static VectorIndexConfig.VectorDistanceFunction stableIdToDistanceFunction(int id) {
     switch (id) {
       case 0:
@@ -329,9 +342,7 @@ public final class IvfPqIndexFormat {
     }
   }
 
-  /**
-   * Immutable in-memory representation of one IVF_PQ index file.
-   */
+  /// Immutable in-memory representation of one IVF_PQ index file.
   public static final class IndexData {
     private final int _dimension;
     private final int _numVectors;

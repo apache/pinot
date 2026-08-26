@@ -37,16 +37,15 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for mailbox assignment determinism in {@link MailboxAssignmentVisitor}.
- *
- * These tests verify that the mailbox info list is sorted by worker ID to ensure
- * deterministic hash-distributed exchange routing. This is critical for correct
- * join results when HashExchange uses (hash % numMailboxes) as an index.
- */
+/// Tests for mailbox assignment determinism in [MailboxAssignmentVisitor].
+///
+/// These tests verify that the mailbox info list is sorted by worker ID to ensure
+/// deterministic hash-distributed exchange routing. This is critical for correct
+/// join results when HashExchange uses (hash % numMailboxes) as an index.
 public class MailboxAssignmentVisitorTest extends QueryEnvironmentTestBase {
 
   @Test
@@ -135,6 +134,65 @@ public class MailboxAssignmentVisitorTest extends QueryEnvironmentTestBase {
     assertEquals(singleMailbox(receiver.getWorkerIdToMailboxesMap(), 1, SENDER_STAGE).getHostname(), "host_A");
   }
 
+  /// A mismatch means the one-class-list-per-colocated-group invariant regressed (see
+  /// [DispatchablePlanMetadata#getPartitionClassIds()]) and must be reported rather than pairing one class with
+  /// another.
+  @Test(expectedExceptions = IllegalStateException.class,
+      expectedExceptionsMessageRegExp = ".*Partition class mismatch.*\\[0, 2\\].*\\[0, 3\\].*")
+  public void testDirectExchangeRejectsMismatchedPartitionClasses() {
+    DispatchablePlanMetadata sender = metadata(Map.of(0, server("A"), 1, server("B")));
+    sender.setPartitionClassIds(new int[]{0, 2});
+    DispatchablePlanMetadata receiver = metadata(Map.of(0, server("A"), 1, server("B")));
+    receiver.setPartitionClassIds(new int[]{0, 3});
+    process(singletonSendNode(List.of()), sender, receiver);
+  }
+
+  /// A receiver with no class list took its workers from the candidate servers, so matching worker counts are a
+  /// coincidence and the exchange must fall back to a shuffle rather than pair the two 1-to-1.
+  @Test
+  public void testPrePartitionedSendWithoutMatchingClassesFallsBackToShuffle() {
+    DispatchablePlanMetadata sender = prePartitionedSender();
+    sender.setPartitionClassIds(new int[]{0, 2});
+    DispatchablePlanMetadata receiver = metadata(Map.of(0, server("A"), 1, server("B")));
+    process(hashSendNode(), sender, receiver);
+
+    // Shuffled: every receiver worker reads from every sender worker, rather than only from the one with its own id.
+    assertEquals(expandedWorkerIds(receiver.getWorkerIdToMailboxesMap(), 0, SENDER_STAGE), List.of(0, 1));
+    assertEquals(expandedWorkerIds(receiver.getWorkerIdToMailboxesMap(), 1, SENDER_STAGE), List.of(0, 1));
+  }
+
+  /// The control for the test above: with both sides in the same class space the very same shapes are wired 1-to-1.
+  @Test
+  public void testPrePartitionedSendWithMatchingClassesIsDirect() {
+    DispatchablePlanMetadata sender = prePartitionedSender();
+    sender.setPartitionClassIds(new int[]{0, 2});
+    DispatchablePlanMetadata receiver = metadata(Map.of(0, server("A"), 1, server("B")));
+    receiver.setPartitionClassIds(new int[]{0, 2});
+    receiver.setPartitionFunction("absHashCodeSum");
+    process(hashSendNode(), sender, receiver);
+
+    assertEquals(expandedWorkerIds(receiver.getWorkerIdToMailboxesMap(), 0, SENDER_STAGE), List.of(0));
+    assertEquals(expandedWorkerIds(receiver.getWorkerIdToMailboxesMap(), 1, SENDER_STAGE), List.of(1));
+  }
+
+  /// A receiver stage with no worker at all (an empty or fully pruned leaf, while another leaf of the plan is not) must
+  /// still leave every sender worker an entry holding an empty mailbox list, or the sender's `WorkerMetadata` carries a
+  /// null mailbox map and fails while the dispatch request is serialized.
+  @Test
+  public void testShuffleToReceiverWithoutWorkersKeepsEmptySenderEntry() {
+    DispatchablePlanMetadata sender = metadata(Map.of(0, server("A"), 1, server("B")));
+    DispatchablePlanMetadata receiver = metadata(Map.of());
+    process(hashSendNode(), sender, receiver);
+
+    for (int workerId = 0; workerId < 2; workerId++) {
+      MailboxInfos mailboxInfos = sender.getWorkerIdToMailboxesMap().get(workerId).get(RECEIVER_STAGE);
+      assertNotNull(mailboxInfos, "Missing entry for worker: " + workerId);
+      assertTrue(mailboxInfos.getMailboxInfos().isEmpty(), String.valueOf(mailboxInfos.getMailboxInfos()));
+    }
+    // Nothing to receive on: the receiver has no worker to hold an entry.
+    assertTrue(receiver.getWorkerIdToMailboxesMap().isEmpty());
+  }
+
   private static QueryServerInstance server(String id) {
     return new QueryServerInstance(id, "host_" + id, 1, 1);
   }
@@ -145,10 +203,34 @@ public class MailboxAssignmentVisitorTest extends QueryEnvironmentTestBase {
     return metadata;
   }
 
+  /// A 2 worker sender marked pre-partitioned, i.e. one whose hash send may be wired 1-to-1.
+  private static DispatchablePlanMetadata prePartitionedSender() {
+    DispatchablePlanMetadata sender = metadata(Map.of(0, server("A"), 1, server("B")));
+    sender.setPrePartitioned(true);
+    sender.setPartitionFunction("absHashCodeSum");
+    return sender;
+  }
+
   private static MailboxSendNode singletonSendNode(List<Integer> keys) {
     DataSchema dataSchema = new DataSchema(new String[]{"col"}, new ColumnDataType[]{ColumnDataType.INT});
     return new MailboxSendNode(SENDER_STAGE, dataSchema, List.of(), RECEIVER_STAGE,
         PinotRelExchangeType.PIPELINE_BREAKER, RelDistribution.Type.SINGLETON, keys, false, null, false, "absHashCode");
+  }
+
+  private static MailboxSendNode hashSendNode() {
+    DataSchema dataSchema = new DataSchema(new String[]{"col"}, new ColumnDataType[]{ColumnDataType.INT});
+    return new MailboxSendNode(SENDER_STAGE, dataSchema, List.of(), RECEIVER_STAGE, PinotRelExchangeType.STREAMING,
+        RelDistribution.Type.HASH_DISTRIBUTED, List.of(0), false, null, false, "absHashCode");
+  }
+
+  /// The sender worker ids the given receiver worker reads from, in mailbox order.
+  private static List<Integer> expandedWorkerIds(Map<Integer, Map<Integer, MailboxInfos>> mailboxesMap, int workerId,
+      int stageId) {
+    List<Integer> workerIds = new ArrayList<>();
+    for (MailboxInfo mailboxInfo : mailboxesMap.get(workerId).get(stageId).getMailboxInfos()) {
+      workerIds.addAll(mailboxInfo.getWorkerIds());
+    }
+    return workerIds;
   }
 
   private static void process(MailboxSendNode sendNode, DispatchablePlanMetadata sender,

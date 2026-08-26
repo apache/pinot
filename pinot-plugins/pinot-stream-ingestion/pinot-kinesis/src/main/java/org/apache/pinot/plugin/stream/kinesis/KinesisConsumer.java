@@ -46,9 +46,7 @@ import software.amazon.awssdk.services.kinesis.model.Record;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
 
-/**
- * A {@link PartitionGroupConsumer} implementation for the Kinesis stream
- */
+/// A [PartitionGroupConsumer] implementation for the Kinesis stream
 public class KinesisConsumer extends KinesisConnectionHandler implements PartitionGroupConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KinesisConsumer.class);
   private static final int INITIAL_RATE_LIMIT_BACKOFF_MS = 1000;
@@ -80,16 +78,14 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     _requestRateLimiter = requestRateLimiter;
   }
 
-  /**
-   * Based on Kinesis documentation, we might get a response with empty records but a non-null nextShardIterator.
-   * Known cases are:
-   *  1. When the shard has ended (has been split or merged) and we need a couple of calls to getRecords() to reach
-   *  a null iterator
-   *  2. When there are no new messages in the shard but the shard is active. We will continue to get a non-null
-   *  nextShardIterator in this case
-   *  3. When there are some messages in the shard, but we need a few iterations to get them.
-   * This needs to be handled by the client based on appropriate retry strategy.
-   */
+  /// Based on Kinesis documentation, we might get a response with empty records but a non-null nextShardIterator.
+  /// Known cases are:
+  ///  1. When the shard has ended (has been split or merged) and we need a couple of calls to getRecords() to reach
+  ///  a null iterator
+  ///  2. When there are no new messages in the shard but the shard is active. We will continue to get a non-null
+  ///  nextShardIterator in this case
+  ///  3. When there are some messages in the shard, but we need a few iterations to get them.
+  /// This needs to be handled by the client based on appropriate retry strategy.
   @Override
   public synchronized KinesisMessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset, int timeoutMs) {
     KinesisPartitionGroupOffset startOffset = (KinesisPartitionGroupOffset) startMsgOffset;
@@ -303,12 +299,10 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     }
   }
 
-  /**
-   * Shared per-JVM request limiter for Kinesis read operations.
-   * <p>
-   * This class is thread-safe. Limiters are keyed by stream, shard, and operation so multiple consumers on the same
-   * server share a single smooth request budget for the same AWS shard operation.
-   */
+  /// Shared per-JVM request limiter for Kinesis read operations.
+  ///
+  /// This class is thread-safe. Limiters are keyed by stream, shard, and operation so multiple consumers on the same
+  /// server share a single smooth request budget for the same AWS shard operation.
   @VisibleForTesting
   static class SharedKinesisRequestRateLimiter implements RequestRateLimiter {
     private static final int RATE_LIMITER_EXPIRATION_HOURS = 1;

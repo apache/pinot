@@ -30,9 +30,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.Enablement;
 
 
-/**
- * Helper class for pinot-admin tool's RebalanceTable command.
- */
+/// Helper class for pinot-admin tool's RebalanceTable command.
 public class PinotTableRebalancer extends PinotZKChanger {
   private final RebalanceConfig _rebalanceConfig = new RebalanceConfig();
 

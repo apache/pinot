@@ -22,301 +22,180 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/**
- * The <code>ColumnReader</code> interface is used to read column data from various data sources
- * for columnar segment building. Unlike RecordReader which reads row-by-row, ColumnReader provides
- * column-wise access to data, enabling efficient columnar segment creation.
- *
- * <p>This interface provides 3 patterns optimised for different use cases
- * (Some implementations may not support all patterns):
- * <ul>
- *   <li>Sequential iteration over all values in a column using hasNext(), next() and rewind()</li>
- *   <li>Sequential iteration with type-specific methods (isInt(), isLong(), nextInt(), nextLong(), etc.)
- *        and null handling (isNextNull(), skipNext()) and supports hasNext() and rewind()</li>
- *   <li>Random access by document ID using getInt(docId), getLong(docId), etc. and isNull(docId) for null checks</li>
- * </ul>
- *
- * <p>Implementations should handle data type conversions and efficient column-wise data access patterns.
- *
- * <h2>Usage Patterns</h2>
- *
- * <p>There are three primary patterns for reading data from a ColumnReader:
- *
- * <h3>Pattern 1: Sequential Iteration with Generic next() and Null Checks</h3>
- * <p>This pattern uses the generic {@link #next()} method which returns Object and may return null.
- * Suitable when you need to handle arbitrary data types or when null handling is done on the return value.
- *
- * <pre>{@code
- * // Read all values in the column
- * while (columnReader.hasNext()) {
- *   Object value;
- *   try {
- *    value = columnReader.next();
- *   } catch (Exception e) {
- *    // Handle exception / log
- *    continue;
- *    }
- *   if (value != null) {
- *     // Process non-null value
- *     processValue(value);
- *   } else {
- *     // Handle null value
- *     handleNullValue();
- *   }
- * }
- *
- * // Rewind to read the column again
- * columnReader.rewind();
- *
- * // Second pass through the data
- * while (columnReader.hasNext()) {
- *   Object value = columnReader.next();
- *   if (value != null) {
- *     processValueAgain(value);
- *   }
- * }
- * }</pre>
- *
- * <h3>Pattern 2: Sequential Iteration with Type-Specific Methods and Explicit Null Checks</h3>
- * <p>This pattern uses {@link #isNextNull()} to check for nulls before calling type-specific methods
- * like {@link #nextInt()}, {@link #nextLong()}, etc. Use {@link #skipNext()} to advance past null values.
- * This is the preferred pattern when you know the column data type and want to avoid boxing overhead.
- * Before using this pattern, check the column data type using methods like {@link #isInt()}, {@link #isLong()}, etc.
- * If the data type does not match, fall back to Pattern 1 with {@link #next()}.
- * <pre>{@code
- * // Read all int values in the column, handling nulls
- * if (columnReader.isInt()) {
- *  while (columnReader.hasNext()) {
- *     if (columnReader.isNextNull()) {
- *       // Skip the null value
- *      columnReader.skipNext();
- *      handleNullValue();
- *     } else {
- *      // Read the primitive int value (no boxing)
- *      int value = columnReader.nextInt();
- *      processIntValue(value);
- *    }
- *  }
- * } else {
- *  // Fallback to Pattern 1 if not INT type
- * }
- *
- * }</pre>
- *
- * <h3>Pattern 3: Random Access by Document ID</h3>
- * <p>This pattern uses {@link #getTotalDocs()} to get the total number of documents, then uses
- * document ID-based accessors like {@link #getInt(int)}, {@link #getLong(int)}, etc. to read
- * specific values. Use {@link #isNull(int)} to check if a value is null before reading.
- * This pattern is useful when you need random access or want to process documents in a specific order.
- *
- * <pre>{@code
- *
- * // Random access example - read specific document IDs
- * int[] docIdsToRead = {5, 10, 15, 20};
- * for (int docId : docIdsToRead) {
- *   if (!columnReader.isNull(docId)) {
- *     int value = columnReader.getInt(docId);
- *     processSpecificDoc(docId, value);
- *   }
- * }
- *
- * // Read in reverse order
- * // Get the total number of documents
- * int totalDocs = columnReader.getTotalDocs();
- * for (int docId = totalDocs - 1; docId >= 0; docId--) {
- *   if (!columnReader.isNull(docId)) {
- *     int value = columnReader.getInt(docId);
- *     processReverseOrder(docId, value);
- *   }
- * }
- * }</pre>
- *
- * <h3>Choosing the Right Pattern</h3>
- * <ul>
- *   <li><b>Pattern 1</b>: Use when dealing with generic Object types or when you don't know
- *       the column type at compile time. Less efficient due to boxing.</li>
- *   <li><b>Pattern 2</b>: Use when you know the column type and want efficient sequential iteration
- *       with primitive types. Preferred for most columnar segment building scenarios.</li>
- *   <li><b>Pattern 3</b>: Use when you need random access, want to process documents in a specific
- *       order, or need to access the same document multiple times.</li>
- * </ul>
- *
- */
+/// Reads the values of a single column by document ID, for columnar segment building. Where a `RecordReader` exposes a
+/// data source row-by-row, a `ColumnReader` exposes one column at a time: a caller reads every value of a column before
+/// moving to the next one. Building a segment one fully-materialized column at a time is cheaper than transposing row
+/// records when the source is already columnar (e.g. Arrow, Parquet).
+///
+/// Documents are addressed by a 0-based id, from 0 (inclusive) to [#getTotalDocs()] (exclusive). Two access patterns
+/// are supported:
+/// - **Random access** — [#getValue(int)] and the typed accessors may be called for any document id, in any order.
+/// - **Repeated sequential traversal** — the full range may be traversed by ascending document id more than once. The
+///   reader starts positioned at document 0; call [#rewind()] to reset it before each subsequent traversal. The
+///   segment build uses this: a statistics pass, then an index-writing pass over the same reader.
+///
+/// To read a column:
+/// 1. Call [#getValueType()] once. A non-`null` result names the type that can be read directly through the matching
+///    type-specific accessor; `null` means the column must be read through the boxed [#getValue(int)].
+/// 2. For each document id, call [#isNull(int)] first — type-specific accessors cannot represent null and must not be
+///    called for a null value.
+/// 3. Read each non-null value with the accessor chosen in step 1, e.g. [#getInt(int)] / [#getIntMV(int)] when
+///    [#getValueType()] is [PinotDataType#INT] / [PinotDataType#INT_ARRAY], or [#getValue(int)] otherwise.
+///
+/// Implementations perform any conversion between the source encoding and the returned Pinot type, are not required to
+/// be thread-safe, and must be released with [#close()] when no longer needed.
+///
+/// ```
+/// PinotDataType valueType = columnReader.getValueType();
+/// for (int docId = 0; docId < columnReader.getTotalDocs(); docId++) {
+///   if (columnReader.isNull(docId)) {
+///     continue;
+///   }
+///   if (valueType == PinotDataType.INT) {
+///     consumeInt(columnReader.getInt(docId));
+///   } else {
+///     consumeObject(columnReader.getValue(docId));
+///   }
+/// }
+/// ```
 public interface ColumnReader extends Closeable, Serializable {
 
-  /**
-   * Return <code>true</code> if more values remain to be read in this column.
-   * <p>This method should not throw exception. Caller is not responsible for handling exceptions from this method.
-   */
-  boolean hasNext();
-
-  /**
-   * Get the next value in the column.
-   * <p>This method should be called only if {@link #hasNext()} returns <code>true</code>. Caller is responsible for
-   * handling exceptions from this method and skip the value if user wants to continue reading the remaining values.
-   *
-   * @return Next column value, or null if the value is null
-   * @throws IOException If an I/O error occurs while reading
-   */
-  @Nullable
-  Object next()
-      throws IOException;
-
-  /**
-   * Check if the next value to be read is null.
-   */
-  boolean isNextNull()
-      throws IOException;
-
-  /**
-   * Move the reader to skip the next value in the column and advance to the following value.
-   * This method is typically used because type specific methods like {@link #nextInt()}, {@link #nextLong()}, etc.
-   * cannot return null values
-   * Thus, if {@link #isNextNull()} returns true, clients should call this method to skip the null value.
-   *
-   * <p><b>Example</b>
-   * <pre>{@code
-   * if (columnReader.isNextNull()) {
-   *   columnReader.skipNext();  // Skip null and move to next value
-   * } else {
-   *   int value = columnReader.nextInt();
-   * }
-   * }</pre>
-   *
-   * @throws IOException If an I/O error occurs while skipping
-   */
-  void skipNext()
-      throws IOException;
-
-  /**
-   * Check if the column data is single-value or multi-value.
-   */
-  boolean isSingleValue();
-
-  /**
-   * Check if the column data type from the actual reader can be returned as the expected type directly.
-   * For multi-value columns, this indicates if the multi-value type specific methods can be called directly.
-   * If true, the type specific methods like nextInt() can be called directly.
-   * Otherwise, clients should use next() and cast the result.
-   */
-  boolean isInt();
-
-  boolean isLong();
-
-  boolean isFloat();
-
-  boolean isDouble();
-
-  boolean isBigDecimal();
-
-  boolean isString();
-
-  boolean isBytes();
-
-  /**
-   * Get the next int / long / float / double / BigDecimal / string / byte[] value for single-value columns.
-   * Should be called only if isNextNull() returns false.
-   * @throws IOException If an I/O error occurs while reading
-   */
-  int nextInt()
-      throws IOException;
-
-  long nextLong()
-      throws IOException;
-
-  float nextFloat()
-      throws IOException;
-
-  double nextDouble()
-      throws IOException;
-
-  BigDecimal nextBigDecimal()
-      throws IOException;
-
-  String nextString()
-      throws IOException;
-
-  byte[] nextBytes()
-      throws IOException;
-
-  /**
-   * Get the next int[] / long[] / float[] / double[] / string[] / bytes[][] values for multi-value columns.
-   * Should be called only if isNextNull() returns false.
-   *
-   * <p>For primitive types (int, long, float, double), returns a {@link MultiValueResult} that includes
-   * element-level null validity tracking. Use {@link MultiValueResult#hasNulls()} and
-   * {@link MultiValueResult#isNull(int)} to check for null elements within the array.
-   *
-   * @throws IOException If an I/O error occurs while reading
-   */
-  MultiValueResult<int[]> nextIntMV()
-      throws IOException;
-
-  MultiValueResult<long[]> nextLongMV()
-      throws IOException;
-
-  MultiValueResult<float[]> nextFloatMV()
-      throws IOException;
-
-  MultiValueResult<double[]> nextDoubleMV()
-      throws IOException;
-
-  BigDecimal[] nextBigDecimalMV()
-      throws IOException;
-
-  String[] nextStringMV()
-      throws IOException;
-
-  byte[][] nextBytesMV()
-      throws IOException;
-
-  /**
-   * Rewind the reader to start reading from the first value again.
-   *
-   * @throws IOException If an I/O error occurs while rewinding
-   */
-  void rewind()
-      throws IOException;
-
-  /**
-   * Get the name of the column.
-   *
-   * @return Column name
-   */
+  /// Returns the name of the column read by this reader.
   String getColumnName();
 
-  /**
-   * Get the total number of documents in this column.
-   *
-   * @return Total number of documents
-   */
+  /// Returns the [PinotDataType] that [#getValue(int)] produces for this column, when that type has a matching typed
+  /// accessor; otherwise `null`.
+  ///
+  /// A non-`null` result `T` therefore names an accessor that returns exactly what [#getValue(int)] returns, only
+  /// unboxed: for every document id where [#isNull(int)] is `false`, the accessor matching `T` — e.g. [#getInt(int)]
+  /// for [PinotDataType#INT], [#getIntMV(int)] for [PinotDataType#INT_ARRAY] — returns the same value as
+  /// [#getValue(int)]. `null` means [#getValue(int)]'s type has no typed accessor; read the column through
+  /// [#getValue(int)].
+  ///
+  /// The result is a constant property of the column (independent of the document id) and, when non-`null`, is one of
+  /// the accessor-backed types — [PinotDataType#INT], [PinotDataType#LONG], [PinotDataType#FLOAT],
+  /// [PinotDataType#DOUBLE], [PinotDataType#BIG_DECIMAL], [PinotDataType#STRING], [PinotDataType#BYTES] — or their
+  /// `_ARRAY` variants for a multi-value column.
+  ///
+  /// Because [#getValue(int)] returns the column's logical type, a logical type whose object is not itself an
+  /// accessor-backed type returns `null`: `BOOLEAN` (a `Boolean`), `TIMESTAMP` (a `Timestamp`), and the complex types.
+  /// A `JSON` column reports [PinotDataType#STRING], since it is stored and read as its text `String`. Implementations
+  /// keyed on the stored [DataType] can use [#toValueType(DataType, boolean)].
+  @Nullable
+  PinotDataType getValueType();
+
+  /// Maps a stored [DataType] and cardinality to the [PinotDataType] a [#getValueType()] implementation should report,
+  /// or `null` when the type has no dedicated accessor (e.g. BOOLEAN, TIMESTAMP, or a complex type). A convenience for
+  /// implementations that already hold the column's [DataType]. `JSON` maps to [PinotDataType#STRING], since it is
+  /// stored and read as its text `String`.
+  @Nullable
+  static PinotDataType toValueType(DataType dataType, boolean singleValue) {
+    switch (dataType) {
+      case INT:
+        return singleValue ? PinotDataType.INT : PinotDataType.INT_ARRAY;
+      case LONG:
+        return singleValue ? PinotDataType.LONG : PinotDataType.LONG_ARRAY;
+      case FLOAT:
+        return singleValue ? PinotDataType.FLOAT : PinotDataType.FLOAT_ARRAY;
+      case DOUBLE:
+        return singleValue ? PinotDataType.DOUBLE : PinotDataType.DOUBLE_ARRAY;
+      case BIG_DECIMAL:
+        return singleValue ? PinotDataType.BIG_DECIMAL : PinotDataType.BIG_DECIMAL_ARRAY;
+      case STRING:
+        return singleValue ? PinotDataType.STRING : PinotDataType.STRING_ARRAY;
+      case JSON:
+        return PinotDataType.STRING;
+      case BYTES:
+        return singleValue ? PinotDataType.BYTES : PinotDataType.BYTES_ARRAY;
+      default:
+        return null;
+    }
+  }
+
+  /// Converts a value read from physical storage into the logical object [#getValue(int)] must return. Pinot stores
+  /// `BOOLEAN` as an `int` (`0`/`1`) and `TIMESTAMP` as a `long` (epoch millis), so those surface as `Boolean` /
+  /// `Timestamp`; every other type is stored as its logical type already. Handles the single-value form and the
+  /// multi-value `Object[]` form, and returns `null` unchanged. A convenience for segment-backed implementations that
+  /// read stored values keyed on the stored [DataType].
+  @Nullable
+  static Object toLogicalValue(@Nullable Object storedValue, DataType dataType) {
+    if (storedValue == null) {
+      return null;
+    }
+    switch (dataType) {
+      case BOOLEAN:
+        if (storedValue instanceof Object[]) {
+          Object[] stored = (Object[]) storedValue;
+          Boolean[] logical = new Boolean[stored.length];
+          for (int i = 0; i < stored.length; i++) {
+            logical[i] = BooleanUtils.fromNonNullInternalValue(stored[i]);
+          }
+          return logical;
+        }
+        return BooleanUtils.fromNonNullInternalValue(storedValue);
+      case TIMESTAMP:
+        if (storedValue instanceof Object[]) {
+          Object[] stored = (Object[]) storedValue;
+          Timestamp[] logical = new Timestamp[stored.length];
+          for (int i = 0; i < stored.length; i++) {
+            logical[i] = new Timestamp(((Number) stored[i]).longValue());
+          }
+          return logical;
+        }
+        return new Timestamp(((Number) storedValue).longValue());
+      default:
+        return storedValue;
+    }
+  }
+
+  /// Returns the number of documents in this column. Document ids run from 0 (inclusive) to this value (exclusive).
   int getTotalDocs();
 
-  /**
-   * Check if the value at the given document ID is null.
-   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
-   *
-   * @param docId Document ID (0-based)
-   * @return true if the value is null, false otherwise
-   * @throws IndexOutOfBoundsException If docId is out of range
-   */
+  /// Resets this reader to the beginning so the column can be traversed again from document 0. The segment build
+  /// traverses each column twice — a statistics pass, then an index-writing pass — and calls this before the second
+  /// traversal. A random-access reader may keep the default no-op; a streaming or batched reader overrides it to reset
+  /// its position (e.g. rewind the source or drop the current batch).
+  ///
+  /// @throws IOException if an I/O error occurs while resetting
+  default void rewind()
+      throws IOException {
+  }
+
+  /// Returns whether the value at the given document id is null. Call this before any type-specific accessor, which
+  /// cannot represent null.
+  ///
+  /// @param docId 0-based document id, from 0 (inclusive) to [#getTotalDocs()] (exclusive)
+  /// @throws IndexOutOfBoundsException if `docId` is out of range
   boolean isNull(int docId)
+      throws IOException;
+
+  /// Returns the value at the given document id as a boxed `Object`, for both single-value and multi-value columns (a
+  /// multi-value column returns an `Object[]`). This is the general-purpose path, used when [#getValueType()] returns
+  /// `null`, or when the caller does not need the primitive form — e.g. it would box the value anyway, or it converts
+  /// the value itself.
+  ///
+  /// @param docId 0-based document id, from 0 (inclusive) to [#getTotalDocs()] (exclusive)
+  /// @throws IndexOutOfBoundsException if `docId` is out of range
+  /// @throws IOException if an I/O error occurs while reading
+  @Nullable
+  Object getValue(int docId)
       throws IOException;
 
   // Single-value accessors
 
-  /**
-   * Get int / long / float / double / BigDecimal / string / byte[] value at the given document ID for single-value
-   * columns. Should be called only if isNull(docId) returns false.
-   * Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
-   *
-   * @param docId Document ID (0-based)
-   * @throws IndexOutOfBoundsException If docId is out of range
-   * @throws IOException If an I/O error occurs while reading
-   */
+  /// Returns the single-value int / long / float / double / BigDecimal / String / byte[] value at the given document
+  /// id. Call the accessor matching [#getValueType()], and only for a non-null value (see [#isNull(int)]).
+  ///
+  /// @param docId 0-based document id, from 0 (inclusive) to [#getTotalDocs()] (exclusive)
+  /// @throws IndexOutOfBoundsException if `docId` is out of range
+  /// @throws IOException if an I/O error occurs while reading
   int getInt(int docId)
       throws IOException;
 
@@ -338,37 +217,19 @@ public interface ColumnReader extends Closeable, Serializable {
   byte[] getBytes(int docId)
       throws IOException;
 
-  /**
-   * Get the value at the given document ID as a Java Object.
-   * Can be used for both single-value and multi-value columns.
-   * This should be used if
-   * 1. Certain API's don't yet support primitive type specific methods (eg: TimeHandler, Partitioner, etc.) and
-   *    thus will be boxed anyway.
-   * 2. The required data type does not match the actual type and the client will handle the conversion
-   * Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
-   *
-   * @param docId Document ID (0-based)
-   * @throws IndexOutOfBoundsException If docId is out of range
-   * @throws IOException If an I/O error occurs while reading
-   */
-  Object getValue(int docId)
-      throws IOException;
-
   // Multi-value accessors
 
-  /**
-   * Get int[] / long[] / float[] / double[] / string[] / bytes[][] values at the given doc ID for multi-value columns.
-   * Should be called only if isNull(docId) returns false.
-   * <p>Document ID is 0-based. Valid values are 0 to {@link #getTotalDocs()} - 1.
-   *
-   * <p>For primitive types (int, long, float, double), returns a {@link MultiValueResult} that includes
-   * element-level null validity tracking. Use {@link MultiValueResult#hasNulls()} and
-   * {@link MultiValueResult#isNull(int)} to check for null elements within the array.
-   *
-   * @param docId Document ID (0-based)
-   * @throws IndexOutOfBoundsException If docId is out of range
-   * @throws IOException If an I/O error occurs while reading
-   */
+  /// Returns the multi-value int[] / long[] / float[] / double[] / BigDecimal[] / String[] / byte[][] values at the
+  /// given document id. Call the accessor matching [#getValueType()], and only for a non-null value (see
+  /// [#isNull(int)]).
+  ///
+  /// The primitive-array accessors ([#getIntMV(int)], [#getLongMV(int)], [#getFloatMV(int)], [#getDoubleMV(int)])
+  /// return a [MultiValueResult] that also tracks element-level nullity; use [MultiValueResult#hasNulls()] and
+  /// [MultiValueResult#isNull(int)] to detect null elements within the array.
+  ///
+  /// @param docId 0-based document id, from 0 (inclusive) to [#getTotalDocs()] (exclusive)
+  /// @throws IndexOutOfBoundsException if `docId` is out of range
+  /// @throws IOException if an I/O error occurs while reading
   MultiValueResult<int[]> getIntMV(int docId)
       throws IOException;
 

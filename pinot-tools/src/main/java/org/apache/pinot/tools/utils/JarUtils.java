@@ -34,9 +34,7 @@ public class JarUtils {
   private JarUtils() {
   } // non-instantiable
 
-  /**
-   * Copies a directory from a jar file to an external directory.
-   */
+  /// Copies a directory from a jar file to an external directory.
   public static void copyResourcesToDirectory(String fromJarFilePath, String jarDir, String destDir)
       throws IOException {
     if (fromJarFilePath.startsWith(JAR_PREFIX)) {

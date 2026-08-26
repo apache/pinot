@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -30,10 +31,8 @@ import org.apache.pinot.segment.local.customobject.SerializedQuantileDigest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * The {@code PercentileRawEstAggregationFunction} returns the serialized {@code QuantileDigest} data structure of the
- * {@code PercentileEstAggregationFunction}.
- */
+/// The `PercentileRawEstAggregationFunction` returns the serialized `QuantileDigest` data structure of the
+/// `PercentileEstAggregationFunction`.
 public class PercentileRawEstAggregationFunction
     extends BaseSingleInputAggregationFunction<QuantileDigest, SerializedQuantileDigest> {
   private final PercentileEstAggregationFunction _percentileEstAggregationFunction;
@@ -50,7 +49,8 @@ public class PercentileRawEstAggregationFunction
 
   protected PercentileRawEstAggregationFunction(ExpressionContext expression,
       PercentileEstAggregationFunction percentileEstAggregationFunction) {
-    super(expression);
+    // This wrapper only serializes what the delegate produced, so the delegate owns the option
+    super(expression, percentileEstAggregationFunction._nullHandlingEnabled);
     _percentileEstAggregationFunction = percentileEstAggregationFunction;
   }
 
@@ -133,8 +133,17 @@ public class PercentileRawEstAggregationFunction
     return ColumnDataType.STRING;
   }
 
+  @Nullable
   @Override
-  public SerializedQuantileDigest extractFinalResult(QuantileDigest intermediateResult) {
+  public SerializedQuantileDigest extractFinalResult(@Nullable QuantileDigest intermediateResult) {
+    // A null intermediate result means nothing was aggregated. With null handling enabled that is NULL; with it
+    // disabled the answer has to stay what it has always been, which is an empty digest serialized, so the empty
+    // accumulator the delegate no longer substitutes is built here where it is rendered.
+    if (intermediateResult == null) {
+      return _percentileEstAggregationFunction._nullHandlingEnabled ? null
+          : new SerializedQuantileDigest(new QuantileDigest(PercentileEstAggregationFunction.DEFAULT_MAX_ERROR),
+              _percentileEstAggregationFunction._percentile);
+    }
     return new SerializedQuantileDigest(intermediateResult, _percentileEstAggregationFunction._percentile);
   }
 }

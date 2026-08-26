@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.materializedview.metadata;
 
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata.MaterializedViewSplitSpec;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -67,7 +67,7 @@ public class MaterializedViewDefinitionMetadataBuilderTest {
         DEFINED_SQL, partitionExprMaps);
 
     assertEquals(def.getMaterializedViewTableNameWithType(), VIEW_TABLE_WITH_TYPE);
-    assertEquals(def.getBaseTables(), Collections.singletonList(SOURCE_RAW),
+    assertEquals(def.getBaseTables(), List.of(SOURCE_RAW),
         "baseTables must be the RAW source name — the consistency manager's reverse index "
             + "is keyed by raw name and the scheduler's `notifyMaterializedViewConsistencyManager` "
             + "extracts raw names before lookup.");
@@ -150,7 +150,7 @@ public class MaterializedViewDefinitionMetadataBuilderTest {
     assertThrows(IllegalArgumentException.class, () ->
         MaterializedViewDefinitionMetadataBuilder.build(VIEW_TABLE_WITH_TYPE, regularOffline,
             viewSchema, sourceConfig, sourceSchema, SOURCE_RAW, DEFINED_SQL,
-            Collections.emptyMap()));
+            Map.of()));
   }
 
   /// bucketTimePeriod is hard-required by `MaterializedViewAnalyzer.validateTaskConfigs`; the
@@ -170,7 +170,7 @@ public class MaterializedViewDefinitionMetadataBuilderTest {
     assertThrows(IllegalStateException.class, () ->
         MaterializedViewDefinitionMetadataBuilder.build(VIEW_TABLE_WITH_TYPE, viewConfig,
             viewSchema, sourceConfig, sourceSchema, SOURCE_RAW, DEFINED_SQL,
-            Collections.emptyMap()));
+            Map.of()));
   }
 
   /// Malformed staleness in a persisted znode (i.e. one that bypassed the analyzer-side
@@ -192,7 +192,7 @@ public class MaterializedViewDefinitionMetadataBuilderTest {
 
     MaterializedViewDefinitionMetadata def = MaterializedViewDefinitionMetadataBuilder.build(
         VIEW_TABLE_WITH_TYPE, viewConfig, viewSchema, sourceConfig, sourceSchema, SOURCE_RAW,
-        DEFINED_SQL, Collections.emptyMap());
+        DEFINED_SQL, Map.of());
     assertEquals(def.getStalenessThresholdMs(), MaterializedViewTask.DEFAULT_STALENESS_THRESHOLD_MS);
   }
 

@@ -30,8 +30,8 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.datasketches.theta.UpdateSketch;
-import org.apache.datasketches.theta.UpdateSketchBuilder;
+import org.apache.datasketches.theta.UpdatableThetaSketch;
+import org.apache.datasketches.theta.UpdatableThetaSketchBuilder;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
@@ -124,7 +124,7 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
         for (String gender : allGenders) {
 
           // calculate theta sketch
-          UpdateSketch sketch = new UpdateSketchBuilder().build();
+          UpdatableThetaSketch sketch = new UpdatableThetaSketchBuilder().build();
           genderCourseToStudentIds.forEach((genderCourse, studentIds) -> {
             if (gender.equals(genderCourse.getLeft())) {
               studentIds.forEach(sketch::update);
@@ -147,7 +147,7 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
         for (String course : allCountries) {
 
           // calculate theta sketch
-          UpdateSketch sketch = new UpdateSketchBuilder().build();
+          UpdatableThetaSketch sketch = new UpdatableThetaSketchBuilder().build();
           genderCourseToStudentIds.forEach((genderCourse, studentIds) -> {
             if (course.equals(genderCourse.getRight())) {
               studentIds.forEach(sketch::update);

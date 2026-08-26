@@ -18,40 +18,31 @@
  */
 package org.apache.pinot.spi.stream;
 
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
 
 
-/**
- * Factory for a stream which provides a consumer and a metadata provider for the stream
- */
+/// Factory for a stream which provides a consumer and a metadata provider for the stream
 public abstract class StreamConsumerFactory {
   private static final AtomicInteger CLIENT_ID_SEQ = new AtomicInteger(0);
 
   protected StreamConfig _streamConfig;
 
-  /**
-   * Initializes the stream consumer factory with the stream metadata for the table
-   * @param streamConfig the stream config object from the table config
-   */
+  /// Initializes the stream consumer factory with the stream metadata for the table
+  /// @param streamConfig the stream config object from the table config
   protected void init(StreamConfig streamConfig) {
     _streamConfig = streamConfig;
   }
 
-  /**
-   * Creates a metadata provider which provides partition specific metadata
-   * @param clientId a client id to identify the creator of this consumer
-   * @param partition the partition id of the partition for which this metadata provider is being created
-   * @return
-   */
+  /// Creates a metadata provider which provides partition specific metadata
+  /// @param clientId a client id to identify the creator of this consumer
+  /// @param partition the partition id of the partition for which this metadata provider is being created
+  /// @return
   public abstract StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition);
 
-  /**
-   * Creates a metadata provider which provides stream specific metadata
-   * @param clientId a client id to identify the creator of this consumer
-   * @return
-   */
+  /// Creates a metadata provider which provides stream specific metadata
+  /// @param clientId a client id to identify the creator of this consumer
+  /// @return
   public abstract StreamMetadataProvider createStreamMetadataProvider(String clientId);
 
   public StreamMetadataProvider createStreamMetadataProvider(String clientId, boolean concurrentAccessExpected) {
@@ -62,28 +53,22 @@ public abstract class StreamConsumerFactory {
     return new LongMsgOffsetFactory();
   }
 
-  /**
-   * Creates a partition group consumer, which can fetch messages from a partition group
-   */
-  public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
-      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
-    return createPartitionLevelConsumer(clientId, partitionGroupConsumptionStatus.getStreamPartitionGroupId());
-  }
+  /// Creates a [PartitionGroupConsumer] that fetches messages from the partition group described by
+  /// `partitionGroupConsumptionStatus`.
+  ///
+  /// Every [StreamConsumerFactory] implementation must override this method. The returned consumer is owned by
+  /// the caller, which is responsible for closing it via [PartitionGroupConsumer#close()]. Each invocation returns
+  /// a new consumer instance; implementations are not required to make the returned consumer thread-safe.
+  ///
+  /// @param clientId identifies the creator of this consumer
+  /// @param partitionGroupConsumptionStatus the partition group to consume and the offsets to start from
+  /// @return a new, non-null partition group consumer
+  public abstract PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
+      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus);
 
   public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus, RetryPolicy retryPolicy) {
     return createPartitionGroupConsumer(clientId, partitionGroupConsumptionStatus);
-  }
-
-  @Deprecated
-  public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Deprecated
-  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Set<String> fieldsToRead,
-      String groupId) {
-    throw new UnsupportedOperationException();
   }
 
   public static String getUniqueClientId(String prefix) {

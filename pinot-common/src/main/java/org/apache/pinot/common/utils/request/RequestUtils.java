@@ -29,6 +29,7 @@ import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,6 +37,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlKind;
@@ -58,6 +60,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
@@ -94,9 +97,7 @@ public class RequestUtils {
     return sqlNodeAndOptions;
   }
 
-  /**
-   * Sets extra options for the given query.
-   */
+  /// Sets extra options for the given query.
   @VisibleForTesting
   public static void setOptions(SqlNodeAndOptions sqlNodeAndOptions, JsonNode jsonRequest) {
     Map<String, String> queryOptions = new HashMap<>();
@@ -179,6 +180,14 @@ public class RequestUtils {
     return Literal.stringArrayValue(Arrays.asList(value));
   }
 
+  public static Literal getLiteral(byte[][] value) {
+    List<ByteBuffer> bytesArray = new ArrayList<>(value.length);
+    for (byte[] bytes : value) {
+      bytesArray.add(ByteBuffer.wrap(bytes.clone()));
+    }
+    return Literal.bytesArrayValue(bytesArray);
+  }
+
   public static Literal getLiteral(@Nullable Object object) {
     if (object == null) {
       return getNullLiteral();
@@ -210,6 +219,9 @@ public class RequestUtils {
     if (object instanceof byte[]) {
       return getLiteral((byte[]) object);
     }
+    if (object instanceof UUID) {
+      return getLiteral(UuidUtils.toBytes((UUID) object));
+    }
     if (object instanceof int[]) {
       return getLiteral((int[]) object);
     }
@@ -224,6 +236,9 @@ public class RequestUtils {
     }
     if (object instanceof String[]) {
       return getLiteral((String[]) object);
+    }
+    if (object instanceof byte[][]) {
+      return getLiteral((byte[][]) object);
     }
     return getLiteral(object.toString());
   }
@@ -251,6 +266,9 @@ public class RequestUtils {
       switch (node.getTypeName()) {
         case BOOLEAN:
           literal.setBoolValue(node.booleanValue());
+          break;
+        case BINARY:
+          literal.setBinaryValue(node.getValueAs(byte[].class));
           break;
         case NULL:
           literal.setNullValue(true);
@@ -326,6 +344,10 @@ public class RequestUtils {
     return getLiteralExpression(getLiteral(value));
   }
 
+  public static Expression getLiteralExpression(byte[][] value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
   public static Expression getLiteralExpression(SqlLiteral node) {
     return getLiteralExpression(getLiteral(node));
   }
@@ -334,9 +356,7 @@ public class RequestUtils {
     return getLiteralExpression(getLiteral(object));
   }
 
-  /**
-   * Returns the value of the given literal.
-   */
+  /// Returns the value of the given literal.
   @Nullable
   public static Object getLiteralValue(Literal literal) {
     Literal._Fields type = literal.getSetField();
@@ -369,6 +389,8 @@ public class RequestUtils {
         return getDoubleArrayValue(literal);
       case STRING_ARRAY_VALUE:
         return getStringArrayValue(literal);
+      case BYTES_ARRAY_VALUE:
+        return getBytesArrayValue(literal);
       default:
         throw new IllegalStateException("Unsupported field type: " + type);
     }
@@ -418,6 +440,19 @@ public class RequestUtils {
     return literal.getStringArrayValue().toArray(new String[0]);
   }
 
+  public static byte[][] getBytesArrayValue(Literal literal) {
+    List<ByteBuffer> list = literal.getBytesArrayValue();
+    int size = list.size();
+    byte[][] array = new byte[size][];
+    for (int i = 0; i < size; i++) {
+      ByteBuffer buffer = list.get(i).duplicate();
+      byte[] bytes = new byte[buffer.remaining()];
+      buffer.get(bytes);
+      array[i] = bytes;
+    }
+    return array;
+  }
+
   public static Pair<ColumnDataType, Object> getLiteralTypeAndValue(Literal literal) {
     Literal._Fields type = literal.getSetField();
     switch (type) {
@@ -449,14 +484,14 @@ public class RequestUtils {
         return Pair.of(ColumnDataType.DOUBLE_ARRAY, getDoubleArrayValue(literal));
       case STRING_ARRAY_VALUE:
         return Pair.of(ColumnDataType.STRING_ARRAY, getStringArrayValue(literal));
+      case BYTES_ARRAY_VALUE:
+        return Pair.of(ColumnDataType.BYTES_ARRAY, getBytesArrayValue(literal));
       default:
         throw new IllegalStateException("Unsupported field type: " + type);
     }
   }
 
-  /**
-   * Returns the string representation of the given literal.
-   */
+  /// Returns the string representation of the given literal.
   public static String getLiteralString(Literal literal) {
     Literal._Fields type = literal.getSetField();
     switch (type) {
@@ -487,9 +522,16 @@ public class RequestUtils {
     return getLiteralString(literal);
   }
 
+  /// Creates a `Function` with the given operands. The operand list stored in the returned function
+  /// is always a mutable `ArrayList`: if `operands` is not already an `ArrayList` (e.g. an immutable
+  /// `List.of(...)`), it is copied into one. Downstream query rewriters and filter optimizers mutate
+  /// operands in place (via `getOperands().replaceAll(...)`, `set(...)`, or `add(...)`), so an
+  /// immutable list would otherwise throw `UnsupportedOperationException` far from where it was
+  /// created.
   public static Function getFunction(String canonicalName, List<Expression> operands) {
     Function function = new Function(canonicalName);
-    function.setOperands(operands);
+    // Ensure a mutable ArrayList so downstream rewriters can modify operands in place.
+    function.setOperands(operands instanceof ArrayList ? operands : new ArrayList<>(operands));
     return function;
   }
 
@@ -523,18 +565,7 @@ public class RequestUtils {
     return getFunctionExpression(getFunction(canonicalName, operands));
   }
 
-  @Deprecated
-  public static Expression getFunctionExpression(String canonicalName) {
-    assert canonicalName.equalsIgnoreCase(canonicalizeFunctionNamePreservingSpecialKey(canonicalName));
-    Expression expression = new Expression(ExpressionType.FUNCTION);
-    Function function = new Function(canonicalName);
-    expression.setFunctionCall(function);
-    return expression;
-  }
-
-  /**
-   * Converts the function name into its canonical form.
-   */
+  /// Converts the function name into its canonical form.
   public static String canonicalizeFunctionName(String functionName) {
     return StringUtils.remove(functionName, '_').toLowerCase();
   }
@@ -543,22 +574,20 @@ public class RequestUtils {
       Map.copyOf(Arrays.stream(FilterKind.values())
           .collect(Collectors.toMap(f -> canonicalizeFunctionName(f.name()), Enum::name)));
 
-  /**
-   * Converts the function name into its canonical form, but preserving the special keys.
-   * - Keep FilterKind.name() as is because we need to read the FilterKind via FilterKind.valueOf().
-   */
+  /// Converts the function name into its canonical form, but preserving the special keys.
+  /// - Keep FilterKind.name() as is because we need to read the FilterKind via FilterKind.valueOf().
   public static String canonicalizeFunctionNamePreservingSpecialKey(String functionName) {
     String canonicalName = canonicalizeFunctionName(functionName);
     return CANONICAL_NAME_TO_SPECIAL_KEY_MAP.getOrDefault(canonicalName, canonicalName);
   }
 
-  /// Returns true iff {@code expression} is an {@code AS}-wrapped function call
-  /// (i.e. shaped like {@code expr AS alias} after Calcite parsing).
+  /// Returns true iff `expression` is an `AS`-wrapped function call
+  /// (i.e. shaped like `expr AS alias` after Calcite parsing).
   ///
   /// Centralises the shape check that was previously open-coded in several places
   /// (alias appliers, MV analyzer, query-context converters).  Callers that need the
-  /// alias name or the underlying expression should use {@link #unwrapAlias(Expression)}
-  /// or {@link #extractAliasOrIdentifierName(Expression)} rather than re-implementing
+  /// alias name or the underlying expression should use [#unwrapAlias(Expression)]
+  /// or [#extractAliasOrIdentifierName(Expression)] rather than re-implementing
   /// this check inline.
   public static boolean isAliased(@Nullable Expression expression) {
     if (expression == null) {
@@ -568,13 +597,13 @@ public class RequestUtils {
     return function != null && SqlKind.AS.lowerName.equals(function.getOperator());
   }
 
-  /// Strips the {@code AS alias} wrapper from a SELECT-list expression and returns the
-  /// underlying source expression.  When {@code expression} is not aliased the original
+  /// Strips the `AS alias` wrapper from a SELECT-list expression and returns the
+  /// underlying source expression.  When `expression` is not aliased the original
   /// expression is returned unchanged, so this method is safe to call unconditionally
   /// while iterating SELECT items.
   ///
   /// Mirrors the local helper that previously lived in
-  /// {@code MaterializedViewAnalyzer#extractSourceExpression}; callers that walk a
+  /// `MaterializedViewAnalyzer#extractSourceExpression`; callers that walk a
   /// SELECT list to inspect the aggregate / transform under each alias should use this
   /// method instead of re-implementing the same operand-zero indirection.
   public static Expression unwrapAlias(Expression expression) {
@@ -583,10 +612,10 @@ public class RequestUtils {
 
   /// Extracts the user-facing column name a SELECT-list expression resolves to:
   ///
-  ///   - {@code expr AS alias} ⇒ {@code alias}
-  ///   - bare identifier ({@code col}) ⇒ {@code col}
+  ///   - `expr AS alias` ⇒ `alias`
+  ///   - bare identifier (`col`) ⇒ `col`
   ///   - any other shape (function/literal without an alias) ⇒
-  ///     {@link IllegalStateException}
+  ///     [IllegalStateException]
   ///
   /// Used by callers that need to map SELECT items to schema columns (e.g. MV schema
   /// coverage checks, MV column inference).  The error message lists the offending
@@ -666,6 +695,9 @@ public class RequestUtils {
       case STRING_ARRAY_VALUE:
         return literal.getStringArrayValue().stream().map(value -> "'" + value + "'").collect(Collectors.toList())
             .toString();
+      case BYTES_ARRAY_VALUE:
+        return Arrays.stream(getBytesArrayValue(literal)).map(value -> "X'" + BytesUtils.toHexString(value) + "'")
+            .collect(Collectors.toList()).toString();
       default:
         throw new IllegalStateException("Unsupported field type: " + type);
     }
@@ -685,11 +717,6 @@ public class RequestUtils {
 
   public static Set<String> getTableNames(PinotQuery pinotQuery) {
     return getTableNames(pinotQuery.getDataSource());
-  }
-
-  @Deprecated
-  public static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
-    return getOptionsFromString(request.get(optionsKey).asText());
   }
 
   public static Map<String, String> getOptionsFromString(String optionStr) {

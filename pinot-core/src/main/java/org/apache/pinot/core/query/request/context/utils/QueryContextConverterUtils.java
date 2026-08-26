@@ -43,16 +43,12 @@ public class QueryContextConverterUtils {
   private QueryContextConverterUtils() {
   }
 
-  /**
-   * Converts the given query into a {@link QueryContext}.
-   */
+  /// Converts the given query into a [QueryContext].
   public static QueryContext getQueryContext(String query) {
     return getQueryContext(CalciteSqlParser.compileToPinotQuery(query));
   }
 
-  /**
-   * Converts the given {@link PinotQuery} into a {@link QueryContext}.
-   */
+  /// Converts the given [PinotQuery] into a [QueryContext].
   public static QueryContext getQueryContext(PinotQuery pinotQuery) {
     // FROM
     String tableName;
@@ -111,6 +107,48 @@ public class QueryContextConverterUtils {
       groupByExpressions = new ArrayList<>(groupByList.size());
       for (Expression thriftExpression : groupByList) {
         groupByExpressions.add(RequestContextUtils.getExpression(thriftExpression));
+      }
+    }
+
+    /// GROUP BY GROUPING SETS / ROLLUP / CUBE: the wire carries, per grouping set (in ordinal order), the
+    /// list of participating column indexes into groupByExpressions (the union of all grouping columns). An
+    /// empty inner list is the grand-total set (). Null when this is a plain GROUP BY query.
+    List<int[]> groupingSets = null;
+    List<List<Integer>> thriftGroupingSets = pinotQuery.getGroupingSets();
+    if (thriftGroupingSets != null) {
+      // Guard against malformed requests: an empty set list would silently produce empty results, and an
+      // out-of-range column index would cause out-of-bounds access deep in the group key generator.
+      if (thriftGroupingSets.isEmpty()) {
+        throw new IllegalStateException("Grouping sets must not be empty");
+      }
+      int numGroupByExpressions = groupByExpressions != null ? groupByExpressions.size() : 0;
+      if (numGroupByExpressions == 0) {
+        // A grouping-sets clause with no grouping columns can only be the grand-total-only set () — semantically
+        // identical to a plain aggregation (a single group over all rows, with GROUPING() resolving to 0). Leave
+        // groupingSets null so the no-group-by aggregation path runs; otherwise the reducer would expect a
+        // $groupingId key column the server never emits, and index past the result schema. A non-empty set here is
+        // malformed (its indexes reference nonexistent group-by expressions), so reject it rather than degrade.
+        for (List<Integer> set : thriftGroupingSets) {
+          if (!set.isEmpty()) {
+            throw new IllegalStateException(
+                "Grouping set references column index " + set.get(0) + " but there are no group-by expressions");
+          }
+        }
+      } else {
+        groupingSets = new ArrayList<>(thriftGroupingSets.size());
+        for (List<Integer> set : thriftGroupingSets) {
+          int[] indexes = new int[set.size()];
+          int idx = 0;
+          for (int columnIndex : set) {
+            if (columnIndex < 0 || columnIndex >= numGroupByExpressions) {
+              throw new IllegalStateException(
+                  "Invalid grouping set column index: " + columnIndex + " for " + numGroupByExpressions
+                      + " group-by expressions");
+            }
+            indexes[idx++] = columnIndex;
+          }
+          groupingSets.add(indexes);
+        }
       }
     }
 
@@ -174,6 +212,7 @@ public class QueryContextConverterUtils {
         .setAliasList(aliasList)
         .setFilter(filter)
         .setGroupByExpressions(groupByExpressions)
+        .setGroupingSets(groupingSets)
         .setOrderByExpressions(orderByExpressions)
         .setHavingFilter(havingFilter)
         .setLimit(pinotQuery.getLimit())

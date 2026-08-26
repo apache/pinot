@@ -71,9 +71,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for DISTINCT_COUNT queries.
- */
+/// Queries test for DISTINCT_COUNT queries.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class DistinctCountQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "DistinctCountQueriesTest");

@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.io.writer.impl;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -29,60 +30,56 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * @class OffHeapMutableByteArrayStore
- *
- * An off-heap byte array store that provides APIs to add byte array (value), retrieve a value, and compare value at
- * an index. No verification is made as to whether the value added already exists or not.
- * Empty byte arrays are supported.
- *
- * @note The class is thread-safe for single writer and multiple readers.
- *
- * This class has a list of OffHeapMutableByteArrayStore.Buffer objects. As Buffer objects get filled, new Buffer
- * objects
- * are added to the list. New Buffers objects have twice the capacity of the previous Buffer
- *
- * Within a Buffer object byte arrays (values) are stored as below:
- *
- *                  __________________________________
- *                  |  start offset of array  1      |
- *                  |  start offset of array  2      |
- *                  |        .....                   |
- *                  |  start offset of array  N      |
- *                  |                                |
- *                  |         UNUSED                 |
- *                  |                                |
- *                  |  Array N .....                 |
- *                  |          .....                 |
- *                  |          .....                 |
- *                  |  Array N-1                     |
- *                  |          .....                 |
- *                  |          .....                 |
- *                  |  Array 0 .....                 |
- *                  |          .....                 |
- *                  |          .....                 |
- *                  |________________________________|
- *
- *
- * We fill the buffer as follows:
- * - The values are added from the bottom, each new value appearing nearer to the top of the buffer, leaving no
- *   room between them. Each value is stored as a sequence of bytes.
- *
- * - The start offsets of the byte arrays are added from the top. Each start offset is stored as an integer, taking 4
- * bytes.
- *
- * Each time we want to add a new value, we check if we have space to add the length of the value, and the value
- * itself. If we do, then we compute the start offset of the new value as:
- *
- *    new-start-offset = (start offset of prev value added) - (length of this value)
- *
- * The new start offset value is stored in the offset
- *
- *    buffer[numValuesSoFar * 4]
- *
- * and the value itself is stored starting at new-start-offset
- *
- */
+/// @class OffHeapMutableByteArrayStore
+///
+/// An off-heap byte array store that provides APIs to add byte array (value), retrieve a value, and compare value at
+/// an index. No verification is made as to whether the value added already exists or not.
+/// Empty byte arrays are supported.
+///
+/// @note The class is thread-safe for single writer and multiple readers.
+///
+/// This class has a list of OffHeapMutableByteArrayStore.Buffer objects. As Buffer objects get filled, new Buffer
+/// objects
+/// are added to the list. New Buffers objects have twice the capacity of the previous Buffer
+///
+/// Within a Buffer object byte arrays (values) are stored as below:
+///
+///                  \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+///                  |  start offset of array  1      |
+///                  |  start offset of array  2      |
+///                  |        .....                   |
+///                  |  start offset of array  N      |
+///                  |                                |
+///                  |         UNUSED                 |
+///                  |                                |
+///                  |  Array N .....                 |
+///                  |          .....                 |
+///                  |          .....                 |
+///                  |  Array N-1                     |
+///                  |          .....                 |
+///                  |          .....                 |
+///                  |  Array 0 .....                 |
+///                  |          .....                 |
+///                  |          .....                 |
+///                  |\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_|
+///
+/// We fill the buffer as follows:
+/// - The values are added from the bottom, each new value appearing nearer to the top of the buffer, leaving no
+///   room between them. Each value is stored as a sequence of bytes.
+///
+/// - The start offsets of the byte arrays are added from the top. Each start offset is stored as an integer, taking 4
+/// bytes.
+///
+/// Each time we want to add a new value, we check if we have space to add the length of the value, and the value
+/// itself. If we do, then we compute the start offset of the new value as:
+///
+///    new-start-offset = (start offset of prev value added) - (length of this value)
+///
+/// The new start offset value is stored in the offset
+///
+///    buffer\[numValuesSoFar \* 4\]
+///
+/// and the value itself is stored starting at new-start-offset
 public class MutableOffHeapByteArrayStore implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(MutableOffHeapByteArrayStore.class);
 
@@ -146,6 +143,17 @@ public class MutableOffHeapByteArrayStore implements Closeable {
       return value;
     }
 
+    private ByteBuffer getByteBuffer(int index) {
+      int startOffset = _pinotDataBuffer.getInt(index * Integer.BYTES);
+      int endOffset;
+      if (index != 0) {
+        endOffset = _pinotDataBuffer.getInt((index - 1) * Integer.BYTES);
+      } else {
+        endOffset = _size;
+      }
+      return _pinotDataBuffer.toDirectByteBuffer(startOffset, endOffset - startOffset);
+    }
+
     private int getValueSize(int index) {
       int startOffset = _pinotDataBuffer.getInt(index * Integer.BYTES);
       int endOffset;
@@ -198,13 +206,11 @@ public class MutableOffHeapByteArrayStore implements Closeable {
     expand(_startSize);
   }
 
-  /**
-   * Expand the buffer list to add a new buffer, allocating a buffer that can definitely fit
-   * the new value.
-   *
-   * @param size Size of the expanded buffer
-   * @return Expanded buffer
-   */
+  /// Expand the buffer list to add a new buffer, allocating a buffer that can definitely fit
+  /// the new value.
+  ///
+  /// @param size Size of the expanded buffer
+  /// @return Expanded buffer
   private Buffer expand(int size) {
     Buffer buffer = new Buffer(size, _numElements, _memoryManager, _allocationContext);
     List<Buffer> newList = new LinkedList<>(_buffers);
@@ -224,6 +230,19 @@ public class MutableOffHeapByteArrayStore implements Closeable {
       }
     }
     // Assumed that we will never ask for an index that does not exist.
+    throw new RuntimeException("dictionary ID '" + index + "' too low");
+  }
+
+  /// Returns a read-only view of the value at the given index without copying it.
+  /// The returned buffer must not be used after this store is closed.
+  public ByteBuffer getByteBuffer(int index) {
+    List<Buffer> bufList = _buffers;
+    for (int x = bufList.size() - 1; x >= 0; x--) {
+      Buffer buffer = bufList.get(x);
+      if (index >= buffer.getStartIndex()) {
+        return buffer.getByteBuffer(index - buffer.getStartIndex()).asReadOnlyBuffer();
+      }
+    }
     throw new RuntimeException("dictionary ID '" + index + "' too low");
   }
 

@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.avro.Schema;
@@ -61,12 +62,11 @@ import static org.apache.avro.Schema.*;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Test if ComplexType (RECORD, ARRAY, MAP, UNION, ENUM, and FIXED) field from an AVRO file can be ingested into a JSON
- * column in a Pinot segment.
- */
+/// Test if ComplexType (RECORD, ARRAY, MAP, UNION, ENUM, and FIXED) field from an AVRO file can be ingested into a JSON
+/// column in a Pinot segment.
 public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "JsonIngestionFromAvroTest");
+  private static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectory(), "JsonIngestionFromAvroTest-" + UUID.randomUUID());
   private static final File AVRO_DATA_FILE = new File(INDEX_DIR, "JsonIngestionFromAvroTest.avro");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
@@ -111,7 +111,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     return _indexSegments;
   }
 
-  /** @return {@link GenericRow} representing a row in Pinot table. */
+  /// @return [GenericRow] representing a row in Pinot table.
   private static GenericRow createTableRecord(int intValue, String stringValue, Object jsonValue,
       GenericData.EnumSymbol enumValue, GenericData.Fixed fixedValue, byte[] bytesValue, List<Object> arrayValue) {
     GenericRow record = new GenericRow();
@@ -305,7 +305,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     }
   }
 
-  /** Create an AVRO file and then ingest it into Pinot while creating a JsonIndex. */
+  /// Create an AVRO file and then ingest it into Pinot while creating a JsonIndex.
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -327,7 +327,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     _indexSegments = List.of(segment, segment);
   }
 
-  /** Verify that we can query the JSON column that ingested ComplexType data from an AVRO file (see setUp). */
+  /// Verify that we can query the JSON column that ingested ComplexType data from an AVRO file (see setUp).
   @Test
   public void testSimpleSelectOnJsonColumn() {
     Operator<SelectionResultsBlock> operator =
@@ -356,7 +356,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     }
   }
 
-  /** Verify simple path expression query on ingested Avro file. */
+  /// Verify simple path expression query on ingested Avro file.
   @Test
   public void testJsonPathSelectOnJsonColumn() {
     Operator<SelectionResultsBlock> operator =
@@ -377,7 +377,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     }
   }
 
-  /** Verify simple path expression query on ingested Avro file. */
+  /// Verify simple path expression query on ingested Avro file.
   @Test
   public void testStringValueSelectOnJsonColumn() {
     Operator<SelectionResultsBlock> operator = getOperator(
@@ -397,13 +397,13 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     }
   }
 
-  /** Verify that ingestion from avro FIXED type field (jsonColumn3) to Pinot JSON column worked fine. */
+  /// Verify that ingestion from avro FIXED type field (jsonColumn3) to Pinot JSON column worked fine.
   @Test
   public void testSimpleSelectOnFixedJsonColumn() {
     testByteArray("select jsonColumn3 FROM testTable");
   }
 
-  /** Verify that ingestion from avro BYTES type field (jsonColumn4) to Pinot JSON column worked fine. */
+  /// Verify that ingestion from avro BYTES type field (jsonColumn4) to Pinot JSON column worked fine.
   @Test
   public void testSimpleSelectOnBytesJsonColumn() {
     testByteArray("select jsonColumn4 FROM testTable");

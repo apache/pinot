@@ -61,12 +61,33 @@ public class OpenStructIndexConfig extends IndexConfig {
   private final Set<String> _denseKeys;
   private final double _denseKeyMinFillRate;
   private final List<FieldConfig> _valueFieldConfigs;
+  private final boolean _sparseJsonIndex;
+  private final boolean _perKeyMetricsEnabled;
   // Eager lookup from key name → FieldConfig for O(1) per-key access. Built in constructor
   // so the config is fully immutable and safe to share across threads.
   private final Map<String, FieldConfig> _valueFieldConfigIndex;
 
   public OpenStructIndexConfig(boolean enabled) {
-    this(!enabled, null, DEFAULT_MAX_DENSE_KEYS, null, DEFAULT_DENSE_KEY_MIN_FILL_RATE, null);
+    this(!enabled, null, DEFAULT_MAX_DENSE_KEYS, null, DEFAULT_DENSE_KEY_MIN_FILL_RATE, null, null);
+  }
+
+  /// @deprecated Use the 7-arg constructor accepting `sparseJsonIndex`. Kept for binary
+  /// compatibility with existing callers built against the pre-`sparseJsonIndex` signature.
+  @Deprecated
+  public OpenStructIndexConfig(Boolean disabled, @Nullable FieldConfig defaultValueFieldConfig,
+      @Nullable Integer maxDenseKeys, @Nullable Set<String> denseKeys, @Nullable Double denseKeyMinFillRate,
+      @Nullable List<FieldConfig> valueFieldConfigs) {
+    this(disabled, defaultValueFieldConfig, maxDenseKeys, denseKeys, denseKeyMinFillRate, valueFieldConfigs, null);
+  }
+
+  /// @deprecated Use the 8-arg constructor accepting `perKeyMetricsEnabled`. Kept for binary
+  /// compatibility with existing callers built against the pre-`perKeyMetricsEnabled` signature.
+  @Deprecated
+  public OpenStructIndexConfig(Boolean disabled, @Nullable FieldConfig defaultValueFieldConfig,
+      @Nullable Integer maxDenseKeys, @Nullable Set<String> denseKeys, @Nullable Double denseKeyMinFillRate,
+      @Nullable List<FieldConfig> valueFieldConfigs, @Nullable Boolean sparseJsonIndex) {
+    this(disabled, defaultValueFieldConfig, maxDenseKeys, denseKeys, denseKeyMinFillRate, valueFieldConfigs,
+        sparseJsonIndex, null);
   }
 
   @JsonCreator
@@ -76,13 +97,17 @@ public class OpenStructIndexConfig extends IndexConfig {
       @JsonProperty("maxDenseKeys") @Nullable Integer maxDenseKeys,
       @JsonProperty("denseKeys") @Nullable Set<String> denseKeys,
       @JsonProperty("denseKeyMinFillRate") @Nullable Double denseKeyMinFillRate,
-      @JsonProperty("valueFieldConfigs") @Nullable List<FieldConfig> valueFieldConfigs) {
+      @JsonProperty("valueFieldConfigs") @Nullable List<FieldConfig> valueFieldConfigs,
+      @JsonProperty("sparseJsonIndex") @Nullable Boolean sparseJsonIndex,
+      @JsonProperty("perKeyMetricsEnabled") @Nullable Boolean perKeyMetricsEnabled) {
     super(disabled);
     _defaultValueFieldConfig = defaultValueFieldConfig;
     _maxDenseKeys = maxDenseKeys != null ? maxDenseKeys : DEFAULT_MAX_DENSE_KEYS;
     _denseKeys = denseKeys;
     _denseKeyMinFillRate = denseKeyMinFillRate != null ? denseKeyMinFillRate : DEFAULT_DENSE_KEY_MIN_FILL_RATE;
     _valueFieldConfigs = valueFieldConfigs;
+    _sparseJsonIndex = sparseJsonIndex != null && sparseJsonIndex;
+    _perKeyMetricsEnabled = perKeyMetricsEnabled != null && perKeyMetricsEnabled;
     if (valueFieldConfigs == null || valueFieldConfigs.isEmpty()) {
       _valueFieldConfigIndex = Map.of();
     } else {
@@ -160,6 +185,22 @@ public class OpenStructIndexConfig extends IndexConfig {
       return _defaultValueFieldConfig.getEncodingType() != FieldConfig.EncodingType.RAW;
     }
     return true;
+  }
+
+  /// `true` to build a JSON index on the sparse `$__sparse__` column at segment creation,
+  /// letting eligible sparse-key filters use postings instead of scanning the blob.
+  /// Default `false`.
+  public boolean isSparseJsonIndex() {
+    return _sparseJsonIndex;
+  }
+
+  /// When `true`, `OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT` is emitted for every key present in the
+  /// sealed segment — dense, sparse, configured, or discovered. The cost is that the number of
+  /// metrics-registry entries follows the ingested key space, and table deletion can only sweep keys
+  /// recoverable from `denseKeys`. When `false` (default), the gauge fires only for keys named in
+  /// `denseKeys`.
+  public boolean isPerKeyMetricsEnabled() {
+    return _perKeyMetricsEnabled;
   }
 
   private static boolean invertedFromIndexes(FieldConfig fieldConfig, String key) {

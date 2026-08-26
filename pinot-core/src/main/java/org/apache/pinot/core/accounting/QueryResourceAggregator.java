@@ -47,10 +47,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Aggregator that computes resource aggregation for queries. Most of the logic from PerQueryCPUMemAccountantFactory is
- * retained here for backward compatibility.
- */
+/// Aggregator that computes resource aggregation for queries. Most of the logic from PerQueryCPUMemAccountantFactory is
+/// retained here for backward compatibility.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class QueryResourceAggregator implements ResourceAggregator {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryResourceAggregator.class);
@@ -317,10 +315,8 @@ public class QueryResourceAggregator implements ResourceAggregator {
     }
   }
 
-  /**
-   * Activates an OOM pause. Query threads calling {@link #waitIfPaused()} will block until the pause is cleared or the
-   * deadline expires. Also hints the JVM to run garbage collection.
-   */
+  /// Activates an OOM pause. Query threads calling [#waitIfPaused()] will block until the pause is cleared or the
+  /// deadline expires. Also hints the JVM to run garbage collection.
   private void activatePause(long timeoutMs) {
     LOGGER.warn("Activating OOM pause for {}ms to allow garbage collection before killing queries. "
         + "Heap used bytes: {}", timeoutMs, _usedBytes);
@@ -330,9 +326,7 @@ public class QueryResourceAggregator implements ResourceAggregator {
     System.gc();
   }
 
-  /**
-   * Clears the OOM pause and wakes all blocked query threads.
-   */
+  /// Clears the OOM pause and wakes all blocked query threads.
   @VisibleForTesting
   void clearPause() {
     LOGGER.info("Clearing OOM pause. Heap used bytes: {}", _usedBytes);
@@ -345,12 +339,10 @@ public class QueryResourceAggregator implements ResourceAggregator {
     }
   }
 
-  /**
-   * Called by query threads at sampling checkpoints. Blocks if an OOM pause is active. Fast-path: single volatile read
-   * when no pause is active.
-   * @return {@code true} if the thread entered the slow path (i.e. a pause was active when called), {@code false} if
-   *         the fast-path was taken and the thread did not block.
-   */
+  /// Called by query threads at sampling checkpoints. Blocks if an OOM pause is active. Fast-path: single volatile read
+  /// when no pause is active.
+  /// @return `true` if the thread entered the slow path (i.e. a pause was active when called), `false` if
+  ///         the fast-path was taken and the thread did not block.
   @VisibleForTesting
   boolean waitIfPaused() {
     if (!_pauseActive) {
@@ -396,9 +388,7 @@ public class QueryResourceAggregator implements ResourceAggregator {
     }
   }
 
-  /**
-   * Kill the query with the highest cost (memory footprint/cpu time/...)
-   */
+  /// Kill the query with the highest cost (memory footprint/cpu time/...)
   private void killMostExpensiveQuery() {
     if (!_memorySamplingEnabled) {
       return;

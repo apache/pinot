@@ -128,6 +128,19 @@ public class CombineErrorOperatorsTest {
     assertEquals(errorMsg.getErrCode(), QueryErrorCode.QUERY_EXECUTION);
   }
 
+  @Test
+  public void testCombineExecutionStatisticsException() {
+    SelectionOnlyCombineOperator combineOperator =
+        new SelectionOnlyCombineOperator(List.of(new ExecutionStatisticsExceptionOperator()), QUERY_CONTEXT,
+            _executorService);
+    BaseResultsBlock resultsBlock = combineOperator.nextBlock();
+    assertTrue(resultsBlock instanceof ExceptionResultsBlock);
+    List<QueryErrorMessage> errorMsgs = resultsBlock.getErrorMessages();
+    assertNotNull(errorMsgs);
+    assertEquals(errorMsgs.size(), 1);
+    assertEquals(errorMsgs.get(0).getErrCode(), QueryErrorCode.INTERNAL);
+  }
+
   @Test(dataProvider = "getErrorCodes")
   public void testCombineExceptionAndErrorOperator(QueryErrorCode queryErrorCode) {
     List<Operator> operators = new ArrayList<>(NUM_OPERATORS);
@@ -224,6 +237,14 @@ public class CombineErrorOperatorsTest {
     @Override
     public ExecutionStatistics getExecutionStatistics() {
       return new ExecutionStatistics(0, 0, 0, 0);
+    }
+  }
+
+  /// Operator that successfully produces a block but fails while reporting execution statistics.
+  private static class ExecutionStatisticsExceptionOperator extends RegularOperator {
+    @Override
+    public ExecutionStatistics getExecutionStatistics() {
+      throw new RuntimeException("Failed to retrieve execution statistics");
     }
   }
 

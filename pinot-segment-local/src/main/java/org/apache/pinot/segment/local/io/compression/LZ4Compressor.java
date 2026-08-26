@@ -25,10 +25,8 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 
 
-/**
- * Implementation of {@link ChunkCompressor} using LZ4 compression algorithm.
- * LZ4Factory.fastestInstance().fastCompressor().compress(sourceBuffer, destinationBuffer)
- */
+/// Implementation of [ChunkCompressor] using LZ4 compression algorithm.
+/// LZ4Factory.fastestInstance().fastCompressor().compress(sourceBuffer, destinationBuffer)
 class LZ4Compressor implements ChunkCompressor {
 
   static final LZ4Factory LZ4_FACTORY = LZ4Factory.fastestInstance();

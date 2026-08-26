@@ -26,9 +26,9 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-/** Index configuration for single text index containing multiple columns.
- *  It was added primarily to handle segments with text indexes on many columns that
- *  end up being impractical due to number of open files. */
+/// Index configuration for single text index containing multiple columns.
+///  It was added primarily to handle segments with text indexes on many columns that
+/// end up being impractical due to number of open files.
 public class MultiColumnTextIndexConfig extends BaseJsonConfig {
 
   // column names included in the text index

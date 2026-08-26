@@ -21,7 +21,6 @@ package org.apache.pinot.core.plan.maker;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -60,9 +59,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>InstancePlanMakerImplV2</code> class is the default implementation of {@link PlanMaker}.
- */
+/// The `InstancePlanMakerImplV2` class is the default implementation of [PlanMaker].
 public class InstancePlanMakerImplV2 implements PlanMaker {
   public static final int DEFAULT_NUM_THREADS_EXTRACT_FINAL_RESULT = 1;
   public static final int DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT = 10_000;
@@ -222,7 +219,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
                 fetchContext));
       }
     } else {
-      fetchContexts = Collections.emptyList();
+      fetchContexts = List.of();
       for (SegmentContext segmentContext : segmentContexts) {
         planNodes.add(makeSegmentPlanNode(segmentContext, queryContext));
       }
@@ -382,7 +379,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
                 segmentContext, fetchContext));
       }
     } else {
-      fetchContexts = Collections.emptyList();
+      fetchContexts = List.of();
       for (SegmentContext segmentContext : segmentContexts) {
         planNodes.add(makeStreamingSegmentPlanNode(segmentContext, queryContext));
       }
@@ -404,12 +401,10 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     }
   }
 
-  /**
-   * In-place rewrite QueryContext based on the information from local IndexSegment.
-   *
-   * @param queryContext
-   * @param indexSegment
-   */
+  /// In-place rewrite QueryContext based on the information from local IndexSegment.
+  ///
+  /// @param queryContext
+  /// @param indexSegment
   @VisibleForTesting
   public static void rewriteQueryContextWithHints(QueryContext queryContext, IndexSegment indexSegment) {
     Map<ExpressionContext, ExpressionContext> expressionOverrideHints = queryContext.getExpressionOverrideHints();

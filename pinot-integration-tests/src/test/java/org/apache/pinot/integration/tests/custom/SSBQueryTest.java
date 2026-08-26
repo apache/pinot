@@ -24,7 +24,6 @@ import java.io.InputStream;
 import java.net.URL;
 import java.sql.ResultSet;
 import java.sql.Statement;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -41,11 +40,9 @@ import org.testng.annotations.Test;
 import org.yaml.snakeyaml.Yaml;
 
 
-/**
- * SSB (Star Schema Benchmark) query integration test.
- * Loads multiple SSB tables (lineorder, customer, supplier, part, dates) and validates
- * JOIN queries using the multi-stage query engine against H2.
- */
+/// SSB (Star Schema Benchmark) query integration test.
+/// Loads multiple SSB tables (lineorder, customer, supplier, part, dates) and validates
+/// JOIN queries using the multi-stage query engine against H2.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class SSBQueryTest extends CustomDataQueryClusterIntegrationTest {
 
@@ -117,11 +114,11 @@ public class SSBQueryTest extends CustomDataQueryClusterIntegrationTest {
       addSchema(schema);
       TableConfig tableConfig = createTableConfig(tableFile);
       addTableConfig(tableConfig);
-      ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(dataFile), tableConfig, schema, 0,
+      ClusterIntegrationTestUtils.buildSegmentsFromAvro(List.of(dataFile), tableConfig, schema, 0,
           _segmentDir, _tarDir);
       uploadSegments(tableName, _tarDir);
       // H2
-      ClusterIntegrationTestUtils.setUpH2TableWithAvro(Collections.singletonList(dataFile), tableName,
+      ClusterIntegrationTestUtils.setUpH2TableWithAvro(List.of(dataFile), tableName,
           _h2Connection);
       waitForAnyDocLoaded(tableName, 60_000L);
     }

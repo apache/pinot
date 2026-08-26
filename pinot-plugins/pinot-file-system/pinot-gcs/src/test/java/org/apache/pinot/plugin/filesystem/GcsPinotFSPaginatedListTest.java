@@ -28,7 +28,6 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Predicate;
 import org.apache.pinot.spi.filesystem.FileMetadata;
@@ -45,10 +44,8 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for GcsPinotFS.listFilesWithMetadata(URI, boolean, Predicate, int)
- * — the paginated listing with early termination using Page&lt;Blob&gt;.
- */
+/// Unit tests for GcsPinotFS.listFilesWithMetadata(URI, boolean, Predicate, int)
+/// — the paginated listing with early termination using Page&lt;Blob&gt;.
 public class GcsPinotFSPaginatedListTest {
 
   private static final Predicate<String> ACCEPT_ALL = path -> true;
@@ -218,7 +215,7 @@ public class GcsPinotFSPaginatedListTest {
   @SuppressWarnings("unchecked")
   @Test
   public void testEmptyBucket() throws IOException {
-    stubStorageList(mockPage(Collections.emptyList(), null));
+    stubStorageList(mockPage(List.of(), null));
 
     final List<FileMetadata> result = _gcsPinotFS.listFilesWithMetadata(
         URI.create("gs://bucket/data/"), true, ACCEPT_ALL, 10);

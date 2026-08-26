@@ -57,10 +57,8 @@ public class PinotDispatchPlanner {
     _tableCache = tableCache;
   }
 
-  /**
-   * Entry point for attaching dispatch metadata to a {@link SubPlan}.
-   * @param subPlan the entrypoint of the sub plan.
-   */
+  /// Entry point for attaching dispatch metadata to a [SubPlan].
+  /// @param subPlan the entrypoint of the sub plan.
   public DispatchableSubPlan createDispatchableSubPlan(SubPlan subPlan, MultiClusterRoutingContext routingContext) {
     // perform physical plan conversion and assign workers to each stage.
     // metadata may come directly from Calcite's RelNode which has not resolved actual table names (taking
@@ -109,13 +107,52 @@ public class PinotDispatchPlanner {
     for (var entry : result._planFragmentMap.entrySet()) {
       context.getDispatchablePlanStageRootMap().put(entry.getKey(), entry.getValue().getFragmentRoot());
     }
+    trackEmptyLeafStages(context);
     runValidations(rootFragment, context);
     return finalizeDispatchableSubPlan(rootFragment, context);
   }
 
-  /**
-   * Run validations on the plan. Since there is only one validator right now, don't try to over-engineer it.
-   */
+  /// Records empty leaf stages so that [DispatchablePlanContext#isAllNonReplicatedLeafStagesEmpty()] works for
+  /// the physical optimizer path, mirroring what `WorkerManager` does for the legacy path. A leaf stage is a
+  /// fragment that scans one or more tables; it is empty when it was assigned zero workers (no routable segments,
+  /// e.g. an empty table or all segments pruned by the broker). When every leaf stage is empty, this drives the
+  /// empty-leaf short-circuit in [#finalizeDispatchableSubPlan].
+  ///
+  /// When only _some_ leaf stages are empty (an empty or fully-pruned table combined with a non-empty table in the
+  /// same query), the physical optimizer cannot yet produce a correct plan: an empty leaf is assigned zero workers,
+  /// and a downstream join/set-op/aggregate derives its worker set from its inputs, so the empty branch can zero out
+  /// a whole stage and silently drop rows. Rather than return wrong results, fail fast with an actionable error
+  /// suggesting the legacy (non-physical) engine, which handles this case.
+  ///
+  /// Unlike the legacy path (which excludes broadcast-replicated dim leaves from this tracking via
+  /// `WorkerManager`'s early return), every table-scanning fragment is counted here. The physical optimizer does
+  /// not honor the `IS_REPLICATED` broadcast hint (a dim table is routed like any other table), and it never
+  /// populates `replicatedSegments`, so [#hasNonEmptyReplicatedLeaf] cannot rescue an incorrectly
+  /// short-circuited replicated join. Counting every leaf keeps the fail-fast conservative: a query mixing an empty
+  /// table with a non-empty (dim or fact) table is rejected rather than risking a wrong result.
+  private static void trackEmptyLeafStages(DispatchablePlanContext context) {
+    int leafStages = 0;
+    int emptyLeafStages = 0;
+    for (DispatchablePlanMetadata metadata : context.getDispatchablePlanMetadataMap().values()) {
+      if (metadata.getScannedTables().isEmpty()) {
+        // Not a leaf stage (no table scan).
+        continue;
+      }
+      leafStages++;
+      context.recordLeafStageAssigned();
+      if (metadata.getWorkerIdToServerInstanceMap().isEmpty()) {
+        emptyLeafStages++;
+        context.recordLeafStageEmpty();
+      }
+    }
+    if (emptyLeafStages > 0 && emptyLeafStages < leafStages) {
+      throw new UnsupportedOperationException("The multi-stage physical optimizer does not yet support queries that "
+          + "combine an empty or fully-pruned table with a non-empty table (e.g. a join or union where one side has "
+          + "no routable segments). Retry with the query option 'usePhysicalOptimizer=false'.");
+    }
+  }
+
+  /// Run validations on the plan. Since there is only one validator right now, don't try to over-engineer it.
   private void runValidations(PlanFragment planFragment, DispatchablePlanContext context) {
     PlanNode rootPlanNode = planFragment.getFragmentRoot();
     boolean isIntermediateStage =
@@ -128,8 +165,8 @@ public class PinotDispatchPlanner {
 
   private static DispatchableSubPlan finalizeDispatchableSubPlan(PlanFragment subPlanRoot,
       DispatchablePlanContext dispatchablePlanContext) {
-    // TODO: Physical Optimizer path does not track empty leaf stages. To support short-circuit,
-    //  check if all leaf TableScanMetadata have empty workerIdToSegmentsMap.
+    // Empty leaf stages are tracked for both engines: the legacy path in WorkerManager, and the physical optimizer
+    // path in #trackEmptyLeafStages.
     boolean allLeafStagesEmpty = dispatchablePlanContext.isAllNonReplicatedLeafStagesEmpty();
     if (allLeafStagesEmpty && hasNonEmptyReplicatedLeaf(dispatchablePlanContext.getDispatchablePlanMetadataMap())) {
       allLeafStagesEmpty = false;

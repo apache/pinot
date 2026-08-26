@@ -60,31 +60,29 @@ import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Executes a "page‑cache warm‑up" after segments are refreshed.
- *
- * <p>The executor reads the warm‑up query file from
- * <code>{controllerConf.pageCacheWarmupDataDir}/{tableNameWithType}/queries</code>,
- * prepends {@code SET isSecondaryWorkload=true;} to intend  the server to run the query on
- * its secondary workload queue, wraps the list in a
- * {@link PageCacheWarmupRequest},
- * and POSTs the request to every server that hosts the table.</p>
- *
- * <p>The call is retried with an exponential back‑off (3 attempts, starting at
- * 3&nbsp;seconds) and the overall fan‑out is bounded by the controller‑level
- * {@code controller.page.cache.warmup.duration.ms} config.
- * </p>
- *
- * <h2>Sequence</h2>
- * <ol>
- *   <li>Validate that the table has warm‑up enabled.</li>
- *   <li>Load the most recently modified warm‑up file (or throws if none exist).</li>
- *   <li>Add the <em>secondary workload</em> hint to each query.</li>
- *   <li>Look up server admin endpoints via the Helix resource manager.</li>
- *   <li>Send parallel warm‑up requests and wait until all complete or the timeout elapses.</li>
- * </ol>
- *
- */
+/// Executes a "page‑cache warm‑up" after segments are refreshed.
+///
+/// <p>The executor reads the warm‑up query file from
+/// <code>{controllerConf.pageCacheWarmupDataDir}/{tableNameWithType}/queries</code>,
+/// prepends {@code SET isSecondaryWorkload=true;} to intend  the server to run the query on
+/// its secondary workload queue, wraps the list in a
+/// {@link PageCacheWarmupRequest},
+/// and POSTs the request to every server that hosts the table.</p>
+///
+/// <p>The call is retried with an exponential back‑off (3 attempts, starting at
+/// 3&nbsp;seconds) and the overall fan‑out is bounded by the controller‑level
+/// {@code controller.page.cache.warmup.duration.ms} config.
+/// </p>
+///
+/// <h2>Sequence</h2>
+/// <ol>
+///   <li>Validate that the table has warm‑up enabled.</li>
+///   <li>Load the most recently modified warm‑up file (or throws if none exist).</li>
+///   <li>Add the <em>secondary workload</em> hint to each query.</li>
+///   <li>Look up server admin endpoints via the Helix resource manager.</li>
+///   <li>Send parallel warm‑up requests and wait until all complete or the timeout elapses.</li>
+/// </ol>
+///
 public class PageCacheWarmupControllerExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(PageCacheWarmupControllerExecutor.class);
 
@@ -96,11 +94,9 @@ public class PageCacheWarmupControllerExecutor {
   private final long _maxPageCacheWarmupDurationMs;
   private final ExecutorService _warmupRequestExecutor;
 
-  /**
-   * Creates an executor bound to the given Controller services. The warmup query directory and the
-   * overall warmup duration are read from the {@link ControllerConf} (defaults are used when it is
-   * {@code null}).
-   */
+  /// Creates an executor bound to the given Controller services. The warmup query directory and the
+  /// overall warmup duration are read from the {@link ControllerConf} (defaults are used when it is
+  /// {@code null}).
   public PageCacheWarmupControllerExecutor(PinotHelixResourceManager pinotHelixResourceManager,
                                            @Nullable ControllerConf controllerConf) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
@@ -117,22 +113,20 @@ public class PageCacheWarmupControllerExecutor {
     });
   }
 
-  /**
-   * Orchestrates page‑cache warm‑up for the specified table.
-   *
-   * <p>The method spawns an asynchronous task that:
-   * <ul>
-   *   <li>Loads the most recently modified warm‑up file (or throws if none exist).</li>
-   *   <li>Builds a {@link PageCacheWarmupRequest} that
-   *       optionally restricts the warm‑up to the supplied segment list.</li>
-   *   <li>Sends the request to every server in parallel with retry semantics.</li>
-   * </ul>
-   * The calling thread blocks only until the task finishes or the
-   * warm‑up timeout defined in the table config expires.</p>
-   *
-   * @param tableNameWithType fully‑qualified table name, e.g. {@code myTable_OFFLINE}
-   * @param segmentsTo        list of segment names to touch; {@code null} or empty means all segments
-   */
+  /// Orchestrates page‑cache warm‑up for the specified table.
+  ///
+  /// <p>The method spawns an asynchronous task that:
+  /// <ul>
+  ///   <li>Loads the most recently modified warm‑up file (or throws if none exist).</li>
+  ///   <li>Builds a {@link PageCacheWarmupRequest} that
+  ///       optionally restricts the warm‑up to the supplied segment list.</li>
+  ///   <li>Sends the request to every server in parallel with retry semantics.</li>
+  /// </ul>
+  /// The calling thread blocks only until the task finishes or the
+  /// warm‑up timeout defined in the table config expires.</p>
+  ///
+  /// @param tableNameWithType fully‑qualified table name, e.g. {@code myTable_OFFLINE}
+  /// @param segmentsTo        list of segment names to touch; {@code null} or empty means all segments
   public void triggerPageCacheWarmup(String tableNameWithType, List<String> segmentsTo) {
     try {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -219,13 +213,11 @@ public class PageCacheWarmupControllerExecutor {
     }
   }
 
-  /**
-   * Sends a single warm‑up HTTP request with retries and logs the outcome.
-   *
-   * <p>The retry policy is {@link #DEFAULT_RETRY_POLICY}. Success increments no metrics,
-   * but failures and retries are logged, and a final failure increments
-   * {@link org.apache.pinot.common.metrics.ControllerMeter#PAGE_CACHE_WARMUP_REQUEST_ERRORS}.</p>
-   */
+  /// Sends a single warm‑up HTTP request with retries and logs the outcome.
+  ///
+  /// <p>The retry policy is {@link #DEFAULT_RETRY_POLICY}. Success increments no metrics,
+  /// but failures and retries are logged, and a final failure increments
+  /// {@link ControllerMeter#PAGE_CACHE_WARMUP_REQUEST_ERRORS}.</p>
   private void sendWarmupRequestWithRetry(URI uri, PageCacheWarmupRequest request, String serverInstance,
                                           String tableName) {
     try {
@@ -259,20 +251,16 @@ public class PageCacheWarmupControllerExecutor {
     }
   }
 
-  /**
-   * Shuts down the warmup request thread pool. Should be called when the owning resource manager stops.
-   */
+  /// Shuts down the warmup request thread pool. Should be called when the owning resource manager stops.
   public void shutdown() {
     _warmupRequestExecutor.shutdownNow();
   }
 
-  /**
-   * Prepends {@code SET isSecondaryWorkload=true;} to each query so that servers
-   * enqueue the warm‑up on a secondary workload queue, avoiding interference with live traffic.
-   *
-   * @param queries original SQL queries
-   * @return list with the secondary‑workload hint added
-   */
+  /// Prepends {@code SET isSecondaryWorkload=true;} to each query so that servers
+  /// enqueue the warm‑up on a secondary workload queue, avoiding interference with live traffic.
+  ///
+  /// @param queries original SQL queries
+  /// @return list with the secondary‑workload hint added
   private static List<String> appendSecondaryWorkload(List<String> queries) {
     List<String> modifiedQueries = new ArrayList<>();
     for (String query : queries) {

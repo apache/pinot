@@ -19,7 +19,6 @@
 package org.apache.pinot.materializedview.executor;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +47,7 @@ public class GrpcMaterializedViewQueryExecutorTest {
   @BeforeMethod
   public void setUp() {
     _helixManager = mock(HelixManager.class);
-    _queryExecutor = new GrpcMaterializedViewQueryExecutor(_helixManager, new GrpcConfig(Collections.emptyMap()));
+    _queryExecutor = new GrpcMaterializedViewQueryExecutor(_helixManager, new GrpcConfig(Map.of()));
   }
 
   @AfterMethod
@@ -93,7 +92,7 @@ public class GrpcMaterializedViewQueryExecutorTest {
 
   @Test
   public void testSelectBrokerNoBrokersThrows() {
-    mockHelixInstanceConfigs(Collections.emptyList());
+    mockHelixInstanceConfigs(List.of());
 
     try {
       _queryExecutor.selectBroker();

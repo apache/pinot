@@ -24,8 +24,8 @@ import com.google.common.collect.Lists;
 import com.uber.h3core.exceptions.H3Exception;
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
@@ -90,7 +90,7 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
     String onHeapColumnName = "onHeap";
     String offHeapColumnName = "offHeap";
     int resolution = 5;
-    H3IndexResolution h3IndexResolution = new H3IndexResolution(Collections.singletonList(resolution));
+    H3IndexResolution h3IndexResolution = new H3IndexResolution(List.of(resolution));
 
     try (MutableH3Index mutableH3Index = new MutableH3Index(h3IndexResolution)) {
       try (GeoSpatialIndexCreator onHeapCreator = new OnHeapH3IndexCreator(TEMP_DIR, onHeapColumnName,
@@ -134,7 +134,7 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
       throws Exception {
     String columnName = "skipInvalid";
     int res = 5;
-    H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
+    H3IndexResolution resolution = new H3IndexResolution(List.of(res));
 
     try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE", true,
         resolution)) {
@@ -160,7 +160,7 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
       throws Exception {
     String columnName = "skipNull";
     int res = 5;
-    H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
+    H3IndexResolution resolution = new H3IndexResolution(List.of(res));
 
     try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE", true,
         resolution)) {
@@ -186,7 +186,7 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
       throws Exception {
     String columnName = "skipInvalidGeometryType";
     int res = 5;
-    H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
+    H3IndexResolution resolution = new H3IndexResolution(List.of(res));
 
     try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE", true,
         resolution)) {
@@ -215,7 +215,7 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
       throws Exception {
     String columnName = "skipPointWithNullCoordinate";
     int res = 5;
-    H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
+    H3IndexResolution resolution = new H3IndexResolution(List.of(res));
 
     try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE", true,
         resolution)) {
@@ -241,7 +241,7 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
       throws Exception {
     String columnName = "skipPointWithInvalidCoordinate";
     int res = 5;
-    H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
+    H3IndexResolution resolution = new H3IndexResolution(List.of(res));
 
     try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE", true,
         resolution)) {
@@ -263,11 +263,46 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
   }
 
   @Test
+  public void testOffHeapSkipAtEmptyBufferDoesNotCreateEmptyChunk()
+      throws Exception {
+    // Regression test for an IndexOutOfBoundsException in OffHeapH3IndexCreator.seal(). When a record is skipped
+    // (e.g. a null/invalid geometry tolerated via continueOnError) while the in-memory posting list buffer is empty
+    // -- which is the case for the very first record and immediately after each flush -- the flush trigger (buffer
+    // size being a multiple of FLUSH_THRESHOLD, which includes 0) used to append a zero-length chunk. That empty
+    // chunk produced an empty ChunkIterator that was read unconditionally during the merge in seal(), throwing.
+    String columnName = "offHeapSkipAtEmptyBuffer";
+    int res = 5;
+    H3IndexResolution resolution = new H3IndexResolution(List.of(res));
+
+    try (GeoSpatialIndexCreator creator = new OffHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE", true,
+        resolution)) {
+      // Skip the very first record while the buffer is empty. This used to create a zero-length leading chunk, which
+      // also pushed seal() into the multi-chunk merge path where the empty chunk was read and threw.
+      creator.add(null);
+      creator.add(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 20)));
+      creator.add(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(30, 40)));
+
+      // seal() must not throw and must produce a valid, readable index.
+      creator.seal();
+    }
+
+    File indexFile = new File(TEMP_DIR, columnName + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
+        H3IndexReader reader = new ImmutableH3IndexReader(buffer)) {
+      // docId 0 was the skipped record; the two valid points are docIds 1 and 2.
+      Assert.assertEquals(reader.getDocIds(H3Utils.H3_CORE.latLngToCell(20, 10, res)),
+          ImmutableRoaringBitmap.bitmapOf(1));
+      Assert.assertEquals(reader.getDocIds(H3Utils.H3_CORE.latLngToCell(40, 30, res)),
+          ImmutableRoaringBitmap.bitmapOf(2));
+    }
+  }
+
+  @Test
   public void testSkipInvalidGeometryContinueOnErrorFalse()
       throws Exception {
     String columnName = "skipInvalid";
     int res = 5;
-    H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
+    H3IndexResolution resolution = new H3IndexResolution(List.of(res));
 
     try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE", false,
         resolution)) {
@@ -284,7 +319,7 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
       throws Exception {
     String columnName = "skipNull";
     int res = 5;
-    H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
+    H3IndexResolution resolution = new H3IndexResolution(List.of(res));
 
     try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE", false,
         resolution)) {
@@ -301,7 +336,7 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
       throws Exception {
     String columnName = "skipInvalidGeometryType";
     int res = 5;
-    H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
+    H3IndexResolution resolution = new H3IndexResolution(List.of(res));
 
     try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE", false,
         resolution)) {
@@ -321,7 +356,7 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
       throws Exception {
     String columnName = "skipPointWithNullCoordinate";
     int res = 5;
-    H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
+    H3IndexResolution resolution = new H3IndexResolution(List.of(res));
 
     try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE", false,
         resolution)) {
@@ -338,7 +373,7 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
       throws Exception {
     String columnName = "skipPointWithInvalidCoordinate";
     int res = 5;
-    H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
+    H3IndexResolution resolution = new H3IndexResolution(List.of(res));
 
     try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE", false,
         resolution)) {

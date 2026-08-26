@@ -22,9 +22,7 @@ import java.util.Iterator;
 import org.apache.pinot.common.utils.DataSchema;
 
 
-/**
- * Base abstract implementation of Table
- */
+/// Base abstract implementation of Table
 public abstract class BaseTable implements Table {
   protected final DataSchema _dataSchema;
   protected final int _numColumns;

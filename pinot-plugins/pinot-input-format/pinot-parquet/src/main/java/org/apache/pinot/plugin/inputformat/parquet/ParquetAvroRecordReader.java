@@ -32,14 +32,14 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 
-/**
- * Avro Record reader for Parquet file. This reader doesn't read parquet file with incompatible Avro schemas,
- * e.g. INT96, DECIMAL. Please use {@link org.apache.pinot.plugin.inputformat.parquet.ParquetNativeRecordReader}
- * instead.<p><p>
- * For More info on Avro to Parquet schema conversion:
- * <a href="https://javadoc.io/doc/org.apache.parquet/parquet-avro/latest/index.html">
- *   https://javadoc.io/doc/org.apache.parquet/parquet-avro/latest/index.html</a>
- */
+/// Avro Record reader for Parquet file. This reader doesn't read parquet file with incompatible Avro schemas,
+/// e.g. INT96, DECIMAL. Please use [org.apache.pinot.plugin.inputformat.parquet.ParquetNativeRecordReader]
+/// instead.
+///
+/// For More info on Avro to Parquet schema conversion:
+/// [https://javadoc.io/doc/org.apache.parquet/parquet-avro/latest/index.html][ref1]
+///
+/// [ref1]: https://javadoc.io/doc/org.apache.parquet/parquet-avro/latest/index.html
 public class ParquetAvroRecordReader implements RecordReader {
   private static final String EXTENSION = "parquet";
 

@@ -18,8 +18,6 @@
       "stream.kafka.topic.name": "flights-realtime",
       "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
       "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory",
-      "stream.kafka.hlc.zk.connect.string": "pinot-zookeeper:2181/kafka",
-      "stream.kafka.zk.broker.url": "pinot-zookeeper:2181/kafka",
       "stream.kafka.broker.list": "kafka:9092",
       "realtime.segment.flush.threshold.time": "3600000",
       "realtime.segment.flush.threshold.size": "50000",

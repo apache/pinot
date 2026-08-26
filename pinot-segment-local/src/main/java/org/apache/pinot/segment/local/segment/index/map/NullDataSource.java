@@ -44,11 +44,9 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * If a key does not exist in a Map Column, then the Map Data Source will return this NulLDataSource.
- * The NullDataSource represents an INT column where every document has the Default Null Value.  Semantically,
- * this means that if a key is not in a Map column, then the value will always resolve to "Null".
- */
+/// If a key does not exist in a Map Column, then the Map Data Source will return this NulLDataSource.
+/// The NullDataSource represents an INT column where every document has the Default Null Value.  Semantically,
+/// this means that if a key is not in a Map column, then the value will always resolve to "Null".
 public class NullDataSource implements DataSource {
   private final NullDataSourceMetadata _md;
   private final ColumnIndexContainer _indexes;

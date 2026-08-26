@@ -124,13 +124,11 @@ public class BrokerReduceServiceTest {
     brokerReduceService.shutDown();
   }
 
-  /**
-   * Pins the safety net: when `brokerRequest != serverBrokerRequest` (i.e. a path that rewrote
-   * the server-side query), no gapfill is requested, AND no MV-rewrite marker is present, the
-   * reducer MUST throw `BadQueryRequestException("Nested query is not supported without
-   * gapfill")`.  This is the guardrail that prevents any future federated / JOIN / nested-query
-   * rewrite path from silently degrading to a meaningless reduce.
-   */
+  /// Pins the safety net: when `brokerRequest != serverBrokerRequest` (i.e. a path that rewrote
+  /// the server-side query), no gapfill is requested, AND no MV-rewrite marker is present, the
+  /// reducer MUST throw `BadQueryRequestException("Nested query is not supported without
+  /// gapfill")`.  This is the guardrail that prevents any future federated / JOIN / nested-query
+  /// rewrite path from silently degrading to a meaningless reduce.
   @Test
   public void testNestedQueryRejectedWhenNoMaterializedViewMarker()
       throws IOException {
@@ -160,15 +158,13 @@ public class BrokerReduceServiceTest {
     }
   }
 
-  /**
-   * Pins the MV-rewrite opt-out: when the server-side query carries the broker-internal
-   * `MATERIALIZED_VIEW_REWRITE=true` marker, the reducer skips the "Nested query is not
-   * supported without gapfill" safety net and proceeds to reduce normally.
-   *
-   * <p>The marker is broker-internal — `BaseSingleStageBrokerRequestHandler.handleRequest` strips
-   * any user-supplied copy of this option at request entry, so the only way a server query can
-   * carry it is if the broker itself stamped it during a committed FULL_REWRITE.
-   */
+  /// Pins the MV-rewrite opt-out: when the server-side query carries the broker-internal
+  /// `MATERIALIZED_VIEW_REWRITE=true` marker, the reducer skips the "Nested query is not
+  /// supported without gapfill" safety net and proceeds to reduce normally.
+  ///
+  /// The marker is broker-internal — `BaseSingleStageBrokerRequestHandler.handleRequest` strips
+  /// any user-supplied copy of this option at request entry, so the only way a server query can
+  /// carry it is if the broker itself stamped it during a committed FULL_REWRITE.
   @Test
   public void testMaterializedViewMarkerOptsOutOfNestedQueryGuard()
       throws IOException {

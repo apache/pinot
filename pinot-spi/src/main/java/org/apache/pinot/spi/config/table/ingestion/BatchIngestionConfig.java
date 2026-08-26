@@ -27,9 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-/**
- * Contains all configs related to the batch sources for ingestion.
- */
+/// Contains all configs related to the batch sources for ingestion.
 public class BatchIngestionConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Configs for all the batch sources to ingest from")

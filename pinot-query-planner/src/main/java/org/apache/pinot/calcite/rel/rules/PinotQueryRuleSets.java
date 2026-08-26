@@ -32,7 +32,6 @@ import org.apache.calcite.rel.rules.FilterMergeRule;
 import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
 import org.apache.calcite.rel.rules.FilterSetOpTransposeRule;
 import org.apache.calcite.rel.rules.JoinPushExpressionsRule;
-import org.apache.calcite.rel.rules.ProjectAggregateMergeRule;
 import org.apache.calcite.rel.rules.ProjectFilterTransposeRule;
 import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectRemoveRule;
@@ -54,16 +53,14 @@ import org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule.PinotJoinCondition
 import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 
 
-/**
- * Default rule sets for Pinot query.
- * Defaultly disabled rules are defined in
- * {@link org.apache.pinot.spi.utils.CommonConstants.Broker#DEFAULT_DISABLED_RULES}
- *
- * <p>TODO: Rule lists may be consolidated into
- * {@link org.apache.pinot.query.planner.rules.DefaultRuleSetCustomizer} in a future refactor once
- * the {@link org.apache.pinot.query.planner.spi.RuleSetCustomizer} SPI is the established
- * extension point for broker rule customization.
- */
+/// Default rule sets for Pinot query.
+/// Defaultly disabled rules are defined in
+/// [org.apache.pinot.spi.utils.CommonConstants.Broker#DEFAULT_DISABLED_RULES]
+///
+/// TODO: Rule lists may be consolidated into
+/// [org.apache.pinot.query.planner.rules.DefaultRuleSetCustomizer] in a future refactor once
+/// the [org.apache.pinot.query.planner.spi.RuleSetCustomizer] SPI is the established
+/// extension point for broker rule customization.
 public class PinotQueryRuleSets {
   private PinotQueryRuleSets() {
   }
@@ -240,8 +237,10 @@ public class PinotQueryRuleSets {
       UnionMergeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.UNION_MERGE).toRule(),
       // Drop unused aggregate calls when a Project on top of the Aggregate doesn't reference them. Default-on.
-      ProjectAggregateMergeRule.Config.DEFAULT
-          .withDescription(PlannerRuleNames.PROJECT_AGGREGATE_MERGE).toRule(),
+      // Pinot fork of Calcite's ProjectAggregateMergeRule: the stock rule rebuilds the aggregate and silently
+      // drops its aggOptions hints, because Calcite only restores the hints of the node the rule matched on
+      // (the Project). See PinotProjectAggregateMergeRule.
+      PinotProjectAggregateMergeRule.instanceWithDescription(PlannerRuleNames.PROJECT_AGGREGATE_MERGE),
       PruneEmptyRules.CorrelateLeftEmptyRuleConfig.DEFAULT
           .withDescription(PlannerRuleNames.PRUNE_EMPTY_CORRELATE_LEFT).toRule(),
       PruneEmptyRules.CorrelateRightEmptyRuleConfig.DEFAULT
@@ -262,9 +261,9 @@ public class PinotQueryRuleSets {
           .withDescription(PlannerRuleNames.PRUNE_EMPTY_UNION).toRule()
   );
 
-  /// Pinot specific post-logical rules used when the physical optimizer is <b>not</b> enabled.
-  /// Includes {@link PinotSortExchangeCopyRule#SORT_EXCHANGE_COPY} with the default fetch-limit
-  /// threshold. Per-query overrides are applied by {@code QueryEnvironment.getTraitProgram},
+  /// Pinot specific post-logical rules used when the physical optimizer is **not** enabled.
+  /// Includes [PinotSortExchangeCopyRule#SORT_EXCHANGE_COPY] with the default fetch-limit
+  /// threshold. Per-query overrides are applied by `QueryEnvironment.getTraitProgram`,
   /// which swaps the configured rule on a per-query copy of this list.
   public static final List<RelOptRule> POST_LOGICAL_RULES = List.of(
       // TODO: Merge the following 2 rules into a single rule

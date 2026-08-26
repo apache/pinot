@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -31,11 +30,10 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
-/**
- * The <code>EmptySelectionOperator</code> class provides the operator for selection query with LIMIT less or equal to 0
- * on a single segment.
- * <p>NOTE: this operator short circuit underlying operators and directly returns the data schema without any rows.
- */
+/// The `EmptySelectionOperator` class provides the operator for selection query with LIMIT less or equal
+/// to 0 on a single segment.
+///
+/// NOTE: this operator short circuit underlying operators and directly returns the data schema without any rows.
 public class EmptySelectionOperator extends BaseOperator<SelectionResultsBlock> {
   private static final String EXPLAIN_NAME = "SELECT_EMPTY";
 
@@ -66,7 +64,7 @@ public class EmptySelectionOperator extends BaseOperator<SelectionResultsBlock> 
 
   @Override
   protected SelectionResultsBlock getNextBlock() {
-    return new SelectionResultsBlock(_dataSchema, Collections.emptyList(), _queryContext);
+    return new SelectionResultsBlock(_dataSchema, List.of(), _queryContext);
   }
 
   @Override
@@ -76,7 +74,7 @@ public class EmptySelectionOperator extends BaseOperator<SelectionResultsBlock> 
 
   @Override
   public List<BaseProjectOperator<?>> getChildOperators() {
-    return Collections.singletonList(_projectOperator);
+    return List.of(_projectOperator);
   }
 
   @Override

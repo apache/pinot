@@ -19,7 +19,8 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
-import org.apache.datasketches.tuple.Sketch;
+import javax.annotation.Nullable;
+import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.TupleSketchIterator;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -31,8 +32,9 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class AvgValueIntegerTupleSketchAggregationFunction
     extends IntegerTupleSketchAggregationFunction {
 
-  public AvgValueIntegerTupleSketchAggregationFunction(List<ExpressionContext> arguments, IntegerSummary.Mode mode) {
-    super(arguments, mode);
+  public AvgValueIntegerTupleSketchAggregationFunction(List<ExpressionContext> arguments, IntegerSummary.Mode mode,
+      boolean nullHandlingEnabled) {
+    super(arguments, mode, nullHandlingEnabled);
   }
 
   // TODO if extra aggregation modes are supported, make this switch
@@ -47,12 +49,18 @@ public class AvgValueIntegerTupleSketchAggregationFunction
     return ColumnDataType.LONG;
   }
 
+  @Nullable
   @Override
-  public Comparable extractFinalResult(TupleIntSketchAccumulator accumulator) {
+  public Comparable extractFinalResult(@Nullable TupleIntSketchAccumulator accumulator) {
+    // A null intermediate result means nothing was aggregated, and so does an empty sketch, which the retained-entry
+    // check below already answers NULL for. The average of nothing is NULL in either mode.
+    if (accumulator == null) {
+      return null;
+    }
     accumulator.setNominalEntries(_nominalEntries);
     accumulator.setSetOperations(_setOps);
     accumulator.setThreshold(_accumulatorThreshold);
-    Sketch<IntegerSummary> result = accumulator.getResult();
+    TupleSketch<IntegerSummary> result = accumulator.getResult();
     if (result.isEmpty() || result.getRetainedEntries() == 0) {
       // there is nothing to average, return null
       return null;

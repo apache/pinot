@@ -26,7 +26,6 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -470,7 +469,7 @@ public class RetentionManagerTest {
 
     PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
     when(mockResourceManager.getBrokerInstancesConfigsFor(offlineTableConfig.getTableName()))
-        .thenReturn(Collections.singletonList(instanceConfig));
+        .thenReturn(List.of(instanceConfig));
 
     CompletionServiceHelper mockServiceHelper = mock(CompletionServiceHelper.class);
 
@@ -843,9 +842,7 @@ public class RetentionManagerTest {
     return segmentZKMetadata;
   }
 
-  /**
-   * Helper method to create a file with content
-   */
+  /// Helper method to create a file with content
   private void createFileWithContent(File file, String content) {
     try {
       Files.write(file.toPath(), content.getBytes());
@@ -854,9 +851,7 @@ public class RetentionManagerTest {
     }
   }
 
-  /**
-   * Helper method to set file modification time
-   */
+  /// Helper method to set file modification time
   private void setFileModificationTime(File file, long timestamp) {
     FileTime fileTime = FileTime.fromMillis(timestamp);
     try {
@@ -970,6 +965,12 @@ public class RetentionManagerTest {
   }
 
   public static class FakePinotFs extends LocalPinotFS {
+
+    @Override
+    public boolean exists(URI fileUri) {
+      // The fake deep store is not backed by a real directory, but always has the segments listed below
+      return true;
+    }
 
     @Override
     public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)

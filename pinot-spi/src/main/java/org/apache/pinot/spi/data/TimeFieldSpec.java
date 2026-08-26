@@ -114,6 +114,7 @@ public final class TimeFieldSpec extends FieldSpec {
     }
     appendDefaultNullValue(jsonObject);
     appendTransformFunction(jsonObject);
+    appendFieldIdAndAliases(jsonObject);
     return jsonObject;
   }
 

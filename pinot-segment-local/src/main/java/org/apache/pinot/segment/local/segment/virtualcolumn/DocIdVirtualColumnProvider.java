@@ -28,9 +28,7 @@ import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
 import org.apache.pinot.spi.utils.Pairs;
 
 
-/**
- * Virtual column provider that returns the document id.
- */
+/// Virtual column provider that returns the document id.
 public class DocIdVirtualColumnProvider implements VirtualColumnProvider {
   private static final DocIdSortedIndexReader DOC_ID_SORTED_INDEX_READER = new DocIdSortedIndexReader();
 

@@ -24,8 +24,8 @@ import java.io.IOException;
 import java.nio.channels.Channels;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.FieldVector;
@@ -45,20 +45,18 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.ColumnReader;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Verifies {@link ArrowColumnReaderFactory} can consume a caller-managed {@link ArrowStreamReader}
- * backed by a {@link ByteArrayInputStream}, without disk I/O, and that the caller-owned
- * {@link RootAllocator} remains usable after the factory is closed.
- */
+/// Verifies [ArrowColumnReaderFactory] can consume a caller-managed [ArrowStreamReader]
+/// backed by a [ByteArrayInputStream], without disk I/O, and that the caller-owned
+/// [RootAllocator] remains usable after the factory is closed.
 public class ArrowColumnReaderFactoryTest {
 
   private static final int ROW_COUNT = 32;
@@ -72,8 +70,7 @@ public class ArrowColumnReaderFactoryTest {
 
       try (ArrowStreamReader streamReader = new ArrowStreamReader(
           Channels.newChannel(new ByteArrayInputStream(ipcBytes)), callerAllocator);
-          ArrowColumnReaderFactory factory =
-              new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
+          ArrowColumnReaderFactory factory = new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
 
         factory.init(newSchema());
 
@@ -115,8 +112,7 @@ public class ArrowColumnReaderFactoryTest {
 
       try (ArrowStreamReader streamReader = new ArrowStreamReader(
           Channels.newChannel(new ByteArrayInputStream(ipcBytes)), callerAllocator);
-          ArrowColumnReaderFactory factory =
-              new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
+          ArrowColumnReaderFactory factory = new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
 
         factory.init(newSchema());
 
@@ -137,10 +133,9 @@ public class ArrowColumnReaderFactoryTest {
 
       try (ArrowStreamReader streamReader = new ArrowStreamReader(
           Channels.newChannel(new ByteArrayInputStream(ipcBytes)), callerAllocator);
-          ArrowColumnReaderFactory factory =
-              new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
+          ArrowColumnReaderFactory factory = new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
 
-        factory.init(newSchema(), Collections.singleton("intCol"));
+        factory.init(newSchema(), Set.of("intCol"));
 
         // Only the requested column has a reader; the others fall back to null per the SPI.
         assertNotNull(factory.getColumnReader("intCol"));
@@ -151,13 +146,11 @@ public class ArrowColumnReaderFactoryTest {
     }
   }
 
-  /**
-   * A second {@code init()} on the same factory must release the first init's off-heap accumulator
-   * vectors rather than orphaning them. Without the re-init guard the first set leaks, and the
-   * caller-owned allocator throws {@code IllegalStateException} on its own {@code close()} because the
-   * outstanding buffers are still allocated — so reaching the end of the caller-allocator
-   * try-with-resources cleanly is the leak detector.
-   */
+  /// A second `init()` on the same factory must release the first init's off-heap accumulator
+  /// vectors rather than orphaning them. Without the re-init guard the first set leaks, and the
+  /// caller-owned allocator throws `IllegalStateException` on its own `close()` because the
+  /// outstanding buffers are still allocated — so reaching the end of the caller-allocator
+  /// try-with-resources cleanly is the leak detector.
   @Test
   public void testReInitReleasesPriorAccumulators()
       throws Exception {
@@ -166,8 +159,7 @@ public class ArrowColumnReaderFactoryTest {
 
       try (ArrowStreamReader streamReader = new ArrowStreamReader(
           Channels.newChannel(new ByteArrayInputStream(ipcBytes)), callerAllocator);
-          ArrowColumnReaderFactory factory =
-              new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
+          ArrowColumnReaderFactory factory = new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
 
         factory.init(newSchema());
         // Second init() over the same (now-drained) reader: it allocates a fresh accumulator set and
@@ -187,46 +179,11 @@ public class ArrowColumnReaderFactoryTest {
     }
   }
 
-  /**
-   * After the reader is drained, the sequential accessors ({@code next}, the typed {@code nextXxx},
-   * {@code isNextNull}, {@code skipNext}) must throw {@link IllegalStateException} rather than read out
-   * of bounds — matching the {@code DefaultValueColumnReader} / {@code PinotSegmentColumnReaderImpl}
-   * SPI contract ("No more values available").
-   */
-  @Test
-  public void testSequentialAccessorsThrowPastEnd()
-      throws Exception {
-    try (RootAllocator callerAllocator = new RootAllocator(Long.MAX_VALUE)) {
-      byte[] ipcBytes = writeArrowStreamFixture(callerAllocator);
-
-      try (ArrowStreamReader streamReader = new ArrowStreamReader(
-          Channels.newChannel(new ByteArrayInputStream(ipcBytes)), callerAllocator);
-          ArrowColumnReaderFactory factory =
-              new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
-
-        factory.init(newSchema());
-
-        try (ColumnReader intCol = factory.getColumnReader("intCol")) {
-          while (intCol.hasNext()) {
-            intCol.next();
-          }
-          assertFalse(intCol.hasNext());
-          assertThrows(IllegalStateException.class, intCol::next);
-          assertThrows(IllegalStateException.class, intCol::nextInt);
-          assertThrows(IllegalStateException.class, intCol::isNextNull);
-          assertThrows(IllegalStateException.class, intCol::skipNext);
-        }
-      }
-    }
-  }
-
-  /**
-   * Dictionary encoding is the standard Arrow representation for low-cardinality strings. The
-   * column-major path must DECODE it — surfacing the logical string values and the STRING type, not
-   * the underlying Int32 dictionary indices. Verifies the decode end-to-end through the factory and
-   * the resulting {@link ColumnReader} (both the typed {@code getString} and generic {@code getValue}
-   * accessors), and that the caller's allocator is left clean afterward.
-   */
+  /// Dictionary encoding is the standard Arrow representation for low-cardinality strings. The
+  /// column-major path must DECODE it — surfacing the logical string values and the STRING type, not
+  /// the underlying Int32 dictionary indices. Verifies the decode end-to-end through the factory and
+  /// the resulting [ColumnReader] (both the typed `getString` and generic `getValue`
+  /// accessors), and that the caller's allocator is left clean afterward.
   @Test
   public void testDecodesDictionaryEncodedStringColumn()
       throws Exception {
@@ -240,16 +197,14 @@ public class ArrowColumnReaderFactoryTest {
 
       try (ArrowStreamReader streamReader = new ArrowStreamReader(
           Channels.newChannel(new ByteArrayInputStream(ipcBytes)), callerAllocator);
-          ArrowColumnReaderFactory factory =
-              new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
-
+          ArrowColumnReaderFactory factory = new ArrowColumnReaderFactory(streamReader, callerAllocator)) {
         factory.init(dictColumnSchema());
 
         try (ColumnReader colorCol = factory.getColumnReader("color")) {
           assertNotNull(colorCol);
           assertEquals(colorCol.getTotalDocs(), rows.length);
           // Must report the DECODED logical type (STRING), not the Int32 index type.
-          assertTrue(colorCol.isString());
+          assertEquals(colorCol.getValueType(), PinotDataType.STRING);
           for (int i = 0; i < rows.length; i++) {
             assertEquals(colorCol.getString(i), rows[i], "decoded getString mismatch at doc " + i);
             assertEquals(colorCol.getValue(i), rows[i], "decoded getValue mismatch at doc " + i);
@@ -268,12 +223,10 @@ public class ArrowColumnReaderFactoryTest {
     }
   }
 
-  /**
-   * Writes a single-column ("color") Arrow IPC stream where the column is dictionary-encoded against
-   * {@code dictValues}, following the standard Arrow {@code encode → write with DictionaryProvider}
-   * pattern. The dictionary vector is owned here and closed; the encoded vector is owned by the
-   * VectorSchemaRoot.
-   */
+  /// Writes a single-column ("color") Arrow IPC stream where the column is dictionary-encoded against
+  /// `dictValues`, following the standard Arrow `encode → write with DictionaryProvider`
+  /// pattern. The dictionary vector is owned here and closed; the encoded vector is owned by the
+  /// VectorSchemaRoot.
   private byte[] writeDictionaryEncodedStringStream(RootAllocator allocator, String[] dictValues, String[] rows)
       throws IOException {
     DictionaryEncoding encoding = new DictionaryEncoding(1L, false, new ArrowType.Int(32, true));

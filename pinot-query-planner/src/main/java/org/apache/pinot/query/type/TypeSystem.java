@@ -25,24 +25,24 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 
 
-/**
- * The {@code TypeSystem} overwrites Calcite type system with Pinot specific logics.
- */
+/// The `TypeSystem` overwrites Calcite type system with Pinot specific logics.
 public class TypeSystem extends RelDataTypeSystemImpl {
   public static final TypeSystem INSTANCE = new TypeSystem();
 
   private static final int MAX_DECIMAL_SCALE = 1000;
   private static final int MAX_DECIMAL_PRECISION = 2000;
 
-  /**
-   * Default precision for derived arithmetic decimal types(plus/multiply/divide/mod). We won't allow the return
-   * precision to be larger than this value majorly due to the following reasons:
-   * <ul><li>1. Precision computation is very costly, it should be explicitly specified</li>
-   * <li>2. Work around the type hoist issue when doing de-correlation decimal type mismatch. See:
-   * <a href="https://github.com/apache/pinot/pull/11151">Derive SUM return type to be PostgreSQL compatible</a>
-   * for more details
-   * </li></ul>
-   */
+  // Pinot stores TIMESTAMP as epoch-millis (LONG), i.e. millisecond precision (3 fractional digits). This is also
+  // Calcite's MAX_DATETIME_PRECISION, so 3 is both the default and the max for TIMESTAMP and no clamping occurs.
+  private static final int TIMESTAMP_PRECISION_MILLIS = 3;
+
+  /// Default precision for derived arithmetic decimal types(plus/multiply/divide/mod). We won't allow the return
+  /// precision to be larger than this value majorly due to the following reasons:
+  ///
+  /// - 1. Precision computation is very costly, it should be explicitly specified
+  /// - 2. Work around the type hoist issue when doing de-correlation decimal type mismatch. See:
+  ///   [Derive SUM return type to be PostgreSQL compatible](https://github.com/apache/pinot/pull/11151)
+  ///   for more details
   private static final int DERIVED_DECIMAL_PRECISION = 19;
   private static final int DERIVED_DECIMAL_SCALE = 1;
 
@@ -84,7 +84,16 @@ public class TypeSystem extends RelDataTypeSystemImpl {
 
   @Override
   public int getDefaultPrecision(SqlTypeName typeName) {
-    return typeName == SqlTypeName.DECIMAL ? MAX_DECIMAL_PRECISION : super.getDefaultPrecision(typeName);
+    if (typeName == SqlTypeName.DECIMAL) {
+      return MAX_DECIMAL_PRECISION;
+    }
+    if (typeName == SqlTypeName.TIMESTAMP) {
+      // Calcite's default TIMESTAMP precision is 0 (whole seconds), which truncates sub-second epoch-millis literals
+      // during constant folding (RexBuilder.clean -> TimestampString.round). Pin it to millisecond precision so folded
+      // TIMESTAMP literals preserve millis and round-trip Pinot's LONG storage. See issue #18881.
+      return TIMESTAMP_PRECISION_MILLIS;
+    }
+    return super.getDefaultPrecision(typeName);
   }
 
   @Override

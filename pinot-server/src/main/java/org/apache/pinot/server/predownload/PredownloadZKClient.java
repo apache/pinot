@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.predownload;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,7 @@ import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.manager.zk.ZKHelixDataAccessor;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.model.CurrentState;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.store.zk.AutoFallbackPropertyStore;
@@ -47,10 +49,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class is to manage the ZK connection and operations. It will be used to fetch the segment
- * metadata from ZK and prepare for the downloading.
- */
+/// This class is to manage the ZK connection and operations. It will be used to fetch the segment
+/// metadata from ZK and prepare for the downloading.
 public class PredownloadZKClient implements AutoCloseable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PredownloadZKClient.class);
@@ -106,12 +106,10 @@ public class PredownloadZKClient implements AutoCloseable {
     return accessor.getProperty(keyBuilder.instanceConfig(_instanceName));
   }
 
-  /**
-   * Get the segments of the instance from ZK. Only fetch segments that are in ONLINE state from
-   * instance current state.
-   *
-   * @return List of segment info with table name and segment name.
-   */
+  /// Get the segments of the instance from ZK. Only fetch segments that are in ONLINE state from
+  /// instance current state.
+  ///
+  /// @return List of segment info with table name and segment name.
   public List<PredownloadSegmentInfo> getSegmentsOfInstance(HelixDataAccessor accessor) {
     List<PredownloadSegmentInfo> predownloadSegmentInfos = new ArrayList<>();
     org.apache.helix.PropertyKey.Builder keyBuilder = accessor.keyBuilder();
@@ -147,12 +145,53 @@ public class PredownloadZKClient implements AutoCloseable {
     return predownloadSegmentInfos;
   }
 
-  /**
-   * Update the segment deepstore metadata from ZK.
-   *
-   * @param predownloadSegmentInfoList List of segment info with table name and segment name.
-   * @param tableInfoMap               Map of table name to table info to be filled with table config.
-   */
+  /// Returns URIs of ONLINE peer servers hosting the given segment.
+  /// Uses ExternalView to discover peers — mirrors PeerServerSegmentFinder without requiring HelixManager.
+  public List<URI> getPeerServerURIs(HelixDataAccessor accessor, String tableNameWithType, String segmentName,
+      String downloadScheme) {
+    org.apache.helix.PropertyKey.Builder keyBuilder = accessor.keyBuilder();
+    ExternalView externalView = accessor.getProperty(keyBuilder.externalView(tableNameWithType));
+    if (externalView == null) {
+      LOGGER.warn("No external view for table: {} when finding peers for segment: {}", tableNameWithType, segmentName);
+      return new ArrayList<>();
+    }
+    Map<String, String> instanceStateMap = externalView.getStateMap(segmentName);
+    if (instanceStateMap == null) {
+      LOGGER.warn("Segment: {} not found in external view of table: {}", segmentName, tableNameWithType);
+      return new ArrayList<>();
+    }
+    String adminPortKey = CommonConstants.HTTP_PROTOCOL.equals(downloadScheme)
+        ? CommonConstants.Helix.Instance.ADMIN_PORT_KEY
+        : CommonConstants.Helix.Instance.ADMIN_HTTPS_PORT_KEY;
+    List<URI> peerURIs = new ArrayList<>();
+    for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
+      String instanceId = entry.getKey();
+      if (!CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE.equals(entry.getValue())) {
+        continue;
+      }
+      InstanceConfig instanceConfig = accessor.getProperty(keyBuilder.instanceConfig(instanceId));
+      if (instanceConfig == null) {
+        LOGGER.warn("Failed to get instance config for peer: {}", instanceId);
+        continue;
+      }
+      String hostName = instanceConfig.getHostName();
+      int port = instanceConfig.getRecord()
+          .getIntField(adminPortKey, CommonConstants.Server.DEFAULT_ADMIN_API_PORT);
+      try {
+        peerURIs.add(new URI(
+            String.format("%s://%s:%d/segments/%s/%s",
+                downloadScheme, hostName, port, tableNameWithType, segmentName)));
+      } catch (Exception e) {
+        LOGGER.warn("Failed to construct peer URI for instance: {}", instanceId, e);
+      }
+    }
+    return peerURIs;
+  }
+
+  /// Update the segment deepstore metadata from ZK.
+  ///
+  /// @param predownloadSegmentInfoList List of segment info with table name and segment name.
+  /// @param tableInfoMap               Map of table name to table info to be filled with table config.
   public void updateSegmentMetadata(List<PredownloadSegmentInfo> predownloadSegmentInfoList,
       Map<String, PredownloadTableInfo> tableInfoMap, InstanceDataManagerConfig instanceDataManagerConfig) {
     // fallback path comes from ZKHelixManager.class getHelixPropertyStore method

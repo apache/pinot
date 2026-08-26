@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.realtime;
 
-import java.util.Collections;
 import java.util.Map;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -56,7 +55,7 @@ public class SegmentCompletionFSMFactoryTest {
 
   @Test
   public void testCreateFSMWithDefaultFsm() {
-    PinotConfiguration pinotConfiguration = new PinotConfiguration(Collections.emptyMap());
+    PinotConfiguration pinotConfiguration = new PinotConfiguration(Map.of());
     SegmentCompletionConfig segmentCompletionConfig = new SegmentCompletionConfig(pinotConfiguration);
     SegmentCompletionFSMFactory.init(segmentCompletionConfig);
 

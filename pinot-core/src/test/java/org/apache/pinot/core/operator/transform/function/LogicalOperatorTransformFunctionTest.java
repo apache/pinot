@@ -36,12 +36,9 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * LogicalOperatorTransformFunctionTest abstracts common test methods for:
- *     AndTransformFunctionTest
- *     OrTransformFunctionTest
- *
- */
+/// LogicalOperatorTransformFunctionTest abstracts common test methods for:
+///     AndTransformFunctionTest
+///     OrTransformFunctionTest
 public abstract class LogicalOperatorTransformFunctionTest extends BaseTransformFunctionTest {
 
   abstract boolean getExpectedValue(boolean left, boolean right);

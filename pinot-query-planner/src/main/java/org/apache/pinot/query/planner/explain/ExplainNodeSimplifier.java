@@ -20,7 +20,6 @@ package org.apache.pinot.query.planner.explain;
 
 import com.google.common.base.CaseFormat;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.proto.Plan;
@@ -45,25 +44,22 @@ import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
-/**
- * Simplifies combine explain nodes from different segments.
- *
- * In order to be considered simplifiable, a node must be:
- * <ol>
- *   <li>A {@link ExplainedNode} </li>
- *   <li>Its title must contain the text {@code Combine}</li>
- * </ol>
- *
- * The simplification process groups the inputs of the node by merging the ones that describe an equivalent plan and
- * wraps each resulting group in an {@code Alternative} node annotated with the number of segments that fall into it.
- * Inputs that can all be merged collapse into a single {@code Alternative}; inputs that cannot be merged (for example
- * because some segments use an index while others do not) produce one {@code Alternative} per distinct plan.
- *
- * Every group is wrapped, even when there is a single one, so that the {@code segments} counts compose correctly when
- * the plans of several servers are later merged (a server whose segments are all uniform still contributes an
- * {@code Alternative} that folds into the matching group of a server with divergent segments). The redundant single
- * {@code Alternative} wrappers are removed once all servers have been merged via {@link #removeRedundantAlternatives}.
- */
+/// Simplifies combine explain nodes from different segments.
+///
+/// In order to be considered simplifiable, a node must be:
+///
+/// 1. A [ExplainedNode]
+/// 2. Its title must contain the text `Combine`
+///
+/// The simplification process groups the inputs of the node by merging the ones that describe an equivalent plan and
+/// wraps each resulting group in an `Alternative` node annotated with the number of segments that fall into it.
+/// Inputs that can all be merged collapse into a single `Alternative`; inputs that cannot be merged (for example
+/// because some segments use an index while others do not) produce one `Alternative` per distinct plan.
+///
+/// Every group is wrapped, even when there is a single one, so that the `segments` counts compose correctly when
+/// the plans of several servers are later merged (a server whose segments are all uniform still contributes an
+/// `Alternative` that folds into the matching group of a server with divergent segments). The redundant single
+/// `Alternative` wrappers are removed once all servers have been merged via [#removeRedundantAlternatives].
 public class ExplainNodeSimplifier {
   public static final String COMBINE
       = CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, ExplainPlanDataTableReducer.COMBINE);
@@ -132,6 +128,7 @@ public class ExplainNodeSimplifier {
       return defaultNode(node);
     }
 
+    @Deprecated(forRemoval = true, since = "1.6.0")
     @Override
     public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Void context) {
       return defaultNode(node);
@@ -226,7 +223,7 @@ public class ExplainNodeSimplifier {
         Map<String, Plan.ExplainNode.AttributeValue> attributes =
             new ExplainAttributeBuilder().putLong(SEGMENTS_ATTRIBUTE, segmentCounts.get(i)).build();
         alternatives.add(new ExplainedNode(node.getStageId(), group.getDataSchema(), null,
-            Collections.singletonList(group), ALTERNATIVE, attributes));
+            List.of(group), ALTERNATIVE, attributes));
       }
       return node.withInputs(alternatives);
     }

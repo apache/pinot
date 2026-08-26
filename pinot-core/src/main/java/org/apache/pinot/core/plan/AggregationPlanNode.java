@@ -20,7 +20,9 @@ package org.apache.pinot.core.plan;
 
 import java.util.EnumSet;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
@@ -29,6 +31,7 @@ import org.apache.pinot.core.operator.query.EmptyAggregationOperator;
 import org.apache.pinot.core.operator.query.FastFilteredCountOperator;
 import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
+import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.AggregationInfo;
@@ -37,15 +40,15 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.spi.data.Schema;
 
 import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
 
 
-/**
- * The <code>AggregationPlanNode</code> class provides the execution plan for aggregation only query on a single
- * segment.
- */
+/// The `AggregationPlanNode` class provides the execution plan for aggregation only query on a single
+/// segment.
 @SuppressWarnings("rawtypes")
 public class AggregationPlanNode implements PlanNode {
   private static final EnumSet<AggregationFunctionType> DICTIONARY_BASED_FUNCTIONS =
@@ -61,6 +64,12 @@ public class AggregationPlanNode implements PlanNode {
   // https://github.com/apache/pinot/pull/16983)
   private static final EnumSet<AggregationFunctionType> METADATA_BASED_FUNCTIONS =
       EnumSet.of(COUNT, MIN, MINMV, MINLONG, MAX, MAXMV, MAXLONG, MINMAXRANGE, MINMAXRANGEMV);
+
+  // MIN/MAX/MINMAXRANGE derive their result numerically from the column min/max, so they can only be resolved from
+  // metadata/dictionary for numeric columns. Non-numeric columns (e.g. BYTES) store min/max as raw values that cannot
+  // be parsed as numbers.
+  private static final EnumSet<AggregationFunctionType> NUMERIC_METADATA_FUNCTIONS =
+      EnumSet.of(MIN, MINMV, MINLONG, MAX, MAXMV, MAXLONG, MINMAXRANGE, MINMAXRANGEMV);
 
   private final IndexSegment _indexSegment;
   private final SegmentContext _segmentContext;
@@ -83,20 +92,16 @@ public class AggregationPlanNode implements PlanNode {
     return _queryContext.hasFilteredAggregations() ? buildFilteredAggOperator() : buildNonFilteredAggOperator();
   }
 
-  /**
-   * Build the operator to be used for filtered aggregations
-   */
+  /// Build the operator to be used for filtered aggregations
   private FilteredAggregationOperator buildFilteredAggOperator() {
     return new FilteredAggregationOperator(_queryContext,
         AggregationFunctionUtils.buildFilteredAggregationInfos(_segmentContext, _queryContext),
         _indexSegment.getSegmentMetadata().getTotalDocs());
   }
 
-  /**
-   * Processing workhorse for non filtered aggregates. Note that this code path is invoked only
-   * if the query has no filtered aggregates at all. If a query has mixed aggregates, filtered
-   * aggregates code will be invoked
-   */
+  /// Processing workhorse for non filtered aggregates. Note that this code path is invoked only
+  /// if the query has no filtered aggregates at all. If a query has mixed aggregates, filtered
+  /// aggregates code will be invoked
   public Operator<AggregationResultsBlock> buildNonFilteredAggOperator() {
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
     assert aggregationFunctions != null;
@@ -115,17 +120,41 @@ public class AggregationPlanNode implements PlanNode {
 
     boolean hasNullValues = _queryContext.isNullHandlingEnabled() && hasNullValues(aggregationFunctions);
     if (!hasNullValues) {
-      // Priority 2: Check if non-scan based aggregation is feasible
-      if (filterOperator.isResultMatchingAll() && isFitForNonScanBasedPlan()) {
+      // when the filter matches all documents, resolve as many functions as possible from the column
+      // dictionary/metadata without scanning the segment. Eligibility is evaluated once per function here
+      // and reused for both the fully non-scan path (all functions resolvable) and
+      // the partial path (some functions resolvable).
+      if (filterOperator.isResultMatchingAll()) {
+        boolean[] nonScanResolvable = new boolean[aggregationFunctions.length];
         DataSource[] dataSources = new DataSource[aggregationFunctions.length];
+        int numResolved = 0;
         for (int i = 0; i < aggregationFunctions.length; i++) {
-          List<?> inputExpressions = aggregationFunctions[i].getInputExpressions();
-          if (!inputExpressions.isEmpty()) {
-            String column = ((ExpressionContext) inputExpressions.get(0)).getIdentifier();
-            dataSources[i] = _indexSegment.getDataSource(column, _queryContext.getSchema());
+          DataSource dataSource = getDataSourceForAggregationFunction(aggregationFunctions[i]);
+          if (isFitForNonScanBasedPlan(aggregationFunctions[i], dataSource)) {
+            nonScanResolvable[i] = true;
+            dataSources[i] = dataSource;
+            numResolved++;
           }
         }
-        return new NonScanBasedAggregationOperator(_queryContext, dataSources, numTotalDocs);
+
+        if (numResolved == aggregationFunctions.length) {
+          // Priority 2: all functions can be resolved from dictionary/metadata -> fully non-scan based execution
+          return new NonScanBasedAggregationOperator(_queryContext, dataSources, numTotalDocs);
+        }
+        if (numResolved > 0) {
+          // Some functions are resolved from dictionary/metadata; the rest are scanned by the AggregationOperator.
+          // Project only the scanned functions' columns so a column that is resolved by metadata is not counted as
+          // scanned (keeps it out of numEntriesScannedPostFilter).
+          AggregationFunction[] scannedFunctions = new AggregationFunction[aggregationFunctions.length - numResolved];
+          for (int i = 0, j = 0; i < aggregationFunctions.length; i++) {
+            if (!nonScanResolvable[i]) {
+              scannedFunctions[j++] = aggregationFunctions[i];
+            }
+          }
+          aggregationInfo = AggregationFunctionUtils.buildAggregationInfoWithoutStarTree(_segmentContext, _queryContext,
+              aggregationFunctions, scannedFunctions, filterOperator);
+          return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs, nonScanResolvable, dataSources);
+        }
       }
 
       // Priority 3: Check if fast filtered count can be used
@@ -140,13 +169,11 @@ public class AggregationPlanNode implements PlanNode {
     return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs);
   }
 
-  /**
-   * Returns {@code true} if any of the aggregation functions have null values, {@code false} otherwise.
-   *
-   * The current implementation is pessimistic and returns {@code true} if any of the arguments to the aggregation
-   * functions is of function type. This is because we do not have a way to determine if the function will return null
-   * values without actually evaluating it.
-   */
+  /// Returns `true` if any of the aggregation functions have null values, `false` otherwise.
+  ///
+  /// The current implementation is pessimistic and returns `true` if any of the arguments to the aggregation
+  /// functions is of function type. This is because we do not have a way to determine if the function will return null
+  /// values without actually evaluating it.
   private boolean hasNullValues(AggregationFunction[] aggregationFunctions) {
     for (AggregationFunction<?, ?> aggregationFunction : aggregationFunctions) {
       for (ExpressionContext argument : aggregationFunction.getInputExpressions()) {
@@ -164,6 +191,15 @@ public class AggregationPlanNode implements PlanNode {
             }
             break;
           case FUNCTION:
+            DataSource resolvedDs = resolveDataSource(argument);
+            if (resolvedDs == null) {
+              return true;
+            }
+            NullValueVectorReader resolvedNullVector = resolvedDs.getNullValueVector();
+            if (resolvedNullVector != null && !resolvedNullVector.getNullBitmap().isEmpty()) {
+              return true;
+            }
+            break;
           default:
             return true;
         }
@@ -172,41 +208,112 @@ public class AggregationPlanNode implements PlanNode {
     return false;
   }
 
-  /**
-   * Returns {@code true} if the given aggregations can be solved with dictionary or column metadata, {@code false}
-   * otherwise.
-   */
-  private boolean isFitForNonScanBasedPlan() {
-    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
-    assert aggregationFunctions != null;
-    for (AggregationFunction<?, ?> aggregationFunction : aggregationFunctions) {
-      if (aggregationFunction.getType() == COUNT) {
-        continue;
-      }
-      ExpressionContext argument = aggregationFunction.getInputExpressions().get(0);
-      if (argument.getType() != ExpressionContext.Type.IDENTIFIER) {
-        return false;
-      }
-      DataSource dataSource = _indexSegment.getDataSource(argument.getIdentifier(), _queryContext.getSchema());
-      if (DICTIONARY_BASED_FUNCTIONS.contains(aggregationFunction.getType())) {
-        if (dataSource.getDictionary() != null) {
-          continue;
-        }
-      }
-      if (METADATA_BASED_FUNCTIONS.contains(aggregationFunction.getType())) {
-        if (dataSource.getDataSourceMetadata().getMaxValue() != null
-            && dataSource.getDataSourceMetadata().getMinValue() != null) {
-          continue;
-        }
-      }
+  /// Returns {@code true} if the given aggregation function can be resolved from the column dictionary or metadata
+  /// (without scanning the segment), {@code false} otherwise. {@code COUNT} is always eligible. Functions whose result
+  /// is derived numerically from the column min/max (e.g. MIN, MAX, MINMAXRANGE) are only eligible for numeric columns,
+  /// since non-numeric columns (e.g. BYTES) store min/max as raw values that cannot be parsed as numbers.
+  ///
+  /// @param aggregationFunction aggregation function to test
+  /// @param dataSource the function argument's data source (see {@link #getDataSourceForAggregationFunction})
+  private boolean isFitForNonScanBasedPlan(AggregationFunction<?, ?> aggregationFunction,
+      @Nullable DataSource dataSource) {
+    AggregationFunctionType functionType = aggregationFunction.getType();
+    if (functionType == COUNT) {
+      return true;
+    }
+
+    if (dataSource == null) {
+      // Aggregation function does not have a single identifier argument (e.g. SUM(1)),
+      // so it cannot be resolved from metadata
       return false;
     }
-    return true;
+
+    // MIN/MAX/MINMAXRANGE derive their result numerically from the column min/max, which is only valid for numeric
+    // columns. Non-numeric columns (e.g. BYTES) store min/max as raw values that cannot be parsed as numbers.
+    if (NUMERIC_METADATA_FUNCTIONS.contains(functionType)
+        && !dataSource.getDataSourceMetadata().getDataType().getStoredType().isNumeric()) {
+      return false;
+    }
+
+    if (dataSource.getDictionary() != null && DICTIONARY_BASED_FUNCTIONS.contains(functionType)) {
+      return true;
+    }
+
+    return METADATA_BASED_FUNCTIONS.contains(functionType)
+        && dataSource.getDataSourceMetadata().getMaxValue() != null
+        && dataSource.getDataSourceMetadata().getMinValue() != null;
   }
 
   private static boolean canOptimizeFilteredCount(BaseFilterOperator filterOperator,
       AggregationFunction[] aggregationFunctions) {
     return (aggregationFunctions.length == 1 && aggregationFunctions[0].getType() == COUNT)
         && filterOperator.canOptimizeCount();
+  }
+
+  /// Returns the data source for the given aggregation function's argument, or {@code null} if the function has no
+  /// argument (e.g. {@code COUNT(*)}) or its argument cannot be resolved to a single column-like data source (e.g.
+  /// {@code COUNT(1)} or an arbitrary transform expression), in which case it cannot be resolved from
+  /// dictionary/metadata. An `item(mapColumn, 'key')` argument resolves to the per-key data source when the column
+  /// materializes that key.
+  ///
+  /// @param aggregationFunction aggregation function whose argument data source is resolved
+  /// @return the argument's data source, or {@code null} if it cannot be resolved
+  @Nullable
+  private DataSource getDataSourceForAggregationFunction(AggregationFunction<?, ?> aggregationFunction) {
+    List<ExpressionContext> inputExpressions = aggregationFunction.getInputExpressions();
+    if (!inputExpressions.isEmpty()) {
+      return resolveDataSource(inputExpressions.get(0));
+    }
+
+    return null;
+  }
+
+  @Nullable
+  private DataSource resolveDataSource(ExpressionContext expression) {
+    return resolveDataSource(expression, _indexSegment, _queryContext.getSchema());
+  }
+
+  @Nullable
+  static DataSource resolveDataSource(ExpressionContext expression, IndexSegment segment,
+      @Nullable Schema schema) {
+    if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
+      return segment.getDataSource(expression.getIdentifier(), schema);
+    }
+    if (expression.getType() == ExpressionContext.Type.FUNCTION) {
+      return tryResolveKeyedDataSource(expression, segment, schema);
+    }
+    return null;
+  }
+
+  @Nullable
+  static DataSource tryResolveKeyedDataSource(ExpressionContext expression, IndexSegment segment,
+      @Nullable Schema schema) {
+    FunctionContext function = expression.getFunction();
+    if (function == null
+        || !ItemTransformFunction.FUNCTION_NAME.equals(function.getFunctionName())) {
+      return null;
+    }
+    List<ExpressionContext> args = function.getArguments();
+    if (args.size() != 2
+        || args.get(0).getType() != ExpressionContext.Type.IDENTIFIER
+        || args.get(1).getType() != ExpressionContext.Type.LITERAL) {
+      return null;
+    }
+    String columnName = args.get(0).getIdentifier();
+    String key = args.get(1).getLiteral().getStringValue();
+    DataSource columnDs = segment.getDataSource(columnName, schema);
+    if (columnDs instanceof OpenStructDataSource) {
+      OpenStructDataSource osDs = (OpenStructDataSource) columnDs;
+      DataSource keyDs = osDs.isMaterialized(key) ? osDs.getDataSource(key) : null;
+      if (keyDs == null) {
+        return null;
+      }
+      // A consuming key column's dictionary can contain a phantom entry (the reserved default,
+      // never observed in any doc); dictionary-based aggregation over it would diverge from the
+      // sealed segment. The segment layer owns that invariant — force the scan path when the
+      // dictionary is not exact.
+      return osDs.isKeyDictionaryExact(key) ? keyDs : null;
+    }
+    return null;
   }
 }

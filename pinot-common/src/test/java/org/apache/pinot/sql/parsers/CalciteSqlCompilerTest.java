@@ -24,7 +24,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -35,6 +34,7 @@ import org.apache.pinot.common.request.JoinType;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.ParseException;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
@@ -43,9 +43,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Some tests for the SQL compiler.
- */
+/// Some tests for the SQL compiler.
 public class CalciteSqlCompilerTest {
   private static final long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
 
@@ -492,13 +490,13 @@ public class CalciteSqlCompilerTest {
   public void testFilterClausesWithRightExpression() {
     PinotQuery pinotQuery = compileToPinotQuery("select * from vegetables where a > b");
     Function func = pinotQuery.getFilterExpression().getFunctionCall();
-    Assert.assertEquals(func.getOperator(), FilterKind.GREATER_THAN.name());
-    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperator(), "minus");
+    Assert.assertEquals(func.getOperator(), FilterKind.EQUALS.name());
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperator(), "greater_than");
     Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
         "a");
     Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(),
         "b");
-    Assert.assertEquals(func.getOperands().get(1).getLiteral().getIntValue(), 0);
+    Assert.assertTrue(func.getOperands().get(1).getLiteral().getBoolValue());
     pinotQuery = compileToPinotQuery("select * from vegetables where 0 < a-b");
     func = pinotQuery.getFilterExpression().getFunctionCall();
     Assert.assertEquals(func.getOperator(), FilterKind.GREATER_THAN.name());
@@ -511,8 +509,8 @@ public class CalciteSqlCompilerTest {
 
     pinotQuery = compileToPinotQuery("select * from vegetables where b < 100 + c");
     func = pinotQuery.getFilterExpression().getFunctionCall();
-    Assert.assertEquals(func.getOperator(), FilterKind.LESS_THAN.name());
-    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperator(), "minus");
+    Assert.assertEquals(func.getOperator(), FilterKind.EQUALS.name());
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperator(), "less_than");
     Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
         "b");
     Assert.assertEquals(
@@ -523,7 +521,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(
         func.getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(1)
             .getIdentifier().getName(), "c");
-    Assert.assertEquals(func.getOperands().get(1).getLiteral().getIntValue(), 0);
+    Assert.assertTrue(func.getOperands().get(1).getLiteral().getBoolValue());
     pinotQuery = compileToPinotQuery("select * from vegetables where b -(100+c)< 0");
     func = pinotQuery.getFilterExpression().getFunctionCall();
     Assert.assertEquals(func.getOperator(), FilterKind.LESS_THAN.name());
@@ -542,8 +540,8 @@ public class CalciteSqlCompilerTest {
 
     pinotQuery = compileToPinotQuery("select * from vegetables where foo1(bar1(a-b)) <= foo2(bar2(c+d))");
     func = pinotQuery.getFilterExpression().getFunctionCall();
-    Assert.assertEquals(func.getOperator(), FilterKind.LESS_THAN_OR_EQUAL.name());
-    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperator(), "minus");
+    Assert.assertEquals(func.getOperator(), FilterKind.EQUALS.name());
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperator(), "less_than_or_equal");
     Assert.assertEquals(
         func.getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "foo1");
     Assert.assertEquals(
@@ -576,7 +574,7 @@ public class CalciteSqlCompilerTest {
         func.getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0)
             .getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(),
         "d");
-    Assert.assertEquals(func.getOperands().get(1).getLiteral().getIntValue(), 0);
+    Assert.assertTrue(func.getOperands().get(1).getLiteral().getBoolValue());
     pinotQuery = compileToPinotQuery("select * from vegetables where foo1(bar1(a-b)) - foo2(bar2(c+d)) <= 0");
     func = pinotQuery.getFilterExpression().getFunctionCall();
     Assert.assertEquals(func.getOperator(), FilterKind.LESS_THAN_OR_EQUAL.name());
@@ -1901,10 +1899,8 @@ public class CalciteSqlCompilerTest {
             .getLiteral().getIntValue(), 5);
   }
 
-  /**
-   * SqlConformanceLevel BABEL allows most reserved keywords in the query.
-   * Some exceptions are time related keywords (date, timestamp, time), table, group, which need to be escaped
-   */
+  /// SqlConformanceLevel BABEL allows most reserved keywords in the query.
+  /// Some exceptions are time related keywords (date, timestamp, time), table, group, which need to be escaped
   @Test
   public void testReservedKeywords() {
 
@@ -3135,16 +3131,16 @@ public class CalciteSqlCompilerTest {
       }
     }
     {
-      // Having will be rewritten to (SUM(col1) + SUM(col3)) - MAX(col4) > 0
+      // Having will be rewritten to greaterThan(SUM(col1) + SUM(col3), MAX(col4)) = true
       String query = "SELECT SUM(col1), col2 FROM foo GROUP BY col2 HAVING SUM(col1) + SUM(col3) > MAX(col4)";
       PinotQuery pinotQuery = compileToPinotQuery(query);
       Function functionCall = pinotQuery.getHavingExpression().getFunctionCall();
-      Assert.assertEquals(functionCall.getOperator(), FilterKind.GREATER_THAN.name());
+      Assert.assertEquals(functionCall.getOperator(), FilterKind.EQUALS.name());
       List<Expression> operands = functionCall.getOperands();
       Assert.assertEquals(operands.size(), 2);
-      Assert.assertEquals(operands.get(1).getLiteral().getIntValue(), 0);
+      Assert.assertTrue(operands.get(1).getLiteral().getBoolValue());
       functionCall = operands.get(0).getFunctionCall();
-      Assert.assertEquals(functionCall.getOperator(), "minus");
+      Assert.assertEquals(functionCall.getOperator(), "greater_than");
       operands = functionCall.getOperands();
       Assert.assertEquals(operands.size(), 2);
       Assert.assertEquals(operands.get(1).getFunctionCall().getOperator(), "max");
@@ -3203,10 +3199,8 @@ public class CalciteSqlCompilerTest {
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getIntValue(), 1);
   }
 
-  /**
-   * This test ensures that Calcite {@link SqlNumericLiteral#isInteger()} does not throw NPE. The issue has been fixed
-   * in Calcite through CALCITE-4199 (https://issues.apache.org/jira/browse/CALCITE-4199).
-   */
+  /// This test ensures that Calcite [org.apache.calcite.sql.SqlNumericLiteral#isInteger()] does not throw NPE.
+  /// The issue has been fixed in Calcite through CALCITE-4199 (https://issues.apache.org/jira/browse/CALCITE-4199).
   @Test
   public void testSqlNumericalLiteralIntegerNPE() {
     CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM testTable WHERE floatColumn > " + Double.MAX_VALUE);
@@ -3334,6 +3328,19 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
+  public void testQuotedTypedTableNameRoundTrip() {
+    List<String> tableNamesWithType = List.of(
+        "events_OFFLINE",
+        "analytics.events_REALTIME",
+        "db\"name.events\";DROP_TABLE--_OFFLINE");
+    for (String tableNameWithType : tableNamesWithType) {
+      PinotQuery pinotQuery = compileToPinotQuery(
+          "SELECT * FROM " + TableNameBuilder.quoteTableNameWithType(tableNameWithType));
+      Assert.assertEquals(pinotQuery.getDataSource().getTableName(), tableNameWithType);
+    }
+  }
+
+  @Test
   public void testInvalidQueryWithSemicolon() {
     Assert.expectThrows(SqlCompilationException.class, () -> compileToPinotQuery(";"));
 
@@ -3363,9 +3370,7 @@ public class CalciteSqlCompilerTest {
         () -> compileToPinotQuery("SELECT UPPER(col1), avg(col2) from foo"));
   }
 
-  /**
-   * Test for customized components in src/main/codegen/parserImpls.ftl file.
-   */
+  /// Test for customized components in src/main/codegen/parserImpls.ftl file.
   @Test
   public void testParserExtensionImpl() {
     String customSql = "INSERT INTO db.tbl FROM FILE 'file:///tmp/file1', FILE 'file:///tmp/file2'";

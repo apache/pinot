@@ -213,7 +213,9 @@ com.dynatrace.hash4j:hash4j:0.30.0
 com.fasterxml.jackson.core:jackson-annotations:2.21
 com.fasterxml.jackson.core:jackson-core:2.21.1
 com.fasterxml.jackson.core:jackson-databind:2.21.1
+com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.21.1
 com.fasterxml.jackson.dataformat:jackson-dataformat-csv:2.21.1
+com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.21.1
 com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.21.1
 com.fasterxml.jackson.datatype:jackson-datatype-guava:2.21.1
 com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.21.1
@@ -423,8 +425,7 @@ org.apache.commons:commons-text:1.15.0
 org.apache.curator:curator-client:5.9.0
 org.apache.curator:curator-framework:5.9.0
 org.apache.curator:curator-recipes:5.9.0
-org.apache.datasketches:datasketches-java:6.2.0
-org.apache.datasketches:datasketches-memory:3.0.2
+org.apache.datasketches:datasketches-java:9.0.0
 org.apache.hadoop.thirdparty:hadoop-shaded-guava:1.5.0
 org.apache.hadoop.thirdparty:hadoop-shaded-protobuf_3_25:1.5.0
 org.apache.hadoop:hadoop-annotations:3.4.3
@@ -531,6 +532,7 @@ org.jooq:joou-java-6:0.9.5
 org.jspecify:jspecify:1.0.0
 org.locationtech.proj4j:proj4j:1.2.2
 org.lz4:lz4-java:1.8.0
+org.mongodb:bson:5.6.1
 org.quartz-scheduler:quartz:2.5.2
 org.roaringbitmap:RoaringBitmap:1.6.12
 org.scala-lang.modules:scala-collection-compat_2.13:2.10.0

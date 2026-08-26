@@ -37,11 +37,9 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * A static implementation that works with pre-loaded table configs and schemas.
- * This is useful for validation scenarios where you want to test query compilation against a specific
- * set of table configs and schemas without needing a live cluster.
- */
+/// A static implementation that works with pre-loaded table configs and schemas.
+/// This is useful for validation scenarios where you want to test query compilation against a specific
+/// set of table configs and schemas without needing a live cluster.
 public class StaticTableCache implements TableCache {
   private static final Logger LOGGER = LoggerFactory.getLogger(StaticTableCache.class);
 
@@ -155,7 +153,7 @@ public class StaticTableCache implements TableCache {
   @Override
   public Map<String, String> getColumnNameMap(String rawTableName) {
     SchemaInfo schemaInfo = _schemaInfoMap.get(rawTableName);
-    return schemaInfo != null ? schemaInfo._columnNameMap : Collections.emptyMap();
+    return schemaInfo != null ? schemaInfo._columnNameMap : Map.of();
   }
 
   @Nullable

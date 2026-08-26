@@ -29,6 +29,7 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.segment.index.readers.bloom.GuavaBloomFilterReaderUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -40,9 +41,7 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
-/**
- * The {@code ValueBasedSegmentPruner} prunes segments based on values inside the filter and segment metadata and data.
- */
+/// The `ValueBasedSegmentPruner` prunes segments based on values inside the filter and segment metadata and data.
 @SuppressWarnings({"rawtypes", "unchecked"})
 abstract public class ValueBasedSegmentPruner implements SegmentPruner {
   public static final String IN_PREDICATE_THRESHOLD = "inpredicate.threshold";
@@ -59,22 +58,20 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
     if (query.getFilter() == null) {
       return false;
     }
-    return isApplicableToFilter(query.getFilter());
+    return isApplicableToFilter(query.getFilter(), query.getQueryOptions());
   }
 
-  /**
-   * 1. NOT is not applicable for segment pruning;
-   * 2. For OR, if one of the child filter is not applicable for pruning, the parent filter is not applicable;
-   * 3. For AND, if one of the child filter is applicable for pruning, the parent filter is applicable, but it
-   *    doesn't mean this child filter can prune the segment.
-   * 4. The specific pruners decide their own applicable predicate types.
-   */
-  private boolean isApplicableToFilter(FilterContext filter) {
+  /// 1. NOT is not applicable for segment pruning;
+  /// 2. For OR, if one of the child filter is not applicable for pruning, the parent filter is not applicable;
+  /// 3. For AND, if one of the child filter is applicable for pruning, the parent filter is applicable, but it
+  ///    doesn't mean this child filter can prune the segment.
+  /// 4. The specific pruners decide their own applicable predicate types.
+  private boolean isApplicableToFilter(FilterContext filter, Map<String, String> queryOptions) {
     switch (filter.getType()) {
       case AND:
         assert filter.getChildren() != null;
         for (FilterContext child : filter.getChildren()) {
-          if (isApplicableToFilter(child)) {
+          if (isApplicableToFilter(child, queryOptions)) {
             return true;
           }
         }
@@ -82,7 +79,7 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
       case OR:
         assert filter.getChildren() != null;
         for (FilterContext child : filter.getChildren()) {
-          if (!isApplicableToFilter(child)) {
+          if (!isApplicableToFilter(child, queryOptions)) {
             return false;
           }
         }
@@ -91,13 +88,25 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
         // Do not prune NOT filter
         return false;
       case PREDICATE:
-        return isApplicableToPredicate(filter.getPredicate());
+        return isApplicableToPredicate(filter.getPredicate(), queryOptions);
       default:
         throw new IllegalStateException();
     }
   }
 
-  abstract boolean isApplicableToPredicate(Predicate predicate);
+  /// Returns whether IN-pruning should run. Negative threshold means always prune.
+  protected boolean shouldPruneInPredicate(int numValues, Map<String, String> queryOptions) {
+    int threshold = getEffectiveInPredicateThreshold(queryOptions);
+    return threshold < 0 || numValues <= threshold;
+  }
+
+  /// Returns the query override when set, otherwise the server threshold.
+  protected int getEffectiveInPredicateThreshold(Map<String, String> queryOptions) {
+    Integer threshold = QueryOptionsUtils.getInPredicatePruningThreshold(queryOptions);
+    return threshold != null ? threshold : _inPredicateThreshold;
+  }
+
+  abstract boolean isApplicableToPredicate(Predicate predicate, Map<String, String> queryOptions);
 
   @Override
   public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {

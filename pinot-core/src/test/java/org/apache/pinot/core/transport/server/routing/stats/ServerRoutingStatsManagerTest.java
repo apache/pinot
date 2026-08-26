@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.transport.server.routing.stats;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,7 +56,7 @@ public class ServerRoutingStatsManagerTest {
             CommonConstants.Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS),
         brokerConfig.getProperty(
             CommonConstants.Broker.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS,
-            Collections.emptyList()));
+            List.of()));
     _brokerMetrics.initializeGlobalMeters();
     BrokerMetrics.register(_brokerMetrics);
   }
@@ -581,7 +580,7 @@ public class ServerRoutingStatsManagerTest {
     // Key removed from cluster config — must fall back to the static broker config value (100000L).
     manager.onChange(
         Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS),
-        Collections.emptyMap());
+        Map.of());
     assertEquals(manager.getStatsMetricExportIntervalMs(), 100000L,
         "Interval must revert to static config when cluster key is removed");
 

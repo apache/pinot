@@ -32,10 +32,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The <code>LiteralTransformFunction</code> class is a special transform function which is a wrapper on top of a
- * LITERAL. The data type is inferred from the literal string.
- */
+/// The `LiteralTransformFunction` class is a special transform function which is a wrapper on top of a
+/// LITERAL. The data type is inferred from the literal string.
 // TODO: Support BIG_DECIMAL literal type, then implement transformToBigDecimalValuesMV.
 public class ArrayLiteralTransformFunction implements TransformFunction {
   public static final String FUNCTION_NAME = "arrayValueConstructor";
@@ -47,6 +45,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
   private final float[] _floatArrayLiteral;
   private final double[] _doubleArrayLiteral;
   private final String[] _stringArrayLiteral;
+  private final byte[][] _bytesArrayLiteral;
 
   // NOTE:
   // This class can be shared across multiple threads, and the result arrays are lazily initialized and cached. They
@@ -57,6 +56,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
   private volatile float[][] _floatArrayResult;
   private volatile double[][] _doubleArrayResult;
   private volatile String[][] _stringArrayResult;
+  private volatile byte[][][] _bytesArrayResult;
 
   public ArrayLiteralTransformFunction(LiteralContext literalContext) {
     _dataType = literalContext.getType();
@@ -67,6 +67,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       _floatArrayLiteral = new float[0];
       _doubleArrayLiteral = new double[0];
       _stringArrayLiteral = new String[0];
+      _bytesArrayLiteral = new byte[0][];
       return;
     }
     switch (_dataType) {
@@ -76,6 +77,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _floatArrayLiteral = null;
         _doubleArrayLiteral = null;
         _stringArrayLiteral = null;
+        _bytesArrayLiteral = null;
         break;
       case LONG:
         _longArrayLiteral = (long[]) value;
@@ -83,6 +85,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _floatArrayLiteral = null;
         _doubleArrayLiteral = null;
         _stringArrayLiteral = null;
+        _bytesArrayLiteral = null;
         break;
       case FLOAT:
         _floatArrayLiteral = (float[]) value;
@@ -90,6 +93,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _longArrayLiteral = null;
         _doubleArrayLiteral = null;
         _stringArrayLiteral = null;
+        _bytesArrayLiteral = null;
         break;
       case DOUBLE:
         _doubleArrayLiteral = (double[]) value;
@@ -97,6 +101,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
         _stringArrayLiteral = null;
+        _bytesArrayLiteral = null;
         break;
       case STRING:
         _stringArrayLiteral = (String[]) value;
@@ -104,6 +109,15 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
         _doubleArrayLiteral = null;
+        _bytesArrayLiteral = null;
+        break;
+      case BYTES:
+        _bytesArrayLiteral = (byte[][]) value;
+        _intArrayLiteral = null;
+        _longArrayLiteral = null;
+        _floatArrayLiteral = null;
+        _doubleArrayLiteral = null;
+        _stringArrayLiteral = null;
         break;
       default:
         throw new IllegalStateException(
@@ -121,6 +135,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       _floatArrayLiteral = new float[0];
       _doubleArrayLiteral = new double[0];
       _stringArrayLiteral = new String[0];
+      _bytesArrayLiteral = new byte[0][];
       return;
     }
     for (ExpressionContext literalContext : literalContexts) {
@@ -138,6 +153,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _floatArrayLiteral = null;
         _doubleArrayLiteral = null;
         _stringArrayLiteral = null;
+        _bytesArrayLiteral = null;
         break;
       case LONG:
         _longArrayLiteral = new long[literalContexts.size()];
@@ -148,6 +164,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _floatArrayLiteral = null;
         _doubleArrayLiteral = null;
         _stringArrayLiteral = null;
+        _bytesArrayLiteral = null;
         break;
       case FLOAT:
         _floatArrayLiteral = new float[literalContexts.size()];
@@ -158,6 +175,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _longArrayLiteral = null;
         _doubleArrayLiteral = null;
         _stringArrayLiteral = null;
+        _bytesArrayLiteral = null;
         break;
       case DOUBLE:
         _doubleArrayLiteral = new double[literalContexts.size()];
@@ -168,6 +186,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
         _stringArrayLiteral = null;
+        _bytesArrayLiteral = null;
         break;
       case STRING:
         _stringArrayLiteral = new String[literalContexts.size()];
@@ -178,6 +197,18 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
         _doubleArrayLiteral = null;
+        _bytesArrayLiteral = null;
+        break;
+      case BYTES:
+        _bytesArrayLiteral = new byte[literalContexts.size()][];
+        for (int i = 0; i < _bytesArrayLiteral.length; i++) {
+          _bytesArrayLiteral[i] = literalContexts.get(i).getLiteral().getBytesValue();
+        }
+        _intArrayLiteral = null;
+        _longArrayLiteral = null;
+        _floatArrayLiteral = null;
+        _doubleArrayLiteral = null;
+        _stringArrayLiteral = null;
         break;
       default:
         throw new IllegalStateException(
@@ -204,6 +235,10 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
 
   public String[] getStringArrayLiteral() {
     return _stringArrayLiteral;
+  }
+
+  public byte[][] getBytesArrayLiteral() {
+    return _bytesArrayLiteral;
   }
 
   @Override
@@ -487,7 +522,14 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
 
   @Override
   public byte[][][] transformToBytesValuesMV(ValueBlock valueBlock) {
-    throw new UnsupportedOperationException();
+    int numDocs = valueBlock.getNumDocs();
+    byte[][][] bytesArrayResult = _bytesArrayResult;
+    if (bytesArrayResult == null || bytesArrayResult.length < numDocs) {
+      bytesArrayResult = new byte[numDocs][][];
+      Arrays.fill(bytesArrayResult, _bytesArrayLiteral);
+      _bytesArrayResult = bytesArrayResult;
+    }
+    return bytesArrayResult;
   }
 
   @Override

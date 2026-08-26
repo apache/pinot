@@ -307,6 +307,10 @@ bytestohex:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.DataTypeConversionFunctions.bytesToHex}"
   transform: null
   udf: null
+bytestouuid:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.uuid.UuidConversionFunctions.bytesToUuid}"
+  transform: null
+  udf: "org.apache.pinot.query.runtime.function.BytesToUuidUdf"
 byteswapint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.byteswapInt}"
   transform: null
@@ -964,6 +968,10 @@ istrue:
   scalar: null
   transform: "org.apache.pinot.core.operator.transform.function.IsTrueTransformFunction"
   udf: null
+isuuid:
+  scalar: "org.apache.pinot.common.function.scalar.uuid.IsUuidScalarFunction"
+  transform: null
+  udf: "org.apache.pinot.query.runtime.function.IsUuidUdf"
 item:
   scalar: null
   transform: "org.apache.pinot.core.operator.transform.function.ItemTransformFunction"
@@ -980,6 +988,18 @@ jsonextractkey:
 jsonextractscalar:
   scalar: null
   transform: "org.apache.pinot.core.operator.transform.function.JsonExtractScalarTransformFunction"
+  udf: null
+jsonextractscalarfast:
+  scalar: null
+  transform: "org.apache.pinot.core.operator.transform.function.JsonExtractScalarTransformFunction.Fast"
+  udf: null
+jsonextractscalarfirstmatch:
+  scalar: null
+  transform: "org.apache.pinot.core.operator.transform.function.JsonExtractScalarTransformFunction.FirstMatch"
+  udf: null
+jsonextractscalarfory:
+  scalar: null
+  transform: "org.apache.pinot.core.operator.transform.function.JsonExtractScalarTransformFunction.Fory"
   udf: null
 jsonformat:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonFormat}"
@@ -1007,6 +1027,18 @@ jsonpathdouble:
     \ 3: org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathDouble]}"
   transform: null
   udf: null
+jsonpathdoublefast:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathDoubleFast}"
+  transform: null
+  udf: null
+jsonpathdoublefirstmatch:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathDoubleFirstMatch}"
+  transform: null
+  udf: null
+jsonpathdoublefory:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathDoubleFory}"
+  transform: null
+  udf: null
 jsonpathexists:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathExists}"
   transform: null
@@ -1016,9 +1048,33 @@ jsonpathlong:
     \ 3: org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathLong]}"
   transform: null
   udf: null
+jsonpathlongfast:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathLongFast}"
+  transform: null
+  udf: null
+jsonpathlongfirstmatch:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathLongFirstMatch}"
+  transform: null
+  udf: null
+jsonpathlongfory:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathLongFory}"
+  transform: null
+  udf: null
 jsonpathstring:
   scalar: "ArgumentCountBasedScalarFunction{[2: org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathString,\
     \ 3: org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathString]}"
+  transform: null
+  udf: null
+jsonpathstringfast:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathStringFast}"
+  transform: null
+  udf: null
+jsonpathstringfirstmatch:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathStringFirstMatch}"
+  transform: null
+  udf: null
+jsonpathstringfory:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.JsonFunctions.jsonPathStringFory}"
   transform: null
   udf: null
 jsonstringtoarray:
@@ -1833,6 +1889,10 @@ toutf8:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.StringFunctions.toUtf8}"
   transform: null
   udf: null
+touuid:
+  scalar: "org.apache.pinot.common.function.scalar.uuid.ToUuidScalarFunction"
+  transform: null
+  udf: "org.apache.pinot.query.runtime.function.ToUuidUdf"
 touuidbytes:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.StringFunctions.toUUIDBytes}"
   transform: null
@@ -1856,6 +1916,30 @@ upper:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.StringFunctions.upper}"
   transform: null
   udf: null
+uuidtimestamp:
+  scalar: "org.apache.pinot.common.function.scalar.uuid.UuidTimestampScalarFunction"
+  transform: null
+  udf: "org.apache.pinot.query.runtime.function.UuidTimestampUdf"
+uuidtobytes:
+  scalar: "org.apache.pinot.common.function.scalar.uuid.UuidToBytesScalarFunction"
+  transform: null
+  udf: "org.apache.pinot.query.runtime.function.UuidToBytesUdf"
+uuidtostring:
+  scalar: "org.apache.pinot.common.function.scalar.uuid.UuidToStringScalarFunction"
+  transform: null
+  udf: "org.apache.pinot.query.runtime.function.UuidToStringUdf"
+uuidv4:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.uuid.UuidConversionFunctions.uuidV4}"
+  transform: null
+  udf: "org.apache.pinot.query.runtime.function.UuidV4Udf"
+uuidv7:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.uuid.UuidConversionFunctions.uuidV7}"
+  transform: null
+  udf: "org.apache.pinot.query.runtime.function.UuidV7Udf"
+uuidversion:
+  scalar: "org.apache.pinot.common.function.scalar.uuid.UuidVersionScalarFunction"
+  transform: null
+  udf: "org.apache.pinot.query.runtime.function.UuidVersionUdf"
 urldecode:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.urlDecode}"
   transform: null

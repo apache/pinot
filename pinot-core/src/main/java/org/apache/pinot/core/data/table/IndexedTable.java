@@ -33,15 +33,14 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.core.util.trace.TraceCallable;
 
 
-/**
- * Base implementation of Map-based Table for indexed lookup
- */
+/// Base implementation of Map-based Table for indexed lookup
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class IndexedTable extends BaseTable {
   private final ExecutorService _executorService;
@@ -61,17 +60,15 @@ public abstract class IndexedTable extends BaseTable {
   private int _numResizes;
   private long _resizeTimeNs;
 
-  /**
-   * Constructor for the IndexedTable.
-   *
-   * @param dataSchema    Data schema of the table
-   * @param hasFinalInput Whether the input is the final aggregate result
-   * @param queryContext  Query context
-   * @param resultSize    Number of records to keep in the final result after calling {@link #finish(boolean, boolean)}
-   * @param trimSize      Number of records to keep when trimming the table
-   * @param trimThreshold Trim the table when the number of records exceeds the threshold
-   * @param lookupMap     Map from keys to records
-   */
+  /// Constructor for the IndexedTable.
+  ///
+  /// @param dataSchema    Data schema of the table
+  /// @param hasFinalInput Whether the input is the final aggregate result
+  /// @param queryContext  Query context
+  /// @param resultSize    Number of records to keep in the final result after calling [#finish(boolean, boolean)]
+  /// @param trimSize      Number of records to keep when trimming the table
+  /// @param trimThreshold Trim the table when the number of records exceeds the threshold
+  /// @param lookupMap     Map from keys to records
   protected IndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext, int resultSize,
       int trimSize, int trimThreshold, Map<Key, Record> lookupMap, ExecutorService executorService) {
     super(dataSchema);
@@ -87,7 +84,9 @@ public abstract class IndexedTable extends BaseTable {
 
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
-    _numKeyColumns = groupByExpressions.size();
+    /// Includes the synthetic $groupingId key column for GROUP BY GROUPING SETS / ROLLUP / CUBE queries, so
+    /// that rows from different grouping sets are keyed (and therefore merged) independently.
+    _numKeyColumns = queryContext.getNumGroupByKeyColumns();
     _aggregationFunctions = queryContext.getAggregationFunctions();
     _hasOrderBy = queryContext.getOrderByExpressions() != null;
     _tableResizer = _hasOrderBy ? new TableResizer(dataSchema, hasFinalInput, queryContext) : null;
@@ -109,16 +108,12 @@ public abstract class IndexedTable extends BaseTable {
     return upsert(new Key(keyValues), record);
   }
 
-  /**
-   * Adds a record with new key or updates a record with existing key.
-   */
+  /// Adds a record with new key or updates a record with existing key.
   protected void addOrUpdateRecord(Key key, Record newRecord) {
     _lookupMap.compute(key, (k, v) -> v == null ? newRecord : updateRecord(v, newRecord));
   }
 
-  /**
-   * Updates a record with existing key. Record with new key will be ignored.
-   */
+  /// Updates a record with existing key. Record with new key will be ignored.
   protected void updateExistingRecord(Key key, Record newRecord) {
     _lookupMap.computeIfPresent(key, (k, v) -> updateRecord(v, newRecord));
   }
@@ -130,20 +125,19 @@ public abstract class IndexedTable extends BaseTable {
     int index = _numKeyColumns;
     if (!_hasFinalInput) {
       for (int i = 0; i < numAggregations; i++, index++) {
-        existingValues[index] = _aggregationFunctions[i].merge(existingValues[index], newValues[index]);
+        existingValues[index] =
+            AggregationFunctionUtils.merge(_aggregationFunctions[i], existingValues[index], newValues[index]);
       }
     } else {
       for (int i = 0; i < numAggregations; i++, index++) {
-        existingValues[index] = _aggregationFunctions[i].mergeFinalResult((Comparable) existingValues[index],
-            (Comparable) newValues[index]);
+        existingValues[index] = AggregationFunctionUtils.mergeFinalResult(_aggregationFunctions[i],
+            (Comparable) existingValues[index], (Comparable) newValues[index]);
       }
     }
     return existingRecord;
   }
 
-  /**
-   * Resizes the lookup map based on the trim size.
-   */
+  /// Resizes the lookup map based on the trim size.
   protected void resize() {
     assert _hasOrderBy;
     long startTimeNs = System.nanoTime();

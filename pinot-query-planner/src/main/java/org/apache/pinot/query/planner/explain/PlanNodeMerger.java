@@ -49,49 +49,43 @@ import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
-/**
- * This is a utility class that given two plan nodes, merges them into a single plan node if possible.
- */
+/// This is a utility class that given two plan nodes, merges them into a single plan node if possible.
 class PlanNodeMerger {
   private PlanNodeMerger() {
   }
 
-  /**
-   * Tries to merge the two plan nodes into a single plan node if possible.
-   *
-   * If the two nodes are not mergeable, null is returned. Otherwise the merged node is returned. The merged node may
-   * be the same as one of the received nodes, or a new node.
-   *
-   * How the nodes are merged depend on the type of the node, but in general, the following rules apply:
-   * <ul>
-   *   <li> The inputs of the nodes are merged recursively. If the inputs are not mergeable, the nodes are not
-   *   mergeable.</li>
-   *   <li> Nodes of different classes are not mergeable.</li>
-   *   <li> All attributes of the nodes must be equal for the nodes to be mergeable.</li>
-   * </ul>
-   *
-   * {@link org.apache.pinot.common.proto.Plan.ExplainNode}s are merged in a special way. The attributes of the nodes
-   * are merged according to the
-   * {@link org.apache.pinot.common.proto.Plan.ExplainNode.AttributeValue.MergeType MergeType}.
-   * As specified in the proto file, the merge type can be one of the following:
-   * <ul>
-   *   <li> {@link org.apache.pinot.common.proto.Plan.ExplainNode.AttributeValue.MergeType#IDEMPOTENT IDEMPOTENT}: The
-   *   values are considered idempotent and will be merged if and only if they are equal.</li>
-   *   <li> {@link org.apache.pinot.common.proto.Plan.ExplainNode.AttributeValue.MergeType#DEFAULT DEFAULT}: The values
-   *   are added together if they are longs, otherwise the values are considered not idempotent.</li>
-   *   <li> {@link org.apache.pinot.common.proto.Plan.ExplainNode.AttributeValue.MergeType#IGNORABLE IGNORABLE}: The
-   *   values will be merged if they are equal. If the values are different, the nodes will be considered different if
-   *   and only if the verbose flag is set to true.</li>
-   * </ul>
-   *
-   * @param plan1 The first plan
-   * @param plan2 The second plan
-   * @param verbose Changes the way {@link Plan.ExplainNode.AttributeValue.MergeType#IGNORABLE} attributes are treated
-   *                when {@link org.apache.pinot.common.proto.Plan.ExplainNode ExplainNode}s are merged.
-   *                Two nodes with a different ignorable attribute will be considered different if and only if verbose
-   *                is true.
-   * @return The merged plan node, or null if the nodes are not mergeable.
-   */
+  /// Tries to merge the two plan nodes into a single plan node if possible.
+  ///
+  /// If the two nodes are not mergeable, null is returned. Otherwise the merged node is returned. The merged node may
+  /// be the same as one of the received nodes, or a new node.
+  ///
+  /// How the nodes are merged depend on the type of the node, but in general, the following rules apply:
+  ///
+  /// - The inputs of the nodes are merged recursively. If the inputs are not mergeable, the nodes are not
+  ///   mergeable.
+  /// - Nodes of different classes are not mergeable.
+  /// - All attributes of the nodes must be equal for the nodes to be mergeable.
+  ///
+  /// [org.apache.pinot.common.proto.Plan.ExplainNode]s are merged in a special way. The attributes of the nodes
+  /// are merged according to the
+  /// [`MergeType`]\[org.apache.pinot.common.proto.Plan.ExplainNode.AttributeValue.MergeType\].
+  /// As specified in the proto file, the merge type can be one of the following:
+  ///
+  /// - [`IDEMPOTENT`]\[org.apache.pinot.common.proto.Plan.ExplainNode.AttributeValue.MergeType#IDEMPOTENT\]: The
+  ///   values are considered idempotent and will be merged if and only if they are equal.
+  /// - [`DEFAULT`]\[org.apache.pinot.common.proto.Plan.ExplainNode.AttributeValue.MergeType#DEFAULT\]: The values
+  ///   are added together if they are longs, otherwise the values are considered not idempotent.
+  /// - [`IGNORABLE`]\[org.apache.pinot.common.proto.Plan.ExplainNode.AttributeValue.MergeType#IGNORABLE\]: The
+  ///   values will be merged if they are equal. If the values are different, the nodes will be considered different if
+  ///   and only if the verbose flag is set to true.
+  ///
+  /// @param plan1 The first plan
+  /// @param plan2 The second plan
+  /// @param verbose Changes the way [Plan.ExplainNode.AttributeValue.MergeType#IGNORABLE] attributes are treated
+  ///                when [`ExplainNode`]\[org.apache.pinot.common.proto.Plan.ExplainNode\]s are merged.
+  ///                Two nodes with a different ignorable attribute will be considered different if and only if verbose
+  ///                is true.
+  /// @return The merged plan node, or null if the nodes are not mergeable.
   @Nullable
   public static PlanNode mergePlans(PlanNode plan1, PlanNode plan2, boolean verbose) {
     Visitor planNodeMerger = new Visitor(verbose);
@@ -231,6 +225,7 @@ class PlanNodeMerger {
       return node.withInputs(children);
     }
 
+    @Deprecated(forRemoval = true, since = "1.6.0")
     @Nullable
     @Override
     public PlanNode visitEnrichedJoin(EnrichedJoinNode node, PlanNode context) {
@@ -433,6 +428,9 @@ class PlanNodeMerger {
         return null;
       }
       if (node.getUpperBound() != otherNode.getUpperBound()) {
+        return null;
+      }
+      if (node.getExclude() != otherNode.getExclude()) {
         return null;
       }
       if (!node.getConstants().equals(otherNode.getConstants())) {

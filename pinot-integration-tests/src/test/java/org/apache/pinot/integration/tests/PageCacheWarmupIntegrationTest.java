@@ -47,23 +47,21 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test for the page cache warmup feature.
- *
- * <p>It exercises the end-to-end "warmup on restart" flow:
- * <ol>
- *   <li>Enable {@code onRestart} warmup in the table config (round-trips through ZooKeeper via
- *       {@code TableConfigSerDeUtils}).</li>
- *   <li>Store warmup queries on the controller (written under the controller's
- *       {@code controller.page.cache.warmup.queries.dataDir}) and verify they can be read back.</li>
- *   <li>Restart the server that hosts the segments. During startup the server runs
- *       {@code startWarmupOnRestart}, which discovers a live controller via
- *       {@code HelixHelper.getControllerUrl(HelixManager)}, fetches the stored queries, and executes
- *       them against its resident segments.</li>
- *   <li>Assert that the host-level {@link ServerMeter#PAGE_CACHE_WARMUP_QUERIES} meter advanced and
- *       that the server still serves queries correctly afterwards.</li>
- * </ol>
- */
+/// Integration test for the page cache warmup feature.
+///
+/// <p>It exercises the end-to-end "warmup on restart" flow:
+/// <ol>
+///   <li>Enable {@code onRestart} warmup in the table config (round-trips through ZooKeeper via
+///       {@code TableConfigSerDeUtils}).</li>
+///   <li>Store warmup queries on the controller (written under the controller's
+///       {@code controller.page.cache.warmup.queries.dataDir}) and verify they can be read back.</li>
+///   <li>Restart the server that hosts the segments. During startup the server runs
+///       {@code startWarmupOnRestart}, which discovers a live controller via
+///       {@code HelixHelper.getControllerUrl(HelixManager)}, fetches the stored queries, and executes
+///       them against its resident segments.</li>
+///   <li>Assert that the host-level {@link ServerMeter#PAGE_CACHE_WARMUP_QUERIES} meter advanced and
+///       that the server still serves queries correctly afterwards.</li>
+/// </ol>
 public class PageCacheWarmupIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PageCacheWarmupIntegrationTest.class);
   private static final String ORIGIN_COLUMN = "Origin";
@@ -129,10 +127,7 @@ public class PageCacheWarmupIntegrationTest extends BaseClusterIntegrationTest {
     return avroFile;
   }
 
-  /**
-   * Returns the page-cache warmup admin client backed by the test harness's shared
-   * {@link org.apache.pinot.client.admin.PinotAdminClient}.
-   */
+  /// Returns the page-cache warmup admin client backed by the test harness's shared Pinot admin client.
   private PageCacheWarmupAdminClient getWarmupAdminClient()
       throws Exception {
     return getOrCreateAdminClient().getPageCacheWarmupClient();
@@ -229,11 +224,9 @@ public class PageCacheWarmupIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
-  /**
-   * Reads the accumulated host-level {@link ServerMeter#PAGE_CACHE_WARMUP_QUERIES} count from the
-   * global server metrics. The warmup executor uses {@code addMeteredGlobalValue}, so the value is
-   * read back through the matching global meter accessor.
-   */
+  /// Reads the accumulated host-level {@link ServerMeter#PAGE_CACHE_WARMUP_QUERIES} count from the
+  /// global server metrics. The warmup executor uses {@code addMeteredGlobalValue}, so the value is
+  /// read back through the matching global meter accessor.
   private long getWarmupQueriesMeterCount() {
     return ServerMetrics.get().getMeteredValue(ServerMeter.PAGE_CACHE_WARMUP_QUERIES).count();
   }

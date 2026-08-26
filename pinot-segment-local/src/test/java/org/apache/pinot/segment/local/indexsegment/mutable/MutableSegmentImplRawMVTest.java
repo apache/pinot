@@ -67,6 +67,14 @@ import static org.testng.Assert.assertNull;
 public class MutableSegmentImplRawMVTest implements PinotBuffersAfterClassCheckRule {
   private static final String AVRO_FILE = "data/test_data-mv.avro";
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "MutableSegmentImplRawMVTest");
+  /// Virtual columns describing the segment itself, which are expected to differ between a mutable segment and an
+  /// immutable segment built from the same records.
+  private static final Set<String> SEGMENT_LEVEL_VIRTUAL_COLUMNS =
+      Set.of(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME,
+          CommonConstants.Segment.BuiltInVirtualColumn.CREATIONTIME,
+          CommonConstants.Segment.BuiltInVirtualColumn.STARTTIME,
+          CommonConstants.Segment.BuiltInVirtualColumn.ENDTIME,
+          CommonConstants.Segment.BuiltInVirtualColumn.CRC);
 
   private Schema _schema;
   private MutableSegmentImpl _mutableSegmentImpl;
@@ -166,8 +174,9 @@ public class MutableSegmentImplRawMVTest implements PinotBuffersAfterClassCheckR
         Dictionary expectedDictionary = expectedDataSource.getDictionary();
         assertEquals(actualDictionary.length(), expectedDictionary.length());
 
-        // Allow the segment name to be different
-        if (column.equals(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME)) {
+        // Allow the segment level metadata to be different between the mutable segment and the immutable segment
+        // built from the same records
+        if (SEGMENT_LEVEL_VIRTUAL_COLUMNS.contains(column)) {
           continue;
         }
 

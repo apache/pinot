@@ -39,7 +39,7 @@ public class DistinctCountHLLAggregationFunctionTest {
   @Test
   public void testCanUseStarTreeDefaultLog2m() {
     DistinctCountHLLAggregationFunction function = new DistinctCountHLLAggregationFunction(
-        List.of(ExpressionContext.forIdentifier("col")));
+        List.of(ExpressionContext.forIdentifier("col")), false);
 
     Assert.assertTrue(function.canUseStarTree(Map.of()));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, "8")));
@@ -47,7 +47,7 @@ public class DistinctCountHLLAggregationFunctionTest {
     Assert.assertFalse(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, 16)));
 
     function = new DistinctCountHLLAggregationFunction(List.of(ExpressionContext.forIdentifier("col"),
-        ExpressionContext.forLiteral(Literal.stringValue("8"))));
+        ExpressionContext.forLiteral(Literal.stringValue("8"))), false);
 
     Assert.assertTrue(function.canUseStarTree(Map.of()));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, "8")));
@@ -58,7 +58,7 @@ public class DistinctCountHLLAggregationFunctionTest {
   @Test
   public void testCanUseStarTreeCustomLog2m() {
     DistinctCountHLLAggregationFunction function = new DistinctCountHLLAggregationFunction(
-        List.of(ExpressionContext.forIdentifier("col"), ExpressionContext.forLiteral(Literal.intValue(16))));
+        List.of(ExpressionContext.forIdentifier("col"), ExpressionContext.forLiteral(Literal.intValue(16))), false);
 
     Assert.assertFalse(function.canUseStarTree(Map.of()));
     Assert.assertFalse(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, "8")));
@@ -66,10 +66,8 @@ public class DistinctCountHLLAggregationFunctionTest {
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, "16")));
   }
 
-  /**
-   * Verifies that BitSet deduplication produces the correct cardinality when dictIds contain duplicates.
-   * The BitSet should count each distinct dict entry exactly once.
-   */
+  /// Verifies that BitSet deduplication produces the correct cardinality when dictIds contain duplicates.
+  /// The BitSet should count each distinct dict entry exactly once.
   @Test
   public void testBitSetDeduplicationProducesCorrectCardinality() {
     int numDistinct = 100;
@@ -88,7 +86,7 @@ public class DistinctCountHLLAggregationFunctionTest {
     ObjectAggregationResultHolder holder = new ObjectAggregationResultHolder();
     DistinctCountHLLAggregationFunction function = new DistinctCountHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(Literal.intValue(12))));
+            ExpressionContext.forLiteral(Literal.intValue(12))), false);
 
     BitSet bitSet = DistinctCountHLLAggregationFunction.getDictIdBitSet(holder, dictionary);
     for (int dictId : dictIds) {
@@ -101,10 +99,8 @@ public class DistinctCountHLLAggregationFunctionTest {
         "Expected cardinality close to " + numDistinct + ", got: " + result.cardinality());
   }
 
-  /**
-   * Verifies that DictIdsWrapper correctly handles a large dictionary (1M entries), matching the reviewer's
-   * expectation that BitSet overhead is negligible (128 KB) and the cardinality estimate stays accurate.
-   */
+  /// Verifies that DictIdsWrapper correctly handles a large dictionary (1M entries), matching the reviewer's
+  /// expectation that BitSet overhead is negligible (128 KB) and the cardinality estimate stays accurate.
   @Test
   public void testBitSetLargeCardinalityDictionary() {
     int numDistinct = 10_000;
@@ -123,7 +119,7 @@ public class DistinctCountHLLAggregationFunctionTest {
     ObjectAggregationResultHolder holder = new ObjectAggregationResultHolder();
     DistinctCountHLLAggregationFunction function = new DistinctCountHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(Literal.intValue(14))));
+            ExpressionContext.forLiteral(Literal.intValue(14))), false);
 
     BitSet bitSet = DistinctCountHLLAggregationFunction.getDictIdBitSet(holder, dictionary);
     for (int dictId : dictIds) {
@@ -136,10 +132,8 @@ public class DistinctCountHLLAggregationFunctionTest {
         "Expected cardinality close to " + numDistinct + ", got: " + result.cardinality());
   }
 
-  /**
-   * Verifies that getDictIdBitSet reuses the same DictIdsWrapper across multiple calls on the same holder,
-   * accumulating all dict IDs correctly.
-   */
+  /// Verifies that getDictIdBitSet reuses the same DictIdsWrapper across multiple calls on the same holder,
+  /// accumulating all dict IDs correctly.
   @Test
   public void testDictIdBitSetIsReusedAcrossBatches() {
     int numDistinct = 200;
@@ -152,7 +146,7 @@ public class DistinctCountHLLAggregationFunctionTest {
     ObjectAggregationResultHolder holder = new ObjectAggregationResultHolder();
     DistinctCountHLLAggregationFunction function = new DistinctCountHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(Literal.intValue(12))));
+            ExpressionContext.forLiteral(Literal.intValue(12))), false);
 
     // Batch 1: dict IDs 0–99
     int[] batch1 = new int[100];

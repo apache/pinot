@@ -33,9 +33,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test that checks data types for queries with no rows returned.
- */
+/// Integration test that checks data types for queries with no rows returned.
 public class EmptyResponseIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String[] SELECT_STAR_TYPES = new String[]{
       "INT", "INT", "LONG", "INT", "FLOAT", "DOUBLE", "INT", "STRING", "INT", "INT", "INT", "INT", "STRING", "INT",

@@ -19,7 +19,6 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -36,9 +35,7 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 
 
-/**
- * Special rule for Pinot, this rule is fixed to always insert exchange after JOIN node.
- */
+/// Special rule for Pinot, this rule is fixed to always insert exchange after JOIN node.
 public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
   public static final PinotJoinExchangeNodeInsertRule INSTANCE =
       new PinotJoinExchangeNodeInsertRule(PinotRuleUtils.PINOT_REL_FACTORY);
@@ -85,8 +82,8 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
       // FULL OUTER JOIN with no equi keys: use hash with empty key to explicitly route all data to one destination.
       // DispatchablePlanVisitor sets requireSingleton on the join stage so WorkerManager picks a single random
       // worker, avoiding hotspots.
-      newLeft = PinotLogicalExchange.create(left, RelDistributions.hash(Collections.emptyList()));
-      newRight = PinotLogicalExchange.create(right, RelDistributions.hash(Collections.emptyList()));
+      newLeft = PinotLogicalExchange.create(left, RelDistributions.hash(List.of()));
+      newRight = PinotLogicalExchange.create(right, RelDistributions.hash(List.of()));
     } else {
       // Hash join
       // Force pre-partitioned exchange when colocated join hint is provided
@@ -130,12 +127,10 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
     }
   }
 
-  /**
-   * For non-equi RIGHT JOINs (no equi keys), the default RANDOM(left)+BROADCAST(right) is incorrect because each
-   * worker independently tracks matched right rows via a local BitSet. Workers that receive only a subset of left rows
-   * will incorrectly emit right rows as unmatched. Invert to BROADCAST(left)+RANDOM(right) so each worker has the
-   * full left table and can correctly determine which of its local right rows are unmatched.
-   */
+  /// For non-equi RIGHT JOINs (no equi keys), the default RANDOM(left)+BROADCAST(right) is incorrect because each
+  /// worker independently tracks matched right rows via a local BitSet. Workers that receive only a subset of left rows
+  /// will incorrectly emit right rows as unmatched. Invert to BROADCAST(left)+RANDOM(right) so each worker has the
+  /// full left table and can correctly determine which of its local right rows are unmatched.
   private static PinotHintOptions.DistributionType inferLeftDistributionType(JoinInfo joinInfo,
       JoinRelType joinType) {
     if (!joinInfo.leftKeys.isEmpty()) {

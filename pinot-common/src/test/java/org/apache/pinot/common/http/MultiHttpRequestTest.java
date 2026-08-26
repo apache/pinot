@@ -28,13 +28,27 @@ import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.http.io.entity.StringEntity;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -87,6 +101,7 @@ public class MultiHttpRequestTest {
     startServer(_portStart + 1, createHandler(ERROR_CODE, ERROR_MSG, 0));
     startServer(_portStart + 2, createHandler(SUCCESS_CODE, TIMEOUT_MSG, TIMEOUT_MS));
     startServer(_portStart + 3, createPostHandler(SUCCESS_CODE, SUCCESS_MSG, 0));
+    startServer(_portStart + 4, createHeaderEchoHandler());
   }
 
   @AfterTest
@@ -139,6 +154,16 @@ public class MultiHttpRequestTest {
           responseBody.write(ERROR_MSG.getBytes());
           responseBody.close();
         }
+      }
+    };
+  }
+
+  private HttpHandler createHeaderEchoHandler() {
+    return httpExchange -> {
+      String response = httpExchange.getRequestHeaders().getFirst("Authorization");
+      httpExchange.sendResponseHeaders(SUCCESS_CODE, response.length());
+      try (OutputStream responseBody = httpExchange.getResponseBody()) {
+        responseBody.write(response.getBytes());
       }
     };
   }
@@ -202,6 +227,161 @@ public class MultiHttpRequestTest {
     Assert.assertEquals(result.getSuccess(), 3);
     Assert.assertEquals(result.getErrors(), 1);
     Assert.assertEquals(result.getTimeouts(), 1);
+  }
+
+  @Test
+  public void testAuthProviderResolvedPerRequestAndOverridesFunctionalHeaders()
+      throws Exception {
+    String url = "http://localhost:" + (_portStart + 4) + URI_PATH;
+    List<Pair<String, String>> requests = List.of(Pair.of(url, null), Pair.of(url, null));
+    AtomicInteger tokenSequence = new AtomicInteger();
+    AuthProvider authProvider = new AuthProvider() {
+      @Override
+      public Map<String, Object> getRequestHeaders() {
+        return Map.of("Authorization", "Service-" + tokenSequence.incrementAndGet());
+      }
+
+      @Override
+      public String getTaskToken() {
+        return null;
+      }
+    };
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+    try {
+      CompletionService<MultiHttpRequestResponse> completionService =
+          new MultiHttpRequest(executor, connectionManager).execute(requests, Map.of("authorization", "End-user"),
+              authProvider, TIMEOUT_MS, "GET", HttpGet::new);
+      Set<String> credentials = new HashSet<>();
+      for (int i = 0; i < requests.size(); i++) {
+        try (MultiHttpRequestResponse response = completionService.take().get()) {
+          credentials.add(EntityUtils.toString(response.getResponse().getEntity()));
+        }
+      }
+      Assert.assertEquals(credentials, Set.of("Service-1", "Service-2"));
+    } finally {
+      executor.shutdownNow();
+      connectionManager.close();
+    }
+  }
+
+  @Test
+  public void testAuthProviderFailureDoesNotSubmitPartialBatch()
+      throws Exception {
+    AtomicInteger headerResolutions = new AtomicInteger();
+    AuthProvider authProvider = new AuthProvider() {
+      @Override
+      public Map<String, Object> getRequestHeaders() {
+        if (headerResolutions.incrementAndGet() == 2) {
+          throw new IllegalStateException("credential refresh failed");
+        }
+        return Map.of("Authorization", "Service");
+      }
+
+      @Override
+      public String getTaskToken() {
+        return null;
+      }
+    };
+    AtomicInteger submittedTasks = new AtomicInteger();
+    Executor executor = command -> submittedTasks.incrementAndGet();
+    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+    try {
+      MultiHttpRequest multiHttpRequest = new MultiHttpRequest(executor, connectionManager);
+      Assert.expectThrows(IllegalStateException.class,
+          () -> multiHttpRequest.execute(List.of(Pair.of("http://localhost/foo", null),
+                  Pair.of("http://localhost/bar", null)), null, authProvider, TIMEOUT_MS, "GET", HttpGet::new));
+      Assert.assertEquals(submittedTasks.get(), 0);
+    } finally {
+      connectionManager.close();
+    }
+  }
+
+  @Test
+  public void testBufferedExecutionSubmitsAndPollsRequests()
+      throws Exception {
+    String url = "http://localhost:" + (_portStart + 3) + URI_PATH;
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+    try (MultiHttpRequest.BufferedRequestExecution execution =
+        new MultiHttpRequest(executor, connectionManager).createBufferedExecution(TIMEOUT_MS)) {
+      for (String body : List.of("b0", "b1", "b2")) {
+        HttpPost request = new HttpPost(url);
+        request.setEntity(new StringEntity(body));
+        execution.submit(request);
+      }
+      for (int i = 0; i < 3; i++) {
+        Future<MultiHttpRequestBufferedResponse> completed = execution.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        Assert.assertNotNull(completed);
+        Assert.assertEquals(completed.get().getResponseBody(), SUCCESS_MSG);
+      }
+    } finally {
+      executor.shutdownNow();
+      connectionManager.close();
+    }
+  }
+
+  @Test
+  public void testBufferedExecutionRejectsOperationsAfterClose()
+      throws Exception {
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+    try {
+      MultiHttpRequest.BufferedRequestExecution execution =
+          new MultiHttpRequest(executor, connectionManager).createBufferedExecution(TIMEOUT_MS);
+      execution.close();
+      Assert.expectThrows(IllegalStateException.class,
+          () -> execution.poll(1, TimeUnit.MILLISECONDS));
+      Assert.expectThrows(IllegalStateException.class, execution::take);
+      Assert.expectThrows(IllegalStateException.class,
+          () -> execution.submit(new HttpPost("http://localhost:" + (_portStart + 3) + URI_PATH)));
+    } finally {
+      executor.shutdownNow();
+      connectionManager.close();
+    }
+  }
+
+  @Test
+  public void testBufferedExecutionCancelsAcceptedRequestAfterSubmissionFailure()
+      throws Exception {
+    AtomicReference<Runnable> acceptedTask = new AtomicReference<>();
+    AtomicInteger handledRequests = new AtomicInteger();
+    String rollbackPath = "/rollback";
+    HttpServer server = _servers.get(3);
+    server.createContext(rollbackPath, exchange -> {
+      handledRequests.incrementAndGet();
+      exchange.sendResponseHeaders(SUCCESS_CODE, 0);
+      exchange.close();
+    });
+    Executor rejectingExecutor = task -> {
+      if (!acceptedTask.compareAndSet(null, task)) {
+        throw new RejectedExecutionException("reject second request");
+      }
+    };
+    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+    String url = "http://localhost:" + (_portStart + 3) + rollbackPath;
+    try {
+      MultiHttpRequest.BufferedRequestExecution execution =
+          new MultiHttpRequest(rejectingExecutor, connectionManager).createBufferedExecution(TIMEOUT_MS);
+      try {
+        HttpPost first = new HttpPost(url);
+        first.setEntity(new StringEntity("first"));
+        execution.submit(first);
+        HttpPost second = new HttpPost(url);
+        second.setEntity(new StringEntity("second"));
+        Assert.expectThrows(RejectedExecutionException.class, () -> execution.submit(second));
+      } finally {
+        execution.close();
+      }
+
+      // Running the accepted task after close must be a no-op because its Future was cancelled.
+      Assert.assertNotNull(acceptedTask.get());
+      acceptedTask.get().run();
+      Assert.assertEquals(handledRequests.get(), 0);
+    } finally {
+      server.removeContext(rollbackPath);
+      connectionManager.close();
+    }
   }
 
   private TestResult collectResult(CompletionService<MultiHttpRequestResponse> completionService, int size) {

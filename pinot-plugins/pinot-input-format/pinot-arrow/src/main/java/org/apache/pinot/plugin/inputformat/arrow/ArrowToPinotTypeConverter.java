@@ -29,47 +29,78 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.arrow.vector.complex.MapVector;
+import org.apache.arrow.vector.types.Types;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
 
-/**
- * Stateless schema-driven Arrow → Pinot value converter shared by the row-major and
- * column-major Arrow ingestion paths.
- *
- * <p>The conversion mirrors the contract established by {@link ArrowRecordExtractor} prior to
- * this extraction (see apache/pinot#18434 for the original row-major refactor): one branch per
- * {@link ArrowType.ArrowTypeID}, with complex types recursing through their child {@link Field}s
- * and scalars normalising per Pinot's expected JDK types.
- *
- * <p>Reused by:
- * <ul>
- *   <li>{@link ArrowRecordExtractor} — row-major ingestion via {@code ArrowRecordReader}
- *   <li>Column-major {@code ColumnReader} implementations that wrap Arrow vectors and need to
- *       emit Pinot-canonical JDK types from {@code getValue() / next()}
- * </ul>
- *
- * <p>All conversion methods are static; the only per-extraction state is the
- * {@code extractRawTimeValues} flag, passed through as a method parameter.
- */
+/// Stateless schema-driven Arrow → Pinot value converter shared by the row-major and
+/// column-major Arrow ingestion paths.
+///
+/// The conversion mirrors the contract established by [ArrowRecordExtractor] prior to
+/// this extraction (see apache/pinot#18434 for the original row-major refactor): one branch per
+/// [ArrowType.ArrowTypeID], with complex types recursing through their child [Field]s
+/// and scalars normalising per Pinot's expected JDK types.
+///
+/// Reused by:
+///
+/// - [ArrowRecordExtractor] — row-major ingestion via `ArrowRecordReader`
+/// - Column-major `ColumnReader` implementations that wrap Arrow vectors and need to
+///      emit Pinot-canonical JDK types from `getValue() / next()`
+///
+/// All conversion methods are static; the only per-extraction state is the
+/// `extractRawTimeValues` flag, passed through as a method parameter.
 public final class ArrowToPinotTypeConverter {
 
   private ArrowToPinotTypeConverter() {
   }
 
-  /**
-   * Convert an Arrow vector value to its Pinot-canonical JDK representation.
-   *
-   * @param field the Arrow {@link Field} describing the value's type
-   * @param value the raw value emitted by {@code FieldVector.getObject(docId)}
-   * @param extractRawTimeValues when {@code true}, {@code Date} / {@code Time} / {@code Timestamp}
-   *                             surface as raw {@code int} / {@code long} in the schema's
-   *                             {@link org.apache.arrow.vector.types.TimeUnit} instead of the
-   *                             corresponding {@code java.time} / {@link Timestamp} contract type
-   * @return the Pinot-canonical value, or {@code null} for {@link ArrowType.Null}
-   */
+  /// Returns the [PinotDataType] that a column with the given Arrow element [Types.MinorType] can be read as through a
+  /// type-specific `ColumnReader` accessor, or `null` when it has no dedicated accessor and must be read through
+  /// `ColumnReader.getValue(int)`. `singleValue` selects the scalar vs `_ARRAY` variant.
+  ///
+  /// The `MinorType` already encodes every distinction the accessors care about, so a plain switch suffices: only
+  /// signed 32/64-bit ints (`INT` / `BIGINT`), single/double floats, 128-bit `DECIMAL`, `VARCHAR`, and `VARBINARY`
+  /// have accessors. Everything else — unsigned/narrow ints, half floats, `DECIMAL256`, `LARGEVARCHAR` /
+  /// `LARGEVARBINARY` / fixed-size binary, `BIT` (boolean), temporal, and complex types — is a distinct `MinorType`
+  /// that falls through to `null` and is read via `getValue(int)`.
+  ///
+  /// @param minorType the element vector's Arrow minor type (for a list column, its element type)
+  /// @param singleValue `true` for a single-value column, `false` for the `_ARRAY` variant
+  @Nullable
+  public static PinotDataType toValueType(Types.MinorType minorType, boolean singleValue) {
+    switch (minorType) {
+      case INT:
+        return singleValue ? PinotDataType.INT : PinotDataType.INT_ARRAY;
+      case BIGINT:
+        return singleValue ? PinotDataType.LONG : PinotDataType.LONG_ARRAY;
+      case FLOAT4:
+        return singleValue ? PinotDataType.FLOAT : PinotDataType.FLOAT_ARRAY;
+      case FLOAT8:
+        return singleValue ? PinotDataType.DOUBLE : PinotDataType.DOUBLE_ARRAY;
+      case DECIMAL:
+        return singleValue ? PinotDataType.BIG_DECIMAL : PinotDataType.BIG_DECIMAL_ARRAY;
+      case VARCHAR:
+        return singleValue ? PinotDataType.STRING : PinotDataType.STRING_ARRAY;
+      case VARBINARY:
+        return singleValue ? PinotDataType.BYTES : PinotDataType.BYTES_ARRAY;
+      default:
+        return null;
+    }
+  }
+
+  /// Convert an Arrow vector value to its Pinot-canonical JDK representation.
+  ///
+  /// @param field the Arrow [Field] describing the value's type
+  /// @param value the raw value emitted by `FieldVector.getObject(docId)`
+  /// @param extractRawTimeValues when `true`, `Date` / `Time` / `Timestamp`
+  ///                             surface as raw `int` / `long` in the schema's
+  ///                             [org.apache.arrow.vector.types.TimeUnit] instead of the
+  ///                             corresponding `java.time` / [Timestamp] contract type
+  /// @return the Pinot-canonical value, or `null` for [ArrowType.Null]
   @Nullable
   public static Object toPinotValue(Field field, Object value, boolean extractRawTimeValues) {
     ArrowType type = field.getType();
@@ -104,6 +135,10 @@ public final class ArrowToPinotTypeConverter {
         if (value instanceof Character) {
           return (int) (Character) value;
         }
+        // TODO: Widen large unsigned 32/64-bit ints to preserve their value.
+        //   UInt4Vector / UInt8Vector surface the raw bits here (Integer / Long), so values above
+        //   Integer.MAX_VALUE / Long.MAX_VALUE wrap negative. Return a widening long / BigInteger for those instead
+        //   of passing the raw signed box through.
         return value;
       // Null — NullVector.getObject always returns null; callers should short-circuit on null,
       // so this branch is unreachable in practice. Defensive return.

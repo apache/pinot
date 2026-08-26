@@ -46,14 +46,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code BaseJoinOperator} implements the basic join algorithm.
- * <p>This algorithm assumes that the right table has to fit in memory since we are not supporting any spilling. It
- * reads the complete right table and materialize the data in memory. Then for each of the left table row, it looks up
- * for the corresponding row(s) from the right table, applies the non-equi evaluators and creates a joint row.
- * <p>For each of the data block received from the left table, it generates a joint data block. The output is in the
- * format of [left_row, right_row].
- */
+/// The `BaseJoinOperator` implements the basic join algorithm.
+///
+/// This algorithm assumes that the right table has to fit in memory since we are not supporting any spilling. It
+/// reads the complete right table and materialize the data in memory. Then for each of the left table row, it looks up
+/// for the corresponding row(s) from the right table, applies the non-equi evaluators and creates a joint row.
+///
+/// For each of the data block received from the left table, it generates a joint data block. The output is in the
+/// format of \[left_row, right_row\].
 // TODO: Support memory size based resource limit.
 public abstract class BaseJoinOperator extends MultiStageOperator {
   protected static final Logger LOGGER = LoggerFactory.getLogger(BaseJoinOperator.class);
@@ -72,16 +72,12 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   // Below are specific parameters to protect the server from a very large join operation.
   // Once the hash table reaches the limit, we will throw exception or break the right table build process.
   // The limit also applies to the number of joined rows in blocks from the left table.
-  /**
-   * Max rows allowed to build the right table hash collection. Also max rows emitted in each join with a block from
-   * the left table.
-   */
+  /// Max rows allowed to build the right table hash collection. Also max rows emitted in each join with a block from
+  /// the left table.
   protected final int _maxRowsInJoin;
-  /**
-   * Mode when join overflow happens, supported values: THROW or BREAK.
-   *   THROW(default): Break right table build process, and throw exception, no JOIN with left table performed.
-   *   BREAK: Break right table build process, continue to perform JOIN operation, results might be partial.
-   */
+  /// Mode when join overflow happens, supported values: THROW or BREAK.
+  ///   THROW(default): Break right table build process, and throw exception, no JOIN with left table performed.
+  ///   BREAK: Break right table build process, continue to perform JOIN operation, results might be partial.
   protected final JoinOverFlowMode _joinOverflowMode;
 
   protected boolean _isRightTableBuilt;
@@ -337,12 +333,10 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     return new StatMap<>(_statMap);
   }
 
-  /**
-   * Checks if we have reached the rows limit for joined rows. If the limit has been reached, either an exception is
-   * thrown or the left input is early terminated based on the {@link #_joinOverflowMode}.
-   *
-   * @return {@code true} if the limit has been reached, {@code false} otherwise.
-   */
+  /// Checks if we have reached the rows limit for joined rows. If the limit has been reached, either an exception is
+  /// thrown or the left input is early terminated based on the [#_joinOverflowMode].
+  ///
+  /// @return `true` if the limit has been reached, `false` otherwise.
   protected boolean isMaxRowsLimitReached(int numJoinedRows) {
     if (numJoinedRows == _maxRowsInJoin) {
       if (_joinOverflowMode == JoinOverFlowMode.THROW) {
@@ -391,27 +385,19 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
       }
     },
     MAX_ROWS_IN_JOIN_REACHED(StatMap.Type.BOOLEAN),
-    /**
-     * How long (CPU time) has been spent on building the hash table.
-     */
+    /// How long (CPU time) has been spent on building the hash table.
     TIME_BUILDING_HASH_TABLE_MS(StatMap.Type.LONG),
-    /**
-     * The max number of rows seen in the join. Recorded during right table build (normal and overflow paths)
-     * and at the joined-output limit check in {@link #isMaxRowsLimitReached}.
-     */
+    /// The max number of rows seen in the join. Recorded during right table build (normal and overflow paths)
+    /// and at the joined-output limit check in [#isMaxRowsLimitReached].
     MAX_ROWS_IN_JOIN(StatMap.Type.LONG) {
       @Override
       public long merge(long value1, long value2) {
         return Math.max(value1, value2);
       }
     },
-    /**
-     * Allocated memory in bytes for this operator or its children in the same stage.
-     */
+    /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
-    /**
-     * Time spent on GC while this operator or its children in the same stage were running.
-     */
+    /// Time spent on GC while this operator or its children in the same stage were running.
     GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;

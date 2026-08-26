@@ -47,30 +47,28 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Generates and stores page-cache warm-up queries for one or more tables.
- *
- * <p>This is the OSS, infrastructure-free way to populate the warm-up query files that Pinot servers
- * replay on restart and segment refresh. It reads candidate queries from a configurable source
- * (broker query logs, a query-statistics Pinot table, or a curated file), ranks them with the chosen
- * {@link WarmupQueryUtils.Policy}, rewrites the table reference to the table-name-with-type the
- * server expects, and stores them via the controller {@code /pagecache/queries} endpoint. Run it
- * periodically (e.g. from cron) to keep the warm-up sets fresh.</p>
- *
- * <p>Sample usage:</p>
- * <pre>{@code
- * pinot-admin.sh GeneratePageCacheWarmupQueries \
- *     -controllerHost localhost -controllerPort 9000 \
- *     -tables myTable -tableType OFFLINE \
- *     -source QUERY_LOG -queryLogFile /var/log/pinot/broker.log \
- *     -policy HYBRID
- * }</pre>
- */
+/// Generates and stores page-cache warm-up queries for one or more tables.
+///
+/// <p>This is the OSS, infrastructure-free way to populate the warm-up query files that Pinot servers
+/// replay on restart and segment refresh. It reads candidate queries from a configurable source
+/// (broker query logs, a query-statistics Pinot table, or a curated file), ranks them with the chosen
+/// {@link WarmupQueryUtils.Policy}, rewrites the table reference to the table-name-with-type the
+/// server expects, and stores them via the controller {@code /pagecache/queries} endpoint. Run it
+/// periodically (e.g. from cron) to keep the warm-up sets fresh.</p>
+///
+/// <p>Sample usage:</p>
+/// <pre>{@code
+/// pinot-admin.sh GeneratePageCacheWarmupQueries \
+///     -controllerHost localhost -controllerPort 9000 \
+///     -tables myTable -tableType OFFLINE \
+///     -source QUERY_LOG -queryLogFile /var/log/pinot/broker.log \
+///     -policy HYBRID
+/// }</pre>
 @CommandLine.Command(name = "GeneratePageCacheWarmupQueries", mixinStandardHelpOptions = true)
 public class GeneratePageCacheWarmupQueriesCommand extends AbstractDatabaseBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(GeneratePageCacheWarmupQueriesCommand.class);
 
-  /** Where warm-up query candidates are read from. */
+  /// Where warm-up query candidates are read from.
   public enum Source {
     QUERY_LOG, PINOT_TABLE, FILE
   }
@@ -228,10 +226,8 @@ public class GeneratePageCacheWarmupQueriesCommand extends AbstractDatabaseBaseA
     }
   }
 
-  /**
-   * Rewrites the selected queries to reference {@code rawTable_TYPE} and stores them (or logs them in
-   * dry-run mode).
-   */
+  /// Rewrites the selected queries to reference {@code rawTable_TYPE} and stores them (or logs them in
+  /// dry-run mode).
   private void storeForType(PinotAdminClient adminClient, String rawTable, TableType tableType,
       List<String> selectedQueries)
       throws Exception {
@@ -250,10 +246,8 @@ public class GeneratePageCacheWarmupQueriesCommand extends AbstractDatabaseBaseA
     LOGGER.info("Stored {} warm-up queries for {}", rewritten.size(), tableNameWithType);
   }
 
-  /**
-   * Resolves the set of (raw table, table types) to generate for: either the explicit {@code -tables}
-   * with {@code -tableType}, or, when none is given, every table that has page-cache warmup enabled.
-   */
+  /// Resolves the set of (raw table, table types) to generate for: either the explicit {@code -tables}
+  /// with {@code -tableType}, or, when none is given, every table that has page-cache warmup enabled.
   @VisibleForTesting
   Map<String, Set<TableType>> resolveTargetTables(PinotAdminClient adminClient)
       throws Exception {

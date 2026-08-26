@@ -144,8 +144,10 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
           break;
         }
         configs.put(MinionConstants.DOWNLOAD_URL_KEY, segmentZKMetadata.getDownloadUrl());
+        // Purge can reuse the original index directory, whose metadata may name the source table. Other conversion
+        // tasks use v1 because they regenerate destination-bound metadata; any future artifact-reuse path must use v2.
         configs.put(MinionConstants.UPLOAD_URL_KEY,
-            _clusterInfoAccessor.getVipUrlForLeadController(tableName) + "/segments");
+            _clusterInfoAccessor.getVipUrlForLeadController(tableName) + "/v2/segments");
         configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segmentZKMetadata.getCrc()));
         pinotTaskConfigs.add(new PinotTaskConfig(taskType, configs));
         tableNumTasks++;

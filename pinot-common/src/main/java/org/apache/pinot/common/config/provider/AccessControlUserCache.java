@@ -40,10 +40,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code AccessControlUserCache} caches all the user configs within the cluster, and listens on ZK changes to keep
- * them in sync. It also maintains several component user config maps.
- */
+/// The `AccessControlUserCache` caches all the user configs within the cluster, and listens on ZK changes to keep
+/// them in sync. It also maintains several component user config maps.
 public class AccessControlUserCache {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AccessControlUserCache.class);
@@ -87,6 +85,32 @@ public class AccessControlUserCache {
 
   public List<UserConfig> getAllControllerUserConfig() {
     return _userControllerConfigMap.values().stream().collect(Collectors.toList());
+  }
+
+  /// Returns the cache-owned controller user config for the given raw username, or `null` when no such user exists.
+  /// Callers must treat the returned config as read-only.
+  @Nullable
+  public UserConfig getControllerUserConfigForUsername(String rawUsername) {
+    if (rawUsername == null || !rawUsername.equals(rawUsername.trim())) {
+      return null;
+    }
+    String normalizedUsername = rawUsername;
+    UserConfig userConfig = _userControllerConfigMap.get(normalizedUsername + "_" + ComponentType.CONTROLLER);
+    if (userConfig != null) {
+      return userConfig;
+    }
+    // Principal names were historically trimmed after loading all users. Retain that compatibility on the uncommon
+    // slow path where a stored username itself contains leading or trailing whitespace.
+    UserConfig matchedUserConfig = null;
+    for (UserConfig candidate : _userControllerConfigMap.values()) {
+      if (candidate.getUserName().trim().equals(normalizedUsername)) {
+        if (matchedUserConfig != null) {
+          return null;
+        }
+        matchedUserConfig = candidate;
+      }
+    }
+    return matchedUserConfig;
   }
 
   public List<UserConfig> getAllBrokerUserConfig() {

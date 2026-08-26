@@ -24,8 +24,8 @@ import java.nio.charset.StandardCharsets;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.Calendar;
-import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -38,10 +38,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests deserialization of a ResultSet given hardcoded Pinot results.
- *
- */
+/// Tests deserialization of a ResultSet given hardcoded Pinot results.
 public class PinotResultSetTest {
   public static final String TEST_RESULT_SET_RESOURCE = "result_table.json";
   private DummyJsonTransport _dummyJsonTransport = new DummyJsonTransport();
@@ -289,7 +286,7 @@ public class PinotResultSetTest {
 
   private ResultSetGroup getResultSet(String resourceName) {
     _dummyJsonTransport._resource = resourceName;
-    Connection connection = ConnectionFactory.fromHostList(Collections.singletonList("dummy"), _dummyJsonTransport);
+    Connection connection = ConnectionFactory.fromHostList(List.of("dummy"), _dummyJsonTransport);
     return connection.execute("dummy");
   }
 

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.routing.timeboundary;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -109,8 +108,8 @@ public class TimeBoundaryManagerTest extends ControllerTest {
   private void testDailyPushTable(String rawTableName, TableConfig tableConfig, TimeUnit timeUnit) {
     ExternalView externalView = new ExternalView(tableConfig.getTableName());
     Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
-    Map<String, String> onlineInstanceStateMap = Collections.singletonMap("server", ONLINE);
-    Map<String, String> offlineInstanceStateMap = Collections.singletonMap("server", OFFLINE);
+    Map<String, String> onlineInstanceStateMap = Map.of("server", ONLINE);
+    Map<String, String> offlineInstanceStateMap = Map.of("server", OFFLINE);
     Set<String> onlineSegments = new HashSet<>();
     // NOTE: Ideal state is not used in the current implementation.
     IdealState idealState = new IdealState("");

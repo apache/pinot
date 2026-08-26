@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -56,24 +55,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * <h1>Overview</h1>
- * Assigns workers to the plan tree. Leaf stage should already have workers assigned before this Rule is run.
- * This rule also adds Exchanges when either of the following conditions are met:
- * <ul>
- *   <li>When the data distribution does not match the trait constraints.</li>
- *   <li>When the data is not sorted by the required RelCollation.</li>
- *   <li>When the workers don't match. E.g. if the workers are same but in different orders, then we'll need to
- *   add an exchange</li>
- * </ul>
- * <h1>Features</h1>
- * <ul>
- *   <li>If data is partitioned in the same way across the same number of workers, then Identity Exchange would be
- *   used.</li>
- *   <li>Can simplify Exchanges for arbitrarily long plans. E.g. you can have any number of joins on the partitioning
- *   key, and this Rule would still be able to use Identity Exchange for the entire plan.</li>
- * </ul>
- */
+/// # Overview
+///
+/// Assigns workers to the plan tree. Leaf stage should already have workers assigned before this Rule is run.
+/// This rule also adds Exchanges when either of the following conditions are met:
+///
+/// - When the data distribution does not match the trait constraints.
+/// - When the data is not sorted by the required RelCollation.
+/// - When the workers don't match. E.g. if the workers are same but in different orders, then we'll need to
+///   add an exchange
+///
+/// # Features
+///
+/// - If data is partitioned in the same way across the same number of workers, then Identity Exchange would be
+///   used.
+/// - Can simplify Exchanges for arbitrarily long plans. E.g. you can have any number of joins on the partitioning
+///   key, and this Rule would still be able to use Identity Exchange for the entire plan.
 public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkerExchangeAssignmentRule.class);
   private final PhysicalPlannerContext _physicalPlannerContext;
@@ -159,19 +156,17 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
       currentNode = currentNode.with(currentNode.getPRelInputs(), currentNodeDistribution);
       // Update current node with its distribution, and since this is a leaf stage boundary, add an identity exchange.
       return new PhysicalExchange(nodeId(), currentNode,
-          currentNode.getPinotDataDistribution(), Collections.emptyList(), ExchangeStrategy.IDENTITY_EXCHANGE,
+          currentNode.getPinotDataDistribution(), List.of(), ExchangeStrategy.IDENTITY_EXCHANGE,
           null, PinotExecStrategyTrait.getDefaultExecStrategy(), _physicalPlannerContext.getDefaultHashFunction());
     }
     // When no exchange, simply update current node with the distribution.
     return currentNode.with(currentNode.getPRelInputs(), currentNodeDistribution);
   }
 
-  /**
-   * For Hash Distributed nodes, for nodes like Join we can inherit multiple distribution traits from inputs.
-   * For SetOp nodes, we may have to drop some Distribution traits that we initially inferred from the left-most
-   * input. This is because SetOp nodes all fold into the same schema, and if any of the inputs is not distributed
-   * by a column, the entire SetOp is not distributed by that column.
-   */
+  /// For Hash Distributed nodes, for nodes like Join we can inherit multiple distribution traits from inputs.
+  /// For SetOp nodes, we may have to drop some Distribution traits that we initially inferred from the left-most
+  /// input. This is because SetOp nodes all fold into the same schema, and if any of the inputs is not distributed
+  /// by a column, the entire SetOp is not distributed by that column.
   PRelNode inheritDistDescFromInputs(PRelNode currentNode) {
     if (currentNode.getPRelInputs().size() <= 1
         || currentNode.getPinotDataDistributionOrThrow().getType() != RelDistribution.Type.HASH_DISTRIBUTED) {
@@ -288,7 +283,7 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
         // Add new identity exchange for sort.
         PinotDataDistribution newDataDistribution = derivedDistribution.withCollation(relCollation);
         currentNodeExchange = new PhysicalExchange(nodeId(), currentNode,
-            newDataDistribution, Collections.emptyList(), ExchangeStrategy.IDENTITY_EXCHANGE, relCollation,
+            newDataDistribution, List.of(), ExchangeStrategy.IDENTITY_EXCHANGE, relCollation,
             PinotExecStrategyTrait.getDefaultExecStrategy(), _physicalPlannerContext.getDefaultHashFunction());
       }
     } else {
@@ -305,11 +300,9 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
     return currentNodeExchange;
   }
 
-  /**
-   * There's no parent distribution and given distribution is not satisfied with default assignment.
-   * <b>Assumption:</b> Since no parent distribution, implies current node is single child and hence workers will
-   *   be same.
-   */
+  /// There's no parent distribution and given distribution is not satisfied with default assignment.
+  /// **Assumption:** Since no parent distribution, implies current node is single child and hence workers will
+  ///   be same.
   private PRelNode meetDistributionConstraintNoParent(PRelNode currentNode,
       PinotDataDistribution currentNodeDistribution, RelDistribution distributionConstraint) {
     Preconditions.checkState(!currentNodeDistribution.satisfies(distributionConstraint),
@@ -323,7 +316,11 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
           _physicalPlannerContext.getDefaultHashFunction());
     }
     if (distributionConstraint.getType() == RelDistribution.Type.SINGLETON) {
-      List<String> newWorkers = currentNodeDistribution.getWorkers().subList(0, 1);
+      // Pick a single worker to gather the data on. When the input has no workers (e.g. an empty leaf stage whose
+      // table has no routable segments), keep the singleton empty; the empty leaf is short-circuited to an empty
+      // result on the broker later (see PinotDispatchPlanner#finalizeDispatchableSubPlan).
+      List<String> currentWorkers = currentNodeDistribution.getWorkers();
+      List<String> newWorkers = currentWorkers.isEmpty() ? currentWorkers : currentWorkers.subList(0, 1);
       PinotDataDistribution pinotDataDistribution = new PinotDataDistribution(RelDistribution.Type.SINGLETON,
           newWorkers, newWorkers.hashCode(), null, null);
       return new PhysicalExchange(nodeId(), currentNode, pinotDataDistribution, List.of(),
@@ -467,10 +464,8 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
         .filter(desc -> desc.getKeys().size() == numExpectedKeys).findFirst();
   }
 
-  /**
-   * Computes the PinotDataDistribution of the given node from the input node. This assumes that all traits of the
-   * input node are already satisfied.
-   */
+  /// Computes the PinotDataDistribution of the given node from the input node. This assumes that all traits of the
+  /// input node are already satisfied.
   private PinotDataDistribution computeCurrentNodeDistribution(PRelNode currentNode, @Nullable PRelNode parent) {
     if (currentNode.getPinotDataDistribution() != null) {
       Preconditions.checkState(isLeafStageBoundary(currentNode, parent),

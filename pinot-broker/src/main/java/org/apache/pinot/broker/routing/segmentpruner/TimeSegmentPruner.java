@@ -20,7 +20,6 @@ package org.apache.pinot.broker.routing.segmentpruner;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -49,11 +48,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code TimeSegmentPruner} prunes segments based on their time column start & end time metadata stored in ZK.
- * The pruner
- * supports queries with filter (or nested filter) of EQUALITY and RANGE predicates.
- */
+/// The `TimeSegmentPruner` prunes segments based on their time column start & end time metadata stored in ZK.
+/// The pruner
+/// supports queries with filter (or nested filter) of EQUALITY and RANGE predicates.
 public class TimeSegmentPruner implements SegmentPruner {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimeSegmentPruner.class);
   private static final long MIN_START_TIME = 0;
@@ -126,11 +123,9 @@ public class TimeSegmentPruner implements SegmentPruner {
     _intervalTree = new IntervalTree<>(_intervalMap);
   }
 
-  /**
-   * NOTE: Pruning is done by searching _intervalTree based on request time interval and check if the results
-   *       are in the input segments. By doing so we will have run time O(M * logN) (N: # of all online segments,
-   *       M: # of qualified intersected segments).
-   */
+  /// NOTE: Pruning is done by searching \_intervalTree based on request time interval and check if the results
+  ///       are in the input segments. By doing so we will have run time O(M \* logN) (N: # of all online segments,
+  ///       M: # of qualified intersected segments).
   @Override
   public Set<String> prune(BrokerRequest brokerRequest, Set<String> segments) {
     IntervalTree<String> intervalTree = _intervalTree;
@@ -146,7 +141,7 @@ public class TimeSegmentPruner implements SegmentPruner {
     }
     if (intervals.isEmpty()) {
       // Invalid query time interval
-      return Collections.emptySet();
+      return Set.of();
     }
 
     Set<String> selectedSegments = new HashSet<>();
@@ -160,16 +155,14 @@ public class TimeSegmentPruner implements SegmentPruner {
     return selectedSegments;
   }
 
-  /**
-   * @return Null if no time condition or cannot filter base on the condition (e.g. 'SELECT * from myTable where time
-   *         < 50 OR firstName = Jason')
-   *         Empty list if time condition is specified but invalid (e.g. 'SELECT * from myTable where time < 50 AND
-   *         time > 100')
-   *         Sorted time intervals without overlapping if time condition is valid
-   *
-   * TODO: 1. Merge adjacent intervals
-   *       2. Set interval boundary using time granularity instead of millis
-   */
+  /// @return Null if no time condition or cannot filter base on the condition (e.g. 'SELECT \* from myTable where time
+  ///         < 50 OR firstName = Jason')
+  ///         Empty list if time condition is specified but invalid (e.g. 'SELECT * from myTable where time < 50 AND
+  ///         time > 100')
+  ///         Sorted time intervals without overlapping if time condition is valid
+  ///
+  /// TODO: 1. Merge adjacent intervals
+  ///       2. Set interval boundary using time granularity instead of millis
   @Nullable
   private List<Interval> getFilterTimeIntervals(Expression filterExpression) {
     Function function = filterExpression.getFunctionCall();
@@ -182,7 +175,7 @@ public class TimeSegmentPruner implements SegmentPruner {
           List<Interval> childIntervals = getFilterTimeIntervals(child);
           if (childIntervals != null) {
             if (childIntervals.isEmpty()) {
-              return Collections.emptyList();
+              return List.of();
             }
             andIntervals.add(childIntervals);
           }
@@ -278,10 +271,9 @@ public class TimeSegmentPruner implements SegmentPruner {
     return getIntersectionTwoSortedIntervals(interval1, interval2);
   }
 
-  /**
-   * Intersect two list of non-overlapping sorted intervals.
-   * E.g. {[1, 3], [4, 6], [7, 8], [10, 10]} and {[2, 5], [7, 9]} are merged as {[2, 3], [4, 5], [7, 8]}
-   */
+  /// Intersect two list of non-overlapping sorted intervals.
+  /// E.g. {\[1, 3\], \[4, 6\], \[7, 8\], \[10, 10\]} and {\[2, 5\], \[7, 9\]} are merged as {\[2, 3\], \[4, 5\], \[7,
+  /// 8\]}
   private List<Interval> getIntersectionTwoSortedIntervals(List<Interval> intervals1, List<Interval> intervals2) {
     List<Interval> res = new ArrayList<>();
     int size1 = intervals1.size();
@@ -319,10 +311,8 @@ public class TimeSegmentPruner implements SegmentPruner {
     return getUnionTwoSortedIntervals(intervals1, intervals2);
   }
 
-  /**
-   * Union two list of non-overlapping sorted intervals.
-   * E.g. {[1, 2], [5, 7], [9, 10]} and {[2, 3], [4, 8]} are merged as {[1, 3], [4, 8], [9, 10]}
-   */
+  /// Union two list of non-overlapping sorted intervals.
+  /// E.g. {\[1, 2\], \[5, 7\], \[9, 10\]} and {\[2, 3\], \[4, 8\]} are merged as {\[1, 3\], \[4, 8\], \[9, 10\]}
   private List<Interval> getUnionTwoSortedIntervals(List<Interval> intervals1, List<Interval> intervals2) {
     List<Interval> res = new ArrayList<>();
     int size1 = intervals1.size();
@@ -349,9 +339,7 @@ public class TimeSegmentPruner implements SegmentPruner {
     return res;
   }
 
-  /**
-   * Returns the complement (non-overlapping sorted intervals) of the given non-overlapping sorted intervals.
-   */
+  /// Returns the complement (non-overlapping sorted intervals) of the given non-overlapping sorted intervals.
   private List<Interval> getComplementSortedIntervals(List<Interval> intervals) {
     List<Interval> res = new ArrayList<>();
     long startTime = MIN_START_TIME;
@@ -394,10 +382,8 @@ public class TimeSegmentPruner implements SegmentPruner {
     return _timeFormatSpec.fromFormatToMillis(value);
   }
 
-  /**
-   * Parse interval to millisecond as [min, max] with both sides included.
-   * E.g. '(* 16311]' is parsed as [0, 16311], '(1455 16311)' is parsed as [1456, 16310]
-   */
+  /// Parse interval to millisecond as \[min, max\] with both sides included.
+  /// E.g. '(\* 16311\]' is parsed as \[0, 16311\], '(1455 16311)' is parsed as \[1456, 16310\]
   private List<Interval> parseInterval(String rangeString) {
     long startTime = MIN_START_TIME;
     long endTime = MAX_END_TIME;

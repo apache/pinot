@@ -35,20 +35,18 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-/**
- * Source-agnostic logic for generating page-cache warm-up queries: it ranks observed queries into a
- * warm-up set ({@link #select}), rewrites a query's table reference to the table-name-with-type the
- * server expects ({@link #rewriteTableName}), and parses broker query-log lines into candidates
- * ({@link #parseLogLine}).
- *
- * <p>This is the OSS port of the long-standing offline warm-up selection job, kept in one place so the
- * admin CLI today and a future on-broker collector can reuse it. The nested {@link Candidate},
- * {@link Policy} and {@link Config} types model the inputs; all methods are stateless and thread-safe.</p>
- *
- * <p>The warm-up <i>execution</i> and <i>storage</i> machinery (the controller {@code /pagecache/queries}
- * endpoint and the server replay) is generic and lives elsewhere; this class only fills the gap of
- * deciding <i>which</i> queries to store.</p>
- */
+/// Source-agnostic logic for generating page-cache warm-up queries: it ranks observed queries into a
+/// warm-up set ({@link #select}), rewrites a query's table reference to the table-name-with-type the
+/// server expects ({@link #rewriteTableName}), and parses broker query-log lines into candidates
+/// ({@link #parseLogLine}).
+///
+/// <p>This is the OSS port of the long-standing offline warm-up selection job, kept in one place so the
+/// admin CLI today and a future on-broker collector can reuse it. The nested {@link Candidate},
+/// {@link Policy} and {@link Config} types model the inputs; all methods are stateless and thread-safe.</p>
+///
+/// <p>The warm-up <i>execution</i> and <i>storage</i> machinery (the controller {@code /pagecache/queries}
+/// endpoint and the server replay) is generic and lives elsewhere; this class only fills the gap of
+/// deciding <i>which</i> queries to store.</p>
 public class WarmupQueryUtils {
   private static final long MILLIS_PER_HOUR = 3600_000L;
 
@@ -67,16 +65,14 @@ public class WarmupQueryUtils {
   // Selection
   // ===============================================================================================
 
-  /**
-   * Selects warm-up queries from {@code candidates} using {@code policy}.
-   *
-   * <p>All statistics are best-effort: when a source cannot provide timestamps or latency/scan
-   * statistics, the percentile/time-bucket policies degrade to taking candidates in supplied order, so
-   * a plain file of queries still yields a usable warm-up set. The returned queries still reference the
-   * raw table name; callers rewrite them via {@link #rewriteTableName} before storing.</p>
-   *
-   * @return the de-duplicated, capped list of selected query strings, in selection order; never null
-   */
+  /// Selects warm-up queries from {@code candidates} using {@code policy}.
+  ///
+  /// <p>All statistics are best-effort: when a source cannot provide timestamps or latency/scan
+  /// statistics, the percentile/time-bucket policies degrade to taking candidates in supplied order, so
+  /// a plain file of queries still yields a usable warm-up set. The returned queries still reference the
+  /// raw table name; callers rewrite them via {@link #rewriteTableName} before storing.</p>
+  ///
+  /// @return the de-duplicated, capped list of selected query strings, in selection order; never null
   public static List<String> select(List<Candidate> candidates, Policy policy, Config config) {
     List<Candidate> filtered = prefilter(candidates, config);
     if (filtered.isEmpty()) {
@@ -101,7 +97,7 @@ public class WarmupQueryUtils {
     return dedupAndCap(selected, config.getMaxQueries());
   }
 
-  /** Drops error responses, blank queries and queries longer than the configured maximum. */
+  /// Drops error responses, blank queries and queries longer than the configured maximum.
   private static List<Candidate> prefilter(List<Candidate> candidates, Config config) {
     if (candidates == null) {
       return List.of();
@@ -113,11 +109,9 @@ public class WarmupQueryUtils {
         .collect(Collectors.toList());
   }
 
-  /**
-   * Spreads selection across the look-back window: divides it into {@code frequencyHours} buckets and
-   * draws an even share from each, newest first. Candidates without a usable timestamp fall outside
-   * every bucket; if that leaves the result empty, falls back to insertion order.
-   */
+  /// Spreads selection across the look-back window: divides it into {@code frequencyHours} buckets and
+  /// draws an even share from each, newest first. Candidates without a usable timestamp fall outside
+  /// every bucket; if that leaves the result empty, falls back to insertion order.
   private static List<Candidate> uniform(List<Candidate> filtered, Config config) {
     long now = config.getNowMs();
     int lookbackHours = config.getLookbackHours();
@@ -146,10 +140,8 @@ public class WarmupQueryUtils {
     return result.isEmpty() ? new ArrayList<>(filtered) : result;
   }
 
-  /**
-   * Keeps candidates whose metric exceeds the configured percentile cut-off, ordered by the metric
-   * descending. Falls back to insertion order when the metric is unavailable (all zero).
-   */
+  /// Keeps candidates whose metric exceeds the configured percentile cut-off, ordered by the metric
+  /// descending. Falls back to insertion order when the metric is unavailable (all zero).
   private static List<Candidate> byPercentile(List<Candidate> filtered, Config config,
       ToLongFunction<Candidate> metric) {
     long[] values = filtered.stream().mapToLong(metric).toArray();
@@ -161,10 +153,8 @@ public class WarmupQueryUtils {
     return selected.isEmpty() ? new ArrayList<>(filtered) : selected;
   }
 
-  /**
-   * Round-robin merge of the uniform, latency and num-docs-scanned selections, so the final set blends
-   * recency, slow queries and heavy scans. De-duplication and capping are applied by {@link #select}.
-   */
+  /// Round-robin merge of the uniform, latency and num-docs-scanned selections, so the final set blends
+  /// recency, slow queries and heavy scans. De-duplication and capping are applied by {@link #select}.
   private static List<Candidate> hybrid(List<Candidate> filtered, Config config) {
     List<List<Candidate>> lists = List.of(
         uniform(filtered, config),
@@ -182,10 +172,8 @@ public class WarmupQueryUtils {
     return merged;
   }
 
-  /**
-   * De-duplicates by {@link Candidate#getDedupKey()} preserving order, returns the query strings, and
-   * caps the result at {@code maxQueries}.
-   */
+  /// De-duplicates by {@link Candidate#getDedupKey()} preserving order, returns the query strings, and
+  /// caps the result at {@code maxQueries}.
   private static List<String> dedupAndCap(List<Candidate> candidates, int maxQueries) {
     Set<String> seen = new HashSet<>();
     List<String> result = new ArrayList<>();
@@ -200,7 +188,7 @@ public class WarmupQueryUtils {
     return result;
   }
 
-  /** Nearest-rank percentile over {@code values}. Returns {@code 0} for an empty array. */
+  /// Nearest-rank percentile over {@code values}. Returns {@code 0} for an empty array.
   static long percentile(long[] values, int percentile) {
     if (values.length == 0) {
       return 0;
@@ -216,17 +204,15 @@ public class WarmupQueryUtils {
   // Table-name rewrite
   // ===============================================================================================
 
-  /**
-   * Returns {@code query} with every {@code FROM}/{@code JOIN} reference to {@code rawTableName}
-   * replaced by {@code tableNameWithType} (e.g. {@code myTable} &rarr; {@code myTable_OFFLINE}).
-   *
-   * <p>This is required because the server warm-up executor compiles each stored query and resolves
-   * the table strictly by the name in its {@code FROM} clause. Unlike a naive {@code String.replace},
-   * the table identifier is only substituted when it is a {@code FROM}/{@code JOIN} target, guarded by
-   * word boundaries and an optional pair of double quotes, so columns, aliases or string literals that
-   * merely contain the table name are left untouched. The keyword is matched case-insensitively; the
-   * identifier case-sensitively (Pinot table names are case-sensitive).</p>
-   */
+  /// Returns {@code query} with every {@code FROM}/{@code JOIN} reference to {@code rawTableName}
+  /// replaced by {@code tableNameWithType} (e.g. {@code myTable} &rarr; {@code myTable_OFFLINE}).
+  ///
+  /// <p>This is required because the server warm-up executor compiles each stored query and resolves
+  /// the table strictly by the name in its {@code FROM} clause. Unlike a naive {@code String.replace},
+  /// the table identifier is only substituted when it is a {@code FROM}/{@code JOIN} target, guarded by
+  /// word boundaries and an optional pair of double quotes, so columns, aliases or string literals that
+  /// merely contain the table name are left untouched. The keyword is matched case-insensitively; the
+  /// identifier case-sensitively (Pinot table names are case-sensitive).</p>
   public static String rewriteTableName(String query, String rawTableName, String tableNameWithType) {
     if (query == null || query.isEmpty() || rawTableName == null || rawTableName.isEmpty()) {
       return query;
@@ -251,21 +237,19 @@ public class WarmupQueryUtils {
   // Broker query-log parsing
   // ===============================================================================================
 
-  /**
-   * Parses a single broker query-log line (as emitted by {@code QueryLogger}) into a candidate.
-   *
-   * <p>A line is a comma-separated list of {@code key=value} entries with the SQL appended last as
-   * {@code query=<SQL>}; because the SQL may contain commas, everything after the final {@code ,query=}
-   * marker is the query text. The {@code table=} field is normalized to the raw table name (a
-   * {@code _OFFLINE}/{@code _REALTIME} suffix is stripped); multi-stage queries that touch several
-   * tables are logged as {@code table=[t1, t2]} and skipped, since warm-up replays each query against a
-   * single table. Truncated lines (query length reaches {@code maxQueryLengthToLog}) and lines without a
-   * parseable query/table are skipped (return {@code null}); query exceptions are recorded as a non-zero
-   * error code so {@link #select} filters them.</p>
-   *
-   * @param maxQueryLengthToLog the broker's {@code pinot.broker.query.log.length}; pass {@code 0} to
-   *                            disable the truncation check (the broker default does not truncate).
-   */
+  /// Parses a single broker query-log line (as emitted by {@code QueryLogger}) into a candidate.
+  ///
+  /// <p>A line is a comma-separated list of {@code key=value} entries with the SQL appended last as
+  /// {@code query=<SQL>}; because the SQL may contain commas, everything after the final {@code ,query=}
+  /// marker is the query text. The {@code table=} field is normalized to the raw table name (a
+  /// {@code _OFFLINE}/{@code _REALTIME} suffix is stripped); multi-stage queries that touch several
+  /// tables are logged as {@code table=[t1, t2]} and skipped, since warm-up replays each query against a
+  /// single table. Truncated lines (query length reaches {@code maxQueryLengthToLog}) and lines without a
+  /// parseable query/table are skipped (return {@code null}); query exceptions are recorded as a non-zero
+  /// error code so {@link #select} filters them.</p>
+  ///
+  /// @param maxQueryLengthToLog the broker's {@code pinot.broker.query.log.length}; pass {@code 0} to
+  ///                            disable the truncation check (the broker default does not truncate).
   @Nullable
   public static ParsedLine parseLogLine(String line, int maxQueryLengthToLog) {
     if (StringUtils.isBlank(line)) {
@@ -321,18 +305,18 @@ public class WarmupQueryUtils {
   // Input types
   // ===============================================================================================
 
-  /** Strategy for ranking {@link Candidate}s into a warm-up set; names line up with the table config. */
+  /// Strategy for ranking {@link Candidate}s into a warm-up set; names line up with the table config.
   public enum Policy {
-    /** Sample uniformly from time buckets across the look-back window. */
+    /// Sample uniformly from time buckets across the look-back window.
     UNIFORM,
-    /** Prefer the slowest queries (above the latency percentile cut-off). */
+    /// Prefer the slowest queries (above the latency percentile cut-off).
     LATENCY,
-    /** Prefer the heaviest scans (above the documents-scanned percentile cut-off). */
+    /// Prefer the heaviest scans (above the documents-scanned percentile cut-off).
     NUM_DOCS_SCANNED,
-    /** Round-robin merge of {@link #UNIFORM}, {@link #LATENCY} and {@link #NUM_DOCS_SCANNED}. */
+    /// Round-robin merge of {@link #UNIFORM}, {@link #LATENCY} and {@link #NUM_DOCS_SCANNED}.
     HYBRID;
 
-    /** Parses a policy name case-insensitively, defaulting to {@link #UNIFORM} for null/blank input. */
+    /// Parses a policy name case-insensitively, defaulting to {@link #UNIFORM} for null/blank input.
     public static Policy fromString(String value) {
       if (value == null || value.trim().isEmpty()) {
         return UNIFORM;
@@ -341,11 +325,9 @@ public class WarmupQueryUtils {
     }
   }
 
-  /**
-   * A single observed query plus the lightweight statistics used to rank it. Immutable. Any statistic
-   * unknown for a source is left at {@code 0}; the {@link #getQuery() query} references the raw table
-   * name.
-   */
+  /// A single observed query plus the lightweight statistics used to rank it. Immutable. Any statistic
+  /// unknown for a source is left at {@code 0}; the {@link #getQuery() query} references the raw table
+  /// name.
   public static class Candidate {
     private final String _query;
     private final long _requestTimeMs;
@@ -385,13 +367,13 @@ public class WarmupQueryUtils {
       return _errorCode;
     }
 
-    /** The de-duplication key: the query hash when present, otherwise the trimmed query text. */
+    /// The de-duplication key: the query hash when present, otherwise the trimmed query text.
     public String getDedupKey() {
       return StringUtils.isNotBlank(_queryHash) ? _queryHash : StringUtils.trimToEmpty(_query);
     }
   }
 
-  /** The result of parsing one query-log line: the raw target table and its warm-up candidate. */
+  /// The result of parsing one query-log line: the raw target table and its warm-up candidate.
   public static class ParsedLine {
     private final String _tableName;
     private final Candidate _candidate;
@@ -410,7 +392,7 @@ public class WarmupQueryUtils {
     }
   }
 
-  /** Selection tunables; build with {@link Builder}. Defaults mirror the offline warm-up job. */
+  /// Selection tunables; build with {@link Builder}. Defaults mirror the offline warm-up job.
   public static class Config {
     public static final int DEFAULT_LOOKBACK_HOURS = 48;
     public static final int DEFAULT_FREQUENCY_HOURS = 4;

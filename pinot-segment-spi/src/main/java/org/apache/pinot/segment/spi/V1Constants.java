@@ -46,7 +46,7 @@ public class V1Constants {
     public static final String BITMAP_INVERTED_INDEX_FILE_EXTENSION = ".bitmap.inv";
     public static final String BITMAP_RANGE_INDEX_FILE_EXTENSION = ".bitmap.range";
     public static final String JSON_INDEX_FILE_EXTENSION = ".json.idx";
-    /** @deprecated Legacy native text index file extension kept only for cleanup and migration logic. */
+    /// @deprecated Legacy native text index file extension kept only for cleanup and migration logic.
     @Deprecated
     public static final String DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION = ".nativetext.idx";
     public static final String H3_INDEX_FILE_EXTENSION = ".h3.idx";
@@ -73,6 +73,20 @@ public class V1Constants {
     public static final String VECTOR_HNSW_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".vector.hnsw.mapping";
     public static final String VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION = ".vector.ivfflat.index";
     public static final String VECTOR_IVF_PQ_INDEX_FILE_EXTENSION = ".vector.ivfpq.index";
+    /// Combined-form IVF file extensions. Written by the IVF creators when
+    /// `VectorIndexConfig.storeInSegmentFile` is `true`; consumed (and removed) by the
+    /// V2→V3 format converter, which packs the bytes into `columns.psf` as a typed entry via
+    /// the standard `copyIndexIfExists` loop. Mirrors the text-index `.text.index`
+    /// extension that signals "ready to be consolidated into the combined segment file."
+    public static final String VECTOR_IVF_FLAT_COMBINED_INDEX_FILE_EXTENSION = ".vector.ivfflat.combined.index";
+    public static final String VECTOR_IVF_PQ_COMBINED_INDEX_FILE_EXTENSION = ".vector.ivfpq.combined.index";
+    /// Combined-form HNSW file — packs the Lucene HNSW directory's files (and the optional docId
+    /// mapping file) into a single file using the same LUCENE_V2 layout the text index uses.
+    /// Build-time transient: the V2→V3 converter packs it into `columns.psf` and removes the
+    /// sibling. At read time the bytes are exposed as a Lucene `Directory` backed by a
+    /// `PinotDataBuffer` slice, so `KnnVectorsReader` works against the consolidated
+    /// entry without re-extracting to disk.
+    public static final String VECTOR_HNSW_COMBINED_INDEX_FILE_EXTENSION = ".vector.hnsw.combined.index";
   }
 
   public static class MetadataKeys {
@@ -85,11 +99,9 @@ public class V1Constants {
       public static final String TABLE_NAME = "segment.table.name";
       public static final String DIMENSIONS = "segment.dimension.column.names";
       public static final String METRICS = "segment.metric.column.names";
-      /**
-       * The primary time column for the table. This will match the timeColumnName defined in the tableConfig.
-       * In the Pinot schema, this column can be defined as either a TimeFieldSpec (which is deprecated) or
-       * DateTimeFieldSpec
-       */
+      /// The primary time column for the table. This will match the timeColumnName defined in the tableConfig.
+      /// In the Pinot schema, this column can be defined as either a TimeFieldSpec (which is deprecated) or
+      /// DateTimeFieldSpec
       public static final String TIME_COLUMN_NAME = "segment.time.column.name";
       public static final String TIME_UNIT = "segment.time.unit";
       public static final String SEGMENT_START_TIME = "segment.start.time";
@@ -143,6 +155,12 @@ public class V1Constants {
       public static final String FORWARD_INDEX_ENCODING = "forwardIndexEncoding";
       // Mandatory, treated as `false` when missing for backward compatibility
       public static final String IS_SORTED = "isSorted";
+      // Optional, treated as `false` when missing for backward compatibility. Set to `true` only when null handling is
+      // enabled for the column but it has no null values, so the null value vector bitmap file is skipped. This
+      // distinguishes "null handling applied, no nulls" (flag set, no bitmap file) from "null handling never applied"
+      // (no flag, no bitmap file) — which absence of the bitmap file alone cannot. Columns that do have null values
+      // are identified by the presence of the bitmap file and are not flagged.
+      public static final String IS_NON_NULL = "isNonNull";
       // Optional
       public static final String MIN_VALUE = "minValue";
       // Optional
@@ -181,6 +199,13 @@ public class V1Constants {
       // Whether this OPEN_STRUCT column has a sparse column for keys not materialized as dense.
       public static final String HAS_SPARSE_COLUMN = "hasSparseColumn";
 
+      // Names of the keys in this OPEN_STRUCT column's sparse column, stored as a JSON array
+      // string. Commas and quotes inside a key round-trip. A backslash does not, once there are
+      // two or more keys: the commas make the list delimiter handler treat the value as a list and
+      // strip the escape, leaving invalid JSON on reload. Absent on segments built before the
+      // sparse read path — readers must treat every unmaterialized key as potentially sparse.
+      public static final String SPARSE_KEYS = "sparseKeys";
+
       /// Partition function, all optional
       public static final String PARTITION_FUNCTION = "partitionFunction";
       public static final String NUM_PARTITIONS = "numPartitions";
@@ -197,6 +222,14 @@ public class V1Constants {
       public static final String TOTAL_DOCS = "totalDocs";
 
       public static final String COLUMN_PROPS_KEY_PREFIX = "column.";
+      /// Optional uncompressed serialized column-value bytes for a raw forward index.
+      public static final String FORWARD_INDEX_RAW_UNCOMPRESSED_VALUE_SIZE_IN_BYTES =
+          "forwardIndex.rawUncompressedValueSizeInBytes";
+      public static final String FORWARD_INDEX_RAW_CHUNK_COMPRESSION_TYPE =
+          "forwardIndex.rawChunkCompressionType";
+      /// Uncompressed serialized column-value bytes for dictionary encoding, written at seal time.
+      public static final String FORWARD_INDEX_DICTIONARY_ENCODED_UNCOMPRESSED_VALUE_SIZE_IN_BYTES =
+          "forwardIndex.dictionaryEncodedUncompressedValueSizeInBytes";
 
       public static String getKeyFor(String column, String key) {
         return COLUMN_PROPS_KEY_PREFIX + column + "." + key;

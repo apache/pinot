@@ -20,7 +20,6 @@ package org.apache.pinot.perf;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -100,9 +99,9 @@ public class BenchmarkQueriesSSQE extends BaseQueriesTest {
       .setRangeIndexColumns(List.of(INT_COL_NAME, LOW_CARDINALITY_STRING_COL))
       .setJsonIndexColumns(List.of(JSON_COL))
       .setStarTreeIndexConfigs(
-          Collections.singletonList(
+          List.of(
               new StarTreeIndexConfig(List.of(SORTED_COL_NAME, INT_COL_NAME), null,
-                  Collections.singletonList(
+                  List.of(
                       new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()),
                   null, Integer.MAX_VALUE))).build();
 

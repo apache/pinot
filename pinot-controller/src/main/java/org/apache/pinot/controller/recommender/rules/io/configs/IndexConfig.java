@@ -24,10 +24,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 
-/**
- * The output format of index, bloomFilter, and dictionary recommendation,
- * can also be used as input to overwrite index configurations
- */
+/// The output format of index, bloomFilter, and dictionary recommendation,
+/// can also be used as input to overwrite index configurations
 public class IndexConfig {
   Set<String> _invertedIndexColumns = new HashSet<>();
   Set<String> _rangeIndexColumns = new HashSet<>();

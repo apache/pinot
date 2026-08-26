@@ -20,7 +20,7 @@ package org.apache.pinot.segment.local.segment.index.bloom;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
-import java.util.Collections;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -82,7 +82,7 @@ public class BloomIndexTypeTest {
         throws IOException {
       BloomFilterConfig config =
           JsonUtils.stringToObject(confStr, BloomFilterConfig.class);
-      _tableConfig.getIndexingConfig().setBloomFilterConfigs(Collections.singletonMap("dimInt", config));
+      _tableConfig.getIndexingConfig().setBloomFilterConfigs(Map.of("dimInt", config));
 
       assertEquals(config);
     }
@@ -117,7 +117,7 @@ public class BloomIndexTypeTest {
               + "  \"loadOnHeap\": true"
               + "}", BloomFilterConfig.class
       );
-      _tableConfig.getIndexingConfig().setBloomFilterConfigs(Collections.singletonMap("dimInt", config));
+      _tableConfig.getIndexingConfig().setBloomFilterConfigs(Map.of("dimInt", config));
       _tableConfig.getIndexingConfig().setBloomFilterColumns(
           JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef)
       );
@@ -161,7 +161,7 @@ public class BloomIndexTypeTest {
       );
       BloomFilterConfig config =
           JsonUtils.stringToObject(confStr, BloomFilterConfig.class);
-      _tableConfig.getIndexingConfig().setBloomFilterConfigs(Collections.singletonMap("dimInt", config));
+      _tableConfig.getIndexingConfig().setBloomFilterConfigs(Map.of("dimInt", config));
       convertToUpdatedFormat();
       assertNotNull(_tableConfig.getFieldConfigList());
       assertFalse(_tableConfig.getFieldConfigList().isEmpty());

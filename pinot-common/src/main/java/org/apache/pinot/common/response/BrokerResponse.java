@@ -19,7 +19,9 @@
 package org.apache.pinot.common.response;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.List;
@@ -36,31 +38,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Interface for broker response.
- */
+/// Interface for broker response.
 public interface BrokerResponse {
   Logger LOGGER = LoggerFactory.getLogger(BrokerResponse.class);
 
-  /**
-   * Convert the broker response to JSON String.
-   */
+  /// Convert the broker response to JSON String.
   default String toJsonString()
       throws IOException {
     return JsonUtils.objectToString(this);
   }
 
-  /**
-   * Write the object JSON to the output stream.
-   */
+  /// Write the object JSON to the output stream.
   default void toOutputStream(OutputStream outputStream)
       throws IOException {
     JsonUtils.objectToOutputStream(this, outputStream);
   }
 
-  /**
-   * Convert the broker response metadata to JSON String.
-   */
+  /// Convert the broker response metadata to JSON String.
   default String toMetadataJsonString()
       throws IOException {
     ObjectNode objectNode = (ObjectNode) JsonUtils.objectToJsonNode(this);
@@ -68,14 +62,12 @@ public interface BrokerResponse {
     return JsonUtils.objectToString(objectNode);
   }
 
-  /**
-   * Emits metrics for the BrokerResponse. Currently only emits metrics for exceptions.
-   * If a broker response has multiple exceptions, we will emit metrics for all of them.
-   * Thus, the sum total of all exceptions is >= total number of queries impacted.
-   * Additionally, some parts of code might already be emitting metrics for individual error codes.
-   * But that list isn't accurate with a many-to-many relationship (or no metrics) between error codes and metrics.
-   * This method ensures we emit metrics for all queries that have exceptions with a one-to-one mapping.
-   */
+  /// Emits metrics for the BrokerResponse. Currently only emits metrics for exceptions.
+  /// If a broker response has multiple exceptions, we will emit metrics for all of them.
+  /// Thus, the sum total of all exceptions is >= total number of queries impacted.
+  /// Additionally, some parts of code might already be emitting metrics for individual error codes.
+  /// But that list isn't accurate with a many-to-many relationship (or no metrics) between error codes and metrics.
+  /// This method ensures we emit metrics for all queries that have exceptions with a one-to-one mapping.
   default void emitBrokerResponseMetrics(BrokerMetrics brokerMetrics) {
     boolean hasCriticalError = false;
     boolean hasNonCriticalError = false;
@@ -103,346 +95,220 @@ public interface BrokerResponse {
     }
   }
 
-  /**
-   * Returns the result table.
-   */
+  /// Returns the result table.
   @Nullable
   ResultTable getResultTable();
 
-  /**
-   * Sets the result table. We expose this method to allow modifying the results on the client side, e.g. hiding the
-   * results and only showing the stats.
-   */
+  /// Sets the result table. We expose this method to allow modifying the results on the client side, e.g. hiding the
+  /// results and only showing the stats.
   void setResultTable(@Nullable ResultTable resultTable);
 
-  /**
-   * Returns the number of rows in the result table.
-   */
+  /// Returns the number of rows in the result table.
   int getNumRowsResultSet();
 
-  /**
-   * Returns whether the query doesn't guarantee to have the complete result due to exceptions or limits.
-   */
+  /// Returns whether the query doesn't guarantee to have the complete result due to exceptions or limits.
   boolean isPartialResult();
 
-  /**
-   * Returns the processing exceptions encountered during the query execution.
-   */
+  /// Returns the processing exceptions encountered during the query execution.
   List<QueryProcessingException> getExceptions();
-
-  @Deprecated
-  @JsonIgnore
-  default List<QueryProcessingException> getProcessingExceptions() {
-    return getExceptions();
-  }
 
   @JsonIgnore
   default int getExceptionsSize() {
     return getExceptions().size();
   }
 
-  /**
-   * Returns whether groups were trimmed (reduced in size after sorting).
-   */
+  /// Returns whether groups were trimmed (reduced in size after sorting).
   boolean isGroupsTrimmed();
 
-  /**
-   * Returns whether the number of groups limit has been reached.
-   */
+  /// Returns whether the number of groups limit has been reached.
   boolean isNumGroupsLimitReached();
 
-  /**
-   * Returns whether the number of groups warning limit has been reached.
-   */
+  /// Returns whether the number of groups warning limit has been reached.
   boolean isNumGroupsWarningLimitReached();
 
-  /**
-   * Returns whether the limit for max rows in join has been reached.
-   */
+  /// Returns whether the limit for max rows in join has been reached.
   boolean isMaxRowsInJoinReached();
 
-  /**
-   * Returns whether the limit for max rows in window has been reached.
-   */
+  /// Returns whether the limit for max rows in window has been reached.
   boolean isMaxRowsInWindowReached();
 
-  /**
-   * Returns whether the MSE Lite leaf-stage limit has been reached.
-   */
+  /// Returns whether the MSE Lite leaf-stage limit has been reached.
   default boolean isMseLiteLeafStageLimitReached() {
     return false;
   }
 
-  /**
-   * Returns the total time used for query execution in milliseconds.
-   */
+  /// Returns the total time used for query execution in milliseconds.
   long getTimeUsedMs();
 
-  /**
-   * Returns the request ID of the query.
-   */
+  /// Returns the request ID of the query.
   String getRequestId();
 
-  /**
-   * Sets the request ID of the query.
-   */
+  /// Sets the request ID of the query.
   void setRequestId(String requestId);
 
-  /**
-   * Returns the client request IF of the query (if any).
-   */
+  /// Returns the client request IF of the query (if any).
   String getClientRequestId();
 
-  /**
-   * Sets the (optional) client requestID of the query;
-   */
+  /// Sets the (optional) client requestID of the query;
   void setClientRequestId(String clientRequestId);
 
-  /**
-   * Returns the broker ID that handled the query.
-   */
+  /// Returns the broker ID that handled the query.
   String getBrokerId();
 
-  /**
-   * Sets the broker ID that handled the query.
-   */
+  /// Sets the broker ID that handled the query.
   void setBrokerId(String brokerId);
 
-  /**
-   * Returns the number of documents selected (matching the filter) for the query.
-   */
+  /// Returns the number of documents selected (matching the filter) for the query.
   long getNumDocsScanned();
 
-  /**
-   * Returns the total number of documents within the table(s) hit.
-   */
+  /// Returns the total number of documents within the table(s) hit.
   long getTotalDocs();
 
-  /**
-   * Returns the number of entries scanned in filter phase while processing the query.
-   */
+  /// Returns the number of entries scanned in filter phase while processing the query.
   long getNumEntriesScannedInFilter();
 
-  /**
-   * Returns the number of entries scanned post filter phase while processing the query.
-   */
+  /// Returns the number of entries scanned post filter phase while processing the query.
   long getNumEntriesScannedPostFilter();
 
-  /**
-   * Returns the number of servers queried.
-   */
+  /// Returns the number of servers queried.
   int getNumServersQueried();
 
-  /**
-   * Returns the number of servers responded.
-   */
+  /// Returns the number of servers responded.
   int getNumServersResponded();
 
-  /**
-   * Returns the number of segments queried by the broker after broker side pruning.
-   */
+  /// Returns the number of segments queried by the broker after broker side pruning.
   long getNumSegmentsQueried();
 
-  /**
-   * Returns the number of segments processed by server after server side pruning.
-   */
+  /// Returns the number of segments processed by server after server side pruning.
   long getNumSegmentsProcessed();
 
-  /**
-   * Returns the number of segments that had at least one matching document.
-   */
+  /// Returns the number of segments that had at least one matching document.
   long getNumSegmentsMatched();
 
-  /**
-   * Returns the number of consuming segments queried by the broker after broker side pruning.
-   */
+  /// Returns the number of consuming segments queried by the broker after broker side pruning.
   long getNumConsumingSegmentsQueried();
 
-  /**
-   * Returns the number of consuming segments processed by server after server side pruning.
-   */
+  /// Returns the number of consuming segments processed by server after server side pruning.
   long getNumConsumingSegmentsProcessed();
 
-  /**
-   * Returns the number of consuming segments that had at least one matching document.
-   */
+  /// Returns the number of consuming segments that had at least one matching document.
   long getNumConsumingSegmentsMatched();
 
-  /**
-   * Returns the minimum freshness timestamp across consuming segments that were queried.
-   *
-   * The freshness timestamp for a segment is the largest event ingestion timestamp if provided by the stream, or the
-   * index timestamp of the last message.
-   */
+  /// Returns the minimum freshness timestamp across consuming segments that were queried.
+  ///
+  /// The freshness timestamp for a segment is the largest event ingestion timestamp if provided by the stream, or the
+  /// index timestamp of the last message.
   long getMinConsumingFreshnessTimeMs();
 
-  /**
-   * Returns the number of segments pruned on the broker side.
-   */
+  /// Returns the number of segments pruned on the broker side.
   long getNumSegmentsPrunedByBroker();
 
-  /**
-   * Returns the number of segments pruned on the server side.
-   */
+  /// Returns the number of segments pruned on the server side.
   long getNumSegmentsPrunedByServer();
 
-  /**
-   * Returns the number of segments pruned due to invalid data or schema.
-   *
-   * This value is always lower or equal than {@link #getNumSegmentsPrunedByServer()}
-   */
+  /// Returns the number of segments pruned due to invalid data or schema.
+  ///
+  /// This value is always lower or equal than [#getNumSegmentsPrunedByServer()]
   long getNumSegmentsPrunedInvalid();
 
-  /**
-   * Returns the number of segments pruned by applying the limit optimization.
-   *
-   * This value is always lower or equal than {@link #getNumSegmentsPrunedByServer()}
-   */
+  /// Returns the number of segments pruned by applying the limit optimization.
+  ///
+  /// This value is always lower or equal than [#getNumSegmentsPrunedByServer()]
   long getNumSegmentsPrunedByLimit();
 
-  /**
-   * Returns the number of segments pruned applying value optimizations, like bloom filters.
-   *
-   * This value is always lower or equal than {@link #getNumSegmentsPrunedByServer()}
-   */
+  /// Returns the number of segments pruned applying value optimizations, like bloom filters.
+  ///
+  /// This value is always lower or equal than [#getNumSegmentsPrunedByServer()]
   long getNumSegmentsPrunedByValue();
 
-  /**
-   * Returns the time used to reduce the server responses into the final response in milliseconds.
-   */
+  /// Returns the time used to reduce the server responses into the final response in milliseconds.
   long getBrokerReduceTimeMs();
 
-  /**
-   * Returns the thread cpu time used for query execution against offline table in nanoseconds.
-   */
+  /// Returns the thread cpu time used for query execution against offline table in nanoseconds.
   long getOfflineThreadCpuTimeNs();
 
-  /**
-   * Returns the thread cpu time used for query execution against real-time table in nanoseconds.
-   */
+  /// Returns the thread cpu time used for query execution against real-time table in nanoseconds.
   long getRealtimeThreadCpuTimeNs();
 
-  /**
-   * Returns the cpu time used for system activities against offline table in nanoseconds.
-   */
+  /// Returns the cpu time used for system activities against offline table in nanoseconds.
   long getOfflineSystemActivitiesCpuTimeNs();
 
-  /**
-   * Returns the cpu time used for system activities against real-time table in nanoseconds.
-   */
+  /// Returns the cpu time used for system activities against real-time table in nanoseconds.
   long getRealtimeSystemActivitiesCpuTimeNs();
 
-  /**
-   * Returns the cpu time used for response serialization against offline table in nanoseconds.
-   */
+  /// Returns the cpu time used for response serialization against offline table in nanoseconds.
   long getOfflineResponseSerializationCpuTimeNs();
 
-  /**
-   * Returns the cpu time used for response serialization against real-time table in nanoseconds.
-   */
+  /// Returns the cpu time used for response serialization against real-time table in nanoseconds.
   long getRealtimeResponseSerializationCpuTimeNs();
 
-  /**
-   * Returns the total cpu time (query execution + system activities + response serialization) used against offline
-   * table in nanoseconds.
-   */
+  /// Returns the total cpu time (query execution + system activities + response serialization) used against offline
+  /// table in nanoseconds.
   default long getOfflineTotalCpuTimeNs() {
     return getOfflineThreadCpuTimeNs() + getOfflineSystemActivitiesCpuTimeNs()
         + getOfflineResponseSerializationCpuTimeNs();
   }
 
-  /**
-   * Returns the total cpu time (query execution + system activities + response serialization) used against real-time
-   * table in nanoseconds.
-   */
+  /// Returns the total cpu time (query execution + system activities + response serialization) used against real-time
+  /// table in nanoseconds.
   default long getRealtimeTotalCpuTimeNs() {
     return getRealtimeThreadCpuTimeNs() + getRealtimeSystemActivitiesCpuTimeNs()
         + getRealtimeResponseSerializationCpuTimeNs();
   }
 
-  /**
-   * Returns the thread memory bytes allocated for query execution against offline table.
-   */
+  /// Returns the thread memory bytes allocated for query execution against offline table.
   long getOfflineThreadMemAllocatedBytes();
 
-  /**
-   * Returns the thread memory bytes allocated for query execution against realtime table.
-   */
+  /// Returns the thread memory bytes allocated for query execution against realtime table.
   long getRealtimeThreadMemAllocatedBytes();
 
-  /**
-   * Returns the memory bytes allocated  for response serialization against offline table.
-   */
+  /// Returns the memory bytes allocated  for response serialization against offline table.
   long getOfflineResponseSerMemAllocatedBytes();
 
-  /**
-   * Returns the memory bytes allocated  for response serialization against realtime table.
-   */
+  /// Returns the memory bytes allocated  for response serialization against realtime table.
   long getRealtimeResponseSerMemAllocatedBytes();
 
-  /**
-   * Returns the total memory bytes allocated for query execution and response serialization against offline table.
-   */
+  /// Returns the total memory bytes allocated for query execution and response serialization against offline table.
   default long getOfflineTotalMemAllocatedBytes() {
     return getOfflineThreadMemAllocatedBytes() + getOfflineResponseSerMemAllocatedBytes();
   }
 
-  /**
-   * Returns the total memory bytes allocated for query execution and response serialization against offline table.
-   */
+  /// Returns the total memory bytes allocated for query execution and response serialization against offline table.
   default long getRealtimeTotalMemAllocatedBytes() {
     return getRealtimeThreadMemAllocatedBytes() + getRealtimeResponseSerMemAllocatedBytes();
   }
 
-  /**
-   * Returns the total number of segments with an EmptyFilterOperator when Explain Plan is called.
-   */
+  /// Returns the total number of segments with an EmptyFilterOperator when Explain Plan is called.
   long getExplainPlanNumEmptyFilterSegments();
 
-  /**
-   * Returns the total number of segments with a MatchAllFilterOperator when Explain Plan is called.
-   */
+  /// Returns the total number of segments with a MatchAllFilterOperator when Explain Plan is called.
   long getExplainPlanNumMatchAllFilterSegments();
 
-  /**
-   * Returns the trace info for the query execution when tracing is enabled, empty map otherwise.
-   */
+  /// Returns the trace info for the query execution when tracing is enabled, empty map otherwise.
   Map<String, String> getTraceInfo();
 
-  /**
-   * Set the tables queried in the request
-   * @param tablesQueried Set of tables queried
-   */
+  /// Set the tables queried in the request
+  /// @param tablesQueried Set of tables queried
   void setTablesQueried(Set<String> tablesQueried);
 
-  /**
-   * Get the tables queried in the request
-   * @return Set of tables queried
-   */
+  /// Get the tables queried in the request
+  /// @return Set of tables queried
   Set<String> getTablesQueried();
 
-  /**
-   * Set the pools queried in the request
-   * @param pools
-   */
+  /// Set the pools queried in the request
+  /// @param pools
   void setPools(Set<Integer> pools);
 
-  /**
-   * Get the pools queried in the request
-   * @return
-   */
+  /// Get the pools queried in the request
+  /// @return
   Set<Integer> getPools();
 
-  /**
-   * Set whether RLS (row level security) filters were applied to the query.
-   * @param rlsFiltersApplied true if RLS filters were applied, false otherwise
-   */
+  /// Set whether RLS (row level security) filters were applied to the query.
+  /// @param rlsFiltersApplied true if RLS filters were applied, false otherwise
   void setRLSFiltersApplied(boolean rlsFiltersApplied);
 
-  /**
-   * Get whether RLS (row level security) filters were applied to the query.
-   * @return true if RLS filters were applied, false otherwise
-   */
+  /// Get whether RLS (row level security) filters were applied to the query.
+  /// @return true if RLS filters were applied, false otherwise
   boolean getRLSFiltersApplied();
 
   /// Get the materialized view table name that was hit (used) for this query, or `null`
@@ -455,5 +321,52 @@ public interface BrokerResponse {
   @Nullable
   default String getMaterializedViewQueried() {
     return null;
+  }
+
+  /// Returns generic, product-agnostic response metadata: a free-form string-to-[JsonNode] map that
+  /// any component can populate to surface non-fatal, informational notes about how the query was
+  /// handled (for example that it was executed with an alternate or degraded strategy). Values are
+  /// arbitrary JSON, so a note can be a scalar, an object, or an array. This is intentionally a
+  /// generic extension point: the core engine attaches no semantics to the keys or values, so
+  /// extensions can add their own entries without a dedicated typed field on this interface.
+  ///
+  /// This is distinct from [#getTraceInfo()] (per-server trace strings, only populated when tracing
+  /// is enabled) and from [#getExceptions()] (the error/warning list). The default is an empty,
+  /// unmodifiable map for implementations that do not support response metadata.
+  ///
+  /// Today entries can only be registered **on the broker**: they are collected in the broker-side
+  /// `QueryExecutionContext` while the query is being handled, and that sink is never sent over the
+  /// wire — an entry registered by a worker (server) on its own copy of the execution context is
+  /// silently dropped. So in practice this map currently carries broker metadata only.
+  ///
+  /// That is a limitation of the current implementation, not of this contract: the plumbing may
+  /// later be extended so that workers can contribute entries too, propagated back to the broker
+  /// with the rest of the per-server metadata. Hence the deliberately generic name — where an entry
+  /// was produced is an internal detail, and surfacing it in the client-facing response as a
+  /// `brokerMetadata` field that would eventually need a sibling `serverMetadata` field would only
+  /// make the response more complex for no benefit to the user. Worker entries, when supported, will
+  /// go into this same map.
+  ///
+  /// Marked [JsonIgnore] on the interface default so it does not register `responseMetadata` as a
+  /// known (setterless) property on deserializable implementations such as `BrokerResponseNative`
+  /// that do not override it. Otherwise Jackson would try to populate the immutable [Map#of()]
+  /// returned here via USE_GETTERS_AS_SETTERS and fail with an [UnsupportedOperationException] when
+  /// a legacy response carries a non-empty `responseMetadata`. Concrete implementations that support
+  /// the field re-expose it by overriding this method with an explicit [JsonProperty].
+  @JsonIgnore
+  default Map<String, JsonNode> getResponseMetadata() {
+    return Map.of();
+  }
+
+  /// Records a generic response-metadata entry (arbitrary JSON value; see [#getResponseMetadata()]).
+  /// The default is a no-op, so implementations that do not support response metadata silently
+  /// ignore it.
+  default void putResponseMetadata(String key, JsonNode value) {
+  }
+
+  /// String convenience for [#putResponseMetadata(String, JsonNode)] — the common case — wrapping the
+  /// value in a JSON string node.
+  default void putResponseMetadata(String key, String value) {
+    putResponseMetadata(key, TextNode.valueOf(value));
   }
 }

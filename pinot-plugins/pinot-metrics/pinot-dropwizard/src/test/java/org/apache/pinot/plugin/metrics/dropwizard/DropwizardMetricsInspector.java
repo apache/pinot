@@ -33,9 +33,7 @@ import org.apache.pinot.spi.metrics.PinotMetricName;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
-/**
- * Dropwizard-backed implementation of {@link MetricsInspector}.
- */
+/// Dropwizard-backed implementation of [MetricsInspector].
 public class DropwizardMetricsInspector extends MetricsInspector {
   private final Map<String, Metric> _metricMap = new HashMap<>();
   private volatile String _lastMetric;

@@ -20,8 +20,9 @@ package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
@@ -61,9 +62,9 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
         .build();
     _serverMetrics = mock(ServerMetrics.class);
     _mutableSegment =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.emptySet(), Collections.emptySet(),
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(), Set.of(),
             new HashSet<>(Arrays.asList(INT_COL, STRING_COL)),
-            Collections.singletonMap(JSON_COL, new JsonIndexConfig()), _serverMetrics);
+            Map.of(JSON_COL, new JsonIndexConfig()), _serverMetrics);
   }
 
   @AfterMethod

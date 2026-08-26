@@ -19,7 +19,8 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
-import org.apache.datasketches.tuple.Sketch;
+import javax.annotation.Nullable;
+import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.TupleSketchIterator;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -30,8 +31,9 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 public class SumValuesIntegerTupleSketchAggregationFunction extends IntegerTupleSketchAggregationFunction {
 
-  public SumValuesIntegerTupleSketchAggregationFunction(List<ExpressionContext> arguments, IntegerSummary.Mode mode) {
-    super(arguments, mode);
+  public SumValuesIntegerTupleSketchAggregationFunction(List<ExpressionContext> arguments, IntegerSummary.Mode mode,
+      boolean nullHandlingEnabled) {
+    super(arguments, mode, nullHandlingEnabled);
   }
 
   // TODO if extra aggregation modes are supported, make this switch
@@ -45,13 +47,19 @@ public class SumValuesIntegerTupleSketchAggregationFunction extends IntegerTuple
     return ColumnDataType.LONG;
   }
 
+  @Nullable
   @Override
-  public Comparable extractFinalResult(TupleIntSketchAccumulator accumulator) {
+  public Comparable extractFinalResult(@Nullable TupleIntSketchAccumulator accumulator) {
+    // A null intermediate result means nothing was aggregated. With null handling enabled there is nothing to sum,
+    // so the answer is NULL; with it disabled it stays what an empty sketch summed to, which is zero.
+    if (accumulator == null) {
+      return _nullHandlingEnabled ? null : 0L;
+    }
     double retainedTotal = 0L;
     accumulator.setNominalEntries(_nominalEntries);
     accumulator.setSetOperations(_setOps);
     accumulator.setThreshold(_accumulatorThreshold);
-    Sketch<IntegerSummary> result = accumulator.getResult();
+    TupleSketch<IntegerSummary> result = accumulator.getResult();
     TupleSketchIterator<IntegerSummary> summaries = result.iterator();
     while (summaries.next()) {
       retainedTotal += summaries.getSummary().getValue();

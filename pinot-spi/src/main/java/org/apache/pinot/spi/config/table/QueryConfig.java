@@ -27,9 +27,7 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Accounting.ScanKillingMode;
 
 
-/**
- * The {@code QueryConfig} class contains the table-level query execution related configurations.
- */
+/// The `QueryConfig` class contains the table-level query execution related configurations.
 public class QueryConfig extends BaseJsonConfig {
   // The timeout for the entire query execution in milliseconds. This value will be gathered on the broker side, and
   // passed to the servers within the broker request.

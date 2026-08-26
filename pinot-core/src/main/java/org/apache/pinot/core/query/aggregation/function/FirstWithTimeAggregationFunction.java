@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -36,20 +37,19 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.IntIterator;
 
 
-/**
- * This function is used for FirstWithTime calculations.
- * <p>The function can be used as FirstWithTime(dataExpression, timeExpression, 'dataType')
- * <p>Following arguments are supported:
- * <ul>
- *   <li>dataExpression: expression that contains the column to be calculated first on</li>
- *   <li>timeExpression: expression that contains the column to be used to decide which data is first, can be any
- *   Numeric column</li>
- *   <li>dataType: the data type of data column</li>
- * </ul>
- */
+/// This function is used for FirstWithTime calculations.
+///
+/// The function can be used as FirstWithTime(dataExpression, timeExpression, 'dataType')
+///
+/// Following arguments are supported:
+///
+/// - dataExpression: expression that contains the column to be calculated first on
+/// - timeExpression: expression that contains the column to be used to decide which data is first, can be any
+///   Numeric column
+/// - dataType: the data type of data column
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
-    extends NullableSingleInputAggregationFunction<ValueLongPair<V>, V> {
+    extends BaseSingleInputAggregationFunction<ValueLongPair<V>, V> {
   protected final ExpressionContext _timeCol;
   private final ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> _objectSerDe;
 
@@ -241,8 +241,10 @@ public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
     return ColumnDataType.OBJECT;
   }
 
+  @Nullable
   @Override
-  public V extractFinalResult(ValueLongPair<V> intermediateResult) {
-    return intermediateResult.getValue();
+  public V extractFinalResult(@Nullable ValueLongPair<V> intermediateResult) {
+    // A null intermediate result means nothing was aggregated, and there is no first value
+    return intermediateResult != null ? intermediateResult.getValue() : null;
   }
 }

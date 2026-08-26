@@ -75,10 +75,8 @@ public class RealtimeSegmentConfig {
 
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
 
-  /**
-   * @param nullHandlingEnabled whether null handling is enabled by default. This value is only used if
-   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-   */
+  /// @param nullHandlingEnabled whether null handling is enabled by default. This value is only used if
+  /// [Schema#isEnableColumnBasedNullHandling()] is false.
   private RealtimeSegmentConfig(
       String tableNameWithType,
       String segmentName,
@@ -242,10 +240,8 @@ public class RealtimeSegmentConfig {
     private int _partitionId;
     private boolean _aggregateMetrics;
     private List<AggregationConfig> _ingestionAggregationConfigs;
-    /**
-     * Whether null handling is enabled by default. This value is only used if
-     * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-     */
+    /// Whether null handling is enabled by default. This value is only used if
+    /// [Schema#isEnableColumnBasedNullHandling()] is false.
     private boolean _defaultNullHandlingEnabled;
     private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
     private PartitionDedupMetadataManager _partitionDedupMetadataManager;
@@ -391,19 +387,8 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
-    /**
-     * Whether null handling is enabled by default. This value is only used if
-     * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-     */
-    @Deprecated
-    public Builder setNullHandlingEnabled(boolean nullHandlingEnabled) {
-      return setDefaultNullHandlingEnabled(nullHandlingEnabled);
-    }
-
-    /**
-     * Whether null handling is enabled by default. This value is only used if
-     * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-     */
+    /// Whether null handling is enabled by default. This value is only used if
+    /// [Schema#isEnableColumnBasedNullHandling()] is false.
     public Builder setDefaultNullHandlingEnabled(boolean defaultNullHandlingEnabled) {
       _defaultNullHandlingEnabled = defaultNullHandlingEnabled;
       return this;

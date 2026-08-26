@@ -24,124 +24,80 @@ import java.util.List;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * SegmentGenerationJobSpec defines all the required information in order to kick off a Pinot data ingestion job.
- *
- */
+/// SegmentGenerationJobSpec defines all the required information in order to kick off a Pinot data ingestion job.
 public class SegmentGenerationJobSpec implements Serializable {
 
-  /**
-   * Execution framework which this job will be running.
-   */
+  /// Execution framework which this job will be running.
   private ExecutionFrameworkSpec _executionFrameworkSpec;
 
-  /**
-   * Supported job types are {@link org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher.PinotIngestionJobType}
-   */
+  /// Supported job types are [org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher.PinotIngestionJobType]
   private String _jobType;
 
-  /**
-   * Root directory of input data, expected to have scheme configured in PinotFS.
-   */
+  /// Root directory of input data, expected to have scheme configured in PinotFS.
   private String _inputDirURI;
 
-  /**
-   * If true, search input files recursively from root directly specified in _inputDirURI.
-   */
+  /// If true, search input files recursively from root directly specified in \_inputDirURI.
   // TODO: set the default value to false after all clients are aware of this.
   private boolean _searchRecursively = true;
 
-  /**
-   * include file name pattern, supported glob pattern.
-   * Sample usage:
-   *    'glob:*.avro' will include all avro files just under the inputDirURI, not sub directories;
-   *    'glob:**\/*.avro' will include all the avro files under inputDirURI recursively.
-   */
+  /// Full path pattern for files to include. Passed to `FileSystems.getDefault().getPathMatcher`.
+  /// Requires a `glob:` or `regex:` prefix (Java regex, not PCRE/JS). Matches the whole
+  /// normalized path (URI schemes such as `s3://` normalize to a single slash, e.g. `s3:/...`).
+  /// Prefer `regex:.*[.]avro` over patterns with `$` or backslashes when job-spec templating
+  /// (Groovy SimpleTemplateEngine) is used.
   private String _includeFileNamePattern;
 
-  /**
-   * exclude file name pattern, supported glob pattern.
-   * Sample usage:
-   *    'glob:*.avro' will exclude all avro files just under the inputDirURI, not sub directories;
-   *    'glob:**\/*.avro' will exclude all the avro files under inputDirURI recursively.
-   */
+  /// Full path pattern for files to exclude. Same PathMatcher rules as the include pattern:
+  /// `glob:` or `regex:` prefix, Java regex, whole normalized path.
   private String _excludeFileNamePattern;
 
-  /**
-   * Root directory of output segments, expected to have scheme configured in PinotFS. Note that this
-   * is the input directory for jobs that push segments to the Pinot cluster.
-   */
+  /// Root directory of output segments, expected to have scheme configured in PinotFS. Note that this
+  /// is the input directory for jobs that push segments to the Pinot cluster.
   private String _outputDirURI;
 
-  /**
-   * Segment creation job parallelism.
-   */
+  /// Segment creation job parallelism.
   private int _segmentCreationJobParallelism;
 
-  /**
-   * Should overwrite output segments if existed.
-   */
+  /// Should overwrite output segments if existed.
   private boolean _overwriteOutput;
 
-  /**
-   * All Pinot FS related specs
-   */
+  /// All Pinot FS related specs
   private List<PinotFSSpec> _pinotFSSpecs;
 
-  /**
-   * Pinot Table Spec
-   */
+  /// Pinot Table Spec
   private TableSpec _tableSpec;
 
-  /**
-   * Data file RecordReader related spec
-   */
+  /// Data file RecordReader related spec
   private RecordReaderSpec _recordReaderSpec;
 
-  /**
-   * SegmentNameGenerator related spec
-   */
+  /// SegmentNameGenerator related spec
   private SegmentNameGeneratorSpec _segmentNameGeneratorSpec;
 
-  /**
-   * Pinot Cluster related specs
-   */
+  /// Pinot Cluster related specs
   private PinotClusterSpec[] _pinotClusterSpecs;
 
-  /**
-   * Segment Push job related spec
-   */
+  /// Segment Push job related spec
   private PushJobSpec _pushJobSpec;
 
-  /**
-   * Should clean up output segment on job completion.
-   */
+  /// Should clean up output segment on job completion.
   private boolean _cleanUpOutputDir;
 
-  /**
-   * TLS setting for controller access
-   */
+  /// TLS setting for controller access
   private TlsSpec _tlsSpec;
 
-  /**
-   * Should fail segment generation if it's an empty segment.
-   */
+  /// Should fail segment generation if it's an empty segment.
   private boolean _failOnEmptySegment = false;
 
-  /**
-   * Controller auth token
-   *
-   * <br/>NOTE: jobs MUST NOT allow references to external tokens via URL or path to prevent:
-   * (a) file system crawling
-   * (b) unauthorized injection of system tokens from the server's local file system.
-   *
-   * Instead, resolve tokens right when the job command is run. This allows injection of client-local credentials.
-   */
+  /// Controller auth token
+  ///
+  /// NOTE: jobs MUST NOT allow references to external tokens via URL or path to prevent:
+  /// (a) file system crawling
+  /// (b) unauthorized injection of system tokens from the server's local file system.
+  ///
+  /// Instead, resolve tokens right when the job command is run. This allows injection of client-local credentials.
   private String _authToken;
 
-  /**
-   * Create a separated metadata only tar gz file to reduce the data transfer of segment metadata push job.
-   */
+  /// Create a separated metadata only tar gz file to reduce the data transfer of segment metadata push job.
   private boolean _createMetadataTarGz;
 
   public ExecutionFrameworkSpec getExecutionFrameworkSpec() {
@@ -156,10 +112,8 @@ public class SegmentGenerationJobSpec implements Serializable {
     return _jobType;
   }
 
-  /**
-   * Set the job type for the ingestion job.
-   * @param jobType Job type for the ingestion job.
-   */
+  /// Set the job type for the ingestion job.
+  /// @param jobType Job type for the ingestion job.
   public void setJobType(String jobType) {
     _jobType = jobType;
   }
@@ -184,14 +138,9 @@ public class SegmentGenerationJobSpec implements Serializable {
     return _includeFileNamePattern;
   }
 
-  /**
-   * include file name pattern, supported glob pattern.
-   * Sample usage:
-   *    'glob:*.avro' will include all avro files just under the inputDirURI, not sub directories;
-   *    'glob:**\/*.avro' will include all the avro files under inputDirURI recursively.
-   *
-   * @param includeFileNamePattern
-   */
+  /// Sets the full path pattern for files to include (Java NIO PathMatcher `glob:` or `regex:`).
+  ///
+  /// @param includeFileNamePattern pattern with a `glob:` or `regex:` prefix
   public void setIncludeFileNamePattern(String includeFileNamePattern) {
     _includeFileNamePattern = includeFileNamePattern;
   }
@@ -200,14 +149,9 @@ public class SegmentGenerationJobSpec implements Serializable {
     return _excludeFileNamePattern;
   }
 
-  /**
-   * exclude file name pattern, supported glob pattern.
-   * Sample usage:
-   *    'glob:*.avro' will exclude all avro files just under the inputDirURI, not sub directories;
-   *    'glob:**\/*.avro' will exclude all the avro files under inputDirURI recursively.
-   *
-   * @param excludeFileNamePattern
-   */
+  /// Sets the full path pattern for files to exclude (Java NIO PathMatcher `glob:` or `regex:`).
+  ///
+  /// @param excludeFileNamePattern pattern with a `glob:` or `regex:` prefix
   public void setExcludeFileNamePattern(String excludeFileNamePattern) {
     _excludeFileNamePattern = excludeFileNamePattern;
   }

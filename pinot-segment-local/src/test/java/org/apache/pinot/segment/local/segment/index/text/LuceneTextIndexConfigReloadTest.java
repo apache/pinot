@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -48,8 +47,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -60,11 +57,9 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for Lucene text index backward compatibility and upgrade scenarios.
- * This test verifies that old format text indexes can be loaded and upgraded
- * to the new format without losing functionality.
- */
+/// Tests for Lucene text index backward compatibility and upgrade scenarios.
+/// This test verifies that old format text indexes can be loaded and upgraded
+/// to the new format without losing functionality.
 public class LuceneTextIndexConfigReloadTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexConfigReloadTest.class);
 
@@ -90,9 +85,7 @@ public class LuceneTextIndexConfigReloadTest {
     }
   }
 
-  /**
-   * Creates test data for the segment
-   */
+  /// Creates test data for the segment
   private List<GenericRow> createTestData() {
     List<GenericRow> rows = new ArrayList<>();
     for (int i = 0; i < TEST_DOCUMENTS.length; i++) {
@@ -104,9 +97,7 @@ public class LuceneTextIndexConfigReloadTest {
     return rows;
   }
 
-  /**
-   * Creates a table config with text index configuration
-   */
+  /// Creates a table config with text index configuration
   private TableConfig createTableConfigWithTextIndex(boolean useNewFormat) {
     // Create field config for text index with custom properties
     // For new format (combined files), set storeInSegmentFile=true
@@ -123,9 +114,7 @@ public class LuceneTextIndexConfigReloadTest {
     return tableConfig;
   }
 
-  /**
-   * Creates a schema for the test
-   */
+  /// Creates a schema for the test
   private Schema createSchema() {
     return new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addSingleValueDimension(TEST_COLUMN, FieldSpec.DataType.STRING)
@@ -163,9 +152,7 @@ public class LuceneTextIndexConfigReloadTest {
     Assert.assertFalse(needsUpdate, "needUpdateIndices should return false when config is not changed");
   }
 
-  /**
-   * Helper method to create a segment with given table config and schema
-   */
+  /// Helper method to create a segment with given table config and schema
   private File createSegment(TableConfig tableConfig, Schema schema)
       throws Exception {
     File outputDir = new File(_tempDir, "test_segment");
@@ -194,9 +181,7 @@ public class LuceneTextIndexConfigReloadTest {
     return segmentFile;
   }
 
-  /**
-   * Helper method to test a segment with given config
-   */
+  /// Helper method to test a segment with given config
   private void testSegmentWithConfig(File segmentFile, TableConfig tableConfig, Schema schema, String configName)
       throws Exception {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
@@ -210,18 +195,14 @@ public class LuceneTextIndexConfigReloadTest {
     }
   }
 
-  /**
-   * Helper method to check if needUpdateIndices returns true for configuration changes
-   */
+  /// Helper method to check if needUpdateIndices returns true for configuration changes
   private boolean checkNeedUpdateIndices(File segmentFile, TableConfig tableConfig, Schema schema)
       throws Exception {
-    Map<String, Object> props = new HashMap<>();
-    props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap);
-    PinotConfiguration segmentDirectoryConfigs = new PinotConfiguration(props);
-
-    SegmentDirectoryLoaderContext segmentLoaderContext =
-        new SegmentDirectoryLoaderContext.Builder().setTableConfig(tableConfig).setSchema(schema)
-            .setSegmentName(segmentFile.getName()).setSegmentDirectoryConfigs(segmentDirectoryConfigs).build();
+    SegmentDirectoryLoaderContext segmentLoaderContext = new SegmentDirectoryLoaderContext.Builder()
+        .setTableConfig(tableConfig)
+        .setSchema(schema)
+        .setSegmentName(segmentFile.getName())
+        .build();
     SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
         .load(segmentFile.toURI(), segmentLoaderContext);
 
@@ -242,9 +223,7 @@ public class LuceneTextIndexConfigReloadTest {
     return needsUpdate;
   }
 
-  /**
-   * Helper method to test text search queries on a segment
-   */
+  /// Helper method to test text search queries on a segment
   private void testTextSearchQueries(ImmutableSegment segment)
       throws Exception {
     // Get the text index reader
@@ -264,9 +243,7 @@ public class LuceneTextIndexConfigReloadTest {
     testSearchQuery(textIndexReader, "\"python programming\"", "Should find exact phrase");
   }
 
-  /**
-   * Helper method to test a single search query
-   */
+  /// Helper method to test a single search query
   private void testSearchQuery(TextIndexReader textIndexReader, String query, String description) {
     try {
       LOGGER.debug("Testing query: '{}' - {}", query, description);

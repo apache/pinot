@@ -47,26 +47,23 @@ import org.openjdk.jmh.runner.options.TimeValue;
 @State(Scope.Benchmark)
 @Fork(value = 1, jvmArgs = {"-server", "-Xmx8G", "-XX:MaxDirectMemorySize=16G"})
 public class BenchmarkQueryEngine {
-  /** List of query patterns used in the benchmark */
+  /// List of query patterns used in the benchmark
   private static final String[] QUERY_PATTERNS = new String[]{"SELECT count(*) from myTable"};
 
-  /** List of query patterns indices to run */
+  /// List of query patterns indices to run
   @Param({"0"})
   public int _queryPattern;
 
-  /** The table name which contains the offline data, for example "myTable_OFFLINE." */
+  /// The table name which contains the offline data, for example "myTable_OFFLINE."
   private static final String TABLE_NAME = "myTable_OFFLINE";
 
-  /** The directory that contains the unpacked data, for example "/data"
-   *
-   * In that directory, there should be a "myTable_OFFLINE" directory which contains unpacked segments, so the
-   * directory for "/data" should look like "/data/myTable_OFFLINE/mySegment_0/metadata.properties"
-   */
+  /// The directory that contains the unpacked data, for example "/data"
+  ///
+  /// In that directory, there should be a "myTable_OFFLINE" directory which contains unpacked segments, so the
+  /// directory for "/data" should look like "/data/myTable_OFFLINE/mySegment_0/metadata.properties"
   private static final String DATA_DIRECTORY = "/home/someuser/data";
 
-  /**
-   * Whether or not to enable profiling information
-   */
+  /// Whether or not to enable profiling information
   private static final boolean ENABLE_PROFILING = false;
 
   PerfBenchmarkDriver _perfBenchmarkDriver;

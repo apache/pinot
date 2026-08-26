@@ -20,8 +20,8 @@ package org.apache.pinot.controller.api.resources;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
@@ -85,14 +85,14 @@ public class PinotDdlRestletResourceUnitTest {
     LogicalTableConfig logicalTableConfig = new LogicalTableConfig();
     logicalTableConfig.setTableName("logical_events");
     logicalTableConfig.setPhysicalTableConfigMap(
-        Collections.singletonMap("events_OFFLINE", new PhysicalTableConfig()));
+        Map.of("events_OFFLINE", new PhysicalTableConfig()));
 
     Request request = mock(Request.class);
     when(request.getRequestURL()).thenReturn(new StringBuilder("http://localhost/sql/ddl"));
 
     try (MockedStatic<ZKMetadataProvider> metadataProvider = Mockito.mockStatic(ZKMetadataProvider.class)) {
       metadataProvider.when(() -> ZKMetadataProvider.getAllLogicalTableConfigs(Mockito.any()))
-          .thenReturn(Collections.singletonList(logicalTableConfig));
+          .thenReturn(List.of(logicalTableConfig));
 
       ControllerApplicationException e = expectThrows(ControllerApplicationException.class,
           () -> resource.executeDdl(new DdlExecutionRequest("DROP TABLE events TYPE OFFLINE"), true,
@@ -130,15 +130,15 @@ public class PinotDdlRestletResourceUnitTest {
     when(taskCount.getRunning()).thenReturn(1);
     when(resource._pinotHelixTaskResourceManager.getTaskCount("task_0")).thenReturn(taskCount);
     when(resource._pinotHelixTaskResourceManager.getTaskStatesByTable("SegmentRefreshTask", "events_OFFLINE"))
-        .thenReturn(Collections.emptyMap())
-        .thenReturn(Collections.singletonMap("task_0", TaskState.IN_PROGRESS));
+        .thenReturn(Map.of())
+        .thenReturn(Map.of("task_0", TaskState.IN_PROGRESS));
 
     Request request = mock(Request.class);
     when(request.getRequestURL()).thenReturn(new StringBuilder("http://localhost/sql/ddl"));
 
     try (MockedStatic<ZKMetadataProvider> metadataProvider = Mockito.mockStatic(ZKMetadataProvider.class)) {
       metadataProvider.when(() -> ZKMetadataProvider.getAllLogicalTableConfigs(Mockito.any()))
-          .thenReturn(Collections.emptyList());
+          .thenReturn(List.of());
 
       ControllerApplicationException e = expectThrows(ControllerApplicationException.class,
           () -> resource.executeDdl(new DdlExecutionRequest("DROP TABLE events TYPE OFFLINE"), false,
@@ -266,9 +266,9 @@ public class PinotDdlRestletResourceUnitTest {
     return new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(tableNameWithType)
         .setIsMaterializedView(true)
-        .setTaskConfig(new TableTaskConfig(Collections.singletonMap(
+        .setTaskConfig(new TableTaskConfig(Map.of(
             MaterializedViewTask.TASK_TYPE,
-            Collections.singletonMap(MaterializedViewTask.DEFINED_SQL_KEY,
+            Map.of(MaterializedViewTask.DEFINED_SQL_KEY,
                 "SELECT id FROM source"))))
         .build();
   }
@@ -301,7 +301,7 @@ public class PinotDdlRestletResourceUnitTest {
     Schema stored = new Schema();
     stored.setSchemaName("t");
     stored.addField(new DimensionFieldSpec("id", DataType.INT, true));
-    stored.setPrimaryKeyColumns(Collections.singletonList("id"));
+    stored.setPrimaryKeyColumns(List.of("id"));
     stored.setEnableColumnBasedNullHandling(true);
 
     Schema compiled = new Schema();
@@ -319,12 +319,12 @@ public class PinotDdlRestletResourceUnitTest {
     Schema stored = new Schema();
     stored.setSchemaName("t");
     stored.addField(new DimensionFieldSpec("id", DataType.INT, true));
-    stored.setPrimaryKeyColumns(Collections.singletonList("id"));
+    stored.setPrimaryKeyColumns(List.of("id"));
 
     Schema compiled = new Schema();
     compiled.setSchemaName("t");
     compiled.addField(new DimensionFieldSpec("id", DataType.INT, true));
-    compiled.setPrimaryKeyColumns(Collections.singletonList("id"));
+    compiled.setPrimaryKeyColumns(List.of("id"));
 
     assertNull(PinotDdlRestletResource.describeColumnShapeMismatch(stored, compiled));
   }
@@ -337,13 +337,13 @@ public class PinotDdlRestletResourceUnitTest {
     stored.setSchemaName("t");
     stored.addField(new DimensionFieldSpec("id", DataType.INT, true));
     stored.addField(new DimensionFieldSpec("other", DataType.INT, true));
-    stored.setPrimaryKeyColumns(Collections.singletonList("id"));
+    stored.setPrimaryKeyColumns(List.of("id"));
 
     Schema compiled = new Schema();
     compiled.setSchemaName("t");
     compiled.addField(new DimensionFieldSpec("id", DataType.INT, true));
     compiled.addField(new DimensionFieldSpec("other", DataType.INT, true));
-    compiled.setPrimaryKeyColumns(Collections.singletonList("other"));
+    compiled.setPrimaryKeyColumns(List.of("other"));
 
     String msg = PinotDdlRestletResource.describeColumnShapeMismatch(stored, compiled);
     assertNotNull(msg);

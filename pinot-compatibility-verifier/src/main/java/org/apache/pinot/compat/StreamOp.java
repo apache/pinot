@@ -27,6 +27,7 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
@@ -61,16 +62,14 @@ import org.slf4j.LoggerFactory;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * PRODUCE
- *   Produce events onto the stream, and verify that the number of rows in the tables increased
- *   by the number of rows produced. Also, verify the segment state for all replicas of the tables
- *
- * TODO: Consider using a file-based stream, where "pushing" events is simply adding new files to
- *       a folder named after the "stream". The implementation for the consumer would need to watch
- *       for new files and read them out. There could be one sub-folder per partition. This approach
- *       can save us handling kafka errors, etc.
- */
+/// PRODUCE
+///   Produce events onto the stream, and verify that the number of rows in the tables increased
+///   by the number of rows produced. Also, verify the segment state for all replicas of the tables
+///
+/// TODO: Consider using a file-based stream, where "pushing" events is simply adding new files to
+///       a folder named after the "stream". The implementation for the consumer would need to watch
+///       for new files and read them out. There could be one sub-folder per partition. This approach
+///       can save us handling kafka errors, etc.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class StreamOp extends BaseOp {
   public enum Op {
@@ -188,7 +187,7 @@ public class StreamOp extends BaseOp {
       config.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 15000);
       AdminClient adminClient = KafkaAdminClient.create(config);
       NewTopic topic = new NewTopic(topicName, partitions, KAFKA_REPLICATION_FACTOR);
-      adminClient.createTopics(Collections.singletonList(topic)).all().get();
+      adminClient.createTopics(List.of(topic)).all().get();
     } catch (Exception e) {
       LOGGER.error("Failed to create Kafka topic with stream config file: {}", _streamConfigFileName, e);
       return false;

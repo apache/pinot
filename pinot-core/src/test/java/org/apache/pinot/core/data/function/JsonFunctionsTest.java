@@ -32,9 +32,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests the JSON scalar transform functions
- */
+/// Tests the JSON scalar transform functions
 public class JsonFunctionsTest {
 
   private void testFunction(String functionExpression, List<String> expectedArguments, GenericRow row,
@@ -134,6 +132,29 @@ public class JsonFunctionsTest {
     row11.putValue("jsonPathString", JsonUtils.stringToObject(jsonStr, Map.class));
     inputs.add(new Object[]{
         "json_path_double(jsonPathString, '$.k3.sub2')", Lists.newArrayList("jsonPathString"), row11, 1.0
+    });
+
+    // Experimental Fory variants must resolve through the ingestion evaluator with raw JSON strings. Parsed
+    // Map/List input would deliberately use their Jayway fallback and would not exercise Fory initialization.
+    GenericRow row12 = new GenericRow();
+    row12.putValue("json", "{\"text\":\"value\",\"count\":10,\"ratio\":1.25}");
+    inputs.add(new Object[]{
+        "json_path_string_fory(json, '$.text', 'DEFAULT')", Lists.newArrayList("json"), row12, "value"
+    });
+    inputs.add(new Object[]{
+        "json_path_long_fory(json, '$.count', -1)", Lists.newArrayList("json"), row12, 10L
+    });
+    inputs.add(new Object[]{
+        "json_path_double_fory(json, '$.ratio', -1.0)", Lists.newArrayList("json"), row12, 1.25
+    });
+    inputs.add(new Object[]{
+        "json_path_string_fast(json, '$.text', 'DEFAULT')", Lists.newArrayList("json"), row12, "value"
+    });
+    inputs.add(new Object[]{
+        "json_path_long_fast(json, '$.count', -1)", Lists.newArrayList("json"), row12, 10L
+    });
+    inputs.add(new Object[]{
+        "json_path_double_fast(json, '$.ratio', -1.0)", Lists.newArrayList("json"), row12, 1.25
     });
     return inputs.toArray(new Object[0][]);
   }

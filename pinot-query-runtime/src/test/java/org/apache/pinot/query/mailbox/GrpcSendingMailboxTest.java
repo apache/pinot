@@ -25,7 +25,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CyclicBarrier;
@@ -69,7 +68,7 @@ public class GrpcSendingMailboxTest {
     ChannelManager channelManager = Mockito.mock(ChannelManager.class);
     GrpcSendingMailbox mailbox = new GrpcSendingMailbox("test-mailbox", channelManager, "localhost", 0, Long.MAX_VALUE,
         new StatMap<>(MailboxSendOperator.StatKey.class), 4 * 1024 * 1024, true);
-    RowHeapDataBlock block = new RowHeapDataBlock(Collections.singletonList(new Object[]{"val"}),
+    RowHeapDataBlock block = new RowHeapDataBlock(List.<Object[]>of(new Object[]{"val"}),
         new DataSchema(new String[]{"foo"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING}));
 
     try (QueryThreadContext ctx = QueryThreadContext.openForMseTest()) {
@@ -104,7 +103,7 @@ public class GrpcSendingMailboxTest {
     try {
       for (int i = 0; i < iterations; i++) {
         CountingGrpcSendingMailbox mailbox = new CountingGrpcSendingMailbox("race-mailbox-" + i, channelManager);
-        RowHeapDataBlock block = new RowHeapDataBlock(Collections.singletonList(new Object[]{"val"}), schema);
+        RowHeapDataBlock block = new RowHeapDataBlock(List.<Object[]>of(new Object[]{"val"}), schema);
 
         CyclicBarrier barrier = new CyclicBarrier(2);
 

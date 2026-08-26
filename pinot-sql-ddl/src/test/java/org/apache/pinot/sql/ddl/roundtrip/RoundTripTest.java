@@ -21,7 +21,6 @@ package org.apache.pinot.sql.ddl.roundtrip;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -334,6 +333,7 @@ public class RoundTripTest {
         .setRangeIndexColumns(Arrays.asList("amount"))
         .setNullHandlingEnabled(true)
         .setAggregateMetrics(true)
+        .setCompressionStatsEnabled(true)
         .setPeerSegmentDownloadScheme("https")
         .setCrypterClassName("org.apache.pinot.crypter.NoOpCrypter")
         .setSegmentVersion("v3")
@@ -457,7 +457,7 @@ public class RoundTripTest {
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("events")
         .build();
-    config.getIndexingConfig().setNoDictionaryConfig(Collections.singletonMap("id", "RAW"));
+    config.getIndexingConfig().setNoDictionaryConfig(Map.of("id", "RAW"));
     assertUnsupportedShowCreate(schema, config, "tableIndexConfig.noDictionaryConfig");
   }
 

@@ -35,14 +35,16 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.spi.utils.PinotDataType.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
 public class PinotDataTypeTest {
+  private static final String UUID_VALUE = "550e8400-e29b-41d4-a716-446655440000";
   private static final PinotDataType[] SOURCE_TYPES = {
-      BYTE, CHARACTER, SHORT, INTEGER, LONG, FLOAT, DOUBLE, BIG_DECIMAL, STRING, JSON,
-      BYTE_ARRAY, CHARACTER_ARRAY, SHORT_ARRAY, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY
+      BYTE, CHARACTER, SHORT, INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL, STRING, JSON,
+      BYTE_ARRAY, CHARACTER_ARRAY, SHORT_ARRAY, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY
   };
   private static final Object[] SOURCE_VALUES = {
       (byte) 123, (char) 123, (short) 123, 123, 123L, 123f, 123d, BigDecimal.valueOf(123), " 123", "123 ",
@@ -50,7 +52,7 @@ public class PinotDataTypeTest {
       new Object[]{123L}, new Object[]{123f}, new Object[]{123d}, new Object[]{" 123"}
   };
   private static final PinotDataType[] DEST_TYPES =
-      {INTEGER, LONG, FLOAT, DOUBLE, BIG_DECIMAL, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
+      {INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
   private static final Object[] EXPECTED_DEST_VALUES =
       {123, 123L, 123f, 123d, BigDecimal.valueOf(123), new Object[]{123}, new Object[]{123L}, new Object[]{123f},
           new Object[]{123d}};
@@ -64,10 +66,10 @@ public class PinotDataTypeTest {
 
   // Test cases where array for MV column contains values of mixing types.
   private static final PinotDataType[] SOURCE_ARRAY_TYPES =
-      {SHORT_ARRAY, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
+      {SHORT_ARRAY, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
   private static final Object[] SOURCE_ARRAY_VALUES = new Object[]{(short) 123, 4, 5L, 6f, 7d, "8"};
 
-  private static final PinotDataType[] DEST_ARRAY_TYPES = {INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
+  private static final PinotDataType[] DEST_ARRAY_TYPES = {INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
   private static final Object[] EXPECTED_DEST_ARRAY_VALUES = {
       new Object[]{123, 4, 5, 6, 7, 8}, new Object[]{123L, 4L, 5L, 6L, 7L, 8L}, new Object[]{123f, 4f, 5f, 6f, 7f, 8f},
       new Object[]{123d, 4d, 5d, 6d, 7d, 8d}
@@ -128,9 +130,9 @@ public class PinotDataTypeTest {
   @DataProvider
   public Object[][] numberFormatConversionErrors() {
     return new Object[][] {
-        {INTEGER_ARRAY, LONG_ARRAY, new Object[]{"abc"}},
-        {INTEGER_ARRAY, INTEGER_ARRAY, new Object[]{"abc"}},
-        {INTEGER_ARRAY, PRIMITIVE_BOOLEAN_ARRAY, new Object[]{"abc"}}
+        {INT_ARRAY, LONG_ARRAY, new Object[]{"abc"}},
+        {INT_ARRAY, INT_ARRAY, new Object[]{"abc"}},
+        {INT_ARRAY, PRIMITIVE_BOOLEAN_ARRAY, new Object[]{"abc"}}
     };
   }
 
@@ -157,9 +159,17 @@ public class PinotDataTypeTest {
         new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) }},
         {BYTES_ARRAY, BYTES_ARRAY, new byte[][] { "foo".getBytes(UTF_8), "bar".getBytes(UTF_8) },
             new byte[][] { "foo".getBytes(UTF_8), "bar".getBytes(UTF_8) }},
+        {STRING_ARRAY, UUID_ARRAY, new String[] {UUID_VALUE},
+            new java.util.UUID[] {java.util.UUID.fromString(UUID_VALUE)}},
+        {UUID_ARRAY, UUID_ARRAY, new java.util.UUID[] {java.util.UUID.fromString(UUID_VALUE)},
+            new java.util.UUID[] {java.util.UUID.fromString(UUID_VALUE)}},
         {COLLECTION, STRING_ARRAY, Arrays.asList("test1", "test2"), new String[] {"test1", "test2"}},
+        {COLLECTION, UUID_ARRAY, Arrays.asList(UUID_VALUE),
+            new java.util.UUID[] {java.util.UUID.fromString(UUID_VALUE)}},
         {COLLECTION, FLOAT_ARRAY, Arrays.asList(1.0f, 2.0f), new Float[] {1.0f, 2.0f}},
         {OBJECT_ARRAY, STRING_ARRAY, new Object[] {"test1", "test2"}, new String[] {"test1", "test2"}},
+        {OBJECT_ARRAY, UUID_ARRAY, new Object[] {UUID_VALUE},
+            new java.util.UUID[] {java.util.UUID.fromString(UUID_VALUE)}},
         {OBJECT_ARRAY, FLOAT_ARRAY, new Object[] {1.0f, 2.0f}, new Float[] {1.0f, 2.0f}},
     };
   }
@@ -180,8 +190,8 @@ public class PinotDataTypeTest {
 
   @Test
   public void testBoolean() {
-    assertEquals(INTEGER.convert(true, BOOLEAN), 1);
-    assertEquals(INTEGER.convert(false, BOOLEAN), 0);
+    assertEquals(INT.convert(true, BOOLEAN), 1);
+    assertEquals(INT.convert(false, BOOLEAN), 0);
     assertEquals(LONG.convert(true, BOOLEAN), 1L);
     assertEquals(LONG.convert(false, BOOLEAN), 0L);
     assertEquals(FLOAT.convert(true, BOOLEAN), 1f);
@@ -212,6 +222,28 @@ public class PinotDataTypeTest {
   }
 
   @Test
+  public void testUUID() {
+    java.util.UUID uuid = java.util.UUID.fromString(UUID_VALUE);
+    byte[] uuidBytes = UuidUtils.toBytes(UUID_VALUE);
+    String mixedCaseUuid = UUID_VALUE.toUpperCase();
+
+    assertEquals(UUID.convert(UUID_VALUE, STRING), uuid);
+    assertEquals(UUID.convert(mixedCaseUuid, STRING), uuid);
+    assertEquals(UUID.convert(uuid, UUID), uuid);
+    assertEquals(UUID.convert(uuidBytes, BYTES), uuid);
+    assertEquals(STRING.convert(uuid, UUID), UUID_VALUE);
+    assertEquals(BYTES.convert(uuid, UUID), uuidBytes);
+    // Single-element collection/object/array sources carry a UUID (FunctionInvoker argument resolution and MV
+    // sources feeding SV UUID columns)
+    assertEquals(UUID.convert(Arrays.asList(UUID_VALUE), COLLECTION), uuid);
+    assertEquals(UUID.convert(UUID_VALUE, OBJECT), uuid);
+    assertEquals(UUID.convert(new Object[]{UUID_VALUE}, OBJECT_ARRAY), uuid);
+    // Sources with no UUID interpretation fail with an explicit message
+    assertThrows(UnsupportedOperationException.class, () -> UUID.convert(1, INT));
+    assertThrows(UnsupportedOperationException.class, () -> UUID.convert(1.0, DOUBLE));
+  }
+
+  @Test
   public void testTimestamp() {
     Timestamp timestamp = new Timestamp(1620324238610L);
     assertEquals(TIMESTAMP.convert(timestamp.getTime(), LONG), timestamp);
@@ -226,7 +258,7 @@ public class PinotDataTypeTest {
     // 2022-04-14 = 19_096 days since epoch. `LocalDate` is TZ-independent — round-trips identically in any
     // JVM timezone.
     LocalDate date = LocalDate.parse("2022-04-14");
-    assertEquals(DATE.convert(19_096, INTEGER), date);
+    assertEquals(DATE.convert(19_096, INT), date);
     assertEquals(DATE.convert(19_096L, LONG), date);
     assertEquals(DATE.convert("2022-04-14", STRING), date);
     // JSON: quoted ISO-8601 string parsed via Jackson.
@@ -245,8 +277,8 @@ public class PinotDataTypeTest {
     assertEquals(DATE_ARRAY.convert(dates, DATE_ARRAY), dates);
     // STRING_ARRAY → DATE_ARRAY: per-element ISO-8601 parsing via DATE.convert.
     assertEquals(DATE_ARRAY.convert(new String[]{"2022-04-14", "2024-01-01"}, STRING_ARRAY), dates);
-    // INTEGER_ARRAY → DATE_ARRAY: per-element epoch-day decoding.
-    assertEquals(DATE_ARRAY.convert(new Integer[]{19_096, 19_723}, INTEGER_ARRAY), dates);
+    // INT_ARRAY → DATE_ARRAY: per-element epoch-day decoding.
+    assertEquals(DATE_ARRAY.convert(new Integer[]{19_096, 19_723}, INT_ARRAY), dates);
     // DATE_ARRAY → STRING_ARRAY: each element via DATE.toString.
     assertEquals(STRING_ARRAY.convert(dates, DATE_ARRAY), new String[]{"2022-04-14", "2024-01-01"});
     // Lookup: Object[] of LocalDate routes to DATE_ARRAY.
@@ -261,7 +293,7 @@ public class PinotDataTypeTest {
     // identically in any JVM timezone.
     LocalTime time = LocalTime.parse("08:51:32");
     assertEquals(TIME.convert(31_892_000L, LONG), time);
-    assertEquals(TIME.convert(31_892_000, INTEGER), time);
+    assertEquals(TIME.convert(31_892_000, INT), time);
     assertEquals(TIME.convert("08:51:32", STRING), time);
     // JSON: quoted ISO-8601 string parsed via Jackson.
     assertEquals(TIME.convert("\"08:51:32\"", JSON), time);
@@ -296,9 +328,9 @@ public class PinotDataTypeTest {
     byte[] bytes = UUID.toBytes(uuid);
     assertEquals(bytes.length, 16);
     assertEquals(UUID.convert(bytes, BYTES), uuid);
-    // toString / toInternal both return the canonical form (no FQN needed in canonical 8-4-4-4-12 layout).
+    // toString returns the canonical form, while toInternal returns the fixed-width byte form.
     assertEquals(UUID.toString(uuid), canonical);
-    assertEquals(UUID.toInternal(uuid), canonical);
+    assertEquals((byte[]) UUID.toInternal(uuid), bytes);
   }
 
   @Test
@@ -306,11 +338,18 @@ public class PinotDataTypeTest {
     UUID u1 = java.util.UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
     UUID u2 = java.util.UUID.fromString("00000000-0000-0000-0000-000000000001");
     UUID[] uuids = {u1, u2};
-    assertEquals(UUID_ARRAY.convert(uuids, UUID_ARRAY), uuids);
+    UUID[] converted = (UUID[]) UUID_ARRAY.convert(uuids, UUID_ARRAY);
+    assertEquals(converted[0], u1);
+    assertEquals(converted[1], u2);
     // STRING_ARRAY → UUID_ARRAY: per-element parse.
-    assertEquals(UUID_ARRAY.convert(
-        new String[]{"550e8400-e29b-41d4-a716-446655440000", "00000000-0000-0000-0000-000000000001"}, STRING_ARRAY),
-        uuids);
+    UUID[] convertedFromStrings = (UUID[]) UUID_ARRAY.convert(
+        new String[]{"550e8400-e29b-41d4-a716-446655440000", "00000000-0000-0000-0000-000000000001"}, STRING_ARRAY);
+    assertEquals(convertedFromStrings[0], u1);
+    assertEquals(convertedFromStrings[1], u2);
+    // toInternal yields the 16-byte big-endian form per element.
+    byte[][] internal = (byte[][]) UUID_ARRAY.toInternal(uuids);
+    assertEquals(UUID.convert(internal[0], BYTES), u1);
+    assertEquals(UUID.convert(internal[1], BYTES), u2);
     // STRING_ARRAY destination: canonical strings.
     assertEquals(STRING_ARRAY.convert(uuids, UUID_ARRAY),
         new String[]{"550e8400-e29b-41d4-a716-446655440000", "00000000-0000-0000-0000-000000000001"});
@@ -323,9 +362,10 @@ public class PinotDataTypeTest {
     assertEquals(UUID.convert(bytesArray[1], BYTES), u2);
     // Lookup: Object[] of UUID routes to UUID_ARRAY.
     assertEquals(getMultiValueType(u1), UUID_ARRAY);
-    // toInternal: String[] of canonical form.
-    assertEquals(UUID_ARRAY.toInternal(uuids),
-        new String[]{"550e8400-e29b-41d4-a716-446655440000", "00000000-0000-0000-0000-000000000001"});
+    // toInternal: byte[][] of 16-byte big-endian forms.
+    byte[][] internalBytes = (byte[][]) UUID_ARRAY.toInternal(uuids);
+    assertEquals(UUID.convert(internalBytes[0], BYTES), u1);
+    assertEquals(UUID.convert(internalBytes[1], BYTES), u2);
   }
 
   @Test
@@ -389,7 +429,7 @@ public class PinotDataTypeTest {
 
   @Test
   public void testGetSingleValueType() {
-    assertEquals(getSingleValueType(1), INTEGER);
+    assertEquals(getSingleValueType(1), INT);
     assertEquals(getSingleValueType(1L), LONG);
     assertEquals(getSingleValueType(1.0f), FLOAT);
     assertEquals(getSingleValueType(1.0d), DOUBLE);
@@ -419,7 +459,7 @@ public class PinotDataTypeTest {
 
   @Test
   public void testGetMultipleValueType() {
-    assertEquals(getMultiValueType(1), INTEGER_ARRAY);
+    assertEquals(getMultiValueType(1), INT_ARRAY);
     assertEquals(getMultiValueType(1L), LONG_ARRAY);
     assertEquals(getMultiValueType(1.0f), FLOAT_ARRAY);
     assertEquals(getMultiValueType(1.0d), DOUBLE_ARRAY);
@@ -465,17 +505,17 @@ public class PinotDataTypeTest {
     // Single-value types that do NOT support BYTES conversion; STRING / JSON / BYTES / BIG_DECIMAL / UUID
     // each have their own valid byte-form encoding and are tested elsewhere.
     PinotDataType[] noBytesConversion = {
-        BOOLEAN, BYTE, CHARACTER, SHORT, INTEGER, LONG, FLOAT, DOUBLE, TIMESTAMP, DATE, TIME, OBJECT
+        BOOLEAN, BYTE, CHARACTER, SHORT, INT, LONG, FLOAT, DOUBLE, TIMESTAMP, DATE, TIME, OBJECT
     };
     for (PinotDataType sourceType : noBytesConversion) {
       assertInvalidConversion(null, sourceType, BYTES, UnsupportedOperationException.class);
     }
 
-    assertInvalidConversion(null, BYTES, INTEGER, UnsupportedOperationException.class);
+    assertInvalidConversion(null, BYTES, INT, UnsupportedOperationException.class);
     assertInvalidConversion(null, BYTES, LONG, UnsupportedOperationException.class);
     assertInvalidConversion(null, BYTES, FLOAT, UnsupportedOperationException.class);
     assertInvalidConversion(null, BYTES, DOUBLE, UnsupportedOperationException.class);
-    assertInvalidConversion(null, BYTES, INTEGER_ARRAY, UnsupportedOperationException.class);
+    assertInvalidConversion(null, BYTES, INT_ARRAY, UnsupportedOperationException.class);
     assertInvalidConversion(null, BYTES, LONG_ARRAY, UnsupportedOperationException.class);
     assertInvalidConversion(null, BYTES, FLOAT_ARRAY, UnsupportedOperationException.class);
     assertInvalidConversion(null, BYTES, DOUBLE_ARRAY, UnsupportedOperationException.class);

@@ -89,11 +89,9 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.BROKER_RESOURCE_I
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-/**
- * This class implements the debugging endpoints.
- * NOTE: Debug classes are not expected to guarantee backward compatibility, and should
- * not be exposed to the client side.
- */
+/// This class implements the debugging endpoints.
+/// NOTE: Debug classes are not expected to guarantee backward compatibility, and should
+/// not be exposed to the client side.
 @Api(tags = Constants.CLUSTER_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
     @Authorization(value = DATABASE)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
@@ -178,16 +176,14 @@ public class DebugResource {
     return debugSegment(tableNameWithType, URIUtils.decode(segmentName));
   }
 
-  /**
-   * Helper method to collect debug information about the table.
-   *
-   * @param pinotHelixResourceManager Helix Resource Manager for the cluster
-   * @param tableName Name of the table
-   * @param tableType Type of the table (offline|realtime)
-   * @param verbosity Verbosity level to include debug information. For level 0, only segments
-   *                  with errors are included. For level > 0, all segments are included.
-   * @return TableDebugInfo Debug info for table.
-   */
+  /// Helper method to collect debug information about the table.
+  ///
+  /// @param pinotHelixResourceManager Helix Resource Manager for the cluster
+  /// @param tableName Name of the table
+  /// @param tableType Type of the table (offline|realtime)
+  /// @param verbosity Verbosity level to include debug information. For level 0, only segments
+  ///                  with errors are included. For level > 0, all segments are included.
+  /// @return TableDebugInfo Debug info for table.
   private TableDebugInfo debugTable(PinotHelixResourceManager pinotHelixResourceManager, String tableName,
       TableType tableType, int verbosity) {
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
@@ -281,7 +277,8 @@ public class DebugResource {
     }
 
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers,
+            _pinotHelixResourceManager.getServerAdminAuthProvider());
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, serverRequestTimeoutMs);
 
@@ -310,15 +307,13 @@ public class DebugResource {
     return new TableDebugInfo.SegmentDebugInfo(segmentName, segmentServerState);
   }
 
-  /**
-   * Helper method to debug segments. Computes differences between ideal state and external view for each segment.
-   *
-   * @param pinotHelixResourceManager Helix Resource Manager
-   * @param tableNameWithType Name of table with type
-   * @param verbosity Verbosity level to include debug information. For level 0, only segments
-   *                  with errors are included. For level > 0, all segments are included.   * @return Debug
-   *                  information for segments
-   */
+  /// Helper method to debug segments. Computes differences between ideal state and external view for each segment.
+  ///
+  /// @param pinotHelixResourceManager Helix Resource Manager
+  /// @param tableNameWithType Name of table with type
+  /// @param verbosity Verbosity level to include debug information. For level 0, only segments
+  ///                  with errors are included. For level > 0, all segments are included.   \* @return Debug
+  ///                  information for segments
   private List<TableDebugInfo.SegmentDebugInfo> debugSegments(PinotHelixResourceManager pinotHelixResourceManager,
       String tableNameWithType, int verbosity) {
     ExternalView externalView = pinotHelixResourceManager.getTableExternalView(tableNameWithType);
@@ -379,13 +374,11 @@ public class DebugResource {
     return result;
   }
 
-  /**
-   * Helper method to check if a segment has any errors/issues.
-   *
-   * @param segmentServerDebugInfo Segment debug info on server
-   * @param externalView external view of segment
-   * @return True if there's any error/issue for the segment, false otherwise.
-   */
+  /// Helper method to check if a segment has any errors/issues.
+  ///
+  /// @param segmentServerDebugInfo Segment debug info on server
+  /// @param externalView external view of segment
+  /// @return True if there's any error/issue for the segment, false otherwise.
   private boolean segmentHasErrors(SegmentServerDebugInfo segmentServerDebugInfo, String externalView) {
     // For now, we will skip cases where IS is ONLINE and EV is OFFLINE (or vice-versa), as it could happen during
     // state transitions.
@@ -403,14 +396,12 @@ public class DebugResource {
     return errorInfo != null && (errorInfo.getErrorMessage() != null || errorInfo.getStackTrace() != null);
   }
 
-  /**
-   * Computes debug information for brokers. Identifies differences in ideal state and external view
-   * for the broker resource.
-   *
-   * @param tableNameWithType Name of table with type suffix
-   * @param verbosity Verbosity level
-   * @return Debug information for brokers of the table
-   */
+  /// Computes debug information for brokers. Identifies differences in ideal state and external view
+  /// for the broker resource.
+  ///
+  /// @param tableNameWithType Name of table with type suffix
+  /// @param verbosity Verbosity level
+  /// @return Debug information for brokers of the table
   private List<TableDebugInfo.BrokerDebugInfo> debugBrokers(String tableNameWithType, int verbosity) {
     List<TableDebugInfo.BrokerDebugInfo> brokerDebugInfos = new ArrayList<>();
     HelixDataAccessor helixDataAccessor = _pinotHelixResourceManager.getHelixZkManager().getHelixDataAccessor();
@@ -436,14 +427,12 @@ public class DebugResource {
     return brokerDebugInfos;
   }
 
-  /**
-   * Computes debug information for servers.
-   *
-   * @param pinotHelixResourceManager Helix Resource Manager
-   * @param tableName Name of table
-   * @param tableType Type of table (offline|realtime)
-   * @return Debug information for servers of the table
-   */
+  /// Computes debug information for servers.
+  ///
+  /// @param pinotHelixResourceManager Helix Resource Manager
+  /// @param tableName Name of table
+  /// @param tableType Type of table (offline|realtime)
+  /// @return Debug information for servers of the table
   private List<TableDebugInfo.ServerDebugInfo> debugServers(PinotHelixResourceManager pinotHelixResourceManager,
       String tableName, TableType tableType) {
     HelixDataAccessor accessor = _pinotHelixResourceManager.getHelixZkManager().getHelixDataAccessor();
@@ -473,10 +462,8 @@ public class DebugResource {
     return serverDebugInfos;
   }
 
-  /**
-   * This method makes a MultiGet call to all servers to get the segments debug info.
-   * @return Map of ServerName ->  (map of SegmentName -> SegmentServerDebugInfo).
-   */
+  /// This method makes a MultiGet call to all servers to get the segments debug info.
+  /// @return Map of ServerName ->  (map of SegmentName -> SegmentServerDebugInfo).
   private Map<String, Map<String, SegmentServerDebugInfo>> getSegmentsDebugInfoFromServers(String tableNameWithType,
       BiMap<String, String> serverToEndpoints, int timeoutMs) {
     LOGGER.info("Reading segments debug info from servers: {} for table: {}", serverToEndpoints.keySet(),
@@ -490,7 +477,8 @@ public class DebugResource {
     }
 
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers,
+            _pinotHelixResourceManager.getServerAdminAuthProvider());
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs);
 
@@ -516,14 +504,12 @@ public class DebugResource {
     return serverToSegmentDebugInfoMap;
   }
 
-  /**
-   * Helper method to get valid types of table that exist in the cluster for the given table name.
-   *
-   * @param tableName Name of table
-   * @param tableTypeStr Type of table
-   * @param pinotHelixResourceManager Pinot Helix Resource manager
-   * @return List of valid table types that exist in the cluster
-   */
+  /// Helper method to get valid types of table that exist in the cluster for the given table name.
+  ///
+  /// @param tableName Name of table
+  /// @param tableTypeStr Type of table
+  /// @param pinotHelixResourceManager Pinot Helix Resource manager
+  /// @return List of valid table types that exist in the cluster
   private List<TableType> getValidTableTypes(String tableName, String tableTypeStr,
       PinotHelixResourceManager pinotHelixResourceManager) {
     TableType tableType = Constants.validateTableType(tableTypeStr);

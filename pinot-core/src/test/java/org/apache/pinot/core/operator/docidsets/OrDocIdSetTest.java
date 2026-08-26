@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.docidsets;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
@@ -48,7 +47,7 @@ public class OrDocIdSetTest {
 
     when(sortedDocIdSet.iterator()).thenReturn(sortedIterator);
     when(bitmapDocIdSet.iterator()).thenReturn(bitmapIterator);
-    when(sortedIterator.getDocIdRanges()).thenReturn(Collections.singletonList(new Pairs.IntPair(1, 10)));
+    when(sortedIterator.getDocIdRanges()).thenReturn(List.of(new Pairs.IntPair(1, 10)));
     when(bitmapIterator.getDocIds()).thenReturn(new MutableRoaringBitmap());
 
     List<BlockDocIdSet> docIdSets = Arrays.asList(sortedDocIdSet, bitmapDocIdSet);
@@ -87,7 +86,7 @@ public class OrDocIdSetTest {
 
     when(sortedDocIdSet.iterator()).thenReturn(sortedIterator);
     when(bitmapDocIdSet.iterator()).thenReturn(bitmapIterator);
-    when(sortedIterator.getDocIdRanges()).thenReturn(Collections.singletonList(new Pairs.IntPair(1, 5)));
+    when(sortedIterator.getDocIdRanges()).thenReturn(List.of(new Pairs.IntPair(1, 5)));
     when(bitmapIterator.getDocIds()).thenReturn(new MutableRoaringBitmap());
 
     List<BlockDocIdSet> docIdSets = Arrays.asList(sortedDocIdSet, bitmapDocIdSet);
@@ -126,7 +125,7 @@ public class OrDocIdSetTest {
     when(bitmapDocIdSet.iterator()).thenReturn(bitmapIterator);
     when(sortedDocIdIterator.iterator()).thenReturn(sortedIterator);
     when(svScanDocIdSet.iterator()).thenReturn(svScanDocIdIterator);
-    when(sortedIterator.getDocIdRanges()).thenReturn(Collections.singletonList(new Pairs.IntPair(1, 5)));
+    when(sortedIterator.getDocIdRanges()).thenReturn(List.of(new Pairs.IntPair(1, 5)));
     when(bitmapIterator.getDocIds()).thenReturn(new MutableRoaringBitmap());
 
     List<BlockDocIdSet> docIdSets = Arrays.asList(bitmapDocIdSet, sortedDocIdIterator, svScanDocIdSet);

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,9 +37,7 @@ import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 
 
-/**
- * Helper class to reduce and set gap fill results into the BrokerResponseNative
- */
+/// Helper class to reduce and set gap fill results into the BrokerResponseNative
 public abstract class BaseGapfillProcessor {
   protected final QueryContext _queryContext;
 
@@ -138,12 +135,10 @@ public abstract class BaseGapfillProcessor {
     }
   }
 
-  /**
-   * Here are three things that happen
-   * 1. Sort the result sets from all pinot servers based on timestamp
-   * 2. Gapfill the data for missing entities per time bucket
-   * 3. Aggregate the dataset per time bucket.
-   */
+  /// Here are three things that happen
+  /// 1. Sort the result sets from all pinot servers based on timestamp
+  /// 2. Gapfill the data for missing entities per time bucket
+  /// 3. Aggregate the dataset per time bucket.
   public void process(BrokerResponseNative brokerResponseNative) {
     DataSchema dataSchema = brokerResponseNative.getResultTable().getDataSchema();
     replaceColumnNameWithAlias(dataSchema);
@@ -151,7 +146,7 @@ public abstract class BaseGapfillProcessor {
 
     DataSchema resultTableSchema = getResultTableDataSchema(dataSchema);
     if (brokerResponseNative.getResultTable().getRows().isEmpty()) {
-      brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, Collections.emptyList()));
+      brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, List.of()));
       return;
     }
 
@@ -181,9 +176,7 @@ public abstract class BaseGapfillProcessor {
     brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, resultRows));
   }
 
-  /**
-   * Constructs the DataSchema for the ResultTable.
-   */
+  /// Constructs the DataSchema for the ResultTable.
   protected DataSchema getResultTableDataSchema(DataSchema dataSchema) {
     if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL) {
       return dataSchema;
@@ -211,11 +204,9 @@ public abstract class BaseGapfillProcessor {
     return new DataSchema(columnNames, columnDataTypes);
   }
 
-  /**
-   * This method returns the time bucket column for broker response since for cases where gapfill contains a subquery
-   * to be evaluated (AGGREGATE_GAP_FILL and AGGREGATE_GAP_FILL_AGGREGATE), the time column may or may not the first
-   * column in the result set, hence the index of the time column in the result set needs to be determined dynamically.
-   */
+  /// This method returns the time bucket column for broker response since for cases where gapfill contains a subquery
+  /// to be evaluated (AGGREGATE_GAP_FILL and AGGREGATE_GAP_FILL_AGGREGATE), the time column may or may not the first
+  /// column in the result set, hence the index of the time column in the result set needs to be determined dynamically.
   protected int getTimeBucketColumnIndexFromBrokerResponse(DataSchema dataSchema) {
     if (_gapfillType != GapfillUtils.GapfillType.AGGREGATE_GAP_FILL
         && _gapfillType != GapfillUtils.GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {

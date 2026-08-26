@@ -18,36 +18,11 @@
  */
 package org.apache.pinot.minion;
 
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
-
-
-/**
- * The class <code>MinionStarter</code> provides methods to start and stop the Pinot Minion.
- * <p>Pinot Minion will automatically join the given Helix cluster as a participant.
- */
+/// The class `MinionStarter` provides methods to start and stop the Pinot Minion.
+///
+/// Pinot Minion will automatically join the given Helix cluster as a participant.
 public class MinionStarter extends BaseMinionStarter {
 
   public MinionStarter() {
-  }
-
-  @Deprecated
-  public MinionStarter(String clusterName, String zkServers, PinotConfiguration minionConfig)
-      throws Exception {
-    init(applyMinionConfigs(minionConfig, clusterName, zkServers));
-  }
-
-  @Deprecated
-  private static PinotConfiguration applyMinionConfigs(PinotConfiguration minionConfig, String clusterName,
-      String zkServers) {
-    minionConfig.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
-    minionConfig.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, zkServers);
-    return minionConfig;
-  }
-
-  @Deprecated
-  public MinionStarter(PinotConfiguration config)
-      throws Exception {
-    init(config);
   }
 }

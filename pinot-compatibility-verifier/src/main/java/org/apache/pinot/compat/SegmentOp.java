@@ -23,7 +23,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -48,19 +47,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Segment Operations:
- * UPLOAD:
- *   Generates a segment for a table from the data in the input file.
- *   Uploads the segment, and verifies that the segments appear in ExternalView
- * DELETE:
- *   Deletes the segment from the table.
- *
- * TODO:
- *  - Maybe segment names can be auto-generated if the name is "AUTO".
- *  - We can add segmentGeneration config file as an option also
- *  - We can consider supporting different readers, starting with csv. Will help in easily scanning the data.
- */
+/// Segment Operations:
+/// UPLOAD:
+///   Generates a segment for a table from the data in the input file.
+///   Uploads the segment, and verifies that the segments appear in ExternalView
+/// DELETE:
+///   Deletes the segment from the table.
+///
+/// TODO:
+///  - Maybe segment names can be auto-generated if the name is "AUTO".
+///  - We can add segmentGeneration config file as an option also
+///  - We can consider supporting different readers, starting with csv. Will help in easily scanning the data.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentOp extends BaseOp {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentOp.class);
@@ -147,10 +144,8 @@ public class SegmentOp extends BaseOp {
     }
   }
 
-  /**
-   * Create Segment file, compress to TarGz, upload the files to controller and verify segment upload.
-   * @return true if all successful, false in case of failure.
-   */
+  /// Create Segment file, compress to TarGz, upload the files to controller and verify segment upload.
+  /// @return true if all successful, false in case of failure.
   private boolean createAndUploadSegments() {
     File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-compat-test-segment-op-" + UUID.randomUUID());
     localTempDir.deleteOnExit();
@@ -174,13 +169,11 @@ public class SegmentOp extends BaseOp {
     }
   }
 
-  /**
-   * Generate the Segment(s) and then compress to TarGz file. Supports generation of segment files for one input data
-   * file.
-   * @param outputDir to generate the Segment file(s).
-   * @return File object of the TarGz compressed segment file.
-   * @throws Exception while generating segment files and/or compressing to TarGz.
-   */
+  /// Generate the Segment(s) and then compress to TarGz file. Supports generation of segment files for one input data
+  /// file.
+  /// @param outputDir to generate the Segment file(s).
+  /// @return File object of the TarGz compressed segment file.
+  /// @throws Exception while generating segment files and/or compressing to TarGz.
   private File generateSegment(File outputDir, String localReplacedInputDataFilePath)
       throws Exception {
     TableConfig tableConfig =
@@ -215,11 +208,9 @@ public class SegmentOp extends BaseOp {
     return segmentTarFile;
   }
 
-  /**
-   * Upload the TarGz Segment file to the controller.
-   * @param segmentTarFile TarGz Segment file
-   * @throws Exception when upload segment fails.
-   */
+  /// Upload the TarGz Segment file to the controller.
+  /// @param segmentTarFile TarGz Segment file
+  /// @throws Exception when upload segment fails.
   private void uploadSegment(File segmentTarFile)
       throws Exception {
     URI controllerURI =
@@ -229,13 +220,11 @@ public class SegmentOp extends BaseOp {
     }
   }
 
-  /**
-   * Verify given table and segment name in the controller are in the state matching the parameter.
-   * @param state of the segment to be verified in the controller.
-   * @return true if segment is in the state provided in the parameter, else false.
-   * @throws IOException when unable to get the external view for the table.
-   * @throws InterruptedException when thread sleep is interrupted.
-   */
+  /// Verify given table and segment name in the controller are in the state matching the parameter.
+  /// @param state of the segment to be verified in the controller.
+  /// @return true if segment is in the state provided in the parameter, else false.
+  /// @throws IOException when unable to get the external view for the table.
+  /// @throws InterruptedException when thread sleep is interrupted.
   private boolean verifySegmentInState(String state)
       throws IOException, InterruptedException {
     long startTime = System.currentTimeMillis();
@@ -281,10 +270,8 @@ public class SegmentOp extends BaseOp {
     return true;
   }
 
-  /**
-   * Deletes the segment for the given segment name and table name.
-   * @return true if delete successful, else false.
-   */
+  /// Deletes the segment for the given segment name and table name.
+  /// @return true if delete successful, else false.
   private boolean deleteSegment() {
     try {
       TableConfig tableConfig =
@@ -305,12 +292,10 @@ public class SegmentOp extends BaseOp {
     }
   }
 
-  /**
-   * Verify given table name and segment name deleted from the controller.
-   * @return true if no segment found, else false.
-   * @throws IOException when unable to get the external view for the table.
-   * @throws InterruptedException when thread sleep is interrupted.
-   */
+  /// Verify given table name and segment name deleted from the controller.
+  /// @return true if no segment found, else false.
+  /// @throws IOException when unable to get the external view for the table.
+  /// @throws InterruptedException when thread sleep is interrupted.
   private boolean verifySegmentDeleted()
       throws IOException, InterruptedException {
     long startTime = System.currentTimeMillis();
@@ -329,10 +314,8 @@ public class SegmentOp extends BaseOp {
     return true;
   }
 
-  /**
-   * Retrieve external view for the given table name.
-   * @return TableViews.TableView of OFFLINE and REALTIME segments.
-   */
+  /// Retrieve external view for the given table name.
+  /// @return TableViews.TableView of OFFLINE and REALTIME segments.
   private TableViews.TableView getExternalViewForTable()
       throws IOException {
     return JsonUtils.stringToObject(ControllerTest.sendGetRequest(
@@ -340,17 +323,15 @@ public class SegmentOp extends BaseOp {
             .forTableExternalView(_tableName)), TableViews.TableView.class);
   }
 
-  /**
-   * Retrieve the number of segments for OFFLINE which are in state matching the parameter.
-   * @param state of the segment to be verified in the controller.
-   * @return -1 in case of ERROR, 1 if all matches the state else 0.
-   */
+  /// Retrieve the number of segments for OFFLINE which are in state matching the parameter.
+  /// @param state of the segment to be verified in the controller.
+  /// @return -1 in case of ERROR, 1 if all matches the state else 0.
   private long getSegmentCountInState(String state)
       throws IOException {
     final Set<String> segmentState =
         getExternalViewForTable()._offline != null ? getExternalViewForTable()._offline.entrySet().stream()
             .filter(k -> k.getKey().equals(_segmentName)).flatMap(x -> x.getValue().values().stream())
-            .collect(Collectors.toSet()) : Collections.emptySet();
+            .collect(Collectors.toSet()) : Set.of();
 
     if (segmentState.contains(CommonConstants.Helix.StateModel.SegmentStateModel.ERROR)) {
       return -1;
@@ -359,10 +340,8 @@ public class SegmentOp extends BaseOp {
     return segmentState.stream().allMatch(x -> x.contains(state)) ? 1 : 0;
   }
 
-  /**
-   * Retrieve the number of segments for both OFFLINE irrespective of the state.
-   * @return count for OFFLINE segments.
-   */
+  /// Retrieve the number of segments for both OFFLINE irrespective of the state.
+  /// @return count for OFFLINE segments.
   private long getCountForSegmentName()
       throws IOException {
     return getExternalViewForTable()._offline != null ? getExternalViewForTable()._offline.entrySet().stream()

@@ -21,7 +21,6 @@ package org.apache.pinot.calcite.rel.rules;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -167,7 +166,7 @@ public class PinotWindowSplitRuleTest {
         RexWindowBounds.UNBOUNDED_FOLLOWING,
         RexWindowExclusion.EXCLUDE_NO_OTHER,
         RelCollations.EMPTY,
-        Collections.emptyList()
+        List.of()
     );
 
     // Apply the shifter
@@ -231,7 +230,7 @@ public class PinotWindowSplitRuleTest {
 
     List<Window.Group> groups = createWindowGroups(numGroups);
 
-    List<RexLiteral> constants = Collections.emptyList();
+    List<RexLiteral> constants = List.of();
     return LogicalWindow.create(RelTraitSet.createEmpty(), _input, constants, intType, groups);
   }
 
@@ -270,7 +269,7 @@ public class PinotWindowSplitRuleTest {
     RelDataType inputRowType = TYPE_FACTORY.createStructType(inputFields);
     LogicalProject inputProject = LogicalProject.create(
         LogicalValues.create(cluster, inputRowType, ImmutableList.of()),
-        Collections.emptyList(),
+        List.of(),
         List.of(inputRef),
         inputRowType
     );
@@ -279,7 +278,7 @@ public class PinotWindowSplitRuleTest {
 
     // Create real window groups
     List<Window.Group> groups = createWindowGroups(numGroups);
-    List<RexLiteral> constants = Collections.emptyList();
+    List<RexLiteral> constants = List.of();
 
     // Create real struct row type for the window
     List<RelDataTypeField> windowFields = new ArrayList<>(inputFields);

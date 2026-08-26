@@ -23,14 +23,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
-/**
- * Controls the behavior of the page cache warmup process.
- *
- * <p>Warmup runs in two independent cases that share the same set of knobs: when a server
- * restarts ({@code onRestart}) and after a segment is refreshed ({@code onRefresh}). Each case is
- * configured with its own {@link Spec} block so it can be enabled/disabled and tuned separately.
- * A {@code null}/absent block disables warmup for that case.
- */
+/// Controls the behavior of the page cache warmup process.
+///
+/// <p>Warmup runs in two independent cases that share the same set of knobs: when a server
+/// restarts ({@code onRestart}) and after a segment is refreshed ({@code onRefresh}). Each case is
+/// configured with its own {@link Spec} block so it can be enabled/disabled and tuned separately.
+/// A {@code null}/absent block disables warmup for that case.
 public class PageCacheWarmupConfig extends BaseJsonConfig {
 
   // Warmup settings applied when a server restarts; null disables restart warmup
@@ -59,10 +57,8 @@ public class PageCacheWarmupConfig extends BaseJsonConfig {
     return _onRefresh;
   }
 
-  /**
-   * Per-case page cache warmup settings. The same shape is reused for the server-restart and
-   * segment-refresh cases (see {@link #getOnRestart()} / {@link #getOnRefresh()}).
-   */
+  /// Per-case page cache warmup settings. The same shape is reused for the server-restart and
+  /// segment-refresh cases (see {@link #getOnRestart()} / {@link #getOnRefresh()}).
   public static class Spec extends BaseJsonConfig {
     private static final int DEFAULT_WARMUP_DURATION_SECONDS = 180;
 

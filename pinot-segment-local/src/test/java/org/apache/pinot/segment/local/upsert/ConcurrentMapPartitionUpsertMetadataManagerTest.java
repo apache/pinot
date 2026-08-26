@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.upsert;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +50,7 @@ import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -94,8 +94,8 @@ import static org.testng.Assert.*;
 public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
-  private static final List<String> PRIMARY_KEY_COLUMNS = Collections.singletonList("pk");
-  private static final List<String> COMPARISON_COLUMNS = Collections.singletonList("timeCol");
+  private static final List<String> PRIMARY_KEY_COLUMNS = List.of("pk");
+  private static final List<String> COMPARISON_COLUMNS = List.of("timeCol");
   private static final String DELETE_RECORD_COLUMN = "deleteCol";
   private static final File INDEX_DIR =
       new File(FileUtils.getTempDirectory(), "ConcurrentMapPartitionUpsertMetadataManagerTest");
@@ -292,6 +292,50 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   @Test
+  public void testReplaceSegmentOnReloadRebuildsFromSnapshot()
+      throws Exception {
+    // Upsert + metadata TTL with snapshots enabled: a reload must rebuild upsert metadata from the validDocIds
+    // snapshot (valid docs only), so docs invalidated since the segment was first loaded are not resurrected.
+    _contextBuilder.setEnableSnapshot(true).setMetadataTTL(30);
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+
+    String segmentName = "reload_snapshot_segment";
+    int[] primaryKeys = new int[]{10, 30, 40};
+    int[] timestamps = new int[]{1500, 3500, 4000};
+
+    // Initial load of the segment with 3 valid docs.
+    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segment1 = createRealSegment(segmentName, primaryKeys, timestamps, validDocIds1);
+    upsertMetadataManager.addSegment(segment1);
+    assertEquals(recordLocationMap.size(), 3);
+
+    // Reload: a fresh copy of the same segment that carries a validDocIds snapshot marking only docs {0, 2} valid
+    // (doc 1 / PK 30 was invalidated). The reload must rebuild from the snapshot, not rescan all docs.
+    ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segment2 = createRealSegment(segmentName, primaryKeys, timestamps, validDocIds2);
+    ThreadSafeMutableRoaringBitmap snapshot = new ThreadSafeMutableRoaringBitmap();
+    snapshot.add(0);
+    snapshot.add(2);
+    segment2.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, snapshot.getBytesAndCardinality());
+
+    upsertMetadataManager.replaceSegment(segment2, segment1);
+
+    // PK 30 (doc 1) is not resurrected; only PK 10 and PK 40 remain, now in the reloaded segment.
+    assertEquals(recordLocationMap.size(), 2);
+    checkRecordLocation(recordLocationMap, 10, segment2, 0, 1500, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 40, segment2, 2, 4000, HashFunction.NONE);
+    assertNull(recordLocationMap.get(HashUtils.hashPrimaryKey(makePrimaryKey(30), HashFunction.NONE)));
+    assertEquals(segment2.getValidDocIds().getMutableRoaringBitmap().getCardinality(), 2);
+
+    upsertMetadataManager.stop();
+    upsertMetadataManager.close();
+    segment1.destroy();
+    segment2.destroy();
+  }
+
+  @Test
   public void testGetQueryableDocIds() {
     _contextBuilder.setDeleteRecordColumn(DELETE_RECORD_COLUMN);
 
@@ -462,7 +506,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, hashFunction);
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 2, 3});
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
-    assertEquals(trackedSegments, Collections.singleton(newSegment1));
+    assertEquals(trackedSegments, Set.of(newSegment1));
 
     // Stop the metadata manager
     upsertMetadataManager.stop();
@@ -473,7 +517,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     assertEquals(recordLocationMap.size(), 1);
     checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, hashFunction);
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
-    assertEquals(trackedSegments, Collections.singleton(newSegment1));
+    assertEquals(trackedSegments, Set.of(newSegment1));
 
     // Close the metadata manager
     upsertMetadataManager.close();
@@ -780,7 +824,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, hashFunction);
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 2, 3});
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
-    assertEquals(trackedSegments, Collections.singleton(newSegment1));
+    assertEquals(trackedSegments, Set.of(newSegment1));
     assertEquals(queryableDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 3});
     assertTrue(newQueryableDocIds1.getMutableRoaringBitmap().isEmpty());
 
@@ -793,7 +837,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     assertEquals(recordLocationMap.size(), 1);
     checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, hashFunction);
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
-    assertEquals(trackedSegments, Collections.singleton(newSegment1));
+    assertEquals(trackedSegments, Set.of(newSegment1));
     assertTrue(newQueryableDocIds1.getMutableRoaringBitmap().isEmpty());
 
     // Close the metadata manager
@@ -831,9 +875,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     return recordInfoList;
   }
 
-  /**
-   * Get recordInfo from validDocIdsSnapshot (enabledSnapshot = True).
-   */
+  /// Get recordInfo from validDocIdsSnapshot (enabledSnapshot = True).
   private List<RecordInfo> getRecordInfoList(MutableRoaringBitmap validDocIdsSnapshot, int[] primaryKeys,
       int[] timestamps, @Nullable boolean[] deleteRecordFlags) {
     List<RecordInfo> recordInfoList = new ArrayList<>();
@@ -881,6 +923,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       return MOCK_FALLBACK_BASE_OFFSET + docId;
     });
     when(primaryKeyDataSource.getForwardIndex()).thenReturn(primaryKeyForwardIndex);
+    DataSourceMetadata primaryKeyDataSourceMetadata = mock(DataSourceMetadata.class);
+    when(primaryKeyDataSourceMetadata.getFieldSpec()).thenReturn(
+        new DimensionFieldSpec(PRIMARY_KEY_COLUMNS.get(0), DataType.INT, true));
+    when(primaryKeyDataSource.getDataSourceMetadata()).thenReturn(primaryKeyDataSourceMetadata);
 
     // Mock comparison column data source
     DataSource comparisonDataSource = mock(DataSource.class);
@@ -897,6 +943,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       return MOCK_FALLBACK_BASE_OFFSET + (docId * 100);
     });
     when(comparisonDataSource.getForwardIndex()).thenReturn(comparisonForwardIndex);
+    DataSourceMetadata comparisonDataSourceMetadata = mock(DataSourceMetadata.class);
+    when(comparisonDataSourceMetadata.getFieldSpec()).thenReturn(
+        new DimensionFieldSpec(COMPARISON_COLUMNS.get(0), DataType.INT, true));
+    when(comparisonDataSource.getDataSourceMetadata()).thenReturn(comparisonDataSourceMetadata);
 
     // Set up data source mapping - IMPORTANT: anyString() must be registered FIRST,
     // then specific matchers override it (Mockito uses last matching stub)
@@ -927,15 +977,13 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     return segment;
   }
 
-  /**
-   * Creates a real ImmutableSegment with actual data on disk.
-   * This avoids the complexity of mocking data sources for RecordInfoReader.
-   *
-   * @param primaryKeys array of primary key values
-   * @param timestamps array of timestamp/comparison values
-   * @param validDocIds bitmap to track valid doc IDs (will be populated)
-   * @return a real ImmutableSegmentImpl that can be read by RecordInfoReader
-   */
+  /// Creates a real ImmutableSegment with actual data on disk.
+  /// This avoids the complexity of mocking data sources for RecordInfoReader.
+  ///
+  /// @param primaryKeys array of primary key values
+  /// @param timestamps array of timestamp/comparison values
+  /// @param validDocIds bitmap to track valid doc IDs (will be populated)
+  /// @return a real ImmutableSegmentImpl that can be read by RecordInfoReader
   private ImmutableSegmentImpl createRealSegment(int[] primaryKeys, int[] timestamps,
       ThreadSafeMutableRoaringBitmap validDocIds)
       throws Exception {
@@ -994,6 +1042,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     when(forwardIndex.getInt(anyInt(), any())).thenAnswer(
         invocation -> primaryKeys.get(invocation.getArgument(0)).getValues()[0]);
     when(dataSource.getForwardIndex()).thenReturn(forwardIndex);
+    DataSourceMetadata uploadedDataSourceMetadata = mock(DataSourceMetadata.class);
+    when(uploadedDataSourceMetadata.getFieldSpec()).thenReturn(
+        new DimensionFieldSpec(PRIMARY_KEY_COLUMNS.get(0), DataType.INT, true));
+    when(dataSource.getDataSourceMetadata()).thenReturn(uploadedDataSourceMetadata);
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getIndexCreationTime()).thenReturn(creationTimeMs);
     when(segmentMetadata.getZkCreationTime()).thenReturn(creationTimeMs);
@@ -1065,6 +1117,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       return docId;
     });
     when(dataSource.getForwardIndex()).thenReturn(forwardIndex);
+    DataSourceMetadata mutableDataSourceMetadata = mock(DataSourceMetadata.class);
+    when(mutableDataSourceMetadata.getFieldSpec()).thenReturn(
+        new DimensionFieldSpec(PRIMARY_KEY_COLUMNS.get(0), DataType.INT, true));
+    when(dataSource.getDataSourceMetadata()).thenReturn(mutableDataSourceMetadata);
 
     when(segment.getDataSource(anyString())).thenReturn(dataSource);
     when(segment.getDataSource(PRIMARY_KEY_COLUMNS.get(0))).thenReturn(dataSource);
@@ -1358,13 +1414,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     }
   }
 
-  /**
-   * Regression test: when preloading an immutable segment whose validDocIds snapshot is empty and the table is
-   * configured with a deleteRecordColumn, doPreloadSegment's fast path must initialize queryableDocIds to an
-   * empty bitmap (not null). Passing null would set _queryableDocIds = null on the segment, causing subsequent
-   * doTakeSnapshot rounds to skip persisting the queryableDocIds bitmap file and leaving the on-disk snapshot
-   * frozen at its pre-restart contents.
-   */
+  /// Regression test: when preloading an immutable segment whose validDocIds snapshot is empty and the table is
+  /// configured with a deleteRecordColumn, doPreloadSegment's fast path must initialize queryableDocIds to an
+  /// empty bitmap (not null). Passing null would set \_queryableDocIds = null on the segment, causing subsequent
+  /// doTakeSnapshot rounds to skip persisting the queryableDocIds bitmap file and leaving the on-disk snapshot
+  /// frozen at its pre-restart contents.
   @Test
   public void testPreloadSegmentEmptyValidDocIdsWithDeleteColumn() {
     _contextBuilder.setEnableSnapshot(true).setDeleteRecordColumn(DELETE_RECORD_COLUMN);
@@ -1391,10 +1445,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     assertTrue(queryableDocIdsCaptor.getValue().getMutableRoaringBitmap().isEmpty());
   }
 
-  /**
-   * Companion to {@link #testPreloadSegmentEmptyValidDocIdsWithDeleteColumn}: when deleteRecordColumn is not
-   * configured, the fast path should still pass null for queryableDocIds since queryable tracking is disabled.
-   */
+  /// Companion to [#testPreloadSegmentEmptyValidDocIdsWithDeleteColumn]: when deleteRecordColumn is not
+  /// configured, the fast path should still pass null for queryableDocIds since queryable tracking is disabled.
   @Test
   public void testPreloadSegmentEmptyValidDocIdsWithoutDeleteColumn() {
     _contextBuilder.setEnableSnapshot(true);
@@ -1933,9 +1985,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
         "37fab5ef0ea39711feabcdc623cb8a4e");
   }
 
-  /**
-   * Use a wrapper class to ensure different value has different reference.
-   */
+  /// Use a wrapper class to ensure different value has different reference.
   private static class IntWrapper implements Comparable<IntWrapper> {
     final int _value;
 
@@ -1972,7 +2022,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     // Test partial upserts with old and new segments having same number of docs
     // This test verifies that when all keys are present, no reversion occurs
     PartialUpsertHandler mockPartialUpsertHandler = mock(PartialUpsertHandler.class);
-    UpsertContext upsertContext = _contextBuilder.setPartialUpsertHandler(mockPartialUpsertHandler)
+    UpsertContext upsertContext = _contextBuilder.setPartialUpsertHandlerSupplier(() -> mockPartialUpsertHandler)
         .setConsistencyMode(UpsertConfig.ConsistencyMode.NONE).build();
 
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
@@ -2035,7 +2085,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     // Test partial upserts with consuming (mutable) segment being sealed - revert should be triggered
     // Note: Revert logic only applies when sealing a consuming segment, not for immutable segment replacement
     PartialUpsertHandler mockPartialUpsertHandler = mock(PartialUpsertHandler.class);
-    UpsertContext upsertContext = _contextBuilder.setPartialUpsertHandler(mockPartialUpsertHandler)
+    UpsertContext upsertContext = _contextBuilder.setPartialUpsertHandlerSupplier(() -> mockPartialUpsertHandler)
         .setConsistencyMode(UpsertConfig.ConsistencyMode.NONE).build();
 
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
@@ -2083,7 +2133,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   public void testPartialUpsertOldSegmentLesserDocs() throws IOException {
     // Test partial upserts with old segment having fewer docs than new segment
     PartialUpsertHandler mockPartialUpsertHandler = mock(PartialUpsertHandler.class);
-    UpsertContext upsertContext = _contextBuilder.setPartialUpsertHandler(mockPartialUpsertHandler)
+    UpsertContext upsertContext = _contextBuilder.setPartialUpsertHandlerSupplier(() -> mockPartialUpsertHandler)
         .setConsistencyMode(UpsertConfig.ConsistencyMode.NONE).build();
 
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
@@ -2429,11 +2479,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     upsertMetadataManager.close();
   }
 
-  /**
-   * Verifies that _previousKeyToRecordLocationMap is cleared after segment commit (replace) and after segment remove,
-   * when not in PROTECTED mode. With PROTECTED mode the same replace assertion is covered by
-   * testProtectedModeRevertsMetadataForConsumingSegmentSeal.
-   */
+  /// Verifies that \_previousKeyToRecordLocationMap is cleared after segment commit (replace) and after segment remove,
+  /// when not in PROTECTED mode. With PROTECTED mode the same replace assertion is covered by
+  /// testProtectedModeRevertsMetadataForConsumingSegmentSeal.
   @Test
   public void testPrevKeyToRecordLocationMapClearedAfterSegmentCommitInNonProtectedMode()
       throws IOException {

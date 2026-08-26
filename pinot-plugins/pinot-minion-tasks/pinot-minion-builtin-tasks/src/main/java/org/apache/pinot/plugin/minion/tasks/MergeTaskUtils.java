@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.minion.tasks;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.core.common.MinionConstants.MergeTask;
+import org.apache.pinot.core.segment.processing.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.core.segment.processing.framework.MergeType;
 import org.apache.pinot.core.segment.processing.framework.SegmentConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
@@ -39,23 +39,20 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 
-/**
- * Common utils for segment merge tasks.
- */
+/// Common utils for segment merge tasks.
 public class MergeTaskUtils {
   private MergeTaskUtils() {
   }
 
   private static final int AGGREGATION_TYPE_KEY_SUFFIX_LENGTH = MergeTask.AGGREGATION_TYPE_KEY_SUFFIX.length();
 
-  /**
-   * Creates the time handler config based on the given table config, schema and task config. Returns {@code null} if
-   * the table does not have a time column.
-   */
+  /// Creates the time handler config based on the given table config, schema and task config. Returns `null` if
+  /// the table does not have a time column.
   @Nullable
   public static TimeHandlerConfig getTimeHandlerConfig(TableConfig tableConfig, Schema schema,
       Map<String, String> taskConfig) {
@@ -89,14 +86,12 @@ public class MergeTaskUtils {
     return timeHandlerConfigBuilder.build();
   }
 
-  /**
-   * Creates the partitioner configs based on the given table config, schema and task config.
-   */
+  /// Creates the partitioner configs based on the given table config, schema and task config.
   public static List<PartitionerConfig> getPartitionerConfigs(TableConfig tableConfig, Schema schema,
       Map<String, String> taskConfig) {
     SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
     if (segmentPartitionConfig == null) {
-      return Collections.emptyList();
+      return List.of();
     }
     List<PartitionerConfig> partitionerConfigs = new ArrayList<>();
     Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
@@ -113,18 +108,14 @@ public class MergeTaskUtils {
     return partitionerConfigs;
   }
 
-  /**
-   * Returns the merge type based on the task config. Returns {@code null} if it is not configured.
-   */
+  /// Returns the merge type based on the task config. Returns `null` if it is not configured.
   @Nullable
   public static MergeType getMergeType(Map<String, String> taskConfig) {
     String mergeType = taskConfig.get(MergeTask.MERGE_TYPE_KEY);
     return mergeType != null ? MergeType.valueOf(mergeType.toUpperCase()) : null;
   }
 
-  /**
-   * Returns the map from column name to the aggregation type associated with it based on the task config.
-   */
+  /// Returns the map from column name to the aggregation type associated with it based on the task config.
   public static Map<String, AggregationFunctionType> getAggregationTypes(Map<String, String> taskConfig) {
     Map<String, AggregationFunctionType> aggregationTypes = new HashMap<>();
     for (Map.Entry<String, String> entry : taskConfig.entrySet()) {
@@ -137,10 +128,54 @@ public class MergeTaskUtils {
     return aggregationTypes;
   }
 
-  /**
-   * Returns the segment config based on the task config.
-   * TODO - Ensure all tasks that build SegmentConfig use this method so that all appropriate configs are set.
-   */
+  /// Validates the prerequisites for an order sensitive aggregation (FIRSTWITHTIME/LASTWITHTIME) on the given
+  /// column: the column must be a metric column in the schema, and the table must have a time column with a DateTime
+  /// spec in the schema so that the reducer can order the values by the original time. No-op for other aggregation
+  /// types. The given aggregation type must be parseable (see
+  /// [AggregationFunctionType#getAggregationFunctionType(String)]).
+  public static void validateOrderSensitiveAggregation(TableConfig tableConfig, Schema schema, String column,
+      String aggregationType) {
+    AggregationFunctionType aggregationFunctionType = AggregationFunctionType.getAggregationFunctionType(
+        aggregationType);
+    if (!ValueAggregatorFactory.requiresTimeOrdering(aggregationFunctionType)) {
+      return;
+    }
+    FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+    Preconditions.checkState(fieldSpec != null,
+        "Aggregation type: %s on column: %s requires the column to exist in schema!", aggregationType, column);
+    Preconditions.checkState(fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC,
+        "Aggregation type: %s on column: %s requires the column to be a metric column in schema!", aggregationType,
+        column);
+    // The reducer can only order the values by time when the table has a time column resolvable in the schema
+    String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
+    Preconditions.checkState(timeColumn != null,
+        "Aggregation type: %s on column: %s requires the table to have a time column!", aggregationType, column);
+    Preconditions.checkState(schema.getSpecForTimeColumn(timeColumn) != null,
+        "Aggregation type: %s on column: %s requires the time column: %s to be a DateTime column in schema!",
+        aggregationType, column, timeColumn);
+  }
+
+  /// Validates that a column configured with a bytes-backed rollup aggregation (sketches, AvgPair, TDigest, ...) is
+  /// declared as a `BYTES` column in the schema. These aggregators read the stored column value as a serialized
+  /// object, so a non-BYTES column would fail with a ClassCastException at task runtime. No-op for other (numeric or
+  /// time-ordered) aggregation types. The given aggregation type must be parseable (see
+  /// [AggregationFunctionType#getAggregationFunctionType(String)]).
+  public static void validateAggregationColumnType(Schema schema, String column, String aggregationType) {
+    AggregationFunctionType aggregationFunctionType = AggregationFunctionType.getAggregationFunctionType(
+        aggregationType);
+    if (!ValueAggregatorFactory.isBytesBacked(aggregationFunctionType)) {
+      return;
+    }
+    FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+    Preconditions.checkState(fieldSpec != null,
+        "Aggregation type: %s on column: %s requires the column to exist in schema!", aggregationType, column);
+    Preconditions.checkState(fieldSpec.getDataType() == FieldSpec.DataType.BYTES,
+        "Aggregation type: %s on column: %s requires the column to be of type BYTES in schema, but found: %s",
+        aggregationType, column, fieldSpec.getDataType());
+  }
+
+  /// Returns the segment config based on the task config.
+  /// TODO - Ensure all tasks that build SegmentConfig use this method so that all appropriate configs are set.
   public static SegmentConfig getSegmentConfig(Map<String, String> taskConfig) {
     SegmentConfig.Builder segmentConfigBuilder = new SegmentConfig.Builder();
     String maxNumRecordsPerSegment = taskConfig.get(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY);
@@ -161,10 +196,8 @@ public class MergeTaskUtils {
     return segmentConfigBuilder.build();
   }
 
-  /**
-   * Check if the segment can be merged. Only skip merging the segment if 'shouldNotMerge'
-   * field exists and is set to true in its segment metadata custom map.
-   */
+  /// Check if the segment can be merged. Only skip merging the segment if 'shouldNotMerge'
+  /// field exists and is set to true in its segment metadata custom map.
   public static boolean allowMerge(SegmentZKMetadata segmentZKMetadata) {
     Map<String, String> customMap = segmentZKMetadata.getCustomMap();
     return MapUtils.isEmpty(customMap) || !Boolean.parseBoolean(

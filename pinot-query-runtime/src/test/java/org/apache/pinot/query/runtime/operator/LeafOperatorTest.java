@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.operator;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -131,7 +130,7 @@ public class LeafOperatorTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
+    List<BaseResultsBlock> dataBlocks = List.of(
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
@@ -163,8 +162,8 @@ public class LeafOperatorTest {
     DataSchema schema = new DataSchema(new String[]{"intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT intCol FROM tbl");
-    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
-        new SelectionResultsBlock(schema, Collections.singletonList(new Object[]{1}), queryContext));
+    List<BaseResultsBlock> dataBlocks = List.of(
+        new SelectionResultsBlock(schema, List.<Object[]>of(new Object[]{1}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
 
@@ -209,7 +208,7 @@ public class LeafOperatorTest {
         new DataSchema(new String[]{"boolCol", "tsCol", "newNamedBoolCol"}, new DataSchema.ColumnDataType[]{
             DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.TIMESTAMP, DataSchema.ColumnDataType.BOOLEAN
         });
-    List<BaseResultsBlock> dataBlocks = Collections.singletonList(new SelectionResultsBlock(resultSchema,
+    List<BaseResultsBlock> dataBlocks = List.of(new SelectionResultsBlock(resultSchema,
         Arrays.asList(new Object[]{1, 1660000000000L}, new Object[]{0, 1600000000000L}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
@@ -295,7 +294,7 @@ public class LeafOperatorTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
+    List<BaseResultsBlock> dataBlocks = List.of(
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock errorBlock = new InstanceResponseBlock();
     errorBlock.addException(QueryErrorCode.QUERY_EXECUTION, "foobar");
@@ -324,9 +323,9 @@ public class LeafOperatorTest {
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
     DataSchema desiredSchema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-    List<BaseResultsBlock> dataBlocks = Collections.emptyList();
+    List<BaseResultsBlock> dataBlocks = List.of();
     InstanceResponseBlock emptySelectionResponseBlock =
-        new InstanceResponseBlock(new SelectionResultsBlock(resultSchema, Collections.emptyList(), queryContext));
+        new InstanceResponseBlock(new SelectionResultsBlock(resultSchema, List.of(), queryContext));
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, emptySelectionResponseBlock);
     LeafOperator operator =
         new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), desiredSchema, queryExecutor,
@@ -348,7 +347,7 @@ public class LeafOperatorTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
+    List<BaseResultsBlock> dataBlocks = List.of(
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
@@ -371,7 +370,7 @@ public class LeafOperatorTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
+    List<BaseResultsBlock> dataBlocks = List.of(
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
@@ -394,7 +393,7 @@ public class LeafOperatorTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
+    List<BaseResultsBlock> dataBlocks = List.of(
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
@@ -473,7 +472,7 @@ public class LeafOperatorTest {
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.EARLY_TERMINATION_REASON.getName(),
         EarlyTerminationReason.DISTINCT_MAX_ROWS.name());
-    QueryExecutor queryExecutor = mockQueryExecutor(Collections.emptyList(), metadataBlock);
+    QueryExecutor queryExecutor = mockQueryExecutor(List.of(), metadataBlock);
     LeafOperator operator =
         new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
             _executorService);
@@ -530,7 +529,7 @@ public class LeafOperatorTest {
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.EARLY_TERMINATION_REASON.getName(),
         earlyTerminationReason);
-    QueryExecutor queryExecutor = mockQueryExecutor(Collections.emptyList(), metadataBlock);
+    QueryExecutor queryExecutor = mockQueryExecutor(List.of(), metadataBlock);
     LeafOperator operator =
         new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
             _executorService);
@@ -560,7 +559,7 @@ public class LeafOperatorTest {
     AggregationResultsBlock aggBlock =
         new AggregationResultsBlock(aggFunctions, Arrays.asList(2L, 10.0), queryContext);
     DataSchema schema = aggBlock.getDataSchema();
-    List<BaseResultsBlock> dataBlocks = Collections.singletonList(aggBlock);
+    List<BaseResultsBlock> dataBlocks = List.of(aggBlock);
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
     LeafOperator operator =
@@ -593,7 +592,7 @@ public class LeafOperatorTest {
     when(table.size()).thenReturn(records.size());
     when(table.iterator()).thenAnswer(inv -> records.iterator());
     GroupByResultsBlock groupByBlock = new GroupByResultsBlock(table, queryContext);
-    List<BaseResultsBlock> dataBlocks = Collections.singletonList(groupByBlock);
+    List<BaseResultsBlock> dataBlocks = List.of(groupByBlock);
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
     LeafOperator operator =
@@ -626,7 +625,7 @@ public class LeafOperatorTest {
     when(distinctTable.size()).thenReturn(distinctRows.size());
     when(distinctTable.getRows()).thenReturn(distinctRows);
     DistinctResultsBlock distinctBlock = new DistinctResultsBlock(distinctTable, queryContext);
-    List<BaseResultsBlock> dataBlocks = Collections.singletonList(distinctBlock);
+    List<BaseResultsBlock> dataBlocks = List.of(distinctBlock);
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
     LeafOperator operator =
@@ -656,7 +655,7 @@ public class LeafOperatorTest {
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName(),
         "true");
-    QueryExecutor queryExecutor = mockQueryExecutor(Collections.emptyList(), metadataBlock);
+    QueryExecutor queryExecutor = mockQueryExecutor(List.of(), metadataBlock);
     LeafOperator operator =
         new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
             _executorService);
@@ -686,7 +685,7 @@ public class LeafOperatorTest {
     DataSchema schema = new DataSchema(new String[]{"intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
-    QueryExecutor queryExecutor = mockQueryExecutor(Collections.emptyList(), metadataBlock);
+    QueryExecutor queryExecutor = mockQueryExecutor(List.of(), metadataBlock);
     LeafOperator operator =
         new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
             _executorService);

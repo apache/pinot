@@ -27,38 +27,34 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 
 
-/**
- * AggInfo is used to represent the aggregation function and its parameters.
- * Aggregation functions are stored as a string, since time-series languages
- * are allowed to implement their own aggregation functions.
- * <br />
- * The class also includes a map of parameters, which can store various
- * configuration options for the aggregation function. This allows for
- * more flexibility in defining and customizing aggregations. The parameters
- * <b>must be able to serialize and deserialize</b> via the {@link #serializeParams(Map)}
- * and {@link #deserializeParams(String)}.
- * <br />
- * Common parameters might include:
- * - window: Defines the time window for aggregation
- * <br />
- * Example usage:
- * <pre>
- *   Map<String, String> params = new HashMap<>();
- *   params.put("window", "5m");
- *   AggInfo aggInfo = new AggInfo("rate", true, params);
- * </pre>
- */
+/// AggInfo is used to represent the aggregation function and its parameters.
+/// Aggregation functions are stored as a string, since time-series languages
+/// are allowed to implement their own aggregation functions.
+///
+/// The class also includes a map of parameters, which can store various
+/// configuration options for the aggregation function. This allows for
+/// more flexibility in defining and customizing aggregations. The parameters
+/// **must be able to serialize and deserialize** via the [#serializeParams(Map)]
+/// and [#deserializeParams(String)].
+///
+/// Common parameters might include:
+/// - window: Defines the time window for aggregation
+///
+/// Example usage:
+///
+/// ```
+/// Map<String, String> params = new HashMap<>();
+/// params.put("window", "5m");
+/// AggInfo aggInfo = new AggInfo("rate", true, params);
+/// ```
 public class AggInfo {
   private final String _aggFunction;
-  /**
-   * Denotes whether an aggregate is partial or full. When returning the logical plan, language developers must not
-   * set this to true. This is used during Physical planning, and Pinot may set this to true if the corresponding
-   * aggregate node is not guaranteed to have the full data. In such cases, the physical plan will always add a
-   * complimentary full aggregate.
-   * <p>
-   *  TODO(timeseries): Ideally we should remove this from the logical plan completely.
-   * </p>
-   */
+  /// Denotes whether an aggregate is partial or full. When returning the logical plan, language developers must not
+  /// set this to true. This is used during Physical planning, and Pinot may set this to true if the corresponding
+  /// aggregate node is not guaranteed to have the full data. In such cases, the physical plan will always add a
+  /// complimentary full aggregate.
+  ///
+  ///  TODO(timeseries): Ideally we should remove this from the logical plan completely.
   private final boolean _isPartial;
   private final Map<String, String> _params;
 
@@ -68,7 +64,7 @@ public class AggInfo {
     Preconditions.checkNotNull(aggFunction, "Received null aggFunction in AggInfo");
     _aggFunction = aggFunction;
     _isPartial = isPartial;
-    _params = params != null ? params : Collections.emptyMap();
+    _params = params != null ? params : Map.of();
   }
 
   public AggInfo withPartialAggregation() {

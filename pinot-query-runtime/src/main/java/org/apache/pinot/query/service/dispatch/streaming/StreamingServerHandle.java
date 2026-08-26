@@ -18,15 +18,11 @@
  */
 package org.apache.pinot.query.service.dispatch.streaming;
 
-/**
- * Broker-side handle to a single open {@code SubmitWithStream} call. Lets the
- * {@link StreamingQuerySession} send {@code BrokerToServer.cancel} fan-outs without depending on the concrete gRPC
- * stub type.
- */
+/// Broker-side handle to a single open `SubmitWithStream` call. Lets the
+/// [StreamingQuerySession] send `BrokerToServer.cancel` fan-outs without depending on the concrete gRPC
+/// stub type.
 public interface StreamingServerHandle {
-  /**
-   * Sends a {@code BrokerToServer.cancel} message on this stream. Best-effort: the stream may already be closed or
-   * broken; implementations should swallow transport failures and never throw.
-   */
+  /// Sends a `BrokerToServer.cancel` message on this stream. Best-effort: the stream may already be closed or
+  /// broken; implementations should swallow transport failures and never throw.
   void cancel(long requestId);
 }

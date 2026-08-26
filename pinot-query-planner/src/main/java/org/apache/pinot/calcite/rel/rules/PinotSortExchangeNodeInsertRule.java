@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
-import java.util.Collections;
+import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistributions;
@@ -27,17 +27,14 @@ import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 
 
-/**
- * Rewrite any sort into a relation that adds an exchange and pushes down the collation
- * to the rest of the tree. This happens for two reasons:
- * <ol>
- *   <li>Sort needs to be a distributed operation, if there are multiple nodes that are
- *   scanning data the sort ordering must be applied globally.</li>
- *   <li>It is ideal to push down the sort ordering as far as possible. If upstream nodes
- *   can send data in sorted order, then we can apply N-way merge sort and early terminate
- *   once all nodes have sent data that is no longer in the top OFFSET+LIMIT.</li>
- * </ol>
- */
+/// Rewrite any sort into a relation that adds an exchange and pushes down the collation
+/// to the rest of the tree. This happens for two reasons:
+///
+/// 1. Sort needs to be a distributed operation, if there are multiple nodes that are
+///    scanning data the sort ordering must be applied globally.
+/// 2. It is ideal to push down the sort ordering as far as possible. If upstream nodes
+///    can send data in sorted order, then we can apply N-way merge sort and early terminate
+///    once all nodes have sent data that is no longer in the top OFFSET+LIMIT.
 public class PinotSortExchangeNodeInsertRule extends RelOptRule {
   public static final PinotSortExchangeNodeInsertRule INSTANCE =
       new PinotSortExchangeNodeInsertRule(PinotRuleUtils.PINOT_REL_FACTORY);
@@ -60,7 +57,7 @@ public class PinotSortExchangeNodeInsertRule extends RelOptRule {
     //       not yet implemented.
     // TODO: Revisit whether we should use hash distribution
     PinotLogicalSortExchange exchange =
-        PinotLogicalSortExchange.create(sort.getInput(), RelDistributions.hash(Collections.emptyList()),
+        PinotLogicalSortExchange.create(sort.getInput(), RelDistributions.hash(List.of()),
             sort.getCollation(), false, !sort.getCollation().getKeys().isEmpty());
     call.transformTo(sort.copy(sort.getTraitSet(), exchange, sort.getCollation()));
   }

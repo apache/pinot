@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.startree.v2;
 
-import java.util.Collections;
+import java.util.List;
 import java.util.Random;
-import org.apache.datasketches.theta.Sketch;
-import org.apache.datasketches.theta.Union;
+import org.apache.datasketches.theta.ThetaSketch;
+import org.apache.datasketches.theta.ThetaUnion;
 import org.apache.pinot.segment.local.aggregator.DistinctCountThetaSketchValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -33,7 +33,7 @@ public class DistinctCountThetaSketchStarTreeV2Test extends BaseStarTreeV2Test<O
 
   @Override
   ValueAggregator<Object, Object> getValueAggregator() {
-    return new DistinctCountThetaSketchValueAggregator(Collections.emptyList());
+    return new DistinctCountThetaSketchValueAggregator(List.of());
   }
 
   @Override
@@ -54,11 +54,11 @@ public class DistinctCountThetaSketchStarTreeV2Test extends BaseStarTreeV2Test<O
     assertEquals(toSketch(starTreeResult).getEstimate(), toSketch(nonStarTreeResult).getEstimate(), delta);
   }
 
-  private Sketch toSketch(Object value) {
-    if (value instanceof Union) {
-      return ((Union) value).getResult();
-    } else if (value instanceof Sketch) {
-      return (Sketch) value;
+  private ThetaSketch toSketch(Object value) {
+    if (value instanceof ThetaUnion) {
+      return ((ThetaUnion) value).getResult();
+    } else if (value instanceof ThetaSketch) {
+      return (ThetaSketch) value;
     } else {
       throw new IllegalStateException(
           "Unsupported data type for Theta Sketch aggregation: " + value.getClass().getSimpleName());

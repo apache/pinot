@@ -21,6 +21,10 @@ package org.apache.pinot.query.queries;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.core.routing.MockRoutingManagerFactory;
+import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
@@ -29,6 +33,8 @@ import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
+import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -83,6 +89,149 @@ public class UnnestSqlPlannerTest extends QueryEnvironmentTestBase {
     Assert.assertEquals(unnestNode.isWithOrdinality(), withOrdinality,
         "Unexpected ordinality flag for query: " + sql);
     assertOrdinality(unnestNode, withOrdinality);
+  }
+
+  @Test
+  public void testUnnestColumnPruningDropsSourceArray() {
+    // With pruning enabled, the unnested source array (mcol1) must not be carried in the UnnestNode output.
+    String sql = "SET unnestColumnPruning=true; "
+        + "SELECT e.col1, u.s FROM e CROSS JOIN UNNEST(e.mcol1) AS u(s)";
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery(sql);
+    List<UnnestNode> unnestNodes = findUnnestNodes(subPlan);
+    Assert.assertEquals(unnestNodes.size(), 1);
+    UnnestNode unnestNode = unnestNodes.get(0);
+
+    Assert.assertTrue(unnestNode.isPrunedPassthrough(), "UnnestNode should be pruned");
+    List<String> columns = Arrays.asList(unnestNode.getDataSchema().getColumnNames());
+    Assert.assertFalse(columns.contains("mcol1"),
+        "Source array column should be pruned from UnnestNode output, found: " + columns);
+    Assert.assertTrue(columns.contains("col1"), "Referenced passthrough column col1 should be retained: " + columns);
+    Assert.assertEquals(unnestNode.getDataSchema().size(), 2, "Expected [col1, element] only: " + columns);
+    // col1 is the only retained passthrough column (input index 0); the element lands right after it.
+    Assert.assertEquals(unnestNode.getPassthroughInputIndexes(), List.of(0));
+    Assert.assertEquals(unnestNode.getElementIndexes(), List.of(1));
+  }
+
+  @Test
+  public void testUnnestColumnPruningDisabledByDefault() {
+    // Without the flag, behavior is unchanged: the source array is still part of the UnnestNode output.
+    String sql = "SELECT e.col1, u.s FROM e CROSS JOIN UNNEST(e.mcol1) AS u(s)";
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery(sql);
+    List<UnnestNode> unnestNodes = findUnnestNodes(subPlan);
+    Assert.assertEquals(unnestNodes.size(), 1);
+    UnnestNode unnestNode = unnestNodes.get(0);
+
+    Assert.assertFalse(unnestNode.isPrunedPassthrough(), "UnnestNode should not be pruned by default");
+    List<String> columns = Arrays.asList(unnestNode.getDataSchema().getColumnNames());
+    Assert.assertTrue(columns.contains("mcol1"),
+        "Without pruning, the source array column should remain in the UnnestNode output: " + columns);
+  }
+
+  @Test
+  public void testUnnestColumnPruningRetainsSelectedSourceArray() {
+    // When the user also selects the source array, it must be retained even with pruning enabled.
+    String sql = "SET unnestColumnPruning=true; "
+        + "SELECT e.col1, e.mcol1, u.s FROM e CROSS JOIN UNNEST(e.mcol1) AS u(s)";
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery(sql);
+    List<UnnestNode> unnestNodes = findUnnestNodes(subPlan);
+    Assert.assertEquals(unnestNodes.size(), 1);
+    UnnestNode unnestNode = unnestNodes.get(0);
+
+    List<String> columns = Arrays.asList(unnestNode.getDataSchema().getColumnNames());
+    Assert.assertTrue(columns.contains("mcol1"),
+        "Explicitly selected source array must be retained: " + columns);
+    Assert.assertTrue(columns.contains("col1"), columns.toString());
+  }
+
+  @Test
+  public void testUnnestColumnPruningWithOrdinality() {
+    // The ordinality index must be recomputed against the pruned (smaller) output.
+    String sql = "SET unnestColumnPruning=true; "
+        + "SELECT e.col1, u.s, u.ord FROM e CROSS JOIN UNNEST(e.mcol1) WITH ORDINALITY AS u(s, ord)";
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery(sql);
+    List<UnnestNode> unnestNodes = findUnnestNodes(subPlan);
+    Assert.assertEquals(unnestNodes.size(), 1);
+    UnnestNode unnestNode = unnestNodes.get(0);
+
+    Assert.assertTrue(unnestNode.isWithOrdinality());
+    Assert.assertTrue(unnestNode.isPrunedPassthrough());
+    List<String> columns = Arrays.asList(unnestNode.getDataSchema().getColumnNames());
+    Assert.assertFalse(columns.contains("mcol1"), "Source array should be pruned: " + columns);
+    // Retained passthrough = [col1] (1), element at index 1, ordinality at index 2.
+    Assert.assertEquals(unnestNode.getPassthroughInputIndexes(), List.of(0));
+    Assert.assertEquals(unnestNode.getElementIndexes(), List.of(1));
+    Assert.assertEquals(unnestNode.getOrdinalityIndex(), 2);
+    Assert.assertEquals(unnestNode.getDataSchema().size(), 3);
+  }
+
+  @Test
+  public void testUnnestColumnPruningMultipleArrays() {
+    // Both source arrays must be dropped; element indexes recompute contiguously after the retained passthrough.
+    String sql = "SET unnestColumnPruning=true; "
+        + "SELECT e.col1, u.longVal, u.stringVal FROM e CROSS JOIN UNNEST(e.mcol2, e.mcol1) AS u(longVal, stringVal)";
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery(sql);
+    List<UnnestNode> unnestNodes = findUnnestNodes(subPlan);
+    Assert.assertEquals(unnestNodes.size(), 1);
+    UnnestNode unnestNode = unnestNodes.get(0);
+
+    Assert.assertTrue(unnestNode.isPrunedPassthrough());
+    List<String> columns = Arrays.asList(unnestNode.getDataSchema().getColumnNames());
+    Assert.assertFalse(columns.contains("mcol1"), columns.toString());
+    Assert.assertFalse(columns.contains("mcol2"), columns.toString());
+    Assert.assertTrue(columns.contains("col1"), columns.toString());
+    Assert.assertEquals(unnestNode.getPassthroughInputIndexes(), List.of(0));
+    Assert.assertEquals(unnestNode.getElementIndexes(), List.of(1, 2));
+    Assert.assertEquals(unnestNode.getDataSchema().size(), 3);
+  }
+
+  @Test
+  public void testUnnestColumnPruningViaBrokerDefault() {
+    // With the broker-config default on (and no per-query SET), pruning still applies.
+    QueryEnvironment env = buildQueryEnvironment(true);
+    DispatchableSubPlan subPlan =
+        env.planQuery("SELECT e.col1, u.s FROM e CROSS JOIN UNNEST(e.mcol1) AS u(s)");
+    List<UnnestNode> unnestNodes = findUnnestNodes(subPlan);
+    Assert.assertEquals(unnestNodes.size(), 1);
+    Assert.assertTrue(unnestNodes.get(0).isPrunedPassthrough(),
+        "Broker-config default should enable pruning without a SET option");
+
+    // A per-query SET overrides the broker default back off.
+    DispatchableSubPlan overridden = env.planQuery(
+        "SET unnestColumnPruning=false; SELECT e.col1, u.s FROM e CROSS JOIN UNNEST(e.mcol1) AS u(s)");
+    Assert.assertFalse(findUnnestNodes(overridden).get(0).isPrunedPassthrough(),
+        "Per-query SET should override the broker-config default");
+  }
+
+  private static QueryEnvironment buildQueryEnvironment(boolean defaultUnnestColumnPruning) {
+    MockRoutingManagerFactory factory = new MockRoutingManagerFactory(1, 2);
+    TABLE_SCHEMAS.forEach((name, schema) -> factory.registerTable(schema, name));
+    SERVER1_SEGMENTS.forEach((table, segments) -> segments.forEach(s -> factory.registerSegment(1, table, s)));
+    SERVER2_SEGMENTS.forEach((table, segments) -> segments.forEach(s -> factory.registerSegment(2, table, s)));
+    RoutingManager routingManager = factory.buildRoutingManager(null);
+    TableCache tableCache = factory.buildTableCache();
+    return new QueryEnvironment(QueryEnvironment.configBuilder()
+        .requestId(-1L)
+        .database(CommonConstants.DEFAULT_DATABASE)
+        .tableCache(tableCache)
+        .workerManager(new WorkerManager("Broker_localhost", "localhost", 3, routingManager))
+        .defaultUnnestColumnPruning(defaultUnnestColumnPruning)
+        .build());
+  }
+
+  @Test
+  public void testUnnestColumnPruningToZeroPassthrough() {
+    // Selecting only the unnested element retains zero passthrough columns.
+    String sql = "SET unnestColumnPruning=true; "
+        + "SELECT u.s FROM e CROSS JOIN UNNEST(e.mcol1) AS u(s)";
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery(sql);
+    List<UnnestNode> unnestNodes = findUnnestNodes(subPlan);
+    Assert.assertEquals(unnestNodes.size(), 1);
+    UnnestNode unnestNode = unnestNodes.get(0);
+
+    Assert.assertTrue(unnestNode.isPrunedPassthrough());
+    Assert.assertTrue(unnestNode.getPassthroughInputIndexes().isEmpty());
+    Assert.assertEquals(unnestNode.getElementIndexes(), List.of(0));
+    Assert.assertEquals(unnestNode.getDataSchema().size(), 1);
   }
 
   @Test

@@ -53,41 +53,39 @@ import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Executes “warm‑up” queries against Pinot segments to proactively populate the OS page cache
- * after a host restart or during a segment refresh.
- * <p>
- * <b>Why do we need this?</b><br>
- * When a server restarts—or when large numbers of segments are replaced because of data refresh—
- * none of the segment files are resident in the OS page cache.  The first few
- * user queries therefore incur expensive disk reads, triggering latency spikes
- * and potential SLO breaches.  By replaying a curated set of “warm‑up” queries at controlled
- * QPS, we fault in the hottest pages before real traffic arrives, smoothing the
- * cold‑start curve.
- *
- * <ul>
- *   <li>{@link #startWarmupOnRestart()} – Invoked at server startup.  Iterates over every table
- *       hosted by the instance and kicks off warm‑up if the table’s {@code onRestart}
- *       {@link PageCacheWarmupConfig.Spec} is enabled.</li>
- *   <li>{@link #startWarmupOnRefresh(String, java.util.List, java.util.List)} – Invoked by the controller
- *       after a segment refresh.  Optionally receives pre‑computed warm‑up queries and/or a list
- *       of freshly‑downloaded segments to target.</li>
- * </ul>
- *
- * <ul>
- *   <li><b>Per‑table QPS budgeting</b>:  QPS defaults to the table’s configured max QPS
- *   ({@link QuotaConfig#getMaxQPS()}) divided by replication factor, if not provided in the
- *   {@link PageCacheWarmupConfig} and replication factor.
- *   </li>
- *   <li><b>Segment selection</b>:  By default all resident segments are warmed up, but the refresh
- *       path allows a <i>segment filter</i> so we don’t thrash the cache with untargeted reads.</li>
- *   <li><b>Time‑bounded execution</b>:  Both the instance‑level warm‑up window and table‑level
- *       warm‑up duration are enforced; overruns are logged and counted via
- *       {@link ServerMeter#PAGE_CACHE_WARMUP_SERVER_ERRORS}.</li>
- * </ul>
- *
- *
- */
+/// Executes “warm‑up” queries against Pinot segments to proactively populate the OS page cache
+/// after a host restart or during a segment refresh.
+/// <p>
+/// <b>Why do we need this?</b><br>
+/// When a server restarts—or when large numbers of segments are replaced because of data refresh—
+/// none of the segment files are resident in the OS page cache.  The first few
+/// user queries therefore incur expensive disk reads, triggering latency spikes
+/// and potential SLO breaches.  By replaying a curated set of “warm‑up” queries at controlled
+/// QPS, we fault in the hottest pages before real traffic arrives, smoothing the
+/// cold‑start curve.
+///
+/// <ul>
+///   <li>{@link #startWarmupOnRestart()} – Invoked at server startup.  Iterates over every table
+///       hosted by the instance and kicks off warm‑up if the table’s {@code onRestart}
+///       {@link PageCacheWarmupConfig.Spec} is enabled.</li>
+///   <li>{@link #startWarmupOnRefresh(String, List, List)} – Invoked by the controller
+///       after a segment refresh.  Optionally receives pre‑computed warm‑up queries and/or a list
+///       of freshly‑downloaded segments to target.</li>
+/// </ul>
+///
+/// <ul>
+///   <li><b>Per‑table QPS budgeting</b>:  QPS defaults to the table’s configured max QPS
+///   ({@link QuotaConfig#getMaxQPS()}) divided by replication factor, if not provided in the
+///   {@link PageCacheWarmupConfig} and replication factor.
+///   </li>
+///   <li><b>Segment selection</b>:  By default all resident segments are warmed up, but the refresh
+///       path allows a <i>segment filter</i> so we don’t thrash the cache with untargeted reads.</li>
+///   <li><b>Time‑bounded execution</b>:  Both the instance‑level warm‑up window and table‑level
+///       warm‑up duration are enforced; overruns are logged and counted via
+///       {@link ServerMeter#PAGE_CACHE_WARMUP_SERVER_ERRORS}.</li>
+/// </ul>
+///
+///
 public class PageCacheWarmupServerQueryExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(PageCacheWarmupServerQueryExecutor.class);
   private final InstanceDataManager _instanceDataManager;

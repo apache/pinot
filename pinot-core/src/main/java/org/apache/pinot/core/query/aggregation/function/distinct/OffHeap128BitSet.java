@@ -24,11 +24,9 @@ import java.util.Iterator;
 import javax.annotation.concurrent.NotThreadSafe;
 
 
-/**
- * Off-heap set for 128-bit values.
- *
- * NOTE: We store and return hash mixed values instead of original values.
- */
+/// Off-heap set for 128-bit values.
+///
+/// NOTE: We store and return hash mixed values instead of original values.
 @NotThreadSafe
 public class OffHeap128BitSet extends BaseOffHeapSet {
 

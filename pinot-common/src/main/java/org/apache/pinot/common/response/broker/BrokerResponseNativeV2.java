@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.common.response.broker;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,10 +36,8 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
 
 
-/**
- * Broker response for multi-stage engine.
- * TODO: Currently this class cannot be used to deserialize the JSON response.
- */
+/// Broker response for multi-stage engine.
+/// TODO: Currently this class cannot be used to deserialize the JSON response.
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
     "numGroupsWarningLimitReached", "numGroups", "earlyTerminationReasons", "maxRowsInJoinReached",
@@ -53,7 +54,8 @@ import org.apache.pinot.common.response.ProcessingException;
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
     "pools", "rlsFiltersApplied", "groupsTrimmed",
-    "mseLiteLeafStageLimitReached", "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied"
+    "mseLiteLeafStageLimitReached", "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied",
+    "responseMetadata"
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
   private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
@@ -66,24 +68,18 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   private boolean _maxRowsInWindowReached;
   private long _maxRowsInWindow;
   private long _timeUsedMs;
-  /**
-   * Statistics for each stage of the query execution.
-   */
+  /// Statistics for each stage of the query execution.
   private ObjectNode _stageStats;
-  /**
-   * Stream-mode stats coverage, populated only when the query used {@code SubmitWithStream}. An array indexed by stage
-   * id; each element is an object with {@code responded}, {@code mergeFailed}, and {@code missing} counters, or
-   * {@code null} for stages that have no coverage info (e.g. stage 0 which runs broker-local).
-   */
+  /// Stream-mode stats coverage, populated only when the query used `SubmitWithStream`. An array indexed by stage
+  /// id; each element is an object with `responded`, `mergeFailed`, and `missing` counters, or
+  /// `null` for stages that have no coverage info (e.g. stage 0 which runs broker-local).
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private ArrayNode _streamStatsCoverage;
-  /**
-   * The max number of rows seen at runtime.
-   * <p>
-   * In single-stage this doesn't make sense given it is the max number of rows read from the table. But in multi-stage
-   * virtual rows can be generated. For example, in a join query, the number of rows can be more than the number of rows
-   * in the table.
-   */
+  /// The max number of rows seen at runtime.
+  ///
+  /// In single-stage this doesn't make sense given it is the max number of rows read from the table. But in multi-stage
+  /// virtual rows can be generated. For example, in a join query, the number of rows can be more than the number of
+  /// rows in the table.
   private long _maxRowsInOperator;
   private String _requestId;
   private String _clientRequestId;
@@ -99,6 +95,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   private Integer _mseLiteLeafStageEffectiveLimit;
   @Nullable
   private Boolean _mseLiteFanOutAdjustedLimitApplied;
+  private final Map<String, JsonNode> _responseMetadata = new HashMap<>();
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @Nullable
@@ -245,9 +242,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     _maxRowsInWindow = Math.max(_maxRowsInWindow, maxRowsInWindow);
   }
 
-  /**
-   * Returns the stage statistics.
-   */
+  /// Returns the stage statistics.
   public ObjectNode getStageStats() {
     return _stageStats;
   }
@@ -256,10 +251,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     _stageStats = stageStats;
   }
 
-  /**
-   * Returns the stream-mode stats coverage, or {@code null} when the query ran in legacy mode. Array indexed by stage
-   * id; elements may be {@code null} for stages with no coverage (e.g. stage 0).
-   */
+  /// Returns the stream-mode stats coverage, or `null` when the query ran in legacy mode. Array indexed by stage
+  /// id; elements may be `null` for stages with no coverage (e.g. stage 0).
   @Nullable
   public ArrayNode getStreamStatsCoverage() {
     return _streamStatsCoverage;
@@ -269,9 +262,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     _streamStatsCoverage = streamStatsCoverage;
   }
 
-  /**
-   * Returns the maximum number of rows seen by a single operator in the query processing chain.
-   */
+  /// Returns the maximum number of rows seen by a single operator in the query processing chain.
   public long getMaxRowsInOperator() {
     return _maxRowsInOperator;
   }
@@ -489,6 +480,22 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public Map<String, String> getTraceInfo() {
     return Map.of();
+  }
+
+  // JsonIgnore(false) re-enables the property here: the interface default getter is @JsonIgnore
+  // (so it does not register responseMetadata as a known setterless property on legacy impls that
+  // don't override it), and that ignore would otherwise be inherited by this override.
+  @JsonIgnore(false)
+  @JsonProperty("responseMetadata")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @Override
+  public Map<String, JsonNode> getResponseMetadata() {
+    return _responseMetadata;
+  }
+
+  @Override
+  public void putResponseMetadata(String key, JsonNode value) {
+    _responseMetadata.put(key, value);
   }
 
   @Override

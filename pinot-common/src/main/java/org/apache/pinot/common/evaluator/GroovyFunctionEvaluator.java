@@ -24,7 +24,6 @@ import com.google.common.base.Splitter;
 import groovy.lang.Binding;
 import groovy.lang.GroovyShell;
 import groovy.lang.Script;
-import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -38,20 +37,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * An {@link FunctionEvaluator} for evaluating transform function expressions of a Schema field spec written in Groovy.
- * GroovyShell is used to execute expressions.
- *
- * The transform expression must follow the convention Groovy({expression}, arguments1, argument2...)
- * For example:
- * "dimensionFieldSpecs": [
- *     {
- *       "name": "fullName",
- *       "dataType": "STRING",
- *       "transformFunction": "Groovy({firstName+' '+lastName}, firstName, lastName)"
- *     }
- *  ]
- */
+/// An [FunctionEvaluator] for evaluating transform function expressions of a Schema field spec written in Groovy.
+/// GroovyShell is used to execute expressions.
+///
+/// The transform expression must follow the convention Groovy({expression}, arguments1, argument2...)
+/// For example:
+/// "dimensionFieldSpecs": \[
+///     {
+///       "name": "fullName",
+///       "dataType": "STRING",
+///       "transformFunction": "Groovy({firstName+' '+lastName}, firstName, lastName)"
+///     }
+///  \]
 public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private static final Logger LOGGER = LoggerFactory.getLogger(GroovyFunctionEvaluator.class);
 
@@ -79,7 +76,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     if (arguments != null) {
       _arguments = Splitter.on(ARGUMENTS_SEPARATOR).trimResults().splitToList(arguments);
     } else {
-      _arguments = Collections.emptyList();
+      _arguments = List.of();
     }
     _numArguments = _arguments.size();
     _binding = new Binding();
@@ -96,10 +93,8 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     return GROOVY_EXPRESSION_PREFIX;
   }
 
-  /**
-   * This method is used to parse the Groovy script and check if the script is valid.
-   * @param script Groovy script to be parsed.
-   */
+  /// This method is used to parse the Groovy script and check if the script is valid.
+  /// @param script Groovy script to be parsed.
   public static void parseGroovyScript(String script) {
     Matcher matcher = GROOVY_FUNCTION_PATTERN.matcher(script);
     Preconditions.checkState(matcher.matches(), "Invalid transform expression: %s", script);
@@ -107,14 +102,12 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     new GroovyShell(new Binding(), _compilerConfiguration).parse(scriptText);
   }
 
-  /**
-   * This will create a Groovy Shell that is configured with static syntax analysis. This static syntax analysis
-   * will that any script which is run is restricted to a specific list of allowed operations, thus making it harder
-   * to execute malicious code.
-   *
-   * @param binding Binding instance to be used by Groovy Shell.
-   * @return GroovyShell instance with static syntax analysis.
-   */
+  /// This will create a Groovy Shell that is configured with static syntax analysis. This static syntax analysis
+  /// will that any script which is run is restricted to a specific list of allowed operations, thus making it harder
+  /// to execute malicious code.
+  ///
+  /// @param binding Binding instance to be used by Groovy Shell.
+  /// @return GroovyShell instance with static syntax analysis.
   private GroovyShell createSafeShell(Binding binding) {
     return new GroovyShell(binding, _compilerConfiguration);
   }
@@ -184,11 +177,9 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     }
   }
 
-  /**
-   * Initialize or update the configuration for the Groovy Static Analyzer.
-   * Update compiler configuration to include the new configuration.
-   * @param groovyStaticAnalyzerConfig GroovyStaticAnalyzerConfig instance to be used for static syntax analysis.
-   */
+  /// Initialize or update the configuration for the Groovy Static Analyzer.
+  /// Update compiler configuration to include the new configuration.
+  /// @param groovyStaticAnalyzerConfig GroovyStaticAnalyzerConfig instance to be used for static syntax analysis.
   public static void setGroovyStaticAnalyzerConfig(GroovyStaticAnalyzerConfig groovyStaticAnalyzerConfig)
       throws JsonProcessingException {
     synchronized (GroovyFunctionEvaluator.class) {

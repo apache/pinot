@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.CaseFormat;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityRadiusPredicate;
@@ -44,23 +43,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Operator for vector similarity radius/threshold search.
- *
- * <p>This operator returns all documents whose vector distance from the query vector is within
- * the specified threshold. It uses a two-phase approach:</p>
- * <ol>
- *   <li>If a vector index is available, retrieves a large candidate set from the ANN index
- *       (using an internal safety limit).</li>
- *   <li>Computes exact distance for each candidate using the forward index, and returns only
- *       documents within the threshold distance.</li>
- * </ol>
- *
- * <p>If no vector index is available, falls back to brute-force scanning of all documents
- * via the forward index.</p>
- *
- * <p>This class is thread-safe for single-threaded execution per query.</p>
- */
+/// Operator for vector similarity radius/threshold search.
+///
+/// This operator returns all documents whose vector distance from the query vector is within
+/// the specified threshold. It uses a two-phase approach:
+///
+/// 1. If a vector index is available, retrieves a large candidate set from the ANN index
+///       (using an internal safety limit).
+/// 2. Computes exact distance for each candidate using the forward index, and returns only
+///       documents within the threshold distance.
+///
+/// If no vector index is available, falls back to brute-force scanning of all documents
+/// via the forward index.
+///
+/// This class is thread-safe for single-threaded execution per query.
 public class VectorRadiusFilterOperator extends BaseFilterOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(VectorRadiusFilterOperator.class);
   private static final String EXPLAIN_NAME = "VECTOR_SIMILARITY_RADIUS";
@@ -78,16 +74,14 @@ public class VectorRadiusFilterOperator extends BaseFilterOperator {
   private final boolean _useApproximateRadiusPath;
   private ImmutableRoaringBitmap _matches;
 
-  /**
-   * Creates a vector radius filter operator.
-   *
-   * @param forwardIndexReader the forward index reader for exact distance computation (required)
-   * @param vectorIndexReader the ANN index reader for candidate retrieval (may be null for brute-force)
-   * @param predicate the vector similarity radius predicate
-   * @param column the column name
-   * @param numDocs the total number of documents in the segment
-   * @param vectorIndexConfig the vector index configuration (may be null)
-   */
+  /// Creates a vector radius filter operator.
+  ///
+  /// @param forwardIndexReader the forward index reader for exact distance computation (required)
+  /// @param vectorIndexReader the ANN index reader for candidate retrieval (may be null for brute-force)
+  /// @param predicate the vector similarity radius predicate
+  /// @param column the column name
+  /// @param numDocs the total number of documents in the segment
+  /// @param vectorIndexConfig the vector index configuration (may be null)
   public VectorRadiusFilterOperator(ForwardIndexReader<?> forwardIndexReader,
       @Nullable VectorIndexReader vectorIndexReader, VectorSimilarityRadiusPredicate predicate,
       String column, int numDocs, @Nullable VectorIndexConfig vectorIndexConfig) {
@@ -137,7 +131,7 @@ public class VectorRadiusFilterOperator extends BaseFilterOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override
@@ -171,10 +165,8 @@ public class VectorRadiusFilterOperator extends BaseFilterOperator {
     attributeBuilder.putString("threshold", String.valueOf(_predicate.getThreshold()));
   }
 
-  /**
-   * Executes the radius search. If a vector index is available, uses it to get a candidate set
-   * and then filters by exact distance. Otherwise, performs a full brute-force scan.
-   */
+  /// Executes the radius search. If a vector index is available, uses it to get a candidate set
+  /// and then filters by exact distance. Otherwise, performs a full brute-force scan.
   private ImmutableRoaringBitmap executeSearch() {
     float[] queryVector = _predicate.getValue();
     float threshold = _predicate.getThreshold();
@@ -188,9 +180,7 @@ public class VectorRadiusFilterOperator extends BaseFilterOperator {
     return executeBruteForceScan(queryVector, threshold);
   }
 
-  /**
-   * Uses the ANN index to get a large candidate set, then filters by exact distance threshold.
-   */
+  /// Uses the ANN index to get a large candidate set, then filters by exact distance threshold.
   private ImmutableRoaringBitmap executeIndexAssistedSearch(float[] queryVector, float threshold) {
     int internalLimit = Math.min(VectorSimilarityRadiusPredicate.DEFAULT_INTERNAL_LIMIT, _numDocs);
     ImmutableRoaringBitmap candidates;
@@ -229,9 +219,7 @@ public class VectorRadiusFilterOperator extends BaseFilterOperator {
     return "vector_index_topk_with_scan";
   }
 
-  /**
-   * Scans all documents and returns those within the distance threshold.
-   */
+  /// Scans all documents and returns those within the distance threshold.
   private ImmutableRoaringBitmap executeBruteForceScan(float[] queryVector, float threshold) {
     LOGGER.warn("Performing exact vector radius scan on column: {} for segment with {} docs. "
             + "distanceFunction={}. This is expensive -- consider adding a vector index.",
@@ -263,9 +251,7 @@ public class VectorRadiusFilterOperator extends BaseFilterOperator {
     return result;
   }
 
-  /**
-   * Filters ANN candidates by computing exact distance and checking against the threshold.
-   */
+  /// Filters ANN candidates by computing exact distance and checking against the threshold.
   @SuppressWarnings("unchecked")
   private ImmutableRoaringBitmap filterByThreshold(ImmutableRoaringBitmap candidates,
       float[] queryVector, float threshold) {

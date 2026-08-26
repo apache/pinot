@@ -107,7 +107,7 @@ public class VersionedPropertyConfigTest {
 
   @Test
   //Test requires 'segment-metadata-without-version-header.properties' sample segment metadata file in resources folder
-  public void testOldSegmentMetadataBackwardCompatability()
+  public void testOldSegmentMetadataBackwardCompatibility()
       throws ConfigurationException {
     File oldSegmentProperties = new File(
         Objects.requireNonNull(

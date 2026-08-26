@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.physical;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -70,14 +71,14 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
           }
           int parallelism = numReceivers / numSenders;
           computeDirectExchange(senderMailboxesMap, receiverMailboxesMap, senderStageId, receiverStageId,
-              senderServerMap, receiverServerMap, numSenders, parallelism);
+              senderServerMap, receiverServerMap, numSenders, parallelism, senderMetadata, receiverMetadata);
         } else if (senderMetadata.isPrePartitioned() && isDirectExchangeCompatible(senderMetadata, receiverMetadata)) {
           // Direct exchange: the data is already pre-partitioned, so send it 1-to-1 to the worker with the same worker
           // id (with parallelism, fan out each sender worker to a contiguous range of receiver workers). The
           // co-location handling is the same as SINGLETON, see computeDirectExchange.
           int parallelism = numReceivers / numSenders;
           computeDirectExchange(senderMailboxesMap, receiverMailboxesMap, senderStageId, receiverStageId,
-              senderServerMap, receiverServerMap, numSenders, parallelism);
+              senderServerMap, receiverServerMap, numSenders, parallelism, senderMetadata, receiverMetadata);
         } else {
           // For other exchange types, send the data to all the instances in the receiver fragment
           // TODO: Add support for more exchange types
@@ -104,10 +105,16 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
   /// partition to a different replica, leaving worker `i` on different servers. Rather than failing the query, we fall
   /// back to a cross-server send: the exchange stays correct because worker id still maps to the same partition on both
   /// sides, and we only lose locality (one extra network hop) until routing re-stabilizes.
+  ///
+  /// A sender worker with no segment to scan is wired like any other one: it is dispatched regardless, so leaving it
+  /// out of the receiver's mailbox map would strand its stage stats, and any error it reports, in a mailbox nobody
+  /// reads.
   private void computeDirectExchange(Map<Integer, Map<Integer, MailboxInfos>> senderMailboxesMap,
       Map<Integer, Map<Integer, MailboxInfos>> receiverMailboxesMap, Integer senderStageId, Integer receiverStageId,
       Map<Integer, QueryServerInstance> senderServerMap, Map<Integer, QueryServerInstance> receiverServerMap,
-      int numSenders, int parallelism) {
+      int numSenders, int parallelism, DispatchablePlanMetadata senderMetadata,
+      DispatchablePlanMetadata receiverMetadata) {
+    checkPartitionClassAgreement(senderMetadata, receiverMetadata, senderStageId, receiverStageId);
     if (parallelism == 1) {
       // 1-to-1 mapping
       for (int workerId = 0; workerId < numSenders; workerId++) {
@@ -153,6 +160,29 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
     }
   }
 
+  /// Fails when the two sides of a direct exchange do not agree on the partition classes their worker ids stand for.
+  /// [#computeDirectExchange] pairs sender worker `k` with receiver worker `k` and checks nothing about the data behind
+  /// them, so equal worker counts are no evidence of agreement -- see
+  /// [DispatchablePlanMetadata#getPartitionClassIds()]. `WorkerManager` shares one class list across every stage of a
+  /// colocated group, so this can only trip if that invariant regresses.
+  ///
+  /// A `null` list means that side's worker ids are not partition classes at all (e.g. a stage assigned over candidate
+  /// servers, or a singleton reducer) and makes no claim to compare against, so only two class-space sides are checked.
+  private static void checkPartitionClassAgreement(DispatchablePlanMetadata senderMetadata,
+      DispatchablePlanMetadata receiverMetadata, int senderStageId, int receiverStageId) {
+    int[] senderPartitionClassIds = senderMetadata.getPartitionClassIds();
+    int[] receiverPartitionClassIds = receiverMetadata.getPartitionClassIds();
+    if (senderPartitionClassIds == null || receiverPartitionClassIds == null) {
+      return;
+    }
+    Preconditions.checkState(Arrays.equals(senderPartitionClassIds, receiverPartitionClassIds),
+        "Partition class mismatch for the direct exchange from stage: %s to stage: %s, sender: %s vs receiver: %s",
+        senderStageId, receiverStageId, Arrays.toString(senderPartitionClassIds),
+        Arrays.toString(receiverPartitionClassIds));
+  }
+
+  /// Wires one sender worker of a direct exchange to the contiguous range of `parallelism` receiver workers it fans out
+  /// to. See [#computeDirectExchange].
   private void computeDirectExchangeWithParallelism(Map<Integer, Map<Integer, MailboxInfos>> senderMailboxesMap,
       Map<Integer, Map<Integer, MailboxInfos>> receiverMailboxesMap, Integer senderStageId, Integer receiverStageId,
       int senderWorkerId, int receiverWorkerId, QueryServerInstance senderServer, QueryServerInstance receiverServer,
@@ -178,12 +208,26 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
     if (numSenders * sender.getPartitionParallelism() != numReceivers) {
       return false;
     }
+    // A sender whose worker ids stand for partition classes may only be wired 1-to-1 to a receiver whose worker ids
+    // stand for the same ones: without a class list the receiver took its workers from the candidate servers, so equal
+    // worker counts would be a coincidence. The shuffle fallback is safe -- connectWorkers re-hashes across any worker
+    // count.
+    if (!Arrays.equals(sender.getPartitionClassIds(), receiver.getPartitionClassIds())) {
+      return false;
+    }
     if (sender.getPartitionFunction() == null) {
       return receiver.getPartitionFunction() == null;
     }
     return sender.getPartitionFunction().equalsIgnoreCase(receiver.getPartitionFunction());
   }
 
+  /// Wires one side of a shuffled exchange: every worker of `stageId` (the source, sized by `serverMap`) becomes a
+  /// mailbox of every one of the `numWorkers` workers on the other side.
+  ///
+  /// NOTE: The source stage may have no worker at all (an empty or fully-pruned leaf), in which case every worker on
+  /// the other side still gets an entry holding an empty mailbox list -- that is what lets the other side's send
+  /// operator resolve this stage and its receive operator return end-of-stream at once, so do not short-circuit it
+  /// away.
   private void connectWorkers(int stageId, Map<Integer, QueryServerInstance> serverMap,
       Map<Integer, Map<Integer, MailboxInfos>> mailboxesMap, int numWorkers) {
     Map<QueryServerInstance, List<Integer>> serverToWorkerIdsMap = new HashMap<>();

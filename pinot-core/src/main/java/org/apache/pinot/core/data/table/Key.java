@@ -21,21 +21,20 @@ package org.apache.pinot.core.data.table;
 import java.util.Arrays;
 
 
-/**
- * Defines the key component of the record.
- * <p>Key can be used as the key in a map, and may only contain single-value columns.
- * <p>For each data type, the value should be stored as:
- * <ul>
- *   <li>INT: Integer</li>
- *   <li>LONG: Long</li>
- *   <li>FLOAT: Float</li>
- *   <li>DOUBLE: Double</li>
- *   <li>STRING: String</li>
- *   <li>BYTES: ByteArray</li>
- * </ul>
- *
- * TODO: Consider replacing Key with Record as the concept is very close and the implementation is the same
- */
+/// Defines the key component of the record.
+///
+/// Key can be used as the key in a map, and may only contain single-value columns.
+///
+/// For each data type, the value should be stored as:
+///
+/// - INT: Integer
+/// - LONG: Long
+/// - FLOAT: Float
+/// - DOUBLE: Double
+/// - STRING: String
+/// - BYTES: ByteArray
+///
+/// TODO: Consider replacing Key with Record as the concept is very close and the implementation is the same
 public class Key implements Comparable<Key> {
   private final Object[] _values;
 

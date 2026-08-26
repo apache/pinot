@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator;
 
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -166,6 +165,6 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.singletonList(_combineOperator);
+    return List.of(_combineOperator);
   }
 }

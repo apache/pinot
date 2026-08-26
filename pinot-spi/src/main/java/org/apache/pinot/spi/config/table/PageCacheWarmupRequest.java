@@ -24,31 +24,27 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
-/**
- *  Request that the controller sends to Pinot servers
- * to trigger a page‑cache warm‑up run.
- *
- * <p>The payload contains:</p>
- * <ul>
- *   <li><b>queries</b> – ordered list of SQL strings to execute. Each server will prepend
- *       {@code SET isSecondaryWorkload=true;} so if server uses BinaryWorkloadScheduler the queries run on the
- *       secondary queue and do not interfere with live traffic.</li>
- *   <li><b>segments</b> – optional set of segment names to restrict the warm‑up to.
- *       When {@code null} or empty, the server warms all segments of the table.</li>
- * </ul>
- *
- */
+///  Request that the controller sends to Pinot servers
+/// to trigger a page‑cache warm‑up run.
+///
+/// <p>The payload contains:</p>
+/// <ul>
+///   <li><b>queries</b> – ordered list of SQL strings to execute. Each server will prepend
+///       {@code SET isSecondaryWorkload=true;} so if server uses BinaryWorkloadScheduler the queries run on the
+///       secondary queue and do not interfere with live traffic.</li>
+///   <li><b>segments</b> – optional set of segment names to restrict the warm‑up to.
+///       When {@code null} or empty, the server warms all segments of the table.</li>
+/// </ul>
+///
 public class PageCacheWarmupRequest extends BaseJsonConfig {
 
   private final List<String> _queries;
   private final List<String> _segments;
 
-  /**
-   * Builds a warm‑up request.
-   *
-   * @param queries   list of SQL queries to run; must not be {@code null} (but may be empty)
-   * @param segments  optional list of segment names to target; {@code null} or empty means “all segments”
-   */
+  /// Builds a warm‑up request.
+  ///
+  /// @param queries   list of SQL queries to run; must not be {@code null} (but may be empty)
+  /// @param segments  optional list of segment names to target; {@code null} or empty means “all segments”
   @JsonCreator
   public PageCacheWarmupRequest(
       @JsonProperty("queries") List<String> queries,

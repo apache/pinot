@@ -41,6 +41,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
   private static final org.apache.thrift.protocol.TField QUERY_OPTIONS_FIELD_DESC = new org.apache.thrift.protocol.TField("queryOptions", org.apache.thrift.protocol.TType.MAP, (short)11);
   private static final org.apache.thrift.protocol.TField EXPLAIN_FIELD_DESC = new org.apache.thrift.protocol.TField("explain", org.apache.thrift.protocol.TType.BOOL, (short)12);
   private static final org.apache.thrift.protocol.TField EXPRESSION_OVERRIDE_HINTS_FIELD_DESC = new org.apache.thrift.protocol.TField("expressionOverrideHints", org.apache.thrift.protocol.TType.MAP, (short)13);
+  private static final org.apache.thrift.protocol.TField GROUPING_SETS_FIELD_DESC = new org.apache.thrift.protocol.TField("groupingSets", org.apache.thrift.protocol.TType.LIST, (short)14);
 
   private static final org.apache.thrift.scheme.SchemeFactory STANDARD_SCHEME_FACTORY = new PinotQueryStandardSchemeFactory();
   private static final org.apache.thrift.scheme.SchemeFactory TUPLE_SCHEME_FACTORY = new PinotQueryTupleSchemeFactory();
@@ -57,6 +58,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
   private @org.apache.thrift.annotation.Nullable java.util.Map<java.lang.String,java.lang.String> queryOptions; // optional
   private boolean explain; // optional
   private @org.apache.thrift.annotation.Nullable java.util.Map<Expression,Expression> expressionOverrideHints; // optional
+  private @org.apache.thrift.annotation.Nullable java.util.List<java.util.List<java.lang.Integer>> groupingSets; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
@@ -71,7 +73,8 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
     OFFSET((short)9, "offset"),
     QUERY_OPTIONS((short)11, "queryOptions"),
     EXPLAIN((short)12, "explain"),
-    EXPRESSION_OVERRIDE_HINTS((short)13, "expressionOverrideHints");
+    EXPRESSION_OVERRIDE_HINTS((short)13, "expressionOverrideHints"),
+    GROUPING_SETS((short)14, "groupingSets");
 
     private static final java.util.Map<java.lang.String, _Fields> byName = new java.util.HashMap<java.lang.String, _Fields>();
 
@@ -111,6 +114,8 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
           return EXPLAIN;
         case 13: // EXPRESSION_OVERRIDE_HINTS
           return EXPRESSION_OVERRIDE_HINTS;
+        case 14: // GROUPING_SETS
+          return GROUPING_SETS;
         default:
           return null;
       }
@@ -159,7 +164,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
   private static final int __OFFSET_ISSET_ID = 2;
   private static final int __EXPLAIN_ISSET_ID = 3;
   private byte __isset_bitfield = 0;
-  private static final _Fields optionals[] = {_Fields.VERSION,_Fields.DATA_SOURCE,_Fields.SELECT_LIST,_Fields.FILTER_EXPRESSION,_Fields.GROUP_BY_LIST,_Fields.ORDER_BY_LIST,_Fields.HAVING_EXPRESSION,_Fields.LIMIT,_Fields.OFFSET,_Fields.QUERY_OPTIONS,_Fields.EXPLAIN,_Fields.EXPRESSION_OVERRIDE_HINTS};
+  private static final _Fields optionals[] = {_Fields.VERSION,_Fields.DATA_SOURCE,_Fields.SELECT_LIST,_Fields.FILTER_EXPRESSION,_Fields.GROUP_BY_LIST,_Fields.ORDER_BY_LIST,_Fields.HAVING_EXPRESSION,_Fields.LIMIT,_Fields.OFFSET,_Fields.QUERY_OPTIONS,_Fields.EXPLAIN,_Fields.EXPRESSION_OVERRIDE_HINTS,_Fields.GROUPING_SETS};
   public static final java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new java.util.EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
@@ -194,6 +199,10 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
         new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP, 
             new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, Expression.class), 
             new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, Expression.class))));
+    tmpMap.put(_Fields.GROUPING_SETS, new org.apache.thrift.meta_data.FieldMetaData("groupingSets", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
+            new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
+                new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)))));
     metaDataMap = java.util.Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(PinotQuery.class, metaDataMap);
   }
@@ -263,6 +272,14 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
       }
       this.expressionOverrideHints = __this__expressionOverrideHints;
     }
+    if (other.isSetGroupingSets()) {
+      java.util.List<java.util.List<java.lang.Integer>> __this__groupingSets = new java.util.ArrayList<java.util.List<java.lang.Integer>>(other.groupingSets.size());
+      for (java.util.List<java.lang.Integer> other_element : other.groupingSets) {
+        java.util.List<java.lang.Integer> __this__groupingSets_copy = new java.util.ArrayList<java.lang.Integer>(other_element);
+        __this__groupingSets.add(__this__groupingSets_copy);
+      }
+      this.groupingSets = __this__groupingSets;
+    }
   }
 
   @Override
@@ -288,6 +305,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
     setExplainIsSet(false);
     this.explain = false;
     this.expressionOverrideHints = null;
+    this.groupingSets = null;
   }
 
   public int getVersion() {
@@ -640,6 +658,46 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
     }
   }
 
+  public int getGroupingSetsSize() {
+    return (this.groupingSets == null) ? 0 : this.groupingSets.size();
+  }
+
+  @org.apache.thrift.annotation.Nullable
+  public java.util.Iterator<java.util.List<java.lang.Integer>> getGroupingSetsIterator() {
+    return (this.groupingSets == null) ? null : this.groupingSets.iterator();
+  }
+
+  public void addToGroupingSets(java.util.List<java.lang.Integer> elem) {
+    if (this.groupingSets == null) {
+      this.groupingSets = new java.util.ArrayList<java.util.List<java.lang.Integer>>();
+    }
+    this.groupingSets.add(elem);
+  }
+
+  @org.apache.thrift.annotation.Nullable
+  public java.util.List<java.util.List<java.lang.Integer>> getGroupingSets() {
+    return this.groupingSets;
+  }
+
+  public void setGroupingSets(@org.apache.thrift.annotation.Nullable java.util.List<java.util.List<java.lang.Integer>> groupingSets) {
+    this.groupingSets = groupingSets;
+  }
+
+  public void unsetGroupingSets() {
+    this.groupingSets = null;
+  }
+
+  /** Returns true if field groupingSets is set (has been assigned a value) and false otherwise */
+  public boolean isSetGroupingSets() {
+    return this.groupingSets != null;
+  }
+
+  public void setGroupingSetsIsSet(boolean value) {
+    if (!value) {
+      this.groupingSets = null;
+    }
+  }
+
   @Override
   public void setFieldValue(_Fields field, @org.apache.thrift.annotation.Nullable java.lang.Object value) {
     switch (field) {
@@ -739,6 +797,14 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
       }
       break;
 
+    case GROUPING_SETS:
+      if (value == null) {
+        unsetGroupingSets();
+      } else {
+        setGroupingSets((java.util.List<java.util.List<java.lang.Integer>>)value);
+      }
+      break;
+
     }
   }
 
@@ -782,6 +848,9 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
     case EXPRESSION_OVERRIDE_HINTS:
       return getExpressionOverrideHints();
 
+    case GROUPING_SETS:
+      return getGroupingSets();
+
     }
     throw new java.lang.IllegalStateException();
   }
@@ -818,6 +887,8 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
       return isSetExplain();
     case EXPRESSION_OVERRIDE_HINTS:
       return isSetExpressionOverrideHints();
+    case GROUPING_SETS:
+      return isSetGroupingSets();
     }
     throw new java.lang.IllegalStateException();
   }
@@ -943,6 +1014,15 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
         return false;
     }
 
+    boolean this_present_groupingSets = true && this.isSetGroupingSets();
+    boolean that_present_groupingSets = true && that.isSetGroupingSets();
+    if (this_present_groupingSets || that_present_groupingSets) {
+      if (!(this_present_groupingSets && that_present_groupingSets))
+        return false;
+      if (!this.groupingSets.equals(that.groupingSets))
+        return false;
+    }
+
     return true;
   }
 
@@ -997,6 +1077,10 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
     hashCode = hashCode * 8191 + ((isSetExpressionOverrideHints()) ? 131071 : 524287);
     if (isSetExpressionOverrideHints())
       hashCode = hashCode * 8191 + expressionOverrideHints.hashCode();
+
+    hashCode = hashCode * 8191 + ((isSetGroupingSets()) ? 131071 : 524287);
+    if (isSetGroupingSets())
+      hashCode = hashCode * 8191 + groupingSets.hashCode();
 
     return hashCode;
   }
@@ -1129,6 +1213,16 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
         return lastComparison;
       }
     }
+    lastComparison = java.lang.Boolean.compare(isSetGroupingSets(), other.isSetGroupingSets());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetGroupingSets()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.groupingSets, other.groupingSets);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
     return 0;
   }
 
@@ -1253,6 +1347,16 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
         sb.append("null");
       } else {
         sb.append(this.expressionOverrideHints);
+      }
+      first = false;
+    }
+    if (isSetGroupingSets()) {
+      if (!first) sb.append(", ");
+      sb.append("groupingSets:");
+      if (this.groupingSets == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.groupingSets);
       }
       first = false;
     }
@@ -1470,6 +1574,34 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
+          case 14: // GROUPING_SETS
+            if (schemeField.type == org.apache.thrift.protocol.TType.LIST) {
+              {
+                org.apache.thrift.protocol.TList _list17 = iprot.readListBegin();
+                struct.groupingSets = new java.util.ArrayList<java.util.List<java.lang.Integer>>(_list17.size);
+                @org.apache.thrift.annotation.Nullable java.util.List<java.lang.Integer> _elem18;
+                for (int _i19 = 0; _i19 < _list17.size; ++_i19)
+                {
+                  {
+                    org.apache.thrift.protocol.TList _list20 = iprot.readListBegin();
+                    _elem18 = new java.util.ArrayList<java.lang.Integer>(_list20.size);
+                    int _elem21;
+                    for (int _i22 = 0; _i22 < _list20.size; ++_i22)
+                    {
+                      _elem21 = iprot.readI32();
+                      _elem18.add(_elem21);
+                    }
+                    iprot.readListEnd();
+                  }
+                  struct.groupingSets.add(_elem18);
+                }
+                iprot.readListEnd();
+              }
+              struct.setGroupingSetsIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
           default:
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
         }
@@ -1501,9 +1633,9 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
           oprot.writeFieldBegin(SELECT_LIST_FIELD_DESC);
           {
             oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.selectList.size()));
-            for (Expression _iter17 : struct.selectList)
+            for (Expression _iter23 : struct.selectList)
             {
-              _iter17.write(oprot);
+              _iter23.write(oprot);
             }
             oprot.writeListEnd();
           }
@@ -1522,9 +1654,9 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
           oprot.writeFieldBegin(GROUP_BY_LIST_FIELD_DESC);
           {
             oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.groupByList.size()));
-            for (Expression _iter18 : struct.groupByList)
+            for (Expression _iter24 : struct.groupByList)
             {
-              _iter18.write(oprot);
+              _iter24.write(oprot);
             }
             oprot.writeListEnd();
           }
@@ -1536,9 +1668,9 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
           oprot.writeFieldBegin(ORDER_BY_LIST_FIELD_DESC);
           {
             oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.orderByList.size()));
-            for (Expression _iter19 : struct.orderByList)
+            for (Expression _iter25 : struct.orderByList)
             {
-              _iter19.write(oprot);
+              _iter25.write(oprot);
             }
             oprot.writeListEnd();
           }
@@ -1567,10 +1699,10 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
           oprot.writeFieldBegin(QUERY_OPTIONS_FIELD_DESC);
           {
             oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, struct.queryOptions.size()));
-            for (java.util.Map.Entry<java.lang.String, java.lang.String> _iter20 : struct.queryOptions.entrySet())
+            for (java.util.Map.Entry<java.lang.String, java.lang.String> _iter26 : struct.queryOptions.entrySet())
             {
-              oprot.writeString(_iter20.getKey());
-              oprot.writeString(_iter20.getValue());
+              oprot.writeString(_iter26.getKey());
+              oprot.writeString(_iter26.getValue());
             }
             oprot.writeMapEnd();
           }
@@ -1587,12 +1719,33 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
           oprot.writeFieldBegin(EXPRESSION_OVERRIDE_HINTS_FIELD_DESC);
           {
             oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRUCT, org.apache.thrift.protocol.TType.STRUCT, struct.expressionOverrideHints.size()));
-            for (java.util.Map.Entry<Expression, Expression> _iter21 : struct.expressionOverrideHints.entrySet())
+            for (java.util.Map.Entry<Expression, Expression> _iter27 : struct.expressionOverrideHints.entrySet())
             {
-              _iter21.getKey().write(oprot);
-              _iter21.getValue().write(oprot);
+              _iter27.getKey().write(oprot);
+              _iter27.getValue().write(oprot);
             }
             oprot.writeMapEnd();
+          }
+          oprot.writeFieldEnd();
+        }
+      }
+      if (struct.groupingSets != null) {
+        if (struct.isSetGroupingSets()) {
+          oprot.writeFieldBegin(GROUPING_SETS_FIELD_DESC);
+          {
+            oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.LIST, struct.groupingSets.size()));
+            for (java.util.List<java.lang.Integer> _iter28 : struct.groupingSets)
+            {
+              {
+                oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.I32, _iter28.size()));
+                for (int _iter29 : _iter28)
+                {
+                  oprot.writeI32(_iter29);
+                }
+                oprot.writeListEnd();
+              }
+            }
+            oprot.writeListEnd();
           }
           oprot.writeFieldEnd();
         }
@@ -1652,7 +1805,10 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
       if (struct.isSetExpressionOverrideHints()) {
         optionals.set(11);
       }
-      oprot.writeBitSet(optionals, 12);
+      if (struct.isSetGroupingSets()) {
+        optionals.set(12);
+      }
+      oprot.writeBitSet(optionals, 13);
       if (struct.isSetVersion()) {
         oprot.writeI32(struct.version);
       }
@@ -1662,9 +1818,9 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
       if (struct.isSetSelectList()) {
         {
           oprot.writeI32(struct.selectList.size());
-          for (Expression _iter22 : struct.selectList)
+          for (Expression _iter30 : struct.selectList)
           {
-            _iter22.write(oprot);
+            _iter30.write(oprot);
           }
         }
       }
@@ -1674,18 +1830,18 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
       if (struct.isSetGroupByList()) {
         {
           oprot.writeI32(struct.groupByList.size());
-          for (Expression _iter23 : struct.groupByList)
+          for (Expression _iter31 : struct.groupByList)
           {
-            _iter23.write(oprot);
+            _iter31.write(oprot);
           }
         }
       }
       if (struct.isSetOrderByList()) {
         {
           oprot.writeI32(struct.orderByList.size());
-          for (Expression _iter24 : struct.orderByList)
+          for (Expression _iter32 : struct.orderByList)
           {
-            _iter24.write(oprot);
+            _iter32.write(oprot);
           }
         }
       }
@@ -1701,10 +1857,10 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
       if (struct.isSetQueryOptions()) {
         {
           oprot.writeI32(struct.queryOptions.size());
-          for (java.util.Map.Entry<java.lang.String, java.lang.String> _iter25 : struct.queryOptions.entrySet())
+          for (java.util.Map.Entry<java.lang.String, java.lang.String> _iter33 : struct.queryOptions.entrySet())
           {
-            oprot.writeString(_iter25.getKey());
-            oprot.writeString(_iter25.getValue());
+            oprot.writeString(_iter33.getKey());
+            oprot.writeString(_iter33.getValue());
           }
         }
       }
@@ -1714,10 +1870,25 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
       if (struct.isSetExpressionOverrideHints()) {
         {
           oprot.writeI32(struct.expressionOverrideHints.size());
-          for (java.util.Map.Entry<Expression, Expression> _iter26 : struct.expressionOverrideHints.entrySet())
+          for (java.util.Map.Entry<Expression, Expression> _iter34 : struct.expressionOverrideHints.entrySet())
           {
-            _iter26.getKey().write(oprot);
-            _iter26.getValue().write(oprot);
+            _iter34.getKey().write(oprot);
+            _iter34.getValue().write(oprot);
+          }
+        }
+      }
+      if (struct.isSetGroupingSets()) {
+        {
+          oprot.writeI32(struct.groupingSets.size());
+          for (java.util.List<java.lang.Integer> _iter35 : struct.groupingSets)
+          {
+            {
+              oprot.writeI32(_iter35.size());
+              for (int _iter36 : _iter35)
+              {
+                oprot.writeI32(_iter36);
+              }
+            }
           }
         }
       }
@@ -1726,7 +1897,7 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
     @Override
     public void read(org.apache.thrift.protocol.TProtocol prot, PinotQuery struct) throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TTupleProtocol iprot = (org.apache.thrift.protocol.TTupleProtocol) prot;
-      java.util.BitSet incoming = iprot.readBitSet(12);
+      java.util.BitSet incoming = iprot.readBitSet(13);
       if (incoming.get(0)) {
         struct.version = iprot.readI32();
         struct.setVersionIsSet(true);
@@ -1738,14 +1909,14 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
       }
       if (incoming.get(2)) {
         {
-          org.apache.thrift.protocol.TList _list27 = iprot.readListBegin(org.apache.thrift.protocol.TType.STRUCT);
-          struct.selectList = new java.util.ArrayList<Expression>(_list27.size);
-          @org.apache.thrift.annotation.Nullable Expression _elem28;
-          for (int _i29 = 0; _i29 < _list27.size; ++_i29)
+          org.apache.thrift.protocol.TList _list37 = iprot.readListBegin(org.apache.thrift.protocol.TType.STRUCT);
+          struct.selectList = new java.util.ArrayList<Expression>(_list37.size);
+          @org.apache.thrift.annotation.Nullable Expression _elem38;
+          for (int _i39 = 0; _i39 < _list37.size; ++_i39)
           {
-            _elem28 = new Expression();
-            _elem28.read(iprot);
-            struct.selectList.add(_elem28);
+            _elem38 = new Expression();
+            _elem38.read(iprot);
+            struct.selectList.add(_elem38);
           }
         }
         struct.setSelectListIsSet(true);
@@ -1757,28 +1928,28 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
       }
       if (incoming.get(4)) {
         {
-          org.apache.thrift.protocol.TList _list30 = iprot.readListBegin(org.apache.thrift.protocol.TType.STRUCT);
-          struct.groupByList = new java.util.ArrayList<Expression>(_list30.size);
-          @org.apache.thrift.annotation.Nullable Expression _elem31;
-          for (int _i32 = 0; _i32 < _list30.size; ++_i32)
+          org.apache.thrift.protocol.TList _list40 = iprot.readListBegin(org.apache.thrift.protocol.TType.STRUCT);
+          struct.groupByList = new java.util.ArrayList<Expression>(_list40.size);
+          @org.apache.thrift.annotation.Nullable Expression _elem41;
+          for (int _i42 = 0; _i42 < _list40.size; ++_i42)
           {
-            _elem31 = new Expression();
-            _elem31.read(iprot);
-            struct.groupByList.add(_elem31);
+            _elem41 = new Expression();
+            _elem41.read(iprot);
+            struct.groupByList.add(_elem41);
           }
         }
         struct.setGroupByListIsSet(true);
       }
       if (incoming.get(5)) {
         {
-          org.apache.thrift.protocol.TList _list33 = iprot.readListBegin(org.apache.thrift.protocol.TType.STRUCT);
-          struct.orderByList = new java.util.ArrayList<Expression>(_list33.size);
-          @org.apache.thrift.annotation.Nullable Expression _elem34;
-          for (int _i35 = 0; _i35 < _list33.size; ++_i35)
+          org.apache.thrift.protocol.TList _list43 = iprot.readListBegin(org.apache.thrift.protocol.TType.STRUCT);
+          struct.orderByList = new java.util.ArrayList<Expression>(_list43.size);
+          @org.apache.thrift.annotation.Nullable Expression _elem44;
+          for (int _i45 = 0; _i45 < _list43.size; ++_i45)
           {
-            _elem34 = new Expression();
-            _elem34.read(iprot);
-            struct.orderByList.add(_elem34);
+            _elem44 = new Expression();
+            _elem44.read(iprot);
+            struct.orderByList.add(_elem44);
           }
         }
         struct.setOrderByListIsSet(true);
@@ -1798,15 +1969,15 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
       }
       if (incoming.get(9)) {
         {
-          org.apache.thrift.protocol.TMap _map36 = iprot.readMapBegin(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING); 
-          struct.queryOptions = new java.util.HashMap<java.lang.String,java.lang.String>(2*_map36.size);
-          @org.apache.thrift.annotation.Nullable java.lang.String _key37;
-          @org.apache.thrift.annotation.Nullable java.lang.String _val38;
-          for (int _i39 = 0; _i39 < _map36.size; ++_i39)
+          org.apache.thrift.protocol.TMap _map46 = iprot.readMapBegin(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING); 
+          struct.queryOptions = new java.util.HashMap<java.lang.String,java.lang.String>(2*_map46.size);
+          @org.apache.thrift.annotation.Nullable java.lang.String _key47;
+          @org.apache.thrift.annotation.Nullable java.lang.String _val48;
+          for (int _i49 = 0; _i49 < _map46.size; ++_i49)
           {
-            _key37 = iprot.readString();
-            _val38 = iprot.readString();
-            struct.queryOptions.put(_key37, _val38);
+            _key47 = iprot.readString();
+            _val48 = iprot.readString();
+            struct.queryOptions.put(_key47, _val48);
           }
         }
         struct.setQueryOptionsIsSet(true);
@@ -1817,20 +1988,42 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
       }
       if (incoming.get(11)) {
         {
-          org.apache.thrift.protocol.TMap _map40 = iprot.readMapBegin(org.apache.thrift.protocol.TType.STRUCT, org.apache.thrift.protocol.TType.STRUCT); 
-          struct.expressionOverrideHints = new java.util.HashMap<Expression,Expression>(2*_map40.size);
-          @org.apache.thrift.annotation.Nullable Expression _key41;
-          @org.apache.thrift.annotation.Nullable Expression _val42;
-          for (int _i43 = 0; _i43 < _map40.size; ++_i43)
+          org.apache.thrift.protocol.TMap _map50 = iprot.readMapBegin(org.apache.thrift.protocol.TType.STRUCT, org.apache.thrift.protocol.TType.STRUCT); 
+          struct.expressionOverrideHints = new java.util.HashMap<Expression,Expression>(2*_map50.size);
+          @org.apache.thrift.annotation.Nullable Expression _key51;
+          @org.apache.thrift.annotation.Nullable Expression _val52;
+          for (int _i53 = 0; _i53 < _map50.size; ++_i53)
           {
-            _key41 = new Expression();
-            _key41.read(iprot);
-            _val42 = new Expression();
-            _val42.read(iprot);
-            struct.expressionOverrideHints.put(_key41, _val42);
+            _key51 = new Expression();
+            _key51.read(iprot);
+            _val52 = new Expression();
+            _val52.read(iprot);
+            struct.expressionOverrideHints.put(_key51, _val52);
           }
         }
         struct.setExpressionOverrideHintsIsSet(true);
+      }
+      if (incoming.get(12)) {
+        {
+          org.apache.thrift.protocol.TList _list54 = iprot.readListBegin(org.apache.thrift.protocol.TType.LIST);
+          struct.groupingSets = new java.util.ArrayList<java.util.List<java.lang.Integer>>(_list54.size);
+          @org.apache.thrift.annotation.Nullable java.util.List<java.lang.Integer> _elem55;
+          for (int _i56 = 0; _i56 < _list54.size; ++_i56)
+          {
+            {
+              org.apache.thrift.protocol.TList _list57 = iprot.readListBegin(org.apache.thrift.protocol.TType.I32);
+              _elem55 = new java.util.ArrayList<java.lang.Integer>(_list57.size);
+              int _elem58;
+              for (int _i59 = 0; _i59 < _list57.size; ++_i59)
+              {
+                _elem58 = iprot.readI32();
+                _elem55.add(_elem58);
+              }
+            }
+            struct.groupingSets.add(_elem55);
+          }
+        }
+        struct.setGroupingSetsIsSet(true);
       }
     }
   }

@@ -38,23 +38,22 @@ public abstract class ControllerPrometheusMetricsTest extends PinotPrometheusMet
 
   //that accept global gauge with suffix
   private static final List<ControllerGauge> GLOBAL_GAUGES_ACCEPTING_TASKTYPE =
-      List.of(ControllerGauge.NUM_MINION_TASKS_IN_PROGRESS, ControllerGauge.NUM_MINION_SUBTASKS_RUNNING,
-          ControllerGauge.NUM_MINION_SUBTASKS_WAITING, ControllerGauge.NUM_MINION_SUBTASKS_ERROR,
-          ControllerGauge.NUM_MINION_SUBTASKS_UNKNOWN,
-          ControllerGauge.NUM_MINION_SUBTASKS_DROPPED,
-          ControllerGauge.NUM_MINION_SUBTASKS_TIMED_OUT,
-          ControllerGauge.NUM_MINION_SUBTASKS_ABORTED,
-          ControllerGauge.PERCENT_MINION_SUBTASKS_IN_QUEUE, ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR);
+      List.of(ControllerGauge.NUM_MINION_TASKS_IN_PROGRESS);
 
   //local gauges that accept partition
   private static final List<ControllerGauge> GAUGES_ACCEPTING_PARTITION =
       List.of(ControllerGauge.MAX_RECORDS_LAG, ControllerGauge.MAX_RECORD_AVAILABILITY_LAG_MS);
 
-  //these accept task type
+  //these accept task type (per-table scoped)
   private static final List<ControllerGauge> GAUGES_ACCEPTING_TASKTYPE =
       List.of(ControllerGauge.TIME_MS_SINCE_LAST_MINION_TASK_METADATA_UPDATE,
           ControllerGauge.TIME_MS_SINCE_LAST_SUCCESSFUL_MINION_TASK_GENERATION,
-          ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR);
+          ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR,
+          ControllerGauge.NUM_MINION_SUBTASKS_RUNNING, ControllerGauge.NUM_MINION_SUBTASKS_WAITING,
+          ControllerGauge.NUM_MINION_SUBTASKS_ERROR, ControllerGauge.NUM_MINION_SUBTASKS_UNKNOWN,
+          ControllerGauge.NUM_MINION_SUBTASKS_DROPPED, ControllerGauge.NUM_MINION_SUBTASKS_TIMED_OUT,
+          ControllerGauge.NUM_MINION_SUBTASKS_ABORTED,
+          ControllerGauge.PERCENT_MINION_SUBTASKS_IN_QUEUE, ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR);
 
   private static final List<ControllerGauge> GAUGES_ACCEPTING_RAW_TABLENAME = List.of();
 

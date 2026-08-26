@@ -35,11 +35,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class is responsible for checking resource utilization for Pinot instances. To begin with, it checks
- * disk utilization for all server instances. The computed disk utilization is stored in the class
- * <code>org.apache.pinot.controller.validation.ResourceUtilizationInfo</code>.
- */
+/// This class is responsible for checking resource utilization for Pinot instances. To begin with, it checks
+/// disk utilization for all server instances. The computed disk utilization is stored in the class
+/// `org.apache.pinot.controller.validation.ResourceUtilizationInfo`.
 public class ResourceUtilizationChecker extends BasePeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(ResourceUtilizationChecker.class);
   private final static String TASK_NAME = ResourceUtilizationChecker.class.getSimpleName();
@@ -77,7 +75,8 @@ public class ResourceUtilizationChecker extends BasePeriodicTask {
       BiMap<String, String> instanceAdminEndpoints = _helixResourceManager.getDataInstanceAdminEndpoints(instances);
       BiMap<String, String> endpointsToInstances = instanceAdminEndpoints.inverse();
       CompletionServiceHelper completionServiceHelper =
-          new CompletionServiceHelper(_executor, _connectionManager, endpointsToInstances);
+          new CompletionServiceHelper(_executor, _connectionManager, endpointsToInstances,
+              _helixResourceManager.getServerAdminAuthProvider());
       for (UtilizationChecker utilizationChecker : _utilizationCheckers) {
         LOGGER.debug("Computing resource utilization for checker: {}", utilizationChecker.getName());
         utilizationChecker.computeResourceUtilization(endpointsToInstances, completionServiceHelper);

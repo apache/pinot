@@ -27,7 +27,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -69,13 +68,11 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.IndexUtil;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
-import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.Intern;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -91,7 +88,7 @@ import org.slf4j.LoggerFactory;
 public class DictionaryIndexType
     extends AbstractIndexType<DictionaryIndexConfig, Dictionary, SegmentDictionaryCreator> {
   private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryIndexType.class);
-  private static final List<String> EXTENSIONS = Collections.singletonList(V1Constants.Dict.FILE_EXTENSION);
+  private static final List<String> EXTENSIONS = List.of(V1Constants.Dict.FILE_EXTENSION);
 
   protected DictionaryIndexType() {
     super(StandardIndexes.DICTIONARY_ID);
@@ -134,7 +131,7 @@ public class DictionaryIndexType
     ColumnConfigDeserializer<DictionaryIndexConfig> fromFieldConfigs = (tableConfig, schema) -> {
       List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
       if (fieldConfigList == null) {
-        return Collections.emptyMap();
+        return Map.of();
       }
       Map<String, DictionaryIndexConfig> result = new HashMap<>();
       for (FieldConfig fieldConfig : fieldConfigList) {
@@ -179,11 +176,11 @@ public class DictionaryIndexType
   }
 
   /// True if any index enabled in the FieldConfig declares
-  /// {@link IndexType#requiresDictionary(FieldSpec, IndexConfig)} for the column. Iterates over every
-  /// registered IndexType, asks each whether it's enabled in this raw FieldConfig (legacy `indexTypes`
-  /// list or the `indexes` map without `disabled:true`), and consults `requiresDictionary` against the
-  /// IndexType's default config. (Built-in dict-requiring indexes — FST/IFST/INVERTED — return true
-  /// unconditionally, so the default config is sufficient.)
+  /// [IndexType#requiresDictionary(FieldSpec, org.apache.pinot.spi.config.table.IndexConfig)] for the column.
+  /// Iterates over every registered IndexType, asks each whether it's enabled in this raw FieldConfig (legacy
+  /// `indexTypes` list or the `indexes` map without `disabled:true`), and consults `requiresDictionary` against the
+  /// IndexType's default config. (Built-in dict-requiring indexes — FST/IFST/INVERTED — return true unconditionally,
+  /// so the default config is sufficient.)
   @SuppressWarnings({"rawtypes", "unchecked"})
   private static boolean hasIndexRequiringDictionary(FieldConfig fieldConfig, FieldSpec fieldSpec) {
     Set<String> enabledIds = enabledIndexIds(fieldConfig);
@@ -256,7 +253,7 @@ public class DictionaryIndexType
   @Override
   public SegmentDictionaryCreator createIndexCreator(IndexCreationContext context, DictionaryIndexConfig indexConfig) {
     boolean useVarLengthDictionary = shouldUseVarLengthDictionary(context, indexConfig);
-    return new SegmentDictionaryCreator(context.getFieldSpec(), context.getIndexDir(), useVarLengthDictionary);
+    return new SegmentDictionaryCreator(context, useVarLengthDictionary);
   }
 
   public boolean shouldUseVarLengthDictionary(IndexCreationContext context, DictionaryIndexConfig indexConfig) {
@@ -278,10 +275,8 @@ public class DictionaryIndexType
     return false;
   }
 
-  /**
-   * Similar to shouldUseVarLengthDictionary, but also checks STRING type. Separated due to backwards compatibility
-   * concerns.
-   */
+  /// Similar to shouldUseVarLengthDictionary, but also checks STRING type. Separated due to backwards compatibility
+  /// concerns.
   public static boolean optimizeTypeShouldUseVarLengthDictionary(DataType storedType, ColumnStatistics profile) {
     if (storedType == DataType.BYTES || storedType == DataType.BIG_DECIMAL || storedType == DataType.STRING) {
       return !profile.isFixedLength();
@@ -291,13 +286,11 @@ public class DictionaryIndexType
   }
 
 
-  /**
-   * This function evaluates whether to override dictionary (i.e use noDictionary)
-   * for a column even when its explicitly configured. This evaluation is for both dimension and metric
-   * column types.
-   *
-   * @return true if dictionary should be created, false if noDictionary should be used
-   */
+  /// This function evaluates whether to override dictionary (i.e use noDictionary)
+  /// for a column even when its explicitly configured. This evaluation is for both dimension and metric
+  /// column types.
+  ///
+  /// @return true if dictionary should be created, false if noDictionary should be used
   public static boolean ignoreDictionaryOverride(boolean optimizeDictionary, boolean optimizeDictionaryForMetrics,
       double noDictionarySizeRatioThreshold, @Nullable Double noDictionaryCardinalityRatioThreshold,
       FieldSpec fieldSpec, FieldIndexConfigs fieldIndexConfigs, int cardinality, int totalNumberOfEntries) {
@@ -327,9 +320,7 @@ public class DictionaryIndexType
     return true;
   }
 
-  /**
-   * Hold common logic for ignoring dictionary override for single value fields, used for dim and metric cols
-   */
+  /// Hold common logic for ignoring dictionary override for single value fields, used for dim and metric cols
   private static boolean ignoreDictionaryOverrideForSingleValueFields(int cardinality, int totalNumberOfEntries,
       double noDictionarySizeRatioThreshold, Double noDictionaryCardinalityRatioThreshold, FieldSpec fieldSpec) {
     if (fieldSpec.isSingleValueField()) {
@@ -348,11 +339,9 @@ public class DictionaryIndexType
     return false;
   }
 
-  /**
-   * Given the column cardinality, totalNumberOfEntries, this function checks if the savings ratio
-   * is larger than the configured threshold (noDictionarySizeRatioThreshold). If savings ratio is
-   * smaller than the threshold, we want to override to noDictionary.
-   */
+  /// Given the column cardinality, totalNumberOfEntries, this function checks if the savings ratio
+  /// is larger than the configured threshold (noDictionarySizeRatioThreshold). If savings ratio is
+  /// smaller than the threshold, we want to override to noDictionary.
   private static boolean canSafelyCreateDictionaryWithinThreshold(int cardinality, int totalNumberOfEntries,
       double noDictionarySizeRatioThreshold, FieldSpec spec) {
     long dictionarySize = cardinality * (long) spec.getDataType().size();
@@ -570,16 +559,15 @@ public class DictionaryIndexType
     indexingConfig.setVarLengthDictionaryColumns(null);
   }
 
-  /**
-   * Creates a MutableDictionary.
-   *
-   * Unlikes most indexes, while dictionaries are important when
-   * {@link org.apache.pinot.segment.spi.MutableSegment mutable segments} are created, they do not follow the
-   * {@link MutableIndex} interface and therefore
-   * {@link DictionaryIndexType#createMutableIndex(MutableIndexContext, IndexConfig)} is not implemented.
-   *
-   * This also means that dictionaries cannot be overridden in realtime tables.
-   */
+  /// Creates a MutableDictionary.
+  ///
+  /// Unlikes most indexes, while dictionaries are important when
+  /// [`mutable segments`]\[org.apache.pinot.segment.spi.MutableSegment\] are created, they do not follow the
+  /// [org.apache.pinot.segment.spi.index.mutable.MutableIndex] interface and therefore
+  /// [DictionaryIndexType#createMutableIndex(MutableIndexContext, org.apache.pinot.spi.config.table.IndexConfig)]
+  /// is not implemented.
+  ///
+  /// This also means that dictionaries cannot be overridden in realtime tables.
   @Nullable
   public static MutableDictionary createMutableDictionary(MutableIndexContext context, DictionaryIndexConfig config) {
     if (config.isDisabled()) {

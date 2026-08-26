@@ -50,7 +50,6 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
@@ -68,9 +67,7 @@ import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 
 
-/**
- * Helper methods for ingestion
- */
+/// Helper methods for ingestion
 public final class IngestionUtils {
 
   private static final PinotFS LOCAL_PINOT_FS = new LocalPinotFS();
@@ -78,13 +75,11 @@ public final class IngestionUtils {
   private IngestionUtils() {
   }
 
-  /**
-   * Create {@link SegmentGeneratorConfig} using tableConfig and schema.
-   * All properties are taken from the 1st Map in tableConfig -> ingestionConfig -> batchIngestionConfig ->
-   * batchConfigMaps
-   * @param tableConfig tableConfig with the batchConfigMap set
-   * @param schema pinot schema
-   */
+  /// Create [SegmentGeneratorConfig] using tableConfig and schema.
+  /// All properties are taken from the 1st Map in tableConfig -> ingestionConfig -> batchIngestionConfig ->
+  /// batchConfigMaps
+  /// @param tableConfig tableConfig with the batchConfigMap set
+  /// @param schema pinot schema
   public static SegmentGeneratorConfig generateSegmentGeneratorConfig(TableConfig tableConfig, Schema schema)
       throws IOException, ClassNotFoundException {
     Preconditions.checkNotNull(tableConfig.getIngestionConfig(),
@@ -97,10 +92,8 @@ public final class IngestionUtils {
         tableConfig.getIngestionConfig().getBatchIngestionConfig());
   }
 
-  /**
-   * Create {@link SegmentGeneratorConfig} using tableConfig, schema and batchIngestionConfig.
-   * The provided batchIngestionConfig will take precedence over the one in tableConfig
-   */
+  /// Create [SegmentGeneratorConfig] using tableConfig, schema and batchIngestionConfig.
+  /// The provided batchIngestionConfig will take precedence over the one in tableConfig
   public static SegmentGeneratorConfig generateSegmentGeneratorConfig(TableConfig tableConfig, Schema schema,
       BatchIngestionConfig batchIngestionConfig)
       throws ClassNotFoundException, IOException {
@@ -181,10 +174,8 @@ public final class IngestionUtils {
     }
   }
 
-  /**
-   * Builds a segment using given {@link SegmentGeneratorConfig}
-   * @return segment name
-   */
+  /// Builds a segment using given [SegmentGeneratorConfig]
+  /// @return segment name
   public static String buildSegment(SegmentGeneratorConfig segmentGeneratorConfig)
       throws Exception {
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -193,13 +184,11 @@ public final class IngestionUtils {
     return driver.getSegmentName();
   }
 
-  /**
-   * Uploads the segments from the provided segmentTar URIs to the table, using push details from the batchConfig
-   * @param tableNameWithType name of the table to upload the segment
-   * @param batchConfig batchConfig with details about push such as controllerURI, pushAttempts, pushParallelism, etc
-   * @param segmentTarURIs list of URI for the segment tar files
-   * @param authProvider auth provider
-   */
+  /// Uploads the segments from the provided segmentTar URIs to the table, using push details from the batchConfig
+  /// @param tableNameWithType name of the table to upload the segment
+  /// @param batchConfig batchConfig with details about push such as controllerURI, pushAttempts, pushParallelism, etc
+  /// @param segmentTarURIs list of URI for the segment tar files
+  /// @param authProvider auth provider
   public static void uploadSegment(String tableNameWithType, BatchConfig batchConfig, List<URI> segmentTarURIs,
       @Nullable AuthProvider authProvider)
       throws Exception {
@@ -286,9 +275,7 @@ public final class IngestionUtils {
     return spec;
   }
 
-  /**
-   * Creates an instance of the PinotFS using the fileURI and fs properties from BatchConfig
-   */
+  /// Creates an instance of the PinotFS using the fileURI and fs properties from BatchConfig
   public static PinotFS getOutputPinotFS(BatchConfig batchConfig, URI fileURI) {
     String fileURIScheme = (fileURI == null) ? null : fileURI.getScheme();
     if (fileURIScheme == null) {
@@ -305,13 +292,12 @@ public final class IngestionUtils {
     PinotFSFactory.register(fileURIScheme, fsClass, fsProps);
   }
 
-  /**
-   * Extracts all fields required by the {@link RecordExtractor} from the given TableConfig and Schema.
-   * Fields for ingestion come from 2 places:
-   * 1. The schema
-   * 2. The ingestion config in the table config. The ingestion config (e.g. filter, complexType) can have fields which
-   * are not in the schema.
-   */
+  /// Extracts all fields required by the [org.apache.pinot.spi.data.readers.RecordExtractor] from the given
+  /// TableConfig and Schema.
+  /// Fields for ingestion come from 2 places:
+  /// 1. The schema
+  /// 2. The ingestion config in the table config. The ingestion config (e.g. filter, complexType) can have fields which
+  /// are not in the schema.
   public static Set<String> getFieldsForRecordExtractor(TableConfig tableConfig, Schema schema) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     if (ingestionConfig != null && ingestionConfig.getSchemaConformingTransformerConfig() != null) {
@@ -335,10 +321,8 @@ public final class IngestionUtils {
     return getFieldsToReadWithComplexType(fields, ingestionConfig);
   }
 
-  /**
-   * Extracts the root-level names from the fields, to support the complex-type handling. For example,
-   * a field a.b.c will return the top-level name a.
-   */
+  /// Extracts the root-level names from the fields, to support the complex-type handling. For example,
+  /// a field a.b.c will return the top-level name a.
   private static Set<String> getFieldsToReadWithComplexType(Set<String> fieldsToRead, IngestionConfig ingestionConfig) {
     if (ingestionConfig == null || ingestionConfig.getComplexTypeConfig() == null) {
       // do nothing
@@ -352,19 +336,5 @@ public final class IngestionUtils {
       result.add(StringUtils.splitByWholeSeparator(field, delimiter)[0]);
     }
     return result;
-  }
-
-  public static Long extractTimeValue(Comparable time) {
-    if (time != null) {
-      if (time instanceof Number) {
-        return ((Number) time).longValue();
-      } else {
-        String stringValue = time.toString();
-        if (StringUtils.isNumeric(stringValue)) {
-          return Long.parseLong(stringValue);
-        }
-      }
-    }
-    return null;
   }
 }

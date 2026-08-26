@@ -64,7 +64,7 @@
       <plugin>
         <groupId>com.mycila</groupId>
         <artifactId>license-maven-plugin</artifactId>
-        <version>5.0.0</version>
+        <version>5.1.2</version>
         <configuration>
           <skip>true</skip>
         </configuration>
@@ -322,6 +322,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-json</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-bson</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -178,7 +177,7 @@ public class BenchmarkGrpcMailboxSend {
     _blocks = new ArrayList<>(numBlocks);
     for (int i = 0; i < numBlocks; i++) {
       _blocks.add(new RowHeapDataBlock(
-          Collections.singletonList(new Object[]{payload}), SCHEMA));
+          List.<Object[]>of(new Object[]{payload}), SCHEMA));
     }
 
     // Drainer: block on the reader signal, then drain everything available with non-blocking

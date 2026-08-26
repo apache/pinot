@@ -23,6 +23,7 @@ import java.io.File;
 import java.nio.file.Files;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
@@ -36,14 +37,13 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests {@link ForwardIndexCreatorFactory}'s forward-index encoding branch selection. Each test uses an isolated
- * temporary index directory and does not share mutable state.
- */
+/// Tests [ForwardIndexCreatorFactory]'s forward-index encoding branch selection. Each test uses an isolated
+/// temporary index directory and does not share mutable state.
 public class ForwardIndexCreatorFactoryTest {
   private static final String COLUMN_NAME = "testCol";
 
@@ -54,8 +54,24 @@ public class ForwardIndexCreatorFactoryTest {
     try (ForwardIndexCreator creator = ForwardIndexCreatorFactory.createIndexCreator(newContext(indexDir, true),
         new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW).build())) {
       assertFalse(creator.isDictionaryEncoded());
+      assertEquals(creator.getRawForwardIndexChunkCompressionType(), ChunkCompressionType.LZ4);
       creator.putInt(1);
       creator.seal();
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
+  @Test
+  public void testCreatorReportsExplicitCompressionType()
+      throws Exception {
+    File indexDir = Files.createTempDirectory("ForwardIndexCreatorFactoryTest").toFile();
+    ForwardIndexConfig config = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCompressionType(ChunkCompressionType.SNAPPY)
+        .build();
+    try (ForwardIndexCreator creator = ForwardIndexCreatorFactory.createIndexCreator(newContext(indexDir, true),
+        config)) {
+      assertEquals(creator.getRawForwardIndexChunkCompressionType(), ChunkCompressionType.SNAPPY);
     } finally {
       FileUtils.deleteQuietly(indexDir);
     }
@@ -76,8 +92,25 @@ public class ForwardIndexCreatorFactoryTest {
     }
   }
 
+  @Test
+  public void testTableConfigConstructorPropagatesCompressionStatsFlag()
+      throws Exception {
+    File indexDir = Files.createTempDirectory("ForwardIndexCreatorFactoryTest").toFile();
+    try {
+      TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+      tableConfig.getIndexingConfig().setCompressionStatsEnabled(true);
+      assertTrue(newContext(indexDir, true, tableConfig).isCompressionStatsEnabled());
+    } finally {
+      FileUtils.deleteQuietly(indexDir);
+    }
+  }
+
   private static IndexCreationContext newContext(File indexDir, boolean hasDictionary) {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    return newContext(indexDir, hasDictionary, tableConfig);
+  }
+
+  private static IndexCreationContext newContext(File indexDir, boolean hasDictionary, TableConfig tableConfig) {
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, DataType.INT, true);
     ColumnMetadata metadata = Mockito.mock(ColumnMetadata.class);
     Mockito.when(metadata.getFieldSpec()).thenReturn(fieldSpec);

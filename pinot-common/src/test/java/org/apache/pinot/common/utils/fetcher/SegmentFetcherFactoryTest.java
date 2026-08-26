@@ -40,6 +40,7 @@ public class SegmentFetcherFactoryTest {
   private static final String FILE_PROTOCOL = "file";
   private static final String TEST_PROTOCOL = "test";
   private static final String TEST_URI = "test://foo/bar";
+  private static final String SEGMENT_NAME = "testSegment";
 
   @Test
   public void testDefaultSegmentFetcherFactory() {
@@ -98,6 +99,12 @@ public class SegmentFetcherFactoryTest {
     assertEquals(fakeCrypter._encryptCalled, 0);
     assertEquals(fakeCrypter._originalPath, "foo/bar.enc");
     assertEquals(fakeCrypter._decryptedPath, "foo/bar");
+
+    List<URI> streamedUris = List.of(new URI(TEST_URI));
+    File untaredSegDir = SegmentFetcherFactory.fetchAndStreamUntarToLocal(SEGMENT_NAME, TEST_PROTOCOL,
+        () -> streamedUris, new File("foo/bar"), -1);
+    assertEquals(untaredSegDir, new File("fakeSegmentIndexFile"));
+    assertEquals(testFileFetcher._fetchFileToLocalCalled, 5);
   }
 
   public static class FakeSegmentFetcher implements SegmentFetcher {
@@ -134,6 +141,15 @@ public class SegmentFetcherFactoryTest {
     public void fetchSegmentToLocal(String segmentName, Supplier<List<URI>> uriSupplier, File dest)
         throws Exception {
       throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public File fetchUntarSegmentToLocalStreamed(String segmentName, Supplier<List<URI>> uriSupplier, File dest,
+        long maxStreamRateInByte)
+        throws Exception {
+      assertEquals(uriSupplier.get(), List.of(new URI(TEST_URI)));
+      _fetchFileToLocalCalled++;
+      return new File("fakeSegmentIndexFile");
     }
   }
 

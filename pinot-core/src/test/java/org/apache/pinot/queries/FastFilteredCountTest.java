@@ -135,7 +135,8 @@ public class FastFilteredCountTest extends BaseQueriesTest {
   // overridden in composite index test
   protected TableConfig getTableConfig() {
     List<FieldConfig> fieldConfigs = List.of(
-        new FieldConfig(TEXT_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null, null));
+        new FieldConfig(TEXT_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.TEXT), null,
+            null));
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)

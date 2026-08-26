@@ -120,13 +120,17 @@ public class PredownloadSegmentInfo {
   public SegmentDirectory initSegmentDirectory(IndexLoadingConfig indexLoadingConfig,
       PredownloadTableInfo predownloadTableInfo) {
     try {
-      SegmentDirectoryLoaderContext loaderContext =
-          new SegmentDirectoryLoaderContext.Builder().setTableConfig(indexLoadingConfig.getTableConfig())
-              .setSchema(indexLoadingConfig.getSchema()).setInstanceId(indexLoadingConfig.getInstanceId())
-              .setTableDataDir(indexLoadingConfig.getTableDataDir()).setSegmentName(_segmentName)
-              .setSegmentCrc(String.valueOf(_crc)).setSegmentTier(indexLoadingConfig.getSegmentTier())
-              .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
-              .setSegmentDirectoryConfigs(indexLoadingConfig.getSegmentDirectoryConfigs()).build();
+      SegmentDirectoryLoaderContext loaderContext = new SegmentDirectoryLoaderContext.Builder()
+          .setReadMode(indexLoadingConfig.getReadMode())
+          .setTableConfig(indexLoadingConfig.getTableConfig())
+          .setSchema(indexLoadingConfig.getSchema())
+          .setInstanceId(indexLoadingConfig.getInstanceId())
+          .setTableDataDir(indexLoadingConfig.getTableDataDir())
+          .setSegmentName(_segmentName)
+          .setSegmentCrc(String.valueOf(_crc))
+          .setSegmentTier(indexLoadingConfig.getSegmentTier())
+          .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
+          .build();
       SegmentDirectoryLoader segmentDirectoryLoader =
           SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
       File indexDir = getSegmentDataDir(predownloadTableInfo, true);

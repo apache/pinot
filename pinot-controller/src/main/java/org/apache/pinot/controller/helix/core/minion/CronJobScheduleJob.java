@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
-import java.util.Collections;
 import java.util.Date;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerTimer;
@@ -67,8 +67,8 @@ public class CronJobScheduleJob implements Job {
         return;
       }
       TaskSchedulingContext context = new TaskSchedulingContext()
-          .setTablesToSchedule(Collections.singleton(table))
-          .setTasksToSchedule(Collections.singleton(taskType))
+          .setTablesToSchedule(Set.of(table))
+          .setTasksToSchedule(Set.of(taskType))
           .setTriggeredBy(CommonConstants.TaskTriggers.CRON_TRIGGER.name());
       long jobStartTime = System.currentTimeMillis();
       pinotTaskManager.scheduleTasks(context);

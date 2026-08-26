@@ -20,7 +20,6 @@ package org.apache.pinot.controller.helix.core.minion;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -81,6 +80,24 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     PinotTaskManager taskManager = _controllerStarter.getTaskManager();
     assertNull(taskManager.getScheduler());
     stopController();
+  }
+
+  @Test
+  public void testSchedulerShutDownWithController()
+      throws Exception {
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
+    startController(properties);
+    Scheduler scheduler = _controllerStarter.getTaskManager().getScheduler();
+    assertNotNull(scheduler);
+    assertTrue(scheduler.isStarted());
+    assertFalse(scheduler.isShutdown());
+
+    stopController();
+
+    // The scheduler's worker threads are not daemons, so one left running outlives the controller and keeps firing
+    // cron jobs against the ZkClient that the shutdown has already closed.
+    assertTrue(scheduler.isShutdown());
   }
 
   @Test
@@ -210,8 +227,8 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
 
     // Test scheduled task creation - should limit to maxSubTasks
     TaskSchedulingContext context = new TaskSchedulingContext()
-        .setTablesToSchedule(Collections.singleton(TABLE_NAME_WITH_TYPE))
-        .setTasksToSchedule(Collections.singleton(taskType));
+        .setTablesToSchedule(Set.of(TABLE_NAME_WITH_TYPE))
+        .setTasksToSchedule(Set.of(taskType));
 
     Map<String, TaskSchedulingInfo> result = taskManager.scheduleTasks(context);
 
@@ -290,7 +307,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     // Test scheduled task creation for both tables - should limit total to maxSubTasks across all tables
     TaskSchedulingContext context = new TaskSchedulingContext()
         .setTablesToSchedule(Set.of(tableNameWithType1, tableNameWithType2))
-        .setTasksToSchedule(Collections.singleton(taskType));
+        .setTasksToSchedule(Set.of(taskType));
 
     Map<String, TaskSchedulingInfo> result = taskManager.scheduleTasks(context);
 
@@ -381,8 +398,8 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     testValidateTaskGeneration(taskManager -> {
       String taskName = "SegmentGenerationAndPushTask";
       TaskSchedulingContext context = new TaskSchedulingContext()
-          .setTablesToSchedule(Collections.singleton(TABLE_NAME_WITH_TYPE))
-          .setTasksToSchedule(Collections.singleton(taskName));
+          .setTablesToSchedule(Set.of(TABLE_NAME_WITH_TYPE))
+          .setTasksToSchedule(Set.of(taskName));
       // Validate schedule tasks for table when task queue is in stopped state
       TaskSchedulingInfo info = taskManager.scheduleTasks(context).get(taskName);
       assertNotNull(info);

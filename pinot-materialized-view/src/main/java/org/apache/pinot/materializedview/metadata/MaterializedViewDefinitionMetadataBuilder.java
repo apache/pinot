@@ -19,7 +19,7 @@
 package org.apache.pinot.materializedview.metadata;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata.MaterializedViewSplitSpec;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -162,7 +162,7 @@ public final class MaterializedViewDefinitionMetadataBuilder {
 
     return new MaterializedViewDefinitionMetadata(
         viewTableNameWithType,
-        Collections.singletonList(sourceRawTableName),
+        List.of(sourceRawTableName),
         definedSql,
         partitionExprMaps,
         splitSpec,

@@ -27,10 +27,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
 
 
-/**
- * The {@code FlattenAndOrFilterOptimizer} flattens the nested AND/OR filters. For example, AND(a, AND(b, c)) can
- * be flattened to AND(a, b, c).
- */
+/// The `FlattenAndOrFilterOptimizer` flattens the nested AND/OR filters. For example, AND(a, AND(b, c)) can
+/// be flattened to AND(a, b, c).
 public class FlattenAndOrFilterOptimizer implements FilterOptimizer {
 
   @Override

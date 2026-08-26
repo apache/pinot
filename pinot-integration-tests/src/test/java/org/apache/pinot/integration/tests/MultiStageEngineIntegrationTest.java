@@ -30,7 +30,6 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -238,7 +237,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertAllLeafStagesEmptyRows("SELECT COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0",
         List.of(List.<Object>of(0)), "LONG");
     assertAllLeafStagesEmptyRows("SELECT SUM(ActualElapsedTime) FROM " + table + " WHERE DaysSinceEpoch < 0",
-        List.of(Collections.singletonList(null)), "LONG");
+        List.of(Arrays.asList((Object) null)), "LONG");
     assertAllLeafStagesEmptyRows("SELECT COUNT(*) + 1 FROM " + table + " WHERE DaysSinceEpoch < 0",
         List.of(List.<Object>of(1)), "LONG");
     assertAllLeafStagesEmptyRows(
@@ -251,12 +250,12 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         List.of(), "LONG", "LONG");
     // MIN/MAX return null on empty input (not +/-INFINITY)
     assertAllLeafStagesEmptyRows("SELECT MIN(ActualElapsedTime) FROM " + table + " WHERE DaysSinceEpoch < 0",
-        List.of(Collections.singletonList(null)), "INT");
+        List.of(Arrays.asList((Object) null)), "INT");
     assertAllLeafStagesEmptyRows("SELECT MAX(ActualElapsedTime) FROM " + table + " WHERE DaysSinceEpoch < 0",
-        List.of(Collections.singletonList(null)), "INT");
+        List.of(Arrays.asList((Object) null)), "INT");
     // AVG returns null on empty input
     assertAllLeafStagesEmptyRows("SELECT AVG(ActualElapsedTime) FROM " + table + " WHERE DaysSinceEpoch < 0",
-        List.of(Collections.singletonList(null)), "DOUBLE");
+        List.of(Arrays.asList((Object) null)), "DOUBLE");
     // Multi-aggregate row alignment
     assertAllLeafStagesEmptyRows(
         "SELECT MIN(ActualElapsedTime), MAX(ActualElapsedTime), AVG(ActualElapsedTime), COUNT(*)"
@@ -266,11 +265,56 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertAllLeafStagesEmptyRows(
         "SELECT SUM(ActualElapsedTime) FROM " + table
             + " WHERE DaysSinceEpoch < 0 HAVING SUM(ActualElapsedTime) IS NULL",
-        List.of(Collections.singletonList(null)), "LONG");
+        List.of(Arrays.asList((Object) null)), "LONG");
     // Window function over empty input
     assertAllLeafStagesEmptyRows(
         "SELECT SUM(ActualElapsedTime) OVER () FROM " + table + " WHERE DaysSinceEpoch < 0",
         List.of(), "LONG");
+  }
+
+  @Test
+  public void testAllLeafStagesEmptyBrokerResponsesWithPhysicalOptimizer()
+      throws Exception {
+    // Same short-circuit behavior must hold under the multi-stage physical optimizer, which previously failed with
+    // "No routing entry for offline or realtime type" when a leaf stage had no routable segments.
+    String table = "mytable";
+    String prefix = "SET useBrokerPruning = 'true'; SET usePhysicalOptimizer = 'true'; ";
+    assertAllLeafStagesEmptyRows(prefix, "SELECT AirlineID, Carrier FROM " + table + " WHERE DaysSinceEpoch < 0",
+        List.of(), "LONG", "STRING");
+    assertAllLeafStagesEmptyRows(prefix, "SELECT COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0",
+        List.of(List.<Object>of(0)), "LONG");
+    assertAllLeafStagesEmptyRows(prefix, "SELECT SUM(ActualElapsedTime) FROM " + table + " WHERE DaysSinceEpoch < 0",
+        List.of(Arrays.asList((Object) null)), "LONG");
+    assertAllLeafStagesEmptyRows(prefix, "SELECT COUNT(*) + 1 FROM " + table + " WHERE DaysSinceEpoch < 0",
+        List.of(List.<Object>of(1)), "LONG");
+    assertAllLeafStagesEmptyRows(prefix,
+        "SELECT AirlineID, COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0 GROUP BY AirlineID",
+        List.of(), "LONG", "LONG");
+  }
+
+  @Test
+  public void testPartiallyEmptyWithPhysicalOptimizerFailsFast()
+      throws Exception {
+    // Combining an empty/fully-pruned table with a non-empty table is not yet supported by the physical optimizer.
+    // It must fail fast with a clear, actionable error rather than silently drop rows.
+    String table = "mytable";
+    String expectedError = "combine an empty or fully-pruned table with a non-empty table";
+    // The empty branch (all segments pruned) contributes zero rows, so the union counts only the non-empty branch.
+    String unionQuery = "SELECT COUNT(*) FROM (SELECT AirlineID FROM " + table + " WHERE DaysSinceEpoch < 0 "
+        + "UNION ALL SELECT AirlineID FROM " + table + ") u";
+
+    JsonNode overUnion = postQuery("SET useBrokerPruning = 'true'; SET usePhysicalOptimizer = 'true'; " + unionQuery);
+    assertFalse(overUnion.get("exceptions").isEmpty(), "Expected a partially-empty error: " + overUnion);
+    assertTrue(overUnion.get("exceptions").toString().contains(expectedError),
+        "Expected a clear partially-empty error, got: " + overUnion.get("exceptions"));
+
+    // The suggested fallback (legacy engine) must answer the same query correctly: the empty branch adds nothing, so
+    // the union count equals the total row count of the non-empty table.
+    long total = postQuery("SELECT COUNT(*) FROM " + table).get("resultTable").get("rows").get(0).get(0).asLong();
+    assertTrue(total > 0, "Sanity: mytable should be non-empty");
+    JsonNode fallback = postQuery("SET useBrokerPruning = 'true'; SET usePhysicalOptimizer = 'false'; " + unionQuery);
+    assertTrue(fallback.get("exceptions").isEmpty(), "Fallback should not error: " + fallback);
+    assertEquals(fallback.get("resultTable").get("rows").get(0).get(0).asLong(), total);
   }
 
   @Test
@@ -297,7 +341,13 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
   private JsonNode assertAllLeafStagesEmptyRows(String query, List<List<Object>> expectedRows, String... expectedTypes)
       throws Exception {
-    JsonNode response = postQuery("SET useBrokerPruning = 'true'; " + query);
+    return assertAllLeafStagesEmptyRows("SET useBrokerPruning = 'true'; ", query, expectedRows, expectedTypes);
+  }
+
+  private JsonNode assertAllLeafStagesEmptyRows(String setPrefix, String query, List<List<Object>> expectedRows,
+      String... expectedTypes)
+      throws Exception {
+    JsonNode response = postQuery(setPrefix + query);
     assertTrue(response.get("exceptions").isEmpty(), "Unexpected exceptions for query: " + query);
     assertEquals(response.get("numServersQueried").asInt(), 0, "Query should not dispatch to servers: " + query);
     assertEquals(response.get("numServersResponded").asInt(), 0, "Query should not dispatch to servers: " + query);
@@ -490,10 +540,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     Assert.assertEquals(queryResponse.get("numRowsResultSet").asInt(), 1);
   }
 
-  /**
-   * This test is added because SSE engine supports it and is used in production.
-   * Make sure that the difference in support is well-documented.
-   */
+  /// This test is added because SSE engine supports it and is used in production.
+  /// Make sure that the difference in support is well-documented.
   @Test
   void testDualWithNotExistsTableMSE()
       throws Exception {
@@ -1004,9 +1052,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     JsonNode results = resultTable.get("rows").get(0);
     assertEquals(results.get(0).asInt(), 1);
     long nowResult = results.get(1).asLong();
-    // Timestamp granularity is seconds
-    assertTrue(nowResult >= ((queryStartTimeMs / 1000) * 1000));
-    assertTrue(nowResult <= ((queryEndTimeMs / 1000) * 1000));
+    // now() returns millisecond-precision epoch millis, consistent with the single-stage engine (issue #18881)
+    assertTrue(nowResult >= queryStartTimeMs);
+    assertTrue(nowResult <= queryEndTimeMs);
     long oneHourAgoResult = results.get(2).asLong();
     assertTrue(oneHourAgoResult >= queryStartTimeMs - TimeUnit.HOURS.toMillis(1));
     assertTrue(oneHourAgoResult <= queryEndTimeMs - TimeUnit.HOURS.toMillis(1));
@@ -1018,8 +1066,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     String dateTimeResult = results.get(4).asText();
     assertTrue(dateTimeResult.equals(queryStartTimeDay) || dateTimeResult.equals(queryEndTimeDay));
     nowResult = results.get(5).asLong();
-    assertTrue(nowResult >= ((queryStartTimeMs / 1000) * 1000));
-    assertTrue(nowResult <= ((queryEndTimeMs / 1000) * 1000));
+    assertTrue(nowResult >= queryStartTimeMs);
+    assertTrue(nowResult <= queryEndTimeMs);
     oneHourAgoResult = results.get(6).asLong();
     assertTrue(oneHourAgoResult >= queryStartTimeMs - TimeUnit.HOURS.toMillis(1));
     assertTrue(oneHourAgoResult <= queryEndTimeMs - TimeUnit.HOURS.toMillis(1));
@@ -1132,10 +1180,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertFalse(jsonNode.get("exceptions").isEmpty());
   }
 
-  /**
-   * Helper method to verify the result of a query that is assumed to return a single column with the same value for
-   * all the rows. Only the first row value is checked.
-   */
+  /// Helper method to verify the result of a query that is assumed to return a single column with the same value for
+  /// all the rows. Only the first row value is checked.
   private void checkSingleColumnSameValueResult(JsonNode result, long expectedRows, String type,
       Object expectedValue) {
     assertEquals(result.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
@@ -1564,7 +1610,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     // default database check. Default database context passed as "database" http header
     checkQueryResultForDBTest("ActualElapsedTime", DEFAULT_TABLE_NAME,
-        Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
+        Map.of(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
   }
 
   @Test
@@ -1580,7 +1626,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     // default database check. Default database context passed as table prefix as well as http header
     checkQueryResultForDBTest("ActualElapsedTime", DEFAULT_DATABASE_NAME + "." + DEFAULT_TABLE_NAME,
-        Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
+        Map.of(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
   }
 
   @Test
@@ -1606,7 +1652,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
     // custom database check. Database context passed as "database" http header
     checkQueryResultForDBTest("ActualElapsedTime_2", DEFAULT_TABLE_NAME,
-        Collections.singletonMap(CommonConstants.DATABASE, DATABASE_NAME));
+        Map.of(CommonConstants.DATABASE, DATABASE_NAME));
   }
 
   @Test
@@ -1623,7 +1669,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
     // custom database check. Database context passed as table prefix as well as http header
     checkQueryResultForDBTest("ActualElapsedTime_2", TABLE_NAME_WITH_DATABASE,
-        Collections.singletonMap(CommonConstants.DATABASE, DATABASE_NAME));
+        Map.of(CommonConstants.DATABASE, DATABASE_NAME));
   }
 
   @Test
@@ -1638,7 +1684,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   public void testWithConflictingDatabaseContextFromTableNamePrefixAndHttpHeader()
       throws Exception {
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, null,
-        Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
+        Map.of(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
     checkQueryPlanningErrorForDBTest(result, QueryErrorCode.TABLE_DOES_NOT_EXIST);
   }
 
@@ -1646,7 +1692,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   public void testWithConflictingDatabaseContextFromHttpHeaderAndQueryOption()
       throws Exception {
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, DATABASE_NAME,
-        Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
+        Map.of(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
     checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_VALIDATION);
   }
 
@@ -1932,7 +1978,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     }
 
     Schema schema = JsonUtils.jsonNodeToObject(schemaNode, Schema.class);
-    List<Schema> schemas = Collections.singletonList(schema);
+    List<Schema> schemas = List.of(schema);
 
     MultiStageQueryValidationRequest request =
         new MultiStageQueryValidationRequest(null, tableConfigs, schemas, null, successfulQueries, false);
@@ -1974,7 +2020,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     }
 
     Schema schema = JsonUtils.jsonNodeToObject(schemaNode, Schema.class);
-    List<Schema> schemas = Collections.singletonList(schema);
+    List<Schema> schemas = List.of(schema);
 
     MultiStageQueryValidationRequest request =
         new MultiStageQueryValidationRequest(null, tableConfigs, schemas, null, mixedQueries, false);
@@ -2024,7 +2070,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     }
 
     Schema schema = JsonUtils.jsonNodeToObject(schemaNode, Schema.class);
-    List<Schema> schemas = Collections.singletonList(schema);
+    List<Schema> schemas = List.of(schema);
 
     MultiStageQueryValidationRequest request =
         new MultiStageQueryValidationRequest("SELECT nonExistentColumn FROM mytable",
@@ -2079,7 +2125,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         .addSingleValueDimension("event_id", FieldSpec.DataType.STRING)
         .addSingleValueDimension("dummy_realtime", FieldSpec.DataType.STRING)
         .addDateTime("mtime", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-        .setPrimaryKeyColumns(Collections.singletonList("event_id")).build();
+        .setPrimaryKeyColumns(List.of("event_id")).build();
 
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "fake");
@@ -2101,7 +2147,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     upsertConfig.setSnapshot(Enablement.ENABLE);
     upsertConfig.setPreload(Enablement.ENABLE);
     upsertConfig.setHashFunction(HashFunction.NONE);
-    upsertConfig.setComparisonColumns(Collections.singletonList("mtime"));
+    upsertConfig.setComparisonColumns(List.of("mtime"));
     upsertConfig.setDeleteRecordColumn("event_id");
     upsertConfig.setMetadataTTL(0);
     upsertConfig.setDeletedKeysTTL(0);
@@ -2115,7 +2161,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     upsertConfig.setUpsertViewRefreshIntervalMs(3000L);
 
     RoutingConfig routingConfig =
-        new RoutingConfig(null, Collections.singletonList(RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE),
+        new RoutingConfig(null, List.of(RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE),
             RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, true);
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("staticTableTest")
@@ -2143,8 +2189,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         .setIsDimTable(false)
         .build();
 
-    List<TableConfig> tableConfigs = Collections.singletonList(tableConfig);
-    List<Schema> schemas = Collections.singletonList(schema);
+    List<TableConfig> tableConfigs = List.of(tableConfig);
+    List<Schema> schemas = List.of(schema);
 
     String query = "SELECT nonExistentColumn FROM staticTableTest";
 
@@ -2194,7 +2240,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       tableConfigs.add(JsonUtils.jsonNodeToObject(realtimeConfig, TableConfig.class));
     }
     Schema schema = JsonUtils.jsonNodeToObject(schemaNode, Schema.class);
-    List<Schema> schemas = Collections.singletonList(schema);
+    List<Schema> schemas = List.of(schema);
 
     MultiStageQueryValidationRequest request =
         new MultiStageQueryValidationRequest("SELECT divairportseqids FROM mytable", tableConfigs, schemas, null, null,

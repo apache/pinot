@@ -55,14 +55,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Periodic task to run rebalancer in background to:
- * <ol>
- * <li> Relocate COMPLETED segments to tag overrides
- * <li> Relocate ONLINE segments to tiers if tier configs are set
- * </ol>
- * Allow at most one replica unavailable during rebalance. Not applicable for HLC tables.
- */
+/// Periodic task to run rebalancer in background to:
+/// - Relocate COMPLETED segments to tag overrides
+/// - Relocate ONLINE segments to tiers if tier configs are set
+///
+/// Allow at most one replica unavailable during rebalance.
 public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentRelocator.class);
 
@@ -261,11 +258,9 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     }
   }
 
-  /**
-   * Migrate segment tiers on their hosting servers locally. Once table is balanced, i.e. segments are on their ideal
-   * servers, we check if any segment needs to move to a new tier on its hosting servers, i.e. doing local tier
-   * migration for the segments.
-   */
+  /// Migrate segment tiers on their hosting servers locally. Once table is balanced, i.e. segments are on their ideal
+  /// servers, we check if any segment needs to move to a new tier on its hosting servers, i.e. doing local tier
+  /// migration for the segments.
   private void migrateToTargetTier(String tableNameWithType) {
     if (!_enableLocalTierMigration) {
       LOGGER.debug("Skipping migrating segments of table: {} to new tiers on hosting servers", tableNameWithType);

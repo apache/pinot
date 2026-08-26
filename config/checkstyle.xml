@@ -209,9 +209,18 @@
 
     <!-- JAVADOC COMMENTS -->
 
-    <!-- If you have a Javadoc comment, make sure it is properly formed -->
-    <module name="JavadocStyle">
-      <property name="checkFirstSentence" value="false"/>
+    <!-- Doc comments must use the /// markdown form (JEP 467), not /** */.
+         The pattern deliberately does not match:
+           - the ASF license header, identified by its text rather than its position, since a
+             handful of files place it below the package/import statements
+           - /*** ... ***/ decorative separators, which are not documentation
+           - /** appearing mid-line, e.g. inside a SQL string literal in a test -->
+    <module name="Regexp">
+      <property name="format"
+                value="(?m)^[ \t]*/\*\*(?!\*)(?![\s\S]{0,60}?Licensed to the Apache Software Foundation)"/>
+      <property name="illegalPattern" value="true"/>
+      <property name="message"
+                value="Use /// markdown doc comments (JEP 467) instead of /** */ Javadoc."/>
     </module>
 
     <!-- NAMING CONVENTIONS -->
@@ -356,5 +365,19 @@
   <module name="RegexpSingleline">
     <property name="format" value="StringUtils\.replace\("/>
     <property name="message" value="StringUtils.replace() is deprecated. Use Strings.CS.replace() instead."/>
+  </module>
+
+  <!-- Modern Java collection guards: use Java immutable collection factories for empty collection literals. -->
+  <module name="RegexpSingleline">
+    <property name="format" value="Collections(\.|::)emptyList\b"/>
+    <property name="message" value="java.util.Collections empty list factory is disallowed. Use List.of() instead."/>
+  </module>
+  <module name="RegexpSingleline">
+    <property name="format" value="Collections(\.|::)emptySet\b"/>
+    <property name="message" value="java.util.Collections empty set factory is disallowed. Use Set.of() instead."/>
+  </module>
+  <module name="RegexpSingleline">
+    <property name="format" value="Collections(\.|::)emptyMap\b"/>
+    <property name="message" value="java.util.Collections empty map factory is disallowed. Use Map.of() instead."/>
   </module>
 </module>

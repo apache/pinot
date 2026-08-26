@@ -23,7 +23,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
@@ -76,13 +76,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Segment writer to ingest streaming data from a start offset to an end offset.
- *
- * TODO:
- *   1. Clean up this class and only keep the necessary parts.
- *   2. Use a different segment impl for better performance because it doesn't need to serve queries.
- */
+/// Segment writer to ingest streaming data from a start offset to an end offset.
+///
+/// TODO:
+///   1. Clean up this class and only keep the necessary parts.
+///   2. Use a different segment impl for better performance because it doesn't need to serve queries.
 public class StatelessRealtimeSegmentWriter implements Closeable {
 
   private static final int DEFAULT_CAPACITY = 100_000;
@@ -237,12 +235,10 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     return localStreamDataDecoder.get();
   }
 
-  /**
-   * Creates a {@link StreamMessageDecoder} using properties in {@link StreamConfig}.
-   *
-   * @param fieldsToRead The fields to read from the source stream
-   * @return The initialized StreamMessageDecoder
-   */
+  /// Creates a [StreamMessageDecoder] using properties in [StreamConfig].
+  ///
+  /// @param fieldsToRead The fields to read from the source stream
+  /// @return The initialized StreamMessageDecoder
   private StreamMessageDecoder createMessageDecoder(Set<String> fieldsToRead) {
     String decoderClass = _streamConfig.getDecoderClass();
     try {
@@ -423,7 +419,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
           //  Fix this before opening support for partitioning in Kinesis
           int numPartitionGroups =
               _partitionMetadataProvider.computePartitionGroupMetadata(getClientId(), _streamConfig,
-                  Collections.emptyList(), /*maxWaitTimeMs=*/5000).size();
+                  List.of(), /*maxWaitTimeMs=*/5000).size();
 
           if (numPartitionGroups != numPartitions) {
             _logger.info(
@@ -448,9 +444,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     }
   }
 
-  /**
-   * Creates a new stream metadata provider
-   */
+  /// Creates a new stream metadata provider
   private void createPartitionMetadataProvider(String reason) {
     closePartitionMetadataProvider();
     _logger.info("Creating new partition metadata provider, reason: {}", reason);

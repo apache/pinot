@@ -45,11 +45,9 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-/**
- * Unit tests to verify that deduplication works correctly with TIMESTAMP data type as dedupTimeColumn.
- * TIMESTAMP is stored internally as LONG (epoch milliseconds) and should be supported for time-based
- * deduplication operations.
- */
+/// Unit tests to verify that deduplication works correctly with TIMESTAMP data type as dedupTimeColumn.
+/// TIMESTAMP is stored internally as LONG (epoch milliseconds) and should be supported for time-based
+/// deduplication operations.
 public class DedupWithTimestampColumnTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(),
       DedupWithTimestampColumnTest.class.getSimpleName());
@@ -77,10 +75,8 @@ public class DedupWithTimestampColumnTest {
     FileUtils.deleteQuietly(TEMP_DIR);
   }
 
-  /**
-   * Test that TIMESTAMP values (stored as LONG) work correctly for deduplication.
-   * This test verifies that records are deduplicated based on TIMESTAMP column values.
-   */
+  /// Test that TIMESTAMP values (stored as LONG) work correctly for deduplication.
+  /// This test verifies that records are deduplicated based on TIMESTAMP column values.
   @Test
   public void testDedupWithTimestampColumn()
       throws IOException {
@@ -113,10 +109,8 @@ public class DedupWithTimestampColumnTest {
     metadataManager.close();
   }
 
-  /**
-   * Test that TTL expiration works correctly with TIMESTAMP columns.
-   * Records with old TIMESTAMP values should be expired based on TTL.
-   */
+  /// Test that TTL expiration works correctly with TIMESTAMP columns.
+  /// Records with old TIMESTAMP values should be expired based on TTL.
   @Test
   public void testTimestampBasedTTLExpiration()
       throws IOException {
@@ -155,9 +149,7 @@ public class DedupWithTimestampColumnTest {
     metadataManager.close();
   }
 
-  /**
-   * Test that newer records with later TIMESTAMP values replace older records during deduplication.
-   */
+  /// Test that newer records with later TIMESTAMP values replace older records during deduplication.
   @Test
   public void testTimestampBasedRecordReplacement()
       throws IOException {
@@ -195,9 +187,7 @@ public class DedupWithTimestampColumnTest {
     metadataManager.close();
   }
 
-  /**
-   * Test that segment metadata correctly reports TIMESTAMP column max values.
-   */
+  /// Test that segment metadata correctly reports TIMESTAMP column max values.
   @Test
   public void testTimestampColumnMetadata() {
     _dedupContextBuilder.setHashFunction(HashFunction.NONE);
@@ -228,10 +218,8 @@ public class DedupWithTimestampColumnTest {
         currentTimeMillis);
   }
 
-  /**
-   * Helper method to generate a DedupRecordInfoReader with TIMESTAMP values.
-   * TIMESTAMP values are simulated as LONG epoch milliseconds.
-   */
+  /// Helper method to generate a DedupRecordInfoReader with TIMESTAMP values.
+  /// TIMESTAMP values are simulated as LONG epoch milliseconds.
   private static DedupUtils.DedupRecordInfoReader generateDedupRecordInfoReader(int numberOfDocs,
       int startPrimaryKeyValue) {
     org.apache.pinot.segment.local.segment.readers.PrimaryKeyReader primaryKeyReader =
@@ -251,9 +239,7 @@ public class DedupWithTimestampColumnTest {
     return new DedupUtils.DedupRecordInfoReader(primaryKeyReader, dedupTimeColumnReader);
   }
 
-  /**
-   * Helper method to verify the in-memory state of the dedup metadata manager.
-   */
+  /// Helper method to verify the in-memory state of the dedup metadata manager.
   private void verifyInMemoryState(ConcurrentMapPartitionDedupMetadataManager metadataManager, int startPrimaryKeyId,
       int recordCount, IndexSegment segment, HashFunction hashFunction) {
     for (int primaryKeyId = startPrimaryKeyId; primaryKeyId < startPrimaryKeyId + recordCount; primaryKeyId++) {

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.workload;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
@@ -33,6 +34,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -51,6 +53,7 @@ import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.reactor.IOReactorConfig;
 import org.apache.hc.core5.util.Timeout;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -69,11 +72,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Class responsible for HTTP communication with brokers and servers for workload propagation.
- * Handles request building, sending, retries, and endpoint discovery.
- * Encapsulates async HTTP client configuration and lifecycle management.
- */
+/// Class responsible for HTTP communication with brokers and servers for workload propagation.
+/// Handles request building, sending, retries, and endpoint discovery.
+/// Encapsulates async HTTP client configuration and lifecycle management.
 public class WorkloadPropagationClient implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadPropagationClient.class);
 
@@ -156,10 +157,8 @@ public class WorkloadPropagationClient implements AutoCloseable {
     return client;
   }
 
-  /**
-   * Sends workload refresh messages to instances via HTTP in parallel.
-   * Uses dedicated executor pool for callback processing and RateLimiter to control QPS.
-   */
+  /// Sends workload refresh messages to instances via HTTP in parallel.
+  /// Uses dedicated executor pool for callback processing and RateLimiter to control QPS.
   public void sendQueryWorkloadMessage(Map<String, QueryWorkloadRequest> instanceToRefreshRequestMap) {
     long startTime = System.currentTimeMillis();
     int totalInstances = instanceToRefreshRequestMap.size();
@@ -175,17 +174,26 @@ public class WorkloadPropagationClient implements AutoCloseable {
         _rateLimiter.acquire();
         _controllerMetrics.addMeteredGlobalValue(ControllerMeter.QUERY_WORKLOAD_MESSAGES_COUNT, 1);
         // Send async request with retry logic (callbacks processed on _httpCallbackExecutor)
-        SimpleHttpRequest httpRequest;
+        Supplier<SimpleHttpRequest> requestSupplier;
         if (queryWorkloadRequest.isRefresh()) {
           String requestBody = JsonUtils.objectToString(queryWorkloadRequest.getWorkloadToCostMap());
-          httpRequest = SimpleRequestBuilder.post(url).setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE)
-              .setBody(requestBody, ContentType.APPLICATION_JSON).build();
+          requestSupplier = () -> {
+            SimpleRequestBuilder requestBuilder =
+                SimpleRequestBuilder.post(url).setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE)
+                    .setBody(requestBody, ContentType.APPLICATION_JSON);
+            setServerAdminAuthHeaders(instance, requestBuilder);
+            return requestBuilder.build();
+          };
         } else {
           String deleteUrl = url + "?workloadNames=" + String.join(",",
               queryWorkloadRequest.getWorkloadToCostMap().keySet());
-          httpRequest = SimpleRequestBuilder.delete(deleteUrl).build();
+          requestSupplier = () -> {
+            SimpleRequestBuilder requestBuilder = SimpleRequestBuilder.delete(deleteUrl);
+            setServerAdminAuthHeaders(instance, requestBuilder);
+            return requestBuilder.build();
+          };
         }
-        CompletableFuture<Boolean> future = sendWorkloadRequestWithRetry(httpRequest, instance);
+        CompletableFuture<Boolean> future = sendWorkloadRequestWithRetry(requestSupplier, instance);
         futures.add(future);
       } catch (Exception e) {
         LOGGER.error("Error creating request for instance: {}", instance, e);
@@ -226,6 +234,13 @@ public class WorkloadPropagationClient implements AutoCloseable {
     }
   }
 
+  private void setServerAdminAuthHeaders(String instance, SimpleRequestBuilder requestBuilder) {
+    if (InstanceTypeUtils.isServer(instance)) {
+      AuthProviderUtils.makeAuthHeadersMap(_pinotHelixResourceManager.getServerAdminAuthProvider())
+          .forEach(requestBuilder::setHeader);
+    }
+  }
+
   private String getServerUrl(String instanceName) {
     if (_serverHttpSchemeAndPort == null) {
       _serverHttpSchemeAndPort = discoverHttpSchemesAndPort(NodeConfig.Type.SERVER_NODE)
@@ -244,11 +259,9 @@ public class WorkloadPropagationClient implements AutoCloseable {
         _brokerHttpSchemeAndPort.getRight());
   }
 
-  /**
-   * Discovers endpoint configurations (protocol scheme and port) for node types.
-   * @param targetType Specific node type to discover, or null to discover both broker and server
-   * @return Map of node type to endpoint config (scheme, port)
-   */
+  /// Discovers endpoint configurations (protocol scheme and port) for node types.
+  /// @param targetType Specific node type to discover, or null to discover both broker and server
+  /// @return Map of node type to endpoint config (scheme, port)
   private Map<NodeConfig.Type, Pair<String, Integer>> discoverHttpSchemesAndPort(
       @Nullable NodeConfig.Type targetType) {
     List<NodeConfig.Type> typesToDiscover = targetType == null
@@ -296,17 +309,25 @@ public class WorkloadPropagationClient implements AutoCloseable {
     return httpSchemesAndPort;
   }
 
-  /**
-   * Sends a workload refresh request with automatic retries and exponential backoff.
-   * Uses async HTTP client for non-blocking I/O with callbacks processed on dedicated executor.
-   */
-  private CompletableFuture<Boolean> sendWorkloadRequestWithRetry(SimpleHttpRequest request, String instanceId) {
-    return sendWorkloadRequestWithRetryInternal(request, instanceId, 0);
+  /// Sends a workload refresh request with automatic retries and exponential backoff.
+  /// Uses async HTTP client for non-blocking I/O with callbacks processed on dedicated executor.
+  @VisibleForTesting
+  CompletableFuture<Boolean> sendWorkloadRequestWithRetry(Supplier<SimpleHttpRequest> requestSupplier,
+      String instanceId) {
+    return sendWorkloadRequestWithRetryInternal(requestSupplier, instanceId, 0);
   }
 
-  private CompletableFuture<Boolean> sendWorkloadRequestWithRetryInternal(SimpleHttpRequest request,
+  private CompletableFuture<Boolean> sendWorkloadRequestWithRetryInternal(Supplier<SimpleHttpRequest> requestSupplier,
       String instanceId, int attemptNumber) {
-    return sendWorkloadRequestAsync(request, instanceId)
+    CompletableFuture<Boolean> requestFuture;
+    try {
+      requestFuture = sendWorkloadRequestAsync(requestSupplier.get(), instanceId);
+    } catch (RuntimeException e) {
+      LOGGER.warn("Failed to create workload request for instance {} on attempt {}", instanceId, attemptNumber + 1,
+          e);
+      requestFuture = CompletableFuture.completedFuture(false);
+    }
+    return requestFuture
         .thenComposeAsync(success -> {
           if (success || attemptNumber >= WORKLOAD_PROPAGATION_MAX_RETRIES - 1) {
             return CompletableFuture.completedFuture(success);
@@ -317,7 +338,7 @@ public class WorkloadPropagationClient implements AutoCloseable {
               instanceId, delayMs, attemptNumber + 1, WORKLOAD_PROPAGATION_MAX_RETRIES);
           CompletableFuture<Boolean> delayed = new CompletableFuture<>();
           CompletableFuture.delayedExecutor(delayMs, TimeUnit.MILLISECONDS, _httpCallbackExecutor)
-              .execute(() -> sendWorkloadRequestWithRetryInternal(request, instanceId, attemptNumber + 1)
+              .execute(() -> sendWorkloadRequestWithRetryInternal(requestSupplier, instanceId, attemptNumber + 1)
                   .whenComplete((result, error) -> {
                     if (error != null) {
                       delayed.completeExceptionally(error);
@@ -376,18 +397,14 @@ public class WorkloadPropagationClient implements AutoCloseable {
     }, _httpCallbackExecutor);
   }
 
-  /**
-   * Checks if the HTTP status code indicates a non-retriable error.
-   * Non-retriable errors: 400 (Bad Request), 403 (Forbidden), 404 (Not Found)
-   */
+  /// Checks if the HTTP status code indicates a non-retriable error.
+  /// Non-retriable errors: 400 (Bad Request), 403 (Forbidden), 404 (Not Found)
   private boolean isNonRetriableStatusCode(int statusCode) {
     return statusCode == HttpStatus.SC_BAD_REQUEST
         || statusCode == HttpStatus.SC_FORBIDDEN || statusCode == HttpStatus.SC_NOT_FOUND;
   }
 
-  /**
-   * Sends an HTTP request asynchronously using non-blocking I/O.
-   */
+  /// Sends an HTTP request asynchronously using non-blocking I/O.
   private CompletableFuture<SimpleHttpResponse> sendHttpRequestAsync(SimpleHttpRequest request) {
     CompletableFuture<SimpleHttpResponse> future = new CompletableFuture<>();
 
@@ -436,9 +453,7 @@ public class WorkloadPropagationClient implements AutoCloseable {
     }
   }
 
-  /**
-   * HTTP client configuration for workload propagation.
-   */
+  /// HTTP client configuration for workload propagation.
   private static class AsyncHttpClientConfig {
     private static final String MAX_CONNS_CONFIG_NAME = "workload.async.http.client.maxConnTotal";
     private static final String MAX_CONNS_PER_ROUTE_CONFIG_NAME = "workload.async.http.client.maxConnPerRoute";

@@ -38,12 +38,10 @@ import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
-/**
- * This operator processes a collection of filtered (and potentially non filtered) aggregations.
- *
- * For a query with either all aggregations being filtered or a mix of filtered and non filtered aggregations,
- * FilteredAggregationOperator will come into execution.
- */
+/// This operator processes a collection of filtered (and potentially non filtered) aggregations.
+///
+/// For a query with either all aggregations being filtered or a mix of filtered and non filtered aggregations,
+/// FilteredAggregationOperator will come into execution.
 @SuppressWarnings("rawtypes")
 public class FilteredAggregationOperator extends BaseOperator<AggregationResultsBlock> {
   private static final String EXPLAIN_NAME = "AGGREGATE_FILTERED";

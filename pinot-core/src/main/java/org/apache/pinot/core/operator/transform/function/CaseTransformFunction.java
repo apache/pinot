@@ -39,25 +39,23 @@ import org.apache.pinot.spi.utils.TimestampUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The <code>CaseTransformFunction</code> class implements the CASE-WHEN-THEN-ELSE transformation.
- * <p>
- * The SQL Syntax is: CASE WHEN condition1 THEN result1 WHEN condition2 THEN result2 WHEN conditionN THEN resultN ELSE
- * result END;
- * <p>
- * Usage: case(${WHEN_STATEMENT_1}, ${THEN_EXPRESSION_1}, ..., ${WHEN_STATEMENT_N}, ${THEN_EXPRESSION_N}, ...,
- * ${ELSE_EXPRESSION})
- * <p>
- * There are 2 * N + 1 arguments:
- * <code>WHEN_STATEMENT_$i</code> is a <code>BinaryOperatorTransformFunction</code> represents <code>condition$i</code>
- * <code>THEN_EXPRESSION_$i</code> is a <code>TransformFunction</code> represents <code>result$i</code>
- * <code>ELSE_EXPRESSION</code> is a <code>TransformFunction</code> represents <code>result</code>
- * <p>
- * ELSE_EXPRESSION can be omitted. When none of when statements is evaluated to be true, and there is no else
- * expression, we output null. Note that when statement is considered as false if it is evaluated to be null.
- * <p>
- * PostgreSQL documentation: <a href="https://www.postgresql.org/docs/current/typeconv-union-case.html">CASE</a>
- */
+/// The `CaseTransformFunction` class implements the CASE-WHEN-THEN-ELSE transformation.
+///
+/// The SQL Syntax is: CASE WHEN condition1 THEN result1 WHEN condition2 THEN result2 WHEN conditionN THEN resultN ELSE
+/// result END;
+///
+/// Usage: case(${WHEN_STATEMENT_1}, ${THEN_EXPRESSION_1}, ..., ${WHEN_STATEMENT_N}, ${THEN_EXPRESSION_N}, ...,
+/// ${ELSE_EXPRESSION})
+///
+/// There are 2 \* N + 1 arguments:
+/// `WHEN_STATEMENT_$i` is a `BinaryOperatorTransformFunction` represents `condition$i`
+/// `THEN_EXPRESSION_$i` is a `TransformFunction` represents `result$i`
+/// `ELSE_EXPRESSION` is a `TransformFunction` represents `result`
+///
+/// ELSE_EXPRESSION can be omitted. When none of when statements is evaluated to be true, and there is no else
+/// expression, we output null. Note that when statement is considered as false if it is evaluated to be null.
+///
+/// PostgreSQL documentation: [CASE](https://www.postgresql.org/docs/current/typeconv-union-case.html)
 public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEnabledTransformFunction {
   public static final String FUNCTION_NAME = "case";
 
@@ -209,10 +207,12 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
       case JSON:
         break;
       case BYTES:
+      case UUID:
         try {
-          BytesUtils.toBytes(literal);
+          byte[] bytes = BytesUtils.toBytes(literal);
+          Preconditions.checkArgument(dataType != DataType.UUID || bytes.length == dataType.size());
         } catch (Exception e) {
-          throw new IllegalArgumentException("Invalid literal: " + literal + " for BYTES");
+          throw new IllegalArgumentException("Invalid literal: " + literal + " for " + dataType);
         }
         break;
       default:
@@ -225,10 +225,8 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     return _resultMetadata;
   }
 
-  /**
-   * Evaluate the ValueBlock for the WHEN statements, returns an array with the index(1 to N) of matched WHEN clause -1
-   * means there is no match.
-   */
+  /// Evaluate the ValueBlock for the WHEN statements, returns an array with the index(1 to N) of matched WHEN clause -1
+  /// means there is no match.
   private int[] getSelectedArray(ValueBlock valueBlock, boolean nullHandlingEnabled) {
     int numDocs = valueBlock.getNumDocs();
     if (_selectedResults == null || _selectedResults.length < numDocs) {
@@ -831,15 +829,16 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     final RoaringBitmap bitmap = new RoaringBitmap();
     int[] selected = getSelectedArray(valueBlock, true);
     int numDocs = valueBlock.getNumDocs();
-    initStringValuesSV(numDocs);
+    initBytesValuesSV(numDocs);
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
     Map<Integer, Pair<byte[][], RoaringBitmap>> thenStatementsIndexToValues = new HashMap<>();
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, ImmutablePair.of(_thenStatements.get(i).transformToBytesValuesSV(valueBlock),
-            _thenStatements.get(i).getNullBitmap(valueBlock)));
+        thenStatementsIndexToValues.put(i,
+            ImmutablePair.of(_thenStatements.get(i).transformToBytesValuesSV(valueBlock),
+                _thenStatements.get(i).getNullBitmap(valueBlock)));
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
@@ -875,6 +874,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     }
     return _bytesValuesSV;
   }
+
 
   @Override
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {

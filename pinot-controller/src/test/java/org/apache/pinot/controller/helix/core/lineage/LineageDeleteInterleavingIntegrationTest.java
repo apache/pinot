@@ -21,7 +21,6 @@ package org.apache.pinot.controller.helix.core.lineage;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.lineage.LineageEntry;
@@ -56,23 +55,20 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/**
- * Integration tests for the lineage-aware segment delete check at the REST layer and across an interleaved
- * start/end/revert lifecycle.
- *
- * <p>This test:
- * <ul>
- *   <li>Drives every step through the REST endpoints.</li>
- *   <li>Walks a single table through all three lineage states with a delete attempt at every step.</li>
- *   <li>Re-reads the lineage znode after every API call (success or failure) to verify failed requests never
- *       mutate the entry.</li>
- *   <li>Verifies the retention path silently skips lineage-locked segments and that the lineage-cleanup pass
- *       uses the bypass delete path.</li>
- * </ul>
- *
- * <p>Each test uses unique segment names so the asynchronous {@code SegmentDeletionManager} cleanup cannot
- * interfere with later tests.
- */
+/// Integration tests for the lineage-aware segment delete check at the REST layer and across an interleaved
+/// start/end/revert lifecycle.
+///
+/// This test:
+///
+/// - Drives every step through the REST endpoints.
+/// - Walks a single table through all three lineage states with a delete attempt at every step.
+/// - Re-reads the lineage znode after every API call (success or failure) to verify failed requests never
+///      mutate the entry.
+/// - Verifies the retention path silently skips lineage-locked segments and that the lineage-cleanup pass
+///      uses the bypass delete path.
+///
+/// Each test uses unique segment names so the asynchronous `SegmentDeletionManager` cleanup cannot
+/// interfere with later tests.
 public class LineageDeleteInterleavingIntegrationTest {
   private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
   private static final String RAW_TABLE_NAME = "lineageInterleavingTable";
@@ -118,10 +114,8 @@ public class LineageDeleteInterleavingIntegrationTest {
         controllerConf, mock(ControllerMetrics.class), brokerServiceHelper);
   }
 
-  /**
-   * Subclass that exposes the package-protected {@link RetentionManager#processTable(String)} so this test
-   * (in a different package) can drive a single retention pass against a single table.
-   */
+  /// Subclass that exposes the package-protected [RetentionManager#processTable(String)] so this test
+  /// (in a different package) can drive a single retention pass against a single table.
   private static final class TestableRetentionManager extends RetentionManager {
     TestableRetentionManager(PinotHelixResourceManager pinotHelixResourceManager,
         LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
@@ -160,55 +154,55 @@ public class LineageDeleteInterleavingIntegrationTest {
     addSegments(OFFLINE_TABLE_NAME, s1, s2, s3);
 
     // Step 1: startReplaceSegments → IN_PROGRESS
-    String entryId = postStartReplaceSegments(OFFLINE_TABLE_NAME, Collections.singletonList(s1),
-        Collections.singletonList(s1New));
-    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, Collections.singletonList(s1),
-        Collections.singletonList(s1New));
+    String entryId = postStartReplaceSegments(OFFLINE_TABLE_NAME, List.of(s1),
+        List.of(s1New));
+    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, List.of(s1),
+        List.of(s1New));
 
     // Step 2: delete s1 (segmentsFrom of IN_PROGRESS) → 500, IdealState + lineage untouched
     IOException ex500 = expectThrows(IOException.class, () -> sendDeleteSegment(OFFLINE_TABLE_NAME, s1));
     assertStatus(ex500, 500);
     assertTrue(getSegments(OFFLINE_TABLE_NAME).contains(s1));
-    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, Collections.singletonList(s1),
-        Collections.singletonList(s1New));
+    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, List.of(s1),
+        List.of(s1New));
 
     // Step 3: upload s1New + delete s1New (segmentsTo of IN_PROGRESS) → 500.
     // the lineage check still rejects without touching the lineage znode.
     addSegments(OFFLINE_TABLE_NAME, s1New);
     ex500 = expectThrows(IOException.class, () -> sendDeleteSegment(OFFLINE_TABLE_NAME, s1New));
     assertStatus(ex500, 500);
-    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, Collections.singletonList(s1),
-        Collections.singletonList(s1New));
+    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, List.of(s1),
+        List.of(s1New));
 
     // Step 4: endReplaceSegments → COMPLETED
     postEndReplaceSegments(OFFLINE_TABLE_NAME, entryId);
-    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.COMPLETED, Collections.singletonList(s1),
-        Collections.singletonList(s1New));
+    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.COMPLETED, List.of(s1),
+        List.of(s1New));
 
     // Step 5: delete s1 (segmentsFrom of COMPLETED) → still 500
     ex500 = expectThrows(IOException.class, () -> sendDeleteSegment(OFFLINE_TABLE_NAME, s1));
     assertStatus(ex500, 500);
     assertTrue(getSegments(OFFLINE_TABLE_NAME).contains(s1));
-    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.COMPLETED, Collections.singletonList(s1),
-        Collections.singletonList(s1New));
+    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.COMPLETED, List.of(s1),
+        List.of(s1New));
 
     // Step 6: delete s1New (segmentsTo of COMPLETED) → 200 (segmentsTo is NOT locked once the entry is COMPLETED).
     // The lineage entry itself must NOT mutate as a side effect of the delete.
     sendDeleteSegment(OFFLINE_TABLE_NAME, s1New);
     assertFalse(getSegments(OFFLINE_TABLE_NAME).contains(s1New));
-    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.COMPLETED, Collections.singletonList(s1),
-        Collections.singletonList(s1New));
+    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.COMPLETED, List.of(s1),
+        List.of(s1New));
 
     // Step 7: revertReplaceSegments (with forceRevert so it can revert a COMPLETED entry safely) → REVERTED
     postRevertReplaceSegments(OFFLINE_TABLE_NAME, entryId, true);
-    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.REVERTED, Collections.singletonList(s1),
-        Collections.singletonList(s1New));
+    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.REVERTED, List.of(s1),
+        List.of(s1New));
 
     // Step 8: delete s1 (REVERTED locks nothing) → 200
     sendDeleteSegment(OFFLINE_TABLE_NAME, s1);
     assertFalse(getSegments(OFFLINE_TABLE_NAME).contains(s1));
-    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.REVERTED, Collections.singletonList(s1),
-        Collections.singletonList(s1New));
+    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.REVERTED, List.of(s1),
+        List.of(s1New));
 
     // Final: IdealState contains exactly s2, s3; lineage has exactly one entry in REVERTED state
     List<String> finalSegments = getSegments(OFFLINE_TABLE_NAME);
@@ -231,8 +225,8 @@ public class LineageDeleteInterleavingIntegrationTest {
     String sFree = "t2_sFree";
 
     addSegments(OFFLINE_TABLE_NAME, s1, sFree);
-    String entryId = postStartReplaceSegments(OFFLINE_TABLE_NAME, Collections.singletonList(s1),
-        Collections.singletonList(s1New));
+    String entryId = postStartReplaceSegments(OFFLINE_TABLE_NAME, List.of(s1),
+        List.of(s1New));
 
     // Batch delete via DELETE /segments/{tableName}?type=OFFLINE&segments=s1&segments=sFree → 500
     String url = _controllerBaseUrl + "/segments/" + RAW_TABLE_NAME + "?type=OFFLINE&segments=" + s1
@@ -251,8 +245,8 @@ public class LineageDeleteInterleavingIntegrationTest {
     assertTrue(segments.contains(sFree));
 
     // Lineage entry is untouched
-    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, Collections.singletonList(s1),
-        Collections.singletonList(s1New));
+    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, List.of(s1),
+        List.of(s1New));
   }
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -265,41 +259,41 @@ public class LineageDeleteInterleavingIntegrationTest {
     String s2 = "t4_s2";
     addSegments(OFFLINE_TABLE_NAME, s1);
 
-    String entryId = postStartReplaceSegments(OFFLINE_TABLE_NAME, Collections.singletonList(s1),
-        Collections.singletonList(s2));
-    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, Collections.singletonList(s1),
-        Collections.singletonList(s2));
+    String entryId = postStartReplaceSegments(OFFLINE_TABLE_NAME, List.of(s1),
+        List.of(s2));
+    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, List.of(s1),
+        List.of(s2));
 
     // Simulate the lost-race outcome via the bypass overload (the only path that can produce this state — the
     // public REST DELETE would be rejected by the new check).
-    _resourceManager.deleteSegmentsForLineageCleanup(OFFLINE_TABLE_NAME, Collections.singletonList(s1));
+    _resourceManager.deleteSegmentsForLineageCleanup(OFFLINE_TABLE_NAME, List.of(s1));
     assertFalse(getSegments(OFFLINE_TABLE_NAME).contains(s1));
     // Lineage entry must NOT mutate as a side effect of the bypass delete.
-    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, Collections.singletonList(s1),
-        Collections.singletonList(s2));
+    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, List.of(s1),
+        List.of(s2));
 
     // Upload s2; lineage still unchanged
     addSegments(OFFLINE_TABLE_NAME, s2);
-    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, Collections.singletonList(s1),
-        Collections.singletonList(s2));
+    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, List.of(s1),
+        List.of(s2));
 
     // endReplaceSegments must fail because s1 (segmentsFrom) is gone.
     IOException endEx = expectThrows(IOException.class, () -> postEndReplaceSegments(OFFLINE_TABLE_NAME, entryId));
     assertNon2xx(endEx);
-    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, Collections.singletonList(s1),
-        Collections.singletonList(s2));
+    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, List.of(s1),
+        List.of(s2));
 
     // Operator recovery via revertReplaceSegments(forceRevert=true) → REVERTED
     postRevertReplaceSegments(OFFLINE_TABLE_NAME, entryId, true);
-    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.REVERTED, Collections.singletonList(s1),
-        Collections.singletonList(s2));
+    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.REVERTED, List.of(s1),
+        List.of(s2));
 
     // s2 is now unblocked — delete via the public path
     sendDeleteSegment(OFFLINE_TABLE_NAME, s2);
     assertFalse(getSegments(OFFLINE_TABLE_NAME).contains(s2));
     // Delete must not touch the lineage entry
-    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.REVERTED, Collections.singletonList(s1),
-        Collections.singletonList(s2));
+    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.REVERTED, List.of(s1),
+        List.of(s2));
   }
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -313,9 +307,9 @@ public class LineageDeleteInterleavingIntegrationTest {
     String s2 = "t4b_s2";
     addSegments(OFFLINE_TABLE_NAME, s1);
 
-    String entryId = postStartReplaceSegments(OFFLINE_TABLE_NAME, Collections.singletonList(s1),
-        Collections.singletonList(s2));
-    _resourceManager.deleteSegmentsForLineageCleanup(OFFLINE_TABLE_NAME, Collections.singletonList(s1));
+    String entryId = postStartReplaceSegments(OFFLINE_TABLE_NAME, List.of(s1),
+        List.of(s2));
+    _resourceManager.deleteSegmentsForLineageCleanup(OFFLINE_TABLE_NAME, List.of(s1));
     addSegments(OFFLINE_TABLE_NAME, s2);
 
     // Attempting revertReplaceSegments without forceRevert against an IN_PROGRESS entry should fail.
@@ -323,13 +317,13 @@ public class LineageDeleteInterleavingIntegrationTest {
         false));
     assertNon2xx(ex);
     // Failed revert must not mutate the znode.
-    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, Collections.singletonList(s1),
-        Collections.singletonList(s2));
+    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, List.of(s1),
+        List.of(s2));
 
     // Retry with forceRevert=true → 200
     postRevertReplaceSegments(OFFLINE_TABLE_NAME, entryId, true);
-    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.REVERTED, Collections.singletonList(s1),
-        Collections.singletonList(s2));
+    assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.REVERTED, List.of(s1),
+        List.of(s2));
   }
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -355,7 +349,7 @@ public class LineageDeleteInterleavingIntegrationTest {
 
     // Lock sExpired in an IN_PROGRESS lineage entry → segmentsFrom is lineage-locked
     String entryId = _resourceManager.startReplaceSegments(RETENTION_OFFLINE_TABLE_NAME,
-        Collections.singletonList(sExpired), Collections.singletonList(sNew), false, null);
+        List.of(sExpired), List.of(sNew), false, null);
     assertNotNull(entryId);
 
     // Run retention. Time-based purge picks up both expired segments, but removeLineageLockedSegments strips
@@ -370,13 +364,13 @@ public class LineageDeleteInterleavingIntegrationTest {
         "Retention must still delete the non-lineage-locked expired segment in the same pass");
     assertTrue(segmentsAfterFirstPass.contains(sKept));
     assertLineageEntry(RETENTION_OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS,
-        Collections.singletonList(sExpired), Collections.singletonList(sNew));
+        List.of(sExpired), List.of(sNew));
 
     // Complete the replacement. sNew has a fresh end-time so it is not retention-eligible.
     addSegmentWithTime(RETENTION_OFFLINE_TABLE_NAME, sNew, nowMs - TimeUnit.HOURS.toMillis(1L), nowMs);
     _resourceManager.endReplaceSegments(RETENTION_OFFLINE_TABLE_NAME, entryId, null);
     assertLineageEntry(RETENTION_OFFLINE_TABLE_NAME, entryId, LineageEntryState.COMPLETED,
-        Collections.singletonList(sExpired), Collections.singletonList(sNew));
+        List.of(sExpired), List.of(sNew));
     // endReplaceSegments does NOT proactively clean up segmentsFrom; that's the retention path's responsibility.
     assertTrue(getSegments(RETENTION_OFFLINE_TABLE_NAME).contains(sExpired));
 
@@ -403,8 +397,8 @@ public class LineageDeleteInterleavingIntegrationTest {
     String s1 = "t6_s1";
     String s1New = "t6_s1_new";
     addSegments(OFFLINE_TABLE_NAME, s1);
-    String entryId = postStartReplaceSegments(OFFLINE_TABLE_NAME, Collections.singletonList(s1),
-        Collections.singletonList(s1New));
+    String entryId = postStartReplaceSegments(OFFLINE_TABLE_NAME, List.of(s1),
+        List.of(s1New));
 
     // PinotHelixResourceManager.isLineageExclusiveDeleteEnabled() reads from the live ControllerConf on every
     // delete (no caching), so toggling the property here flips the behavior for the next REST call. Reset in a
@@ -416,8 +410,8 @@ public class LineageDeleteInterleavingIntegrationTest {
       assertFalse(getSegments(OFFLINE_TABLE_NAME).contains(s1),
           "Segment must be removed from IdealState when lineage-exclusive-delete is disabled");
       // The lineage entry must not be mutated as a side effect of the delete.
-      assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, Collections.singletonList(s1),
-          Collections.singletonList(s1New));
+      assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, List.of(s1),
+          List.of(s1New));
     } finally {
       conf.setProperty(ControllerConf.LINEAGE_EXCLUSIVE_DELETE_ENABLED, true);
     }

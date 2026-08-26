@@ -343,7 +343,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     return new ResultTable(resultTable.getDataSchema(), newRows);
   }
 
-  /** Checks the correctness of EXPLAIN PLAN output. */
+  /// Checks the correctness of EXPLAIN PLAN output.
   private void check(String query, ResultTable expected) {
     check(query, expected, false);
   }
@@ -688,7 +688,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     check(query2, new ResultTable(DATA_SCHEMA, result2));
   }
 
-  /** Test case for SQL statements with filter that doesn't involve index access. */
+  /// Test case for SQL statements with filter that doesn't involve index access.
   @Test
   public void testSelectColumnsUsingFilter() {
     // MatchAllFilterOperator is returned for all segments because the predicate `sortedIndexCol1 != 5` is true for all
@@ -809,7 +809,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     check(query6, new ResultTable(DATA_SCHEMA, result6));
   }
 
-  /** Test case for SQL statements with filter that doesn't involve index access. */
+  /// Test case for SQL statements with filter that doesn't involve index access.
   @Test
   public void testSelectColumnsUsingFilterVerbose() {
     // MatchAllFilterOperator is returned for all segments because the predicate `sortedIndexCol1 != 5` is true for all
@@ -945,7 +945,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     check(query6, new ResultTable(DATA_SCHEMA, result6));
   }
 
-  /** Test case for SQL statements with filter that involves inverted or sorted index access. */
+  /// Test case for SQL statements with filter that involves inverted or sorted index access.
   @Test
   public void testSelectColumnsUsingFilterOnInvertedIndexColumn() {
     // Segments 1, 2, 4 result in both the AND predicates getting evaluated as all three have some rows that match.
@@ -1030,7 +1030,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     check(query3, new ResultTable(DATA_SCHEMA, result3));
   }
 
-  /** Test case for SQL statements with filter that involves inverted or sorted index access. */
+  /// Test case for SQL statements with filter that involves inverted or sorted index access.
   @Test
   public void testSelectColumnsUsingFilterOnInvertedIndexColumnVerbose() {
     // Segments 1, 2, 4 result in both the AND predicates getting evaluated as all three have some rows that match.
@@ -1143,7 +1143,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     check(query3, new ResultTable(DATA_SCHEMA, result3));
   }
 
-  /** Test case for SQL statements with filter that involves range index access. */
+  /// Test case for SQL statements with filter that involves range index access.
   @Test
   public void testSelectColumnUsingFilterOnRangeIndexColumn() {
     // select * query triggering range index
@@ -1175,7 +1175,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     check(query1, new ResultTable(DATA_SCHEMA, result1));
   }
 
-  /** Test case for SQL statements with filter that involves range index access. */
+  /// Test case for SQL statements with filter that involves range index access.
   @Test
   public void testSelectColumnUsingFilterOnRangeIndexColumnVerbose() {
     // select * query triggering range index
@@ -1811,7 +1811,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     });
     result3.add(
         new Object[]{"AGGREGATE(aggregations:count(*), max(noIndexCol1), sum(noIndexCol2), avg(noIndexCol2))", 3, 2});
-    result3.add(new Object[]{"PROJECT(noIndexCol2, noIndexCol1)", 4, 3});
+    result3.add(new Object[]{"PROJECT(noIndexCol2)", 4, 3});
     result3.add(new Object[]{"DOC_ID_SET", 5, 4});
     result3.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
     check(query3, new ResultTable(DATA_SCHEMA, result3));
@@ -1924,7 +1924,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     });
     result3.add(
         new Object[]{"AGGREGATE(aggregations:count(*), max(noIndexCol1), sum(noIndexCol2), avg(noIndexCol2))", 3, 2});
-    result3.add(new Object[]{"PROJECT(noIndexCol2, noIndexCol1)", 4, 3});
+    result3.add(new Object[]{"PROJECT(noIndexCol2)", 4, 3});
     result3.add(new Object[]{"DOC_ID_SET", 5, 4});
     result3.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
     check(query3, new ResultTable(DATA_SCHEMA, result3));

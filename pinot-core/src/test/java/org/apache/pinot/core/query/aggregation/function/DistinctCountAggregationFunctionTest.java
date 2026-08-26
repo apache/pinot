@@ -20,7 +20,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import org.apache.pinot.queries.FluentQueryTest;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
@@ -31,51 +31,33 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
   public void distinctCountWithNulls() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(false)
-        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            "myField",
-            "1",
-            "2"
-        )
-        .andOnSecondInstance(
-            "myField",
-            "2",
-            "null"
-        )
+        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance("myField", "1", "2")
+        .andOnSecondInstance("myField", "2", "null")
         .whenQuery("select DISTINCT_COUNT(myField) from testTable")
-        .thenResultIs("INTEGER",
-            "3"
-        ).whenQueryWithNullHandlingEnabled("select DISTINCT_COUNT(myField) from testTable")
-        .thenResultIs("INTEGER",
-            "2"
-        );
+        .thenResultIs("INT", "3")
+        .whenQueryWithNullHandlingEnabled("select DISTINCT_COUNT(myField) from testTable")
+        .thenResultIs("INT", "2");
   }
 
   @Test
   public void distinctCountWithGroupBy() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(false)
-        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            "myField",
-            "1",
-            "2",
-            "null"
-        )
-        .andOnSecondInstance(
-            "myField",
-            "2",
-            "null"
-        )
+        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance("myField", "1", "2", "null")
+        .andOnSecondInstance("myField", "2", "null")
         .whenQuery("select myField, DISTINCT_COUNT(myField) from testTable group by myField order by myField")
-        .thenResultIs("INTEGER | INTEGER",
+        .thenResultIs(
+            "INT | INT",
             "-2147483648 | 1",
             "1           | 1",
             "2           | 1"
         )
         .whenQueryWithNullHandlingEnabled(
             "select myField, DISTINCT_COUNT(myField) from testTable  group by myField order by myField")
-        .thenResultIs("INTEGER | INTEGER",
+        .thenResultIs(
+            "INT | INT",
             "1    | 1",
             "2    | 1",
             "null | 0"
@@ -84,25 +66,18 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
 
   @Test
   public void distinctCountGroupByMV() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("tags", DataType.STRING)
+        .addMetricField("value", DataType.INT)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
-                .addMetricField("value", FieldSpec.DataType.INT)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"tag1;tag2", 1},
-            new Object[]{"tag2;tag3", null}
-        )
-        .andOnSecondInstance(
-            new Object[]{"tag1;tag2", 1},
-            new Object[]{"tag2;tag3", null}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"tag1;tag2", 1}, new Object[]{"tag2;tag3", null})
+        .andOnSecondInstance(new Object[]{"tag1;tag2", 1}, new Object[]{"tag2;tag3", null})
         .whenQuery("select tags, DISTINCT_COUNT(value) from testTable group by tags order by tags")
         .thenResultIs(
-            "STRING | INTEGER",
+            "STRING | INT",
             "tag1    | 1",
             "tag2    | 2",
             "tag3    | 1"
@@ -110,7 +85,7 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
         .whenQueryWithNullHandlingEnabled(
             "select tags, DISTINCT_COUNT(value) from testTable group by tags order by tags")
         .thenResultIs(
-            "STRING | INTEGER",
+            "STRING | INT",
             "tag1    | 1",
             "tag2    | 1",
             "tag3    | 0"
@@ -119,110 +94,75 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
 
   @Test
   public void distinctCountMV() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"1;2;3;4"},
-            new Object[]{"3;4;5;6"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"6;7;8;9"},
-            new Object[]{"9;10;11;12"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"1;2;3;4"}, new Object[]{"3;4;5;6"})
+        .andOnSecondInstance(new Object[]{"6;7;8;9"}, new Object[]{"9;10;11;12"})
         .whenQuery("select DISTINCT_COUNT(mv) from testTable")
-        .thenResultIs("INTEGER", "12");
+        .thenResultIs("INT", "12");
   }
 
   @Test
   public void distinctCountMVWithNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"null"},
-            new Object[]{"1;2"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"null"},
-            new Object[]{"1;2"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"null"}, new Object[]{"1;2"})
+        .andOnSecondInstance(new Object[]{"null"}, new Object[]{"1;2"})
         .whenQuery("select DISTINCT_COUNT(mv) from testTable")
-        .thenResultIs("INTEGER", "3")
+        .thenResultIs("INT", "3")
         .whenQueryWithNullHandlingEnabled("select DISTINCT_COUNT(mv) from testTable")
-        .thenResultIs("INTEGER", "2");
+        .thenResultIs("INT", "2");
   }
 
   @Test
   public void distinctCountMVGroupBySVWithNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .addSingleValueDimension("sv", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
-                .addSingleValueDimension("sv", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"null", "k1"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"null", "k1"},
-            new Object[]{"1;2", "k1"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"null", "k1"})
+        .andOnSecondInstance(new Object[]{"null", "k1"}, new Object[]{"1;2", "k1"})
         .whenQuery("select DISTINCT_COUNT(mv) from testTable group by sv")
-        .thenResultIs("INTEGER", "3")
+        .thenResultIs("INT", "3")
         .whenQueryWithNullHandlingEnabled("select DISTINCT_COUNT(mv) from testTable group by sv")
-        .thenResultIs("INTEGER", "2");
+        .thenResultIs("INT", "2");
   }
 
   @Test
   public void distinctCountBigDecimal() {
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(FieldSpec.DataType.BIG_DECIMAL),
-            SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            "myField",
-            "1.5",
-            "2.5"
-        )
-        .andOnSecondInstance(
-            "myField",
-            "2.5",
-            "3.5"
-        )
+        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(DataType.BIG_DECIMAL), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance("myField", "1.5", "2.5")
+        .andOnSecondInstance("myField", "2.5", "3.5")
         .whenQuery("select DISTINCT_COUNT(myField) from testTable")
-        .thenResultIs("INTEGER", "3");
+        .thenResultIs("INT", "3");
   }
 
   @Test
   public void distinctCountBigDecimalGroupBy() {
     // Schema column order is alphabetical via TreeSet, so row values must be in {grp, value} order.
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("value", DataType.BIG_DECIMAL)
+        .addSingleValueDimension("grp", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .addSingleValueDimension("value", FieldSpec.DataType.BIG_DECIMAL)
-                .addSingleValueDimension("grp", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"a", "1.5"},
-            new Object[]{"a", "2.5"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"a", "2.5"},
-            new Object[]{"b", "3.5"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"a", "1.5"}, new Object[]{"a", "2.5"})
+        .andOnSecondInstance(new Object[]{"a", "2.5"}, new Object[]{"b", "3.5"})
         .whenQuery("select grp, DISTINCT_COUNT(value) from testTable group by grp order by grp")
-        .thenResultIs("STRING | INTEGER",
+        .thenResultIs(
+            "STRING | INT",
             "a | 2",
             "b | 1"
         );
@@ -230,42 +170,31 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
 
   @Test
   public void distinctCountBigDecimalMV() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addMultiValueDimension("mv", DataType.BIG_DECIMAL)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .addMultiValueDimension("mv", FieldSpec.DataType.BIG_DECIMAL)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"1.5;2.5"},
-            new Object[]{"2.5;3.5"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"3.5;4.5"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"1.5;2.5"}, new Object[]{"2.5;3.5"})
+        .andOnSecondInstance(new Object[]{"3.5;4.5"})
         .whenQuery("select DISTINCT_COUNT(mv) from testTable")
-        .thenResultIs("INTEGER", "4");
+        .thenResultIs("INT", "4");
   }
 
   @Test
   public void distinctCountBigDecimalMVGroupBySV() {
     // Schema column order is alphabetical via TreeSet, so row values must be in {grp, mv} order.
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addMultiValueDimension("mv", DataType.BIG_DECIMAL)
+        .addSingleValueDimension("grp", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .addMultiValueDimension("mv", FieldSpec.DataType.BIG_DECIMAL)
-                .addSingleValueDimension("grp", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"a", "1.5;2.5"},
-            new Object[]{"a", "2.5;3.5"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"b", "3.5;4.5"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"a", "1.5;2.5"}, new Object[]{"a", "2.5;3.5"})
+        .andOnSecondInstance(new Object[]{"b", "3.5;4.5"})
         .whenQuery("select grp, DISTINCT_COUNT(mv) from testTable group by grp order by grp")
-        .thenResultIs("STRING | INTEGER",
+        .thenResultIs(
+            "STRING | INT",
             "a | 3",
             "b | 2"
         );
@@ -274,19 +203,16 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
   @Test
   public void distinctCountBigDecimalMVGroupByMV() {
     // Schema column order is alphabetical via TreeSet, so row values must be in {grp, mv} order.
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addMultiValueDimension("mv", DataType.BIG_DECIMAL)
+        .addMultiValueDimension("grp", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .addMultiValueDimension("mv", FieldSpec.DataType.BIG_DECIMAL)
-                .addMultiValueDimension("grp", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"a;b", "1.5;2.5"},
-            new Object[]{"b;c", "2.5;3.5"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"a;b", "1.5;2.5"}, new Object[]{"b;c", "2.5;3.5"})
         .whenQuery("select grp, DISTINCT_COUNT(mv) from testTable group by grp order by grp")
-        .thenResultIs("STRING | INTEGER",
+        .thenResultIs(
+            "STRING | INT",
             "a | 2",
             "b | 3",
             "c | 2"
@@ -295,25 +221,18 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
 
   @Test
   public void distinctCountMVGroupByMVWithNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv1", DataType.INT)
+        .addMultiValueDimension("mv2", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv1", FieldSpec.DataType.INT)
-                .addMultiValueDimension("mv2", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"null", "k1;k2"},
-            new Object[]{"1;2", "k1;k2"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"null", "k1;k2"},
-            new Object[]{"1;2", "k1;k2"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"null", "k1;k2"}, new Object[]{"1;2", "k1;k2"})
+        .andOnSecondInstance(new Object[]{"null", "k1;k2"}, new Object[]{"1;2", "k1;k2"})
         .whenQuery("select DISTINCT_COUNT(mv1) from testTable group by mv2")
-        .thenResultIs("INTEGER", "3", "3")
+        .thenResultIs("INT", "3", "3")
         .whenQueryWithNullHandlingEnabled("select DISTINCT_COUNT(mv1) from testTable group by mv2")
-        .thenResultIs("INTEGER", "2", "2");
+        .thenResultIs("INT", "2", "2");
   }
 }

@@ -25,15 +25,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Client for page-cache warmup query administration operations.
- *
- * <p>Page-cache warmup lets operators register a curated set of SQL queries that Pinot servers
- * replay against their resident segments (on restart or after a segment refresh) to fault the
- * hottest pages into the OS page cache before real traffic arrives. The queries are stored on the
- * controller under {@code controller.page.cache.warmup.queries.dataDir} and exposed through the
- * {@code /pagecache/queries/{tableName}} REST endpoints. This client wraps those endpoints.
- */
+/// Client for page-cache warmup query administration operations.
+///
+/// <p>Page-cache warmup lets operators register a curated set of SQL queries that Pinot servers
+/// replay against their resident segments (on restart or after a segment refresh) to fault the
+/// hottest pages into the OS page cache before real traffic arrives. The queries are stored on the
+/// controller under {@code controller.page.cache.warmup.queries.dataDir} and exposed through the
+/// {@code /pagecache/queries/{tableName}} REST endpoints. This client wraps those endpoints.
 public class PageCacheWarmupAdminClient extends BaseServiceAdminClient {
   private static final Logger LOGGER = LoggerFactory.getLogger(PageCacheWarmupAdminClient.class);
 
@@ -46,15 +44,13 @@ public class PageCacheWarmupAdminClient extends BaseServiceAdminClient {
     return "/pagecache/queries/" + tableName;
   }
 
-  /**
-   * Stores (or overwrites) the page-cache warmup query list for the given table.
-   *
-   * @param tableName raw table name (no type suffix)
-   * @param tableType table type, {@code OFFLINE} or {@code REALTIME}
-   * @param queries ordered list of SQL warmup queries (must be non-empty per the controller contract)
-   * @return {@code true} if the controller accepted and stored the queries
-   * @throws PinotAdminException if the request fails (e.g. validation error or I/O failure)
-   */
+  /// Stores (or overwrites) the page-cache warmup query list for the given table.
+  ///
+  /// @param tableName raw table name (no type suffix)
+  /// @param tableType table type, {@code OFFLINE} or {@code REALTIME}
+  /// @param queries ordered list of SQL warmup queries (must be non-empty per the controller contract)
+  /// @return {@code true} if the controller accepted and stored the queries
+  /// @throws PinotAdminException if the request fails (e.g. validation error or I/O failure)
   public boolean storeWarmupQueries(String tableName, String tableType, List<String> queries)
       throws PinotAdminException {
     /// POST /pagecache/queries/{tableName}?tableType=... with a JSON array body. The controller
@@ -65,15 +61,13 @@ public class PageCacheWarmupAdminClient extends BaseServiceAdminClient {
     return true;
   }
 
-  /**
-   * Retrieves the stored page-cache warmup query list for the given table.
-   *
-   * @param tableName raw table name (no type suffix)
-   * @param tableType table type, {@code OFFLINE} or {@code REALTIME}
-   * @return the stored warmup queries in the order they were registered
-   * @throws PinotAdminException if the request fails (a {@link PinotAdminNotFoundException} is thrown
-   *     when no queries have been stored for the table)
-   */
+  /// Retrieves the stored page-cache warmup query list for the given table.
+  ///
+  /// @param tableName raw table name (no type suffix)
+  /// @param tableType table type, {@code OFFLINE} or {@code REALTIME}
+  /// @return the stored warmup queries in the order they were registered
+  /// @throws PinotAdminException if the request fails (a {@link PinotAdminNotFoundException} is thrown
+  ///     when no queries have been stored for the table)
   public List<String> getWarmupQueries(String tableName, String tableType)
       throws PinotAdminException {
     /// GET /pagecache/queries/{tableName}?tableType=... returns a bare JSON array of SQL strings.
@@ -82,14 +76,12 @@ public class PageCacheWarmupAdminClient extends BaseServiceAdminClient {
     return PinotAdminTransport.parseStringArrayNode(response);
   }
 
-  /**
-   * Deletes the stored page-cache warmup query list for the given table. The controller treats a
-   * delete of a non-existent query file as a no-op success.
-   *
-   * @param tableName raw table name (no type suffix)
-   * @param tableType table type, {@code OFFLINE} or {@code REALTIME}
-   * @throws PinotAdminException if the request fails
-   */
+  /// Deletes the stored page-cache warmup query list for the given table. The controller treats a
+  /// delete of a non-existent query file as a no-op success.
+  ///
+  /// @param tableName raw table name (no type suffix)
+  /// @param tableType table type, {@code OFFLINE} or {@code REALTIME}
+  /// @throws PinotAdminException if the request fails
   public void deleteWarmupQueries(String tableName, String tableType)
       throws PinotAdminException {
     LOGGER.info("Deleting page-cache warmup queries for table: {} of type: {}", tableName, tableType);

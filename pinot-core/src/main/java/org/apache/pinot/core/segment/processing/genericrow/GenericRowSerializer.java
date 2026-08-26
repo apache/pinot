@@ -34,11 +34,9 @@ import org.apache.pinot.spi.utils.MapUtils;
 import org.apache.pinot.spi.utils.Utf8Utils;
 
 
-/**
- * Utility class to serialize the {@link GenericRow}.
- * The bytes are stored in NATIVE order. The data should be deserialized by the {@link GenericRowDeserializer} on the
- * same host to ensure that both of them are using the same byte order.
- */
+/// Utility class to serialize the [GenericRow].
+/// The bytes are stored in NATIVE order. The data should be deserialized by the [GenericRowDeserializer] on the
+/// same host to ensure that both of them are using the same byte order.
 public class GenericRowSerializer {
   private final int _numFields;
   private final String[] _fieldNames;
@@ -74,9 +72,7 @@ public class GenericRowSerializer {
     }
   }
 
-  /**
-   * Serializes the given {@link GenericRow}.
-   */
+  /// Serializes the given [GenericRow].
   public byte[] serialize(GenericRow row) {
     int numBytes = 0;
 
@@ -147,6 +143,22 @@ public class GenericRowSerializer {
               stringBytesArray[j] = stringBytes;
             }
             _objectBytes[i] = stringBytesArray;
+            break;
+          case BYTES:
+            numBytes += Integer.BYTES * numValues;
+            for (Object element : multiValue) {
+              numBytes += ((byte[]) element).length;
+            }
+            break;
+          case BIG_DECIMAL:
+            numBytes += Integer.BYTES * numValues;
+            byte[][] bigDecimalBytesArray = new byte[numValues][];
+            for (int j = 0; j < numValues; j++) {
+              byte[] bigDecimalBytes = BigDecimalUtils.serialize((BigDecimal) multiValue[j]);
+              numBytes += bigDecimalBytes.length;
+              bigDecimalBytesArray[j] = bigDecimalBytes;
+            }
+            _objectBytes[i] = bigDecimalBytesArray;
             break;
           default:
             throw new IllegalStateException("Unsupported MV stored type: " + _storedTypes[i]);
@@ -238,6 +250,20 @@ public class GenericRowSerializer {
             for (byte[] stringBytes : stringBytesArray) {
               byteBuffer.putInt(stringBytes.length);
               byteBuffer.put(stringBytes);
+            }
+            break;
+          case BYTES:
+            for (Object element : multiValue) {
+              byte[] bytes = (byte[]) element;
+              byteBuffer.putInt(bytes.length);
+              byteBuffer.put(bytes);
+            }
+            break;
+          case BIG_DECIMAL:
+            byte[][] bigDecimalBytesArray = (byte[][]) _objectBytes[i];
+            for (byte[] bigDecimalBytes : bigDecimalBytesArray) {
+              byteBuffer.putInt(bigDecimalBytes.length);
+              byteBuffer.put(bigDecimalBytes);
             }
             break;
           default:

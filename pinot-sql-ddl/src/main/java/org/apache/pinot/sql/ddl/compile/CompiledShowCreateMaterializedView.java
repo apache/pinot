@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.sql.ddl.compile;
 
-import java.util.Collections;
+import java.util.List;
 import javax.annotation.Nullable;
 
 
@@ -37,7 +37,7 @@ public final class CompiledShowCreateMaterializedView extends CompiledDdl {
   private final String _rawTableName;
 
   public CompiledShowCreateMaterializedView(@Nullable String databaseName, String rawTableName) {
-    super(DdlOperation.SHOW_CREATE_MATERIALIZED_VIEW, databaseName, Collections.emptyList());
+    super(DdlOperation.SHOW_CREATE_MATERIALIZED_VIEW, databaseName, List.of());
     _rawTableName = rawTableName;
   }
 

@@ -19,7 +19,6 @@
 package org.apache.pinot.common.utils;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,9 +35,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Test for the service status.
- */
+/// Test for the service status.
 public class ServiceStatusTest {
   private static final ServiceStatus.ServiceStatusCallback ALWAYS_GOOD = new ServiceStatus.ServiceStatusCallback() {
     @Override
@@ -227,7 +224,7 @@ public class ServiceStatusTest {
 
   private TestIdealStateAndExternalViewMatchServiceStatusCallback buildTestISEVCallback() {
     return new TestIdealStateAndExternalViewMatchServiceStatusCallback("potato", INSTANCE_NAME,
-        Collections.singletonList(TABLE_NAME));
+        List.of(TABLE_NAME));
   }
 
   private String generateRandomString(int len) {

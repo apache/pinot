@@ -22,22 +22,42 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
+import org.apache.pinot.tools.utils.SampleQueries;
 
 
-/**
- * The basic Batch/Offline Quickstart.
- */
+/// The basic Batch/Offline Quickstart.
+///
+/// This quickstart bootstraps every batch example table and demonstrates the batch-side features that used to have
+/// a dedicated quickstart each: the multi-stage engine, JSON indexes, complex type handling, timestamp indexes,
+/// lookup joins and vector similarity. The types those quickstarts used to own are kept as deprecated aliases.
 public class Quickstart extends QuickStartBase {
+  protected static final Map<String, String> OPTIONS_TO_USE_MSE = Map.of("queryOptions",
+      CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE + "=true");
+
+  private static final List<String> DEPRECATED_TYPES =
+      List.of("MULTI_STAGE", "JOIN", "TIMESTAMP", "OFFLINE_JSON_INDEX", "OFFLINE-JSON-INDEX", "BATCH_JSON_INDEX",
+          "BATCH-JSON-INDEX", "OFFLINE_COMPLEX_TYPE", "OFFLINE-COMPLEX-TYPE", "BATCH_COMPLEX_TYPE",
+          "BATCH-COMPLEX-TYPE");
+
   @Override
   public List<String> types() {
-    return Arrays.asList("OFFLINE", "BATCH");
+    List<String> types = new ArrayList<>(List.of("BATCH", "OFFLINE"));
+    types.addAll(DEPRECATED_TYPES);
+    return types;
+  }
+
+  @Override
+  public List<String> deprecatedTypes() {
+    return DEPRECATED_TYPES;
   }
 
   public enum Color {
@@ -56,6 +76,20 @@ public class Quickstart extends QuickStartBase {
 
   public AuthProvider getAuthProvider() {
     return null;
+  }
+
+  @Override
+  protected Map<String, Object> getConfigOverrides() {
+    Map<String, Object> configOverrides = new HashMap<>(super.getConfigOverrides());
+    configOverrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    return configOverrides;
+  }
+
+  @Override
+  protected Map<String, String> getClusterConfigOverrides() {
+    Map<String, String> clusterConfigOverrides = new HashMap<>(super.getClusterConfigOverrides());
+    clusterConfigOverrides.put(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "50");
+    return clusterConfigOverrides;
   }
 
   protected Map<String, Object> getIndividualBrokerConfigOverridesFunction(int brokerId) {
@@ -110,48 +144,121 @@ public class Quickstart extends QuickStartBase {
             QuickstartRunner.DEFAULT_CONTROLLER_PORT));
   }
 
+  /// Three servers so that the multi-stage sample queries below actually exercise a cross-server exchange, which is
+  /// what the merged MULTI_STAGE and JOIN quickstarts used to set up.
+  ///
+  /// This is the default for every quickstart extending this class, not just `-type BATCH`. Subclasses that do not
+  /// need distributed execution can override it; [TPCHQuickStart] for instance runs on a single server.
   protected int getNumQuickstartRunnerServers() {
-    return 1;
+    return 3;
   }
 
   @Override
   public void runSampleQueries(QuickstartRunner runner)
       throws Exception {
-    String q1 = "select count(*) from baseballStats limit 1";
-    printStatus(Color.YELLOW, "Total number of documents in the table");
-    printStatus(Color.CYAN, "Query : " + q1);
-    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
-    printStatus(Color.GREEN, "***************************************************");
+    runBaseballQueries(runner);
+    runMultiStageEngineQueries(runner);
+    runStarSchemaBenchmarkQueries(runner);
+    runLookupJoinQueries(runner);
+    runJsonIndexQueries(runner);
+    runComplexTypeQueries(runner);
+    runTimestampIndexQueries(runner);
+    if (hasTables(runner, "fineFoodReviews")) {
+      runVectorQueryExamples(runner);
+    }
+  }
 
-    String q2 = "select playerName, sum(runs) from baseballStats group by playerName order by sum(runs) desc limit 5";
-    printStatus(Color.YELLOW, "Top 5 run scorers of all time ");
-    printStatus(Color.CYAN, "Query : " + q2);
-    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
-    printStatus(Color.GREEN, "***************************************************");
+  private void runBaseballQueries(QuickstartRunner runner)
+      throws Exception {
+    if (!hasTables(runner, "baseballStats")) {
+      return;
+    }
+    printStatus(Color.YELLOW, "***** Baseball stats *****");
+    runAndPrintQuery(runner, "Total number of documents in the table", "select count(*) from baseballStats limit 1");
+    runAndPrintQuery(runner, "Top 5 run scorers of all time ", SampleQueries.BASEBALL_SUM_RUNS_Q1);
+    runAndPrintQuery(runner, "Top 5 run scorers of the year 2000", SampleQueries.BASEBALL_SUM_RUNS_Q2);
+    runAndPrintQuery(runner, "Top 10 run scorers after 2000", SampleQueries.BASEBALL_SUM_RUNS_Q3);
+    runAndPrintQuery(runner, "Print playerName,runs,homeRuns for 10 records from the table and order them by yearID",
+        SampleQueries.BASEBALL_ORDER_BY_YEAR);
+  }
 
-    String q3 =
-        "select playerName, sum(runs) from baseballStats where yearID=2000 group by playerName order by sum(runs) "
-            + "desc limit 5";
-    printStatus(Color.YELLOW, "Top 5 run scorers of the year 2000");
-    printStatus(Color.CYAN, "Query : " + q3);
-    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
-    printStatus(Color.GREEN, "***************************************************");
+  private void runMultiStageEngineQueries(QuickstartRunner runner)
+      throws Exception {
+    if (!hasTables(runner, "baseballStats", "dimBaseballTeams")) {
+      return;
+    }
+    printStatus(Color.YELLOW, "***** Multi-stage engine *****");
+    runAndPrintQuery(runner, "Total number of documents in the table", SampleQueries.COUNT_BASEBALL_STATS,
+        OPTIONS_TO_USE_MSE);
+    runAndPrintQuery(runner, "Correlate the same player(s) with more than 160-run some year(s) and with less than "
+        + "2-run some other year(s)", SampleQueries.BASEBALL_STATS_SELF_JOIN, OPTIONS_TO_USE_MSE);
+    runAndPrintQuery(runner, "Baseball Stats with joined team names", SampleQueries.BASEBALL_JOIN_DIM_BASEBALL_TEAMS,
+        OPTIONS_TO_USE_MSE);
+  }
 
-    String q4 =
-        "select playerName, sum(runs) from baseballStats where yearID>=2000 group by playerName order by sum(runs) "
-            + "desc limit 10";
-    printStatus(Color.YELLOW, "Top 10 run scorers after 2000");
-    printStatus(Color.CYAN, "Query : " + q4);
-    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q4)));
-    printStatus(Color.GREEN, "***************************************************");
+  private void runStarSchemaBenchmarkQueries(QuickstartRunner runner)
+      throws Exception {
+    if (!hasTables(runner, "lineorder", "customer", "dates")) {
+      return;
+    }
+    printStatus(Color.YELLOW, "***** Star schema benchmark, on the multi-stage engine *****");
+    runAndPrintQuery(runner, "Total number of line orders", "select count(*) from lineorder",
+        OPTIONS_TO_USE_MSE);
+    runAndPrintQuery(runner, "Revenue by year for line orders with a small discount and quantity",
+        "select d.D_YEAR, sum(lo.LO_REVENUE) as revenue from lineorder lo join dates d on lo.LO_ORDERDATE = "
+            + "d.D_DATEKEY where lo.LO_DISCOUNT between 1 and 3 and lo.LO_QUANTITY < 25 group by d.D_YEAR "
+            + "order by d.D_YEAR limit 10", OPTIONS_TO_USE_MSE);
+    runAndPrintQuery(runner, "Top 10 customer nations by revenue",
+        "select c.C_NATION, sum(lo.LO_REVENUE) as revenue from lineorder lo join customer c on lo.LO_CUSTKEY = "
+            + "c.C_CUSTKEY group by c.C_NATION order by revenue desc limit 10", OPTIONS_TO_USE_MSE);
+  }
 
-    String q5 = "select playerName, runs, homeRuns from baseballStats order by yearID limit 10";
-    printStatus(Color.YELLOW, "Print playerName,runs,homeRuns for 10 records from the table and order them by yearID");
-    printStatus(Color.CYAN, "Query : " + q5);
-    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q5)));
-    printStatus(Color.GREEN, "***************************************************");
+  private void runLookupJoinQueries(QuickstartRunner runner)
+      throws Exception {
+    if (!hasTables(runner, "baseballStats", "dimBaseballTeams")) {
+      return;
+    }
+    printStatus(Color.YELLOW, "***** Lookup join *****");
+    runAndPrintQuery(runner, "Baseball Teams", "select count(*) from dimBaseballTeams limit 1");
+    runAndPrintQuery(runner, "Baseball Stats with joined team names",
+        "select playerName, teamID, lookup('dimBaseballTeams', 'teamName', 'teamID', teamID) from baseballStats "
+            + "limit 10");
+  }
 
-    runVectorQueryExamples(runner);
+  private void runJsonIndexQueries(QuickstartRunner runner)
+      throws Exception {
+    if (!hasTables(runner, "githubEvents")) {
+      return;
+    }
+    printStatus(Color.YELLOW, "***** JSON index *****");
+    runAndPrintQuery(runner, "Most contributed repos by 'LombiqBot'",
+        "select json_extract_scalar(repo, '$.name', 'STRING'), count(*) from githubEvents where json_match(actor, "
+            + "'\"$.login\"=''LombiqBot''') group by 1 order by 2 desc limit 10");
+  }
+
+  private void runComplexTypeQueries(QuickstartRunner runner)
+      throws Exception {
+    if (!hasTables(runner, "githubComplexTypeEvents")) {
+      return;
+    }
+    printStatus(Color.YELLOW, "***** Complex type handling *****");
+    runAndPrintQuery(runner, "Flattened commit authors",
+        "select id, \"payload.commits.author.name\", \"payload.commits.author.email\" from githubComplexTypeEvents "
+            + "limit 10");
+  }
+
+  private void runTimestampIndexQueries(QuickstartRunner runner)
+      throws Exception {
+    if (!hasTables(runner, "airlineStats")) {
+      return;
+    }
+    printStatus(Color.YELLOW, "***** Timestamp index *****");
+    runAndPrintQuery(runner, "Pick one row with timestamp and different granularity using generated column name ",
+        "select ts, $ts$DAY, $ts$WEEK, $ts$MONTH from airlineStats limit 1");
+    runAndPrintQuery(runner, "Pick one row with timestamp and different granularity using dateTrunc function",
+        "select ts, dateTrunc('DAY', ts), dateTrunc('WEEK', ts), dateTrunc('MONTH', ts) from airlineStats limit 1");
+    runAndPrintQuery(runner, "Count events in week basis ",
+        "select count(*), toTimestamp(dateTrunc('WEEK', ts)) as tsWeek from airlineStats GROUP BY tsWeek limit 1");
   }
 
   public static void main(String[] args)

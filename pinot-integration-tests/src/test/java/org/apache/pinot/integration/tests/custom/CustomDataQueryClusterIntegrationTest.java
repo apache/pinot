@@ -118,10 +118,8 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
     LOGGER.warn("Finished setting up integration test class: {}", getClass().getSimpleName());
   }
 
-  /**
-   * Initializes the controller request URL builder for the shared suite.
-   * Called at the start of setUp; safe to call from overridden setUp methods.
-   */
+  /// Initializes the controller request URL builder for the shared suite.
+  /// Called at the start of setUp; safe to call from overridden setUp methods.
   protected void initControllerRequestURLBuilder() {
     if (_controllerRequestURLBuilder == null) {
       _controllerRequestURLBuilder =
@@ -129,11 +127,9 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
     }
   }
 
-  /**
-   * Creates schema, table config, builds segments, and uploads them.
-   * Subclasses can override this to customize the table creation flow
-   * (e.g., for dimension tables, upsert tables, or tables built from GenericRow).
-   */
+  /// Creates schema, table config, builds segments, and uploads them.
+  /// Subclasses can override this to customize the table creation flow
+  /// (e.g., for dimension tables, upsert tables, or tables built from GenericRow).
   protected void setUpTable()
       throws Exception {
     // create & upload schema AND table config
@@ -144,7 +140,7 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
     if (isRealtimeTable()) {
       // In suite mode multiple realtime tests use different topics, so make sure
       // this class-specific topic exists before the controller validates stream metadata.
-      _sharedClusterTestSuite.createKafkaTopic(getKafkaTopic());
+      _sharedClusterTestSuite.createKafkaTopic(getKafkaTopic(), getNumKafkaPartitions());
       waitForKafkaTopicMetadataReadyForConsumer(getKafkaTopic(), getNumKafkaPartitions());
 
       // create realtime table
@@ -249,11 +245,9 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
         getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), injectTombstones());
   }
 
-  /**
-   * Pushes data into Kafka for realtime ingestion. Subclasses using non-Avro formats
-   * (e.g., protobuf, CSV) can override this method and ignore the dataFiles parameter.
-   * The default implementation delegates to {@link #pushAvroIntoKafka(List)}.
-   */
+  /// Pushes data into Kafka for realtime ingestion. Subclasses using non-Avro formats
+  /// (e.g., protobuf, CSV) can override this method and ignore the dataFiles parameter.
+  /// The default implementation delegates to [#pushAvroIntoKafka(List)].
   protected void pushDataIntoKafka(List<File> dataFiles)
       throws Exception {
     pushAvroIntoKafka(dataFiles);
@@ -299,9 +293,7 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
     return super.getRandomBrokerPort();
   }
 
-  /**
-   * Returns the controller starter from the shared suite instance.
-   */
+  /// Returns the controller starter from the shared suite instance.
   protected BaseControllerStarter getSharedControllerStarter() {
     return _sharedClusterTestSuite._controllerStarter;
   }
@@ -311,44 +303,32 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
     return _sharedClusterTestSuite._serverStarters;
   }
 
-  /**
-   * Returns the property store from the shared suite instance.
-   */
+  /// Returns the property store from the shared suite instance.
   protected ZkHelixPropertyStore<ZNRecord> getSharedPropertyStore() {
     return _sharedClusterTestSuite._propertyStore;
   }
 
-  /**
-   * Returns the task manager from the shared suite's controller.
-   */
+  /// Returns the task manager from the shared suite's controller.
   protected PinotTaskManager getTaskManager() {
     return getSharedControllerStarter().getTaskManager();
   }
 
-  /**
-   * Returns the Helix task resource manager from the shared suite's controller.
-   */
+  /// Returns the Helix task resource manager from the shared suite's controller.
   protected PinotHelixTaskResourceManager getHelixTaskResourceManager() {
     return getSharedControllerStarter().getHelixTaskResourceManager();
   }
 
-  /**
-   * Returns the Helix resource manager from the shared suite's controller.
-   */
+  /// Returns the Helix resource manager from the shared suite's controller.
   protected PinotHelixResourceManager getSharedHelixResourceManager() {
     return getSharedControllerStarter().getHelixResourceManager();
   }
 
-  /**
-   * Returns the Kafka broker list from the shared suite instance.
-   */
+  /// Returns the Kafka broker list from the shared suite instance.
   protected String getSharedKafkaBrokerList() {
     return _sharedClusterTestSuite.getKafkaBrokerList();
   }
 
-  /**
-   * Creates a Kafka topic on the shared suite's Kafka cluster.
-   */
+  /// Creates a Kafka topic on the shared suite's Kafka cluster.
   protected void createSharedKafkaTopic(String topic, int numPartitions) {
     _sharedClusterTestSuite.createKafkaTopic(topic, numPartitions);
   }

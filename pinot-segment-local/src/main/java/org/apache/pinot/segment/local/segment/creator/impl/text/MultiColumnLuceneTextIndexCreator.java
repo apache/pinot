@@ -43,15 +43,12 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.NRTCachingDirectory;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.LuceneNRTCachingMergePolicy;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.text.MultiColumnLuceneTextIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.text.MultiColumnLuceneTextIndexReader.ColumnConfig;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
-import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -60,13 +57,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class is used to create Lucene-based multi-column text index.
- * Used for both offline from {@link SegmentColumnarIndexCreator}
- * and realtime from {@link RealtimeLuceneTextIndex}
- * While this is an index creator, it consumes values for multiple columns in a single call,
- * which doesn't fit IndexCreator.
- */
+/// This class is used to create Lucene-based multi-column text index.
+/// Used for both offline from [org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator]
+/// and realtime from [org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex]
+/// While this is an index creator, it consumes values for multiple columns in a single call,
+/// which doesn't fit IndexCreator.
 public class MultiColumnLuceneTextIndexCreator implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiColumnLuceneTextIndexCreator.class);
   public static final String LUCENE_INDEX_DOC_ID_COLUMN_NAME = "DocID";
@@ -81,34 +76,34 @@ public class MultiColumnLuceneTextIndexCreator implements Closeable {
   private IndexWriter _indexWriter;
   private int _nextDocId = 0;
 
-  /**
-   * Called by {@link SegmentColumnarIndexCreator}
-   * when building an offline segment. Similar to how it creates per column
-   * dictionary, forward and inverted index, a text index is also created
-   * if text search is enabled on a column.
-   * @param columns column names
-   * @param columnsSV per-column flags, true->single value, false-> multi-value
-   * @param segmentIndexDir segment index directory
-   * @param commit true if the index should be committed (at the end after all documents have
-   *               been added), false if index should not be committed
-   * @param realtimeConversion index creator should create an index using the realtime segment
-   * @param consumerDir consumer dir containing the realtime index, used when realtimeConversion and commit is true
-   * @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
-   * Note on commit:
-   *               Once {@link SegmentColumnarIndexCreator}
-   *               finishes indexing all documents/rows for the segment, we need to commit and close
-   *               the Lucene index which will internally persist the index on disk, do the necessary
-   *               resource cleanup etc. We commit during {@link DictionaryBasedInvertedIndexCreator#seal()}
-   *               and close during {@link DictionaryBasedInvertedIndexCreator#close()}.
-   *               This lucene index writer is used by both offline and realtime (both during
-   *               indexing in-memory MutableSegment and later during conversion to offline).
-   *               Since realtime segment conversion is again going to go through the offline
-   *               indexing path and will do everything (indexing, commit, close etc), there is
-   *               no need to commit the index from the realtime side. So when the realtime segment
-   *               is destroyed (which is after the realtime segment has been committed and converted
-   *               to offline), we close this lucene index writer to release resources but don't commit.
-   * @param mcTextConfig the text index config
-   */
+  /// Called by [org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator]
+  /// when building an offline segment. Similar to how it creates per column
+  /// dictionary, forward and inverted index, a text index is also created
+  /// if text search is enabled on a column.
+  /// @param columns column names
+  /// @param columnsSV per-column flags, true->single value, false-> multi-value
+  /// @param segmentIndexDir segment index directory
+  /// @param commit true if the index should be committed (at the end after all documents have
+  ///               been added), false if index should not be committed
+  /// @param realtimeConversion index creator should create an index using the realtime segment
+  /// @param consumerDir consumer dir containing the realtime index, used when realtimeConversion and commit is true
+  /// @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
+  /// Note on commit:
+  ///               Once [org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator]
+  ///               finishes indexing all documents/rows for the segment, we need to commit and close
+  ///               the Lucene index which will internally persist the index on disk, do the necessary
+  ///               resource cleanup etc. We commit during
+  ///               [org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator#seal()]
+  ///               and close during
+  ///               [org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator#close()].
+  ///               This lucene index writer is used by both offline and realtime (both during
+  ///               indexing in-memory MutableSegment and later during conversion to offline).
+  ///               Since realtime segment conversion is again going to go through the offline
+  ///               indexing path and will do everything (indexing, commit, close etc), there is
+  ///               no need to commit the index from the realtime side. So when the realtime segment
+  ///               is destroyed (which is after the realtime segment has been committed and converted
+  ///               to offline), we close this lucene index writer to release resources but don't commit.
+  /// @param mcTextConfig the text index config
   public MultiColumnLuceneTextIndexCreator(
       List<String> columns,
       BooleanList columnsSV,
@@ -202,18 +197,23 @@ public class MultiColumnLuceneTextIndexCreator implements Closeable {
     return _indexWriter;
   }
 
-  /**
-   * Copy the mutable lucene index files to create an immutable lucene index
-   * @param segmentIndexDir segment index directory
-   * @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
-   * @param indexWriterConfig indexWriterConfig
-   */
+  /// Copy the mutable lucene index files to create an immutable lucene index
+  /// @param segmentIndexDir segment index directory
+  /// @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
+  /// @param indexWriterConfig indexWriterConfig
   private void convertMutableSegment(File segmentIndexDir, File consumerDir, @Nullable int[] immutableToMutableIdMap,
       IndexWriterConfig indexWriterConfig) {
     try {
       // Copy the mutable index to the v1 index location
       File dest = getV1TextIndexFile(segmentIndexDir);
       File mutableDir = getMutableIndexDir(segmentIndexDir, consumerDir);
+      // Remove any stale Lucene files left over at the destination from a prior crashed or killed
+      // conversion attempt. Otherwise FileUtils.copyDirectory preserves dest-only files, and
+      // CREATE_OR_APPEND below folds those stale segments into the merged index, inflating
+      // Lucene numDocs past the segment's totalDocs and causing AIOOB in DocIdTranslator at query time.
+      if (dest.exists()) {
+        FileUtils.deleteDirectory(dest);
+      }
       FileUtils.copyDirectory(mutableDir, dest);
 
       // Remove the copied write.lock file
@@ -235,14 +235,12 @@ public class MultiColumnLuceneTextIndexCreator implements Closeable {
     }
   }
 
-  /**
-   * Generate the mapping file from mutable Pinot docId (stored within the Lucene index) to immutable Pinot docId using
-   * the immutableToMutableIdMap from segment conversion
-   * @param segmentIndexDir segment index directory
-   * @param columns column name
-   * @param directory directory of the index
-   * @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
-   */
+  /// Generate the mapping file from mutable Pinot docId (stored within the Lucene index) to immutable Pinot docId using
+  /// the immutableToMutableIdMap from segment conversion
+  /// @param segmentIndexDir segment index directory
+  /// @param columns column name
+  /// @param directory directory of the index
+  /// @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
   private void buildMappingFile(File segmentIndexDir, List<String> columns, Directory directory,
       @Nullable int[] immutableToMutableIdMap)
       throws IOException {
@@ -286,10 +284,8 @@ public class MultiColumnLuceneTextIndexCreator implements Closeable {
     }
   }
 
-  /**
-   * Adds given SV or MV documents to multi-column text index.
-   * @param documents list of values for all text columns (either String or String[])
-   */
+  /// Adds given SV or MV documents to multi-column text index.
+  /// @param documents list of values for all text columns (either String or String\[\])
   public void add(List<Object> documents) {
     if (_reuseMutableIndex) {
       return; // no-op
@@ -325,12 +321,10 @@ public class MultiColumnLuceneTextIndexCreator implements Closeable {
     }
   }
 
-  /**
-   * Adds given SV or MV documents to multi-column text index.
-   * Same as add(List<Object> documents) but allows passing length for multivalued columns (and reuse arrays).
-   * @param documents documents list of values for all text columns (either String or String[])
-   * @param lengths number of items passed in i-th multivalued column
-   */
+  /// Adds given SV or MV documents to multi-column text index.
+  /// Same as add(List<Object> documents) but allows passing length for multivalued columns (and reuse arrays).
+  /// @param documents documents list of values for all text columns (either String or String\[\])
+  /// @param lengths number of items passed in i-th multivalued column
   public void add(List<Object> documents, int[] lengths) {
     if (_reuseMutableIndex) {
       return; // no-op

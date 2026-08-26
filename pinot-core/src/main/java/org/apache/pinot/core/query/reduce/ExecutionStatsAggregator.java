@@ -349,40 +349,37 @@ public class ExecutionStatsAggregator {
     }
   }
 
-  /**
-   * Writes the accumulated execution stats onto the given DataTable's metadata (and exception map),
-   * so a merged-only DataTable can be re-injected into the regular reduce path with the same
-   * downstream totals as a direct reduce of the original inputs would have produced.
-   *
-   * <p>Unlike {@link #setStats(String, BrokerResponseNative, BrokerMetrics)}, this method does NOT
-   * bump broker meters or timers. The merge-only path is expected to run off the request-serving
-   * path; meter increments fire when the result is eventually re-reduced.
-   *
-   * <p>Limitations of the round-trip via DataTable metadata:
-   * <ul>
-   *   <li>CPU and memory stats round-trip as a single combined value per key
-   *       ({@link DataTable.MetadataKey#THREAD_CPU_TIME_NS}, etc.) because the wire format has no
-   *       per-tableType keys. In the standard reduce path the aggregator attributes each server's
-   *       value to offline vs realtime based on {@code routingInstance.getTableType()} and surfaces
-   *       them as separate fields on {@link BrokerResponseNative}; on a re-reduce of the merged
-   *       DataTable the whole combined value lands in one bucket — whichever tableType the caller
-   *       assigned to the synthetic server response. So the per-tableType split visible on
-   *       BrokerResponse is lost across the round-trip, even though the total is preserved.
-   *   <li>Per-server exceptions are written via {@link DataTable#addException(int, String)} which
-   *       backs a {@code Map<Integer, String>} keyed by error code; if two inputs reported the
-   *       same error code the merged DataTable carries last-write-wins for the message.
-   *   <li>Per-server trace info is JSON-encoded into a single
-   *       {@link DataTable.MetadataKey#TRACE_INFO} entry; the downstream aggregator reads it back
-   *       as one trace blob attributed to the synthetic server.
-   *   <li>DISTINCT early-termination reasons round-trip as a single enum name
-   *       ({@link DataTable.MetadataKey#EARLY_TERMINATION_REASON}) because the wire format is one
-   *       string per DataTable. The aggregator OR-reduces multiple per-server reasons into three
-   *       independent booleans; on re-injection we encode only the first set flag in declaration
-   *       order. The user-visible "DISTINCT is partial" signal is preserved (each of the three
-   *       flags independently sets partial-ness on {@link BrokerResponseNative}); the exact reason
-   *       granularity is best-effort when multiple flags are true.
-   * </ul>
-   */
+  /// Writes the accumulated execution stats onto the given DataTable's metadata (and exception map),
+  /// so a merged-only DataTable can be re-injected into the regular reduce path with the same
+  /// downstream totals as a direct reduce of the original inputs would have produced.
+  ///
+  /// Unlike [#setStats(String, BrokerResponseNative, BrokerMetrics)], this method does NOT
+  /// bump broker meters or timers. The merge-only path is expected to run off the request-serving
+  /// path; meter increments fire when the result is eventually re-reduced.
+  ///
+  /// Limitations of the round-trip via DataTable metadata:
+  ///
+  /// - CPU and memory stats round-trip as a single combined value per key
+  ///      ([DataTable.MetadataKey#THREAD_CPU_TIME_NS], etc.) because the wire format has no
+  ///      per-tableType keys. In the standard reduce path the aggregator attributes each server's
+  ///      value to offline vs realtime based on `routingInstance.getTableType()` and surfaces
+  ///      them as separate fields on [BrokerResponseNative]; on a re-reduce of the merged
+  ///      DataTable the whole combined value lands in one bucket — whichever tableType the caller
+  ///      assigned to the synthetic server response. So the per-tableType split visible on
+  ///      BrokerResponse is lost across the round-trip, even though the total is preserved.
+  /// - Per-server exceptions are written via [DataTable#addException(int, String)] which
+  ///      backs a `Map<Integer, String>` keyed by error code; if two inputs reported the
+  ///      same error code the merged DataTable carries last-write-wins for the message.
+  /// - Per-server trace info is JSON-encoded into a single
+  ///      [DataTable.MetadataKey#TRACE_INFO] entry; the downstream aggregator reads it back
+  ///      as one trace blob attributed to the synthetic server.
+  /// - DISTINCT early-termination reasons round-trip as a single enum name
+  ///      ([DataTable.MetadataKey#EARLY_TERMINATION_REASON]) because the wire format is one
+  ///      string per DataTable. The aggregator OR-reduces multiple per-server reasons into three
+  ///      independent booleans; on re-injection we encode only the first set flag in declaration
+  ///      order. The user-visible "DISTINCT is partial" signal is preserved (each of the three
+  ///      flags independently sets partial-ness on [BrokerResponseNative]); the exact reason
+  ///      granularity is best-effort when multiple flags are true.
   public void setStatsOnMergedDataTable(DataTable dataTable) {
     Map<String, String> metadata = dataTable.getMetadata();
 

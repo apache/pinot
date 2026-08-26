@@ -49,14 +49,12 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests to verify that CopyObjectRequest uses sourceBucket/sourceKey
- * instead of the deprecated copySource with URL encoding.
- * This fixes compatibility with S3-compatible backends (Ceph, NetApp ONTAP)
- * where %2F-encoded slashes are interpreted literally.
- *
- * @see <a href="https://github.com/apache/pinot/issues/11182">#11182</a>
- */
+/// Unit tests to verify that CopyObjectRequest uses sourceBucket/sourceKey
+/// instead of the deprecated copySource with URL encoding.
+/// This fixes compatibility with S3-compatible backends (Ceph, NetApp ONTAP)
+/// where %2F-encoded slashes are interpreted literally.
+///
+/// @see <a href="https://github.com/apache/pinot/issues/11182">#11182</a>
 public class S3PinotFSCopyTest {
 
   private S3Client _s3Client;
@@ -239,12 +237,10 @@ public class S3PinotFSCopyTest {
     assertEquals(captured.key(), "new/file.txt");
   }
 
-  /**
-   * Reproduces the exact scenario from issue #11182:
-   * Ceph S3-compatible backend receives a copy request during segment finalization.
-   * With the old code, slashes were encoded as %2F which caused Ceph to fail
-   * with "failed to parse x-amz-copy-source header".
-   */
+  /// Reproduces the exact scenario from issue #11182:
+  /// Ceph S3-compatible backend receives a copy request during segment finalization.
+  /// With the old code, slashes were encoded as %2F which caused Ceph to fail
+  /// with "failed to parse x-amz-copy-source header".
   @Test
   public void testCephCompatibilitySlashesNotEncoded()
       throws Exception {
@@ -262,16 +258,14 @@ public class S3PinotFSCopyTest {
         "copySource must not be set - it would contain %2F-encoded slashes that break Ceph");
   }
 
-  /**
-   * Demonstrates the exact bug from issue #11182 and proves the fix.
-   *
-   * OLD code did: URLEncoder.encode(host + path) → produced "pinot-segments%2Ftable%2Fsegment"
-   * then passed that as copySource. Ceph rejected this with 400: "failed to parse x-amz-copy-source header"
-   * because %2F was interpreted as a literal key character, not a path delimiter.
-   *
-   * NEW code passes sourceBucket and sourceKey separately, so the SDK builds the header correctly
-   * with real "/" delimiters that Ceph (and all S3-compatible backends) can parse.
-   */
+  /// Demonstrates the exact bug from issue #11182 and proves the fix.
+  ///
+  /// OLD code did: URLEncoder.encode(host + path) → produced "pinot-segments%2Ftable%2Fsegment"
+  /// then passed that as copySource. Ceph rejected this with 400: "failed to parse x-amz-copy-source header"
+  /// because %2F was interpreted as a literal key character, not a path delimiter.
+  ///
+  /// NEW code passes sourceBucket and sourceKey separately, so the SDK builds the header correctly
+  /// with real "/" delimiters that Ceph (and all S3-compatible backends) can parse.
   @Test
   @SuppressWarnings("deprecation")
   public void testOldCodeProducedEncodedSlashesNewCodeDoesNot()
@@ -321,14 +315,12 @@ public class S3PinotFSCopyTest {
         "sourceKey must not contain %2F encoded slashes");
   }
 
-  /**
-   * Verifies the fix works for NetApp ONTAP S3-compatible storage.
-   * ONTAP has the same issue as Ceph: %2F-encoded slashes in the x-amz-copy-source
-   * header are interpreted literally, causing copy/touch operations to fail with 400.
-   *
-   * Uses a realistic ONTAP bucket/path structure to confirm sourceBucket/sourceKey
-   * are passed cleanly without any URL encoding.
-   */
+  /// Verifies the fix works for NetApp ONTAP S3-compatible storage.
+  /// ONTAP has the same issue as Ceph: %2F-encoded slashes in the x-amz-copy-source
+  /// header are interpreted literally, causing copy/touch operations to fail with 400.
+  ///
+  /// Uses a realistic ONTAP bucket/path structure to confirm sourceBucket/sourceKey
+  /// are passed cleanly without any URL encoding.
   @Test
   @SuppressWarnings("deprecation")
   public void testNetappOntapCompatibilitySlashesNotEncoded()
@@ -361,11 +353,9 @@ public class S3PinotFSCopyTest {
         "sourceKey must not contain %2F — ONTAP interprets these literally");
   }
 
-  /**
-   * Verifies touch() also works correctly for NetApp ONTAP paths.
-   * Touch copies an object onto itself with updated metadata — the same
-   * %2F encoding bug affected this code path too.
-   */
+  /// Verifies touch() also works correctly for NetApp ONTAP paths.
+  /// Touch copies an object onto itself with updated metadata — the same
+  /// %2F encoding bug affected this code path too.
   @Test
   @SuppressWarnings("deprecation")
   public void testNetappOntapTouchCompatibility()

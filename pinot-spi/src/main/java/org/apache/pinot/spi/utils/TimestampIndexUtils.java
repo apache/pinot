@@ -20,7 +20,6 @@ package org.apache.pinot.spi.utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -63,30 +62,22 @@ public class TimestampIndexUtils {
     FIELD_SPEC_GRANULARITY_MAP.put(TimestampIndexGranularity.YEAR, "365:DAYS");
   }
 
-  /**
-   * Returns the column name with granularity, e.g. $ts$DAY.
-   */
+  /// Returns the column name with granularity, e.g. $ts$DAY.
   public static String getColumnWithGranularity(String timestampColumn, TimestampIndexGranularity granularity) {
     return getColumnWithGranularity(timestampColumn, granularity.name());
   }
 
-  /**
-   * Returns the column name with granularity, e.g. $ts$DAY.
-   */
+  /// Returns the column name with granularity, e.g. $ts$DAY.
   public static String getColumnWithGranularity(String timestampColumn, String granularity) {
     return "$" + timestampColumn + "$" + granularity;
   }
 
-  /**
-   * Returns whether the given string is a valid granularity.
-   */
+  /// Returns whether the given string is a valid granularity.
   public static boolean isValidGranularity(String granularity) {
     return VALID_GRANULARITIES.contains(granularity);
   }
 
-  /**
-   * Returns whether the given column nane is a column name with granularity.
-   */
+  /// Returns whether the given column nane is a column name with granularity.
   public static boolean isValidColumnWithGranularity(String column) {
     if (column.charAt(0) != '$') {
       return false;
@@ -98,12 +89,10 @@ public class TimestampIndexUtils {
     return VALID_GRANULARITIES.contains(column.substring(secondDollarPos + 1));
   }
 
-  /**
-   * Extracts all columns with granularity based on the TIMESTAMP index config.
-   */
+  /// Extracts all columns with granularity based on the TIMESTAMP index config.
   public static Set<String> extractColumnsWithGranularity(TableConfig tableConfig) {
     if (tableConfig.getFieldConfigList() == null) {
-      return Collections.emptySet();
+      return Set.of();
     }
     Set<String> columnsWithGranularity = new HashSet<>();
     for (FieldConfig fieldConfig : tableConfig.getFieldConfigList()) {
@@ -116,15 +105,13 @@ public class TimestampIndexUtils {
         columnsWithGranularity.add(getColumnWithGranularity(timestampColumn, granularity));
       }
     }
-    return columnsWithGranularity.isEmpty() ? Collections.emptySet() : columnsWithGranularity;
+    return columnsWithGranularity.isEmpty() ? Set.of() : columnsWithGranularity;
   }
 
-  /**
-   * Applies the TIMESTAMP index configured in the table config:
-   * - Adds the derived timestamp columns with granularity to the schema
-   * - Adds transform for the derived timestamp columns with granularity
-   * - Adds range index to the derived timestamp columns with granularity
-   */
+  /// Applies the TIMESTAMP index configured in the table config:
+  /// - Adds the derived timestamp columns with granularity to the schema
+  /// - Adds transform for the derived timestamp columns with granularity
+  /// - Adds range index to the derived timestamp columns with granularity
   public static void applyTimestampIndex(TableConfig tableConfig, Schema schema) {
     if (tableConfig.getFieldConfigList() == null) {
       return;
@@ -203,6 +190,6 @@ public class TimestampIndexUtils {
   }
 
   private static String getTransformExpression(String timestampColumn, TimestampIndexGranularity granularity) {
-    return "dateTrunc('" + granularity + "',\"" + timestampColumn + "\")";
+    return "dateTrunc('" + granularity + "'," + SqlUtils.quoteIdentifier(timestampColumn) + ")";
   }
 }

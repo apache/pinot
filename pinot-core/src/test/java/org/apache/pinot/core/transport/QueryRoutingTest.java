@@ -20,8 +20,8 @@ package org.apache.pinot.core.transport;
 
 import com.google.common.util.concurrent.Futures;
 import java.net.InetSocketAddress;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
@@ -108,8 +108,8 @@ public class QueryRoutingTest {
         _serverInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
     _realtimeServerRoutingInstance =
         _serverInstance.toServerRoutingInstance(TableType.REALTIME, ServerInstance.RoutingType.NETTY);
-    _routingTable = Collections.singletonMap(_serverInstance,
-        new SegmentsToQuery(Collections.emptyList(), Collections.emptyList()));
+    _routingTable = Map.of(_serverInstance,
+        new SegmentsToQuery(List.of(), List.of()));
   }
 
   private QueryServer getQueryServer(int responseDelayMs, byte[] responseBytes) {
@@ -123,11 +123,9 @@ public class QueryRoutingTest {
     return new QueryServer(port, null, handler);
   }
 
-  /**
-   * Starts the query server and returns the actual bound port. Uses port 0 to let the OS assign a free port,
-   * avoiding TOCTOU race conditions. {@link QueryServer#start()} blocks on {@code bind().sync()}, so the
-   * server is ready to accept connections when this method returns.
-   */
+  /// Starts the query server and returns the actual bound port. Uses port 0 to let the OS assign a free port,
+  /// avoiding TOCTOU race conditions. [QueryServer#start()] blocks on `bind().sync()`, so the
+  /// server is ready to accept connections when this method returns.
   private int startAndGetPort(QueryServer server) {
     server.start();
     return ((InetSocketAddress) server.getChannel().localAddress()).getPort();
@@ -504,8 +502,8 @@ public class QueryRoutingTest {
     ServerRoutingInstance serverRoutingInstance2 =
         serverInstance2.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
     Map<ServerInstance, SegmentsToQuery> routingTable =
-        Map.of(serverInstance1, new SegmentsToQuery(Collections.emptyList(), Collections.emptyList()),
-            serverInstance2, new SegmentsToQuery(Collections.emptyList(), Collections.emptyList()));
+        Map.of(serverInstance1, new SegmentsToQuery(List.of(), List.of()),
+            serverInstance2, new SegmentsToQuery(List.of(), List.of()));
 
     // Submit the query with skipUnavailableServers=true, the single started server should return a valid response
     BrokerRequest brokerRequest =

@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -89,7 +88,7 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
             .setStreamConfigs(streamConfigs)
-            .setSegmentAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.COMPLETED.toString(),
+            .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.COMPLETED.toString(),
                 new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)))
             .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1)).build();
     _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(createHelixManager(), tableConfig, null);
@@ -352,7 +351,7 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
         int instanceIndex = (partitionId % numConsumingInstancesPerReplicaGroup)
             + replicaGroupId * numConsumingInstancesPerReplicaGroup;
         consumingInstancePartitions.setInstances(partitionId, replicaGroupId,
-            Collections.singletonList(CONSUMING_INSTANCES.get(instanceIndex)));
+            List.of(CONSUMING_INSTANCES.get(instanceIndex)));
       }
     }
 
@@ -368,7 +367,7 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
     for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
       for (int partitionId = 0; partitionId < numCompletedInstancesPerReplicaGroup; partitionId++) {
         completedInstancePartitions.setInstances(partitionId, replicaGroupId,
-            Collections.singletonList(COMPLETED_INSTANCES.get(completedInstanceIdToAdd++)));
+            List.of(COMPLETED_INSTANCES.get(completedInstanceIdToAdd++)));
       }
     }
 
@@ -463,22 +462,19 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
         SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING));
   }
 
-  /**
-   * Tests segment assignment for tables consuming subset partitions with non-contiguous partition IDs.
-   *
-   * <p><b>Key Invariant:</b> A table consuming subset partitions {0, 2, 5, 7} from an 8-partition topic
-   * should assign those partitions to the SAME instances as a full table consuming all 8 partitions.
-   *
-   * <p>This is achieved by using the TOTAL partition count (8) in the instance partitions map, so that
-   * RealtimeSegmentAssignment routes both subset and full tables identically via {@code partitionId % 8}.
-   *
-   * <p>This test verifies:
-   * <ul>
-   *   <li>Subset table assignment matches full table assignment for the same partition IDs</li>
-   *   <li>Non-contiguous partitions don't create hotspots</li>
-   *   <li>All consuming instances are utilized (no underutilization)</li>
-   * </ul>
-   */
+  /// Tests segment assignment for tables consuming subset partitions with non-contiguous partition IDs.
+  ///
+  /// **Key Invariant:** A table consuming subset partitions {0, 2, 5, 7} from an 8-partition topic
+  /// should assign those partitions to the SAME instances as a full table consuming all 8 partitions.
+  ///
+  /// This is achieved by using the TOTAL partition count (8) in the instance partitions map, so that
+  /// RealtimeSegmentAssignment routes both subset and full tables identically via `partitionId % 8`.
+  ///
+  /// This test verifies:
+  ///
+  /// - Subset table assignment matches full table assignment for the same partition IDs
+  /// - Non-contiguous partitions don't create hotspots
+  /// - All consuming instances are utilized (no underutilization)
   @Test
   public void testSubsetPartitionAssignment() {
     // Subset partition IDs: non-contiguous selection from 8 total partitions
@@ -512,7 +508,7 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
         int instanceIndex = (partitionId % numConsumingInstancesPerReplicaGroup)
             + replicaGroupId * numConsumingInstancesPerReplicaGroup;
         consumingInstancePartitions.setInstances(partitionId, replicaGroupId,
-            Collections.singletonList(CONSUMING_INSTANCES.get(instanceIndex)));
+            List.of(CONSUMING_INSTANCES.get(instanceIndex)));
       }
     }
 
@@ -624,20 +620,18 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
         "Partitions 0 and 7 should map to different instance sets to avoid hotspots");
   }
 
-  /**
-   * Regression for imported COMPLETED instance partitions during rebalance.
-   *
-   * <p><b>Prod scenario:</b> Table B imports Table A's CONSUMING and COMPLETED instance partitions via
-   * {@code instancePartitionsMap} (no {@code instanceAssignmentConfigMap} for COMPLETED). During rebalance,
-   * {@link org.apache.pinot.controller.helix.core.rebalance.TableRebalancer#getInstancePartitionsMap} only
-   * loads COMPLETED IPs when {@link InstanceAssignmentConfigUtils#shouldRelocateCompletedSegments} returns true.
-   *
-   * <p><b>Bug:</b> {@code shouldRelocateCompletedSegments} ignored {@code instancePartitionsMap}, so rebalance
-   * passed only CONSUMING IPs to segment assignment and completed segments stayed on one server per partition.
-   *
-   * <p>This test mirrors {@code TableRebalancer}: the rebalance {@code instancePartitionsMap} is built from
-   * {@code shouldRelocateCompletedSegments(tableConfig)}, not by always passing COMPLETED IPs directly.
-   */
+  /// Regression for imported COMPLETED instance partitions during rebalance.
+  ///
+  /// **Prod scenario:** Table B imports Table A's CONSUMING and COMPLETED instance partitions via
+  /// `instancePartitionsMap` (no `instanceAssignmentConfigMap` for COMPLETED). During rebalance,
+  /// [org.apache.pinot.controller.helix.core.rebalance.TableRebalancer#getInstancePartitionsMap] only
+  /// loads COMPLETED IPs when [InstanceAssignmentConfigUtils#shouldRelocateCompletedSegments] returns true.
+  ///
+  /// **Bug:** `shouldRelocateCompletedSegments` ignored `instancePartitionsMap`, so rebalance
+  /// passed only CONSUMING IPs to segment assignment and completed segments stayed on one server per partition.
+  ///
+  /// This test mirrors `TableRebalancer`: the rebalance `instancePartitionsMap` is built from
+  /// `shouldRelocateCompletedSegments(tableConfig)`, not by always passing COMPLETED IPs directly.
   @Test
   public void testImportedInstancePartitionsWithMultipleServersPerPartition() {
     int numReplicas = 2;
@@ -660,7 +654,7 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(numReplicas)
             .setStreamConfigs(streamConfigs)
             .setInstancePartitionsMap(importedInstancePartitions)
-            .setSegmentAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.COMPLETED.toString(),
+            .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.COMPLETED.toString(),
                 new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)))
             .build();
     assertTrue(InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig),
@@ -820,10 +814,8 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
     }
   }
 
-  /**
-   * Builds the instance-partitions map the same way as
-   * {@link org.apache.pinot.controller.helix.core.rebalance.TableRebalancer#getInstancePartitionsMap}.
-   */
+  /// Builds the instance-partitions map the same way as
+  /// [org.apache.pinot.controller.helix.core.rebalance.TableRebalancer#getInstancePartitionsMap].
   private static Map<InstancePartitionsType, InstancePartitions> buildRebalanceInstancePartitionsMap(
       TableConfig tableConfig, InstancePartitions consumingInstancePartitions,
       InstancePartitions completedInstancePartitions) {

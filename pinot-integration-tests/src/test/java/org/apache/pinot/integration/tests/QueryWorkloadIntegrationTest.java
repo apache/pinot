@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -130,7 +129,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     // Add offline table config
     TableConfig offlineTableConfig = createOfflineTableConfig();
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap =
-        Collections.singletonMap("OFFLINE", createInstanceAssignmentConfig());
+        Map.of("OFFLINE", createInstanceAssignmentConfig());
     offlineTableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     addTableConfig(offlineTableConfig);
     // Add realtime table config
@@ -160,9 +159,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     WorkloadBudgetManagerFactory.unregister();
   }
 
-  /**
-   * Test basic workload config creation and cost propagation
-   */
+  /// Test basic workload config creation and cost propagation
   @Test
   public void testQueryWorkloadConfigPropagation() throws Exception {
     EnforcementProfile enforcementProfile = new EnforcementProfile(Long.MAX_VALUE, Long.MAX_VALUE);
@@ -265,9 +262,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
-  /**
-   * Helper method to properly clean up a workload and wait for deletion to propagate
-   */
+  /// Helper method to properly clean up a workload and wait for deletion to propagate
   private void cleanupWorkload(String workloadName) throws Exception {
     getOrCreateAdminClient().getQueryWorkloadClient().deleteQueryWorkloadConfig(workloadName);
     // Wait for deletion to propagate - verify workload is actually removed from controller
@@ -283,9 +278,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     }, 10_000L, "Failed to delete query workload config: " + workloadName);
   }
 
-  /**
-   * Helper method to test cost propagation to all instances (servers and brokers)
-   */
+  /// Helper method to test cost propagation to all instances (servers and brokers)
   private void validateCostPropagation(QueryWorkloadConfig queryWorkloadConfig) throws Exception {
     for (NodeConfig nodeConfig : queryWorkloadConfig.getNodeConfigs()) {
       PropagationScheme propagationScheme = nodeConfig.getPropagationScheme();
@@ -313,9 +306,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
-  /**
-   * Helper method to test query execution with workload and verify expected behavior
-   */
+  /// Helper method to test query execution with workload and verify expected behavior
   private void testQueryExecution(String workloadName, boolean expectRejection) throws Exception {
     String query = "SELECT DISTINCTCOUNT(AirlineID), DISTINCTCOUNT(Carrier) FROM myTable GROUP BY ArrTimeBlk"
         + " LIMIT 10000;" + "SET workloadName='" + workloadName + "'";
@@ -338,9 +329,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
-  /**
-   * Test QueryWorkloadResource endpoints on a specific server instance for a specific workload
-   */
+  /// Test QueryWorkloadResource endpoints on a specific server instance for a specific workload
   private void validateCostPropagationOnInstances(String instance, String workloadName,
                                                   long expectedCpuBudgetNs, long expectedMemoryBudgetBytes)
       throws Exception {
@@ -364,9 +353,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
-  /**
-   * Get the definitive list of instances that serve a specific table
-   */
+  /// Get the definitive list of instances that serve a specific table
   private Set<String> getInstancesForTable(String tableName, InstanceType instanceType) throws Exception {
     String url;
     String tag;
@@ -396,9 +383,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     return serverInstances;
   }
 
-  /**
-   * Helper method to wait for workload config propagation
-   */
+  /// Helper method to wait for workload config propagation
   private void updateAndValidateWorkloadConfigPropagation(QueryWorkloadConfig queryWorkloadConfig)
       throws Exception {
     getOrCreateAdminClient().getQueryWorkloadClient()

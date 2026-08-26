@@ -19,7 +19,6 @@
 package org.apache.pinot.materializedview.scheduler;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -231,7 +230,7 @@ public class MaterializedViewTaskSchedulerTest {
     when(context.getPropertyStore()).thenReturn(propertyStore);
 
     MaterializedViewRuntimeMetadata runtime = new MaterializedViewRuntimeMetadata(
-        "mv_OFFLINE", 0L, Collections.emptyMap());
+        "mv_OFFLINE", 0L, Map.of());
     when(propertyStore.get(
         eq(ZKMetadataProvider.constructPropertyStorePathForMaterializedViewRuntime("mv_OFFLINE")),
         any(Stat.class),
@@ -261,7 +260,7 @@ public class MaterializedViewTaskSchedulerTest {
 
   @Test
   public void testComputeMaxSourceEndTimeMsEmptyList() {
-    long max = MaterializedViewTaskScheduler.computeMaxSourceEndTimeMs(Collections.emptyList());
+    long max = MaterializedViewTaskScheduler.computeMaxSourceEndTimeMs(List.of());
     assertEquals(max, Long.MIN_VALUE,
         "Empty list should return MIN_VALUE so the caller falls back to roughCutoffMs");
   }
@@ -296,7 +295,7 @@ public class MaterializedViewTaskSchedulerTest {
     // endMs == 0 is the epoch boundary, not "unset" — the >= 0 filter must admit it so
     // a synthetic test/source carrying epoch-zero segments still produces a real max.
     long max = MaterializedViewTaskScheduler.computeMaxSourceEndTimeMs(
-        Collections.singletonList(segmentWithEndMs(0L)));
+        List.of(segmentWithEndMs(0L)));
     assertEquals(max, 0L);
   }
 
@@ -369,7 +368,7 @@ public class MaterializedViewTaskSchedulerTest {
     when(context.getTableConfig(sourceTableOffline)).thenReturn(
         new TableConfigBuilder(TableType.OFFLINE).setTableName(sourceTable).build());
     // Source has zero overlapping segments => scheduler picks DELETE for the STALE bucket.
-    when(context.getSegmentsZKMetadata(sourceTableOffline)).thenReturn(Collections.emptyList());
+    when(context.getSegmentsZKMetadata(sourceTableOffline)).thenReturn(List.of());
     // No in-flight tasks (forRunningTasks is a no-op mock, so all per-mode counts stay 0).
 
     // Runtime carries one STALE partition at staleBucketMs; the watermark sits at the same bucket.
@@ -389,7 +388,7 @@ public class MaterializedViewTaskSchedulerTest {
         .setTableName("mv").setIsMaterializedView(true).setTaskConfig(taskConfig).build();
 
     List<PinotTaskConfig> tasks =
-        new MaterializedViewTaskScheduler(context).generateTasks(Collections.singletonList(mvConfig));
+        new MaterializedViewTaskScheduler(context).generateTasks(List.of(mvConfig));
 
     assertEquals(tasks.size(), 1, "expected exactly one DELETE task");
     Map<String, String> configs = tasks.get(0).getConfigs();
@@ -428,7 +427,7 @@ public class MaterializedViewTaskSchedulerTest {
     // (Built before the when() below: stubbing a mock inside another stubbing trips Mockito.)
     SegmentZKMetadata sourceTail = segmentWithEndMs(b3 - 1);
     when(context.getSegmentsZKMetadata(sourceTableOffline)).thenReturn(
-        Collections.singletonList(sourceTail));
+        List.of(sourceTail));
     // One in-flight OVERWRITE for [b2, b3) — the step-1 dispatch from the previous cycle —
     // so step 1 is skipped this cycle and only the APPEND loop runs.
     doAnswer(inv -> {
@@ -458,7 +457,7 @@ public class MaterializedViewTaskSchedulerTest {
         .setTableName("mv").setIsMaterializedView(true).setTaskConfig(taskConfig).build();
 
     List<PinotTaskConfig> tasks =
-        new MaterializedViewTaskScheduler(context).generateTasks(Collections.singletonList(mvConfig));
+        new MaterializedViewTaskScheduler(context).generateTasks(List.of(mvConfig));
 
     assertTrue(tasks.isEmpty(), "the STALE bucket is the exclusive (OVERWRITE/DELETE) step's "
         + "responsibility; the APPEND loop must skip it instead of double-dispatching the same "

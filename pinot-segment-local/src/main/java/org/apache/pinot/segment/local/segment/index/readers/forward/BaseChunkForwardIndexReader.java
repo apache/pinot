@@ -37,9 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base implementation for chunk-based raw (non-dictionary-encoded) forward index reader.
- */
+/// Base implementation for chunk-based raw (non-dictionary-encoded) forward index reader.
 public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<ChunkReaderContext> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseChunkForwardIndexReader.class);
 
@@ -110,16 +108,14 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     _isSingleValue = isSingleValue;
   }
 
-  /**
-   * Helper method to return the chunk buffer that contains the value at the given document id.
-   * <ul>
-   *   <li> If the chunk already exists in the reader context, returns the same. </li>
-   *   <li> Otherwise, loads the chunk for the row, and sets it in the reader context. </li>
-   * </ul>
-   * @param docId Document id
-   * @param context Reader context
-   * @return Chunk for the row
-   */
+  /// Helper method to return the chunk buffer that contains the value at the given document id.
+  ///
+  /// - If the chunk already exists in the reader context, returns the same.
+  /// - Otherwise, loads the chunk for the row, and sets it in the reader context.
+  ///
+  /// @param docId Document id
+  /// @param context Reader context
+  /// @return Chunk for the row
   protected ByteBuffer getChunkBuffer(int docId, ChunkReaderContext context) {
     int chunkId = getChunkId(docId);
     if (context.getChunkId() == chunkId) {
@@ -215,17 +211,17 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
 
     ByteBuffer decompressedBuffer = context.getChunkBuffer();
     decompressedBuffer.clear();
+    // Invalidate the cached chunk before decoding. If decompression fails, a subsequent read must
+    // retry instead of returning a partially-mutated buffer as a cache hit.
+    context.setChunkId(-1);
 
     try {
-      if (_compressionType == ChunkCompressionType.DELTA || _compressionType == ChunkCompressionType.DELTADELTA) {
-        // For delta-based compression, pre-size the output using decompressor's length calculation.
-        ByteBuffer compressedBuffer = _dataBuffer.toDirectByteBuffer(chunkPosition, chunkSize);
-        int decompressedSize = _chunkDecompressor.decompressedLength(compressedBuffer);
-        decompressedBuffer = ByteBuffer.allocateDirect(decompressedSize);
-        _chunkDecompressor.decompress(compressedBuffer, decompressedBuffer);
-      } else {
-        _chunkDecompressor.decompress(_dataBuffer.toDirectByteBuffer(chunkPosition, chunkSize), decompressedBuffer);
-      }
+      // ChunkReaderContext is sized for a full decoded chunk. Decode every compression type into
+      // that owned buffer so the buffer returned on the first read is also the one cached for
+      // subsequent reads in the same chunk. The old DELTA/DELTADELTA branch allocated a separate
+      // buffer without installing it in the context, causing all same-chunk reads after the first
+      // one to observe the untouched context buffer.
+      _chunkDecompressor.decompress(_dataBuffer.toDirectByteBuffer(chunkPosition, chunkSize), decompressedBuffer);
     } catch (IOException e) {
       LOGGER.error("Exception caught while decompressing data chunk", e);
       throw new RuntimeException(e);
@@ -234,11 +230,9 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     return decompressedBuffer;
   }
 
-  /**
-   * Helper method to get the offset of the chunk in the data.
-   * @param chunkId Id of the chunk for which to return the position.
-   * @return Position (offset) of the chunk in the data.
-   */
+  /// Helper method to get the offset of the chunk in the data.
+  /// @param chunkId Id of the chunk for which to return the position.
+  /// @return Position (offset) of the chunk in the data.
   protected long getChunkPosition(int chunkId) {
     if (_headerEntryChunkOffsetSize == Integer.BYTES) {
       return _dataHeader.getInt(chunkId * _headerEntryChunkOffsetSize);

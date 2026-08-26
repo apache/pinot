@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -70,9 +69,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for ST_UNION queries.
- */
+/// Queries test for ST_UNION queries.
 @SuppressWarnings("rawtypes")
 public class StUnionQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "StUnionQueriesTest");
@@ -218,7 +215,7 @@ public class StUnionQueriesTest extends BaseQueriesTest {
         ColumnDataType.BYTES,
         ColumnDataType.BYTES
     });
-    List<Object[]> expectedRows = Collections.singletonList(new Object[]{
+    List<Object[]> expectedRows = List.<Object[]>of(new Object[]{
         ScalarFunctions.stAsText(_expectedResults),
         BytesUtils.toHexString(ScalarFunctions.stAsBinary(_expectedResults)),
         BytesUtils.toHexString(ScalarFunctions.toGeometry(_expectedResults)),

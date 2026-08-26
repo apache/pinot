@@ -23,10 +23,10 @@ import java.io.File;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.client.ResultSetGroup;
@@ -51,10 +51,8 @@ import static org.apache.pinot.core.common.MinionConstants.UpsertCompactMergeTas
 import static org.testng.Assert.*;
 
 
-/**
- * Integration test for the UpsertCompactMergeTask minion task.
- * This test validates the complete flow of compacting and merging segments in an upsert table.
- */
+/// Integration test for the UpsertCompactMergeTask minion task.
+/// This test validates the complete flow of compacting and merging segments in an upsert table.
 public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegrationTest {
   protected static final String DEFAULT_TABLE_NAME = "mytable";
   protected static final String DEFAULT_SCHEMA_NAME = "mytable";
@@ -135,9 +133,7 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     FileUtils.deleteDirectory(_tempDir);
   }
 
-  /**
-   * Tests the basic flow of UpsertCompactMergeTask execution.
-   */
+  /// Tests the basic flow of UpsertCompactMergeTask execution.
   @Test(priority = 1)
   public void testBasicUpsertCompactMergeTaskExecution()
       throws Exception {
@@ -149,8 +145,8 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
 
     // Schedule the UpsertCompactMergeTask
     assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
-            .setTablesToSchedule(Collections.singleton(REALTIME_TABLE_NAME))
-            .setTasksToSchedule(Collections.singleton(MinionConstants.UpsertCompactMergeTask.TASK_TYPE)))
+            .setTablesToSchedule(Set.of(REALTIME_TABLE_NAME))
+            .setTasksToSchedule(Set.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE)))
         .get(MinionConstants.UpsertCompactMergeTask.TASK_TYPE));
 
     // Verify task is queued
@@ -181,16 +177,14 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     assertTrue(hasTaskMetadata, "Should have task metadata indicating segments were processed");
   }
 
-  /**
-   * Tests error scenarios in task execution.
-   */
+  /// Tests error scenarios in task execution.
   @Test(priority = 3)
   public void testErrorScenarios()
       throws Exception {
     // Test 1: Invalid configuration - scheduling tasks for non-existent table
     var result = _taskManager.scheduleTasks(new TaskSchedulingContext()
-        .setTablesToSchedule(Collections.singleton("nonExistentTable_REALTIME"))
-        .setTasksToSchedule(Collections.singleton(MinionConstants.UpsertCompactMergeTask.TASK_TYPE)));
+        .setTablesToSchedule(Set.of("nonExistentTable_REALTIME"))
+        .setTasksToSchedule(Set.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE)));
 
     // The task manager should return an empty result for non-existent tables rather than throw exception
     assertNull(result.get(MinionConstants.UpsertCompactMergeTask.TASK_TYPE),
@@ -210,8 +204,8 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     // The task generator should not generate tasks for tables without proper config
     // This is expected behavior - no tasks should be scheduled for tables without task config
     var noTaskResult = _taskManager.scheduleTasks(new TaskSchedulingContext()
-        .setTablesToSchedule(Collections.singleton("testTableWithoutTask_REALTIME"))
-        .setTasksToSchedule(Collections.singleton(MinionConstants.UpsertCompactMergeTask.TASK_TYPE)));
+        .setTablesToSchedule(Set.of("testTableWithoutTask_REALTIME"))
+        .setTasksToSchedule(Set.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE)));
 
     // Verify that no tasks are scheduled when table config is missing
     assertNull(noTaskResult.get(MinionConstants.UpsertCompactMergeTask.TASK_TYPE),
@@ -284,7 +278,7 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
   private TableTaskConfig getUpsertCompactMergeTaskConfig() {
     Map<String, String> taskConfigs = getDefaultTaskConfigs();
     return new TableTaskConfig(
-        Collections.singletonMap(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, taskConfigs));
+        Map.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, taskConfigs));
   }
 
   private Map<String, String> getDefaultTaskConfigs() {
@@ -439,10 +433,8 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     verifyLatestRecordsRetained();
   }
 
-  /**
-   * Verifies that for each primary key, the record with the highest timestamp is retained after merge.
-   * This is crucial for upsert behavior - the latest record should win.
-   */
+  /// Verifies that for each primary key, the record with the highest timestamp is retained after merge.
+  /// This is crucial for upsert behavior - the latest record should win.
   private void verifyLatestRecordsRetained()
       throws Exception {
     // Based on the gameScores_csv.tar.gz data, expected latest records are:
@@ -481,10 +473,8 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     System.out.println("✓ Verified that latest records are retained for each primary key after upsert merge");
   }
 
-  /**
-   * Captures the initial data state before running the merge task.
-   * This allows us to verify that the data remains consistent after the merge.
-   */
+  /// Captures the initial data state before running the merge task.
+  /// This allows us to verify that the data remains consistent after the merge.
   private void captureInitialDataState()
       throws Exception {
     // Capture initial count
@@ -564,10 +554,8 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     }
   }
 
-  /**
-   * Verifies that segments have been processed by the UpsertCompactMerge task.
-   * This checks for task completion metadata in segment custom maps.
-   */
+  /// Verifies that segments have been processed by the UpsertCompactMerge task.
+  /// This checks for task completion metadata in segment custom maps.
   private void verifyTaskProcessedSegments(List<SegmentZKMetadata> segments) {
     List<SegmentZKMetadata> processedSegments = segments.stream()
         .filter(s -> {
@@ -597,9 +585,7 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     }
   }
 
-  /**
-   * Verifies merged segments created by the task.
-   */
+  /// Verifies merged segments created by the task.
   private void verifyMergedSegments(List<SegmentZKMetadata> segments) {
     List<SegmentZKMetadata> mergedSegments = segments.stream()
         .filter(s -> s.getSegmentName().contains(MERGED_SEGMENT_NAME_PREFIX))
@@ -637,11 +623,9 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     }
   }
 
-  /**
-   * Verifies that the original segments that were merged have been properly invalidated.
-   * In an upsert table, when segments are merged, the original segments should be marked
-   * as having invalid documents or should be removed.
-   */
+  /// Verifies that the original segments that were merged have been properly invalidated.
+  /// In an upsert table, when segments are merged, the original segments should be marked
+  /// as having invalid documents or should be removed.
   private void verifyOriginalSegmentsInvalidated(String mergedSegmentsList) {
     String[] originalSegmentNames = mergedSegmentsList.split(",");
     List<SegmentZKMetadata> allSegments = _pinotHelixResourceManager.getSegmentsZKMetadata(REALTIME_TABLE_NAME);
@@ -671,10 +655,8 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     }
   }
 
-  /**
-   * Verifies that segments are properly uploaded to the controller.
-   * For successful task completion, merged segments should be uploaded.
-   */
+  /// Verifies that segments are properly uploaded to the controller.
+  /// For successful task completion, merged segments should be uploaded.
   private void verifySegmentUploadToController()
       throws Exception {
     List<SegmentZKMetadata> segments = _pinotHelixResourceManager.getSegmentsZKMetadata(REALTIME_TABLE_NAME);

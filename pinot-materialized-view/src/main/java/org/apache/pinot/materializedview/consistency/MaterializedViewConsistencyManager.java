@@ -21,7 +21,6 @@ package org.apache.pinot.materializedview.consistency;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -80,7 +79,7 @@ import org.slf4j.LoggerFactory;
 /// Thread-safety: all public methods are thread-safe. The internal flush and the periodic sweep
 /// both run on the same single-threaded scheduler, so ZK writes are serialized per base table.
 ///
-/// <h3>Partition model (TIME-WINDOWED ONLY in PR 1)</h3>
+/// ## Partition model (TIME-WINDOWED ONLY in PR 1)
 ///
 /// This implementation assumes a single MV partition shape: time-windowed partitions of
 /// uniform width `bucketTimePeriod`, keyed by `bucketStartMs`. Range-based notifications
@@ -271,7 +270,7 @@ public class MaterializedViewConsistencyManager {
   public List<String> getDependentMaterializedViews(String rawBaseTableName) {
     List<String> dependents = _baseTableToMaterializedViewTables.get(rawBaseTableName);
     if (dependents == null || dependents.isEmpty()) {
-      return Collections.emptyList();
+      return List.of();
     }
     // Defensive copy so a caller doesn't accidentally mutate the live reverse index.
     return new ArrayList<>(dependents);
@@ -613,7 +612,7 @@ public class MaterializedViewConsistencyManager {
     MaterializedViewRuntimeMetadata runtime =
         MaterializedViewRuntimeMetadataUtils.fetchWithVersion(_propertyStore, viewTableName, stat);
     if (runtime == null) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     long bucketMs = inferBucketMs(viewTableName, runtime.getPartitions());

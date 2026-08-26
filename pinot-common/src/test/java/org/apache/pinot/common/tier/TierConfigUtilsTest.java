@@ -19,9 +19,9 @@
 package org.apache.pinot.common.tier;
 
 import com.google.common.collect.Lists;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
@@ -33,9 +33,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests the utility methods for TierConfig
- */
+/// Tests the utility methods for TierConfig
 public class TierConfigUtilsTest {
 
   @Test
@@ -47,7 +45,7 @@ public class TierConfigUtilsTest {
     Assert.assertFalse(TierConfigUtils.shouldRelocateToTiers(tableConfig));
 
     tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(Collections.emptyList())
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(List.of())
             .build();
     Assert.assertFalse(TierConfigUtils.shouldRelocateToTiers(tableConfig));
 
@@ -74,7 +72,7 @@ public class TierConfigUtilsTest {
     Assert.assertFalse(TierConfigUtils.shouldRelocateToTiers(tableConfig));
 
     tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTierConfigList(Collections.emptyList())
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTierConfigList(List.of())
             .build();
     Assert.assertFalse(TierConfigUtils.shouldRelocateToTiers(tableConfig));
 
@@ -90,9 +88,7 @@ public class TierConfigUtilsTest {
     Assert.assertTrue(TierConfigUtils.shouldRelocateToTiers(tableConfig));
   }
 
-  /**
-   * Tests conversion from {@code TierConfig} to {@code Tier} in the {@code TierFactory}
-   */
+  /// Tests conversion from `TierConfig` to `Tier` in the `TierFactory`
   @Test
   public void testGetTier() {
     TierConfig tierConfig = new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
@@ -162,9 +158,7 @@ public class TierConfigUtilsTest {
     }
   }
 
-  /**
-   * Tests the custom comparator for tiers
-   */
+  /// Tests the custom comparator for tiers
   @Test
   public void testTierComparator() {
     Comparator<Tier> tierComparator = TierConfigUtils.getTierComparator();
@@ -222,7 +216,7 @@ public class TierConfigUtilsTest {
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(Lists
         .newArrayList(new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null,
-            Collections.singletonMap("dataDir", "/foo/bar")))).build();
+            Map.of("dataDir", "/foo/bar")))).build();
     dataDir = TierConfigUtils.getDataDirForTier(tableConfig, "myTier", instanceTierConfigs);
     Assert.assertEquals(dataDir, "/foo/bar");
   }

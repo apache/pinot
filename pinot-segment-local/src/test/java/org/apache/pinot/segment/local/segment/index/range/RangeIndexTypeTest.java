@@ -58,21 +58,17 @@ public class RangeIndexTypeTest {
         "A disabled range index must not appear in the rebuild list");
   }
 
-  /**
-   * End-to-end shape of the user-visible scenario:
-   *
-   * <ol>
-   *   <li>A column starts with a raw forward index and a raw range index (no dictionary).</li>
-   *   <li>The user enables a dictionary on that column.</li>
-   *   <li>On segment reload, the dictionary handler builds the new dictionary, and the loader consults
-   *       {@link DictionaryIndexConfig#getIndexTypesToInvalidateOnDictionaryChange} to find every index whose
-   *       on-disk payload has been invalidated by the dictionary state change. The range index must be in that
-   *       set so it is dropped and rebuilt against the new dictionary IDs.</li>
-   * </ol>
-   *
-   * This test asserts step (3): the rebuild list, computed from the post-change config (range still enabled,
-   * dictionary now enabled), includes the range index.
-   */
+  /// End-to-end shape of the user-visible scenario:
+  ///
+  /// 1. A column starts with a raw forward index and a raw range index (no dictionary).
+  /// 2. The user enables a dictionary on that column.
+  /// 3. On segment reload, the dictionary handler builds the new dictionary, and the loader consults
+  ///       [DictionaryIndexConfig#getIndexTypesToInvalidateOnDictionaryChange] to find every index whose
+  ///       on-disk payload has been invalidated by the dictionary state change. The range index must be in that
+  ///       set so it is dropped and rebuilt against the new dictionary IDs.
+  ///
+  /// This test asserts step (3): the rebuild list, computed from the post-change config (range still enabled,
+  /// dictionary now enabled), includes the range index.
   @Test
   public void rangeIndexIsScheduledForRebuildAfterDictionaryEnable() {
     FieldSpec fieldSpec = new DimensionFieldSpec("col", FieldSpec.DataType.INT, true);

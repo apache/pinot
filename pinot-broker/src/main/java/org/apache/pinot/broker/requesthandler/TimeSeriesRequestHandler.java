@@ -24,7 +24,6 @@ import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -284,14 +283,12 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     return HumanReadableDuration.from(step).getSeconds();
   }
 
-  /**
-   * First-stage access control check for the request.
-   * This method checks if the requester has access to the broker to prevent unauthenticated requests from
-   * using up resources.
-   * Secondary table-level access control checks will be performed later.
-   *
-   * @param requesterIdentity The identity of the requester.
-   */
+  /// First-stage access control check for the request.
+  /// This method checks if the requester has access to the broker to prevent unauthenticated requests from
+  /// using up resources.
+  /// Secondary table-level access control checks will be performed later.
+  ///
+  /// @param requesterIdentity The identity of the requester.
   private void firstStageAccessControlCheck(RequesterIdentity requesterIdentity) {
     AccessControl accessControl = _accessControlFactory.create();
     AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity);
@@ -334,11 +331,9 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  /**
-   * Helper function that takes a @Code{LeafTimeSeriesPlanNode} and validates the column names used
-   * in the filter, groupBy, value etc. expressions
-   * @param leafNode
-   */
+  /// Helper function that takes a @Code{LeafTimeSeriesPlanNode} and validates the column names used
+  /// in the filter, groupBy, value etc. expressions
+  /// @param leafNode
   static void validateColumnNames(LeafTimeSeriesPlanNode leafNode, Schema tableSchema) {
     String tableName = TableNameBuilder.extractRawTableName(leafNode.getTableName());
     Preconditions.checkNotNull(tableSchema, "Schema for Table " + tableName + " not found");
@@ -386,13 +381,11 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  /**
-   * Table-level access control check for the request.
-   * This method checks if the requester has access to the tables in the request.
-   *
-   * @param httpHeaders The HTTP headers of the request.
-   * @param tableNames The list of table to check access for.
-   */
+  /// Table-level access control check for the request.
+  /// This method checks if the requester has access to the tables in the request.
+  ///
+  /// @param httpHeaders The HTTP headers of the request.
+  /// @param tableNames The list of table to check access for.
   private void tableLevelAccessControlCheck(HttpHeaders httpHeaders, List<String> tableNames) {
     AccessControl accessControl = _accessControlFactory.create();
     for (String tableName : tableNames) {
@@ -416,7 +409,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       DataSchema schema = new DataSchema(new String[]{"QUERY", "PLAN"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
       BrokerResponseNative response = BrokerResponseNative.empty();
-      response.setResultTable(new ResultTable(schema, Collections.singletonList(new Object[]{request.getQuery(),
+      response.setResultTable(new ResultTable(schema, List.<Object[]>of(new Object[]{request.getQuery(),
           plan})));
       return response;
     } catch (URISyntaxException e) {

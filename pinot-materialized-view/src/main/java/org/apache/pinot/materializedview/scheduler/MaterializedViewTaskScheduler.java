@@ -21,7 +21,6 @@ package org.apache.pinot.materializedview.scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -77,13 +76,12 @@ import org.slf4j.LoggerFactory;
 ///   - **Append** – If no STALE partitions exist and the watermark can advance (next
 ///       window is outside the buffer period), generate a normal `APPEND` task.
 ///
-///
 /// Dirty marking (STALE detection) is handled externally by
 /// `MaterializedViewConsistencyManager`, which reacts to base table segment changes
 /// (add, replace, delete) and proactively marks affected partitions in
 /// [MaterializedViewRuntimeMetadata].
 ///
-/// <h3>Partition model (TIME-WINDOWED ONLY in PR 1)</h3>
+/// ## Partition model (TIME-WINDOWED ONLY in PR 1)
 ///
 /// All selection logic assumes time-windowed partitions of fixed width `bucketTimePeriod`:
 /// the watermark is `long ms`, APPEND windows are `[watermarkMs, watermarkMs+bucketMs)`, and
@@ -922,7 +920,7 @@ public class MaterializedViewTaskScheduler {
         MaterializedViewTask.DEFAULT_STALENESS_THRESHOLD_MS);
     MaterializedViewDefinitionMetadata definition = new MaterializedViewDefinitionMetadata(
         viewTableWithType,
-        Collections.singletonList(sourceTableName),
+        List.of(sourceTableName),
         definedSQL,
         partitionExprMaps,
         splitSpec,

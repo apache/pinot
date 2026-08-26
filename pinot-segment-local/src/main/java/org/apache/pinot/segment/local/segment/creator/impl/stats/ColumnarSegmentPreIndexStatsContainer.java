@@ -37,17 +37,15 @@ import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/**
- * {@link SegmentPreIndexStatsContainer} that collects column statistics directly from {@link
- * ColumnReader} instances — one column at a time via the reader's sequential (rewind + next)
- * contract — rather than row by row. For a columnar source this keeps peak working memory to a single
- * column (or, for a batch-bounded reader, a single batch) instead of holding the whole row set, at
- * the cost of re-reading the source once per column. The values feed the same underlying collectors
- * as the row-based {@code SegmentPreIndexStatsCollectorImpl}.
- *
- * <p>Handles columns present in the source, new columns materialized from their defaults, and the
- * type coercion schema evolution requires (applied per value via {@link ColumnarValueNormalizer}).
- */
+/// [SegmentPreIndexStatsContainer] that collects column statistics directly from [ColumnReader] instances — one column
+/// at a time via the reader's sequential (rewind + next)
+/// contract — rather than row by row. For a columnar source this keeps peak working memory to a single
+/// column (or, for a batch-bounded reader, a single batch) instead of holding the whole row set, at
+/// the cost of re-reading the source once per column. The values feed the same underlying collectors
+/// as the row-based `SegmentPreIndexStatsCollectorImpl`.
+///
+/// Handles columns present in the source, new columns materialized from their defaults, and the
+/// type coercion schema evolution requires (applied per value via [ColumnarValueNormalizer]).
 public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexStatsContainer {
   private final Map<String, ColumnStatistics> _columnStatisticsMap;
   private final int _totalDocCount;
@@ -66,7 +64,7 @@ public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexSta
     }
   }
 
-  /** Validate that every reader agrees on the doc count and return it (throws if there are none). */
+  /// Validate that every reader agrees on the doc count and return it (throws if there are none).
   private static int resolveTotalDocs(Map<String, ColumnReader> columnReaders) {
     int totalDocs = -1;
     for (ColumnReader columnReader : columnReaders.values()) {
@@ -82,7 +80,7 @@ public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexSta
     return totalDocs;
   }
 
-  /** Zero-doc segment: every non-virtual column gets empty statistics, mirroring the row-major path. */
+  /// Zero-doc segment: every non-virtual column gets empty statistics, mirroring the row-major path.
   private void buildEmptyStatistics(StatsCollectorConfig statsCollectorConfig, Collection<FieldSpec> fieldSpecs) {
     for (FieldSpec fieldSpec : fieldSpecs) {
       if (!fieldSpec.isVirtualColumn()) {
@@ -114,31 +112,125 @@ public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexSta
     }
   }
 
-  /**
-   * Consume one column sequentially (rewind + next) and feed each normalized value to its collector.
-   *
-   * <p>The column-major driver runs with no transform pipeline, so each value must be normalized here
-   * the way the row-major {@code NullValueTransformer} + {@code DataTypeTransformer} would: substitute
-   * the column default for nulls and coerce to the column's stored type (e.g. Boolean -> Integer for a
-   * BOOLEAN column stored as INT, Timestamp -> Long for TIMESTAMP). Without it a non-segment source
-   * (e.g. Arrow) feeds nulls / source-typed values into the typed collectors' {@code collect(Object)}
-   * cast convention and NPEs / ClassCastExceptions. Shared with the index-write path via {@link
-   * ColumnarValueNormalizer}; closes the null/type-handling gap in {@code buildColumnar()}
-   * (apache/pinot#18629). Sequential (rewindable) consumption is the contract every columnar source
-   * can satisfy cheaply, including lazy / streaming readers that cannot serve random docId access.
-   */
+  /// Consume one column by document ID and feed each normalized value to its collector.
+  ///
+  /// The column-major driver runs with no transform pipeline, so each value must be normalized here
+  /// the way the row-major `NullValueTransformer` + `DataTypeTransformer` would: substitute
+  /// the column default for nulls and coerce to the column's stored type (e.g. Boolean -> Integer for a
+  /// BOOLEAN column stored as INT, Timestamp -> Long for TIMESTAMP). Without it a non-segment source
+  /// (e.g. Arrow) feeds nulls / source-typed values into the typed collectors' `collect(Object)`
+  /// cast convention and NPEs / ClassCastExceptions. Shared with the index-write path via [ColumnarValueNormalizer] ;
+  /// closes the null/type-handling gap in `buildColumnar()`
+  /// (apache/pinot#18629).
   private static void collectColumn(String columnName, FieldSpec fieldSpec, ColumnReader columnReader,
       AbstractColumnStatisticsCollector statsCollector) {
     PinotDataType destDataType = PinotDataType.getPinotDataTypeForIngestion(fieldSpec);
     try {
-      columnReader.rewind();
-      while (columnReader.hasNext()) {
+      int numDocs = columnReader.getTotalDocs();
+      // Typed fast path: when the reader can serve a single-value column as a primitive directly
+      // (ColumnReader.getValueType()), read it with the type-specific accessor and feed the matching
+      // AbstractColumnStatisticsCollector.collect(primitive) overload. This avoids the
+      // Integer/Long/Float/Double box that getValue(docId) -> collect(Object) incurs on every value, plus the
+      // per-value normalize() allocation. Anything the reader cannot type directly — multi-value,
+      // BIG_DECIMAL/STRING/BYTES, or a column needing coercion (BOOLEAN/TIMESTAMP) — falls through to
+      // the shared, normalize()-based Object path below, which stays the single source of truth for
+      // null and type handling.
+      if (fieldSpec.isSingleValueField()
+          && collectSingleValuePrimitive(columnName, fieldSpec, destDataType, columnReader, statsCollector, numDocs)) {
+        return;
+      }
+      for (int docId = 0; docId < numDocs; docId++) {
         statsCollector.collect(
-            ColumnarValueNormalizer.normalize(columnName, fieldSpec, destDataType, columnReader.next()));
+            ColumnarValueNormalizer.normalize(columnName, fieldSpec, destDataType, columnReader.getValue(docId)));
       }
     } catch (IOException e) {
       throw new RuntimeException("Caught exception collecting stats for column: " + columnName, e);
     }
+  }
+
+  /// Typed, allocation-free stats collection for a single-value primitive column. Returns `true`
+  /// if it consumed the column (the reader served it as INT / LONG / FLOAT / DOUBLE directly), or
+  /// `false` — without advancing the reader — if the caller should fall back to the Object path.
+  ///
+  /// A `null` value is collected as the column's default, pre-normalized once via [ColumnarValueNormalizer] so it
+  /// matches the value the Object path would collect (segment metadata
+  /// stays identical between the two paths). The reader's `getValueType()` check guards each typed
+  /// accessor, so a column the reader cannot type natively (e.g. BOOLEAN or TIMESTAMP read from a
+  /// non-native vector) returns `false` here rather than risking a wrong typed read.
+  private static boolean collectSingleValuePrimitive(String columnName, FieldSpec fieldSpec,
+      PinotDataType destDataType, ColumnReader columnReader, AbstractColumnStatisticsCollector statsCollector,
+      int numDocs)
+      throws IOException {
+    PinotDataType valueType = columnReader.getValueType();
+    switch (fieldSpec.getDataType()) {
+      case INT: {
+        if (valueType != PinotDataType.INT) {
+          return false;
+        }
+        for (int docId = 0; docId < numDocs; docId++) {
+          if (columnReader.isNull(docId)) {
+            collectNull(columnName, fieldSpec, destDataType, columnReader, statsCollector, docId);
+          } else {
+            statsCollector.collect(columnReader.getInt(docId));
+          }
+        }
+        return true;
+      }
+      case LONG: {
+        if (valueType != PinotDataType.LONG) {
+          return false;
+        }
+        for (int docId = 0; docId < numDocs; docId++) {
+          if (columnReader.isNull(docId)) {
+            collectNull(columnName, fieldSpec, destDataType, columnReader, statsCollector, docId);
+          } else {
+            statsCollector.collect(columnReader.getLong(docId));
+          }
+        }
+        return true;
+      }
+      case FLOAT: {
+        if (valueType != PinotDataType.FLOAT) {
+          return false;
+        }
+        for (int docId = 0; docId < numDocs; docId++) {
+          if (columnReader.isNull(docId)) {
+            collectNull(columnName, fieldSpec, destDataType, columnReader, statsCollector, docId);
+          } else {
+            statsCollector.collect(columnReader.getFloat(docId));
+          }
+        }
+        return true;
+      }
+      case DOUBLE: {
+        if (valueType != PinotDataType.DOUBLE) {
+          return false;
+        }
+        for (int docId = 0; docId < numDocs; docId++) {
+          if (columnReader.isNull(docId)) {
+            collectNull(columnName, fieldSpec, destDataType, columnReader, statsCollector, docId);
+          } else {
+            statsCollector.collect(columnReader.getDouble(docId));
+          }
+        }
+        return true;
+      }
+      default:
+        return false;
+    }
+  }
+
+  /// Collect a null doc on the typed fast path by routing it through the same [ColumnarValueNormalizer#normalize] call
+  /// `collectColumn` uses, so this path records exactly
+  /// what the Object path would: a source that returns `null` at a null doc (e.g. Arrow) yields
+  /// the column default, and one that surfaces a stored sentinel (e.g. a Pinot-segment reader) yields
+  /// that sentinel — both identical to the Object path. Null docs are rare, so the box this incurs is
+  /// immaterial; the non-null hot path stays primitive.
+  private static void collectNull(String columnName, FieldSpec fieldSpec, PinotDataType destDataType,
+      ColumnReader columnReader, AbstractColumnStatisticsCollector statsCollector, int docId)
+      throws IOException {
+    statsCollector.collect(
+        ColumnarValueNormalizer.normalize(columnName, fieldSpec, destDataType, columnReader.getValue(docId)));
   }
 
   @Override

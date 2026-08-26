@@ -18,17 +18,14 @@
  */
 package org.apache.pinot.common.datablock;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 
 
-/**
- * A block type to indicate some metadata about the current processing state.
- * For the different types of metadata blocks see {@link MetadataBlockType}.
- */
+/// A block type to indicate some metadata about the current processing state.
+/// For the different types of metadata blocks see [MetadataBlockType].
 public class MetadataBlock extends BaseDataBlock {
   @Nullable
   private List<DataBuffer> _statsByStage;
@@ -38,7 +35,7 @@ public class MetadataBlock extends BaseDataBlock {
   private final String _serverId;
 
   private MetadataBlock() {
-    this(Collections.emptyList());
+    this(List.of());
   }
 
   public static MetadataBlock newEos() {
@@ -75,7 +72,7 @@ public class MetadataBlock extends BaseDataBlock {
 
   private MetadataBlock(int stageId, int workerId, @Nullable String serverId) {
     super(0, null, new String[0], new byte[0], new byte[0]);
-    _statsByStage = Collections.emptyList();
+    _statsByStage = List.of();
     _stageId = stageId;
     _workerId = workerId;
     _serverId = serverId;
@@ -85,11 +82,9 @@ public class MetadataBlock extends BaseDataBlock {
     return _errCodeToExceptionMap.isEmpty() ? MetadataBlockType.EOS : MetadataBlockType.ERROR;
   }
 
-  /**
-   * Returns the list of serialized stats.
-   * <p>
-   * The returned list may contain nulls, which would mean that no stats were available for that stage.
-   */
+  /// Returns the list of serialized stats.
+  ///
+  /// The returned list may contain nulls, which would mean that no stats were available for that stage.
   @Nullable
   @Override
   public List<DataBuffer> getStatsByStage() {
@@ -125,17 +120,13 @@ public class MetadataBlock extends BaseDataBlock {
   }
 
   public enum MetadataBlockType {
-    /**
-     * Indicates that this block is the final block to be sent
-     * (End Of Stream) as part of an operator chain computation.
-     */
+    /// Indicates that this block is the final block to be sent
+    /// (End Of Stream) as part of an operator chain computation.
     EOS,
 
-    /**
-     * An {@code ERROR} metadata block indicates that there was
-     * some error during computation. To retrieve the error that
-     * occurred, use {@link MetadataBlock#getExceptions()}
-     */
+    /// An `ERROR` metadata block indicates that there was
+    /// some error during computation. To retrieve the error that
+    /// occurred, use [MetadataBlock#getExceptions()]
     ERROR
   }
 }

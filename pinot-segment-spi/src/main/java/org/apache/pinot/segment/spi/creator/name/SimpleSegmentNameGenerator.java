@@ -23,18 +23,15 @@ import java.util.UUID;
 import javax.annotation.Nullable;
 
 
-/**
- * Simple segment name generator which does not perform time conversion.
- * <p>
- * The segment name is simply joining the following fields with '_' but ignoring all the {@code null}s.
- * <ul>
- *   <li>Table name</li>
- *   <li>Minimum time value</li>
- *   <li>Maximum time value</li>
- *   <li>Segment name postfix</li>
- *   <li>Sequence id</li>
- * </ul>
- */
+/// Simple segment name generator which does not perform time conversion.
+///
+/// The segment name is simply joining the following fields with '\_' but ignoring all the `null`s.
+///
+/// - Table name
+/// - Minimum time value
+/// - Maximum time value
+/// - Segment name postfix
+/// - Sequence id
 @SuppressWarnings("serial")
 public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
   private final String _segmentNamePrefix;

@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.query.planner.explain;
 
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.calcite.rel.RelDistribution;
@@ -36,20 +36,18 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 
 
-/**
- * Tests for {@link PlanNodeMerger}, the logic that decides whether two explain plan nodes describe the same plan and
- * can be merged into one.
- */
+/// Tests for [PlanNodeMerger], the logic that decides whether two explain plan nodes describe the same plan and
+/// can be merged into one.
 public class PlanNodeMergerTest {
   private static final DataSchema SCHEMA = new DataSchema(new String[]{"col"},
       new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
 
   private static ExplainedNode leaf(String title) {
-    return new ExplainedNode(0, SCHEMA, null, Collections.emptyList(), title, Map.of());
+    return new ExplainedNode(0, SCHEMA, null, List.of(), title, Map.of());
   }
 
   private static ExchangeNode exchange(Set<String> tableNames) {
-    return new ExchangeNode(0, SCHEMA, Collections.singletonList(leaf("Scan")),
+    return new ExchangeNode(0, SCHEMA, List.of(leaf("Scan")),
         PinotRelExchangeType.getDefaultExchangeType(), RelDistribution.Type.BROADCAST_DISTRIBUTED, null, false, null,
         false, false, tableNames, ExchangeStrategy.BROADCAST_EXCHANGE, "absHashCodeMurmur3");
   }
@@ -68,8 +66,8 @@ public class PlanNodeMergerTest {
 
   @Test
   public void differentNodeTypesDoNotMerge() {
-    ProjectNode project = new ProjectNode(0, SCHEMA, NodeHint.EMPTY, Collections.singletonList(leaf("Scan")),
-        Collections.emptyList());
+    ProjectNode project = new ProjectNode(0, SCHEMA, NodeHint.EMPTY, List.of(leaf("Scan")),
+        List.of());
     assertNull(PlanNodeMerger.mergePlans(project, leaf("Scan"), false));
   }
 }

@@ -52,10 +52,8 @@ public class ControllerConfTest {
 
   private static final Random RAND = new Random();
 
-  /**
-   * When only new configs are supplied (deprecated configs have been removed), then the correct
-   * converted value is returned.
-   */
+  /// When only new configs are supplied (deprecated configs have been removed), then the correct
+  /// converted value is returned.
   @Test
   public void supplyingNewConfigsShouldReturnCorrectlyConvertedValue() {
     //setup
@@ -244,5 +242,14 @@ public class ControllerConfTest {
     Assert.assertEquals(conf.getPinotTaskQueueMaxDeletesPerCycle(), 100);
     Assert.assertEquals(conf.getPinotTaskQueueCapacity(), 10000);
     Assert.assertEquals(conf.getPinotTaskQueueWarningThreshold(), 8000);
+  }
+
+  @Test
+  public void testIngestFromUriLocalFileSystemCompatibilityOption() {
+    ControllerConf controllerConf = new ControllerConf();
+    Assert.assertFalse(controllerConf.isIngestFromUriLocalFileSystemAllowed());
+
+    controllerConf.setProperty(ControllerConf.INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM, true);
+    Assert.assertTrue(controllerConf.isIngestFromUriLocalFileSystemAllowed());
   }
 }

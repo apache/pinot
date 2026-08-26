@@ -60,6 +60,8 @@ public class DispatchablePlanContext {
 
   private final Map<Integer, DispatchablePlanMetadata> _dispatchablePlanMetadataMap = new HashMap<>();
   private final Map<Integer, PlanNode> _dispatchablePlanStageRootMap = new HashMap<>();
+  private final Map<String, WorkerManager.PartitionTableInfo> _partitionTableInfoCache = new HashMap<>();
+  private final Map<Integer, Set<String>> _prunedSegmentsCache = new HashMap<>();
   private long _numSegmentsPrunedByBroker;
   private int _leafStagesAssigned;
   private int _leafStagesEmpty;
@@ -133,6 +135,21 @@ public class DispatchablePlanContext {
     return _dispatchablePlanStageRootMap;
   }
 
+  /// The partition layout of each partitioned table scanned by this query, keyed by table name. Read from the routing
+  /// manager once per table so that the colocation pre-pass and every leaf stage scanning the same table (e.g. both
+  /// sides of a self-join) see one snapshot. The value is opaque here: [WorkerManager] builds and interprets it.
+  public Map<String, WorkerManager.PartitionTableInfo> getPartitionTableInfoCache() {
+    return _partitionTableInfoCache;
+  }
+
+  /// The segments the broker's pruners provably eliminated for each leaf fragment, keyed by fragment id. Keyed by
+  /// fragment rather than by table because the verdict depends on the leaf's own filter, and the two sides of a
+  /// self-join scan one table under two different ones. Cached because the colocation pre-pass and the leaf
+  /// assignment both need it, and each entry costs a routing call.
+  public Map<Integer, Set<String>> getPrunedSegmentsCache() {
+    return _prunedSegmentsCache;
+  }
+
   public long getNumSegmentsPrunedByBroker() {
     return _numSegmentsPrunedByBroker;
   }
@@ -149,12 +166,10 @@ public class DispatchablePlanContext {
     _leafStagesEmpty++;
   }
 
-  /**
-   * Returns true when at least one non-replicated leaf stage was processed during worker
-   * assignment, and every such leaf stage ended up with zero workers (e.g. all segments
-   * pruned by broker, or the table has no segments). Replicated leaves (dim tables) are
-   * excluded because they return early in WorkerManager before reaching the tracking code.
-   */
+  /// Returns true when at least one non-replicated leaf stage was processed during worker
+  /// assignment, and every such leaf stage ended up with zero workers (e.g. all segments
+  /// pruned by broker, or the table has no segments). Replicated leaves (dim tables) are
+  /// excluded because they return early in WorkerManager before reaching the tracking code.
   public boolean isAllNonReplicatedLeafStagesEmpty() {
     return _leafStagesAssigned > 0 && _leafStagesAssigned == _leafStagesEmpty;
   }

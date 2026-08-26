@@ -21,7 +21,6 @@ package org.apache.pinot.plugin.minion.tasks;
 import com.google.common.net.InetAddresses;
 import java.io.File;
 import java.net.URI;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -53,9 +52,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Util class for segment conversion tasks
- */
+/// Util class for segment conversion tasks
 public class SegmentConversionUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentConversionUtils.class);
 
@@ -66,17 +63,15 @@ public class SegmentConversionUtils {
   private SegmentConversionUtils() {
   }
 
-  /**
-   * Gets segment names for the given table
-   * @param tableNameWithType a table name with type
-   * @param startTimestamp start timestamp in ms (inclusive)
-   * @param endTimestamp end timestamp in ms (exclusive)
-   * @param excludeOverlapping whether to exclude the segments overlapping with the timestamps, false by default
-   * @param controllerBaseURI the controller base URI
-   * @param authProvider a {@link AuthProvider}
-   * @return a set of segment names
-   * @throws Exception when there are exceptions getting segment names for the given table
-   */
+  /// Gets segment names for the given table
+  /// @param tableNameWithType a table name with type
+  /// @param startTimestamp start timestamp in ms (inclusive)
+  /// @param endTimestamp end timestamp in ms (exclusive)
+  /// @param excludeOverlapping whether to exclude the segments overlapping with the timestamps, false by default
+  /// @param controllerBaseURI the controller base URI
+  /// @param authProvider a [AuthProvider]
+  /// @return a set of segment names
+  /// @throws Exception when there are exceptions getting segment names for the given table
   public static Set<String> getSegmentNamesForTable(String tableNameWithType, long startTimestamp, long endTimestamp,
       boolean excludeOverlapping, URI controllerBaseURI, @Nullable AuthProvider authProvider)
       throws Exception {
@@ -93,18 +88,16 @@ public class SegmentConversionUtils {
           return new HashSet<>(allSegmentNameList);
         }
       }
-      return Collections.emptySet();
+      return Set.of();
     }
   }
 
-  /**
-   * Gets segment names for the given table
-   * @param tableNameWithType a table name with type
-   * @param controllerBaseURI the controller base URI
-   * @param authProvider a {@link AuthProvider}
-   * @return a set of segment names
-   * @throws Exception when there are exceptions getting segment names for the given table
-   */
+  /// Gets segment names for the given table
+  /// @param tableNameWithType a table name with type
+  /// @param controllerBaseURI the controller base URI
+  /// @param authProvider a [AuthProvider]
+  /// @return a set of segment names
+  /// @throws Exception when there are exceptions getting segment names for the given table
   public static Set<String> getSegmentNamesForTable(String tableNameWithType, URI controllerBaseURI,
       @Nullable AuthProvider authProvider)
       throws Exception {

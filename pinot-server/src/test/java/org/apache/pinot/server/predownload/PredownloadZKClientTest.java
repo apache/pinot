@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.predownload;
 
+import java.net.URI;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -25,15 +26,20 @@ import java.util.Map;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixException;
 import org.apache.helix.PropertyKey;
+import org.apache.helix.PropertyType;
 import org.apache.helix.model.CurrentState;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.zookeeper.api.client.HelixZkClient;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.impl.factory.SharedZkClientFactory;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.MockedStatic;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -41,6 +47,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.server.predownload.PredownloadTestUtil.*;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
@@ -181,5 +188,70 @@ public class PredownloadZKClientTest {
       assertEquals(predownloadSegmentInfoList.get(0).getCrc(), CRC);
       assertEquals(predownloadSegmentInfoList.get(1).getCrc(), 0);
     }
+  }
+
+  @Test
+  public void testGetPeerServerURIs()
+      throws Exception {
+    // Pass accessor directly — no spy needed since method signature accepts accessor as param
+    HelixDataAccessor dataAccessor = mock(HelixDataAccessor.class);
+    when(dataAccessor.keyBuilder()).thenReturn(new PropertyKey.Builder(CLUSTER_NAME));
+
+    ExternalView externalView = mock(ExternalView.class);
+    String peerInstanceId = "Server_peer_8098";
+    InstanceConfig peerConfig = mock(InstanceConfig.class);
+    when(peerConfig.getHostName()).thenReturn("peerHost");
+    ZNRecord peerRecord = new ZNRecord(peerInstanceId);
+    peerRecord.setIntField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY, 9000);
+    when(peerConfig.getRecord()).thenReturn(peerRecord);
+
+    // Case 1: ExternalView is null → empty list
+    doAnswer(inv -> null).when(dataAccessor).getProperty(any(PropertyKey.class));
+    assertTrue(_predownloadZkClient.getPeerServerURIs(dataAccessor, TABLE_NAME, SEGMENT_NAME, "http").isEmpty(),
+        "Should return empty list when ExternalView is null");
+
+    // Case 2: ExternalView found but segment has no state map → empty list
+    doAnswer(inv -> {
+      PropertyKey key = inv.getArgument(0);
+      return (key.getType() == PropertyType.EXTERNALVIEW) ? externalView : null;
+    }).when(dataAccessor).getProperty(any(PropertyKey.class));
+    when(externalView.getStateMap(SEGMENT_NAME)).thenReturn(null);
+    assertTrue(_predownloadZkClient.getPeerServerURIs(dataAccessor, TABLE_NAME, SEGMENT_NAME, "http").isEmpty(),
+        "Should return empty list when segment not in ExternalView");
+
+    // Case 3: Only self ONLINE → empty list
+    // In @BeforeClass: new PredownloadZKClient(ZK_ADDRESS, INSTANCE_ID, CLUSTER_NAME)
+    // → _instanceName = CLUSTER_NAME
+    when(externalView.getStateMap(SEGMENT_NAME)).thenReturn(Map.of(CLUSTER_NAME, "ONLINE"));
+    assertTrue(_predownloadZkClient.getPeerServerURIs(dataAccessor, TABLE_NAME, SEGMENT_NAME, "http").isEmpty(),
+        "Should exclude self instance from peer list");
+
+    // Case 4: peer ONLINE + one OFFLINE → only peer returned (self-exclusion tested in Case 3)
+    Map<String, String> stateMap = new HashMap<>();
+    stateMap.put(peerInstanceId, "ONLINE");      // peer → included
+    stateMap.put("Server_offline", "OFFLINE");   // offline → excluded
+    when(externalView.getStateMap(SEGMENT_NAME)).thenReturn(stateMap);
+    doAnswer(inv -> {
+      PropertyKey key = inv.getArgument(0);
+      return (key.getType() == PropertyType.EXTERNALVIEW) ? externalView : peerConfig;
+    }).when(dataAccessor).getProperty(any(PropertyKey.class));
+
+    List<URI> uris = _predownloadZkClient.getPeerServerURIs(dataAccessor, TABLE_NAME, SEGMENT_NAME, "http");
+    assertEquals(uris.size(), 1, "Should return exactly one peer URI");
+    String uriStr = uris.get(0).toString();
+    assertTrue(uriStr.contains("peerHost"), "URI should contain peer hostname");
+    assertTrue(uriStr.contains("9000"), "URI should contain peer admin port");
+    assertTrue(uriStr.contains(TABLE_NAME), "URI should contain table name");
+    assertTrue(uriStr.contains(SEGMENT_NAME), "URI should contain segment name");
+    assertTrue(uriStr.startsWith("http://"), "URI should use http scheme");
+
+    // Case 5: Peer InstanceConfig is null → skipped, empty list
+    when(externalView.getStateMap(SEGMENT_NAME)).thenReturn(Map.of(peerInstanceId, "ONLINE"));
+    doAnswer(inv -> {
+      PropertyKey key = inv.getArgument(0);
+      return (key.getType() == PropertyType.EXTERNALVIEW) ? externalView : null;
+    }).when(dataAccessor).getProperty(any(PropertyKey.class));
+    assertTrue(_predownloadZkClient.getPeerServerURIs(dataAccessor, TABLE_NAME, SEGMENT_NAME, "http").isEmpty(),
+        "Should skip peer when its InstanceConfig is null");
   }
 }

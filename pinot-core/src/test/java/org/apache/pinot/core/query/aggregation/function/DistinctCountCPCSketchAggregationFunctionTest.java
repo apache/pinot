@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.lang.foreign.MemorySegment;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import org.apache.datasketches.cpc.CpcSketch;
-import org.apache.datasketches.memory.Memory;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -39,7 +39,7 @@ public class DistinctCountCPCSketchAggregationFunctionTest {
   @Test
   public void testCanUseStarTreeDefaultLgK() {
     DistinctCountCPCSketchAggregationFunction function =
-        new DistinctCountCPCSketchAggregationFunction(List.of(ExpressionContext.forIdentifier("col")));
+        new DistinctCountCPCSketchAggregationFunction(List.of(ExpressionContext.forIdentifier("col")), false);
 
     Assert.assertTrue(function.canUseStarTree(Map.of()));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, "12")));
@@ -47,7 +47,7 @@ public class DistinctCountCPCSketchAggregationFunctionTest {
     Assert.assertFalse(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, 11)));
 
     function = new DistinctCountCPCSketchAggregationFunction(
-        List.of(ExpressionContext.forIdentifier("col"), ExpressionContext.forLiteral(Literal.intValue(12))));
+        List.of(ExpressionContext.forIdentifier("col"), ExpressionContext.forLiteral(Literal.intValue(12))), false);
 
     Assert.assertTrue(function.canUseStarTree(Map.of()));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, "12")));
@@ -59,7 +59,7 @@ public class DistinctCountCPCSketchAggregationFunctionTest {
   public void testCanUseCustomLgK() {
     DistinctCountCPCSketchAggregationFunction function = new DistinctCountCPCSketchAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"),
-            ExpressionContext.forLiteral(Literal.stringValue("nominalEntries=8192"))));
+            ExpressionContext.forLiteral(Literal.stringValue("nominalEntries=8192"))), false);
 
     // Default lgK = 12 / K=4096
     Assert.assertFalse(function.canUseStarTree(Map.of()));
@@ -74,7 +74,7 @@ public class DistinctCountCPCSketchAggregationFunctionTest {
   @Test
   public void testEmptyResultProducesConvertibleFinalResult() {
     DistinctCountCPCSketchAggregationFunction function =
-        new DistinctCountCPCSketchAggregationFunction(List.of(ExpressionContext.forIdentifier("col")));
+        new DistinctCountCPCSketchAggregationFunction(List.of(ExpressionContext.forIdentifier("col")), false);
 
     AggregationResultHolder holder = function.createAggregationResultHolder();
     CpcSketchAccumulator accumulator = function.extractAggregationResult(holder);
@@ -92,7 +92,7 @@ public class DistinctCountCPCSketchAggregationFunctionTest {
   @Test
   public void testEmptyResultProducesConvertibleRawFinalResult() {
     DistinctCountRawCPCSketchAggregationFunction function =
-        new DistinctCountRawCPCSketchAggregationFunction(List.of(ExpressionContext.forIdentifier("col")));
+        new DistinctCountRawCPCSketchAggregationFunction(List.of(ExpressionContext.forIdentifier("col")), false);
 
     AggregationResultHolder holder = function.createAggregationResultHolder();
     CpcSketchAccumulator accumulator = function.extractAggregationResult(holder);
@@ -110,14 +110,14 @@ public class DistinctCountCPCSketchAggregationFunctionTest {
     // The string should be a valid Base64-encoded CPC sketch that round-trips
     String base64 = (String) converted;
     byte[] bytes = Base64.getDecoder().decode(base64);
-    CpcSketch deserialized = CpcSketch.heapify(Memory.wrap(bytes));
+    CpcSketch deserialized = CpcSketch.heapify(MemorySegment.ofArray(bytes));
     Assert.assertEquals(deserialized.getEstimate(), 0.0);
   }
 
   @Test
   public void testMergeWithEmptyAccumulators() {
     DistinctCountCPCSketchAggregationFunction function =
-        new DistinctCountCPCSketchAggregationFunction(List.of(ExpressionContext.forIdentifier("col")));
+        new DistinctCountCPCSketchAggregationFunction(List.of(ExpressionContext.forIdentifier("col")), false);
 
     CpcSketchAccumulator empty1 = new CpcSketchAccumulator(12, 2);
     CpcSketchAccumulator empty2 = new CpcSketchAccumulator(12, 2);

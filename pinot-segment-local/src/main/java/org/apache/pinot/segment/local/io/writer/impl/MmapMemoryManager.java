@@ -34,16 +34,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * @class MmapMemoryManager is an OffHeapMemoryManager that manages memory by
- * allocating it via mmap.
- *
- * This class attempts to minimize the overall number of file handles used for mapping the files.
- * We create files of length 0.5g (or the requested buffer length, whichever is higher),
- * and map areas of the file for each allocation request within a segment.
- *
- * @note Thread-unsafe. We expect to use this class only in a single writer case.
- */
+/// @class MmapMemoryManager is an OffHeapMemoryManager that manages memory by
+/// allocating it via mmap.
+///
+/// This class attempts to minimize the overall number of file handles used for mapping the files.
+/// We create files of length 0.5g (or the requested buffer length, whichever is higher),
+/// and map areas of the file for each allocation request within a segment.
+///
+/// @note Thread-unsafe. We expect to use this class only in a single writer case.
 public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(MmapMemoryManager.class);
 
@@ -70,13 +68,11 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
     return DEFAULT_FILE_LENGTH;
   }
 
-  /**
-   * @param dirPathName directory under which all mmap files are created.
-   * @param segmentName Name of the segment for which this memory manager allocates memory
-   *
-   * @param serverMetrics Server metrics
-   * @see RealtimeIndexOffHeapMemoryManager
-   */
+  /// @param dirPathName directory under which all mmap files are created.
+  /// @param segmentName Name of the segment for which this memory manager allocates memory
+  ///
+  /// @param serverMetrics Server metrics
+  /// @see RealtimeIndexOffHeapMemoryManager
   public MmapMemoryManager(String dirPathName, String segmentName, ServerMetrics serverMetrics) {
     super(serverMetrics, segmentName);
     _dirPathName = dirPathName;
@@ -141,13 +137,11 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
     _curFileLen = fileLen;
   }
 
-  /**
-   * @param size size of memory to be mmaped
-   * @param columnName Name of the column for which memory is being allocated
-   * @return buffer allocated in mmap mode
-   *
-   * @see {@link RealtimeIndexOffHeapMemoryManager#allocate(long, String)}
-   */
+  /// @param size size of memory to be mmaped
+  /// @param columnName Name of the column for which memory is being allocated
+  /// @return buffer allocated in mmap mode
+  ///
+  /// @see [RealtimeIndexOffHeapMemoryManager#allocate(long, String)]
   @Override
   protected PinotDataBuffer allocateInternal(long size, String columnName) {
     addFileIfNecessary(size);

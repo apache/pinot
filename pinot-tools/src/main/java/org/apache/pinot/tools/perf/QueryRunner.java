@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -272,24 +271,25 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     return true;
   }
 
-  /**
-   * Use single thread to run queries as fast as possible.
-   * <p>Use a single thread to send queries back to back and log statistic information periodically.
-   * <p>Queries are picked sequentially from the query file.
-   * <p>Query runner will stop when all queries in the query file has been executed number of times configured.
-   *
-   * @param conf perf benchmark driver config.
-   * @param queries query stream.
-   * @param numTimesToRunQueries number of times to run all queries in the query file, 0 means infinite times.
-   * @param reportIntervalMs report interval in milliseconds.
-   * @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
-   *                                               them, 0 means never.
-   * @param timeout timeout in milliseconds for completing all queries.
-   * @param headers for the query request, e.g. to carry security token.
-   *
-   * @return QuerySummary containing final report of query stats
-   * @throws Exception
-   */
+  /// Use single thread to run queries as fast as possible.
+  ///
+  /// Use a single thread to send queries back to back and log statistic information periodically.
+  ///
+  /// Queries are picked sequentially from the query file.
+  ///
+  /// Query runner will stop when all queries in the query file has been executed number of times configured.
+  ///
+  /// @param conf perf benchmark driver config.
+  /// @param queries query stream.
+  /// @param numTimesToRunQueries number of times to run all queries in the query file, 0 means infinite times.
+  /// @param reportIntervalMs report interval in milliseconds.
+  /// @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
+  ///                                               them, 0 means never.
+  /// @param timeout timeout in milliseconds for completing all queries.
+  /// @param headers for the query request, e.g. to carry security token.
+  ///
+  /// @return QuerySummary containing final report of query stats
+  /// @throws Exception
   public static QuerySummary singleThreadedQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
       int numTimesToRunQueries, int reportIntervalMs, int numIntervalsToReportAndClearStatistics, long timeout,
       Map<String, String> headers, boolean enablePerQueryStats)
@@ -299,7 +299,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     int numExceptions = 0;
     long totalBrokerTime = 0L;
     long totalClientTime = 0L;
-    List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
+    List<Statistics> statisticsList = List.of(new Statistics(CLIENT_TIME_STATISTICS));
     @Nullable
     Map<String, QueryStat> queryStatMap;
     if (enablePerQueryStats) {
@@ -382,29 +382,31 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     return querySummary;
   }
 
-  /**
-   * Use multiple threads to run queries as fast as possible.
-   * <p>Use a concurrent linked queue to buffer the queries to be sent. Use the main thread to insert queries into the
-   * queue whenever the queue length is low, and start <code>numThreads</code> worker threads to fetch queries from the
-   * queue and send them.
-   * <p>The main thread is responsible for collecting and logging the statistic information periodically.
-   * <p>Queries are picked sequentially from the query file.
-   * <p>Query runner will stop when all queries in the query file has been executed number of times configured.
-   *
-   * @param conf perf benchmark driver config.
-   * @param queries query stream.
-   * @param numTimesToRunQueries number of times to run all queries in the query file, 0 means infinite times.
-   * @param numThreads number of threads sending queries.
-   * @param queueDepth queue size limit for query generator
-   * @param reportIntervalMs report interval in milliseconds.
-   * @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
-   *                                               them, 0 means never.
-   * @param timeout timeout in milliseconds for completing all queries
-   * @param headers for the query request, e.g. to carry security token.
-   *
-   * @return QuerySummary containing final report of query stats
-   * @throws Exception
-   */
+  /// Use multiple threads to run queries as fast as possible.
+  ///
+  /// Use a concurrent linked queue to buffer the queries to be sent. Use the main thread to insert queries into the
+  /// queue whenever the queue length is low, and start `numThreads` worker threads to fetch queries from the
+  /// queue and send them.
+  ///
+  /// The main thread is responsible for collecting and logging the statistic information periodically.
+  ///
+  /// Queries are picked sequentially from the query file.
+  ///
+  /// Query runner will stop when all queries in the query file has been executed number of times configured.
+  ///
+  /// @param conf perf benchmark driver config.
+  /// @param queries query stream.
+  /// @param numTimesToRunQueries number of times to run all queries in the query file, 0 means infinite times.
+  /// @param numThreads number of threads sending queries.
+  /// @param queueDepth queue size limit for query generator
+  /// @param reportIntervalMs report interval in milliseconds.
+  /// @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
+  ///                                               them, 0 means never.
+  /// @param timeout timeout in milliseconds for completing all queries
+  /// @param headers for the query request, e.g. to carry security token.
+  ///
+  /// @return QuerySummary containing final report of query stats
+  /// @throws Exception
   public static QuerySummary multiThreadedQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
       int numTimesToRunQueries, int numThreads, int queueDepth, int reportIntervalMs,
       int numIntervalsToReportAndClearStatistics, long timeout, Map<String, String> headers,
@@ -416,7 +418,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     AtomicInteger numExceptions = new AtomicInteger(0);
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
-    List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
+    List<Statistics> statisticsList = List.of(new Statistics(CLIENT_TIME_STATISTICS));
     @Nullable
     Map<String, QueryStat> queryStatMap;
     if (enablePerQueryStats) {
@@ -502,30 +504,32 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     return querySummary;
   }
 
-  /**
-   * Use multiple threads to run query at a target QPS.
-   * <p>Use a concurrent linked queue to buffer the queries to be sent. Use the main thread to insert queries into the
-   * queue at the target QPS, and start <code>numThreads</code> worker threads to fetch queries from the queue and send
-   * them.
-   * <p>The main thread is responsible for collecting and logging the statistic information periodically.
-   * <p>Queries are picked sequentially from the query file.
-   * <p>Query runner will stop when all queries in the query file has been executed number of times configured.
-   *
-   * @param conf perf benchmark driver config.
-   * @param queries query stream.
-   * @param numTimesToRunQueries number of times to run all queries in the query file, 0 means infinite times.
-   * @param numThreads number of threads sending queries.
-   * @param queueDepth queue size limit for query generator
-   * @param startQPS start QPS (target QPS).
-   * @param reportIntervalMs report interval in milliseconds.
-   * @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
-   *                                               them, 0 means never.
-   * @param timeout timeout in milliseconds for completing all queries
-   * @param headers for the query request, e.g. to carry security token.
-   *
-   * @return QuerySummary containing final report of query stats
-   * @throws Exception
-   */
+  /// Use multiple threads to run query at a target QPS.
+  ///
+  /// Use a concurrent linked queue to buffer the queries to be sent. Use the main thread to insert queries into the
+  /// queue at the target QPS, and start `numThreads` worker threads to fetch queries from the queue and send
+  /// them.
+  ///
+  /// The main thread is responsible for collecting and logging the statistic information periodically.
+  ///
+  /// Queries are picked sequentially from the query file.
+  ///
+  /// Query runner will stop when all queries in the query file has been executed number of times configured.
+  ///
+  /// @param conf perf benchmark driver config.
+  /// @param queries query stream.
+  /// @param numTimesToRunQueries number of times to run all queries in the query file, 0 means infinite times.
+  /// @param numThreads number of threads sending queries.
+  /// @param queueDepth queue size limit for query generator
+  /// @param startQPS start QPS (target QPS).
+  /// @param reportIntervalMs report interval in milliseconds.
+  /// @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
+  ///                                               them, 0 means never.
+  /// @param timeout timeout in milliseconds for completing all queries
+  /// @param headers for the query request, e.g. to carry security token.
+  ///
+  /// @return QuerySummary containing final report of query stats
+  /// @throws Exception
   public static QuerySummary targetQPSQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
       int numTimesToRunQueries, int numThreads, int queueDepth, double startQPS, int reportIntervalMs,
       int numIntervalsToReportAndClearStatistics, long timeout, Map<String, String> headers,
@@ -537,7 +541,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     AtomicInteger numExceptions = new AtomicInteger(0);
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
-    List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
+    List<Statistics> statisticsList = List.of(new Statistics(CLIENT_TIME_STATISTICS));
     @Nullable
     Map<String, QueryStat> queryStatMap;
     if (enablePerQueryStats) {
@@ -634,33 +638,36 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     return querySummary;
   }
 
-  /**
-   * Use multiple threads to run query at an increasing target QPS.
-   * <p>Use a concurrent linked queue to buffer the queries to be sent. Use the main thread to insert queries into the
-   * queue at the target QPS, and start <code>numThreads</code> worker threads to fetch queries from the queue and send
-   * them.
-   * <p>We start with the start QPS, and keep adding delta QPS to the start QPS during the test.
-   * <p>The main thread is responsible for collecting and logging the statistic information periodically.
-   * <p>Queries are picked sequentially from the query file.
-   * <p>Query runner will stop when all queries in the query file has been executed number of times configured.
-   *
-   * @param conf perf benchmark driver config.
-   * @param queries query stream.
-   * @param numTimesToRunQueries number of times to run all queries in the query file, 0 means infinite times.
-   * @param numThreads number of threads sending queries.
-   * @param queueDepth queue size limit for query generator
-   * @param startQPS start QPS.
-   * @param deltaQPS delta QPS.
-   * @param reportIntervalMs report interval in milliseconds.
-   * @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
-   *                                               them, 0 means never.
-   * @param timeout timeout in milliseconds for completing all queries.
-   * @param numIntervalsToIncreaseQPS number of intervals to increase QPS.
-   * @param headers for the query request, e.g. to carry security token.
-   *
-   * @return QuerySummary containing final report of query stats
-   * @throws Exception
-   */
+  /// Use multiple threads to run query at an increasing target QPS.
+  ///
+  /// Use a concurrent linked queue to buffer the queries to be sent. Use the main thread to insert queries into the
+  /// queue at the target QPS, and start `numThreads` worker threads to fetch queries from the queue and send
+  /// them.
+  ///
+  /// We start with the start QPS, and keep adding delta QPS to the start QPS during the test.
+  ///
+  /// The main thread is responsible for collecting and logging the statistic information periodically.
+  ///
+  /// Queries are picked sequentially from the query file.
+  ///
+  /// Query runner will stop when all queries in the query file has been executed number of times configured.
+  ///
+  /// @param conf perf benchmark driver config.
+  /// @param queries query stream.
+  /// @param numTimesToRunQueries number of times to run all queries in the query file, 0 means infinite times.
+  /// @param numThreads number of threads sending queries.
+  /// @param queueDepth queue size limit for query generator
+  /// @param startQPS start QPS.
+  /// @param deltaQPS delta QPS.
+  /// @param reportIntervalMs report interval in milliseconds.
+  /// @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
+  ///                                               them, 0 means never.
+  /// @param timeout timeout in milliseconds for completing all queries.
+  /// @param numIntervalsToIncreaseQPS number of intervals to increase QPS.
+  /// @param headers for the query request, e.g. to carry security token.
+  ///
+  /// @return QuerySummary containing final report of query stats
+  /// @throws Exception
   public static QuerySummary increasingQPSQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
       int numTimesToRunQueries, int numThreads, int queueDepth, double startQPS, double deltaQPS, int reportIntervalMs,
       int numIntervalsToReportAndClearStatistics, int numIntervalsToIncreaseQPS, long timeout,
@@ -672,7 +679,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     AtomicInteger numExceptions = new AtomicInteger(0);
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
-    List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
+    List<Statistics> statisticsList = List.of(new Statistics(CLIENT_TIME_STATISTICS));
     @Nullable
     Map<String, QueryStat> queryStatMap;
     if (enablePerQueryStats) {
