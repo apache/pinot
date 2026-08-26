@@ -102,12 +102,12 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
     Map<String, Object> map = (Map<String, Object>) value;
     for (Map.Entry<String, Object> entry : map.entrySet()) {
       String key = entry.getKey();
-      if (_config.isIgnoredKey(key)) {
-        _ignoredKeyDropCount++;
-        continue;
-      }
       Object rawValue = entry.getValue();
       if (rawValue == null) {
+        continue;
+      }
+      if (_config.isIgnoredKey(key)) {
+        _ignoredKeyDropCount++;
         continue;
       }
 

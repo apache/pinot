@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -250,6 +251,28 @@ public class MutableOpenStructIndexTest {
 
       verify(metrics, times(1)).addMeteredTableValue("testTable_REALTIME", "metrics",
           ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS, 2L);
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  @Test
+  public void testIgnoredKeyWithNullValueNotMetered()
+      throws IOException {
+    OpenStructIndexConfig config = JsonUtils.stringToObject(
+        "{\"ignoredKeys\": [\"debug\"]}", OpenStructIndexConfig.class);
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      Map<String, Object> row = new HashMap<>();
+      row.put("debug", null);
+      try (MutableOpenStructIndex idx = new MutableOpenStructIndex(
+          "metrics", "testTable_REALTIME", openStructSpec(), config, _memMgr, 1000)) {
+        idx.index(0, row);
+      }
+
+      verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+          eq(ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS), anyLong());
     } finally {
       ServerMetrics.deregister();
     }

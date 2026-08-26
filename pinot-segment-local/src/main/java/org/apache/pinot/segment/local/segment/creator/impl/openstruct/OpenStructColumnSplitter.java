@@ -197,12 +197,12 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     if (map != null && !map.isEmpty()) {
       for (Map.Entry<String, Object> entry : map.entrySet()) {
         String key = entry.getKey();
-        if (_config.isIgnoredKey(key)) {
-          _ignoredKeyDropCount++;
-          continue;
-        }
         Object rawValue = entry.getValue();
         if (rawValue == null) {
+          continue;
+        }
+        if (_config.isIgnoredKey(key)) {
+          _ignoredKeyDropCount++;
           continue;
         }
         FieldSpec keySpec = _childFieldSpecs.get(key);

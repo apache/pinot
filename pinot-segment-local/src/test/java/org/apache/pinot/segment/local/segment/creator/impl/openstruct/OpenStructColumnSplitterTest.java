@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.math.BigDecimal;
 import java.nio.file.Files;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -630,6 +631,28 @@ public class OpenStructColumnSplitterTest {
 
       verify(metrics, times(1)).addMeteredTableValue("testTable_OFFLINE", "metrics",
           ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS, 2L);
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  @Test
+  public void testIgnoredKeyWithNullValueNotMetered()
+      throws Exception {
+    OpenStructIndexConfig cfg = JsonUtils.stringToObject(
+        "{\"ignoredKeys\": [\"debug\"]}", OpenStructIndexConfig.class);
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", "testTable_OFFLINE", spec(),
+          cfg);
+      Map<String, Object> row = new HashMap<>();
+      row.put("debug", null);
+      s.add(row, 0);
+      s.seal();
+
+      verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+          eq(ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS), anyLong());
     } finally {
       ServerMetrics.deregister();
     }
