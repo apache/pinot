@@ -107,14 +107,14 @@ public enum AggregationFunctionType {
   DISTINCTCOUNTTHETASKETCH("distinctCountThetaSketch", ReturnTypes.BIGINT, OperandTypes.ONE_OR_MORE, SqlTypeName.OTHER),
   DISTINCTCOUNTRAWTHETASKETCH("distinctCountRawThetaSketch", ReturnTypes.VARCHAR, OperandTypes.ONE_OR_MORE,
       SqlTypeName.OTHER),
-  DISTINCTCOUNTTUPLESKETCH("distinctCountTupleSketch", ReturnTypes.BIGINT,
-      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.ANY), i -> i == 1), SqlTypeName.OTHER),
+  DISTINCTCOUNTTUPLESKETCH("distinctCountTupleSketch", ReturnTypes.BIGINT, TupleSketchOperands.CHECKER,
+      SqlTypeName.OTHER),
   DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH("distinctCountRawIntegerSumTupleSketch", ReturnTypes.VARCHAR,
-      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.ANY), i -> i == 1), SqlTypeName.OTHER),
+      TupleSketchOperands.CHECKER, SqlTypeName.OTHER),
   SUMVALUESINTEGERSUMTUPLESKETCH("sumValuesIntegerSumTupleSketch", ReturnTypes.BIGINT,
-      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.ANY), i -> i == 1), SqlTypeName.OTHER),
+      TupleSketchOperands.CHECKER, SqlTypeName.OTHER),
   AVGVALUEINTEGERSUMTUPLESKETCH("avgValueIntegerSumTupleSketch", ReturnTypes.BIGINT,
-      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.ANY), i -> i == 1), SqlTypeName.OTHER),
+      TupleSketchOperands.CHECKER, SqlTypeName.OTHER),
   DISTINCTCOUNTCPCSKETCH("distinctCountCPCSketch", ReturnTypes.BIGINT,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.ANY), i -> i == 1), SqlTypeName.OTHER),
   DISTINCTCOUNTRAWCPCSKETCH("distinctCountRawCPCSketch", ReturnTypes.VARCHAR,
@@ -241,6 +241,17 @@ public enum AggregationFunctionType {
       OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER), i -> i == 2),
       SqlTypeName.OTHER),
   TIMESERIESAGGREGATE("timeSeriesAggregate", SqlTypeName.OTHER, SqlTypeName.OTHER);
+
+  /// Nested because an enum constant's arguments cannot reference a static field of its own enum.
+  private static final class TupleSketchOperands {
+    private static final SqlOperandTypeChecker CHECKER = OperandTypes.or(
+        OperandTypes.family(SqlTypeFamily.BINARY),
+        OperandTypes.family(SqlTypeFamily.BINARY, SqlTypeFamily.CHARACTER),
+        OperandTypes.family(SqlTypeFamily.BINARY, SqlTypeFamily.INTEGER));
+
+    private TupleSketchOperands() {
+    }
+  }
 
   private static final Set<String> NAMES = Arrays.stream(values())
       .flatMap(func -> Stream.of(func.name(), func.getName(), func.getName().toLowerCase()))

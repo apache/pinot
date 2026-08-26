@@ -59,16 +59,16 @@ import org.apache.pinot.spi.utils.CommonConstants;
 /// Usage examples:
 ///
 /// - Simple union (1 or 2 arguments): main expression to aggregate on, followed by an optional Tuple sketch size
-///   argument. The second argument is the sketch lgK – the given log_base2 of k, and defaults to 16.
+///   argument. The second argument is the nominal entries, and defaults to 16384.
 ///   The "raw" equivalents return serialised sketches in base64-encoded strings.
 ///
 ///   DISTINCT_COUNT_TUPLE_SKETCH(col)
 ///
-///   DISTINCT_COUNT_TUPLE_SKETCH(col, 12)
+///   DISTINCT_COUNT_TUPLE_SKETCH(col, 16384)
 ///
 ///   DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col)
 ///
-///   DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col, 12)
+///   DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col, 16384)
 /// - Extracting a cardinality estimate from a CPC sketch:
 ///
 ///   GET_INT_TUPLE_SKETCH_ESTIMATE(sketch_bytes)
