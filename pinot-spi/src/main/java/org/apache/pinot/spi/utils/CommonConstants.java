@@ -671,8 +671,9 @@ public class CommonConstants {
     /// so a table whose raw counts are known to be biased keeps the previous heuristic behaviour.
     ///
     /// To stop the planner using them without losing the collected store, set
-    /// [#CONFIG_OF_USE_STATISTICS] to `false` rather than turning this off. Enable on a canary
-    /// broker first.
+    /// [#CONFIG_OF_USE_STATISTICS] to `false` rather than turning this off. The cost-based join
+    /// reorder phase is gated separately again by [#CONFIG_OF_USE_JOIN_REORDER] and its query
+    /// option. Enable on a canary broker first.
     public static final String CONFIG_OF_STATS_ENABLED = "pinot.broker.stats.enabled";
     public static final boolean DEFAULT_STATS_ENABLED = false;
 
@@ -731,6 +732,19 @@ public class CommonConstants {
     /// Ignored when [#CONFIG_OF_STATS_ENABLED] is `false`: there are no statistics to consult.
     public static final String CONFIG_OF_USE_STATISTICS = "pinot.broker.multistage.use.statistics";
     public static final boolean DEFAULT_USE_STATISTICS = true;
+
+    /// Whether to run the cost-based join-reordering phase by default.
+    /// This value can always be overridden by [Request.QueryOptionKey#USE_JOIN_REORDER] query option.
+    public static final String CONFIG_OF_USE_JOIN_REORDER = "pinot.broker.multistage.use.join.reorder";
+    public static final boolean DEFAULT_USE_JOIN_REORDER = false;
+
+    /// Maximum number of joins in a plan for which the cost-based join-reordering phase will run.
+    /// Plans with more joins than this cap skip the reorder phase to avoid excessive planning time.
+    /// This value can always be overridden by
+    /// [Request.QueryOptionKey#JOIN_REORDER_MAX_JOINS] query option.
+    public static final String CONFIG_OF_JOIN_REORDER_MAX_JOINS =
+        "pinot.broker.multistage.join.reorder.max.joins";
+    public static final int DEFAULT_JOIN_REORDER_MAX_JOINS = 10;
 
     /// Whether to use lite mode by default.
     /// This value can always be overridden by [Request.QueryOptionKey#USE_LITE_MODE] query option
@@ -944,6 +958,10 @@ public class CommonConstants {
         public static final String APPLICATION_NAME = "applicationName";
         public static final String USE_SPOOLS = "useSpools";
         public static final String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
+        public static final String USE_JOIN_REORDER = "useJoinReorder";
+        /// Maximum number of joins that the cost-based join-reordering phase will handle.
+        /// Plans with more joins than this cap are left unchanged.
+        public static final String JOIN_REORDER_MAX_JOINS = "joinReorderMaxJoins";
         // When true, the multi-stage planner prunes input (passthrough) columns - notably the unnested source array -
         // from the UNNEST output when they are not referenced downstream, avoiding copying them into every exploded
         // row. Defaults to false: enabling it makes the broker emit a smaller UNNEST output schema, which an
