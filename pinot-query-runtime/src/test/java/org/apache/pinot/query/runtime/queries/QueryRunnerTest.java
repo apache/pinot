@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.query.runtime.queries;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -29,7 +31,9 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
@@ -161,6 +165,42 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       server.shutDown();
     }
     _mailboxService.shutdown();
+  }
+
+  /// The self stats of a node are the node's own value minus its children's. A mailbox send reports its stats from
+  /// inside the getNextBlock() call whose time it is still spending, so unless that call is accounted first it
+  /// reports less than the input whose call it contains and the subtraction goes negative. A query whose filter
+  /// matches nothing makes the end-of-stream block the only block a stage handles, which is when the whole of the
+  /// send's time would be missing.
+  @Test
+  public void testSelfStatsAreNotNegative() {
+    @Language("sql")
+    String sql = "SELECT col1, COUNT(*) FROM a WHERE col1 = 'no-such-value' GROUP BY col1";
+    QueryDispatcher.QueryResult queryResult = queryRunner(sql, true);
+    Map<Integer, DispatchablePlanFragment> planNodes = planQuery(sql).getQueryPlan().getQueryStageMap();
+    ObjectNode statsTree =
+        new MultiStageStatsTreeBuilder(planNodes, queryResult.getQueryStats()).jsonStatsByStage(1);
+
+    int checked = assertSelfStatsAreNotNegative(statsTree);
+    Assert.assertTrue(checked > 0, "expected some self stats to check, got: " + statsTree);
+  }
+
+  /// Asserts that no self stat in the tree is negative, and returns how many were checked.
+  private static int assertSelfStatsAreNotNegative(JsonNode node) {
+    int checked = 0;
+    for (String statName : List.of("selfExecutionTimeMs", "selfClockTimeMs", "selfAllocatedMB", "selfGcTimeMs")) {
+      JsonNode stat = node.get(statName);
+      if (stat != null) {
+        Assert.assertTrue(stat.asLong() >= 0,
+            statName + " is " + stat.asLong() + ", which means this node reported less than its children, for node "
+                + node);
+        checked++;
+      }
+    }
+    for (JsonNode child : node.path("children")) {
+      checked += assertSelfStatsAreNotNegative(child);
+    }
+    return checked;
   }
 
   /// Test compares with expected row count only.

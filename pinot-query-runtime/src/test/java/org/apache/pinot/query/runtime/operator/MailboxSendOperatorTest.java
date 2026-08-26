@@ -171,6 +171,46 @@ public class MailboxSendOperatorTest {
     verify(_input).earlyTerminate();
   }
 
+  /// The stats a send operator reports travel inside the end-of-stream block it sends, so they are collected from
+  /// inside its own getNextBlock() call. Everything that call has spent, including the input call it contains, must
+  /// already be accounted by then: otherwise this operator reports less time than its own input, and the stats tree
+  /// renders a negative self time for the stage.
+  @Test
+  public void shouldAccountCurrentBlockBeforeReportingStats()
+      throws Exception {
+    // Given: an input that takes a measurable time and then reports EOS without ever producing a data block, so the
+    // end-of-stream block is the only block this operator ever handles.
+    when(_input.nextBlock()).thenAnswer(invocation -> {
+      Thread.sleep(50);
+      return SuccessMseBlock.INSTANCE;
+    });
+    long[] reportedAtSendTime = {-1};
+    MailboxSendOperator[] operatorRef = new MailboxSendOperator[1];
+    doAnswer(invocation -> {
+      reportedAtSendTime[0] =
+          operatorRef[0].copyStatMaps().getLong(MailboxSendOperator.StatKey.EXECUTION_TIME_MS);
+      return null;
+    }).when(_exchange).send(any(MseBlock.Eos.class), anyList());
+
+    // When:
+    MailboxSendOperator operator = getOperator();
+    operatorRef[0] = operator;
+    long startNs = System.nanoTime();
+    operator.nextBlock();
+    long wallTimeMs = (System.nanoTime() - startNs) / 1_000_000;
+
+    // Then: the time the input spent is already part of what this operator reports when it hands its stats over.
+    assertTrue(reportedAtSendTime[0] > 0,
+        "expected the current block to be accounted before the stats are collected, got " + reportedAtSendTime[0]);
+    long total = operator.copyStatMaps().getLong(MailboxSendOperator.StatKey.EXECUTION_TIME_MS);
+    assertTrue(total >= reportedAtSendTime[0],
+        "total " + total + " must not be below what was already reported " + reportedAtSendTime[0]);
+    // What was accounted early must not be counted a second time when the call returns. An operator can never have
+    // spent more than the call it was made from took, so double counting shows up as exceeding the wall time.
+    assertTrue(total <= wallTimeMs,
+        "total " + total + " exceeds the " + wallTimeMs + "ms the call actually took, so it was counted twice");
+  }
+
   private MailboxSendOperator getOperator() {
     WorkerMetadata workerMetadata = new WorkerMetadata(0, Map.of(), Map.of());
     StageMetadata stageMetadata = new StageMetadata(SENDER_STAGE_ID, List.of(workerMetadata), Map.of());

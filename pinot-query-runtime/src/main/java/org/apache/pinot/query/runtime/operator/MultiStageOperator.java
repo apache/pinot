@@ -61,6 +61,13 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
     _operatorId = Joiner.on("_").join(getClass().getSimpleName(), _context.getStageId(), _context.getServer());
   }
 
+  /// The [#getNextBlock()] call currently running, or null when none is. See [#registerExecutionSoFar()].
+  ///
+  /// A single thread runs an opchain at a time and an operator never re-enters its own [#nextBlock()], so this is
+  /// only ever read and written from inside the call it describes.
+  @Nullable
+  private BlockExecution _blockExecution;
+
   /// Returns the logger for the operator.
   ///
   /// This method is used to generic multi-stage operator messages using the name of the specific operator.
@@ -71,6 +78,57 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
   public abstract OperatorTypeDescriptor getOperatorType();
 
   public abstract void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs);
+
+  /// Accounts everything this operator has spent so far in the [#getNextBlock()] call currently running.
+  ///
+  /// [#nextBlock()] normally registers a block's usage only once [#getNextBlock()] has returned, which is too late
+  /// for an operator that has to report its own stats from inside that call: [MailboxSendOperator] serializes them
+  /// into the end-of-stream block it is about to send. Without this, that operator reports less time, memory and GC
+  /// than the inputs whose calls it contains, and the stats tree renders a negative self time for the stage.
+  ///
+  /// Whatever is left when the call returns is registered as usual, so the totals an operator ends up with are the
+  /// same either way. No rows are attributed here; they are counted from the block the call returns.
+  ///
+  /// Does nothing when called outside a [#nextBlock()] call.
+  protected void registerExecutionSoFar() {
+    BlockExecution blockExecution = _blockExecution;
+    if (blockExecution != null) {
+      blockExecution.registerUnaccounted(0);
+    }
+  }
+
+  /// What a single [#getNextBlock()] call has spent, and how much of that has already been handed to
+  /// [#registerExecution].
+  ///
+  /// The meters are created by [#nextBlock()] and passed in rather than created here, so that each of them keeps
+  /// measuring from exactly the point it always did.
+  private final class BlockExecution {
+    private final Stopwatch _stopwatch = Stopwatch.createStarted();
+    private final ThreadResourceSnapshot _resourceSnapshot;
+    private final long _preGcTimeMs;
+    private long _accountedTimeMs;
+    private long _accountedMemoryBytes;
+    private long _accountedGcTimeMs;
+
+    private BlockExecution(ThreadResourceSnapshot resourceSnapshot, long preGcTimeMs) {
+      _resourceSnapshot = resourceSnapshot;
+      _preGcTimeMs = preGcTimeMs;
+    }
+
+    /// Hands whatever this call has spent and not yet registered to [MultiStageOperator#registerExecution],
+    /// attributing `numRows` rows to it. Each invocation registers only what accrued since the previous one, which
+    /// is what lets the call report from the inside and still end up with exact totals.
+    private void registerUnaccounted(int numRows) {
+      long timeMs = _stopwatch.elapsed(TimeUnit.MILLISECONDS);
+      long memoryBytes = _resourceSnapshot.getAllocatedBytes();
+      long gcTimeMs = getGcTimeMillis() - _preGcTimeMs;
+      registerExecution(timeMs - _accountedTimeMs, numRows, memoryBytes - _accountedMemoryBytes,
+          gcTimeMs - _accountedGcTimeMs);
+      _accountedTimeMs = timeMs;
+      _accountedMemoryBytes = memoryBytes;
+      _accountedGcTimeMs = gcTimeMs;
+    }
+  }
 
   /// By default, it uses the active deadline, which is the one that should be used for most operators, but if the
   /// operator does not actively process data (ie both mailbox operators), it should override this method to use the
@@ -104,18 +162,22 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
     long preBlockGcTime = getGcTimeMillis();
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
       MseBlock nextBlock;
-      Stopwatch executeStopwatch = Stopwatch.createStarted();
+      BlockExecution blockExecution = new BlockExecution(resourceSnapshot, preBlockGcTime);
+      _blockExecution = blockExecution;
       try {
         checkTermination();
         nextBlock = getNextBlock();
       } catch (Exception e) {
         logger().warn("Operator {}: Exception while processing next block", _operatorId, e);
         nextBlock = ErrorMseBlock.fromException(e);
+      } finally {
+        // Cleared even when getNextBlock() throws, so a later registerExecutionSoFar() cannot read a finished call.
+        _blockExecution = null;
       }
       int numRows = nextBlock instanceof MseBlock.Data ? ((MseBlock.Data) nextBlock).getNumRows() : 0;
-      long memoryUsedBytes = resourceSnapshot.getAllocatedBytes();
-      long gcTimeMs = getGcTimeMillis() - preBlockGcTime;
-      registerExecution(executeStopwatch.elapsed(TimeUnit.MILLISECONDS), numRows, memoryUsedBytes, gcTimeMs);
+      // Only what registerExecutionSoFar() left unaccounted, so the totals are the same whether or not the operator
+      // reported from inside the call.
+      blockExecution.registerUnaccounted(numRows);
 
       if (logger().isDebugEnabled()) {
         logger().debug("Operator {}. Block {} ready to send", _operatorId, nextBlock);
