@@ -282,7 +282,7 @@ public class ImmutableSegmentLoader {
     if (indexLoadingConfig.getTableConfig() == null || indexLoadingConfig.getSchema() == null) {
       return false;
     }
-    return new SegmentPreProcessor(segmentDirectory, indexLoadingConfig).needProcess();
+    return SegmentPreProcessor.create(segmentDirectory, indexLoadingConfig).needProcess();
   }
 
   private static boolean needConvertSegmentFormat(IndexLoadingConfig indexLoadingConfig,
@@ -329,7 +329,7 @@ public class ImmutableSegmentLoader {
         .build();
     SegmentDirectory segmentDirectory =
         SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(indexDir.toURI(), segmentLoaderContext);
-    try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
+    try (SegmentPreProcessor preProcessor = SegmentPreProcessor.create(segmentDirectory, indexLoadingConfig)) {
       preProcessor.process(segmentOperationsThrottlerSet);
     }
   }
