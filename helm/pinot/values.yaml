@@ -71,6 +71,126 @@ serviceAccount:
 
 additionalMatchLabels: {}
 
+# ------------------------------------------------------------------------------
+# Java Flight Recorder (JFR):
+# ------------------------------------------------------------------------------
+# Runs a continuous JFR recording in each Pinot JVM, so that when something goes wrong the
+# profile of the minutes leading up to it is already on disk. The recording rolls like a log
+# file: once it reaches `maxSize` the oldest data is dropped.
+#
+# Started by the JVM through -XX:StartFlightRecording in JAVA_OPTS, so it covers startup too.
+#
+# Enable it per role with `<role>.jfr.enabled`. Everything under this block is shared by every
+# role that enables it.
+jfr:
+  # Event settings profile. `default` targets ~1% overhead and is the right choice for
+  # always-on recording; `profile` collects considerably more (and costs more). A path to
+  # a custom .jfc file also works, as long as that file exists inside the container.
+  configuration: default
+
+  # Name of the recording. Used by `jcmd <pid> JFR.dump name=<recordingName> filename=...`.
+  recordingName: pinot
+
+  # How much recording data to keep for the current JVM run. Steady-state disk use is about
+  # `maxSize + 2 * maxChunkSize`.
+  #
+  # Recommended range: 1Gi to 4Gi with `configuration: default`. How far back that reaches
+  # depends on the workload — GC frequency above all — so rather than guessing an event rate,
+  # pick the disk you can afford and read the window you got from `jfr summary` (it prints
+  # Start and Duration). Below ~512Mi a busy server keeps only minutes; above ~8Gi you are
+  # usually better off with `configuration: profile` at a smaller size.
+  #
+  # Kubernetes units, like every size in this chart: `2Gi` is 2^30, `2G` is 10^9.
+  maxSize: 2Gi
+
+  # How much wall-clock history to keep for the current run, e.g. `12h` or `7d`.
+  # Leave empty to bound the recording by size alone, which is usually what you want: you
+  # pick the disk budget you can afford and let the time window fall out of the event rate
+  # rather than guessing the event rate up front.
+  maxAge: ""
+
+  # Size of an individual chunk file in the repository. Chunks are the unit of eviction and
+  # the unit of loss: a SIGKILL leaves the open chunk incomplete (`jfr assemble` recovers
+  # it). Smaller chunks mean finer-grained eviction, larger chunks mean slightly less
+  # overhead. Kubernetes units.
+  maxChunkSize: 12Mi
+
+  # Where the JFR repository is mounted inside the container.
+  #
+  # This is deliberately a volume of its own rather than a subdirectory of the role's data
+  # volume, so that a runaway recording can never eat the space Pinot needs for segments.
+  mountPath: /var/pinot/jfr
+
+  persistence:
+    # Keep recordings on a PersistentVolume so they survive the pod being rescheduled.
+    #
+    # Off by default because it cannot be turned on in place: it adds an entry to the
+    # StatefulSet's volumeClaimTemplates, which Kubernetes forbids changing on a deployed
+    # workload. See helm/pinot/UPGRADING.md for the one-time procedure. It also provisions one
+    # volume of `size` per pod, so 50 servers at 10Gi is 500Gi.
+    #
+    # With this off, recordings go to an emptyDir: they survive a container restart but not the
+    # pod being rescheduled, and no cleanup init container is needed. That is enough for "turn
+    # on profiling now and look at it soon"; turn it on for post-mortem after a node loss.
+    #
+    # Ignored by minionStateless, which is a Deployment and always uses an emptyDir.
+    enabled: false
+    accessMode: ReadWriteOnce
+    size: 10Gi
+
+    # How many in-place container restarts to leave room for. Kubernetes re-runs init containers
+    # only when the *pod* is recreated, so a process that restarts in place (an OOMKill, say)
+    # strands its repository until the next pod-level restart. The chart refuses to render unless
+    # `janitor.maxTotalSize + (1 + restartHeadroom) * (maxSize + 2 * maxChunkSize)` fits in `size`.
+    #
+    # Raise it if a role restarts in place often. If the volume does fill, the JVM cannot create
+    # its repository and fails to start; recovery is `kubectl delete pod`.
+    restartHeadroom: 1
+    # storageClass: "-"
+    storageClass: ""
+    # sizeLimit for the emptyDir used when persistence.enabled is false. Left empty the chart derives
+    # `maxSize + 2 * maxChunkSize`, so a runaway recording is capped by the kubelet rather than
+    # eating shared node ephemeral storage and evicting unrelated pods.
+    emptyDirSizeLimit: ""
+
+  # Init container that reclaims the repositories previous JVM runs left behind. JFR bounds the
+  # repository of the JVM that is running but never reclaims one belonging to a JVM that exited,
+  # so on a PersistentVolume they accumulate on every restart until the volume is full.
+  #
+  # Only applies when persistence.enabled is true; an emptyDir starts empty, so there is nothing
+  # to reclaim.
+  janitor:
+    enabled: true
+
+    # Delete repositories left by runs older than this. Accepts `<n>d`, `<n>h` or `<n>m`.
+    # Leave empty to skip the age-based pass.
+    maxAge: 7d
+
+    # After the age pass, if the repository directory is still larger than this, delete the
+    # oldest leftover repositories until it fits. Leave empty to skip the size-based pass.
+    #
+    # Kubernetes units, like every other size in this chart.
+    #
+    # This has to leave room for the runs that follow the janitor; see persistence.restartHeadroom.
+    maxTotalSize: 4Gi
+
+    # Never delete a repository written to this recently, even if it is over budget or aged out.
+    # JFR flushes at least once a second, so anything idle this long belongs to a JVM that is gone.
+    minIdleMinutes: 15
+
+    # Image used to run the cleanup. Defaults to the Pinot image, which is already present
+    # on the node; override only if you want a smaller one.
+    image:
+      repository: ""
+      tag: ""
+      pullPolicy: ""
+
+    # Defaults to the Pinot image's own user. Set this if the role runs with a non-default UID and
+    # the cleanup needs to match it to write to the volume.
+    securityContext: {}
+
+    resources: {}
+
 
 pinotAuth:
   enabled: false
@@ -143,6 +263,11 @@ controller:
     port: 9000
 
   jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-controller.log -Djute.maxbuffer=4000000"
+
+  # Continuous Java Flight Recorder recording for this role.
+  # Settings live under the top-level `jfr` block and are shared by all roles.
+  jfr:
+    enabled: false
 
   log4j2ConfFile: /opt/pinot/etc/conf/pinot-controller-log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -252,6 +377,11 @@ broker:
   startCommand: "StartBroker"
 
   jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-broker.log -Djute.maxbuffer=4000000"
+
+  # Continuous Java Flight Recorder recording for this role.
+  # Settings live under the top-level `jfr` block and are shared by all roles.
+  jfr:
+    enabled: false
 
   log4j2ConfFile: /opt/pinot/etc/conf/pinot-broker-log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -439,6 +569,11 @@ server:
 
   jvmOpts: "-Xms512M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-server.log -Djute.maxbuffer=4000000"
 
+  # Continuous Java Flight Recorder recording for this role.
+  # Settings live under the top-level `jfr` block and are shared by all roles.
+  jfr:
+    enabled: false
+
   log4j2ConfFile: /opt/pinot/etc/conf/pinot-server-log4j2.xml
   pluginsDir: /opt/pinot/plugins
 
@@ -557,6 +692,11 @@ minion:
 
   dataDir: /var/pinot/minion/data
   jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log -Djute.maxbuffer=4000000"
+
+  # Continuous Java Flight Recorder recording for this role.
+  # Settings live under the top-level `jfr` block and are shared by all roles.
+  jfr:
+    enabled: false
 
   log4j2ConfFile: /opt/pinot/etc/conf/pinot-minion-log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -679,6 +819,15 @@ minionStateless:
 
   dataDir: /var/pinot/minion/data
   jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log -Djute.maxbuffer=4000000"
+
+  # Continuous Java Flight Recorder recording for this role.
+  # Settings live under the top-level `jfr` block and are shared by all roles.
+  #
+  # Being a Deployment, this role always uses an emptyDir regardless of jfr.persistence.enabled:
+  # replicas cannot each have their own volume, and sharing one would let a starting pod's
+  # cleanup delete a running pod's recording.
+  jfr:
+    enabled: false
 
   log4j2ConfFile: /opt/pinot/etc/conf/pinot-minion-log4j2.xml
   pluginsDir: /opt/pinot/plugins

@@ -59,8 +59,7 @@ spec:
 {{ toYaml .Values.broker.affinity | indent 8 }}
       tolerations:
 {{ toYaml .Values.broker.tolerations | indent 8 }}
-      initContainers:
-{{ toYaml .Values.broker.initContainers | indent 8 }}
+{{- include "pinot.jfr.initContainers" (dict "ctx" . "role" .Values.broker) }}
       containers:
       - name: broker
         securityContext:
@@ -75,7 +74,7 @@ spec:
         ]
         env:
           - name: JAVA_OPTS
-            value: "{{ .Values.broker.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.broker.log4j2ConfFile }} -Dplugins.dir={{ .Values.broker.pluginsDir }}"
+            value: "{{ .Values.broker.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.broker.log4j2ConfFile }} -Dplugins.dir={{ .Values.broker.pluginsDir }}{{ if .Values.broker.jfr.enabled }} {{ include "pinot.jfr.javaOpts" (dict "ctx" . "role" .Values.broker) }}{{ end }}"
 {{- if .Values.broker.extraEnv }}
 {{ toYaml .Values.broker.extraEnv | indent 10 }}
 {{- end }}
@@ -91,6 +90,9 @@ spec:
         volumeMounts:
           - name: config
             mountPath: /var/pinot/broker/config
+          {{- if .Values.broker.jfr.enabled }}
+          {{- include "pinot.jfr.volumeMount" . | nindent 10 }}
+          {{- end }}
           {{- if ne (len .Values.broker.persistence.extraVolumeMounts) 0 }}
 {{ toYaml .Values.broker.persistence.extraVolumeMounts | indent 10 }}
           {{- end }}
@@ -134,6 +136,13 @@ spec:
         - name: config
           configMap:
             name: {{ include "pinot.broker.config" . }}
+      {{- if and .Values.broker.jfr.enabled (not .Values.jfr.persistence.enabled) }}
+        {{- include "pinot.jfr.emptyDirVolume" . | nindent 8 }}
+      {{- end }}
       {{- if ne (len .Values.broker.persistence.extraVolumes) 0 }}
 {{ toYaml .Values.broker.persistence.extraVolumes | indent 8 }}
       {{- end }}
+  {{- if and .Values.broker.jfr.enabled .Values.jfr.persistence.enabled }}
+  volumeClaimTemplates:
+    {{- include "pinot.jfr.volumeClaimTemplate" . | nindent 4 }}
+  {{- end }}
