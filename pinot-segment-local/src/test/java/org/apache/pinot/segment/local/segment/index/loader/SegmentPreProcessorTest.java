@@ -39,6 +39,7 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -49,6 +50,7 @@ import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -61,6 +63,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -2022,6 +2025,187 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
             new IndexLoadingConfig(tableConfig, schema))) {
       assertTrue(processor.needProcess());
       processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+  }
+
+  /// A star-tree dimension column that is moved to 'noDictionaryColumns' without the star-tree being rebuilt leaves
+  /// the star-tree unreadable: its dimension forward index stores dictionary ids in a fixed-bit encoding whose width
+  /// is read from the main column metadata, which is now raw. The stale star-tree must be dropped so the segment
+  /// stays loadable, even when dynamic star-tree creation is disabled.
+  @Test
+  public void testStarTreeDimensionConvertedToNoDictionary()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", DataType.STRING)
+        .addMetric("longCol", DataType.LONG)
+        .build();
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setStarTreeIndexConfigs(
+        List.of(new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol"), null, 1000)));
+    buildStarTreeTestSegment(tableConfig, schema);
+
+    // Drift the config: the star-tree dimension is moved to noDictionaryColumns and the star-tree config is dropped,
+    // while dynamic star-tree creation stays disabled.
+    indexingConfig.setNoDictionaryColumns(List.of("stringCol"));
+    indexingConfig.setStarTreeIndexConfigs(null);
+    indexingConfig.setEnableDynamicStarTreeCreation(false);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
+      assertTrue(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+    assertSegmentLoadsWithoutStarTree(indexLoadingConfig);
+
+    // The stale star-tree is gone, so there is nothing left to process
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
+      assertFalse(processor.needProcess());
+    }
+  }
+
+  /// Same drift as [#testStarTreeDimensionConvertedToNoDictionary()], but the dict-to-raw conversion has already been
+  /// persisted by an earlier pre-processing round, so the segment on disk is already inconsistent and nothing else
+  /// needs updating. Pre-processing must still detect and repair it.
+  @Test
+  public void testStarTreeDimensionAlreadyConvertedToNoDictionary()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", DataType.STRING)
+        .addMetric("longCol", DataType.LONG)
+        .build();
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setStarTreeIndexConfigs(
+        List.of(new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol"), null, 1000)));
+    buildStarTreeTestSegment(tableConfig, schema);
+
+    // Convert the dimension column to raw while leaving the star-tree in place, reproducing the state an earlier
+    // pre-processing round leaves behind.
+    indexingConfig.setNoDictionaryColumns(List.of("stringCol"));
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap)) {
+      new ForwardIndexHandler(segmentDirectory, indexLoadingConfig).updateIndices(segmentDirectory.createWriter());
+    }
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap)) {
+      assertFalse(segmentDirectory.getSegmentMetadata().getColumnMetadataFor("stringCol").hasDictionary());
+      assertNotNull(segmentDirectory.getSegmentMetadata().getStarTreeV2MetadataList());
+    }
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
+      assertTrue(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+    assertSegmentLoadsWithoutStarTree(indexLoadingConfig);
+  }
+
+  /// The loader must not fail the whole segment over a stale star-tree even when pre-processing never gets a chance to
+  /// repair it, e.g. because it is skipped for the table.
+  @Test
+  public void testStarTreeDimensionConvertedToNoDictionaryWithoutPreprocess()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", DataType.STRING)
+        .addMetric("longCol", DataType.LONG)
+        .build();
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setStarTreeIndexConfigs(
+        List.of(new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol"), null, 1000)));
+    buildStarTreeTestSegment(tableConfig, schema);
+
+    indexingConfig.setNoDictionaryColumns(List.of("stringCol"));
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap)) {
+      new ForwardIndexHandler(segmentDirectory, indexLoadingConfig).updateIndices(segmentDirectory.createWriter());
+    }
+
+    // The stale star-tree is still in the segment, but it must be skipped rather than fail the load
+    ImmutableSegment segment = ImmutableSegmentLoader.load(INDEX_DIR, indexLoadingConfig, false);
+    try {
+      assertEquals(segment.getSegmentMetadata().getTotalDocs(), 5);
+      assertTrue(segment.getStarTrees() == null || segment.getStarTrees().isEmpty());
+    } finally {
+      segment.destroy();
+    }
+  }
+
+  /// With dynamic star-tree creation enabled, the stale star-tree is not just dropped but rebuilt from the current
+  /// config, which no longer splits on the re-encoded column.
+  @Test
+  public void testStarTreeDimensionConvertedToNoDictionaryWithDynamicCreation()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", DataType.STRING)
+        .addSingleValueDimension("intCol", DataType.INT)
+        .addMetric("longCol", DataType.LONG)
+        .build();
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setStarTreeIndexConfigs(
+        List.of(new StarTreeIndexConfig(List.of("stringCol", "intCol"), null, List.of("SUM__longCol"), null, 1000)));
+    buildStarTreeTestSegment(tableConfig, schema);
+
+    // 'stringCol' becomes raw and drops out of the split order, and the star-tree is rebuilt on 'intCol' alone
+    indexingConfig.setNoDictionaryColumns(List.of("stringCol"));
+    indexingConfig.setStarTreeIndexConfigs(
+        List.of(new StarTreeIndexConfig(List.of("intCol"), null, List.of("SUM__longCol"), null, 1000)));
+    indexingConfig.setEnableDynamicStarTreeCreation(true);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
+      assertTrue(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    ImmutableSegment segment = ImmutableSegmentLoader.load(INDEX_DIR, indexLoadingConfig, false);
+    try {
+      List<StarTreeV2> starTrees = segment.getStarTrees();
+      assertNotNull(starTrees);
+      assertEquals(starTrees.size(), 1);
+      assertEquals(starTrees.get(0).getMetadata().getDimensionsSplitOrder(), List.of("intCol"));
+    } finally {
+      segment.destroy();
+    }
+  }
+
+  private void buildStarTreeTestSegment(TableConfig tableConfig, Schema schema)
+      throws Exception {
+    FileUtils.deleteQuietly(TEMP_DIR);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setInstanceType(InstanceType.SERVER);
+    config.setOutDir(TEMP_DIR.getAbsolutePath());
+    config.setSegmentName(SEGMENT_NAME);
+
+    String[] stringValues = {"A", "C", "B", "C", "D"};
+    long[] longValues = {2, 1, 2, 3, 4};
+    List<GenericRow> rows = new ArrayList<>(stringValues.length);
+    for (int i = 0; i < stringValues.length; i++) {
+      GenericRow row = new GenericRow();
+      row.putValue("stringCol", stringValues[i]);
+      row.putValue("intCol", i % 3);
+      row.putValue("longCol", longValues[i]);
+      rows.add(row);
+    }
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap)) {
+      assertNotNull(segmentDirectory.getSegmentMetadata().getStarTreeV2MetadataList());
+    }
+  }
+
+  private void assertSegmentLoadsWithoutStarTree(IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap)) {
+      assertNull(segmentDirectory.getSegmentMetadata().getStarTreeV2MetadataList());
+    }
+    ImmutableSegment segment = ImmutableSegmentLoader.load(INDEX_DIR, indexLoadingConfig, false);
+    try {
+      assertEquals(segment.getSegmentMetadata().getTotalDocs(), 5);
+      assertTrue(segment.getStarTrees() == null || segment.getStarTrees().isEmpty());
+    } finally {
+      segment.destroy();
     }
   }
 
