@@ -1902,20 +1902,16 @@ public class TableRebalancer {
     ///
     /// The instances that do not fit are kept at the back rather than dropped, so that an assignment is still produced
     /// when none of them fits and the budget stays the only thing that decides whether it is applied.
-    List<Triple<String, String, Integer>> sortInstancesThatFitFirst(
+    List<Triple<String, String, Integer>> retainInstancesThatFit(
         List<Triple<String, String, Integer>> instancesInfo, Set<String> currentInstances,
         Set<String> targetInstances) {
       long requiredBytes = _instancePairToRequiredBytes.getOrDefault(Pair.of(currentInstances, targetInstances), 0L);
       List<Triple<String, String, Integer>> fits = new ArrayList<>(instancesInfo.size());
-      List<Triple<String, String, Integer>> doesNotFit = new ArrayList<>();
       for (Triple<String, String, Integer> instanceInfo : instancesInfo) {
         if (_remainingBytes.getOrDefault(instanceInfo.getLeft(), 0L) >= requiredBytes) {
           fits.add(instanceInfo);
-        } else {
-          doesNotFit.add(instanceInfo);
         }
       }
-      fits.addAll(doesNotFit);
       return fits;
     }
 
@@ -2564,8 +2560,12 @@ public class TableRebalancer {
             getSortedInstancesOnNumSegmentsToOffload(targetInstanceStateMap, nextInstanceStateMap,
                 numSegmentsToOffloadMap);
         if (stepBudget != null) {
-          // sort so that if there are instances with enough disk budget, they'll be picked
-          instancesInfo = stepBudget.sortInstancesThatFitFirst(instancesInfo, currentInstances, targetInstances);
+          // Keep only the instances with enough disk budget. Adding one without it would have the whole group of
+          // segments rejected when it is charged, holding back the instances that could have taken them in this step
+          instancesInfo = stepBudget.retainInstancesThatFit(instancesInfo, currentInstances, targetInstances);
+          // Fewer instances than the target assignment has is fine: the segments gain the rest in a later step, once
+          // the instances that are out of space have dropped what they owe
+          numInstancesToAdd = Math.min(numInstancesToAdd, instancesInfo.size());
         }
         for (int i = 0; i < numInstancesToAdd; i++) {
           Triple<String, String, Integer> instanceInfo = instancesInfo.get(i);

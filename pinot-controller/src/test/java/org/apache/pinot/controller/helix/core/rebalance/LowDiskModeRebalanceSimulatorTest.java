@@ -253,6 +253,58 @@ public class LowDiskModeRebalanceSimulatorTest {
     return SegmentAssignmentUtils.getInstanceStateMap(List.of(instances), ONLINE);
   }
 
+  /// A segment group needing two instances at once, where only one of them has room, is added to the one that does
+  /// rather than being held back entirely.
+  ///
+  /// A group whose current replicas number the minimum available has to gain `replication - minAvailableReplicas`
+  /// instances, which is two or more whenever replication exceeds the minimum by that much. Adding an instance that
+  /// cannot take the group on would have the whole assignment rejected when it is charged, so the instance that could
+  /// have taken it waits too - and if every group in the step is held back that way, the budget is relaxed and the
+  /// guarantee is given up for a step. Adding the one that fits makes progress within the budget instead.
+  @Test
+  public void testGroupIsAddedToTheInstancesThatFitRatherThanHeldBack() {
+    long mib = 1024L * 1024;
+    Map<String, Map<String, String>> initialAssignment = new TreeMap<>();
+    Map<String, Map<String, String>> current = new TreeMap<>();
+    Map<String, Map<String, String>> target = new TreeMap<>();
+    Map<String, Long> sizes = new TreeMap<>();
+
+    // The group to move: one replica left, and the target wants it on two more instances
+    addSegment(initialAssignment, current, target, sizes, "moving", List.of("hostKeep"), List.of("hostKeep"),
+        List.of("hostKeep", "hostRoomy", "hostFull"), 200 * mib);
+    // hostFull starts full and the target keeps it that way, so it has no room for anything else
+    addSegment(initialAssignment, current, target, sizes, "fillsHostFull", List.of("hostFull"), List.of("hostFull"),
+        List.of("hostFull"), 900 * mib);
+    // hostFull also owes a segment it cannot drop, since that is its only replica, which uses up what little the
+    // target assignment leaves it
+    addSegment(initialAssignment, current, target, sizes, "stuckOnHostFull", List.of("hostFull"), List.of("hostFull"),
+        List.of("other"), 150 * mib);
+    // hostRoomy is growing into space it does not use yet
+    addSegment(initialAssignment, current, target, sizes, "fillsHostRoomy", List.of("other"), List.of("other"),
+        List.of("hostRoomy"), 900 * mib);
+
+    TableRebalancer.DiskUsageBudget budget =
+        TableRebalancer.DiskUsageBudget.create(initialAssignment, toTableSizeDetails(sizes));
+    Map<String, Long> remaining = budget.forStep(current, target).getRemainingBytes();
+    System.out.printf("%n  remaining: hostRoomy=%s hostFull=%s, group needs %s%n",
+        formatMib(remaining.getOrDefault("hostRoomy", 0L)), formatMib(remaining.getOrDefault("hostFull", 0L)),
+        formatMib(200 * mib));
+    assertTrue(remaining.getOrDefault("hostRoomy", 0L) >= 200 * mib, "hostRoomy must have room for the group");
+    assertTrue(remaining.getOrDefault("hostFull", 0L) < 200 * mib, "hostFull must not have room for the group");
+
+    Map<String, Map<String, String>> next =
+        TableRebalancer.getNextAssignment(current, target, 1, true, true,
+            RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
+            NO_DATA_LOSS_RISK, budget);
+    Set<String> movingNext = next.get("moving").keySet();
+    System.out.println("  next assignment for the group: " + movingNext);
+
+    assertTrue(movingNext.contains("hostRoomy"),
+        "the group should be added to the instance that has room, got " + movingNext);
+    assertFalse(movingNext.contains("hostFull"),
+        "the group must not be added to the instance that has no room, got " + movingNext);
+  }
+
   /// The disk budget holds a total per pair of current and target instances, used to pick which instance to add. It
   /// is tempting to charge a strict replica group move by looking that total up, but the two are different totals when
   /// batching is enabled: `updateNextAssignmentForPartitionIdStrictReplicaGroup` is then called once per partition,
