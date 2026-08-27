@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -1089,6 +1090,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
   public BrokerMetrics getBrokerMetrics() {
     return _brokerMetrics;
+  }
+
+  /// The statistics manager, or `null` when statistics collection is disabled.
+  @VisibleForTesting
+  @Nullable
+  public BrokerTableStatsManager getStatsManager() {
+    return _statsManager;
   }
 
   public BrokerRoutingManager getRoutingManager() {
