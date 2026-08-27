@@ -78,7 +78,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
       _columns.put(_resultSet.getColumnName(i), i + 1);
       String columnTypeName = _resultSet.getColumnDataType(i);
       _columnDataTypes.put(i + 1, columnTypeName);
-      _resolvedColumnDataTypes.put(i + 1, ColumnDataType.get(columnTypeName));
+      _resolvedColumnDataTypes.put(i + 1, ColumnDataType.forName(columnTypeName));
     }
   }
 
