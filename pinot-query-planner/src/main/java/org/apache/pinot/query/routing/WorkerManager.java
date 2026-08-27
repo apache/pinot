@@ -38,6 +38,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.calcite.rel.rules.ImmutableTableOptions;
 import org.apache.pinot.calcite.rel.rules.TableOptions;
@@ -479,6 +480,43 @@ public class WorkerManager {
     return false;
   }
 
+  /// A stage adopts the worker assignment of the FIRST of its local exchange children (every branch of a UNION ALL
+  /// is one); the others then send 1-to-1 by worker id. Only the worker COUNT has to match, because
+  /// [MailboxAssignmentVisitor] already handles a child whose workers sit on different servers -- it costs a network
+  /// hop rather than an in-process handover, still far cheaper than the shuffle it replaces. A child with no worker
+  /// at all (a fully pruned leaf) can never anchor it: inheriting its empty map would leave this stage with no
+  /// workers and silently drop every live sibling's rows.
+  private static boolean canInheritWorkerAssignment(List<DispatchablePlanMetadata> children) {
+    Map<Integer, QueryServerInstance> anchor =
+        children.isEmpty() ? null : children.get(0).getWorkerIdToServerInstanceMap();
+    if (anchor == null || anchor.isEmpty()) {
+      return false;
+    }
+    for (int i = 1; i < children.size(); i++) {
+      Map<Integer, QueryServerInstance> workers = children.get(i).getWorkerIdToServerInstanceMap();
+      if (workers == null || workers.size() != anchor.size()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Whether the partition descriptor inherited from the first local exchange child describes ALL of them. When it
+  /// does not, the stage still keeps their worker assignment -- a UNION ALL only concatenates, so placement is free
+  /// -- but it must not advertise a descriptor that only some of its rows satisfy, because exchanges above it read
+  /// it (see [MailboxAssignmentVisitor#isDirectExchangeCompatible]) to decide whether they may skip a shuffle.
+  private static boolean shareOnePartitioning(List<DispatchablePlanMetadata> children) {
+    DispatchablePlanMetadata first = children.get(0);
+    for (int i = 1; i < children.size(); i++) {
+      DispatchablePlanMetadata other = children.get(i);
+      if (!Arrays.equals(first.getPartitionClassIds(), other.getPartitionClassIds())
+          || !StringUtils.equalsIgnoreCase(first.getPartitionFunction(), other.getPartitionFunction())) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   private Map<Integer, QueryServerInstance> assignWorkersForLocalExchange(DispatchablePlanMetadata childMetadata) {
     int partitionParallelism = childMetadata.getPartitionParallelism();
     Map<Integer, QueryServerInstance> childWorkerIdToServerInstanceMap = childMetadata.getWorkerIdToServerInstanceMap();
@@ -554,14 +592,19 @@ public class WorkerManager {
     }
 
     // Assign workers for local exchange if there is one
-    DispatchablePlanMetadata localExchangeChildMetadata = null;
-    Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = null;
+    List<DispatchablePlanMetadata> localExchangeChildren = new ArrayList<>(children.size());
     for (PlanFragment child : children) {
       if (isLocalExchange(child, context)) {
-        Preconditions.checkState(localExchangeChildMetadata == null, "Found multiple local exchanges in the children");
-        localExchangeChildMetadata = metadataMap.get(child.getFragmentId());
-        workerIdToServerInstanceMap = assignWorkersForLocalExchange(localExchangeChildMetadata);
+        localExchangeChildren.add(metadataMap.get(child.getFragmentId()));
       }
+    }
+    DispatchablePlanMetadata localExchangeChildMetadata = null;
+    Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = null;
+    boolean inheritPartitioning = false;
+    if (canInheritWorkerAssignment(localExchangeChildren)) {
+      localExchangeChildMetadata = localExchangeChildren.get(0);
+      workerIdToServerInstanceMap = assignWorkersForLocalExchange(localExchangeChildMetadata);
+      inheritPartitioning = shareOnePartitioning(localExchangeChildren);
     }
 
     // If there is no local exchange, assign workers to the servers hosting the tables
@@ -624,12 +667,12 @@ public class WorkerManager {
         // With a local exchange peer the worker map is copied from it, so the classes come along; without one it comes
         // from the candidate servers, whose worker ids are not classes at all.
         childMetadata.setPartitionClassIds(
-            localExchangeChildMetadata != null ? localExchangeChildMetadata.getPartitionClassIds() : null);
+            inheritPartitioning ? localExchangeChildMetadata.getPartitionClassIds() : null);
       }
     }
 
     metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
-    if (localExchangeChildMetadata != null) {
+    if (inheritPartitioning) {
       metadata.setPartitionFunction(localExchangeChildMetadata.getPartitionFunction());
       metadata.setPartitionClassIds(localExchangeChildMetadata.getPartitionClassIds());
     } else {
