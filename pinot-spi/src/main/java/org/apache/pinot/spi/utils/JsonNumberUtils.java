@@ -23,7 +23,7 @@ package org.apache.pinot.spi.utils;
 ///
 /// Accepts regular long syntax plus JSON numeric forms: `1E1` → `10`, `1.9` → `1` (truncate toward
 /// zero), `1.123E1` → `11`. Throws [NumberFormatException] with `For input string: "<value>"` on
-/// overflow (`9223372036854775808`), illegal exponent (`2E20`, `2E-1`), and other malformed input.
+/// overflow (`9223372036854775808`, `2.0E19`), illegal exponent (`2E20`, `2E-1`), and other malformed input.
 ///
 /// Thread-safe: no mutable state.
 public final class JsonNumberUtils {
