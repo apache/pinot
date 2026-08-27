@@ -1021,6 +1021,10 @@ public class JsonFunctionsTest {
     expectThrows(NumberFormatException.class,
         () -> JsonFunctions.jsonExtractScalar("{\"x\":\"2E-1\"}", "$.x", "LONG"));
     expectThrows(NumberFormatException.class,
+        () -> JsonFunctions.jsonExtractScalar("{\"x\":\"2.0E19\"}", "$.x", "LONG"));
+    expectThrows(NumberFormatException.class,
+        () -> JsonFunctions.jsonExtractScalar("{\"x\":\"1.0E20\"}", "$.x", "LONG"));
+    expectThrows(NumberFormatException.class,
         () -> JsonFunctions.jsonExtractScalar("{\"x\":[\"9223372036854775808\"]}", "$.x", "LONG_ARRAY"));
     assertEquals((long[]) JsonFunctions.jsonExtractScalar("{\"x\":[\"1.9\",\"1E1\"]}", "$.x", "LONG_ARRAY"),
         new long[]{1L, 10L});

@@ -89,6 +89,10 @@ public class JsonNumberUtilsTest {
     assertJsonLongError("2E100.123");
     assertJsonLongError("2E-1");
     assertJsonLongError("10E18");
+    assertJsonLongError("2.0E19");
+    assertJsonLongError("1.0E20");
+    assertJsonLongError("1.123E20");
+    assertJsonLongError("-2.0E19");
   }
 
   private void assertJsonLong(String input, long expected) {

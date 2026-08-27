@@ -130,11 +130,18 @@ public final class JsonNumberUtils {
 
     if (exponentFound) {
       if (dotFound) {
+        double parsed;
         try {
-          return (long) Double.parseDouble(cs.toString());
+          parsed = Double.parseDouble(cs.toString());
         } catch (NumberFormatException ne) {
           throw formatException(cs);
         }
+        // Casting a finite double to long saturates at the long bounds. Reject values
+        // outside [Long.MIN_VALUE, 2^63) so 2.0E19 fails the same way 2E19 does.
+        if (!Double.isFinite(parsed) || parsed < Long.MIN_VALUE || parsed >= 0x1p63) {
+          throw formatException(cs);
+        }
+        return (long) parsed;
       }
 
       long exp;
