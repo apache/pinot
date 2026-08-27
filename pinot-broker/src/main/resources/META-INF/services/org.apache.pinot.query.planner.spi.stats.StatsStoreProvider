@@ -1,0 +1,2 @@
+org.apache.pinot.broker.stats.SqliteStatsStoreProvider
+org.apache.pinot.broker.stats.InMemoryStatsStoreProvider
