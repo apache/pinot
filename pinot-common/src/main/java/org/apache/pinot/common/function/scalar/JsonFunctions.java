@@ -35,6 +35,8 @@ import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -916,10 +918,11 @@ public class JsonFunctions {
 
   /// Coerces a JsonPath result to stored `LONG`. When `isTimestamp` is true, numeric values are
   /// epoch millis and strings go through [TimestampUtils#toMillisSinceEpoch]. Otherwise string
-  /// numbers use [JsonNumberUtils#parseJsonLong] (truncate toward zero, reject overflow).
+  /// numbers use [JsonNumberUtils#parseJsonLong] (truncate toward zero, reject overflow). Unquoted
+  /// JSON numbers arrive as [Number] and use the same overflow check (`2.0E19` must not saturate).
   public static long coerceToLong(Object value, boolean isTimestamp) {
     if (value instanceof Number) {
-      return ((Number) value).longValue();
+      return longFromJsonNumber((Number) value);
     }
     if (isTimestamp) {
       return TimestampUtils.toMillisSinceEpoch(value.toString());
@@ -932,6 +935,33 @@ public class JsonFunctions {
     } catch (NumberFormatException e) {
       throw new NumberFormatException("For input string: \"" + value + "\"");
     }
+  }
+
+  /// Converts a JsonPath [Number] to long without saturating. `Double.longValue()` and
+  /// `BigInteger.longValue()` wrap or clamp values outside the long range.
+  private static long longFromJsonNumber(Number number) {
+    if (number instanceof BigInteger) {
+      try {
+        return ((BigInteger) number).longValueExact();
+      } catch (ArithmeticException e) {
+        throw new NumberFormatException("For input string: \"" + number + "\"");
+      }
+    }
+    if (number instanceof BigDecimal) {
+      try {
+        return ((BigDecimal) number).setScale(0, RoundingMode.DOWN).longValueExact();
+      } catch (ArithmeticException e) {
+        throw new NumberFormatException("For input string: \"" + number + "\"");
+      }
+    }
+    if (number instanceof Double || number instanceof Float) {
+      double parsed = number.doubleValue();
+      if (!Double.isFinite(parsed) || parsed < Long.MIN_VALUE || parsed >= 0x1p63) {
+        throw new NumberFormatException("For input string: \"" + number + "\"");
+      }
+      return (long) parsed;
+    }
+    return number.longValue();
   }
 
   /// Coerces a JsonPath result to `FLOAT`. `Boolean` becomes `1f` / `0f`.

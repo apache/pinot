@@ -906,7 +906,7 @@ public class JsonFunctionsTest {
     // TIMESTAMP: numeric epoch as-is; ISO-8601 string via TimestampUtils (Long.parseLong would throw).
     assertEquals(JsonFunctions.jsonExtractScalar(json, "$.tnum", "TIMESTAMP"), 1514805173000L);
     assertEquals(JsonFunctions.jsonExtractScalar(json, "$.tiso", "TIMESTAMP"), 1514805173000L);
-    // LONG from numeric strings uses BigDecimal truncation/exponent handling; Long.parseLong would throw.
+    // LONG from numeric strings uses JsonNumberUtils (truncate toward zero, reject overflow).
     assertEquals(JsonFunctions.jsonExtractScalar(json, "$.lstr", "LONG"), 1L);
     assertEquals(JsonFunctions.jsonExtractScalar(json, "$.lexp", "LONG"), 10L);
   }
@@ -1024,6 +1024,13 @@ public class JsonFunctionsTest {
         () -> JsonFunctions.jsonExtractScalar("{\"x\":\"2.0E19\"}", "$.x", "LONG"));
     expectThrows(NumberFormatException.class,
         () -> JsonFunctions.jsonExtractScalar("{\"x\":\"1.0E20\"}", "$.x", "LONG"));
+    // Unquoted JSON numbers arrive as Number (Double / BigInteger), not strings.
+    expectThrows(NumberFormatException.class,
+        () -> JsonFunctions.jsonExtractScalar("{\"x\":2.0E19}", "$.x", "LONG"));
+    expectThrows(NumberFormatException.class,
+        () -> JsonFunctions.jsonExtractScalar("{\"x\":2E19}", "$.x", "LONG"));
+    expectThrows(NumberFormatException.class,
+        () -> JsonFunctions.jsonExtractScalar("{\"x\":9223372036854775808}", "$.x", "LONG"));
     expectThrows(NumberFormatException.class,
         () -> JsonFunctions.jsonExtractScalar("{\"x\":[\"9223372036854775808\"]}", "$.x", "LONG_ARRAY"));
     assertEquals((long[]) JsonFunctions.jsonExtractScalar("{\"x\":[\"1.9\",\"1E1\"]}", "$.x", "LONG_ARRAY"),
