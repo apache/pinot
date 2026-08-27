@@ -27,6 +27,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.io.SocketConfig;
@@ -35,6 +36,7 @@ import org.apache.helix.HelixManager;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
+import org.apache.pinot.broker.stats.BrokerTableStatsManager;
 import org.apache.pinot.common.audit.AuditLogFilter;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.http.PoolingHttpClientConnectionManagerHelper;
@@ -79,7 +81,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
       BrokerMetrics brokerMetrics, PinotConfiguration brokerConf, SqlQueryExecutor sqlQueryExecutor,
       ServerRoutingStatsManager serverRoutingStatsManager, AccessControlFactory accessFactory,
       HelixManager helixManager, QueryQuotaManager queryQuotaManager, ThreadAccountant threadAccountant,
-      AbstractResponseStore responseStore) {
+      AbstractResponseStore responseStore, @Nullable BrokerTableStatsManager statsManager) {
     _brokerResourcePackages = brokerConf.getProperty(CommonConstants.Broker.BROKER_RESOURCE_PACKAGES,
         CommonConstants.Broker.DEFAULT_BROKER_RESOURCE_PACKAGES);
     String[] pkgs = _brokerResourcePackages.split(",");
@@ -107,6 +109,9 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(helixManager).to(HelixManager.class);
         bind(sqlQueryExecutor).to(SqlQueryExecutor.class);
         bind(routingManager).to(BrokerRoutingManager.class);
+        if (statsManager != null) {
+          bind(statsManager).to(BrokerTableStatsManager.class);
+        }
         bind(brokerRequestHandler).to(BrokerRequestHandler.class);
         bind(brokerMetrics).to(BrokerMetrics.class);
         String loggerRootDir = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_LOGGER_ROOT_DIR);
