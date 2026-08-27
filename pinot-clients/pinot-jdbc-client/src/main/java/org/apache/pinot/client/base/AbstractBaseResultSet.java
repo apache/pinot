@@ -124,7 +124,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   public InputStream getAsciiStream(int columnIndex)
       throws SQLException {
     String value = getString(columnIndex);
-    InputStream in = new ByteArrayInputStream(value.getBytes(StandardCharsets.US_ASCII));
+    InputStream in = value == null ? null : new ByteArrayInputStream(value.getBytes(StandardCharsets.US_ASCII));
     return in;
   }
 
@@ -134,12 +134,14 @@ public abstract class AbstractBaseResultSet implements ResultSet {
     return getBigDecimal(columnIndex, 0);
   }
 
+  @Nullable
   @Override
   public BigDecimal getBigDecimal(String columnLabel, int scale)
       throws SQLException {
     return getBigDecimal(findColumn(columnLabel), scale);
   }
 
+  @Nullable
   @Override
   public BigDecimal getBigDecimal(int columnIndex, int scale)
       throws SQLException {
@@ -156,6 +158,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
     return index == -1 ? 0 : value.length() - index - 1;
   }
 
+  @Nullable
   @Override
   public BigDecimal getBigDecimal(String columnLabel)
       throws SQLException {
@@ -231,17 +234,19 @@ public abstract class AbstractBaseResultSet implements ResultSet {
     }
   }
 
+  @Nullable
   @Override
   public Reader getCharacterStream(String columnLabel)
       throws SQLException {
     return getCharacterStream(findColumn(columnLabel));
   }
 
+  @Nullable
   @Override
   public Reader getCharacterStream(int columnIndex)
       throws SQLException {
     InputStream in = getUnicodeStream(columnIndex);
-    Reader reader = new InputStreamReader(in, StandardCharsets.UTF_8);
+    Reader reader = in == null ? null : new InputStreamReader(in, StandardCharsets.UTF_8);
     return reader;
   }
 
@@ -270,24 +275,28 @@ public abstract class AbstractBaseResultSet implements ResultSet {
     throw new SQLFeatureNotSupportedException();
   }
 
+  @Nullable
   @Override
   public Date getDate(int columnIndex)
       throws SQLException {
     return getDate(columnIndex, Calendar.getInstance());
   }
 
+  @Nullable
   @Override
   public Date getDate(String columnLabel)
       throws SQLException {
     return getDate(findColumn(columnLabel), Calendar.getInstance());
   }
 
+  @Nullable
   @Override
   public Date getDate(String columnLabel, Calendar cal)
       throws SQLException {
     return getDate(findColumn(columnLabel), cal);
   }
 
+  @Nullable
   @Override
   public Date getDate(int columnIndex, Calendar cal)
       throws SQLException {
@@ -525,24 +534,28 @@ public abstract class AbstractBaseResultSet implements ResultSet {
     return null;
   }
 
+  @Nullable
   @Override
   public Time getTime(int columnIndex)
       throws SQLException {
     return getTime(columnIndex, Calendar.getInstance());
   }
 
+  @Nullable
   @Override
   public Time getTime(String columnLabel)
       throws SQLException {
     return getTime(findColumn(columnLabel), Calendar.getInstance());
   }
 
+  @Nullable
   @Override
   public Time getTime(String columnLabel, Calendar cal)
       throws SQLException {
     return getTime(findColumn(columnLabel), cal);
   }
 
+  @Nullable
   @Override
   public Time getTime(int columnIndex, Calendar cal)
       throws SQLException {
@@ -554,24 +567,28 @@ public abstract class AbstractBaseResultSet implements ResultSet {
     }
   }
 
+  @Nullable
   @Override
   public Timestamp getTimestamp(int columnIndex)
       throws SQLException {
     return getTimestamp(columnIndex, Calendar.getInstance());
   }
 
+  @Nullable
   @Override
   public Timestamp getTimestamp(String columnLabel)
       throws SQLException {
     return getTimestamp(findColumn(columnLabel), Calendar.getInstance());
   }
 
+  @Nullable
   @Override
   public Timestamp getTimestamp(String columnLabel, Calendar cal)
       throws SQLException {
     return getTimestamp(findColumn(columnLabel), cal);
   }
 
+  @Nullable
   @Override
   public Timestamp getTimestamp(int columnIndex, Calendar cal)
       throws SQLException {
@@ -590,34 +607,39 @@ public abstract class AbstractBaseResultSet implements ResultSet {
     return ResultSet.TYPE_FORWARD_ONLY;
   }
 
+  @Nullable
   @Override
   public URL getURL(String columnLabel)
       throws SQLException {
     return getURL(findColumn(columnLabel));
   }
 
+  @Nullable
   @Override
   public URL getURL(int columnIndex)
       throws SQLException {
     try {
-      URL url = new URL(getString(columnIndex));
+      String value = getString(columnIndex);
+      URL url = value == null ? null : new URL(value);
       return url;
     } catch (Exception e) {
       throw new SQLException("Unable to fetch URL", e);
     }
   }
 
+  @Nullable
   @Override
   public InputStream getUnicodeStream(String columnLabel)
       throws SQLException {
     return getUnicodeStream(findColumn(columnLabel));
   }
 
+  @Nullable
   @Override
   public InputStream getUnicodeStream(int columnIndex)
       throws SQLException {
     String value = getString(columnIndex);
-    InputStream in = new ByteArrayInputStream(value.getBytes(StandardCharsets.UTF_8));
+    InputStream in = value == null ? null : new ByteArrayInputStream(value.getBytes(StandardCharsets.UTF_8));
     return in;
   }
 
@@ -625,11 +647,8 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   private UUID getUuid(int columnIndex)
       throws SQLException {
     String value = getString(columnIndex);
-    if (value == null) {
-      return null;
-    }
     try {
-      return UUID.fromString(value);
+      return value == null ? null : UUID.fromString(value);
     } catch (IllegalArgumentException e) {
       throw new SQLDataException("Error parsing UUID", e);
     }
@@ -1227,6 +1246,16 @@ public abstract class AbstractBaseResultSet implements ResultSet {
       throw new SQLDataException("Data type not supported for column " + columnIndex);
     }
 
+    var value = getObject(columnIndex, dataType);
+    if (wasNull()) {
+      return null;
+    }
+    return value;
+  }
+
+  @Nullable
+  private Object getObject(int columnIndex, ColumnDataType dataType)
+      throws SQLException {
     if (dataType.isArray()) {
       return getList(columnIndex, dataType);
     }
