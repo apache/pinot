@@ -66,11 +66,13 @@ public abstract class AbstractBaseResultSet implements ResultSet {
     throw new SQLFeatureNotSupportedException("Map is not supported by the ResultSet");
   }
 
+  @Nullable
   protected List<?> getList(int columnIndex, ColumnDataType dataType)
       throws SQLException {
     throw new SQLFeatureNotSupportedException("Array is not supported by the ResultSet");
   }
 
+  @Nullable
   protected ColumnDataType getColumnType(int columnIndex) throws SQLException {
     return null;
   }
