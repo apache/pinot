@@ -934,6 +934,7 @@ public class JsonFunctions {
     }
   }
 
+  /// Coerces a JsonPath result to `FLOAT`. `Boolean` becomes `1f` / `0f`.
   public static float coerceToFloat(Object value) {
     if (value instanceof Number) {
       return ((Number) value).floatValue();
@@ -944,6 +945,7 @@ public class JsonFunctions {
     return Float.parseFloat(value.toString());
   }
 
+  /// Coerces a JsonPath result to `DOUBLE`. `Boolean` becomes `1d` / `0d`.
   public static double coerceToDouble(Object value) {
     if (value instanceof Number) {
       return ((Number) value).doubleValue();
@@ -954,6 +956,7 @@ public class JsonFunctions {
     return Double.parseDouble(value.toString());
   }
 
+  /// Coerces a JsonPath result to `BIG_DECIMAL`. `Boolean` becomes `1` / `0`.
   public static BigDecimal coerceToBigDecimal(Object value) {
     if (value instanceof BigDecimal) {
       return (BigDecimal) value;

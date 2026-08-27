@@ -106,10 +106,12 @@ public class NumberUtilsTest {
     //with exponent
     assertJsonLongError("2E+");
     assertJsonLongError("2E-");
+    assertJsonLongError("2E19");
     assertJsonLongError("2E20");
     assertJsonLongError("2E100");
     assertJsonLongError("2E100.123");
     assertJsonLongError("2E-1");
+    assertJsonLongError("10E18");
   }
 
   private void assertLong(String input, long expected) {

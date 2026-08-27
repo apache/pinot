@@ -20,7 +20,6 @@ package org.apache.pinot.core.util;
 
 import org.apache.pinot.spi.utils.JsonNumberUtils;
 
-
 /// Utility class with various number related methods.
 public class NumberUtils {
 

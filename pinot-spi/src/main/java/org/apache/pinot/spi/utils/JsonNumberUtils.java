@@ -144,11 +144,15 @@ public final class JsonNumberUtils {
         throw new NumberFormatException("Wrong exponent");
       }
 
-      if (exp < 0 || exp > POWERS_OF_10.length) {
+      if (exp < 0 || exp >= POWERS_OF_10.length) {
         throw new NumberFormatException("Wrong exponent");
       }
 
-      return (negative ? result : -result) * POWERS_OF_10[(int) exp];
+      try {
+        return Math.multiplyExact(negative ? result : -result, POWERS_OF_10[(int) exp]);
+      } catch (ArithmeticException e) {
+        throw formatException(cs);
+      }
     }
 
     return negative ? result : -result;

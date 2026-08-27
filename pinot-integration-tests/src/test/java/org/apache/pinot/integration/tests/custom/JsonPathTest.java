@@ -1105,11 +1105,8 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     assertTrue(rows.size() > 0);
     for (JsonNode row : rows) {
       JsonNode cell = row.get(0);
-      if (cell.isBoolean()) {
-        assertFalse(cell.asBoolean(), "BOOLEAN 0 should be broker false, not stored INT 0");
-      } else {
-        assertEquals(cell.asInt(), 0, "BOOLEAN 0 should be false or stored 0, got " + cell);
-      }
+      assertTrue(cell.isBoolean(), "BOOLEAN result should be broker boolean, got " + cell);
+      assertFalse(cell.asBoolean(), "n=0 must be false");
     }
 
     query = "SET enableNullHandling=true; SELECT "
@@ -1121,6 +1118,22 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     assertTrue(rows.size() > 0);
     for (JsonNode row : rows) {
       assertTrue(row.get(0).isNull(), "explicit NULL default should return SQL NULL, got " + row.get(0));
+    }
+
+    // Null-handling off: the 4-arg scalar still receives Java null and returns null. SSE keeps
+    // the transform's placeholder 0 when the flag is off.
+    query = "SELECT jsonExtractScalar(a.myMapStr, '$.missing', 'INT', NULL) "
+        + "FROM " + table + " AS a JOIN " + table + " AS b ON a.myMapStr_k1 = b.myMapStr_k1 LIMIT 5";
+    response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty(), response.toString());
+    rows = (ArrayNode) response.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0);
+    for (JsonNode row : rows) {
+      if (useMultiStageQueryEngine) {
+        assertTrue(row.get(0).isNull(), "MSE 4-arg NULL default is Java null, got " + row.get(0));
+      } else {
+        assertEquals(row.get(0).asInt(), 0, "SSE NULL default without null handling is 0, got " + row.get(0));
+      }
     }
 
     query = "SELECT json_extract_scalar(a.myMapStr, '$.missing', 'STRING') "
