@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.jayway.jsonpath.spi.cache.Cache;
 import com.jayway.jsonpath.spi.cache.CacheProvider;
 import java.io.File;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -1092,7 +1093,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
       assertTrue(leftK1.startsWith("value-k1-"));
       assertEquals(row.get(2).asText(), "def");
       assertTrue(row.get(3).isNumber());
-      assertEquals(new java.math.BigDecimal(row.get(4).asText()).intValue(), row.get(3).asInt());
+      assertEquals(new BigDecimal(row.get(4).asText()).intValue(), row.get(3).asInt());
     }
 
     query = "SELECT json_extract_scalar(a.myMapNumberStr, '$.n', 'BOOLEAN') "
