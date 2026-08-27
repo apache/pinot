@@ -1133,6 +1133,11 @@
         "description": "Lookup join with transformation on right table joined key",
         "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy = 'lookup') */ a.col1, b.col2 FROM a JOIN b ON a.col1 = upper(b.col1)",
         "expectedException": "Right input for lookup join must be an identifier.*"
+      },
+      {
+        "description": "Lookup join selecting all columns leaves no Project over the right table scan",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy = 'lookup') */ * FROM a JOIN b ON a.col1 = b.col1 WHERE a.col1 = 1",
+        "expectedException": "Right input for lookup join must be a Project.*"
       }
     ]
   }
