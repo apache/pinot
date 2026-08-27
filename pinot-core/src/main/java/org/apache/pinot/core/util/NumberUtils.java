@@ -18,33 +18,14 @@
  */
 package org.apache.pinot.core.util;
 
+import org.apache.pinot.spi.utils.JsonNumberUtils;
+
+
 /// Utility class with various number related methods.
 public class NumberUtils {
 
   public static final NumericException NULL_EXCEPTION = new NumericException("Can't parse null string");
   public static final NumericException EXP_EXCEPTION = new NumericException("Wrong exponent");
-
-  private static final long[] POWERS_OF_10 = new long[]{
-      1L,
-      10L,
-      100L,
-      1000L,
-      10000L,
-      100000L,
-      1000000L,
-      10000000L,
-      100000000L,
-      1000000000L,
-      10000000000L,
-      100000000000L,
-      1000000000000L,
-      10000000000000L,
-      100000000000000L,
-      1000000000000000L,
-      10000000000000000L,
-      100000000000000000L,
-      1000000000000000000L,
-  };
 
   private NumberUtils() {
   }
@@ -124,98 +105,16 @@ public class NumberUtils {
   /// @return parsed long value
   public static long parseJsonLong(CharSequence cs)
       throws NumericException {
-    if (cs == null) {
-      throw NULL_EXCEPTION;
-    }
-
-    boolean negative = false;
-    int i = 0;
-    int len = cs.length();
-    long limit = -Long.MAX_VALUE;
-
-    if (len > 0) {
-      boolean dotFound = false;
-      boolean exponentFound = false;
-
-      char firstChar = cs.charAt(0);
-      if (firstChar < '0') { // Possible leading "+" or "-"
-        if (firstChar == '-') {
-          negative = true;
-          limit = Long.MIN_VALUE;
-        } else if (firstChar != '+') {
-          throw NumericException.INSTANCE;
-        }
-
-        if (len == 1) { // Cannot have lone "+" or "-"
-          throw NumericException.INSTANCE;
-        }
-        i++;
+    try {
+      return JsonNumberUtils.parseJsonLong(cs);
+    } catch (NumberFormatException e) {
+      if (cs == null) {
+        throw NULL_EXCEPTION;
       }
-      long multmin = limit / 10;
-      long result = 0;
-      while (i < len) {
-        // Accumulating negatively avoids surprises near MAX_VALUE
-        char c = cs.charAt(i++);
-        if (c < '0' || c > '9' || result < multmin) {
-          if (c == '.') {
-            //ignore the rest of sequence
-            dotFound = true;
-            break;
-          } else if (c == 'e' || c == 'E') {
-            exponentFound = true;
-            break;
-          }
-          throw NumericException.INSTANCE;
-        }
-
-        int digit = c - '0';
-        result *= 10;
-        if (result < limit + digit) {
-          throw NumericException.INSTANCE;
-        }
-        result -= digit;
+      String message = e.getMessage();
+      if (message != null && message.startsWith("Wrong exponent")) {
+        throw EXP_EXCEPTION;
       }
-
-      if (dotFound) {
-        //scan rest of the string to make sure it's only digits
-        while (i < len) {
-          char c = cs.charAt(i++);
-          if (c < '0' || c > '9') {
-            if ((c | 32) == 'e') {
-              exponentFound = true;
-              break;
-            } else {
-              throw NumericException.INSTANCE;
-            }
-          }
-        }
-      }
-
-      if (exponentFound) {
-        if (dotFound) {
-          try { // TODO: remove toString()
-            return (long) Double.parseDouble(cs.toString());
-          } catch (NumberFormatException ne) {
-            throw NumericException.INSTANCE;
-          }
-        }
-
-        long exp;
-        try {
-          exp = parseLong(cs, i, len);
-        } catch (NumericException nfe) {
-          throw EXP_EXCEPTION;
-        }
-
-        if (exp < 0 || exp > POWERS_OF_10.length) {
-          throw EXP_EXCEPTION;
-        }
-
-        return (negative ? result : -result) * POWERS_OF_10[(int) exp];
-      }
-
-      return negative ? result : -result;
-    } else {
       throw NumericException.INSTANCE;
     }
   }

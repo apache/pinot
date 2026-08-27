@@ -53,7 +53,9 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.JsonNumberUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
 
@@ -680,17 +682,12 @@ public class JsonFunctions {
   }
 
   /// Reads `jsonPath` from a JSON `String`, UTF-8 `byte[]`, or already-parsed document.
-  /// Shared with `JsonExtractScalarTransformFunction` so both stay on the same input dispatch.
   /// A missing path returns `null` (`Option.SUPPRESS_EXCEPTIONS`). Malformed input throws.
+  /// Callers that already know the input type (the transform hot path) should call
+  /// `parseUtf8` / `parse` themselves instead of going through this dispatch.
   @Nullable
-  public static <T> T readJsonPathInternal(Object jsonInput, String jsonPath, ParseContext parseContext) {
+  private static <T> T readJsonPathInternal(Object jsonInput, String jsonPath, ParseContext parseContext) {
     return parseJsonDocument(jsonInput, parseContext).read(jsonPath, NO_PREDICATES);
-  }
-
-  /// Compiled-path counterpart of [#readJsonPathInternal(Object, String, ParseContext)].
-  @Nullable
-  public static <T> T readJsonPathInternal(Object jsonInput, JsonPath jsonPath, ParseContext parseContext) {
-    return parseJsonDocument(jsonInput, parseContext).read(jsonPath);
   }
 
   private static DocumentContext parseJsonDocument(Object jsonInput, ParseContext parseContext) {
@@ -735,22 +732,22 @@ public class JsonFunctions {
   private static Object coerceScalar(Object value, DataType dataType) {
     switch (dataType) {
       case INT:
-        return toInt(value, false);
+        return coerceToInt(value, false);
       case BOOLEAN:
-        return toInt(value, true);
+        return coerceToInt(value, true);
       case LONG:
-        return toLong(value, false);
+        return coerceToLong(value, false);
       case TIMESTAMP:
-        return toLong(value, true);
+        return coerceToLong(value, true);
       case FLOAT:
-        return toFloat(value);
+        return coerceToFloat(value);
       case DOUBLE:
-        return toDouble(value);
+        return coerceToDouble(value);
       case BIG_DECIMAL:
-        return toBigDecimal(value);
+        return coerceToBigDecimal(value);
       case STRING:
       case JSON:
-        return toStringValue(value);
+        return coerceToString(value);
       case BYTES:
         return BytesUtils.toBytes(value.toString());
       default:
@@ -797,7 +794,7 @@ public class JsonFunctions {
     }
     int[] values = new int[array.length];
     for (int i = 0; i < array.length; i++) {
-      values[i] = toInt(resolveArrayElement(array[i], defaultValue), false);
+      values[i] = coerceToInt(resolveArrayElement(array[i], defaultValue), false);
     }
     return values;
   }
@@ -808,7 +805,7 @@ public class JsonFunctions {
     }
     long[] values = new long[array.length];
     for (int i = 0; i < array.length; i++) {
-      values[i] = toLong(resolveArrayElement(array[i], defaultValue), false);
+      values[i] = coerceToLong(resolveArrayElement(array[i], defaultValue), false);
     }
     return values;
   }
@@ -819,7 +816,7 @@ public class JsonFunctions {
     }
     float[] values = new float[array.length];
     for (int i = 0; i < array.length; i++) {
-      values[i] = toFloat(resolveArrayElement(array[i], defaultValue));
+      values[i] = coerceToFloat(resolveArrayElement(array[i], defaultValue));
     }
     return values;
   }
@@ -830,7 +827,7 @@ public class JsonFunctions {
     }
     double[] values = new double[array.length];
     for (int i = 0; i < array.length; i++) {
-      values[i] = toDouble(resolveArrayElement(array[i], defaultValue));
+      values[i] = coerceToDouble(resolveArrayElement(array[i], defaultValue));
     }
     return values;
   }
@@ -841,7 +838,7 @@ public class JsonFunctions {
     }
     BigDecimal[] values = new BigDecimal[array.length];
     for (int i = 0; i < array.length; i++) {
-      values[i] = toBigDecimal(resolveArrayElement(array[i], defaultValue));
+      values[i] = coerceToBigDecimal(resolveArrayElement(array[i], defaultValue));
     }
     return values;
   }
@@ -852,12 +849,15 @@ public class JsonFunctions {
     }
     String[] values = new String[array.length];
     for (int i = 0; i < array.length; i++) {
-      values[i] = toStringValue(resolveArrayElement(array[i], defaultValue));
+      values[i] = coerceToString(resolveArrayElement(array[i], defaultValue));
     }
     return values;
   }
 
-  private static int toInt(Object value, boolean isBoolean) {
+  /// Coerces a JsonPath result to stored `INT`. When `isBoolean` is true, follows Pinot's numeric
+  /// BOOLEAN convention (any non-zero `Number` is true; `"true"` / `"TRUE"` / `"1"` via
+  /// [BooleanUtils#toInt(String)]).
+  public static int coerceToInt(Object value, boolean isBoolean) {
     if (isBoolean) {
       if (value instanceof Boolean) {
         return (Boolean) value ? 1 : 0;
@@ -878,7 +878,10 @@ public class JsonFunctions {
     return Integer.parseInt(value.toString());
   }
 
-  private static long toLong(Object value, boolean isTimestamp) {
+  /// Coerces a JsonPath result to stored `LONG`. When `isTimestamp` is true, numeric values are
+  /// epoch millis and strings go through [TimestampUtils#toMillisSinceEpoch]. Otherwise string
+  /// numbers use [JsonNumberUtils#parseJsonLong] (truncate toward zero, reject overflow).
+  public static long coerceToLong(Object value, boolean isTimestamp) {
     if (value instanceof Number) {
       return ((Number) value).longValue();
     }
@@ -889,15 +892,13 @@ public class JsonFunctions {
       return (Boolean) value ? 1L : 0L;
     }
     try {
-      // pinot-common cannot depend on pinot-core's NumberUtils#parseJsonLong; BigDecimal reproduces its
-      // truncate-toward-zero and exponent handling for JSON numeric strings ("1.9" -> 1, "1E1" -> 10).
-      return new BigDecimal(value.toString().trim()).longValue();
+      return JsonNumberUtils.parseJsonLong(value.toString());
     } catch (NumberFormatException e) {
       throw new NumberFormatException("For input string: \"" + value + "\"");
     }
   }
 
-  private static float toFloat(Object value) {
+  public static float coerceToFloat(Object value) {
     if (value instanceof Number) {
       return ((Number) value).floatValue();
     }
@@ -907,7 +908,7 @@ public class JsonFunctions {
     return Float.parseFloat(value.toString());
   }
 
-  private static double toDouble(Object value) {
+  public static double coerceToDouble(Object value) {
     if (value instanceof Number) {
       return ((Number) value).doubleValue();
     }
@@ -917,7 +918,7 @@ public class JsonFunctions {
     return Double.parseDouble(value.toString());
   }
 
-  private static BigDecimal toBigDecimal(Object value) {
+  public static BigDecimal coerceToBigDecimal(Object value) {
     if (value instanceof BigDecimal) {
       return (BigDecimal) value;
     }
@@ -927,7 +928,8 @@ public class JsonFunctions {
     return new BigDecimal(value.toString());
   }
 
-  private static String toStringValue(Object value) {
+  /// `String` values pass through; every other JSON value is serialized via [JsonUtils#objectToString].
+  public static String coerceToString(Object value) {
     if (value instanceof String) {
       return (String) value;
     }
@@ -936,6 +938,13 @@ public class JsonFunctions {
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Caught exception while serializing JSON value: " + value, e);
     }
+  }
+
+  /// Base64-decodes a JSON string to `BYTES`, matching [PinotDataType.JSON#toBytes(Object)].
+  /// Use this only for values extracted from the document. SQL default literals stay on the
+  /// hex / raw-`byte[]` path.
+  public static byte[] coerceExtractedToBytes(Object value) {
+    return PinotDataType.JSON.toBytes(value);
   }
 
   private static String unsupportedResultsTypeMessage(String resultsType) {

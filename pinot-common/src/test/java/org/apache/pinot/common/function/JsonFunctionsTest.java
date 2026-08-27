@@ -20,7 +20,6 @@ package org.apache.pinot.common.function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.jayway.jsonpath.InvalidJsonException;
-import com.jayway.jsonpath.JsonPath;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -1036,19 +1035,15 @@ public class JsonFunctionsTest {
   }
 
   @Test
-  public void testReadJsonPathInternalAcceptsStringBytesAndParsedObject() {
+  public void testJsonExtractScalarAcceptsStringBytesAndParsedObject() {
     String json = "{\"i\":42}";
-    JsonPath compiled = JsonPathCache.INSTANCE.getOrCompute("$.i");
-    Object fromString = JsonFunctions.readJsonPathInternal(json, "$.i", JsonFunctions.PARSE_CONTEXT);
-    Object fromBytes = JsonFunctions.readJsonPathInternal(json.getBytes(StandardCharsets.UTF_8), compiled,
-        JsonFunctions.PARSE_CONTEXT);
-    Object fromParsed = JsonFunctions.readJsonPathInternal(Map.of("i", 42), "$.i", JsonFunctions.PARSE_CONTEXT);
-    assertEquals(fromString, 42);
-    assertEquals(fromBytes, 42);
-    assertEquals(fromParsed, 42);
-    assertNull(JsonFunctions.readJsonPathInternal(json, "$.missing", JsonFunctions.PARSE_CONTEXT));
-    expectThrows(Exception.class,
-        () -> JsonFunctions.readJsonPathInternal("not json", "$.i", JsonFunctions.PARSE_CONTEXT));
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.i", "INT"), 42);
+    assertEquals(JsonFunctions.jsonExtractScalar(json.getBytes(StandardCharsets.UTF_8), "$.i", "INT"), 42);
+    assertEquals(JsonFunctions.jsonExtractScalar(Map.of("i", 42), "$.i", "INT"), 42);
+    expectThrows(IllegalArgumentException.class,
+        () -> JsonFunctions.jsonExtractScalar(json, "$.missing", "INT"));
+    expectThrows(IllegalArgumentException.class,
+        () -> JsonFunctions.jsonExtractScalar("not json", "$.i", "INT"));
   }
 
   /// Unparseable bytes must behave exactly like an unresolved path: the default when one is supplied, otherwise the

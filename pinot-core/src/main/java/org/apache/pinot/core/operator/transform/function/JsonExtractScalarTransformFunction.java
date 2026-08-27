@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.ParseContext;
@@ -35,13 +34,7 @@ import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.util.NumberUtils;
-import org.apache.pinot.core.util.NumericException;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.BooleanUtils;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.PinotDataType;
-import org.apache.pinot.spi.utils.TimestampUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -488,7 +481,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
         throw new IllegalArgumentException(
             "Cannot resolve JSON path on some records. Consider setting a default value.");
       }
-      _bytesValuesSV[i] = PinotDataType.JSON.toBytes(result);
+      _bytesValuesSV[i] = JsonFunctions.coerceExtractedToBytes(result);
     }
     return _bytesValuesSV;
   }
@@ -730,82 +723,27 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   }
 
   private static int toInt(Object value, boolean isBoolean) {
-    if (isBoolean) {
-      if (value instanceof Boolean) {
-        return (Boolean) value ? 1 : 0;
-      }
-      // For BOOLEAN result, follow PinotDataType numeric convention: non-zero number → true.
-      if (value instanceof Number) {
-        return ((Number) value).doubleValue() != 0 ? 1 : 0;
-      }
-      // String fallback: BooleanUtils.toInt accepts "true" / "TRUE" / "1".
-      return BooleanUtils.toInt(value.toString());
-    }
-    if (value instanceof Number) {
-      return ((Number) value).intValue();
-    }
-    if (value instanceof Boolean) {
-      return (Boolean) value ? 1 : 0;
-    }
-    return Integer.parseInt(value.toString());
+    return JsonFunctions.coerceToInt(value, isBoolean);
   }
 
   private static long toLong(Object value, boolean isTimestamp) {
-    if (value instanceof Number) {
-      return ((Number) value).longValue();
-    }
-    if (isTimestamp) {
-      return TimestampUtils.toMillisSinceEpoch(value.toString());
-    }
-    if (value instanceof Boolean) {
-      return (Boolean) value ? 1L : 0L;
-    }
-    try {
-      return NumberUtils.parseJsonLong(value.toString());
-    } catch (NumericException nfe) {
-      throw new NumberFormatException("For input string: \"" + value + "\"");
-    }
+    return JsonFunctions.coerceToLong(value, isTimestamp);
   }
 
   private static float toFloat(Object value) {
-    if (value instanceof Number) {
-      return ((Number) value).floatValue();
-    }
-    if (value instanceof Boolean) {
-      return (Boolean) value ? 1f : 0f;
-    }
-    return Float.parseFloat(value.toString());
+    return JsonFunctions.coerceToFloat(value);
   }
 
   private static double toDouble(Object value) {
-    if (value instanceof Number) {
-      return ((Number) value).doubleValue();
-    }
-    if (value instanceof Boolean) {
-      return (Boolean) value ? 1d : 0d;
-    }
-    return Double.parseDouble(value.toString());
+    return JsonFunctions.coerceToDouble(value);
   }
 
   private static BigDecimal toBigDecimal(Object value) {
-    if (value instanceof BigDecimal) {
-      return (BigDecimal) value;
-    }
-    if (value instanceof Boolean) {
-      return (Boolean) value ? BigDecimal.ONE : BigDecimal.ZERO;
-    }
-    return new BigDecimal(value.toString());
+    return JsonFunctions.coerceToBigDecimal(value);
   }
 
   private static String toString(Object value) {
-    if (value instanceof String) {
-      return (String) value;
-    }
-    try {
-      return JsonUtils.objectToString(value);
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException("Caught exception while serializing JSON value: " + value, e);
-    }
+    return JsonFunctions.coerceToString(value);
   }
 
   @SuppressWarnings("unchecked")
@@ -814,7 +752,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     if (_jsonFieldTransformFunction.getResultMetadata().getDataType() == DataType.BYTES) {
       byte[][] jsonBytes = _jsonFieldTransformFunction.transformToBytesValuesSV(valueBlock);
       IntFunction<T> jaywayExtractor =
-          i -> JsonFunctions.readJsonPathInternal(jsonBytes[i], _jsonPath, parseContext);
+          i -> parseContext.parseUtf8(jsonBytes[i]).read(_jsonPath);
       // Fory does not accept BYTES input. Stay on Jayway instead of the Fast extractor.
       if (_simpleJsonPath == null || _extractionMode == ExtractionMode.FORY) {
         return jaywayExtractor;
@@ -836,7 +774,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     } else {
       String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(valueBlock);
       IntFunction<T> jaywayExtractor =
-          i -> JsonFunctions.readJsonPathInternal(jsonStrings[i], _jsonPath, parseContext);
+          i -> parseContext.parse(jsonStrings[i]).read(_jsonPath);
       if (_simpleJsonPath == null) {
         return jaywayExtractor;
       }
