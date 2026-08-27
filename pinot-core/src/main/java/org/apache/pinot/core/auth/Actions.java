@@ -35,6 +35,7 @@ public class Actions {
     public static final String DEBUG_RESOURCE_USAGE = "DebugResourceUsage";
     public static final String DELETE_CLUSTER_CONFIG = "DeleteClusterConfig";
     public static final String DELETE_INSTANCE = "DeleteInstance";
+    public static final String DELETE_STATISTICS = "DeleteStatistics";
     public static final String DELETE_TASK = "DeleteTask";
     public static final String DELETE_TENANT = "DeleteTenant";
     public static final String DELETE_USER = "DeleteUser";

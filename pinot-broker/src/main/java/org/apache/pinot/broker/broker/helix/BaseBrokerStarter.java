@@ -1337,6 +1337,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     return _brokerMetrics;
   }
 
+  /// The statistics manager, or `null` when statistics collection is disabled.
+  @VisibleForTesting
+  @Nullable
+  public BrokerTableStatsManager getStatsManager() {
+    return _statsManager;
+  }
+
   public BrokerRoutingManager getRoutingManager() {
     return _routingManager;
   }
