@@ -1066,6 +1066,70 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(withSkip.get("numEntriesScannedPostFilter").asInt(), getNumAvroFiles());
   }
 
+  /// Real JSON above a self-join so extraction cannot stay on the leaf. Asserts both SQL aliases, a
+  /// non-null default, an explicit NULL default, BOOLEAN broker-facing values, and the 3-arg error path.
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonExtractScalarJoinAliasesAndDefaults(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String table = getTableName();
+
+    String query = "SELECT "
+        + "json_extract_scalar(a.myMapStr, '$.k1', 'STRING'), "
+        + "jsonExtractScalar(b.myMapStr, '$.k1', 'STRING'), "
+        + "json_extract_scalar(a.myMapStr, '$.missing', 'STRING', 'def'), "
+        + "jsonExtractScalar(a.myMapNumberStr, '$.n', 'INT'), "
+        + "json_extract_scalar(a.myMapNumberStr, '$.n', 'BIG_DECIMAL') "
+        + "FROM " + table + " AS a JOIN " + table + " AS b ON a.myMapStr_k1 = b.myMapStr_k1 "
+        + "LIMIT 20";
+    JsonNode response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty(), response.toString());
+    ArrayNode rows = (ArrayNode) response.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0);
+    for (JsonNode row : rows) {
+      String leftK1 = row.get(0).asText();
+      assertEquals(row.get(1).asText(), leftK1);
+      assertTrue(leftK1.startsWith("value-k1-"));
+      assertEquals(row.get(2).asText(), "def");
+      assertTrue(row.get(3).isNumber());
+      assertEquals(new java.math.BigDecimal(row.get(4).asText()).intValue(), row.get(3).asInt());
+    }
+
+    query = "SELECT json_extract_scalar(a.myMapNumberStr, '$.n', 'BOOLEAN') "
+        + "FROM " + table + " AS a JOIN " + table + " AS b ON a.myMapStr_k1 = b.myMapStr_k1 "
+        + "WHERE jsonExtractScalar(a.myMapNumberStr, '$.n', 'INT') = 0 LIMIT 5";
+    response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty(), response.toString());
+    rows = (ArrayNode) response.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0);
+    for (JsonNode row : rows) {
+      JsonNode cell = row.get(0);
+      if (cell.isBoolean()) {
+        assertFalse(cell.asBoolean(), "BOOLEAN 0 should be broker false, not stored INT 0");
+      } else {
+        assertEquals(cell.asInt(), 0, "BOOLEAN 0 should be false or stored 0, got " + cell);
+      }
+    }
+
+    query = "SET enableNullHandling=true; SELECT "
+        + "jsonExtractScalar(a.myMapStr, '$.missing', 'INT', NULL) "
+        + "FROM " + table + " AS a JOIN " + table + " AS b ON a.myMapStr_k1 = b.myMapStr_k1 LIMIT 5";
+    response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty(), response.toString());
+    rows = (ArrayNode) response.get("resultTable").get("rows");
+    assertTrue(rows.size() > 0);
+    for (JsonNode row : rows) {
+      assertTrue(row.get(0).isNull(), "explicit NULL default should return SQL NULL, got " + row.get(0));
+    }
+
+    query = "SELECT json_extract_scalar(a.myMapStr, '$.missing', 'STRING') "
+        + "FROM " + table + " AS a JOIN " + table + " AS b ON a.myMapStr_k1 = b.myMapStr_k1 LIMIT 1";
+    response = postQuery(query);
+    assertFalse(response.get("exceptions").isEmpty(), "3-arg missing path must error");
+    assertTrue(response.get("exceptions").get(0).get("message").asText().contains("Cannot resolve JSON path"),
+        response.get("exceptions").toString());
+  }
+
   private static List<String> extractOrderedDistinctValues(JsonNode response) {
     List<String> values = new ArrayList<>();
     JsonNode rows = response.get("resultTable").get("rows");
