@@ -59,7 +59,9 @@ public class PinotResultSetTest {
     int currentRow = 0;
     while (pinotResultSet.next()) {
       Assert.assertEquals(pinotResultSet.getInt(1), resultSet.getInt(currentRow, 0));
+      Assert.assertEquals(pinotResultSet.getShort(1), resultSet.getInt(currentRow, 0));
       Assert.assertEquals(pinotResultSet.getLong(2), resultSet.getLong(currentRow, 1));
+      Assert.assertEquals(pinotResultSet.getShort(2), (short) resultSet.getLong(currentRow, 1));
       Assert.assertEquals(pinotResultSet.getFloat(3), resultSet.getFloat(currentRow, 2));
       Assert.assertEquals(pinotResultSet.getDouble(4), resultSet.getDouble(currentRow, 3));
       Assert.assertEquals(pinotResultSet.getString(5), resultSet.getString(currentRow, 4));
@@ -177,6 +179,8 @@ public class PinotResultSetTest {
         + "\"columnDataTypes\":[\"INT_ARRAY\",\"STRING_ARRAY\"]},\"rows\":[[null,[]]]}}");
 
     Assert.assertTrue(resultSet.next());
+    Assert.assertNull(resultSet.getObject(1, List.class));
+    Assert.assertTrue(resultSet.wasNull());
     Assert.assertNull(resultSet.getObject(1));
     Assert.assertTrue(resultSet.wasNull());
     Assert.assertEquals(resultSet.getObject(2), List.of());
