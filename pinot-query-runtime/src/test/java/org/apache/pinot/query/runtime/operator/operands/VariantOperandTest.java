@@ -37,10 +37,12 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class VariantOperandTest {
@@ -245,6 +247,19 @@ public class VariantOperandTest {
   private static Object typedTryGet(byte[] variant, String targetType, ColumnDataType resultType) {
     return operand(resultType, "tryVariantGet",
         new RexExpression.InputRef(0), stringLiteral("$"), stringLiteral(targetType)).apply(row(variant));
+  }
+
+  /// The runtime CAST guard is defense-in-depth behind Calcite validation; this proves the guard itself executes.
+  @Test
+  public void testCastFromRawVariantIsRejected() {
+    IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
+        () -> operand(ColumnDataType.STRING, "CAST", new RexExpression.InputRef(0),
+            new RexExpression.Literal(ColumnDataType.STRING, "VARCHAR")));
+    assertTrue(exception.getMessage().contains("Raw VARIANT values do not support CAST"), exception.getMessage());
+
+    // CAST over a non-VARIANT operand still builds an operand.
+    assertNotNull(operand(ColumnDataType.STRING, "CAST",
+        new RexExpression.Literal(ColumnDataType.INT, 1), new RexExpression.Literal(ColumnDataType.STRING, "VARCHAR")));
   }
 
   private static TransformOperand operand(ColumnDataType resultType, String functionName,

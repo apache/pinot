@@ -300,7 +300,13 @@ public class VariantTypeTest extends CustomDataQueryClusterIntegrationTest {
       JsonNode response = postVariantQuery(
           "SELECT " + EVENT_ID + " FROM " + TABLE_NAME + " WHERE " + PAYLOAD + " " + operator
               + " (parse_json('{\"candidate\":1}'), parse_json('{\"candidate\":2}'))");
-      assertExceptionContains(response, "raw variant", "in");
+      if (useMultiStageQueryEngine) {
+        assertExceptionContains(response, "raw variant", "in");
+      } else {
+        // Single-stage no longer constant-folds parse_json (the fold would erase the VARIANT type), so the IN list
+        // has no literal values and the query is rejected at parsing rather than by the runtime capability guard.
+        assertHasException(response);
+      }
     }
   }
 
@@ -343,6 +349,27 @@ public class VariantTypeTest extends CustomDataQueryClusterIntegrationTest {
         "SELECT DISTINCT variant_get(" + PAYLOAD + ", '$.eventType', 'STRING') FROM " + TABLE_NAME)) {
       assertNoExceptions(postVariantQuery(query));
     }
+  }
+
+  /// CAST would leak the raw PVAR envelope as STRING/JSON/BYTES hex, bypassing the opacity contract; both engines
+  /// must reject it while CAST over an extracted typed path keeps working.
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testRawVariantCastIsRejected(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    for (String targetType : List.of("VARCHAR", "VARBINARY", "JSON")) {
+      JsonNode response = postVariantQuery(
+          "SELECT CAST(" + PAYLOAD + " AS " + targetType + ") FROM " + TABLE_NAME);
+      if (useMultiStageQueryEngine) {
+        // Calcite's native VARIANT type may reject the cast at validation ("Cannot cast ...") before the runtime
+        // guard is reached; either rejection keeps the envelope opaque.
+        assertHasException(response);
+      } else {
+        assertExceptionContains(response, "raw variant", "cast");
+      }
+    }
+    assertNoExceptions(postVariantQuery(
+        "SELECT CAST(variant_get(" + PAYLOAD + ", '$.eventType', 'STRING') AS VARCHAR) FROM " + TABLE_NAME));
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -576,6 +603,12 @@ public class VariantTypeTest extends CustomDataQueryClusterIntegrationTest {
 
   private static void assertNoExceptions(JsonNode response) {
     Assert.assertEquals(response.get("exceptions").size(), 0, response.toPrettyString());
+  }
+
+  private static void assertHasException(JsonNode response) {
+    JsonNode exceptions = response.get("exceptions");
+    Assert.assertNotNull(exceptions, response.toPrettyString());
+    Assert.assertFalse(exceptions.isEmpty(), response.toPrettyString());
   }
 
   private static void assertExceptionContains(JsonNode response, String... expectedFragments) {

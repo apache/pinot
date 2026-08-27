@@ -103,8 +103,12 @@ public class PredicateEvaluatorProvider {
             operation = predicate.getType().name();
             break;
         }
+        // Name the actual failing type: ordering capability is also absent for e.g. MAP and STRUCT, which must not
+        // be blamed on VARIANT. The variantGet hint only makes sense for VARIANT.
+        String hint =
+            dataType == DataType.VARIANT ? "; extract a typed path with variantGet first" : "";
         throw new IllegalArgumentException(
-            "Raw VARIANT values do not support " + operation + "; extract a typed path with variantGet first");
+            "Raw " + dataType + " values do not support " + operation + hint);
       }
       if (dictionary != null) {
         // dictionary based predicate evaluators

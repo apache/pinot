@@ -174,8 +174,10 @@ The initial schema and table constraints are:
 - enabled raw forward index;
 - no dictionary or secondary index on the raw Variant column;
 - not a primary key, partition column, sorted column, upsert comparison column,
-  metrics-aggregation key, or star-tree dimension; and
-- partial upsert may use only the `OVERWRITE` strategy.
+  metrics-aggregation key, or star-tree dimension;
+- partial upsert may use only the `OVERWRITE` strategy; and
+- minion merge tasks (`MergeRollupTask`, `RealtimeToOfflineSegmentsTask`) may use only the `CONCAT` merge type,
+  because rollup and dedup group rows by raw stored bytes.
 
 Segment creation validates every non-null value as a complete `PVAR` envelope. Raw
 Variant columns do not publish logical minimum or maximum values and are never marked
@@ -197,6 +199,7 @@ The logical type reports:
 | ordering / min-max / sort / ASOF match key | no |
 | join, lookup, primary, or partition key | no |
 | direct value-consuming aggregation | no |
+| `CAST` from a raw value | no |
 | non-distinct `COUNT(raw_variant)` | yes |
 
 Planner validation provides the primary error. Runtime and single-stage guards remain
@@ -242,6 +245,9 @@ Function lookup remains case-insensitive under Pinot's existing registration rul
 The v1 path grammar supports root `$`, dot-separated object fields, and non-negative
 array indexes. Supported extraction targets are `BOOLEAN`, `INT`, `LONG`, `FLOAT`,
 `DOUBLE`, `BIG_DECIMAL`, `STRING`, `BYTES`, `UUID`, `TIMESTAMP`, `VARIANT`, and `JSON`.
+
+Neither engine constant-folds the JSON-to-Variant functions: a folded result would
+degrade to a plain `BYTES` literal and erase the logical type together with its guards.
 
 Strict functions reject malformed encodings, paths, incompatible conversions, numeric
 overflow, and malformed JSON. `try_` functions return SQL null for those failures.
