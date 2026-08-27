@@ -26,6 +26,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.QueryFunctionInvoker;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Literal;
@@ -87,6 +88,12 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
       return expression;
     }
     String canonicalName = FunctionRegistry.canonicalize(function.getOperator());
+    if (TransformFunctionType.parsesJsonToVariant(canonicalName)) {
+      // Mirror the multi-stage fold guard (PinotEvaluateLiteralRule): folding a JSON-to-Variant call would degrade
+      // the result to a plain BYTES literal, erasing the VARIANT type and with it JSON rendering, null-handling
+      // enforcement, and the raw-value opacity guards. Keep the call for runtime evaluation.
+      return expression;
+    }
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
     if (functionInfo == null || !functionInfo.isDeterministic()) {
       return expression;

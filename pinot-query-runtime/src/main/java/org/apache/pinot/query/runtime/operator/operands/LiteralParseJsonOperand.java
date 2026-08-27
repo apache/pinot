@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.operator.operands;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.VariantUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -32,10 +33,6 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 /// immutable by convention and can therefore be reused for every input row. Instances are thread-safe after
 /// construction.
 final class LiteralParseJsonOperand implements TransformOperand {
-  private static final String PARSE_JSON = "parsejson";
-  private static final String PARSE_JSON_TO_VARIANT = "parsejsontovariant";
-  private static final String TRY_PARSE_JSON = "tryparsejson";
-  private static final String TRY_PARSE_JSON_TO_VARIANT = "tryparsejsontovariant";
 
   private final ColumnDataType _resultType;
   @Nullable
@@ -65,19 +62,12 @@ final class LiteralParseJsonOperand implements TransformOperand {
   }
 
   static boolean isSupported(String canonicalName) {
-    switch (canonicalName) {
-      case PARSE_JSON:
-      case PARSE_JSON_TO_VARIANT:
-      case TRY_PARSE_JSON:
-      case TRY_PARSE_JSON_TO_VARIANT:
-        return true;
-      default:
-        return false;
-    }
+    // Derived from the registration source of truth so this dispatcher cannot drift from new aliases.
+    return TransformFunctionType.parsesJsonToVariant(canonicalName);
   }
 
   private static boolean isTolerant(String canonicalName) {
-    return canonicalName.equals(TRY_PARSE_JSON) || canonicalName.equals(TRY_PARSE_JSON_TO_VARIANT);
+    return TransformFunctionType.parsesJsonToVariantTolerantly(canonicalName);
   }
 
   @Override

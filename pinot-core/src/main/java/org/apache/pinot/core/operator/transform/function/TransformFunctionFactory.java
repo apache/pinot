@@ -139,6 +139,7 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.VARIANT_EXISTS, VariantExistsTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.IS_VARIANT_NULL, IsVariantNullTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.VARIANT_TYPE_OF, VariantTypeOfTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.VARIANT_TO_JSON, VariantToJsonTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.PARSE_JSON_TO_VARIANT, ParseJsonToVariantTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.TRY_PARSE_JSON_TO_VARIANT,
         ParseJsonToVariantTransformFunction.Try.class);

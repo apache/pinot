@@ -66,6 +66,18 @@ public class PredicateEvaluatorProviderTest {
     }
   }
 
+  /// Non-VARIANT types can also fail a capability check (e.g. MAP has no ordering); the rejection must name the
+  /// actual type and must not suggest variantGet.
+  @Test
+  public void testCapabilityRejectionNamesActualDataType() {
+    BadQueryRequestException exception = Assert.expectThrows(BadQueryRequestException.class,
+        () -> PredicateEvaluatorProvider.getPredicateEvaluator(
+            new RangePredicate(ExpressionContext.forIdentifier("mapCol"), "[1\t\t2]"), null, DataType.MAP, null));
+    String message = exception.getCause().getMessage();
+    assertTrue(message.contains("Raw MAP values do not support"), message);
+    assertFalse(message.contains("variantGet"), message);
+  }
+
   /// RAW forward index with dictionary but no inverted/range/sorted index — the planner must drop the dictionary so
   /// that the scan-based filter operator receives a raw-value evaluator. Otherwise, the scan iterator would call
   /// `applySV(rawValue)` on a dict-based evaluator and throw [UnsupportedOperationException].

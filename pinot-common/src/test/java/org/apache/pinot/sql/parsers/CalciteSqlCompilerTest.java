@@ -2649,6 +2649,27 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(today, expectedTodayStr);
   }
 
+  /// JSON-to-Variant calls must never constant-fold: a folded result degrades to a plain BYTES literal, erasing
+  /// the VARIANT type and with it JSON rendering, null-handling enforcement, and the opacity guards. Mirrors the
+  /// multi-stage guard in PinotEvaluateLiteralRule.
+  @Test
+  public void testParseJsonIsNotCompileTimeFolded() {
+    for (String call : new String[]{
+        "parseJson('{\"a\":1}')", "parse_json('{\"a\":1}')", "tryParseJson('{\"a\":1}')",
+        "parseJsonToVariant('{\"a\":1}')", "tryParseJsonToVariant('{\"a\":1}')"
+    }) {
+      Expression expression = compileToExpression(call);
+      Assert.assertNotNull(expression.getFunctionCall(), call);
+      Expression rewritten = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+      Assert.assertNotNull(rewritten.getFunctionCall(), call + " must stay a function call");
+      Assert.assertNull(rewritten.getLiteral(), call + " must not fold to a literal");
+    }
+    // A composition whose outer call is foldable still keeps the Variant call unfolded inside.
+    Expression composed = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(
+        compileToExpression("variantTypeOf(parseJson('{\"a\":1}'))"));
+    Assert.assertNotNull(composed.getFunctionCall());
+  }
+
   @Test
   public void testCompileTimeExpression() {
     long lowerBound = System.currentTimeMillis();
