@@ -111,10 +111,10 @@ public enum AggregationFunctionType {
       SqlTypeName.OTHER),
   DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH("distinctCountRawIntegerSumTupleSketch", ReturnTypes.VARCHAR,
       TupleSketchOperands.CHECKER, SqlTypeName.OTHER),
-  SUMVALUESINTEGERSUMTUPLESKETCH("sumValuesIntegerSumTupleSketch", ReturnTypes.BIGINT,
-      TupleSketchOperands.CHECKER, SqlTypeName.OTHER),
-  AVGVALUEINTEGERSUMTUPLESKETCH("avgValueIntegerSumTupleSketch", ReturnTypes.BIGINT,
-      TupleSketchOperands.CHECKER, SqlTypeName.OTHER),
+  SUMVALUESINTEGERSUMTUPLESKETCH("sumValuesIntegerSumTupleSketch", ReturnTypes.BIGINT, TupleSketchOperands.CHECKER,
+      SqlTypeName.OTHER),
+  AVGVALUEINTEGERSUMTUPLESKETCH("avgValueIntegerSumTupleSketch", ReturnTypes.BIGINT, TupleSketchOperands.CHECKER,
+      SqlTypeName.OTHER),
   DISTINCTCOUNTCPCSKETCH("distinctCountCPCSketch", ReturnTypes.BIGINT,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.ANY), i -> i == 1), SqlTypeName.OTHER),
   DISTINCTCOUNTRAWCPCSKETCH("distinctCountRawCPCSketch", ReturnTypes.VARCHAR,
@@ -244,13 +244,11 @@ public enum AggregationFunctionType {
 
   /// Nested because an enum constant's arguments cannot reference a static field of its own enum.
   private static final class TupleSketchOperands {
-    private static final SqlOperandTypeChecker CHECKER = OperandTypes.or(
+    static final SqlOperandTypeChecker CHECKER = OperandTypes.or(
         OperandTypes.family(SqlTypeFamily.BINARY),
         OperandTypes.family(SqlTypeFamily.BINARY, SqlTypeFamily.CHARACTER),
-        OperandTypes.family(SqlTypeFamily.BINARY, SqlTypeFamily.INTEGER));
-
-    private TupleSketchOperands() {
-    }
+        OperandTypes.family(SqlTypeFamily.BINARY, SqlTypeFamily.INTEGER)
+    );
   }
 
   private static final Set<String> NAMES = Arrays.stream(values())
