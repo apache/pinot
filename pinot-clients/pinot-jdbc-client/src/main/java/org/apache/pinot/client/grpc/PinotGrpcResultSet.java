@@ -193,7 +193,7 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
     if (!(value instanceof Map)) {
       throw new SQLDataException("Expected map value, found: " + value.getClass());
     }
-    return (Map<?,?>) value;
+    return (Map<?, ?>) value;
   }
 
   @Nullable
