@@ -986,7 +986,8 @@ jsonextractkey:
   transform: "org.apache.pinot.core.operator.transform.function.JsonExtractKeyTransformFunction"
   udf: null
 jsonextractscalar:
-  scalar: null
+  scalar: "ArgumentCountBasedScalarFunction{[3: org.apache.pinot.common.function.scalar.JsonFunctions.jsonExtractScalar,\
+    \ 4: org.apache.pinot.common.function.scalar.JsonFunctions.jsonExtractScalar]}"
   transform: "org.apache.pinot.core.operator.transform.function.JsonExtractScalarTransformFunction"
   udf: null
 jsonextractscalarfast:
