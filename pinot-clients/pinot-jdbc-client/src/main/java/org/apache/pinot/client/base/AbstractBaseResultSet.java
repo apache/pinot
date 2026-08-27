@@ -210,15 +210,15 @@ public abstract class AbstractBaseResultSet implements ResultSet {
     throw new SQLFeatureNotSupportedException();
   }
 
-  @Override
   @Nullable
+  @Override
   public byte[] getBytes(String columnLabel)
       throws SQLException {
     return getBytes(findColumn(columnLabel));
   }
 
-  @Override
   @Nullable
+  @Override
   public byte[] getBytes(int columnIndex)
       throws SQLException {
     try {
@@ -439,36 +439,36 @@ public abstract class AbstractBaseResultSet implements ResultSet {
     throw new SQLFeatureNotSupportedException();
   }
 
-  @Override
   @Nullable
+  @Override
   public Object getObject(String columnLabel)
       throws SQLException {
     return getObject(findColumn(columnLabel));
   }
 
-  @Override
   @Nullable
+  @Override
   public Object getObject(int columnIndex, Map<String, Class<?>> map)
       throws SQLException {
     return getObject(columnIndex);
   }
 
-  @Override
   @Nullable
+  @Override
   public Object getObject(String columnLabel, Map<String, Class<?>> map)
       throws SQLException {
     return getObject(findColumn(columnLabel), map);
   }
 
-  @Override
   @Nullable
+  @Override
   public <T> T getObject(String columnLabel, Class<T> type)
       throws SQLException {
     return getObject(findColumn(columnLabel), type);
   }
 
-  @Override
   @Nullable
+  @Override
   public <T> T getObject(int columnIndex, Class<T> type)
       throws SQLException {
     Object value = getObject(columnIndex);
@@ -516,8 +516,8 @@ public abstract class AbstractBaseResultSet implements ResultSet {
     throw new SQLFeatureNotSupportedException();
   }
 
-  @Override
   @Nullable
+  @Override
   public Statement getStatement()
       throws SQLException {
     return null;
@@ -1215,8 +1215,8 @@ public abstract class AbstractBaseResultSet implements ResultSet {
     throw new SQLFeatureNotSupportedException();
   }
 
-  @Override
   @Nullable
+  @Override
   public Object getObject(int columnIndex)
       throws SQLException {
 

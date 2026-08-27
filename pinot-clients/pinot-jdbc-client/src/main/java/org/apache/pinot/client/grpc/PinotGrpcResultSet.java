@@ -143,8 +143,8 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
     return new PinotResultMetadata(_totalColumns, _columns, _columnDataTypes);
   }
 
-  @Override
   @Nullable
+  @Override
   protected ColumnDataType getColumnType(int columnIndex) throws SQLException {
     validateColumn(columnIndex);
     return _dataSchema.getColumnDataType(columnIndex - 1);
@@ -164,8 +164,8 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
     return _currentRow;
   }
 
-  @Override
   @Nullable
+  @Override
   public String getString(int columnIndex)
       throws SQLException {
     Object value = getValue(columnIndex);
@@ -187,8 +187,8 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
     return value;
   }
 
-  @Override
   @Nullable
+  @Override
   protected Map<?, ?> getMap(int columnIndex)
       throws SQLException {
     Object value = getValue(columnIndex);
@@ -207,8 +207,8 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
     }
   }
 
-  @Override
   @Nullable
+  @Override
   protected List<?> getList(int columnIndex, ColumnDataType dataType)
       throws SQLException {
     Object value = getValue(columnIndex);

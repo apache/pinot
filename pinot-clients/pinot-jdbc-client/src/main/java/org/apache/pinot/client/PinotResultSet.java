@@ -180,8 +180,8 @@ public class PinotResultSet extends AbstractBaseResultSet {
     return new PinotResultMetadata(_totalColumns, _columns, _columnDataTypes);
   }
 
-  @Override
   @Nullable
+  @Override
   protected ColumnDataType getColumnType(int columnIndex) {
     return _resolvedColumnDataTypes.get(columnIndex);
   }
@@ -203,8 +203,8 @@ public class PinotResultSet extends AbstractBaseResultSet {
     return _currentRow;
   }
 
-  @Override
   @Nullable
+  @Override
   public String getString(int columnIndex)
       throws SQLException {
     validateColumn(columnIndex);
@@ -225,15 +225,15 @@ public class PinotResultSet extends AbstractBaseResultSet {
     return false;
   }
 
-  @Override
   @Nullable
+  @Override
   protected Map<?, ?> getMap(int columnIndex)
       throws SQLException {
     return parseJson(columnIndex, MAP_READER, "map");
   }
 
-  @Override
   @Nullable
+  @Override
   protected List<?> getList(int columnIndex, ColumnDataType dataType)
       throws SQLException {
     switch (dataType) {
