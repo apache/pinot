@@ -1075,18 +1075,20 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String table = getTableName();
-    // SSE has no JOIN. MSE self-join is the case that used to fail to resolve the scalar.
+    // SSE has no JOIN or table aliases. MSE self-join is the case that used to fail to resolve
+    // the scalar.
     String from = useMultiStageQueryEngine
         ? table + " AS a JOIN " + table + " AS b ON a.myMapStr_k1 = b.myMapStr_k1"
-        : table + " AS a";
-    String rightJson = useMultiStageQueryEngine ? "b.myMapStr" : "a.myMapStr";
+        : table;
+    String a = useMultiStageQueryEngine ? "a." : "";
+    String rightJson = useMultiStageQueryEngine ? "b.myMapStr" : "myMapStr";
 
     String query = "SELECT "
-        + "json_extract_scalar(a.myMapStr, '$.k1', 'STRING'), "
+        + "json_extract_scalar(" + a + "myMapStr, '$.k1', 'STRING'), "
         + "jsonExtractScalar(" + rightJson + ", '$.k1', 'STRING'), "
-        + "json_extract_scalar(a.myMapStr, '$.missing', 'STRING', 'def'), "
-        + "jsonExtractScalar(a.myMapNumberStr, '$.n', 'INT'), "
-        + "json_extract_scalar(a.myMapNumberStr, '$.n', 'BIG_DECIMAL') "
+        + "json_extract_scalar(" + a + "myMapStr, '$.missing', 'STRING', 'def'), "
+        + "jsonExtractScalar(" + a + "myMapNumberStr, '$.n', 'INT'), "
+        + "json_extract_scalar(" + a + "myMapNumberStr, '$.n', 'BIG_DECIMAL') "
         + "FROM " + from + " LIMIT 20";
     JsonNode response = postQuery(query);
     assertTrue(response.get("exceptions").isEmpty(), response.toString());
@@ -1101,8 +1103,8 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
       assertEquals(new BigDecimal(row.get(4).asText()).intValue(), row.get(3).asInt());
     }
 
-    query = "SELECT json_extract_scalar(a.myMapNumberStr, '$.n', 'BOOLEAN') "
-        + "FROM " + from + " WHERE jsonExtractScalar(a.myMapNumberStr, '$.n', 'INT') = 0 LIMIT 5";
+    query = "SELECT json_extract_scalar(" + a + "myMapNumberStr, '$.n', 'BOOLEAN') "
+        + "FROM " + from + " WHERE jsonExtractScalar(" + a + "myMapNumberStr, '$.n', 'INT') = 0 LIMIT 5";
     response = postQuery(query);
     assertTrue(response.get("exceptions").isEmpty(), response.toString());
     rows = (ArrayNode) response.get("resultTable").get("rows");
@@ -1114,7 +1116,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     }
 
     query = "SET enableNullHandling=true; SELECT "
-        + "jsonExtractScalar(a.myMapStr, '$.missing', 'INT', NULL) FROM " + from + " LIMIT 5";
+        + "jsonExtractScalar(" + a + "myMapStr, '$.missing', 'INT', NULL) FROM " + from + " LIMIT 5";
     response = postQuery(query);
     assertTrue(response.get("exceptions").isEmpty(), response.toString());
     rows = (ArrayNode) response.get("resultTable").get("rows");
@@ -1125,7 +1127,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
 
     // Null-handling off: a single-side extract stays on the leaf transform, which writes the INT
     // placeholder 0. The DataTable also cannot distinguish INT NULL from 0 without the flag.
-    query = "SELECT jsonExtractScalar(a.myMapStr, '$.missing', 'INT', NULL) FROM " + from + " LIMIT 5";
+    query = "SELECT jsonExtractScalar(" + a + "myMapStr, '$.missing', 'INT', NULL) FROM " + from + " LIMIT 5";
     response = postQuery(query);
     assertTrue(response.get("exceptions").isEmpty(), response.toString());
     rows = (ArrayNode) response.get("resultTable").get("rows");
@@ -1134,7 +1136,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
       assertEquals(row.get(0).asInt(), 0, "NULL default without null handling is INT 0, got " + row.get(0));
     }
 
-    query = "SELECT json_extract_scalar(a.myMapStr, '$.missing', 'STRING') FROM " + from + " LIMIT 1";
+    query = "SELECT json_extract_scalar(" + a + "myMapStr, '$.missing', 'STRING') FROM " + from + " LIMIT 1";
     response = postQuery(query);
     assertFalse(response.get("exceptions").isEmpty(), "3-arg missing path must error");
     assertTrue(response.get("exceptions").get(0).get("message").asText().contains("Cannot resolve JSON path"),
