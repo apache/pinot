@@ -1264,4 +1264,28 @@ public class MergeRollupTaskGeneratorTest {
     }
     return idealState;
   }
+
+  @Test
+  public void testVariantColumnRejectsRollupAndDedupMergeTypes() {
+    MergeRollupTaskGenerator taskGenerator = new MergeRollupTaskGenerator();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addDateTimeField(TIME_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    schema.addField(new DimensionFieldSpec("payload", FieldSpec.DataType.VARIANT, true));
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTaskConfig(new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, new HashMap<>())))
+        .build();
+
+    for (String rejected : new String[]{"rollup", "ROLLUP", "dedup"}) {
+      Map<String, String> taskConfig = new HashMap<>();
+      taskConfig.put("hourly.mergeType", rejected);
+      IllegalStateException exception = expectThrows(IllegalStateException.class,
+          () -> taskGenerator.validateTaskConfigs(offlineTableConfig, schema, taskConfig));
+      assertTrue(exception.getMessage().contains("VARIANT"), exception.getMessage());
+    }
+
+    Map<String, String> concatConfig = new HashMap<>();
+    concatConfig.put("hourly.mergeType", "concat");
+    taskGenerator.validateTaskConfigs(offlineTableConfig, schema, concatConfig);
+  }
 }

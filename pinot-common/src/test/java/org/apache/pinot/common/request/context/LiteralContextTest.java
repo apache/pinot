@@ -24,6 +24,7 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.UUID;
 import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.common.utils.VariantUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -287,5 +288,20 @@ public class LiteralContextTest {
 
     assertEquals(literalContext.getStringValue(), uuid.toString());
     assertEquals(literalContext.getBytesValue(), UuidUtils.toBytes(uuid));
+  }
+
+  /// A VARIANT-typed literal context resolves through PinotDataType.VARIANT, mirroring the UUID logical-type arm.
+  /// PinotDataType.VARIANT validates the envelope and rejects every conversion except VARIANT-to-VARIANT, so
+  /// opacity is preserved while construction no longer throws "Unsupported DataType".
+  @Test
+  public void testVariantLiteralResolvesPinotDataType() {
+    byte[] envelope = VariantUtils.parseJsonToVariant("{\"a\":1}");
+    LiteralContext literalContext = new LiteralContext(DataType.VARIANT, envelope);
+    assertEquals(literalContext.getType(), DataType.VARIANT);
+    assertEquals(literalContext.getBytesValue(), envelope);
+
+    // Only a byte[] envelope is a valid single Variant value; there is no VARIANT array form.
+    assertThrows(IllegalStateException.class, () -> new LiteralContext(DataType.VARIANT, "not-bytes"));
+    assertThrows(IllegalStateException.class, () -> new LiteralContext(DataType.VARIANT, new byte[][]{envelope}));
   }
 }

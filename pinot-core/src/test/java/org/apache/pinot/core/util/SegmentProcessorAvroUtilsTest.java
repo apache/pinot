@@ -35,6 +35,7 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.VariantUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordReader;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.segment.local.utils.DataTypeTransformerUtils;
@@ -173,6 +174,8 @@ public class SegmentProcessorAvroUtilsTest {
     assertFieldType(avroSchema, "jsonSv", Schema.Type.STRING, null);
     assertFieldType(avroSchema, "bytesSv", Schema.Type.BYTES, null);
     assertFieldType(avroSchema, "uuidSv", Schema.Type.STRING, "uuid");
+    // VARIANT passes through as opaque bytes with no logical type: the PVAR envelope must not be interpreted.
+    assertFieldType(avroSchema, "variantSv", Schema.Type.BYTES, null);
 
     assertElementType(avroSchema, "intMv", Schema.Type.INT, null);
     assertElementType(avroSchema, "boolMv", Schema.Type.BOOLEAN, null);
@@ -232,6 +235,8 @@ public class SegmentProcessorAvroUtilsTest {
     row.putValue("jsonSv", "{\"a\":1}");
     row.putValue("bytesSv", rawBytes);
     row.putValue("uuidSv", uuidBytes);
+    byte[] variantEnvelope = VariantUtils.parseJsonToVariant("{\"eventType\":\"click\",\"score\":3}");
+    row.putValue("variantSv", variantEnvelope);
     row.putValue("intMv", new Object[]{7, 8});
     row.putValue("longMv", new Object[]{9L, 10L});
     row.putValue("floatMv", new Object[]{11.0f, 12.0f});
@@ -280,6 +285,8 @@ public class SegmentProcessorAvroUtilsTest {
       assertEquals(readRow.getValue("jsonSv"), "{\"a\":1}");
       assertEquals((byte[]) readRow.getValue("bytesSv"), rawBytes);
       assertEquals((byte[]) readRow.getValue("uuidSv"), uuidBytes);
+      // The round-trip claim the CONCAT merge path depends on: PVAR bytes come back untouched.
+      assertEquals((byte[]) readRow.getValue("variantSv"), variantEnvelope);
       assertEquals((Object[]) readRow.getValue("intMv"), new Object[]{7, 8});
       assertEquals((Object[]) readRow.getValue("longMv"), new Object[]{9L, 10L});
       assertEquals((Object[]) readRow.getValue("floatMv"), new Object[]{11.0f, 12.0f});
@@ -358,6 +365,7 @@ public class SegmentProcessorAvroUtilsTest {
         .addSingleValueDimension("jsonSv", DataType.JSON)
         .addSingleValueDimension("bytesSv", DataType.BYTES)
         .addSingleValueDimension("uuidSv", DataType.UUID)
+        .addSingleValueDimension("variantSv", DataType.VARIANT)
         .addMultiValueDimension("intMv", DataType.INT)
         .addMultiValueDimension("longMv", DataType.LONG)
         .addMultiValueDimension("floatMv", DataType.FLOAT)

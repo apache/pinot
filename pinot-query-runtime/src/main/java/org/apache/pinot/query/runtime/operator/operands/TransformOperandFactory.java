@@ -31,6 +31,7 @@ public class TransformOperandFactory {
       FunctionRegistry.canonicalize(TransformFunctionType.IS_DISTINCT_FROM.getName());
   private static final String IS_NOT_DISTINCT_FROM =
       FunctionRegistry.canonicalize(TransformFunctionType.IS_NOT_DISTINCT_FROM.getName());
+  private static final String CAST = FunctionRegistry.canonicalize(TransformFunctionType.CAST.getName());
 
   private TransformOperandFactory() {
   }
@@ -67,6 +68,13 @@ public class TransformOperandFactory {
             "Raw VARIANT values do not support comparison; extract a typed path with variantGet first");
       }
       return new FunctionOperand(functionCall, dataSchema);
+    }
+    if (canonicalName.equals(CAST) && numOperands >= 1) {
+      // Casting the raw envelope would leak encoding bytes as STRING/JSON/BYTES and bypass the opacity contract.
+      // Calcite validation rejects some cast shapes from its native VARIANT type, but its coercion rules are not
+      // this contract's to rely on; the runtime enforces the rejection regardless of what the planner admits.
+      Preconditions.checkArgument(getResultType(operands.get(0), dataSchema) != DataSchema.ColumnDataType.VARIANT,
+          "Raw VARIANT values do not support CAST; extract a typed path with variantGet first");
     }
     switch (functionCall.getFunctionName()) {
       case "AND":

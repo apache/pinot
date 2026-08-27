@@ -277,6 +277,10 @@ public enum TransformFunctionType {
 
   private static final Set<String> NULL_HANDLING_REQUIRED_FUNCTION_NAMES =
       createNullHandlingRequiredFunctionNames();
+  private static final Set<String> PARSE_JSON_TO_VARIANT_FUNCTION_NAMES =
+      createCanonicalFunctionNames(List.of(PARSE_JSON_TO_VARIANT, TRY_PARSE_JSON_TO_VARIANT));
+  private static final Set<String> TOLERANT_PARSE_JSON_TO_VARIANT_FUNCTION_NAMES =
+      createCanonicalFunctionNames(List.of(TRY_PARSE_JSON_TO_VARIANT));
   private final String _name;
   private final List<String> _names;
   private final SqlReturnTypeInference _returnTypeInference;
@@ -326,11 +330,31 @@ public enum TransformFunctionType {
     return NULL_HANDLING_REQUIRED_FUNCTION_NAMES.contains(canonicalize(functionName));
   }
 
+  /// Returns whether the function parses JSON text into a Variant value.
+  ///
+  /// Both engines must keep these calls out of compile-time constant folding: a folded result would degrade to a
+  /// plain BYTES literal, erasing the VARIANT type and with it JSON rendering, null-handling enforcement, and the
+  /// raw-value opacity guards. The check accepts every registered spelling, mirroring [#requiresNullHandling].
+  public static boolean parsesJsonToVariant(String functionName) {
+    return PARSE_JSON_TO_VARIANT_FUNCTION_NAMES.contains(canonicalize(functionName));
+  }
+
+  /// Returns whether the function is the tolerant (`try`) form of [#parsesJsonToVariant], which returns SQL null
+  /// for malformed JSON instead of throwing. Derived from the same registration source so the strict/tolerant
+  /// classification cannot drift from newly registered aliases.
+  public static boolean parsesJsonToVariantTolerantly(String functionName) {
+    return TOLERANT_PARSE_JSON_TO_VARIANT_FUNCTION_NAMES.contains(canonicalize(functionName));
+  }
+
   private static Set<String> createNullHandlingRequiredFunctionNames() {
+    return createCanonicalFunctionNames(
+        List.of(VARIANT_GET, TRY_VARIANT_GET, VARIANT_EXISTS, IS_VARIANT_NULL, VARIANT_TYPE_OF, VARIANT_TO_JSON,
+            PARSE_JSON_TO_VARIANT, TRY_PARSE_JSON_TO_VARIANT));
+  }
+
+  private static Set<String> createCanonicalFunctionNames(List<TransformFunctionType> functionTypes) {
     Set<String> names = new HashSet<>();
-    for (TransformFunctionType functionType
-        : List.of(VARIANT_GET, TRY_VARIANT_GET, VARIANT_EXISTS, IS_VARIANT_NULL, VARIANT_TYPE_OF, VARIANT_TO_JSON,
-            PARSE_JSON_TO_VARIANT, TRY_PARSE_JSON_TO_VARIANT)) {
+    for (TransformFunctionType functionType : functionTypes) {
       for (String name : functionType.getNames()) {
         names.add(canonicalize(name));
       }
