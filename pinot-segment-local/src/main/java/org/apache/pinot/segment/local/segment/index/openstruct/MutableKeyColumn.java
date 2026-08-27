@@ -48,6 +48,7 @@ public class MutableKeyColumn implements Closeable {
   private final String _key;
   private final DataType _storedType;
   private final PinotDataType _destType;
+  private final boolean _needsInferenceCheck;
   private final MutableForwardIndex _forwardIndex;
   private final ThreadSafeMutableRoaringBitmap _presenceBitmap;
   private final MutableDictionary _dictionary;
@@ -65,13 +66,15 @@ public class MutableKeyColumn implements Closeable {
 
   public MutableKeyColumn(String key, DataType storedType, Object defaultNullValue,
       PinotDataBufferMemoryManager memoryManager, int capacity) {
-    this(key, storedType, defaultNullValue, memoryManager, capacity, key);
+    this(key, storedType, defaultNullValue, memoryManager, capacity, key, false);
   }
 
   public MutableKeyColumn(String key, DataType storedType, Object defaultNullValue,
-      PinotDataBufferMemoryManager memoryManager, int capacity, String allocationContext) {
+      PinotDataBufferMemoryManager memoryManager, int capacity, String allocationContext,
+      boolean needsInferenceCheck) {
     _key = key;
     _storedType = storedType;
+    _needsInferenceCheck = needsInferenceCheck;
     _destType = ColumnDataType.fromDataTypeSV(storedType).toPinotDataType();
     _presenceBitmap = new ThreadSafeMutableRoaringBitmap();
     _invertedIndex = new RealtimeInvertedIndex();
@@ -105,6 +108,14 @@ public class MutableKeyColumn implements Closeable {
 
   public PinotDataType getDestType() {
     return _destType;
+  }
+
+  /// Whether a value on this key can ever produce a type-inference failure. True only for a key
+  /// with no declared child spec whose stored type fell back to STRING; fixed at allocation, since
+  /// neither the child spec nor the stored type changes afterwards. Lets the per-row path skip the
+  /// inference call entirely for every other key.
+  public boolean needsInferenceCheck() {
+    return _needsInferenceCheck;
   }
 
   public MutableForwardIndex getForwardIndex() {

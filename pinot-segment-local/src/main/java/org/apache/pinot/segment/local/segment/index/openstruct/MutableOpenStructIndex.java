@@ -137,9 +137,9 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
         continue;
       }
 
-      // Re-resolve for its metering side effect only: on the established path resolveStoredType
-      // always returns keyCol's own stored type, so coercion uses the cached destType.
-      resolveStoredType(key, rawValue, keyCol.getStoredType());
+      if (keyCol.needsInferenceCheck()) {
+        meterIfUninferable(rawValue);
+      }
       Object coerced = tryCoerce(key, rawValue, keyCol.getDestType());
       if (coerced == null) {
         continue;
@@ -175,6 +175,15 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
     return establishedType != null ? establishedType : inferred;
   }
 
+  /// Counts an inference failure for a value on a STRING-fallback key. This is the metering-only
+  /// half of [#resolveStoredType]: on the established path that method always returns the key's
+  /// own stored type, so the return value is unused and only the side effect matters.
+  private void meterIfUninferable(Object rawValue) {
+    if (OpenStructTypeInference.inferDataType(rawValue) == null) {
+      _typeInferenceFailureCount++;
+    }
+  }
+
   /// Coerces rawValue to storedType. Returns null on failure; the caller drops the entry. Failures
   /// are reported through [ServerMeter#OPEN_STRUCT_TYPE_COERCION_FAILURES] rather than a log line,
   /// because this runs per value on the consuming path. Note: a successful coerce of a
@@ -201,8 +210,9 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
     // true) rather than the real child spec, so mirroring that exactly is what keeps a doc's
     // resolved value identical before and after seal.
     Object defaultNullValue = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, storedType, null);
-    MutableKeyColumn newCol =
-        new MutableKeyColumn(key, storedType, defaultNullValue, _memoryManager, _capacity, allocationContext);
+    boolean needsInferenceCheck = !_childFieldSpecs.containsKey(key) && storedType == DataType.STRING;
+    MutableKeyColumn newCol = new MutableKeyColumn(key, storedType, defaultNullValue, _memoryManager, _capacity,
+        allocationContext, needsInferenceCheck);
     Map<String, MutableKeyColumn> updated = new HashMap<>(_keyColumns);
     updated.put(key, newCol);
     _keyColumns = updated;

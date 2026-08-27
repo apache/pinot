@@ -334,4 +334,28 @@ public class MutableOpenStructIndexTest {
       ServerMetrics.deregister();
     }
   }
+
+  @Test
+  public void testInferenceCheckSkippedForNonStringKeys()
+      throws IOException {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME",
+          openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
+        // "clicks" establishes as LONG. Unmappable values on it are a coercion concern only —
+        // inference must never run for a key whose established type is not STRING.
+        idx.index(0, Map.of("clicks", 5L));
+        idx.index(1, Map.of("clicks", Map.of("a", 1)));
+        idx.index(2, Map.of("clicks", Map.of("a", 2)));
+      }
+
+      verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+          eq(ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES), anyLong());
+      verify(metrics, times(1)).addMeteredTableValue("testTable_REALTIME", "metrics",
+          ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, 2L);
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
 }
