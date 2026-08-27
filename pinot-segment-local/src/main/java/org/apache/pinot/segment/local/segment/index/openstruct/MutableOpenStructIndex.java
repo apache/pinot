@@ -73,6 +73,9 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   // visibility; flushed to ServerMetrics on close() to avoid a metered-value call on every
   // ignored key of every consumed row.
   private volatile long _ignoredKeyDropCount;
+  // Batched for the same reason as _ignoredKeyDropCount: keep a metered-value call, which rebuilds
+  // the metric name and hits the registry, off the per-row consuming path. Flushed in close().
+  private volatile long _typeCoercionFailureCount;
 
   public MutableOpenStructIndex(String openStructColumn, String tableNameWithType, ComplexFieldSpec fieldSpec,
       OpenStructIndexConfig config, PinotDataBufferMemoryManager memoryManager, int capacity) {
@@ -186,12 +189,7 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
       PinotDataType sourceType = PinotDataType.getSingleValueType(rawValue);
       return destType.convert(rawValue, sourceType);
     } catch (Exception e) {
-      ServerMetrics serverMetrics = ServerMetrics.get();
-      if (serverMetrics != null) {
-        // Column-granular for the same reason as the inference meter above.
-        serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
-            ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, 1);
-      }
+      _typeCoercionFailureCount++;
       return null;
     }
   }
@@ -294,15 +292,26 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   @Override
   public void close()
       throws IOException {
-    if (_ignoredKeyDropCount > 0) {
-      ServerMetrics serverMetrics = ServerMetrics.get();
-      if (serverMetrics != null) {
-        serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
-            ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS, _ignoredKeyDropCount);
-      }
-    }
+    flushMeters();
     for (MutableKeyColumn keyCol : _keyColumns.values()) {
       keyCol.close();
+    }
+  }
+
+  /// Emits the batched ingestion counters. Counters accumulate per row on the consuming path and
+  /// are flushed once here, mirroring what [OpenStructColumnSplitter] does at seal time.
+  private void flushMeters() {
+    ServerMetrics serverMetrics = ServerMetrics.get();
+    if (serverMetrics == null) {
+      return;
+    }
+    if (_ignoredKeyDropCount > 0) {
+      serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
+          ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS, _ignoredKeyDropCount);
+    }
+    if (_typeCoercionFailureCount > 0) {
+      serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
+          ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, _typeCoercionFailureCount);
     }
   }
 }

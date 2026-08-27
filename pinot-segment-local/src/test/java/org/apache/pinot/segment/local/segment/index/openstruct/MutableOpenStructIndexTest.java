@@ -178,13 +178,15 @@ public class MutableOpenStructIndexTest {
       throws IOException {
     ServerMetrics metrics = mock(ServerMetrics.class);
     assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", openStructSpec(),
-        OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
-      // Unmappable value on a fresh key: falls back to STRING and meters an inference failure.
-      idx.index(0, Map.of("req-42", Map.of("a", 1)));
-      // Unmappable value on a key already typed LONG: dropped by coercion, metered there only.
-      idx.index(1, Map.of("clicks", 5L));
-      idx.index(2, Map.of("clicks", Map.of("a", 1)));
+    try {
+      try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME",
+          openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
+        // Unmappable value on a fresh key: falls back to STRING and meters an inference failure.
+        idx.index(0, Map.of("req-42", Map.of("a", 1)));
+        // Unmappable value on a key already typed LONG: dropped by coercion, metered there only.
+        idx.index(1, Map.of("clicks", 5L));
+        idx.index(2, Map.of("clicks", Map.of("a", 1)));
+      }
 
       verify(metrics).addMeteredTableValue("testTable_REALTIME", "metrics",
           ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, 1L);
@@ -273,6 +275,31 @@ public class MutableOpenStructIndexTest {
 
       verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
           eq(ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS), anyLong());
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  @Test
+  public void testCoercionFailuresMeteredOnceOnClose()
+      throws IOException {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME",
+          openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
+        // Establish "clicks" as LONG, then feed three unmappable values that fail coercion.
+        idx.index(0, Map.of("clicks", 5L));
+        idx.index(1, Map.of("clicks", Map.of("a", 1)));
+        idx.index(2, Map.of("clicks", Map.of("a", 2)));
+        idx.index(3, Map.of("clicks", Map.of("a", 3)));
+
+        verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+            eq(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES), anyLong());
+      }
+
+      verify(metrics, times(1)).addMeteredTableValue("testTable_REALTIME", "metrics",
+          ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, 3L);
     } finally {
       ServerMetrics.deregister();
     }
