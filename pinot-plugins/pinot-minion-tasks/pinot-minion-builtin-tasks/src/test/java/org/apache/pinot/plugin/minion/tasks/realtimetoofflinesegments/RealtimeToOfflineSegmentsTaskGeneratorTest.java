@@ -49,6 +49,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// Tests for [RealtimeToOfflineSegmentsTaskGenerator]
@@ -735,5 +736,38 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
       idealState.setPartitionState(segmentName, "Server_0", "ONLINE");
     }
     return idealState;
+  }
+
+  @Test
+  public void testVariantColumnRejectsRollupAndDedupMergeTypes() {
+    ClusterInfoAccessor mockClusterInfoAccessor = mock(ClusterInfoAccessor.class);
+    PinotHelixResourceManager mockPinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    when(mockClusterInfoAccessor.getPinotHelixResourceManager()).thenReturn(mockPinotHelixResourceManager);
+
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension("payload", FieldSpec.DataType.VARIANT)
+        .addDateTime(TIME_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    RealtimeToOfflineSegmentsTaskGenerator taskGenerator = new RealtimeToOfflineSegmentsTaskGenerator();
+    taskGenerator.init(mockClusterInfoAccessor);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTaskConfig(new TableTaskConfig(Map.of("RealtimeToOfflineSegmentsTask", Map.of()))).build();
+
+    for (String rejected : new String[]{"rollup", "ROLLUP", "dedup"}) {
+      Map<String, String> taskConfig = Map.of("mergeType", rejected);
+      IllegalStateException exception = expectThrows(IllegalStateException.class,
+          () -> taskGenerator.validateTaskConfigs(tableConfig, schema, taskConfig));
+      assertTrue(exception.getMessage().contains("VARIANT"), exception.getMessage());
+    }
+
+    // The deprecated collectorType alias is honored by the generator and executor, so validation must also see it.
+    IllegalStateException legacyException = expectThrows(IllegalStateException.class,
+        () -> taskGenerator.validateTaskConfigs(tableConfig, schema, Map.of("collectorType", "rollup")));
+    assertTrue(legacyException.getMessage().contains("VARIANT"), legacyException.getMessage());
+
+    // CONCAT (explicit, via the alias, and default) remains supported.
+    taskGenerator.validateTaskConfigs(tableConfig, schema, Map.of("mergeType", "concat"));
+    taskGenerator.validateTaskConfigs(tableConfig, schema, Map.of("collectorType", "concat"));
+    taskGenerator.validateTaskConfigs(tableConfig, schema, Map.of());
   }
 }
