@@ -919,8 +919,21 @@ public class JsonFunctionsTest {
   }
 
   @Test
-  public void testJsonExtractScalarBytes() {
-    assertEquals((byte[]) JsonFunctions.jsonExtractScalar("{\"h\":\"0a0b\"}", "$.h", "BYTES"),
+  public void testJsonExtractScalarBytesUsesBase64() {
+    // Transform uses PinotDataType.JSON.toBytes (Base64). "AAGl/w==" is {0x00, 0x01, 0xa5, 0xff}.
+    assertEquals((byte[]) JsonFunctions.jsonExtractScalar("{\"h\":\"AAGl/w==\"}", "$.h", "BYTES"),
+        new byte[]{0x00, 0x01, (byte) 0xa5, (byte) 0xff});
+    byte[] fromBytesInput = (byte[]) JsonFunctions.jsonExtractScalar(
+        "{\"h\":\"AAGl/w==\"}".getBytes(StandardCharsets.UTF_8), "$.h", "BYTES");
+    assertEquals(fromBytesInput, new byte[]{0x00, 0x01, (byte) 0xa5, (byte) 0xff});
+  }
+
+  @Test
+  public void testJsonExtractScalarBytesDefaultIsHexLiteral() {
+    // The 4th argument is a SQL BYTES literal, not a JSON string. Hex "0a0b" must not be Base64-decoded.
+    assertEquals((byte[]) JsonFunctions.jsonExtractScalar("{}", "$.missing", "BYTES", "0a0b"),
+        new byte[]{0x0a, 0x0b});
+    assertEquals((byte[]) JsonFunctions.jsonExtractScalar("{}", "$.missing", "BYTES", new byte[]{0x0a, 0x0b}),
         new byte[]{0x0a, 0x0b});
   }
 
@@ -933,6 +946,9 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonExtractScalar(json, "$.missing", "STRING", "def"), "def");
     assertEquals(JsonFunctions.jsonExtractScalar(json, "$.missing", "BOOLEAN", 1), 1);
     assertEquals(JsonFunctions.jsonExtractScalar(json, "$.missing", "BIG_DECIMAL", BigDecimal.ONE), BigDecimal.ONE);
+    // 4-arg SQL NULL default returns Java null. 3-arg (no default) still throws.
+    assertNull(JsonFunctions.jsonExtractScalar(json, "$.missing", "INT", null));
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.missing", "INT", 0), 0);
   }
 
   @DataProvider(name = "unresolvedThrowTypes")
@@ -959,6 +975,24 @@ public class JsonFunctionsTest {
   public void testJsonExtractScalarArrays() {
     String json = scalarSampleJson();
     assertEquals((int[]) JsonFunctions.jsonExtractScalar(json, "$.arr", "INT_ARRAY"), new int[]{1, 2, 3});
+    assertEquals((long[]) JsonFunctions.jsonExtractScalar(json, "$.arr", "LONG_ARRAY"), new long[]{1L, 2L, 3L});
+    assertEquals((float[]) JsonFunctions.jsonExtractScalar(json, "$.arr", "FLOAT_ARRAY"), new float[]{1f, 2f, 3f});
+    assertEquals((double[]) JsonFunctions.jsonExtractScalar(json, "$.arr", "DOUBLE_ARRAY"), new double[]{1d, 2d, 3d});
+    assertEquals((String[]) JsonFunctions.jsonExtractScalar(json, "$.arr", "STRING_ARRAY"),
+        new String[]{"1", "2", "3"});
+    assertEquals((BigDecimal[]) JsonFunctions.jsonExtractScalar(json, "$.arr", "BIG_DECIMAL_ARRAY"),
+        new BigDecimal[]{new BigDecimal("1"), new BigDecimal("2"), new BigDecimal("3")});
+    // BOOLEAN_ARRAY uses stored INT 0/1 via the BOOLEAN convention (non-zero → 1).
+    assertEquals((int[]) JsonFunctions.jsonExtractScalar("{\"v\":[1,5,0,2.5]}", "$.v", "BOOLEAN_ARRAY"),
+        new int[]{1, 1, 0, 1});
+    assertEquals((int[]) JsonFunctions.jsonExtractScalar("{\"v\":[true,0,\"true\",false]}", "$.v", "BOOLEAN_ARRAY"),
+        new int[]{1, 0, 1, 0});
+    // TIMESTAMP_ARRAY uses stored LONG epoch millis.
+    assertEquals((long[]) JsonFunctions.jsonExtractScalar(
+        "{\"v\":[1514805173000,\"2018-01-01T11:12:53Z\"]}", "$.v", "TIMESTAMP_ARRAY"),
+        new long[]{1514805173000L, 1514805173000L});
+    assertEquals((String[]) JsonFunctions.jsonExtractScalar("{\"a\":[\"x\",\"y\"]}", "$.a", "STRING_ARRAY"),
+        new String[]{"x", "y"});
     // An unresolved multi-value path yields an empty array and never throws.
     assertEquals((int[]) JsonFunctions.jsonExtractScalar(json, "$.missing", "INT_ARRAY"), new int[0]);
     assertEquals((int[]) JsonFunctions.jsonExtractScalar("not json", "$.x", "INT_ARRAY"), new int[0]);
@@ -969,8 +1003,27 @@ public class JsonFunctionsTest {
     assertEquals(e.getMessage(),
         "At least one of the resolved JSON arrays include nulls, which is not supported in Pinot. "
             + "Consider setting a default value as the fourth argument of json_extract_scalar.");
-    assertEquals((String[]) JsonFunctions.jsonExtractScalar("{\"a\":[\"x\",\"y\"]}", "$.a", "STRING_ARRAY"),
-        new String[]{"x", "y"});
+    // Explicit NULL default cannot store SQL NULL in a primitive array; write the type placeholder.
+    assertEquals((int[]) JsonFunctions.jsonExtractScalar(json, "$.arrnull", "INT_ARRAY", null), new int[]{1, 0, 3});
+    assertEquals((long[]) JsonFunctions.jsonExtractScalar(json, "$.arrnull", "LONG_ARRAY", null),
+        new long[]{1L, 0L, 3L});
+    assertEquals((String[]) JsonFunctions.jsonExtractScalar("{\"a\":[\"x\",null]}", "$.a", "STRING_ARRAY", null),
+        new String[]{"x", ""});
+  }
+
+  @Test
+  public void testJsonExtractScalarLongOverflow() {
+    NumberFormatException overflow = expectThrows(NumberFormatException.class,
+        () -> JsonFunctions.jsonExtractScalar("{\"x\":\"9223372036854775808\"}", "$.x", "LONG"));
+    assertEquals(overflow.getMessage(), "For input string: \"9223372036854775808\"");
+    expectThrows(NumberFormatException.class,
+        () -> JsonFunctions.jsonExtractScalar("{\"x\":\"2E20\"}", "$.x", "LONG"));
+    expectThrows(NumberFormatException.class,
+        () -> JsonFunctions.jsonExtractScalar("{\"x\":\"2E-1\"}", "$.x", "LONG"));
+    expectThrows(NumberFormatException.class,
+        () -> JsonFunctions.jsonExtractScalar("{\"x\":[\"9223372036854775808\"]}", "$.x", "LONG_ARRAY"));
+    assertEquals((long[]) JsonFunctions.jsonExtractScalar("{\"x\":[\"1.9\",\"1E1\"]}", "$.x", "LONG_ARRAY"),
+        new long[]{1L, 10L});
   }
 
   @Test
@@ -998,7 +1051,8 @@ public class JsonFunctionsTest {
         {"$.i", "INT"}, {"$.l", "LONG"}, {"$.f", "FLOAT"}, {"$.d", "DOUBLE"}, {"$.s", "STRING"},
         {"$.obj", "STRING"}, {"$.obj", "JSON"}, {"$.hp", "BIG_DECIMAL"}, {"$.b", "BOOLEAN"},
         {"$.tnum", "TIMESTAMP"}, {"$.tiso", "TIMESTAMP"}, {"$.arr", "INT_ARRAY"}, {"$.arr", "LONG_ARRAY"},
-        {"$.arr", "DOUBLE_ARRAY"}, {"$.arr", "BIG_DECIMAL_ARRAY"}, {"$.arr", "STRING_ARRAY"}
+        {"$.arr", "FLOAT_ARRAY"}, {"$.arr", "DOUBLE_ARRAY"}, {"$.arr", "BIG_DECIMAL_ARRAY"},
+        {"$.arr", "STRING_ARRAY"}, {"$.arr", "BOOLEAN_ARRAY"}, {"$.arr", "TIMESTAMP_ARRAY"}
     };
   }
 
