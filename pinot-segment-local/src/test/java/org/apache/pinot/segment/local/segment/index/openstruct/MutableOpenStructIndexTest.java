@@ -200,19 +200,26 @@ public class MutableOpenStructIndexTest {
   }
 
   /// A later unmappable value on a key whose type fell back to STRING is stored as its serialized
-  /// form, so it is metered every time — not just on the first sighting that established the type.
+  /// form, so it is counted every time — not just on the first sighting that established the type.
+  /// The accumulated count is emitted once at close.
   @Test
-  public void testInferenceFailuresMeteredPerValueOnStringFallbackKey()
+  public void testInferenceFailuresAccumulatePerValueAndMeterOnceOnClose()
       throws IOException {
     ServerMetrics metrics = mock(ServerMetrics.class);
     assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
-    try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME", openStructSpec(),
-        OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
-      for (int docId = 0; docId < 3; docId++) {
-        idx.index(docId, Map.of("payload", Map.of("a", docId)));
+    try {
+      try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME",
+          openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
+        for (int docId = 0; docId < 3; docId++) {
+          idx.index(docId, Map.of("payload", Map.of("a", docId)));
+        }
+
+        verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+            eq(ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES), anyLong());
       }
-      verify(metrics, times(3)).addMeteredTableValue("testTable_REALTIME", "metrics",
-          ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, 1L);
+
+      verify(metrics, times(1)).addMeteredTableValue("testTable_REALTIME", "metrics",
+          ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, 3L);
     } finally {
       ServerMetrics.deregister();
     }
@@ -300,6 +307,29 @@ public class MutableOpenStructIndexTest {
 
       verify(metrics, times(1)).addMeteredTableValue("testTable_REALTIME", "metrics",
           ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, 3L);
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
+
+  @Test
+  public void testNoFailureMetersEmittedWhenNoFailures()
+      throws IOException {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME",
+          openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
+        idx.index(0, Map.of("clicks", 5L, "country", "US"));
+        idx.index(1, Map.of("clicks", 7L));
+      }
+
+      verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+          eq(ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES), anyLong());
+      verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+          eq(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES), anyLong());
+      verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+          eq(ServerMeter.OPEN_STRUCT_IGNORED_KEY_DROPS), anyLong());
     } finally {
       ServerMetrics.deregister();
     }

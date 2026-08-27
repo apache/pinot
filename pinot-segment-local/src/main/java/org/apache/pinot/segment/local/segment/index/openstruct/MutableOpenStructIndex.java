@@ -76,6 +76,7 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   // Batched for the same reason as _ignoredKeyDropCount: keep a metered-value call, which rebuilds
   // the metric name and hits the registry, off the per-row consuming path. Flushed in close().
   private volatile long _typeCoercionFailureCount;
+  private volatile long _typeInferenceFailureCount;
 
   public MutableOpenStructIndex(String openStructColumn, String tableNameWithType, ComplexFieldSpec fieldSpec,
       OpenStructIndexConfig config, PinotDataBufferMemoryManager memoryManager, int capacity) {
@@ -168,11 +169,7 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
                 + " Falling back to STRING.",
             _openStructColumn, key, rawValue.getClass().getName());
       }
-      ServerMetrics serverMetrics = ServerMetrics.get();
-      if (serverMetrics != null) {
-        serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
-            ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, 1);
-      }
+      _typeInferenceFailureCount++;
       return DataType.STRING;
     }
     return establishedType != null ? establishedType : inferred;
@@ -312,6 +309,10 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
     if (_typeCoercionFailureCount > 0) {
       serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
           ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES, _typeCoercionFailureCount);
+    }
+    if (_typeInferenceFailureCount > 0) {
+      serverMetrics.addMeteredTableValue(_tableNameWithType, _openStructColumn,
+          ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES, _typeInferenceFailureCount);
     }
   }
 }
