@@ -46,4 +46,17 @@ public interface SegmentZkMetadataFetchListener {
 
   /// Refreshes the metadata for the given segment (called when segment is getting refreshed).
   void refreshSegment(String segment, @Nullable ZNRecord znRecord);
+
+  /// Called once when this listener's routing entry is removed, so listeners holding per-table
+  /// state outside that entry (caches, persisted data) can release it.
+  ///
+  /// NOTE: the table itself may still exist. Routing is also removed when this broker stops serving
+  /// a table it still knows about — an `ONLINE -> OFFLINE` broker-resource transition (untagging,
+  /// broker-resource rebalance) or an operator calling the routing-delete endpoint. Treat this as
+  /// "stop tracking this table here", not "this table is gone".
+  ///
+  /// Implementations should not throw; the caller logs and continues so one listener cannot block
+  /// routing removal. The default implementation does nothing.
+  default void onRoutingRemoved() {
+  }
 }
