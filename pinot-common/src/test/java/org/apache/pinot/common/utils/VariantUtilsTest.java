@@ -1002,4 +1002,152 @@ public class VariantUtilsTest {
         | Byte.toUnsignedInt(bytes[offset + 2]) << 8
         | Byte.toUnsignedInt(bytes[offset + 3]);
   }
+
+  /// The navigation memo reuses one cursor across rows; every transition it can take must resolve on the current
+  /// row's bytes, never on the previous row's.
+  /// Filler keys keep every object above the small-object threshold so the memo paths actually engage.
+  @Test
+  public void testReusableResultCrossRowMemoTransitions() {
+    ReusableResult result = new ReusableResult();
+    VariantPath path = VariantUtils.compilePath("$.b");
+
+    // Row 1 memoizes id and entry index for "b" under dictionary [a, b].
+    assertTrue(VariantUtils.extractInto(
+        VariantUtils.parseJsonToVariant(
+            "{\"a\":1,\"b\":2,\"f1\":0,\"f2\":0,\"f3\":0,\"f4\":0}"), path, ResultType.LONG, result));
+    assertEquals(result.getLongValue(), 2L);
+
+    // Identical layout: the entry-index hint hits.
+    assertTrue(VariantUtils.extractInto(
+        VariantUtils.parseJsonToVariant(
+            "{\"a\":3,\"b\":4,\"f1\":0,\"f2\":0,\"f3\":0,\"f4\":0}"), path, ResultType.LONG, result));
+    assertEquals(result.getLongValue(), 4L);
+
+    // Different dictionary where "b" moves to id 0: the memoized id no longer spells "b", so the fresh search runs.
+    assertTrue(VariantUtils.extractInto(
+        VariantUtils.parseJsonToVariant(
+            "{\"b\":5,\"g1\":0,\"g2\":0,\"g3\":0,\"g4\":0,\"g5\":0}"), path, ResultType.LONG, result));
+    assertEquals(result.getLongValue(), 5L);
+
+    // Dictionary [b, c] but hostile stale-hint shape: id 0 is now "b" and the object has an entry at the old hint.
+    assertTrue(VariantUtils.extractInto(
+        VariantUtils.parseJsonToVariant(
+            "{\"b\":6,\"c\":99,\"h1\":0,\"h2\":0,\"h3\":0,\"h4\":0}"), path, ResultType.LONG, result));
+    assertEquals(result.getLongValue(), 6L);
+
+    // A dictionary that lacks "b" entirely: memoized as absent from the dictionary.
+    assertFalse(VariantUtils.extractInto(
+        VariantUtils.parseJsonToVariant(
+            "{\"c\":7,\"i1\":0,\"i2\":0,\"i3\":0,\"i4\":0,\"i5\":0}"), path, ResultType.LONG, result));
+    // Identical metadata again: the absent-from-dictionary memo answers without a search.
+    assertFalse(VariantUtils.extractInto(
+        VariantUtils.parseJsonToVariant(
+            "{\"c\":8,\"i1\":0,\"i2\":0,\"i3\":0,\"i4\":0,\"i5\":0}"), path, ResultType.LONG, result));
+    // "b" reappears after an absence memo: the metadata comparison must invalidate the miss.
+    assertTrue(VariantUtils.extractInto(
+        VariantUtils.parseJsonToVariant(
+            "{\"b\":9,\"i1\":0,\"i2\":0,\"i3\":0,\"i4\":0,\"i5\":0}"), path, ResultType.LONG, result));
+    assertEquals(result.getLongValue(), 9L);
+
+    // Key in the dictionary but not in the probed object: memoizes the id, then a matching row still finds it.
+    assertFalse(VariantUtils.extractInto(
+        VariantUtils.parseJsonToVariant(
+            "{\"nested\":{\"b\":1},\"z\":2,\"j1\":0,\"j2\":0,\"j3\":0,\"j4\":0}"), path, ResultType.LONG, result));
+    assertFalse(VariantUtils.extractInto(
+        VariantUtils.parseJsonToVariant(
+            "{\"nested\":{\"b\":3},\"z\":4,\"j1\":0,\"j2\":0,\"j3\":0,\"j4\":0}"), path, ResultType.LONG, result));
+    assertTrue(VariantUtils.extractInto(
+        VariantUtils.parseJsonToVariant(
+            "{\"nested\":{\"x\":1},\"b\":10,\"z\":5,\"j1\":0,\"j2\":0,\"j3\":0}"), path, ResultType.LONG,
+        result));
+    assertEquals(result.getLongValue(), 10L);
+
+    // Switching the compiled path on the same cursor resets the memo.
+    assertTrue(VariantUtils.extractInto(
+        VariantUtils.parseJsonToVariant("{\"a\":11,\"b\":12,\"f1\":0,\"f2\":0,\"f3\":0,\"f4\":0}"),
+        VariantUtils.compilePath("$.a"), ResultType.LONG, result));
+    assertEquals(result.getLongValue(), 11L);
+  }
+
+  /// Same transitions across the binary-search threshold, where wide objects take the memo's id-scan paths.
+  @Test
+  public void testReusableResultCrossRowMemoWideObjects() {
+    int numKeys = 64;
+    ReusableResult result = new ReusableResult();
+    VariantPath path = VariantUtils.compilePath("$.k40");
+
+    StringBuilder full = new StringBuilder("{");
+    for (int i = 0; i < numKeys; i++) {
+      full.append(i > 0 ? "," : "").append("\"k").append(i).append("\":").append(100 + i);
+    }
+    String fullRow = full.append('}').toString();
+    assertTrue(VariantUtils.extractInto(VariantUtils.parseJsonToVariant(fullRow), path, ResultType.LONG, result));
+    assertEquals(result.getLongValue(), 140L);
+
+    // Same shape, different values: hint hit.
+    StringBuilder shifted = new StringBuilder("{");
+    for (int i = 0; i < numKeys; i++) {
+      shifted.append(i > 0 ? "," : "").append("\"k").append(i).append("\":").append(200 + i);
+    }
+    assertTrue(VariantUtils.extractInto(VariantUtils.parseJsonToVariant(shifted.append('}').toString()), path,
+        ResultType.LONG, result));
+    assertEquals(result.getLongValue(), 240L);
+
+    // Same dictionary cannot be produced for a subset row by the JSON builder, so emulate a narrower object under a
+    // changed dictionary: k40 absent from the object while other keys remain.
+    StringBuilder without = new StringBuilder("{");
+    boolean first = true;
+    for (int i = 0; i < numKeys; i++) {
+      if (i == 40) {
+        continue;
+      }
+      without.append(first ? "" : ",").append("\"k").append(i).append("\":").append(300 + i);
+      first = false;
+    }
+    assertFalse(VariantUtils.extractInto(VariantUtils.parseJsonToVariant(without.append('}').toString()), path,
+        ResultType.LONG, result));
+
+    // And it comes back.
+    assertTrue(VariantUtils.extractInto(VariantUtils.parseJsonToVariant(fullRow), path, ResultType.LONG, result));
+    assertEquals(result.getLongValue(), 140L);
+  }
+
+  /// Regression: a row that bypasses memo consultation (small object, non-object level, or failed navigation) must
+  /// not launder a stale absent-from-dictionary verdict. The absence anchor is compared against the metadata it was
+  /// proven under, never against the previous navigated row.
+  @Test
+  public void testAbsentMemoSurvivesRowsThatBypassTheMemo() {
+    ReusableResult result = new ReusableResult();
+    VariantPath path = VariantUtils.compilePath("$.b");
+
+    // Rows 0 and 1 share metadata M1 lacking "b": the stability gate opens on row 1 and the absence verdict is
+    // memoized, anchored to M1.
+    assertFalse(VariantUtils.extractInto(
+        VariantUtils.parseJsonToVariant("{\"c\":0,\"i1\":0,\"i2\":0,\"i3\":0,\"i4\":0,\"i5\":0}"),
+        path, ResultType.LONG, result));
+    assertFalse(VariantUtils.extractInto(
+        VariantUtils.parseJsonToVariant("{\"c\":1,\"i1\":0,\"i2\":0,\"i3\":0,\"i4\":0,\"i5\":0}"),
+        path, ResultType.LONG, result));
+    // Row 2: top-level object at or below the small-object threshold; the memo is bypassed entirely, but its
+    // metadata M2 matches row 3's. Nested keys push "b" and row 3's keys into the dictionary.
+    assertTrue(VariantUtils.extractInto(
+        VariantUtils.parseJsonToVariant("{\"b\":{\"k1\":1,\"k2\":2,\"k3\":3,\"k4\":4,\"nest\":5}}"),
+        path, ResultType.VARIANT, result));
+    // Row 3: wide object under metadata M2 that CONTAINS "b". A previous-row comparison would wrongly confirm the
+    // stale absence; the anchored comparison against M1 must reject it and find the value.
+    assertTrue(VariantUtils.extractInto(
+        VariantUtils.parseJsonToVariant("{\"b\":9,\"k1\":1,\"k2\":2,\"k3\":3,\"k4\":4,\"nest\":0}"),
+        path, ResultType.LONG, result));
+    assertEquals(result.getLongValue(), 9L);
+
+    // Same laundering attempt through a non-object row and a failed navigation.
+    assertFalse(VariantUtils.extractInto(
+        VariantUtils.parseJsonToVariant("{\"c\":2,\"i1\":0,\"i2\":0,\"i3\":0,\"i4\":0,\"i5\":0}"),
+        path, ResultType.LONG, result));
+    assertFalse(VariantUtils.extractInto(VariantUtils.parseJsonToVariant("42"), path, ResultType.LONG, result));
+    assertTrue(VariantUtils.extractInto(
+        VariantUtils.parseJsonToVariant("{\"b\":7,\"k1\":1,\"k2\":2,\"k3\":3,\"k4\":4,\"nest\":0}"),
+        path, ResultType.LONG, result));
+    assertEquals(result.getLongValue(), 7L);
+  }
 }
