@@ -604,10 +604,10 @@ public class PinotSegmentUploadDownloadRestletResource {
     List<SegmentUploadMetadata> segmentUploadMetadataList = new ArrayList<>();
     List<File> tempFiles = new ArrayList<>();
     List<String> segmentNames = new ArrayList<>();
-    Map<String, SegmentMetadataInfo> segmentsMetadataInfoMap = createSegmentsMetadataInfoMap(multiPart);
-    LOGGER.info("Uploading segments in batch mode of size: {}", segmentsMetadataInfoMap.size());
 
     try {
+      Map<String, SegmentMetadataInfo> segmentsMetadataInfoMap = createSegmentsMetadataInfoMap(multiPart, tempFiles);
+      LOGGER.info("Uploading segments in batch mode of size: {}", segmentsMetadataInfoMap.size());
       int entryCount = 0;
       for (Map.Entry<String, SegmentMetadataInfo> entry : segmentsMetadataInfoMap.entrySet()) {
         String segmentName = entry.getKey();
@@ -1294,26 +1294,31 @@ public class PinotSegmentUploadDownloadRestletResource {
     String uuid = UUID.randomUUID().toString();
     File segmentMetadataDir =
         new File(FileUtils.getTempDirectory(), SegmentUploadConstants.SEGMENT_METADATA_DIR_PREFIX + uuid);
-    FileUtils.copyFile(creationMetaFile, new File(segmentMetadataDir, V1Constants.SEGMENT_CREATION_META));
-    FileUtils.copyFile(metadataPropertiesFile,
-        new File(segmentMetadataDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
     File segmentMetadataTarFile = new File(FileUtils.getTempDirectory(),
         SegmentUploadConstants.SEGMENT_METADATA_TAR_FILE_PREFIX + uuid + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    if (segmentMetadataTarFile.exists()) {
-      FileUtils.forceDelete(segmentMetadataTarFile);
-    }
-    TarCompressionUtils.createCompressedTarFile(segmentMetadataDir, segmentMetadataTarFile);
     try {
+      FileUtils.copyFile(creationMetaFile, new File(segmentMetadataDir, V1Constants.SEGMENT_CREATION_META));
+      FileUtils.copyFile(metadataPropertiesFile,
+          new File(segmentMetadataDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+      if (segmentMetadataTarFile.exists()) {
+        FileUtils.forceDelete(segmentMetadataTarFile);
+      }
+      TarCompressionUtils.createCompressedTarFile(segmentMetadataDir, segmentMetadataTarFile);
       FileUtils.copyFile(segmentMetadataTarFile, destFile);
     } finally {
-      FileUtils.forceDelete(segmentMetadataTarFile);
+      // Both the staging directory and the intermediate tar file are scoped to this call. Delete quietly so that a
+      // cleanup failure does not mask the exception that caused it.
+      FileUtils.deleteQuietly(segmentMetadataDir);
+      FileUtils.deleteQuietly(segmentMetadataTarFile);
     }
   }
 
   // The multipart input would contain a single multipart and this part would contain the segment metadata
 // files (creation.meta, metadata.properties), and an additional mapping file names 'all_segments_metadata' which
 // would contain the mappings from segment names to segment download URI's.
-  private static Map<String, SegmentMetadataInfo> createSegmentsMetadataInfoMap(FormDataMultiPart multiPart) {
+  @VisibleForTesting
+  static Map<String, SegmentMetadataInfo> createSegmentsMetadataInfoMap(FormDataMultiPart multiPart,
+      List<File> tempFiles) {
     List<BodyPart> bodyParts = multiPart.getBodyParts();
     validateMultiPartForBatchSegmentUpload(bodyParts);
     FormDataBodyPart bodyPartFromReq = (FormDataBodyPart) bodyParts.get(0);
@@ -1322,6 +1327,7 @@ public class PinotSegmentUploadDownloadRestletResource {
     File allSegmentsMetadataTarFile = new File(FileUtils.getTempDirectory(),
         SegmentUploadConstants.ALL_SEGMENTS_METADATA_TAR_FILE_PREFIX + uuid
             + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    tempFiles.add(allSegmentsMetadataTarFile);
     try {
       createSegmentFileFromBodyPart(bodyPartFromReq, allSegmentsMetadataTarFile);
     } catch (IOException e) {
@@ -1332,6 +1338,9 @@ public class PinotSegmentUploadDownloadRestletResource {
     List<File> segmentsMetadataFiles = new ArrayList<>();
     File allSegmentsMetadataDir = new File(FileUtils.getTempDirectory(),
         SegmentUploadConstants.ALL_SEGMENTS_METADATA_DIR_PREFIX + uuid);
+    // This directory backs the File handles held by the returned SegmentMetadataInfo values, so it can only be
+    // removed once the caller is done with the map
+    tempFiles.add(allSegmentsMetadataDir);
     try {
       FileUtils.forceMkdir(allSegmentsMetadataDir);
       List<File> metadataFiles = TarCompressionUtils.untar(allSegmentsMetadataTarFile, allSegmentsMetadataDir);
