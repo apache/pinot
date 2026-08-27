@@ -546,6 +546,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD =
         "pinot.broker.mse.streaming.group.by.flush.threshold";
     public static final int DEFAULT_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD = -1;
+    /// Default output block size (rows) for the streaming selection ORDER BY combine
+    /// ({@link Request.QueryOptionKey#SORTED_SELECTION_MERGE_BLOCK_SIZE}).
+    public static final int DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE = 10_000;
     // Whether to infer partition hint by default or not.
     // This value can always be overridden by INFER_PARTITION_HINT query option
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
@@ -796,6 +799,40 @@ public class CommonConstants {
 
         /// Flush threshold for streaming group-by on MSE leaf stages.
         public static final String STREAMING_GROUP_BY_FLUSH_THRESHOLD = "streamingGroupByFlushThreshold";
+
+        /// Opt-in: use the streaming k-way-merge selection ORDER BY combine over sorted segments.
+        ///
+        /// This option has two effects. On the server it selects the streaming selection ORDER BY combine operator.
+        /// On the broker it additionally allows the multi-stage planner to mark a validated leaf selection ORDER BY
+        /// sender fragment as sorted-on-sender, which is one of the two ways the precondition
+        /// [#STREAMING_SORTED_MAILBOX_RECEIVE] needs can be satisfied. It is required only for that plain
+        /// leaf-selection path, where the rel plan contains no sort exchange: when the rel plan already carries a
+        /// sort exchange with sender-side sorting, [#STREAMING_SORTED_MAILBOX_RECEIVE] alone is enough.
+        ///
+        /// NOTE: the planner-side marking is a no-op under usePhysicalOptimizer (the v2 path does not go through
+        /// PlanFragmenter). The server-side combine selection is unaffected.
+        public static final String SORTED_SELECTION_MERGE_ENABLED = "sortedSelectionMergeEnabled";
+        /// Output block size (rows) for the streaming selection ORDER BY combine.
+        public static final String SORTED_SELECTION_MERGE_BLOCK_SIZE = "sortedSelectionMergeBlockSize";
+
+        /// Opt-in for the streaming k-way merge in SortedMailboxReceiveOperator. true = use the k-way merge when the
+        /// planner has also proven senders are sorted (isSortedOnSender); unset or false = always
+        /// accumulate-then-sort. isSortedOnSender is set either by a rel-level sort exchange that already declares
+        /// sender-side sorting, or (for a plain leaf selection ORDER BY, where no such exchange exists) by
+        /// PlanFragmenter under [#SORTED_SELECTION_MERGE_ENABLED]. Only the latter case needs both options.
+        /// Whether the merge actually ran is reported per receive operator in the response stageStats as
+        /// `kWayMergeUsed`.
+        /// Note: like SQL ORDER BY, the order among rows with equal collation keys is unspecified and may differ
+        /// between the merge path and the accumulate-then-sort path; the output row multiset is identical.
+        /// NOTE: This is a no-op under usePhysicalOptimizer (the v2 path does not set sorted-on-sender).
+        /// NOTE: do not enable during a mixed-version rollout. `kWayMergeUsed` is a new StatMap key, and StatMap
+        /// decodes keys by ordinal without a bounds check, so a peer running a build that predates the key cannot
+        /// deserialize the stage stats it appears in. The key is only written when this option is on, so leaving
+        /// the option off (the default) keeps a mixed-version cluster safe.
+        public static final String STREAMING_SORTED_MAILBOX_RECEIVE = "streamingSortedMailboxReceive";
+        /// Output block size (rows) for the streaming sorted mailbox-receive k-way merge; defaults to 10000.
+        public static final String STREAMING_SORTED_MAILBOX_RECEIVE_BLOCK_SIZE =
+            "streamingSortedMailboxReceiveBlockSize";
 
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
         public static final String ORDERED_PREFERRED_POOLS = "orderedPreferredPools";

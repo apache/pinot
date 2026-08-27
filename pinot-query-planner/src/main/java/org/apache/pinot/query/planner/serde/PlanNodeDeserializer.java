@@ -395,7 +395,11 @@ public class PlanNodeDeserializer {
         return JoinNode.JoinStrategy.LOOKUP;
       case AS_OF:
         return JoinNode.JoinStrategy.ASOF;
+      case SORTED:
+        return JoinNode.JoinStrategy.SORTED;
       default:
+        // Fail fast rather than degrading to HASH: an unrecognized strategy means the sender knows a join semantics
+        // this node does not, and silently running it as a hash join can drop conditions and return wrong rows.
         throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
     }
   }

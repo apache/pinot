@@ -1152,6 +1152,67 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     return null;
   }
 
+  /// Tests that a sorted merge join with the `is_colocated_by_join_keys='true'` hint marks the sort exchange as
+  /// pre-partitioned when the join keys match the table partition keys, so the colocation machinery can eliminate the
+  /// redundant all-to-all shuffle. Tables `a` and `b` are partitioned on `col2` and `col1`
+  /// respectively, which are the join keys here.
+  @Test
+  public void testColocatedSortedMergeJoinIsPrePartitioned() {
+    String query = "SELECT /*+ joinOptions(join_strategy='sorted', is_colocated_by_join_keys='true') */ "
+        + "a.col2, b.col1 FROM a JOIN b ON a.col2 = b.col1";
+    DispatchableSubPlan dispatchableSubPlan;
+    try (QueryEnvironment.CompiledQuery compiledQuery = _queryEnvironment.compile(query)) {
+      dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+    }
+
+    List<MailboxSendNode> joinInputSends = findJoinInputSends(dispatchableSubPlan);
+    assertEquals(joinInputSends.size(), 2, "Sorted merge join should have two join-input sends");
+    for (MailboxSendNode sendNode : joinInputSends) {
+      assertTrue(sendNode.isPrePartitioned(),
+          "Colocated sorted merge join input send should be pre-partitioned");
+    }
+  }
+
+  /// Tests that a sorted merge join WITHOUT the `is_colocated_by_join_keys='true'` hint does not mark the sort
+  /// exchange as pre-partitioned, so the all-to-all shuffle is retained.
+  @Test
+  public void testNonColocatedSortedMergeJoinIsNotPrePartitioned() {
+    String query = "SELECT /*+ joinOptions(join_strategy='sorted') */ "
+        + "a.col2, b.col1 FROM a JOIN b ON a.col2 = b.col1";
+    DispatchableSubPlan dispatchableSubPlan;
+    try (QueryEnvironment.CompiledQuery compiledQuery = _queryEnvironment.compile(query)) {
+      dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+    }
+
+    List<MailboxSendNode> joinInputSends = findJoinInputSends(dispatchableSubPlan);
+    assertEquals(joinInputSends.size(), 2, "Sorted merge join should have two join-input sends");
+    for (MailboxSendNode sendNode : joinInputSends) {
+      assertFalse(sendNode.isPrePartitioned(),
+          "Non-colocated sorted merge join input send should not be pre-partitioned");
+    }
+  }
+
+  /// Finds the [MailboxSendNode] fragment roots that feed into the join stage (i.e. the two join-input sends).
+  private List<MailboxSendNode> findJoinInputSends(DispatchableSubPlan dispatchableSubPlan) {
+    DispatchablePlanFragment joinStage = findJoinStage(dispatchableSubPlan);
+    assertNotNull(joinStage, "Should have a join stage");
+    int joinStageId = joinStage.getPlanFragment().getFragmentId();
+    List<MailboxSendNode> sends = new ArrayList<>();
+    for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStages()) {
+      PlanNode root = fragment.getPlanFragment().getFragmentRoot();
+      if (root instanceof MailboxSendNode) {
+        MailboxSendNode sendNode = (MailboxSendNode) root;
+        for (int receiverStageId : sendNode.getReceiverStageIds()) {
+          if (receiverStageId == joinStageId) {
+            sends.add(sendNode);
+            break;
+          }
+        }
+      }
+    }
+    return sends;
+  }
+
   /// Tests that FULL OUTER JOIN with only non-equi conditions uses a singleton worker for the join stage, to ensure
   /// correctness of unmatched row tracking. With multiple workers, the broadcast right table would be on each worker
   /// but each worker only sees a subset of left rows, leading to incorrect unmatched-right-rows output.
