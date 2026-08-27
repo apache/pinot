@@ -61,10 +61,19 @@ public abstract class AbstractBaseResultSet implements ResultSet {
       throws SQLException;
 
   @Nullable
-  protected abstract Map<?, ?> getMap(int columnIndex)
-      throws SQLException;
+  protected Map<?, ?> getMap(int columnIndex)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException("Map is not supported by the ResultSet");
+  }
 
-  protected abstract ColumnDataType getColumnType(int columnIndex);
+  protected List<?> getList(int columnIndex, ColumnDataType dataType)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException("Array is not supported by the ResultSet");
+  }
+
+  protected ColumnDataType getColumnType(int columnIndex) throws SQLException {
+    return null;
+  }
 
   protected void validateState()
       throws SQLException {
@@ -1253,9 +1262,6 @@ public abstract class AbstractBaseResultSet implements ResultSet {
         throw new SQLDataException("Data type not supported for " + dataType);
     }
   }
-
-  protected abstract List<?> getList(int columnIndex, ColumnDataType dataType)
-      throws SQLException;
 
   @Nullable
   protected List<Timestamp> toTimestampList(List<String> values)
