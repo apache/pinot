@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.client.grpc;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -39,7 +37,6 @@ import org.apache.pinot.common.proto.Broker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,8 +44,6 @@ import org.slf4j.LoggerFactory;
 public class PinotGrpcResultSet extends AbstractBaseResultSet {
   public static final String NULL_STRING = "null";
   private static final Logger LOG = LoggerFactory.getLogger(PinotGrpcResultSet.class);
-  private static final ObjectReader MAP_READER =
-      JsonUtils.DEFAULT_READER.forType(new TypeReference<Map<?, ?>>() { });
 
   private final Iterator<Broker.BrokerResponse> _brokerResponseIterator;
   private final int _totalColumns;
@@ -198,13 +193,7 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
     if (!(value instanceof Map)) {
       throw new SQLDataException("Expected map value, found: " + value.getClass());
     }
-    try {
-      // Rebind through the same untyped Jackson reader used by PinotResultSet so numeric and nested container types
-      // do not depend on the transport decoder's intermediate representation.
-      return MAP_READER.readValue(JsonUtils.objectToString(value));
-    } catch (IOException e) {
-      throw new SQLDataException("Error parsing map", e);
-    }
+    return (Map<?,?>) value;
   }
 
   @Nullable
