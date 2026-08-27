@@ -358,4 +358,31 @@ public class MutableOpenStructIndexTest {
       ServerMetrics.deregister();
     }
   }
+
+  /// A STRING-established key does run the per-row inference check, so this pins the other side of
+  /// that branch: a later *inferable* value must not be counted. Without the `inferDataType == null`
+  /// guard inside meterIfUninferable, every row on such a key would meter a failure.
+  @Test
+  public void testInferenceCheckOnStringKeyDoesNotMeterInferableValues()
+      throws IOException {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    assertTrue(ServerMetrics.register(metrics), "another ServerMetrics is already registered");
+    try {
+      try (MutableOpenStructIndex idx = new MutableOpenStructIndex("metrics", "testTable_REALTIME",
+          openStructSpec(), OpenStructIndexConfig.DEFAULT, _memMgr, 100)) {
+        // "country" has no child spec and infers as STRING, so needsInferenceCheck() is true and
+        // meterIfUninferable runs on every later row — but both values infer cleanly.
+        idx.index(0, Map.of("country", "US"));
+        idx.index(1, Map.of("country", "CA"));
+        idx.index(2, Map.of("country", "MX"));
+      }
+
+      verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+          eq(ServerMeter.OPEN_STRUCT_TYPE_INFERENCE_FAILURES), anyLong());
+      verify(metrics, never()).addMeteredTableValue(anyString(), anyString(),
+          eq(ServerMeter.OPEN_STRUCT_TYPE_COERCION_FAILURES), anyLong());
+    } finally {
+      ServerMetrics.deregister();
+    }
+  }
 }
