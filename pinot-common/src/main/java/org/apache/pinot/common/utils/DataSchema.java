@@ -1171,7 +1171,7 @@ public class DataSchema {
     }
 
     @Nullable
-    public static ColumnDataType get(String typeName) {
+    public static ColumnDataType forName(String typeName) {
       return NAME_TO_TYPES.get(typeName);
     }
 
