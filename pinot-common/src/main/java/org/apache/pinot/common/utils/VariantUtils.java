@@ -23,7 +23,6 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import java.io.IOException;
-import java.io.StringWriter;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -35,6 +34,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -42,6 +42,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.commons.io.output.StringBuilderWriter;
 import org.apache.parquet.variant.Variant;
 import org.apache.parquet.variant.VariantArrayBuilder;
 import org.apache.parquet.variant.VariantBuilder;
@@ -943,7 +944,9 @@ public final class VariantUtils {
 
   private static String variantToJson(Variant variant) {
     try {
-      StringWriter writer = new StringWriter();
+      // StringBuilder-backed writer: StringWriter wraps a synchronized StringBuffer and would pay a monitor
+      // acquisition per append on this per-row rendering path.
+      StringBuilderWriter writer = new StringBuilderWriter();
       try (JsonGenerator generator = JSON_FACTORY.createGenerator(writer)) {
         writeJsonValue(generator, variant);
       }
@@ -952,6 +955,7 @@ public final class VariantUtils {
       throw new IllegalStateException("Cannot render Variant as JSON", e);
     }
   }
+
 
   private static void writeJsonValue(JsonGenerator generator, Variant variant)
       throws IOException {
@@ -1174,6 +1178,21 @@ public final class VariantUtils {
   /// <p>The constants and layouts used here mirror Parquet Variant encoding version 1. Keeping this cursor on
   /// {@link ReusableResult} avoids allocating envelope views, Variant wrappers, and navigation wrappers for every row.
   private static final class Cursor {
+    /// Memo slot marker: the path key has not been resolved against any metadata dictionary yet.
+    private static final int MEMO_UNKNOWN = -1;
+    /// Lazily computed per-row comparison of this row's metadata region against the previous navigated row's.
+    private static final int METADATA_CMP_UNKNOWN = 0;
+    private static final int METADATA_CMP_MATCH = 1;
+    private static final int METADATA_CMP_MISMATCH = 2;
+
+    /// Memo slot marker: no object-entry index hint has been recorded for the path element.
+    private static final int HINT_UNKNOWN = -1;
+    /// Memo slot marker: the path key was absent from the previous row's entire metadata dictionary.
+    private static final int MEMO_ABSENT_FROM_DICTIONARY = -2;
+    /// Objects at or below this entry count resolve by direct linear scan; the navigation memo cannot beat it.
+    private static final int SMALL_OBJECT_LINEAR_THRESHOLD = 4;
+
+
     private byte[] _envelope;
     private int _metadataOffset;
     private int _metadataLength;
@@ -1186,11 +1205,46 @@ public final class VariantUtils {
     private int _selectedOffset;
     private int _selectedLength;
 
+    // Cross-row navigation memo. Rows in a segment overwhelmingly share one metadata dictionary and one object
+    // layout, so the dictionary id and object-entry index resolved for each path element on one row almost always
+    // resolve the next row in O(1). The memo is self-validating per row: a hint is only trusted after re-checking,
+    // on the current row's bytes, that the hinted entry's id still spells the path key
+    // ([#selectObjectField(PathElement, int)]), so stale hints degrade to the ordinary search instead of
+    // corrupting results. Only the absent-from-dictionary marker relies on cross-row state; it is anchored to the
+    // exact envelope it was proven under and reused only when the current row's metadata region is byte-identical
+    // to that anchored region ([#absentFromDictionary(int)]).
+    private VariantPath _memoPath;
+    private int[] _memoIds;
+    private int[] _memoHints;
+    // Per-element anchor for MEMO_ABSENT_FROM_DICTIONARY: the envelope (and its metadata region) under which the
+    // absence was proven. Only a row whose metadata is byte-identical to the anchored region may reuse the verdict.
+    private byte[][] _memoAbsentEnvelopes;
+    private int[] _memoAbsentMetadataOffsets;
+    private int[] _memoAbsentMetadataLengths;
+    // Previous navigated row, used ONLY as a heuristic gate: the dictionary-classification investment on a miss
+    // (a full dictionary scan) is made only when the metadata repeated across consecutive rows, so heterogeneous
+    // per-row dictionaries keep the pre-memo miss cost. Never used to validate a verdict.
+    private byte[] _previousRowEnvelope;
+    private int _previousRowMetadataOffset;
+    private int _previousRowMetadataLength;
+    private int _metadataCmpState;
+
     private boolean navigate(byte[] envelope, VariantPath path) {
       reset(envelope);
-      for (PathElement element : path._elements) {
+      PathElement[] elements = path._elements;
+      if (path != _memoPath) {
+        _memoPath = path;
+        _memoIds = new int[elements.length];
+        _memoHints = new int[elements.length];
+        _memoAbsentEnvelopes = new byte[elements.length][];
+        _memoAbsentMetadataOffsets = new int[elements.length];
+        _memoAbsentMetadataLengths = new int[elements.length];
+        Arrays.fill(_memoIds, MEMO_UNKNOWN);
+      }
+      for (int i = 0; i < elements.length; i++) {
+        PathElement element = elements[i];
         if (element._field != null) {
-          if (getType() != Variant.Type.OBJECT || !selectObjectField(element)) {
+          if (getType() != Variant.Type.OBJECT || !selectObjectField(element, i)) {
             return false;
           }
         } else if (getType() != Variant.Type.ARRAY || !selectArrayElement(element._index)) {
@@ -1200,7 +1254,45 @@ public final class VariantUtils {
       return true;
     }
 
+    /// Heuristic investment gate: returns whether this row's metadata region is byte-identical to the previous
+    /// navigated row's, computed at most once per row. A stale or missed comparison only skips an optimization; it
+    /// can never validate a verdict.
+    private boolean metadataRepeatedAcrossRows() {
+      if (_metadataCmpState == METADATA_CMP_UNKNOWN) {
+        byte[] previous = _previousRowEnvelope;
+        _metadataCmpState = previous != null && _previousRowMetadataLength == _metadataLength
+            && (previous == _envelope || Arrays.equals(previous, _previousRowMetadataOffset,
+                _previousRowMetadataOffset + _previousRowMetadataLength,
+                _envelope, _metadataOffset, _metadataOffset + _metadataLength))
+            ? METADATA_CMP_MATCH : METADATA_CMP_MISMATCH;
+      }
+      return _metadataCmpState == METADATA_CMP_MATCH;
+    }
+
+    /// Returns whether the path element's absent-from-dictionary verdict applies to this row: the current metadata
+    /// region must be byte-identical to the region the absence was proven under. Rows that bypass the memo (small
+    /// objects, non-object levels, failed navigations) can never invalidate this anchor because it is compared
+    /// directly, not against the previous navigated row.
+    private boolean absentFromDictionary(int elementIndex) {
+      byte[] anchor = _memoAbsentEnvelopes[elementIndex];
+      if (anchor == null) {
+        return false;
+      }
+      int anchorOffset = _memoAbsentMetadataOffsets[elementIndex];
+      int anchorLength = _memoAbsentMetadataLengths[elementIndex];
+      return anchorLength == _metadataLength && (anchor == _envelope
+          || Arrays.equals(anchor, anchorOffset, anchorOffset + anchorLength,
+              _envelope, _metadataOffset, _metadataOffset + _metadataLength));
+    }
+
     private void reset(byte[] envelope) {
+      // Capture the outgoing row for the metadata-stability gate before its fields are overwritten. Envelopes are
+      // read-only by contract, so retaining the reference is safe and copy-free.
+      _previousRowEnvelope = _envelope;
+      _previousRowMetadataOffset = _metadataOffset;
+      _previousRowMetadataLength = _metadataLength;
+      _metadataCmpState = METADATA_CMP_UNKNOWN;
+
       int metadataLength = VariantEnvelope.validateAndGetMetadataLength(envelope);
       int valueLength = envelope.length - VariantEnvelope.HEADER_SIZE - metadataLength;
 
@@ -1394,7 +1486,7 @@ public final class VariantUtils {
       return new Variant(_envelope, _selectedOffset, _selectedLength, _envelope, _metadataOffset, _metadataLength);
     }
 
-    private boolean selectObjectField(PathElement field) {
+    private boolean selectObjectField(PathElement field, int elementIndex) {
       int header = getHeader();
       int typeInfo = (header >>> 2) & VARIANT_PRIMITIVE_TYPE_MASK;
       int sizeBytes = ((typeInfo >>> 4) & 1) == 0 ? 1 : Integer.BYTES;
@@ -1411,17 +1503,104 @@ public final class VariantUtils {
       int totalDataLength = readUnsignedLittleEndian(finalOffsetPosition, offsetSize, selectedLimit());
       requireRange(dataStart, totalDataLength, selectedLimit(), "Variant object data");
 
+      if (numElements <= SMALL_OBJECT_LINEAR_THRESHOLD) {
+        // For a handful of entries a direct scan costs at most a few key comparisons — no more than validating the
+        // memo would — so the memo machinery is skipped entirely.
+        int index = findObjectFieldIndexLinear(field._fieldUtf8, 0, numElements, idStart, idSize, offsetStart);
+        if (index < 0) {
+          return false;
+        }
+        selectObjectFieldAtIndex(index, offsetStart, offsetSize, dataStart, totalDataLength);
+        return true;
+      }
+
+      int memoId = _memoIds[elementIndex];
+      if (memoId >= 0) {
+        ensureMetadataParsed();
+        if (memoId < _metadataDictSize && metadataKeyEquals(memoId, field._fieldUtf8)) {
+          // The memoized dictionary id still spells the path key on this row's bytes, so the id alone identifies
+          // the field: dictionary strings are distinct per the Variant specification, and object entries reference
+          // dictionary ids. This check is local to the current row, so a stale memo can never select a wrong field.
+          int hint = _memoHints[elementIndex];
+          if (hint >= 0 && hint < numElements
+              && readUnsignedLittleEndian(idStart + hint * idSize, idSize, offsetStart) == memoId) {
+            selectObjectFieldAtIndex(hint, offsetStart, offsetSize, dataStart, totalDataLength);
+            return true;
+          }
+          return selectObjectFieldById(memoId, elementIndex, numElements, idStart, idSize, offsetStart, offsetSize,
+              dataStart, totalDataLength);
+        }
+        // The dictionary changed underneath the memo; fall through to a fresh resolution.
+      } else if (memoId == MEMO_ABSENT_FROM_DICTIONARY && absentFromDictionary(elementIndex)) {
+        // No object under an identical dictionary can contain a key the dictionary does not define.
+        return false;
+      }
+      return selectObjectFieldSlow(field, elementIndex, numElements, idStart, idSize, offsetStart, offsetSize,
+          dataStart, totalDataLength);
+    }
+
+    /// Selects the entry whose id equals the already-validated dictionary id, scanning ids without key comparisons.
+    ///
+    /// A metadata dictionary with duplicate strings (a hard specification violation, unlike the ordering deviations
+    /// the key-based fallbacks tolerate) could make an id-scan miss where a key-based scan would match a duplicate;
+    /// that shape is deliberately outside the tolerance contract.
+    private boolean selectObjectFieldById(int memoId, int elementIndex, int numElements, int idStart, int idSize,
+        int offsetStart, int offsetSize, int dataStart, int totalDataLength) {
+      for (int i = 0; i < numElements; i++) {
+        if (readUnsignedLittleEndian(idStart + i * idSize, idSize, offsetStart) == memoId) {
+          _memoHints[elementIndex] = i;
+          selectObjectFieldAtIndex(i, offsetStart, offsetSize, dataStart, totalDataLength);
+          return true;
+        }
+      }
+      // The id is absent from this object's id list, so the field is absent from this object.
+      return false;
+    }
+
+    /// Full key-based resolution, run when the memo cannot answer; re-memoizes for the following rows.
+    private boolean selectObjectFieldSlow(PathElement field, int elementIndex, int numElements, int idStart,
+        int idSize, int offsetStart, int offsetSize, int dataStart, int totalDataLength) {
+      int index = findObjectFieldIndex(field, numElements, idStart, idSize, offsetStart);
+      if (index >= 0) {
+        _memoIds[elementIndex] = readUnsignedLittleEndian(idStart + index * idSize, idSize, offsetStart);
+        _memoHints[elementIndex] = index;
+        _memoAbsentEnvelopes[elementIndex] = null;
+        selectObjectFieldAtIndex(index, offsetStart, offsetSize, dataStart, totalDataLength);
+        return true;
+      }
+      if (!metadataRepeatedAcrossRows()) {
+        // The dictionary changes row over row, so classifying the miss against the whole dictionary would cost a
+        // full dictionary scan per row with nothing reusable. Keep the pre-memo miss cost instead.
+        _memoIds[elementIndex] = MEMO_UNKNOWN;
+        _memoHints[elementIndex] = HINT_UNKNOWN;
+        _memoAbsentEnvelopes[elementIndex] = null;
+        return false;
+      }
+      int dictionaryId = findDictionaryId(field._fieldUtf8);
+      _memoIds[elementIndex] = dictionaryId >= 0 ? dictionaryId : MEMO_ABSENT_FROM_DICTIONARY;
+      _memoHints[elementIndex] = HINT_UNKNOWN;
+      if (dictionaryId >= 0) {
+        _memoAbsentEnvelopes[elementIndex] = null;
+      } else {
+        // Anchor the absence verdict to the exact metadata it was proven under; envelopes are read-only by contract.
+        _memoAbsentEnvelopes[elementIndex] = _envelope;
+        _memoAbsentMetadataOffsets[elementIndex] = _metadataOffset;
+        _memoAbsentMetadataLengths[elementIndex] = _metadataLength;
+      }
+      return false;
+    }
+
+    /// Returns the object-entry index whose key equals the path field, or {@code -1} when absent.
+    private int findObjectFieldIndex(PathElement field, int numElements, int idStart, int idSize, int offsetStart) {
       if (numElements < OBJECT_BINARY_SEARCH_THRESHOLD || !field._binarySearchSafe) {
-        return selectObjectFieldLinear(field._fieldUtf8, 0, numElements, idStart, idSize, offsetStart, offsetSize,
-            dataStart, totalDataLength);
+        return findObjectFieldIndexLinear(field._fieldUtf8, 0, numElements, idStart, idSize, offsetStart);
       }
 
       // Preserve the linear lookup's constant-time first-field case before paying the binary-search cost for the rest
       // of a wide object.
       int firstId = readUnsignedLittleEndian(idStart, idSize, offsetStart);
       if (metadataKeyEquals(firstId, field._fieldUtf8)) {
-        selectObjectFieldAtIndex(0, offsetStart, offsetSize, dataStart, totalDataLength);
-        return true;
+        return 0;
       }
 
       int low = 1;
@@ -1433,16 +1612,14 @@ public final class VariantUtils {
         if (comparison == INVALID_UTF8_COMPARISON) {
           // Malformed UTF-8 is not a valid Variant key, but retain the old byte-equality behavior for tolerant
           // callers instead of relying on an ordering that is no longer defined.
-          return selectObjectFieldLinear(field._fieldUtf8, 1, numElements, idStart, idSize, offsetStart, offsetSize,
-              dataStart, totalDataLength);
+          return findObjectFieldIndexLinear(field._fieldUtf8, 1, numElements, idStart, idSize, offsetStart);
         }
         if (comparison < 0) {
           low = index + 1;
         } else if (comparison > 0) {
           high = index - 1;
         } else {
-          selectObjectFieldAtIndex(index, offsetStart, offsetSize, dataStart, totalDataLength);
-          return true;
+          return index;
         }
       }
       // parquet-java orders object keys with String.compareTo (UTF-16 code units), while other conforming producers
@@ -1450,20 +1627,31 @@ public final class VariantUtils {
       // to U+E000..U+FFFF, so a miss under the parquet-java ordering is not authoritative for an external envelope.
       // Preserve the allocation-free binary fast path for hits, then use byte equality as the interoperability-safe
       // fallback for misses and unknown producer orderings.
-      return selectObjectFieldLinear(field._fieldUtf8, 1, numElements, idStart, idSize, offsetStart, offsetSize,
-          dataStart, totalDataLength);
+      return findObjectFieldIndexLinear(field._fieldUtf8, 1, numElements, idStart, idSize, offsetStart);
     }
 
-    private boolean selectObjectFieldLinear(byte[] fieldUtf8, int startIndex, int numElements, int idStart,
-        int idSize, int offsetStart, int offsetSize, int dataStart, int totalDataLength) {
+    private int findObjectFieldIndexLinear(byte[] fieldUtf8, int startIndex, int numElements, int idStart,
+        int idSize, int offsetStart) {
       for (int i = startIndex; i < numElements; i++) {
         int id = readUnsignedLittleEndian(idStart + i * idSize, idSize, offsetStart);
         if (metadataKeyEquals(id, fieldUtf8)) {
-          selectObjectFieldAtIndex(i, offsetStart, offsetSize, dataStart, totalDataLength);
-          return true;
+          return i;
         }
       }
-      return false;
+      return -1;
+    }
+
+    /// Returns the dictionary id whose string equals the key bytes, or {@code -1} when the dictionary does not
+    /// define the key. Linear on purpose: this runs once per metadata change, and it makes no assumption about the
+    /// producer's dictionary ordering.
+    private int findDictionaryId(byte[] keyUtf8) {
+      ensureMetadataParsed();
+      for (int id = 0; id < _metadataDictSize; id++) {
+        if (metadataKeyEquals(id, keyUtf8)) {
+          return id;
+        }
+      }
+      return -1;
     }
 
     private void selectObjectFieldAtIndex(int index, int offsetStart, int offsetSize, int dataStart,
@@ -1725,12 +1913,17 @@ public final class VariantUtils {
         return false;
       }
       int start = _metadataDataOffset + offset;
-      for (int i = 0; i < length; i++) {
-        if (_envelope[start + i] != expected[i]) {
-          return false;
+      if (length < 16) {
+        // Short keys dominate real paths; keep them on a simple scalar loop and reserve the vectorized
+        // comparison for long keys.
+        for (int i = 0; i < length; i++) {
+          if (_envelope[start + i] != expected[i]) {
+            return false;
+          }
         }
+        return true;
       }
-      return true;
+      return Arrays.equals(_envelope, start, start + length, expected, 0, length);
     }
 
     private void ensureMetadataParsed() {
