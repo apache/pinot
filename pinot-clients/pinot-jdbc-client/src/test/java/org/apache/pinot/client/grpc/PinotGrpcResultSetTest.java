@@ -110,6 +110,8 @@ public class PinotGrpcResultSetTest {
     Assert.assertTrue(resultSet.next());
     setCurrentRowValue(resultSet, 0, null);
     setCurrentRowValue(resultSet, 1, null);
+    Assert.assertNull(resultSet.getObject(1, List.class));
+    Assert.assertTrue(resultSet.wasNull());
     Assert.assertNull(resultSet.getObject(1));
     Assert.assertTrue(resultSet.wasNull());
     Assert.assertNull(resultSet.getObject(2));
