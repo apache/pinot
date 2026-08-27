@@ -145,7 +145,8 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
 
   @Override
   @Nullable
-  protected ColumnDataType getColumnType(int columnIndex) {
+  protected ColumnDataType getColumnType(int columnIndex) throws SQLException {
+    validateColumn(columnIndex);
     return _dataSchema.getColumnDataType(columnIndex - 1);
   }
 
