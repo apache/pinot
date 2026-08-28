@@ -38,11 +38,6 @@ public class CombinedFilterOperator extends BaseFilterOperator {
   private final boolean _restrictionPushdownEnabled;
 
   public CombinedFilterOperator(BaseFilterOperator mainFilterOperator, BaseFilterOperator subFilterOperator,
-      Map<String, String> queryOptions) {
-    this(mainFilterOperator, subFilterOperator, queryOptions, false);
-  }
-
-  public CombinedFilterOperator(BaseFilterOperator mainFilterOperator, BaseFilterOperator subFilterOperator,
       Map<String, String> queryOptions, boolean restrictionPushdownEnabled) {
     // This filter operator does not support AND/OR/NOT operations.
     super(0, false);

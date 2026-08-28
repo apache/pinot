@@ -26,6 +26,7 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.spi.utils.Pairs.IntPair;
 import org.roaringbitmap.BatchIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -169,15 +170,53 @@ public class AndDocIdSetPushdownTest {
     return children;
   }
 
+  /// Builds a leaf of every kind that [BlockDocIdSet#applyAnd] dispatches on, so that the bitmap, scan, sorted-range
+  /// and match-all/empty arms are all exercised by the randomized equivalence test.
   private static BlockDocIdSet randomLeaf(Random random) {
+    switch (random.nextInt(8)) {
+      case 0:
+        return new MatchAllDocIdSet(NUM_DOCS);
+      case 1:
+        return EmptyDocIdSet.getInstance();
+      case 2:
+      case 3: {
+        // Sorted leaf: inclusive ranges, which applyAnd has to convert to an exclusive upper bound
+        List<IntPair> docIdRanges = new ArrayList<>();
+        int start = random.nextInt(NUM_DOCS / 2);
+        int numRanges = 1 + random.nextInt(3);
+        for (int i = 0; i < numRanges && start < NUM_DOCS; i++) {
+          int end = Math.min(start + random.nextInt(500), NUM_DOCS - 1);
+          docIdRanges.add(new IntPair(start, end));
+          start = end + 2 + random.nextInt(500);
+        }
+        return new SortedDocIdSet(docIdRanges);
+      }
+      case 4:
+      case 5:
+        return new CountingScanDocIdSet(randomBitmap(random));
+      default:
+        return new BitmapDocIdSet(randomBitmap(random), NUM_DOCS);
+    }
+  }
+
+  private static MutableRoaringBitmap randomBitmap(Random random) {
     MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
     int numRuns = 1 + random.nextInt(8);
     for (int i = 0; i < numRuns; i++) {
       int start = random.nextInt(NUM_DOCS);
       bitmap.add(start, Math.min((long) start + 1 + random.nextInt(2000), NUM_DOCS));
     }
-    // Half of the leaves are scan-based, so that both the eager and the lazy paths are exercised
-    return random.nextBoolean() ? new BitmapDocIdSet(bitmap, NUM_DOCS) : new CountingScanDocIdSet(bitmap);
+    return bitmap;
+  }
+
+  /// A sorted leaf whose ranges end exactly at the candidate boundaries, pinning the inclusive-to-exclusive
+  /// conversion in [BlockDocIdSet#applyAnd] against an off-by-one.
+  @Test
+  public void testSortedLeafRangeBoundariesAreInclusive() {
+    BlockDocIdSet sorted = new SortedDocIdSet(List.of(new IntPair(10, 20), new IntPair(30, 30)));
+    MutableRoaringBitmap candidates = MutableRoaringBitmap.bitmapOf(9, 10, 20, 21, 29, 30, 31);
+
+    assertEquals(sorted.applyAnd(candidates).toArray(), new int[]{10, 20, 30});
   }
 
   private static int[] collectDocIds(BlockDocIdSet docIdSet) {

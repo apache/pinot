@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -56,6 +57,7 @@ public final class OrDocIdSet implements BlockDocIdSet {
 
   @Override
   public BlockDocIdIterator iterator() {
+    Preconditions.checkState(_docIdSets != null, "iterator() called on an already consumed OrDocIdSet");
     int numDocIdSets = _docIdSets.size();
     BlockDocIdIterator[] allDocIdIterators = new BlockDocIdIterator[numDocIdSets];
     List<SortedDocIdIterator> sortedDocIdIterators = new ArrayList<>();
@@ -80,10 +82,12 @@ public final class OrDocIdSet implements BlockDocIdSet {
       }
     }
 
-    // Set _docIdSets to null so that underlying BlockDocIdSets can be garbage collected
-    _docIdSets = null;
+    // Publish the stats state before dropping the branches, so that a concurrent reader of
+    // getNumEntriesScannedInFilter() never sees it disappear, then set _docIdSets to null so that the underlying
+    // BlockDocIdSets can be garbage collected
     _numEntriesScannedInFilter = numEntriesScannedForNonScanBasedDocIdSets;
     _scanBasedDocIdSets.set(scanBasedDocIdSets);
+    _docIdSets = null;
 
     int numSortedDocIdIterators = sortedDocIdIterators.size();
     int numBitmapBasedDocIdIterators = bitmapBasedDocIdIterators.size();
@@ -135,25 +139,42 @@ public final class OrDocIdSet implements BlockDocIdSet {
   }
 
   @Override
-  public boolean canApplyAnd() {
+  public boolean isApplyAndDeferrable() {
     return true;
   }
 
+  /// Unions the branches, each restricted to the candidate document ids.
+  ///
+  /// A branch only has to look at the candidates no earlier branch has matched yet, because
+  /// `(A OR B) AND S == (A AND S) OR (B AND (S MINUS (A AND S)))`. That matters because the cost of a scan-based
+  /// branch is linear in the size of the candidate set it is given, so handing every branch the full candidate set
+  /// would scan it once per branch.
   @Override
-  public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
+  public ImmutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
     List<BlockDocIdSet> docIdSets = _docIdSets;
-    // Set _docIdSets to null so that underlying BlockDocIdSets can be garbage collected
-    _docIdSets = null;
-    // Every branch is evaluated below, so collect the scanned entries from all of them
+    Preconditions.checkState(docIdSets != null, "applyAnd() called on an already consumed OrDocIdSet");
+    // Publish the stats state before dropping the branches, so that a concurrent reader of
+    // getNumEntriesScannedInFilter() never sees it disappear. Branches left unevaluated by the short-circuit below
+    // report zero.
     _scanBasedDocIdSets.set(docIdSets);
+    _docIdSets = null;
     MutableRoaringBitmap docIdsToReturn = new MutableRoaringBitmap();
     if (docIds.isEmpty()) {
       return docIdsToReturn;
     }
-    // NOTE: Every branch is restricted to the same candidate document ids, which is what makes this sound:
-    //       (A OR B) AND C is (A AND C) OR (B AND C). docIds is not modified, so it can be shared by the branches.
+    int numCandidates = docIds.getCardinality();
+    ImmutableRoaringBitmap remainingDocIds = docIds;
     for (BlockDocIdSet docIdSet : docIdSets) {
-      docIdsToReturn.or(docIdSet.applyAnd(docIds));
+      ImmutableRoaringBitmap matchingDocIds = docIdSet.applyAnd(remainingDocIds);
+      if (matchingDocIds.isEmpty()) {
+        continue;
+      }
+      docIdsToReturn.or(matchingDocIds);
+      if (docIdsToReturn.getCardinality() == numCandidates) {
+        // Every candidate is already matched, the remaining branches cannot add anything
+        break;
+      }
+      remainingDocIds = ImmutableRoaringBitmap.andNot(remainingDocIds, matchingDocIds);
     }
     return docIdsToReturn;
   }
