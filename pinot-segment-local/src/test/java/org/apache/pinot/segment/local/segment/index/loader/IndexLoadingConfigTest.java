@@ -157,6 +157,37 @@ public class IndexLoadingConfigTest {
   }
 
   @Test
+  public void testSkipSegmentPreprocessRespectsTierOverwrites()
+      throws IOException {
+    InstanceDataManagerConfig idmCfg = mock(InstanceDataManagerConfig.class);
+    when(idmCfg.getConfig()).thenReturn(new PinotConfiguration());
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("col1", FieldSpec.DataType.INT)
+            .build();
+    // Table-level skipSegmentPreprocess=true; override to false on "preprocessed" tier.
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setSkipSegmentPreprocess(true)
+        .setTierOverwrites(JsonUtils.stringToJsonNode("{\"preprocessed\": {\"skipSegmentPreprocess\": false}}"))
+        .build();
+
+    IndexLoadingConfig ilc = new IndexLoadingConfig(idmCfg, tableConfig, schema);
+    // Default tier: no override applied, table-level value flows through.
+    assertTrue(ilc.isSkipSegmentPreprocess());
+
+    // Unknown tier: no override for it, still falls back to table-level value.
+    ilc.setSegmentTier("someOtherTier");
+    assertTrue(ilc.isSkipSegmentPreprocess());
+
+    // "preprocessed" tier: override kicks in and flips the flag.
+    ilc.setSegmentTier("preprocessed");
+    assertFalse(ilc.isSkipSegmentPreprocess());
+
+    // Switching back to a tier without an override: table-level value again.
+    ilc.setSegmentTier(null);
+    assertTrue(ilc.isSkipSegmentPreprocess());
+  }
+
+  @Test
   public void testCalculateForwardIndexConfig()
       throws JsonProcessingException {
     // Check default settings

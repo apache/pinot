@@ -350,7 +350,8 @@ public class IndexLoadingConfig {
   }
 
   public boolean isSkipSegmentPreprocess() {
-    return _tableConfig != null && _tableConfig.getIndexingConfig().isSkipSegmentPreprocess();
+    TableConfig tableConfig = getTableConfigWithTierOverwrites();
+    return tableConfig != null && tableConfig.getIndexingConfig().isSkipSegmentPreprocess();
   }
 
   @Nullable
