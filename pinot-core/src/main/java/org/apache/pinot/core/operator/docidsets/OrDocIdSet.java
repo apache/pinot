@@ -28,6 +28,7 @@ import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.OrDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
 import org.apache.pinot.spi.utils.Pairs;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -131,6 +132,30 @@ public final class OrDocIdSet implements BlockDocIdSet {
       }
     }
     return _numEntriesScannedInFilter + numEntriesScannedForScanBasedDocIdSets;
+  }
+
+  @Override
+  public boolean canApplyAnd() {
+    return true;
+  }
+
+  @Override
+  public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
+    List<BlockDocIdSet> docIdSets = _docIdSets;
+    // Set _docIdSets to null so that underlying BlockDocIdSets can be garbage collected
+    _docIdSets = null;
+    // Every branch is evaluated below, so collect the scanned entries from all of them
+    _scanBasedDocIdSets.set(docIdSets);
+    MutableRoaringBitmap docIdsToReturn = new MutableRoaringBitmap();
+    if (docIds.isEmpty()) {
+      return docIdsToReturn;
+    }
+    // NOTE: Every branch is restricted to the same candidate document ids, which is what makes this sound:
+    //       (A OR B) AND C is (A AND C) OR (B AND C). docIds is not modified, so it can be shared by the branches.
+    for (BlockDocIdSet docIdSet : docIdSets) {
+      docIdsToReturn.or(docIdSet.applyAnd(docIds));
+    }
+    return docIdsToReturn;
   }
 
   @Override

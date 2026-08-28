@@ -300,6 +300,13 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.AND_SCAN_REORDERING));
   }
 
+  /// Whether an AND may push the document ids matched by its index-based children into its composite (AND/OR/NOT)
+  /// children. Enabled unless the query explicitly disables it.
+  public static boolean isAndRestrictionPushdownEnabled(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.AND_RESTRICTION_PUSHDOWN);
+    return value != null ? Boolean.parseBoolean(value) : QueryOptionKey.DEFAULT_AND_RESTRICTION_PUSHDOWN;
+  }
+
   public static boolean isSkipUpsert(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT));
   }

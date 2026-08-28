@@ -20,6 +20,8 @@ package org.apache.pinot.core.operator.docidsets;
 
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.MatchAllDocIdIterator;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public final class MatchAllDocIdSet implements BlockDocIdSet {
@@ -37,5 +39,10 @@ public final class MatchAllDocIdSet implements BlockDocIdSet {
   @Override
   public long getNumEntriesScannedInFilter() {
     return 0L;
+  }
+
+  @Override
+  public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
+    return docIds.toMutableRoaringBitmap();
   }
 }

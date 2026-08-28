@@ -845,6 +845,12 @@ public class CommonConstants {
 
         // Reorder scan based predicates based on cardinality and number of selected values
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
+
+        // Push the document ids matched by an AND's index-based children into its composite (AND/OR/NOT) children, so
+        // that a scan-based predicate nested inside an OR is only evaluated on the documents that can still match.
+        // Enabled by default; set to false to restore the previous behavior.
+        public static final String AND_RESTRICTION_PUSHDOWN = "andRestrictionPushdown";
+        public static final boolean DEFAULT_AND_RESTRICTION_PUSHDOWN = true;
         public static final String SKIP_INDEXES = "skipIndexes";
 
         // Query option key used to trace rule productions
