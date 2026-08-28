@@ -45,19 +45,17 @@ public class NotDocIdSet implements BlockDocIdSet {
   }
 
   @Override
-  public boolean canApplyAnd() {
+  public boolean isApplyAndDeferrable() {
     return true;
   }
 
   @Override
-  public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
+  public ImmutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
+    if (docIds.isEmpty()) {
+      return new MutableRoaringBitmap();
+    }
     // Within the candidate set, NOT(child) is the candidates the child does not match, so the child only has to be
     // evaluated on the candidates: (NOT child) AND docIds == docIds MINUS (child AND docIds).
-    MutableRoaringBitmap docIdsToReturn = docIds.toMutableRoaringBitmap();
-    if (docIdsToReturn.isEmpty()) {
-      return docIdsToReturn;
-    }
-    docIdsToReturn.andNot(_childDocIdSet.applyAnd(docIds));
-    return docIdsToReturn;
+    return ImmutableRoaringBitmap.andNot(docIds, _childDocIdSet.applyAnd(docIds));
   }
 }

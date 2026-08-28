@@ -46,7 +46,7 @@ public final class EmptyDocIdSet implements BlockDocIdSet {
   }
 
   @Override
-  public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
+  public ImmutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
     return new MutableRoaringBitmap();
   }
 }

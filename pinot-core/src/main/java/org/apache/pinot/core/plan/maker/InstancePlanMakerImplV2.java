@@ -115,7 +115,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   private int _minServerGroupTrimSize = Server.DEFAULT_QUERY_EXECUTOR_MIN_SERVER_GROUP_TRIM_SIZE;
   private int _groupByTrimThreshold = Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD;
   private AndRestrictionPushdownMode _andRestrictionPushdownMode =
-      Server.DEFAULT_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN;
+      Server.DEFAULT_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN_MODE;
 
   @Override
   public void init(PinotConfiguration queryExecutorConfig) {
@@ -144,9 +144,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         Server.DEFAULT_QUERY_EXECUTOR_MIN_SERVER_GROUP_TRIM_SIZE);
     _groupByTrimThreshold = queryExecutorConfig.getProperty(Server.GROUPBY_TRIM_THRESHOLD,
         Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD);
-    _andRestrictionPushdownMode = AndRestrictionPushdownMode.valueOf(
-        queryExecutorConfig.getProperty(Server.AND_RESTRICTION_PUSHDOWN,
-            Server.DEFAULT_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN.name()).toUpperCase());
+    _andRestrictionPushdownMode = QueryOptionsUtils.parseAndRestrictionPushdownMode(
+        Server.AND_RESTRICTION_PUSHDOWN_MODE, queryExecutorConfig.getProperty(Server.AND_RESTRICTION_PUSHDOWN_MODE,
+            Server.DEFAULT_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN_MODE.name()));
     Preconditions.checkState(_groupByTrimThreshold > 0,
         "Invalid configurable: groupByTrimThreshold: %d must be positive", _groupByTrimThreshold);
     LOGGER.info("Initialized plan maker with maxExecutionThreads: {}, defaultExecutionThreads: {}, "
@@ -238,9 +238,18 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   /// Resolves [AndRestrictionPushdownMode] for a query.
   ///
-  /// Under AUTO the push-down is skipped for a selection query without ORDER BY. Such a query stops as soon as it has
-  /// LIMIT rows, while the push-down materializes the whole filter result, so applying it there would make the query
-  /// do the full filter work instead of only enough to fill the result.
+  /// The push-down materializes the filter result instead of streaming it, so under AUTO it is only applied to a
+  /// query that is going to read every matching document anyway. That is exactly the aggregation and group-by
+  /// queries:
+  ///
+  /// - a selection query without ORDER BY stops as soon as it has LIMIT rows;
+  /// - a DISTINCT query without ORDER BY stops the same way, in `DistinctOperator#getNextBlock`;
+  /// - whether a selection query *with* ORDER BY can stop early is decided per segment, because
+  ///   [org.apache.pinot.core.plan.SelectionPlanNode] picks `SelectionPartiallyOrderedBy*` from the segment's sorted
+  ///   column, so it cannot be ruled out here and is excluded conservatively;
+  /// - LIMIT 0 reads nothing at all.
+  ///
+  /// Use ALWAYS to push down on a workload known not to terminate early.
   private static boolean isAndRestrictionPushdownEnabled(AndRestrictionPushdownMode mode, QueryContext queryContext) {
     switch (mode) {
       case ALWAYS:
@@ -248,7 +257,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       case NEVER:
         return false;
       case AUTO:
-        return !QueryContextUtils.isSelectionOnlyQuery(queryContext);
+        // NOTE: DISTINCT is modelled as an aggregation function, so it has to be excluded explicitly
+        return queryContext.getLimit() > 0 && QueryContextUtils.isAggregationQuery(queryContext)
+            && !QueryContextUtils.isDistinctQuery(queryContext);
       default:
         throw new IllegalStateException("Unsupported AND restriction push-down mode: " + mode);
     }

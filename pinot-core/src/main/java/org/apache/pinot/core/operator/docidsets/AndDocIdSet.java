@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -76,6 +77,7 @@ public final class AndDocIdSet implements BlockDocIdSet {
   @Override
   public BlockDocIdIterator iterator() {
     List<BlockDocIdSet> docIdSets = _docIdSets;
+    Preconditions.checkState(docIdSets != null, "iterator() called on an already consumed AndDocIdSet");
     int numDocIdSets = docIdSets.size();
     // NOTE: Keep the order of BlockDocIdSets to preserve the order decided within FilterOperatorUtils.
     // TODO: Consider deciding the order based on the stats of BlockDocIdIterators
@@ -92,7 +94,7 @@ public final class AndDocIdSet implements BlockDocIdSet {
 
     for (int i = 0; i < numDocIdSets; i++) {
       BlockDocIdSet docIdSet = docIdSets.get(i);
-      if (_restrictionPushdownEnabled && docIdSet.canApplyAnd()) {
+      if (_restrictionPushdownEnabled && docIdSet.isApplyAndDeferrable()) {
         // NOTE: Do not call iterator() here. That evaluates the whole subtree over the segment, which is exactly what
         //       the push-down below avoids.
         restrictableDocIdSets.add(docIdSet);
@@ -116,10 +118,12 @@ public final class AndDocIdSet implements BlockDocIdSet {
       }
     }
 
-    // Set _docIdSets to null so that underlying BlockDocIdSets can be garbage collected
-    _docIdSets = null;
+    // Publish the stats state before dropping the children, so that a concurrent reader of
+    // getNumEntriesScannedInFilter() never sees it disappear, then set _docIdSets to null so that the underlying
+    // BlockDocIdSets can be garbage collected
     _numEntriesScannedInFilter = numEntriesScannedForNonScanBasedDocIdSets;
     _scanBasedDocIdSets.set(scanBasedDocIdSets);
+    _docIdSets = null;
 
     // evaluate the bitmaps in the order of the lowest matching num docIds comes first, so that we minimize the number
     // of containers (range) for comparison from the beginning, as will minimize the effort of bitmap AND application
@@ -223,34 +227,33 @@ public final class AndDocIdSet implements BlockDocIdSet {
   }
 
   @Override
-  public boolean canApplyAnd() {
-    return true;
+  public boolean isApplyAndDeferrable() {
+    return _restrictionPushdownEnabled;
   }
 
+  /// Intersects this AND with the candidate set by handing the candidates to [#iterator] as one more index-based
+  /// child. Everything [#iterator] does -- merging the index children first, sorting bitmaps by cardinality,
+  /// [org.apache.pinot.common.utils.config.QueryOptionsUtils#isAndScanReorderingEnabled], running every scan against
+  /// the merged document ids -- then applies to the restricted evaluation too, with one implementation of AND.
   @Override
-  public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
+  public ImmutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
     List<BlockDocIdSet> docIdSets = _docIdSets;
-    // Set _docIdSets to null so that underlying BlockDocIdSets can be garbage collected
-    _docIdSets = null;
-    // Every child evaluated below may scan, so collect the scanned entries from all of them. Children that are not
-    // reached (because the candidate set became empty) report zero.
-    _scanBasedDocIdSets.set(docIdSets);
+    Preconditions.checkState(docIdSets != null, "applyAnd() called on an already consumed AndDocIdSet");
     if (docIds.isEmpty()) {
+      // Publish the stats state before dropping the children, so that a concurrent reader never sees it disappear
+      _scanBasedDocIdSets.set(List.of());
+      _docIdSets = null;
       return new MutableRoaringBitmap();
     }
-    // NOTE: The children are already ordered cheapest-first by FilterOperatorUtils#reorderAndFilterChildOperators, so
-    //       intersecting them in order keeps the candidate set as small as possible for the expensive ones.
-    // TODO: Unlike iterator(), this path does not honour the AndScanReordering query option.
-    MutableRoaringBitmap docIdsToReturn = null;
-    ImmutableRoaringBitmap candidateDocIds = docIds;
-    for (BlockDocIdSet docIdSet : docIdSets) {
-      docIdsToReturn = docIdSet.applyAnd(candidateDocIds);
-      if (docIdsToReturn.isEmpty()) {
-        return docIdsToReturn;
-      }
-      candidateDocIds = docIdsToReturn;
-    }
-    return docIdsToReturn != null ? docIdsToReturn : docIds.toMutableRoaringBitmap();
+    List<BlockDocIdSet> docIdSetsWithCandidates = new ArrayList<>(docIdSets.size() + 1);
+    docIdSetsWithCandidates.add(new RangelessBitmapDocIdSet(docIds));
+    docIdSetsWithCandidates.addAll(docIdSets);
+    _docIdSets = docIdSetsWithCandidates;
+    BlockDocIdIterator docIdIterator = iterator();
+    // iterator() returns the merged document ids directly whenever it has no lazy child left, which is the usual case
+    // once the candidate set has forced the merge branch
+    return docIdIterator instanceof BitmapBasedDocIdIterator ? ((BitmapBasedDocIdIterator) docIdIterator).getDocIds()
+        : BlockDocIdSet.collect(docIdIterator);
   }
 
   @Override

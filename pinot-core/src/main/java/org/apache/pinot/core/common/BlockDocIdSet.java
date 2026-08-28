@@ -56,28 +56,28 @@ public interface BlockDocIdSet {
     return this;
   }
 
-  /// Returns whether [#applyAnd] can restrict this DocIdSet to a candidate document set *without* first evaluating
-  /// the whole subtree over the segment.
+  /// Returns whether a parent AND may defer calling [#iterator] on this DocIdSet and reach it through [#applyAnd]
+  /// instead.
   ///
-  /// Composite DocIdSets (AND, OR, NOT) return `true`: they can forward the candidate set to their own children.
-  /// This is what lets a restriction from an enclosing AND reach a scan-based predicate nested inside an OR, which
-  /// would otherwise be evaluated against every document the OR branch matches. Leaf DocIdSets return `false`:
-  /// their index lookup has already happened by the time the DocIdSet exists, so deferring them buys nothing.
+  /// Composite DocIdSets (AND, OR, NOT) return `true`: forwarding a candidate set to their own children is how a
+  /// restriction from an enclosing AND reaches a scan-based predicate nested inside an OR, which would otherwise be
+  /// evaluated against every document that OR branch matches. Leaf DocIdSets return `false`: their index lookup has
+  /// already happened by the time the DocIdSet exists, so deferring them buys nothing.
   ///
-  /// A caller must only defer calling [#iterator] on a child when this returns `true`.
-  default boolean canApplyAnd() {
+  /// This says nothing about whether [#applyAnd] may be called -- every DocIdSet supports it.
+  default boolean isApplyAndDeferrable() {
     return false;
   }
 
   /// Returns the document ids matching this DocIdSet that are also in `docIds`, i.e. the intersection of this
   /// DocIdSet with the given candidate set.
   ///
-  /// `docIds` is never modified, so the same candidate set may be handed to several DocIdSets; an OR does exactly
-  /// that when it forwards the candidate set to each of its branches.
+  /// `docIds` is never modified, so the same candidate set may be handed to several DocIdSets. The returned bitmap
+  /// must not be modified by the caller either: it may be a view of a bitmap the DocIdSet still owns.
   ///
   /// Like [ScanBasedDocIdIterator#applyAnd], this method consumes the DocIdSet: call it at most once, and never
-  /// together with [#iterator].
-  default MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
+  /// together with [#iterator]. [#getNumEntriesScannedInFilter] stays valid afterwards.
+  default ImmutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
     if (docIds.isEmpty()) {
       return new MutableRoaringBitmap();
     }
@@ -99,12 +99,16 @@ public interface BlockDocIdSet {
       return docIdsFromRanges;
     }
     // Generic fallback: drive the iterator from the candidate set so that it is only asked about candidate documents
-    BlockDocIdIterator restrictedDocIdIterator = new AndDocIdIterator(
-        new BlockDocIdIterator[]{new RangelessBitmapDocIdIterator(docIds), docIdIterator});
+    return collect(new AndDocIdIterator(
+        new BlockDocIdIterator[]{new RangelessBitmapDocIdIterator(docIds), docIdIterator}));
+  }
+
+  /// Materializes the document ids remaining in the given iterator.
+  static MutableRoaringBitmap collect(BlockDocIdIterator docIdIterator) {
     RoaringBitmapWriter<MutableRoaringBitmap> bitmapWriter =
         RoaringBitmapWriter.bufferWriter().runCompress(false).get();
     int docId;
-    while ((docId = restrictedDocIdIterator.next()) != Constants.EOF) {
+    while ((docId = docIdIterator.next()) != Constants.EOF) {
       bitmapWriter.add(docId);
     }
     return bitmapWriter.get();

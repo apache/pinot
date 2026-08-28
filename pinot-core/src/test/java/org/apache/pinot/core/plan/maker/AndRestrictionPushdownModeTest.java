@@ -45,21 +45,30 @@ public class AndRestrictionPushdownModeTest {
   private static final String DISTINCT = "SELECT DISTINCT col1 FROM testTable WHERE col2 = 1";
 
   @Test
-  public void testAutoSkipsSelectionOnlyQuery() {
-    assertFalse(resolve(null, SELECTION_ONLY), "A selection-only query stops at its LIMIT, so AUTO must not push down");
+  public void testDefaultIsNever() {
+    assertFalse(resolve(null, AGGREGATION), "The push-down ships disabled");
+    assertFalse(resolve(null, SELECTION_ONLY));
+  }
+
+  @Test
+  public void testAutoSkipsQueriesThatCanStopEarly() {
+    assertFalse(resolve("auto", SELECTION_ONLY), "A selection-only query stops at its LIMIT");
+    assertFalse(resolve("auto", DISTINCT), "DistinctOperator stops once it has LIMIT rows");
+    // Whether an ORDER BY selection can stop early is decided per segment, so AUTO excludes it conservatively
+    assertFalse(resolve("auto", SELECTION_ORDER_BY));
+    assertFalse(resolve("auto", AGGREGATION + " LIMIT 0"), "LIMIT 0 reads nothing");
   }
 
   @Test
   public void testAutoAppliesToQueriesThatReadEveryMatchingDocument() {
-    assertTrue(resolve(null, SELECTION_ORDER_BY), "ORDER BY forces every matching document to be read");
-    assertTrue(resolve(null, AGGREGATION));
-    assertTrue(resolve(null, GROUP_BY));
-    assertTrue(resolve(null, DISTINCT));
+    assertTrue(resolve("auto", AGGREGATION));
+    assertTrue(resolve("auto", GROUP_BY));
   }
 
   @Test
-  public void testAlwaysAppliesEvenToSelectionOnlyQuery() {
+  public void testAlwaysAppliesEvenToQueriesThatCanStopEarly() {
     assertTrue(resolve("always", SELECTION_ONLY));
+    assertTrue(resolve("always", DISTINCT));
   }
 
   @Test
@@ -70,29 +79,40 @@ public class AndRestrictionPushdownModeTest {
   @Test
   public void testModeIsCaseInsensitive() {
     assertTrue(resolve("AlWaYs", SELECTION_ONLY));
-    assertFalse(resolve("NEVER", AGGREGATION));
+    assertTrue(resolve("AuTo", AGGREGATION));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testInvalidQueryOptionValueIsRejected() {
+    // A boolean is the most likely mistake, since the option name reads like a toggle
+    resolve("true", AGGREGATION);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testInvalidServerConfigValueIsRejected() {
+    planMakerWithServerDefault("sometimes");
   }
 
   @Test
   public void testServerDefaultAppliesWithoutQueryOption() {
-    InstancePlanMakerImplV2 planMaker = planMakerWithServerDefault("never");
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(AGGREGATION);
+    InstancePlanMakerImplV2 planMaker = planMakerWithServerDefault("always");
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(SELECTION_ONLY);
     planMaker.applyQueryOptions(queryContext);
-    assertFalse(queryContext.isAndRestrictionPushdownEnabled(), "The server default must apply");
+    assertTrue(queryContext.isAndRestrictionPushdownEnabled(), "The server default must apply");
   }
 
   @Test
   public void testQueryOptionOverridesServerDefault() {
-    InstancePlanMakerImplV2 planMaker = planMakerWithServerDefault("never");
+    InstancePlanMakerImplV2 planMaker = planMakerWithServerDefault("always");
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(AGGREGATION);
-    queryContext.getQueryOptions().put(QueryOptionKey.AND_RESTRICTION_PUSHDOWN, "always");
+    queryContext.getQueryOptions().put(QueryOptionKey.AND_RESTRICTION_PUSHDOWN_MODE, "never");
     planMaker.applyQueryOptions(queryContext);
-    assertTrue(queryContext.isAndRestrictionPushdownEnabled(), "The query option must win over the server default");
+    assertFalse(queryContext.isAndRestrictionPushdownEnabled(), "The query option must win over the server default");
   }
 
   private static InstancePlanMakerImplV2 planMakerWithServerDefault(String mode) {
     InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2();
-    planMaker.init(new PinotConfiguration(Map.of(Server.AND_RESTRICTION_PUSHDOWN, mode)));
+    planMaker.init(new PinotConfiguration(Map.of(Server.AND_RESTRICTION_PUSHDOWN_MODE, mode)));
     return planMaker;
   }
 
@@ -101,7 +121,7 @@ public class AndRestrictionPushdownModeTest {
   private static boolean resolve(@Nullable String mode, String query) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     if (mode != null) {
-      queryContext.getQueryOptions().put(QueryOptionKey.AND_RESTRICTION_PUSHDOWN, mode);
+      queryContext.getQueryOptions().put(QueryOptionKey.AND_RESTRICTION_PUSHDOWN_MODE, mode);
     }
     new InstancePlanMakerImplV2().applyQueryOptions(queryContext);
     return queryContext.isAndRestrictionPushdownEnabled();

@@ -847,7 +847,7 @@ public class CommonConstants {
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
 
         // Per-query override of Server.AndRestrictionPushdownMode: ALWAYS, NEVER or AUTO
-        public static final String AND_RESTRICTION_PUSHDOWN = "andRestrictionPushdown";
+        public static final String AND_RESTRICTION_PUSHDOWN_MODE = "andRestrictionPushdownMode";
         public static final String SKIP_INDEXES = "skipIndexes";
 
         // Query option key used to trace rule productions
@@ -1390,11 +1390,12 @@ public class CommonConstants {
     /// Controls whether an AND pushes the document ids matched by its index-based children into its composite
     /// (AND/OR/NOT) children, so that a scan-based predicate nested inside an OR is only evaluated on the documents
     /// that can still match the AND. See [issue 19339](https://github.com/apache/pinot/issues/19339).
-    public static final String AND_RESTRICTION_PUSHDOWN = "and.restriction.pushdown";
-    public static final String CONFIG_OF_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN =
-        QUERY_EXECUTOR_CONFIG_PREFIX + "." + AND_RESTRICTION_PUSHDOWN;
-    public static final AndRestrictionPushdownMode DEFAULT_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN =
-        AndRestrictionPushdownMode.AUTO;
+    public static final String AND_RESTRICTION_PUSHDOWN_MODE = "and.restriction.pushdown.mode";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN_MODE =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + AND_RESTRICTION_PUSHDOWN_MODE;
+    /// Defaults to NEVER: the push-down is a new filter execution path and is opt-in until it has soaked.
+    public static final AndRestrictionPushdownMode DEFAULT_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN_MODE =
+        AndRestrictionPushdownMode.NEVER;
 
     /// How aggressively an AND pushes the document ids it has matched so far into its composite children.
     public enum AndRestrictionPushdownMode {
