@@ -91,10 +91,6 @@ public class IndexLoadingConfig {
 
   private boolean _dirty = true;
 
-  // Stored so that refreshIndexConfigs() can re-derive OPEN_STRUCT child configs after a dirty rebuild
-  @Nullable
-  private volatile SegmentMetadataImpl _openStructSegmentMetadata;
-
   private MultiColumnTextIndexConfig _multiColTextIndexConfig;
 
   /// NOTE: This step might modify the passed in table config and schema.
@@ -223,11 +219,6 @@ public class IndexLoadingConfig {
     _multiColTextIndexConfig = indexingConfig.getMultiColumnTextIndexConfig();
     _skipSegmentPreprocess = indexingConfig.isSkipSegmentPreprocess();
     _dirty = false;
-
-    SegmentMetadataImpl osMetadata = _openStructSegmentMetadata;
-    if (osMetadata != null) {
-      addOpenStructChildConfigs(osMetadata);
-    }
   }
 
   private TableConfig getTableConfigWithTierOverwrites() {
@@ -419,7 +410,6 @@ public class IndexLoadingConfig {
   }
 
   public void addOpenStructChildConfigs(SegmentMetadataImpl segmentMetadata) {
-    _openStructSegmentMetadata = segmentMetadata;
     if (_indexConfigsByColName == null || _dirty) {
       refreshIndexConfigs();
     }
