@@ -57,12 +57,20 @@ public final class AndDocIdSet implements BlockDocIdSet {
   private List<BlockDocIdSet> _docIdSets;
   private volatile long _numEntriesScannedInFilter;
 
+  /// Creates an AndDocIdSet that does not push its matching document ids into its composite children.
   public AndDocIdSet(List<BlockDocIdSet> docIdSets, @Nullable Map<String, String> queryOptions) {
+    this(docIdSets, queryOptions, false);
+  }
+
+  /// @param restrictionPushdownEnabled whether the matching document ids may be handed to the composite (AND/OR/NOT)
+  ///                                   children. Resolved once per query from the `andRestrictionPushdown` query
+  ///                                   option and the server default, see `QueryContext`.
+  public AndDocIdSet(List<BlockDocIdSet> docIdSets, @Nullable Map<String, String> queryOptions,
+      boolean restrictionPushdownEnabled) {
     _docIdSets = docIdSets;
     _cardinalityBasedRankingForScan =
         queryOptions != null && QueryOptionsUtils.isAndScanReorderingEnabled(queryOptions);
-    _restrictionPushdownEnabled =
-        queryOptions == null || QueryOptionsUtils.isAndRestrictionPushdownEnabled(queryOptions);
+    _restrictionPushdownEnabled = restrictionPushdownEnabled;
   }
 
   @Override

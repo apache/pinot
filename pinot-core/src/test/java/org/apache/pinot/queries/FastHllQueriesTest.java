@@ -138,7 +138,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(BASE_QUERY), 120000L, 0L, 240000L, 120000L,
         new Object[]{21L, 1762L});
     // Test inter segments query with filter
-    QueriesTestUtils.testInterSegmentsResult(getBrokerResponseWithFilter(BASE_QUERY), 24516L, 336536L, 49032L, 120000L,
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponseWithFilter(BASE_QUERY), 24516L, 277480L, 49032L, 120000L,
         new Object[]{17L, 1197L});
     // Test inter segments query with group-by
     List<Object[]> expectedRows =

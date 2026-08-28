@@ -20,15 +20,12 @@ package org.apache.pinot.core.operator.docidsets;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.OptionalInt;
 import java.util.Random;
-import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.segment.spi.Constants;
-import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.roaringbitmap.BatchIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -45,8 +42,6 @@ import static org.testng.Assert.assertTrue;
 /// See [issue 19339](https://github.com/apache/pinot/issues/19339).
 public class AndDocIdSetPushdownTest {
   private static final int NUM_DOCS = 10000;
-  private static final Map<String, String> PUSHDOWN_DISABLED =
-      Map.of(QueryOptionKey.AND_RESTRICTION_PUSHDOWN, "false");
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final String ERROR_MESSAGE = "Random seed: " + RANDOM_SEED;
 
@@ -66,7 +61,7 @@ public class AndDocIdSetPushdownTest {
     expected.and(selective);
 
     CountingScanDocIdSet pushedDownScan = new CountingScanDocIdSet(scanMatches);
-    BlockDocIdSet withPushdown = orBranchTree(null, pushedDownScan, selective, indexedInBranch, otherBranch);
+    BlockDocIdSet withPushdown = orBranchTree(true, pushedDownScan, selective, indexedInBranch, otherBranch);
     assertEquals(collectDocIds(withPushdown), expected.toArray());
     long scannedWithPushdown = pushedDownScan.getNumEntriesScannedInFilter();
     assertEquals(scannedWithPushdown, selective.getCardinality(),
@@ -76,7 +71,7 @@ public class AndDocIdSetPushdownTest {
 
     CountingScanDocIdSet unrestrictedScan = new CountingScanDocIdSet(scanMatches);
     BlockDocIdSet withoutPushdown =
-        orBranchTree(PUSHDOWN_DISABLED, unrestrictedScan, selective, indexedInBranch, otherBranch);
+        orBranchTree(false, unrestrictedScan, selective, indexedInBranch, otherBranch);
     assertEquals(collectDocIds(withoutPushdown), expected.toArray(),
         "Disabling the push-down must not change the result");
     long scannedWithoutPushdown = unrestrictedScan.getNumEntriesScannedInFilter();
@@ -98,7 +93,7 @@ public class AndDocIdSetPushdownTest {
 
     CountingScanDocIdSet scan = new CountingScanDocIdSet(scanMatches);
     BlockDocIdSet docIdSet = new AndDocIdSet(
-        List.of(new BitmapDocIdSet(selective, NUM_DOCS), new NotDocIdSet(scan, NUM_DOCS)), null);
+        List.of(new BitmapDocIdSet(selective, NUM_DOCS), new NotDocIdSet(scan, NUM_DOCS)), null, true);
 
     assertEquals(collectDocIds(docIdSet), expected.toArray());
     assertEquals(scan.getNumEntriesScannedInFilter(), selective.getCardinality(),
@@ -119,7 +114,7 @@ public class AndDocIdSetPushdownTest {
 
     BlockDocIdSet or = new OrDocIdSet(
         List.of(new BitmapDocIdSet(firstBranch, NUM_DOCS), new BitmapDocIdSet(secondBranch, NUM_DOCS)), NUM_DOCS);
-    BlockDocIdSet docIdSet = new AndDocIdSet(List.of(new CountingScanDocIdSet(scanMatches), or), null);
+    BlockDocIdSet docIdSet = new AndDocIdSet(List.of(new CountingScanDocIdSet(scanMatches), or), null, true);
 
     assertEquals(collectDocIds(docIdSet), expected.toArray());
   }
@@ -129,48 +124,47 @@ public class AndDocIdSetPushdownTest {
   public void testRandomTreesMatchTheSameDocumentsWithAndWithoutPushdown() {
     for (int i = 0; i < 200; i++) {
       long seed = RANDOM_SEED + i;
-      BlockDocIdSet withPushdown = randomTree(new Random(seed), 3, null);
-      BlockDocIdSet withoutPushdown = randomTree(new Random(seed), 3, PUSHDOWN_DISABLED);
+      BlockDocIdSet withPushdown = randomTree(new Random(seed), 3, true);
+      BlockDocIdSet withoutPushdown = randomTree(new Random(seed), 3, false);
       assertEquals(collectDocIds(withPushdown), collectDocIds(withoutPushdown), ERROR_MESSAGE + ", iteration: " + i);
     }
   }
 
-  private static BlockDocIdSet orBranchTree(@Nullable Map<String, String> queryOptions, BlockDocIdSet scan,
+  private static BlockDocIdSet orBranchTree(boolean pushdownEnabled, BlockDocIdSet scan,
       ImmutableRoaringBitmap selective, ImmutableRoaringBitmap indexedInBranch, ImmutableRoaringBitmap otherBranch) {
     BlockDocIdSet branch =
-        new AndDocIdSet(List.of(new BitmapDocIdSet(indexedInBranch, NUM_DOCS), scan), queryOptions);
+        new AndDocIdSet(List.of(new BitmapDocIdSet(indexedInBranch, NUM_DOCS), scan), null, pushdownEnabled);
     BlockDocIdSet or = new OrDocIdSet(List.of(branch, new BitmapDocIdSet(otherBranch, NUM_DOCS)), NUM_DOCS);
-    return new AndDocIdSet(List.of(new BitmapDocIdSet(selective, NUM_DOCS), or), queryOptions);
+    return new AndDocIdSet(List.of(new BitmapDocIdSet(selective, NUM_DOCS), or), null, pushdownEnabled);
   }
 
   /// Builds a random filter tree. Two calls with equally seeded [Random] instances build the same tree, which is what
   /// lets the same tree be evaluated with and without the push-down.
-  private static BlockDocIdSet randomTree(Random random, int depth, @Nullable Map<String, String> queryOptions) {
+  private static BlockDocIdSet randomTree(Random random, int depth, boolean pushdownEnabled) {
     if (depth == 0) {
       return randomLeaf(random);
     }
     switch (random.nextInt(5)) {
       case 0: {
-        List<BlockDocIdSet> children = randomChildren(random, depth, queryOptions);
-        return new AndDocIdSet(children, queryOptions);
+        List<BlockDocIdSet> children = randomChildren(random, depth, pushdownEnabled);
+        return new AndDocIdSet(children, null, pushdownEnabled);
       }
       case 1: {
-        List<BlockDocIdSet> children = randomChildren(random, depth, queryOptions);
+        List<BlockDocIdSet> children = randomChildren(random, depth, pushdownEnabled);
         return new OrDocIdSet(children, NUM_DOCS);
       }
       case 2:
-        return new NotDocIdSet(randomTree(random, depth - 1, queryOptions), NUM_DOCS);
+        return new NotDocIdSet(randomTree(random, depth - 1, pushdownEnabled), NUM_DOCS);
       default:
         return randomLeaf(random);
     }
   }
 
-  private static List<BlockDocIdSet> randomChildren(Random random, int depth,
-      @Nullable Map<String, String> queryOptions) {
+  private static List<BlockDocIdSet> randomChildren(Random random, int depth, boolean pushdownEnabled) {
     int numChildren = 2 + random.nextInt(2);
     List<BlockDocIdSet> children = new ArrayList<>(numChildren);
     for (int i = 0; i < numChildren; i++) {
-      children.add(randomTree(random, depth - 1, queryOptions));
+      children.add(randomTree(random, depth - 1, pushdownEnabled));
     }
     return children;
   }
