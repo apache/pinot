@@ -234,7 +234,7 @@ public class ZkStarter {
   }
 
   private static final ExecutorService ZK_DISCONNECTOR =
-      Executors.newFixedThreadPool(1, new NamedThreadFactory("zk-disconnector"));
+      Executors.newFixedThreadPool(1, new NamedThreadFactory("zk-disconnector", true));
 
   /// Stops a local Zk instance, deleting its data directory
   public static void stopLocalZkServer(final ZookeeperInstance instance) {
