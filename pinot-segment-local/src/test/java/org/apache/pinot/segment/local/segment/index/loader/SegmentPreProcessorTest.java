@@ -47,6 +47,7 @@ import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3For
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
+import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -84,6 +85,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterMethod;
@@ -2162,6 +2164,64 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
       assertNotNull(starTrees);
       assertEquals(starTrees.size(), 1);
       assertEquals(starTrees.get(0).getMetadata().getDimensionsSplitOrder(), List.of("intCol"));
+    } finally {
+      segment.destroy();
+    }
+  }
+
+  /// Apache Pinot PR #19153 added star-tree support for dimensions stored as a `RAW` forward index with a separated
+  /// dictionary. Such a column still has a dictionary, so its star-tree stays readable and must NOT be treated as
+  /// stale: pre-processing has to flip the forward index to raw, keep the dictionary, and leave the star-tree alone.
+  @Test
+  public void testStarTreeDimensionConvertedToRawWithSeparatedDictionary()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", DataType.STRING)
+        .addMetric("longCol", DataType.LONG)
+        .build();
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setStarTreeIndexConfigs(
+        List.of(new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol"), null, 1000)));
+    buildStarTreeTestSegment(tableConfig, schema);
+
+    // Keep the star-tree config, but store the dimension as RAW forward index with the dictionary kept alongside
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    ObjectNode forwardConfig = JsonUtils.newObjectNode();
+    forwardConfig.put("encodingType", "RAW");
+    indexes.set("forward", forwardConfig);
+    ObjectNode dictionaryConfig = JsonUtils.newObjectNode();
+    dictionaryConfig.put("disabled", false);
+    indexes.set("dictionary", dictionaryConfig);
+    tableConfig.setFieldConfigList(List.of(
+        new FieldConfig.Builder("stringCol").withEncodingType(FieldConfig.EncodingType.RAW)
+            .withIndexes(indexes)
+            .build()));
+    indexingConfig.setEnableDynamicStarTreeCreation(false);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap)) {
+      SegmentMetadataImpl segmentMetadata = segmentDirectory.getSegmentMetadata();
+      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor("stringCol");
+      assertEquals(columnMetadata.getForwardIndexEncoding(), FieldConfig.EncodingType.RAW);
+      assertTrue(columnMetadata.hasDictionary());
+      // The star-tree is still loadable, so it must be left in place
+      assertNotNull(segmentMetadata.getStarTreeV2MetadataList());
+      assertTrue(StarTreeBuilderUtils.findUnloadableDimensions(segmentMetadata.getStarTreeV2MetadataList(),
+          segmentMetadata).isEmpty());
+    }
+
+    ImmutableSegment segment = ImmutableSegmentLoader.load(INDEX_DIR, indexLoadingConfig, false);
+    try {
+      List<StarTreeV2> starTrees = segment.getStarTrees();
+      assertNotNull(starTrees);
+      assertEquals(starTrees.size(), 1);
+      assertEquals(starTrees.get(0).getMetadata().getDimensionsSplitOrder(), List.of("stringCol"));
+      assertNotNull(segment.getDataSource("stringCol").getDictionary());
     } finally {
       segment.destroy();
     }

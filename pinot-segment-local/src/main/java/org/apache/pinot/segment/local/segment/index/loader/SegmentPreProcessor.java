@@ -371,9 +371,9 @@ public class SegmentPreProcessor implements AutoCloseable {
       // segment load. Drop it even here: removing star-trees only deletes files, so unlike rebuilding them it is
       // cheap enough to do with dynamic star-tree creation disabled. When it is enabled the star-trees are rebuilt by
       // the regular flow below, because their split order no longer matches the builder configs.
-      Set<String> unloadableDimensions =
-          starTreeMetadataList != null ? StarTreeBuilderUtils.findUnloadableDimensions(starTreeMetadataList,
-              segmentMetadata) : Set.of();
+      Set<String> unloadableDimensions = starTreeMetadataList != null
+          ? StarTreeBuilderUtils.findUnloadableDimensions(starTreeMetadataList, segmentMetadata)
+          : Set.of();
       if (unloadableDimensions.isEmpty()) {
         return false;
       }
