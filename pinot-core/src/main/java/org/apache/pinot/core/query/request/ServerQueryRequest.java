@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -205,8 +206,30 @@ public class ServerQueryRequest {
     return _queryContext.getTableName();
   }
 
+  /// The segments assigned to this worker, or null when the request carries them per referenced table in
+  /// [#getTableSegmentsContexts()] instead, as it does for a logical table. Callers must check that one first, the
+  /// way `ServerQueryExecutorV1Impl` does, or use [#hasSegmentsToQuery()] when all they need is whether this
+  /// request has any segment at all.
+  @Nullable
   public List<String> getSegmentsToQuery() {
     return _segmentsToQuery;
+  }
+
+  /// Whether this request has at least one segment to read, whichever of the two representations carries them.
+  ///
+  /// A request holds its segments either flat in [#getSegmentsToQuery()], for a plain table, or grouped per
+  /// referenced table in [#getTableSegmentsContexts()], for a logical table; the other one is null. Resolving that
+  /// here keeps callers that only need the question answered from having to know which representation applies.
+  public boolean hasSegmentsToQuery() {
+    if (_tableSegmentsContexts != null) {
+      for (TableSegmentsContext tableSegmentsContext : _tableSegmentsContexts) {
+        if (CollectionUtils.isNotEmpty(tableSegmentsContext.getSegments())) {
+          return true;
+        }
+      }
+      return false;
+    }
+    return CollectionUtils.isNotEmpty(_segmentsToQuery);
   }
 
   public List<String> getOptionalSegments() {

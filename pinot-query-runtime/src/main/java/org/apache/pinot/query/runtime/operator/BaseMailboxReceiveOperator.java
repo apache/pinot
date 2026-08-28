@@ -120,9 +120,16 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     return _multiConsumer.calculateStats();
   }
 
+  /// Returns a copy of this operator's stats, extended with [StatKey#NON_ACTIVE_WORKERS] for this single worker.
   @Override
   public StatMap<StatKey> copyStatMaps() {
-    return new StatMap<>(_statMap);
+    StatMap<StatKey> statMap = new StatMap<>(_statMap);
+    // This operator hands downstream what it reads from its mailboxes, so having emitted no row means having
+    // received none.
+    if (statMap.getLong(StatKey.EMITTED_ROWS) == 0) {
+      statMap.merge(StatKey.NON_ACTIVE_WORKERS, 1);
+    }
+    return statMap;
   }
 
   protected void onEos() {
@@ -203,6 +210,10 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     }
   }
 
+  /// The stats reported by this operator.
+  ///
+  /// New keys must be appended at the end of this enum: [StatMap] identifies keys by their ordinal on the wire, so
+  /// inserting, reordering or removing a constant breaks the compatibility with other versions.
   public enum StatKey implements StatMap.Key {
     EXECUTION_TIME_MS(StatMap.Type.LONG) {
       @Override
@@ -246,7 +257,19 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
     /// Time spent on GC while this operator or its children in the same stage were running.
-    GC_TIME_MS(StatMap.Type.LONG);
+    GC_TIME_MS(StatMap.Type.LONG),
+    /// How many workers of this stage emitted no row out of this mailbox receive.
+    ///
+    /// Reported as the count of idle workers rather than active ones so that it is absent when every worker
+    /// received something, which is the common case. This is what tells apart a worker that was handed no data at
+    /// all from one that was handed data and filtered it away downstream: compare it against the `parallelism` the
+    /// stats tree renders on this node, and against what the operators above and below report.
+    ///
+    /// This operator hands downstream what it reads, so emitting no row means having received none. The converse
+    /// can fail in two corner cases, where rows are read but never emitted: after the downstream operator has
+    /// early terminated, and when a sorted receive buffers its rows and then ends in error. Such a worker is
+    /// reported as idle despite having been given data.
+    NON_ACTIVE_WORKERS(StatMap.Type.INT);
 
     private final StatMap.Type _type;
 

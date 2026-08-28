@@ -18,8 +18,14 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -42,6 +48,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.mockito.MockitoAnnotations.openMocks;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -211,17 +218,152 @@ public class MailboxSendOperatorTest {
         "total " + total + " exceeds the " + wallTimeMs + "ms the call actually took, so it was counted twice");
   }
 
+  @Test
+  public void shouldReportPerWorkerStats()
+      throws Exception {
+    // Given: a worker that sends two single-row blocks
+    when(_input.nextBlock()).thenReturn(getDummyDataBlock(), getDummyDataBlock(), SuccessMseBlock.INSTANCE);
+
+    // When:
+    MailboxSendOperator operator = getOperator();
+    drain(operator);
+
+    // Then: the per-worker view is this single worker, so the max is its own emitted rows and it is not idle
+    StatMap<MailboxSendOperator.StatKey> statMap = operator.copyStatMaps();
+    assertEquals(statMap.getLong(MailboxSendOperator.StatKey.EMITTED_ROWS), 2L, "expected 2 emitted rows");
+    assertEquals(statMap.getLong(MailboxSendOperator.StatKey.MAX_EMITTED_ROWS), 2L, "expected max to be 2");
+    assertEquals(statMap.getInt(MailboxSendOperator.StatKey.NON_ACTIVE_WORKERS), 0, "expected no idle worker");
+  }
+
+  /// A send operator is idle exactly when it sent no row, so a worker that sent nothing is counted however much
+  /// work the stage was given.
+  @Test
+  public void shouldReportIdleWorkerWhenNoRowIsSent()
+      throws Exception {
+    // Given: a worker that sends no data block at all
+    when(_input.nextBlock()).thenReturn(SuccessMseBlock.INSTANCE);
+
+    // When:
+    MailboxSendOperator operator = getOperator();
+    drain(operator);
+
+    // Then:
+    StatMap<MailboxSendOperator.StatKey> statMap = operator.copyStatMaps();
+    assertEquals(statMap.getInt(MailboxSendOperator.StatKey.NON_ACTIVE_WORKERS), 1, "expected one idle worker");
+    assertEquals(statMap.getLong(MailboxSendOperator.StatKey.MAX_EMITTED_ROWS), 0L, "expected no max");
+  }
+
+  /// [MultiStageOperator#calculateStats()] runs more than once per opchain, so the derived stats must not
+  /// accumulate on the operator's own stat map.
+  @Test
+  public void shouldNotDoubleCountIdleWorkersOnRepeatedStatCollection()
+      throws Exception {
+    // Given: a worker that sends nothing, so it is the one counted as idle
+    when(_input.nextBlock()).thenReturn(SuccessMseBlock.INSTANCE);
+
+    // When: stats are collected several times, as the runtime does
+    MailboxSendOperator operator = getOperator();
+    drain(operator);
+    operator.copyStatMaps();
+    operator.copyStatMaps();
+    StatMap<MailboxSendOperator.StatKey> statMap = operator.copyStatMaps();
+
+    // Then: the worker is still counted exactly once
+    assertEquals(statMap.getInt(MailboxSendOperator.StatKey.NON_ACTIVE_WORKERS), 1, "expected counted once");
+  }
+
+  /// Every stat is merged across the workers of the stage before being reported, which is where these stats stop
+  /// describing one worker and start describing the distribution.
+  @Test
+  public void shouldMergePerWorkerStatsAcrossWorkers() {
+    // Given: three workers of the same stage, one of which sent nothing
+    StatMap<MailboxSendOperator.StatKey> stage = workerStats(5);
+    stage.merge(workerStats(100));
+    stage.merge(workerStats(0));
+
+    // Then:
+    assertEquals(stage.getLong(MailboxSendOperator.StatKey.EMITTED_ROWS), 105L, "expected rows to be summed");
+    assertEquals(stage.getInt(MailboxSendOperator.StatKey.NON_ACTIVE_WORKERS), 1, "expected 1 of 3 workers idle");
+    assertEquals(stage.getLong(MailboxSendOperator.StatKey.MAX_EMITTED_ROWS), 100L, "expected max across workers");
+  }
+
+  /// The stage's clock time is derived by dividing the summed execution time by the parallelism, which assumes the
+  /// work was spread evenly. This is the same measure on the worker that took longest, so it must survive the
+  /// merge as a maximum rather than a sum.
+  @Test
+  public void shouldReportTheSlowestWorkersClockTime() {
+    StatMap<MailboxSendOperator.StatKey> slow = new StatMap<>(MailboxSendOperator.StatKey.class);
+    slow.merge(MailboxSendOperator.StatKey.MAX_CLOCK_TIME_MS, 500L);
+    StatMap<MailboxSendOperator.StatKey> fast = new StatMap<>(MailboxSendOperator.StatKey.class);
+    fast.merge(MailboxSendOperator.StatKey.MAX_CLOCK_TIME_MS, 10L);
+
+    slow.merge(fast);
+
+    assertEquals(slow.getLong(MailboxSendOperator.StatKey.MAX_CLOCK_TIME_MS), 500L,
+        "expected the slowest worker to win the merge, not the sum of the two");
+  }
+
+  @Test
+  public void shouldPreservePerWorkerStatsAcrossSerialization()
+      throws Exception {
+    // Given: two workers whose stats are merged through the serialized form, as they are across servers
+    StatMap<MailboxSendOperator.StatKey> stage = workerStats(0);
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    workerStats(100).serialize(new DataOutputStream(bytes));
+
+    // When:
+    stage.merge(new DataInputStream(new ByteArrayInputStream(bytes.toByteArray())));
+
+    // Then:
+    assertEquals(stage.getInt(MailboxSendOperator.StatKey.NON_ACTIVE_WORKERS), 1, "expected one idle worker");
+    assertEquals(stage.getLong(MailboxSendOperator.StatKey.MAX_EMITTED_ROWS), 100L, "expected max across workers");
+  }
+
+  /// Builds the stats a single worker sending `emittedRows` rows would report.
+  ///
+  /// Each worker gets its own input mock so that draining one does not exhaust the stubbing of the next.
+  private StatMap<MailboxSendOperator.StatKey> workerStats(int emittedRows) {
+    MultiStageOperator input = mock(MultiStageOperator.class);
+    when(input.calculateStats()).thenReturn(MultiStageQueryStats.emptyStats(SENDER_STAGE_ID));
+    if (emittedRows == 0) {
+      when(input.nextBlock()).thenReturn(SuccessMseBlock.INSTANCE);
+    } else {
+      when(input.nextBlock()).thenReturn(getDummyDataBlock(emittedRows), SuccessMseBlock.INSTANCE);
+    }
+    MailboxSendOperator operator = getOperator(input);
+    drain(operator);
+    return operator.copyStatMaps();
+  }
+
+  private static void drain(MailboxSendOperator operator) {
+    MseBlock block = operator.nextBlock();
+    while (block.isData()) {
+      block = operator.nextBlock();
+    }
+  }
+
   private MailboxSendOperator getOperator() {
+    return getOperator(_input);
+  }
+
+  private MailboxSendOperator getOperator(MultiStageOperator input) {
     WorkerMetadata workerMetadata = new WorkerMetadata(0, Map.of(), Map.of());
     StageMetadata stageMetadata = new StageMetadata(SENDER_STAGE_ID, List.of(workerMetadata), Map.of());
     OpChainExecutionContext context =
         OpChainExecutionContext.fromQueryContext(_mailboxService, Map.of(), stageMetadata, workerMetadata, null, true,
             true, QueryExecutionContext.forMseTest());
-    return new MailboxSendOperator(context, _input, statMap -> _exchange);
+    return new MailboxSendOperator(context, input, statMap -> _exchange);
   }
 
   private static MseBlock.Data getDummyDataBlock() {
+    return getDummyDataBlock(1);
+  }
+
+  /// Returns a single data block holding `numRows` rows, which must be at least one.
+  private static MseBlock.Data getDummyDataBlock(int numRows) {
+    Object[][] rows = new Object[numRows][];
+    Arrays.setAll(rows, i -> new Object[]{i});
     return OperatorTestUtil.block(new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{ColumnDataType.INT}),
-        new Object[]{1});
+        rows);
   }
 }
