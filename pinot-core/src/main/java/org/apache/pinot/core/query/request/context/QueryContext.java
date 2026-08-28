@@ -102,6 +102,9 @@ public class QueryContext {
   private boolean _skipStarTree;
   // Whether to skip reordering scan filters for the query
   private boolean _skipScanFilterReorder;
+  // Whether an AND may push the document ids it has matched into its composite (AND/OR/NOT) children.
+  // Resolved from the query option and the server default by InstancePlanMakerImplV2#applyQueryOptions.
+  private boolean _andRestrictionPushdownEnabled;
   // Maximum number of threads used to execute the query
   private int _maxExecutionThreads = Server.DEFAULT_QUERY_EXECUTOR_MAX_EXECUTION_THREADS;
   // The following properties apply to group-by queries
@@ -394,6 +397,17 @@ public class QueryContext {
 
   public void setSkipScanFilterReorder(boolean skipScanFilterReorder) {
     _skipScanFilterReorder = skipScanFilterReorder;
+  }
+
+  /// Whether an AND may hand the document ids matched by its index-based children to its composite (AND/OR/NOT)
+  /// children, so that a scan-based predicate nested inside an OR is only evaluated on the documents that can still
+  /// match. See [org.apache.pinot.spi.utils.CommonConstants.Server.AndRestrictionPushdownMode].
+  public boolean isAndRestrictionPushdownEnabled() {
+    return _andRestrictionPushdownEnabled;
+  }
+
+  public void setAndRestrictionPushdownEnabled(boolean andRestrictionPushdownEnabled) {
+    _andRestrictionPushdownEnabled = andRestrictionPushdownEnabled;
   }
 
   public int getMaxExecutionThreads() {

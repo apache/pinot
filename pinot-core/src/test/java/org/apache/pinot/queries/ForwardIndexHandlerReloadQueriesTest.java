@@ -257,7 +257,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
     assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 1384L);
     // After reload column7 gets a dictionary + inverted index; the NOT IN filter resolves to 0 forward-index scans.
-    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 250896L);
+    assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 247424L);
     assertNotNull(brokerResponseNative.getExceptions());
 
     dataSchema = new DataSchema(new String[]{

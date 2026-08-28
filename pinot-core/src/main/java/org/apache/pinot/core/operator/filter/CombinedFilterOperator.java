@@ -35,9 +35,15 @@ public class CombinedFilterOperator extends BaseFilterOperator {
   private final BaseFilterOperator _mainFilterOperator;
   private final BaseFilterOperator _subFilterOperator;
   private final Map<String, String> _queryOptions;
+  private final boolean _restrictionPushdownEnabled;
 
   public CombinedFilterOperator(BaseFilterOperator mainFilterOperator, BaseFilterOperator subFilterOperator,
       Map<String, String> queryOptions) {
+    this(mainFilterOperator, subFilterOperator, queryOptions, false);
+  }
+
+  public CombinedFilterOperator(BaseFilterOperator mainFilterOperator, BaseFilterOperator subFilterOperator,
+      Map<String, String> queryOptions, boolean restrictionPushdownEnabled) {
     // This filter operator does not support AND/OR/NOT operations.
     super(0, false);
     assert !mainFilterOperator.isResultEmpty() && !mainFilterOperator.isResultMatchingAll()
@@ -45,6 +51,7 @@ public class CombinedFilterOperator extends BaseFilterOperator {
     _mainFilterOperator = mainFilterOperator;
     _subFilterOperator = subFilterOperator;
     _queryOptions = queryOptions;
+    _restrictionPushdownEnabled = restrictionPushdownEnabled;
   }
 
   @Override
@@ -66,6 +73,7 @@ public class CombinedFilterOperator extends BaseFilterOperator {
       return EmptyDocIdSet.getInstance();
     }
     BlockDocIdSet subFilterDocIdSet = _subFilterOperator.nextBlock().getBlockDocIdSet();
-    return new AndDocIdSet(Arrays.asList(optimizedMainFilterDocIdSet, subFilterDocIdSet), _queryOptions);
+    return new AndDocIdSet(Arrays.asList(optimizedMainFilterDocIdSet, subFilterDocIdSet), _queryOptions,
+        _restrictionPushdownEnabled);
   }
 }

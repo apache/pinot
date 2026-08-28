@@ -66,7 +66,7 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
   private BlockDocIdSet excludeNulls(BlockDocIdSet blockDocIdSet, ImmutableRoaringBitmap nullBitmap) {
     return new AndDocIdSet(Arrays.asList(blockDocIdSet,
         new BitmapDocIdSet(ImmutableRoaringBitmap.flip(nullBitmap, 0, (long) _numDocs), _numDocs)),
-        _queryContext.getQueryOptions());
+        _queryContext.getQueryOptions(), _queryContext.isAndRestrictionPushdownEnabled());
   }
 
   @Nullable

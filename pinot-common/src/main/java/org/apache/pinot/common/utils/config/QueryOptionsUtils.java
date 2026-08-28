@@ -35,6 +35,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
+import org.apache.pinot.spi.utils.CommonConstants.Server.AndRestrictionPushdownMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -300,11 +301,12 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.AND_SCAN_REORDERING));
   }
 
-  /// Whether an AND may push the document ids matched by its index-based children into its composite (AND/OR/NOT)
-  /// children. Enabled unless the query explicitly disables it.
-  public static boolean isAndRestrictionPushdownEnabled(Map<String, String> queryOptions) {
-    String value = queryOptions.get(QueryOptionKey.AND_RESTRICTION_PUSHDOWN);
-    return value != null ? Boolean.parseBoolean(value) : QueryOptionKey.DEFAULT_AND_RESTRICTION_PUSHDOWN;
+  /// Per-query override of [AndRestrictionPushdownMode], or `null` when the query does not set one, in which case
+  /// the server default applies.
+  @Nullable
+  public static AndRestrictionPushdownMode getAndRestrictionPushdownMode(Map<String, String> queryOptions) {
+    String mode = queryOptions.get(QueryOptionKey.AND_RESTRICTION_PUSHDOWN);
+    return mode != null ? AndRestrictionPushdownMode.valueOf(mode.toUpperCase()) : null;
   }
 
   public static boolean isSkipUpsert(Map<String, String> queryOptions) {

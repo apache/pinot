@@ -55,6 +55,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.CommonConstants.Server.AndRestrictionPushdownMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,6 +114,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   private int _minSegmentGroupTrimSize = Server.DEFAULT_QUERY_EXECUTOR_MIN_SEGMENT_GROUP_TRIM_SIZE;
   private int _minServerGroupTrimSize = Server.DEFAULT_QUERY_EXECUTOR_MIN_SERVER_GROUP_TRIM_SIZE;
   private int _groupByTrimThreshold = Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD;
+  private AndRestrictionPushdownMode _andRestrictionPushdownMode =
+      Server.DEFAULT_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN;
 
   @Override
   public void init(PinotConfiguration queryExecutorConfig) {
@@ -141,6 +144,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         Server.DEFAULT_QUERY_EXECUTOR_MIN_SERVER_GROUP_TRIM_SIZE);
     _groupByTrimThreshold = queryExecutorConfig.getProperty(Server.GROUPBY_TRIM_THRESHOLD,
         Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD);
+    _andRestrictionPushdownMode = AndRestrictionPushdownMode.valueOf(
+        queryExecutorConfig.getProperty(Server.AND_RESTRICTION_PUSHDOWN,
+            Server.DEFAULT_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN.name()).toUpperCase());
     Preconditions.checkState(_groupByTrimThreshold > 0,
         "Invalid configurable: groupByTrimThreshold: %d must be positive", _groupByTrimThreshold);
     LOGGER.info("Initialized plan maker with maxExecutionThreads: {}, defaultExecutionThreads: {}, "
@@ -230,6 +236,24 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         new InstanceResponsePlanNode(combinePlanNode, segmentContexts, fetchContexts, queryContext));
   }
 
+  /// Resolves [AndRestrictionPushdownMode] for a query.
+  ///
+  /// Under AUTO the push-down is skipped for a selection query without ORDER BY. Such a query stops as soon as it has
+  /// LIMIT rows, while the push-down materializes the whole filter result, so applying it there would make the query
+  /// do the full filter work instead of only enough to fill the result.
+  private static boolean isAndRestrictionPushdownEnabled(AndRestrictionPushdownMode mode, QueryContext queryContext) {
+    switch (mode) {
+      case ALWAYS:
+        return true;
+      case NEVER:
+        return false;
+      case AUTO:
+        return !QueryContextUtils.isSelectionOnlyQuery(queryContext);
+      default:
+        throw new IllegalStateException("Unsupported AND restriction push-down mode: " + mode);
+    }
+  }
+
   @VisibleForTesting
   void applyQueryOptions(QueryContext queryContext) {
     Map<String, String> queryOptions = queryContext.getQueryOptions();
@@ -246,6 +270,12 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
     // Set skipScanFilterReorder
     queryContext.setSkipScanFilterReorder(QueryOptionsUtils.isSkipScanFilterReorder(queryOptions));
+
+    // Set andRestrictionPushdown, letting the query option override the server default
+    AndRestrictionPushdownMode andRestrictionPushdownMode =
+        QueryOptionsUtils.getAndRestrictionPushdownMode(queryOptions);
+    queryContext.setAndRestrictionPushdownEnabled(isAndRestrictionPushdownEnabled(
+        andRestrictionPushdownMode != null ? andRestrictionPushdownMode : _andRestrictionPushdownMode, queryContext));
 
     queryContext.setSkipIndexes(QueryOptionsUtils.getSkipIndexes(queryOptions));
 
