@@ -41,10 +41,14 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /// This class implements group by aggregation.
-/// It is optimized for performance, and uses the best possible algorithm/data-structure
-/// for a given query based on the following parameters:
+/// It is optimized for performance, and uses the best possible algorithm/data-structure for a given query based on the
+/// following parameters:
+/// - Whether all group-by columns are dictionary encoded.
 /// - Maximum number of group keys possible.
 /// - Single/Multi valued columns.
+///
+/// Null handling does not affect the choice: every group key generator gives a null a group of its own when it is
+/// enabled.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class DefaultGroupByExecutor implements GroupByExecutor {
   // Thread local (reusable) array for single-valued group keys
@@ -69,11 +73,6 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   }
 
   public DefaultGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
-      ExpressionContext[] groupByExpressions, BaseProjectOperator<?> projectOperator) {
-    this(queryContext, aggregationFunctions, groupByExpressions, projectOperator, null);
-  }
-
-  public DefaultGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
       ExpressionContext[] groupByExpressions, BaseProjectOperator<?> projectOperator,
       @Nullable GroupKeyGenerator groupKeyGenerator) {
     _aggregationFunctions = aggregationFunctions;
@@ -90,8 +89,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       // isDictionaryEncoded() flag rather than gating on dictionary nullness alone.
       hasNoDictionaryGroupByExpression |= !columnContext.isDictionaryEncoded();
     }
-    /// Grouping-set queries expand each row into one group per grouping set, so they always use the
-    /// multi-value (int[][]) executor path even though the union group-by columns are single-valued.
+    // Grouping-set queries expand each row into one group per grouping set, so they always use the
+    // multi-value (int[][]) executor path even though the union group-by columns are single-valued.
     boolean groupingSets = queryContext.isGroupingSets();
     _hasMVGroupByExpression = hasMVGroupByExpression || groupingSets;
 
@@ -105,12 +104,14 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     if (groupKeyGenerator != null) {
       _groupKeyGenerator = groupKeyGenerator;
     } else if (groupingSets) {
-      _groupKeyGenerator = new GroupingSetsGroupKeyGenerator(projectOperator, groupByExpressions,
-          queryContext.getGroupingSets(), numGroupsLimit, _nullHandlingEnabled);
+      _groupKeyGenerator =
+          new GroupingSetsGroupKeyGenerator(projectOperator, groupByExpressions, queryContext.getGroupingSets(),
+              numGroupsLimit, _nullHandlingEnabled);
     } else {
-      if (hasNoDictionaryGroupByExpression || _nullHandlingEnabled) {
+      // Null handling does not steer this choice: every generator below gives a null an id of its own, so the
+      // encoding of the group-by columns decides on its own which one to use.
+      if (hasNoDictionaryGroupByExpression) {
         if (groupByExpressions.length == 1) {
-          // TODO(nhejazi): support MV and dictionary based when null handling is enabled.
           _groupKeyGenerator =
               new NoDictionarySingleColumnGroupKeyGenerator(projectOperator, groupByExpressions[0], numGroupsLimit,
                   _nullHandlingEnabled, groupByExpressionSizesFromPredicates);
@@ -121,7 +122,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
         }
       } else {
         _groupKeyGenerator = new DictionaryBasedGroupKeyGenerator(projectOperator, groupByExpressions, numGroupsLimit,
-            maxInitialResultHolderCapacity, groupByExpressionSizesFromPredicates);
+            maxInitialResultHolderCapacity, _nullHandlingEnabled, groupByExpressionSizesFromPredicates);
       }
     }
 
