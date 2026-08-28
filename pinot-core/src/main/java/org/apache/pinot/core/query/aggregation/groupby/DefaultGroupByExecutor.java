@@ -98,16 +98,15 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     // Initialize group key generator
     int numGroupsLimit = queryContext.getNumGroupsLimit();
     int maxInitialResultHolderCapacity = queryContext.getMaxInitialResultHolderCapacity();
-    Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates = null;
-    if (queryContext.isOptimizeMaxInitialResultHolderCapacity()) {
-      groupByExpressionSizesFromPredicates = getGroupByExpressionSizesFromPredicates(queryContext);
-    }
     if (groupKeyGenerator != null) {
       _groupKeyGenerator = groupKeyGenerator;
     } else if (groupingSets) {
       _groupKeyGenerator = new GroupingSetsGroupKeyGenerator(projectOperator, groupByExpressions,
           queryContext.getGroupingSets(), numGroupsLimit, _nullHandlingEnabled);
     } else {
+      Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates =
+          queryContext.isOptimizeMaxInitialResultHolderCapacity()
+              ? getGroupByExpressionSizesFromPredicates(queryContext, projectOperator) : null;
       if (hasNoDictionaryGroupByExpression || _nullHandlingEnabled) {
         if (groupByExpressions.length == 1) {
           // TODO(nhejazi): support MV and dictionary based when null handling is enabled.
@@ -148,7 +147,11 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   /// 1. If the filter context is null or lacks GroupBy expressions, return null.
   /// 2. Ensure the top-level filter context consists solely of AND-type filters; other types for example OR we cannot
   ///    guarantee deterministic sizes for GroupBy expressions.
-  private Map<ExpressionContext, Integer> getGroupByExpressionSizesFromPredicates(QueryContext queryContext) {
+  /// 3. Skip multi-value GroupBy expressions: a row matching an IN/EQ predicate on a multi-value column contributes
+  ///    one group per value inside the row (not only the matching values), so the predicate size does not bound the
+  ///    number of distinct groups.
+  private Map<ExpressionContext, Integer> getGroupByExpressionSizesFromPredicates(QueryContext queryContext,
+      BaseProjectOperator<?> projectOperator) {
     FilterContext filterContext = queryContext.getFilter();
     if (filterContext == null || queryContext.getGroupByExpressions() == null) {
       return null;
@@ -184,6 +187,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     // Populate the group-by expressions with sizes from the predicate map
     return queryContext.getGroupByExpressions().stream()
         .filter(predicateSizeMap::containsKey)
+        .filter(expression -> projectOperator.getResultColumnContext(expression).isSingleValue())
         .collect(Collectors.toMap(
             expression -> expression,
             expression -> predicateSizeMap.getOrDefault(expression, null)
