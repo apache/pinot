@@ -27,21 +27,18 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.datasource.BaseDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
-import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
-import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -159,14 +156,14 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
     return _sparseDataSource != null ? _sparseDataSource.getJsonIndex() : null;
   }
 
-  @SuppressWarnings({"rawtypes", "unchecked"})
-  @Override
+  @SuppressWarnings("unchecked")
   @Nullable
+  @Override
   public Map<String, Object> getMapValue(int docId) {
     Map<String, Object> result = null;
 
     for (Map.Entry<String, DataSource> entry : _perKeyDataSources.entrySet()) {
-      Object value = readValue(entry.getValue(), docId);
+      Object value = readValue(entry.getKey(), entry.getValue(), docId);
       if (value != null) {
         if (result == null) {
           result = new HashMap<>();
@@ -176,7 +173,7 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
     }
 
     if (_sparseDataSource != null) {
-      Object sparseValue = readValue(_sparseDataSource, docId);
+      Object sparseValue = readValue(_fieldSpec.getName(), _sparseDataSource, docId);
       if (sparseValue instanceof String) {
         String json = (String) sparseValue;
         if (!json.isEmpty()) {
@@ -196,42 +193,20 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
     return result;
   }
 
-  @SuppressWarnings({"rawtypes", "unchecked"})
+  /// Reads the value of `key` at `docId`, or `null` when the doc is null or the column has no
+  /// forward index. Delegates the null-vector check and the dictionary/raw per-type read dispatch to
+  /// [PinotSegmentColumnReader] rather than re-deriving them here, so this path cannot drift from the
+  /// reader every other column read in the engine already goes through. OPEN_STRUCT child columns are
+  /// always single-valued, hence the 0 maxNumValuesPerMVEntry.
   @Nullable
-  private static Object readValue(DataSource dataSource, int docId) {
-    NullValueVectorReader nullReader = dataSource.getNullValueVector();
-    if (nullReader != null && nullReader.isNull(docId)) {
-      return null;
-    }
-    ForwardIndexReader fwdReader = dataSource.getForwardIndex();
+  private static Object readValue(String key, DataSource dataSource, int docId) {
+    ForwardIndexReader<?> fwdReader = dataSource.getForwardIndex();
     if (fwdReader == null) {
       return null;
     }
-    try (ForwardIndexReaderContext ctx = fwdReader.createContext()) {
-      Dictionary dictionary = dataSource.getDictionary();
-      if (dictionary != null) {
-        int dictId = fwdReader.getDictId(docId, ctx);
-        return dictionary.get(dictId);
-      }
-      DataType storedType = fwdReader.getStoredType();
-      switch (storedType) {
-        case INT:
-          return fwdReader.getInt(docId, ctx);
-        case LONG:
-          return fwdReader.getLong(docId, ctx);
-        case FLOAT:
-          return fwdReader.getFloat(docId, ctx);
-        case DOUBLE:
-          return fwdReader.getDouble(docId, ctx);
-        case BIG_DECIMAL:
-          return fwdReader.getBigDecimal(docId, ctx);
-        case STRING:
-          return fwdReader.getString(docId, ctx);
-        case BYTES:
-          return fwdReader.getBytes(docId, ctx);
-        default:
-          throw new IllegalStateException("Unsupported stored type for OPEN_STRUCT key: " + storedType);
-      }
+    try (PinotSegmentColumnReader reader = new PinotSegmentColumnReader(key, fwdReader, dataSource.getDictionary(),
+        dataSource.getNullValueVector(), 0)) {
+      return reader.isNull(docId) ? null : reader.getValue(docId);
     } catch (Exception e) {
       throw new RuntimeException("Failed to read value from OPEN_STRUCT key forward index", e);
     }

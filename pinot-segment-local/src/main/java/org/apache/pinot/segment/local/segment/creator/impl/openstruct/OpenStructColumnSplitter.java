@@ -579,6 +579,13 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       }
     }
 
+    // Absent docs store "" in the raw forward index (see loop below) and are flagged in the null vector, so feed
+    // the same placeholder through the stats collector and record it as the default null value. Collected inside
+    // the write loop rather than in a pass of its own: it needs the exact same per-doc branch.
+    DimensionFieldSpec sparseFieldSpec = new DimensionFieldSpec(sparseCol, DataType.STRING, true);
+    String defaultValue = "";
+    AbstractColumnStatisticsCollector statsCollector = StatsCollectorUtil.createStatsCollector(sparseFieldSpec, null);
+
     SingleValueVarByteRawIndexCreator fwdCreator = new SingleValueVarByteRawIndexCreator(
         _indexDir, ChunkCompressionType.LZ4, sparseCol, _numDocs, DataType.STRING, maxLen);
     NullValueVectorCreator nullCreator = new NullValueVectorCreator(_indexDir, sparseCol);
@@ -588,11 +595,13 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     try {
       for (int docId = 0; docId < _numDocs; docId++) {
         if (jsonPerDoc[docId] != null) {
+          statsCollector.collect(jsonPerDoc[docId]);
           fwdCreator.putString(jsonPerDoc[docId]);
           if (jsonCreator != null) {
             jsonCreator.add(jsonPerDoc[docId]);
           }
         } else {
+          statsCollector.collect(defaultValue);
           fwdCreator.putString("");
           nullCreator.setNull(docId);
           if (jsonCreator != null) {
@@ -613,14 +622,6 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       }
     }
 
-    // Absent docs store "" in the raw forward index (see loop above) and are flagged in the null vector, so feed
-    // the same placeholder through the stats collector and record it as the default null value.
-    DimensionFieldSpec sparseFieldSpec = new DimensionFieldSpec(sparseCol, DataType.STRING, true);
-    String defaultValue = "";
-    AbstractColumnStatisticsCollector statsCollector = StatsCollectorUtil.createStatsCollector(sparseFieldSpec, null);
-    for (int docId = 0; docId < _numDocs; docId++) {
-      statsCollector.collect(jsonPerDoc[docId] != null ? jsonPerDoc[docId] : defaultValue);
-    }
     statsCollector.seal();
 
     PropertiesConfiguration props = new PropertiesConfiguration();

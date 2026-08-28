@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.eq;
@@ -225,6 +227,9 @@ public class ImmutableOpenStructDataSourceTest {
     return ds;
   }
 
+  /// Dense child columns are written dictionary-encoded (`OpenStructColumnSplitter#writeColumnIndexes` builds the
+  /// dictionary and the forward index from the same `useDictionary` flag), so the mock must report
+  /// `isDictionaryEncoded()` — not merely expose a dictionary — to match a real segment.
   @SuppressWarnings({"rawtypes", "unchecked"})
   private static DataSource mockDenseDataSource(DataType storedType, Object valueAtDoc0, boolean nullAtDoc1) {
     DataSource ds = mock(DataSource.class);
@@ -232,8 +237,11 @@ public class ImmutableOpenStructDataSourceTest {
     ForwardIndexReaderContext ctx = mock(ForwardIndexReaderContext.class);
     when(fwdReader.createContext()).thenReturn(ctx);
     when(fwdReader.getStoredType()).thenReturn(storedType);
+    when(fwdReader.isSingleValue()).thenReturn(true);
+    when(fwdReader.isDictionaryEncoded()).thenReturn(true);
 
     Dictionary dictionary = mock(Dictionary.class);
+    when(dictionary.getValueType()).thenReturn(storedType);
     when(fwdReader.getDictId(eq(0), eq(ctx))).thenReturn(42);
     when(dictionary.get(42)).thenReturn(valueAtDoc0);
     when(ds.getDictionary()).thenReturn(dictionary);
@@ -255,6 +263,8 @@ public class ImmutableOpenStructDataSourceTest {
     ForwardIndexReaderContext ctx = mock(ForwardIndexReaderContext.class);
     when(fwdReader.createContext()).thenReturn(ctx);
     when(fwdReader.getStoredType()).thenReturn(DataType.STRING);
+    when(fwdReader.isSingleValue()).thenReturn(true);
+    when(fwdReader.isDictionaryEncoded()).thenReturn(false);
     when(fwdReader.getString(eq(0), eq(ctx))).thenReturn(jsonAtDoc0);
     when(fwdReader.getString(eq(1), eq(ctx))).thenReturn("");
     when(ds.getForwardIndex()).thenReturn(fwdReader);
@@ -363,6 +373,87 @@ public class ImmutableOpenStructDataSourceTest {
     assertNotNull(doc0);
     assertEquals(doc0.get("clicks"), 10);
     assertEquals(doc0.get("name"), "hello");
+  }
+
+  /// Raw (no-dictionary) dense child columns are a real, config-selectable encoding
+  /// (`OpenStructColumnSplitter#writeColumnIndexes` with `useDictionary == false`), and they take a different
+  /// read path than the dictionary-encoded case: the per-type dispatch inside the forward-index read rather
+  /// than a dictId lookup. Cover every stored type OPEN_STRUCT can materialize.
+  @DataProvider(name = "rawStoredTypes")
+  public static Object[][] rawStoredTypes() {
+    return new Object[][]{
+        {DataType.INT, 7},
+        {DataType.LONG, 7L},
+        {DataType.FLOAT, 1.5f},
+        {DataType.DOUBLE, 2.5d},
+        {DataType.BIG_DECIMAL, new BigDecimal("3.25")},
+        {DataType.STRING, "raw"},
+        {DataType.BYTES, new byte[]{1, 2, 3}}
+    };
+  }
+
+  @Test(dataProvider = "rawStoredTypes")
+  public void testGetMapValueRawDenseColumnPerStoredType(DataType storedType, Object expected) {
+    DataSource rawDs = mockRawDenseDataSource(storedType, expected);
+
+    ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(
+        openStructSpec("event"), Map.of("k", rawDs), null, 2, null);
+
+    Map<String, Object> doc0 = ds.getMapValue(0);
+    assertNotNull(doc0);
+    if (storedType == DataType.BYTES) {
+      assertEquals((byte[]) doc0.get("k"), (byte[]) expected);
+    } else {
+      assertEquals(doc0.get("k"), expected);
+    }
+  }
+
+  /// No dictionary and a raw forward index — the combination `mockDenseDataSource` never produces.
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private static DataSource mockRawDenseDataSource(DataType storedType, Object valueAtDoc0) {
+    DataSource ds = mock(DataSource.class);
+    ForwardIndexReader fwdReader = mock(ForwardIndexReader.class);
+    ForwardIndexReaderContext ctx = mock(ForwardIndexReaderContext.class);
+    when(fwdReader.createContext()).thenReturn(ctx);
+    when(fwdReader.getStoredType()).thenReturn(storedType);
+    when(fwdReader.isSingleValue()).thenReturn(true);
+    when(fwdReader.isDictionaryEncoded()).thenReturn(false);
+    when(ds.getDictionary()).thenReturn(null);
+
+    switch (storedType) {
+      case INT:
+        when(fwdReader.getInt(eq(0), eq(ctx))).thenReturn((Integer) valueAtDoc0);
+        break;
+      case LONG:
+        when(fwdReader.getLong(eq(0), eq(ctx))).thenReturn((Long) valueAtDoc0);
+        break;
+      case FLOAT:
+        when(fwdReader.getFloat(eq(0), eq(ctx))).thenReturn((Float) valueAtDoc0);
+        break;
+      case DOUBLE:
+        when(fwdReader.getDouble(eq(0), eq(ctx))).thenReturn((Double) valueAtDoc0);
+        break;
+      case BIG_DECIMAL:
+        when(fwdReader.getBigDecimal(eq(0), eq(ctx))).thenReturn((BigDecimal) valueAtDoc0);
+        break;
+      case STRING:
+        when(fwdReader.getString(eq(0), eq(ctx))).thenReturn((String) valueAtDoc0);
+        break;
+      case BYTES:
+        when(fwdReader.getBytes(eq(0), eq(ctx))).thenReturn((byte[]) valueAtDoc0);
+        break;
+      default:
+        throw new IllegalArgumentException("Unhandled stored type in test fixture: " + storedType);
+    }
+
+    when(ds.getForwardIndex()).thenReturn(fwdReader);
+
+    NullValueVectorReader nullReader = mock(NullValueVectorReader.class);
+    when(nullReader.isNull(0)).thenReturn(false);
+    when(nullReader.isNull(1)).thenReturn(true);
+    when(ds.getNullValueVector()).thenReturn(nullReader);
+
+    return ds;
   }
 
   @Test
