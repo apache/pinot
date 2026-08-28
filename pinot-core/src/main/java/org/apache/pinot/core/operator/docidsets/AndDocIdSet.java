@@ -53,6 +53,7 @@ public final class AndDocIdSet implements BlockDocIdSet {
   // Keep the scan based BlockDocIdSets to be accessed when collecting query execution stats
   private final AtomicReference<List<BlockDocIdSet>> _scanBasedDocIdSets = new AtomicReference<>();
   private final boolean _cardinalityBasedRankingForScan;
+  private final boolean _restrictionPushdownEnabled;
   private List<BlockDocIdSet> _docIdSets;
   private volatile long _numEntriesScannedInFilter;
 
@@ -60,11 +61,14 @@ public final class AndDocIdSet implements BlockDocIdSet {
     _docIdSets = docIdSets;
     _cardinalityBasedRankingForScan =
         queryOptions != null && QueryOptionsUtils.isAndScanReorderingEnabled(queryOptions);
+    _restrictionPushdownEnabled =
+        queryOptions == null || QueryOptionsUtils.isAndRestrictionPushdownEnabled(queryOptions);
   }
 
   @Override
   public BlockDocIdIterator iterator() {
-    int numDocIdSets = _docIdSets.size();
+    List<BlockDocIdSet> docIdSets = _docIdSets;
+    int numDocIdSets = docIdSets.size();
     // NOTE: Keep the order of BlockDocIdSets to preserve the order decided within FilterOperatorUtils.
     // TODO: Consider deciding the order based on the stats of BlockDocIdIterators
     BlockDocIdIterator[] allDocIdIterators = new BlockDocIdIterator[numDocIdSets];
@@ -72,11 +76,21 @@ public final class AndDocIdSet implements BlockDocIdSet {
     List<BitmapBasedDocIdIterator> bitmapBasedDocIdIterators = new ArrayList<>();
     List<ScanBasedDocIdIterator> scanBasedDocIdIterators = new ArrayList<>();
     List<BlockDocIdIterator> remainingDocIdIterators = new ArrayList<>();
+    // Composite (AND/OR/NOT) children whose evaluation is deferred so that the merged index document ids can be
+    // pushed into them. Their slot in allDocIdIterators stays null until the lazy fallback below fills it.
+    List<BlockDocIdSet> restrictableDocIdSets = new ArrayList<>();
     long numEntriesScannedForNonScanBasedDocIdSets = 0L;
     List<BlockDocIdSet> scanBasedDocIdSets = new ArrayList<>();
 
     for (int i = 0; i < numDocIdSets; i++) {
-      BlockDocIdSet docIdSet = _docIdSets.get(i);
+      BlockDocIdSet docIdSet = docIdSets.get(i);
+      if (_restrictionPushdownEnabled && docIdSet.canApplyAnd()) {
+        // NOTE: Do not call iterator() here. That evaluates the whole subtree over the segment, which is exactly what
+        //       the push-down below avoids.
+        restrictableDocIdSets.add(docIdSet);
+        scanBasedDocIdSets.add(docIdSet);
+        continue;
+      }
       BlockDocIdIterator docIdIterator = docIdSet.iterator();
       allDocIdIterators[i] = docIdIterator;
       if (docIdIterator instanceof SortedDocIdIterator) {
@@ -117,8 +131,10 @@ public final class AndDocIdSet implements BlockDocIdSet {
     int numBitmapBasedDocIdIterators = bitmapBasedDocIdIterators.size();
     int numScanBasedDocIdIterators = scanBasedDocIdIterators.size();
     int numRemainingDocIdIterators = remainingDocIdIterators.size();
+    int numRestrictableDocIdSets = restrictableDocIdSets.size();
     int numIndexBasedDocIdIterators = numSortedDocIdIterators + numBitmapBasedDocIdIterators;
-    if ((numIndexBasedDocIdIterators > 0 && numScanBasedDocIdIterators > 0) || numIndexBasedDocIdIterators > 1) {
+    if ((numIndexBasedDocIdIterators > 0 && (numScanBasedDocIdIterators > 0 || numRestrictableDocIdSets > 0))
+        || numIndexBasedDocIdIterators > 1) {
       // When there are at least one index-base BlockDocIdIterator (SortedDocIdIterator or BitmapBasedDocIdIterator)
       // and at least one ScanBasedDocIdIterator, or more than one index-based BlockDocIdIterator, merge them and
       // construct a RangelessBitmapDocIdIterator from the merged document ids. If there is no remaining
@@ -166,6 +182,14 @@ public final class AndDocIdSet implements BlockDocIdSet {
       for (ScanBasedDocIdIterator scanBasedDocIdIterator : scanBasedDocIdIterators) {
         docIds = scanBasedDocIdIterator.applyAnd(docIds);
       }
+      // Hand the matching document ids to the composite children, so that a scan-based predicate nested inside one of
+      // them (typically under an OR) is only evaluated on the documents that can still match this AND.
+      for (BlockDocIdSet restrictableDocIdSet : restrictableDocIdSets) {
+        if (docIds.isEmpty()) {
+          break;
+        }
+        docIds = restrictableDocIdSet.applyAnd(docIds);
+      }
       RangelessBitmapDocIdIterator rangelessBitmapDocIdIterator = new RangelessBitmapDocIdIterator(docIds);
       if (numRemainingDocIdIterators == 0) {
         return rangelessBitmapDocIdIterator;
@@ -179,9 +203,46 @@ public final class AndDocIdSet implements BlockDocIdSet {
       }
     } else {
       // Otherwise, construct and return an AndDocIdIterator with all BlockDocIdIterators.
-
+      // There is no index-based document id set to seed the push-down with, so evaluate the deferred composite
+      // children now and let AndDocIdIterator drive them lazily, as it did before the push-down existed.
+      for (int i = 0; i < numDocIdSets; i++) {
+        if (allDocIdIterators[i] == null) {
+          allDocIdIterators[i] = docIdSets.get(i).iterator();
+        }
+      }
       return new AndDocIdIterator(allDocIdIterators);
     }
+  }
+
+  @Override
+  public boolean canApplyAnd() {
+    return true;
+  }
+
+  @Override
+  public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
+    List<BlockDocIdSet> docIdSets = _docIdSets;
+    // Set _docIdSets to null so that underlying BlockDocIdSets can be garbage collected
+    _docIdSets = null;
+    // Every child evaluated below may scan, so collect the scanned entries from all of them. Children that are not
+    // reached (because the candidate set became empty) report zero.
+    _scanBasedDocIdSets.set(docIdSets);
+    if (docIds.isEmpty()) {
+      return new MutableRoaringBitmap();
+    }
+    // NOTE: The children are already ordered cheapest-first by FilterOperatorUtils#reorderAndFilterChildOperators, so
+    //       intersecting them in order keeps the candidate set as small as possible for the expensive ones.
+    // TODO: Unlike iterator(), this path does not honour the AndScanReordering query option.
+    MutableRoaringBitmap docIdsToReturn = null;
+    ImmutableRoaringBitmap candidateDocIds = docIds;
+    for (BlockDocIdSet docIdSet : docIdSets) {
+      docIdsToReturn = docIdSet.applyAnd(candidateDocIds);
+      if (docIdsToReturn.isEmpty()) {
+        return docIdsToReturn;
+      }
+      candidateDocIds = docIdsToReturn;
+    }
+    return docIdsToReturn != null ? docIdsToReturn : docIds.toMutableRoaringBitmap();
   }
 
   @Override

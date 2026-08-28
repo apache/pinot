@@ -21,6 +21,8 @@ package org.apache.pinot.core.operator.docidsets;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.NotDocIdIterator;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class NotDocIdSet implements BlockDocIdSet {
@@ -40,5 +42,22 @@ public class NotDocIdSet implements BlockDocIdSet {
   @Override
   public long getNumEntriesScannedInFilter() {
     return _childDocIdSet.getNumEntriesScannedInFilter();
+  }
+
+  @Override
+  public boolean canApplyAnd() {
+    return true;
+  }
+
+  @Override
+  public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
+    // Within the candidate set, NOT(child) is the candidates the child does not match, so the child only has to be
+    // evaluated on the candidates: (NOT child) AND docIds == docIds MINUS (child AND docIds).
+    MutableRoaringBitmap docIdsToReturn = docIds.toMutableRoaringBitmap();
+    if (docIdsToReturn.isEmpty()) {
+      return docIdsToReturn;
+    }
+    docIdsToReturn.andNot(_childDocIdSet.applyAnd(docIds));
+    return docIdsToReturn;
   }
 }
