@@ -37,6 +37,10 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.aggregation.groupby.offheap.OffHeapDoubleGroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.offheap.OffHeapIntGroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.offheap.OffHeapLongGroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.offheap.ResourceTrackingGroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
@@ -97,41 +101,63 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     // Initialize group key generator
     int numGroupsLimit = queryContext.getNumGroupsLimit();
     int maxInitialResultHolderCapacity = queryContext.getMaxInitialResultHolderCapacity();
+    Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates =
+        queryContext.isOptimizeMaxInitialResultHolderCapacity()
+            ? getGroupByExpressionSizesFromPredicates(queryContext, projectOperator) : null;
+    // Off-heap group-by is not enabled for grouping sets yet: GroupingSetsGroupKeyGenerator keeps its key map and
+    // on-the-fly dictionaries on heap, so only the fixed-width result holders could move off-heap, and that
+    // combination is untested. The close plumbing already covers grouping sets (the trim path closes the generator
+    // in GroupByUtils.buildGroupingSetsResultsBlock, and the combine operators close the AggregationGroupByResult's
+    // generator), so enabling it later mainly requires off-heap key storage in that generator plus test coverage.
+    boolean groupByOffHeap = queryContext.isGroupByOffHeap() && !groupingSets;
     if (groupKeyGenerator != null) {
+      // Shared generator (filtered aggregations): if the first executor created it in off-heap mode, it is already
+      // wrapped in a ResourceTrackingGroupKeyGenerator, and this executor registers its holders on the same wrapper
       _groupKeyGenerator = groupKeyGenerator;
-    } else if (groupingSets) {
-      _groupKeyGenerator =
-          new GroupingSetsGroupKeyGenerator(projectOperator, groupByExpressions, queryContext.getGroupingSets(),
-              numGroupsLimit, _nullHandlingEnabled);
     } else {
-      Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates =
-          queryContext.isOptimizeMaxInitialResultHolderCapacity()
-              ? getGroupByExpressionSizesFromPredicates(queryContext, projectOperator) : null;
-      // Null handling does not steer this choice: every generator below gives a null an id of its own, so the
-      // encoding of the group-by columns decides on its own which one to use.
-      if (hasNoDictionaryGroupByExpression) {
+      GroupKeyGenerator generator;
+      if (groupingSets) {
+        generator = new GroupingSetsGroupKeyGenerator(projectOperator, groupByExpressions,
+            queryContext.getGroupingSets(), numGroupsLimit, _nullHandlingEnabled);
+      } else if (hasNoDictionaryGroupByExpression) {
         if (groupByExpressions.length == 1) {
-          _groupKeyGenerator =
+          generator =
               new NoDictionarySingleColumnGroupKeyGenerator(projectOperator, groupByExpressions[0], numGroupsLimit,
-                  _nullHandlingEnabled, groupByExpressionSizesFromPredicates);
+                  _nullHandlingEnabled, groupByExpressionSizesFromPredicates, groupByOffHeap);
         } else {
-          _groupKeyGenerator =
+          generator =
               new NoDictionaryMultiColumnGroupKeyGenerator(projectOperator, groupByExpressions, numGroupsLimit,
-                  _nullHandlingEnabled, groupByExpressionSizesFromPredicates);
+                  _nullHandlingEnabled, groupByExpressionSizesFromPredicates, groupByOffHeap);
         }
       } else {
-        _groupKeyGenerator = new DictionaryBasedGroupKeyGenerator(projectOperator, groupByExpressions, numGroupsLimit,
-            maxInitialResultHolderCapacity, _nullHandlingEnabled, groupByExpressionSizesFromPredicates);
+        generator = new DictionaryBasedGroupKeyGenerator(projectOperator, groupByExpressions, numGroupsLimit,
+            maxInitialResultHolderCapacity, _nullHandlingEnabled, groupByExpressionSizesFromPredicates,
+            groupByOffHeap);
       }
+      _groupKeyGenerator = groupByOffHeap ? new ResourceTrackingGroupKeyGenerator(generator) : generator;
     }
 
-    // Initialize result holders
+    // Initialize result holders. In off-heap mode, fixed-width holders are mirrored off-heap and registered on the
+    // resource-tracking generator so the existing generator close() call sites release them.
+    ResourceTrackingGroupKeyGenerator offHeapResourceTracker =
+        _groupKeyGenerator instanceof ResourceTrackingGroupKeyGenerator
+            ? (ResourceTrackingGroupKeyGenerator) _groupKeyGenerator : null;
     int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();
     int initialCapacity = Math.min(maxNumResults, maxInitialResultHolderCapacity);
     int numAggregationFunctions = _aggregationFunctions.length;
     _groupByResultHolders = new GroupByResultHolder[numAggregationFunctions];
-    for (int i = 0; i < numAggregationFunctions; i++) {
-      _groupByResultHolders[i] = _aggregationFunctions[i].createGroupByResultHolder(initialCapacity, maxNumResults);
+    try {
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        _groupByResultHolders[i] = offHeapResourceTracker != null
+            ? createOffHeapCapableResultHolder(_aggregationFunctions[i], initialCapacity, maxNumResults,
+                offHeapResourceTracker)
+            : _aggregationFunctions[i].createGroupByResultHolder(initialCapacity, maxNumResults);
+      }
+    } catch (Throwable t) {
+      // Holder creation failed midway: release the generator (and any off-heap holders already registered on it)
+      // because the caller never gets an executor reference to clean up. Close is idempotent.
+      _groupKeyGenerator.close();
+      throw t;
     }
 
     // Initialize map from document Id to group key
@@ -142,6 +168,31 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       _svGroupKeys = THREAD_LOCAL_SV_GROUP_KEYS.get();
       _mvGroupKeys = null;
     }
+  }
+
+  /// Mirrors fixed-width result holders off-heap. The holder type and default value are discovered through a
+  /// zero-capacity probe (aggregation functions choose both — createGroupByResultHolder must stay side-effect-free
+  /// for the probe to be safe), and any non-fixed-width holder (object holders, dummy
+  /// holders, custom implementations) is recreated on-heap with the real initial capacity. Off-heap holders are
+  /// registered on the resource tracker, which releases them when the group key generator is closed.
+  private static GroupByResultHolder createOffHeapCapableResultHolder(AggregationFunction<?, ?> function,
+      int initialCapacity, int maxCapacity, ResourceTrackingGroupKeyGenerator resourceTracker) {
+    GroupByResultHolder probe = function.createGroupByResultHolder(0, maxCapacity);
+    GroupByResultHolder holder;
+    if (probe.getClass() == DoubleGroupByResultHolder.class) {
+      holder = new OffHeapDoubleGroupByResultHolder(initialCapacity, maxCapacity,
+          ((DoubleGroupByResultHolder) probe).getDefaultValue());
+    } else if (probe.getClass() == LongGroupByResultHolder.class) {
+      holder = new OffHeapLongGroupByResultHolder(initialCapacity, maxCapacity,
+          ((LongGroupByResultHolder) probe).getDefaultValue());
+    } else if (probe.getClass() == IntGroupByResultHolder.class) {
+      holder = new OffHeapIntGroupByResultHolder(initialCapacity, maxCapacity,
+          ((IntGroupByResultHolder) probe).getDefaultValue());
+    } else {
+      return function.createGroupByResultHolder(initialCapacity, maxCapacity);
+    }
+    resourceTracker.register((AutoCloseable) holder);
+    return holder;
   }
 
   /// Retrieve the sizes of GroupBy expressions from IN an EQ predicates found in the filter context, if available.

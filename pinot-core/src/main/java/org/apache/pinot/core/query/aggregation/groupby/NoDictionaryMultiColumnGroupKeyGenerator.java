@@ -31,6 +31,8 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
+import org.apache.pinot.core.query.aggregation.groupby.offheap.OffHeapBytesGroupIdMap;
+import org.apache.pinot.core.query.aggregation.groupby.offheap.OffHeapGroupByUtils;
 import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMap;
 import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMapFactory;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -66,9 +68,21 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   private final boolean _nullHandlingEnabled;
   private final int _globalGroupIdUpperBound;
 
+  // Off-heap mode (see the offHeap constructor param): the packed per-column key ids (4 bytes per column,
+  // including ID_FOR_NULL components) go to a direct-memory key table instead of _groupKeyMap, which is null.
+  private final OffHeapBytesGroupIdMap _offHeapGroupKeyMap;
+  private final byte[] _keyScratch;
+
   public NoDictionaryMultiColumnGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
       ExpressionContext[] groupByExpressions, int numGroupsLimit, boolean nullHandlingEnabled,
       Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates) {
+    this(projectOperator, groupByExpressions, numGroupsLimit, nullHandlingEnabled,
+        groupByExpressionSizesFromPredicates, false);
+  }
+
+  public NoDictionaryMultiColumnGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
+      ExpressionContext[] groupByExpressions, int numGroupsLimit, boolean nullHandlingEnabled,
+      Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates, boolean offHeap) {
     _groupByExpressions = groupByExpressions;
     _numGroupByExpressions = groupByExpressions.length;
     _storedTypes = new DataType[_numGroupByExpressions];
@@ -106,8 +120,16 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       _isSingleValueExpressions[i] = columnContext.isSingleValue();
     }
 
-    _groupKeyMap = new Object2IntOpenHashMap<>();
-    _groupKeyMap.defaultReturnValue(INVALID_ID);
+    if (offHeap) {
+      _groupKeyMap = null;
+      _offHeapGroupKeyMap = new OffHeapBytesGroupIdMap(Math.min(numGroupsLimit, 8192));
+      _keyScratch = new byte[_numGroupByExpressions * Integer.BYTES];
+    } else {
+      _groupKeyMap = new Object2IntOpenHashMap<>();
+      _groupKeyMap.defaultReturnValue(INVALID_ID);
+      _offHeapGroupKeyMap = null;
+      _keyScratch = null;
+    }
     _numGroupsLimit = numGroupsLimit;
     _globalGroupIdUpperBound = canOptimizeGroupByUpperBound ? optimizedGroupByUpperBound : numGroupsLimit;
   }
@@ -168,7 +190,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
     // note that we are mutating its backing array for memory efficiency
     FixedIntArray flyweightKey = new FixedIntArray(keyValues);
     for (int row = 0; row < numDocs; row++) {
-      int numGroups = _groupKeyMap.size();
+      int numGroups = getNumGroupsInternal();
       boolean hasInvalidKeyValue = false;
       if (numGroups < _numGroupsLimit) {
         for (int col = 0; col < _numGroupByExpressions; col++) {
@@ -376,12 +398,23 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
 
   @Override
   public int getCurrentGroupKeyUpperBound() {
-    return _groupKeyMap.size();
+    return getNumGroupsInternal();
   }
 
   @Override
   public Iterator<GroupKey> getGroupKeys() {
-    return new GroupKeyIterator();
+    return _offHeapGroupKeyMap != null ? new OffHeapGroupKeyIterator() : new GroupKeyIterator();
+  }
+
+  @Override
+  public void close() {
+    if (_offHeapGroupKeyMap != null) {
+      _offHeapGroupKeyMap.close();
+    }
+  }
+
+  private int getNumGroupsInternal() {
+    return _offHeapGroupKeyMap != null ? _offHeapGroupKeyMap.size() : _groupKeyMap.size();
   }
 
   /// Helper method to get or create group-id for a group key.
@@ -389,6 +422,10 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   /// @param keyList Group key, that is a list of objects to be grouped
   /// @return Group id
   private int getGroupIdForKey(FixedIntArray keyList) {
+    if (_offHeapGroupKeyMap != null) {
+      int keyLength = OffHeapGroupByUtils.packInts(keyList.elements(), _numGroupByExpressions, _keyScratch);
+      return _offHeapGroupKeyMap.getGroupId(_keyScratch, 0, keyLength, _numGroupsLimit);
+    }
     int numGroups = _groupKeyMap.size();
     if (numGroups < _numGroupsLimit) {
       return _groupKeyMap.computeIfAbsent(keyList, k -> numGroups);
@@ -422,7 +459,36 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
 
   @Override
   public int getNumKeys() {
-    return _groupKeyMap.size();
+    return getNumGroupsInternal();
+  }
+
+  /// Iterator over the dense group ids of the off-heap key table: the packed per-column key ids are read back and
+  /// rebuilt into values through the same dictionaries / on-the-fly dictionaries as the on-heap iterator.
+  private class OffHeapGroupKeyIterator implements Iterator<GroupKey> {
+    private final GroupKey _groupKey = new GroupKey();
+    private final int[] _keyIds = new int[_numGroupByExpressions];
+    private final FixedIntArray _flyweightKey = new FixedIntArray(_keyIds);
+    private int _groupId;
+
+    @Override
+    public boolean hasNext() {
+      return _groupId < _offHeapGroupKeyMap.size();
+    }
+
+    @Override
+    public GroupKey next() {
+      _offHeapGroupKeyMap.readKey(_groupId, _keyScratch, 0);
+      OffHeapGroupByUtils.unpackInts(_keyScratch, _numGroupByExpressions, _keyIds);
+      _groupKey._groupId = _groupId;
+      _groupKey._keys = buildKeysFromIds(_flyweightKey);
+      _groupId++;
+      return _groupKey;
+    }
+
+    @Override
+    public void remove() {
+      throw new UnsupportedOperationException();
+    }
   }
 
   /// Iterator for [GroupKey].
