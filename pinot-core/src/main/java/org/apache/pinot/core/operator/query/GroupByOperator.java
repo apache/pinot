@@ -40,6 +40,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.AggregationInfo;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
+import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGeneratorProvider;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
@@ -62,10 +63,16 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private final boolean _useStarTree;
   private final long _numTotalDocs;
   private final DataSchema _dataSchema;
+  private final GroupKeyGeneratorProvider _groupKeyGeneratorProvider;
 
   private int _numDocsScanned = 0;
 
   public GroupByOperator(QueryContext queryContext, AggregationInfo aggregationInfo, long numTotalDocs) {
+    this(queryContext, aggregationInfo, numTotalDocs, GroupKeyGeneratorProvider.DEFAULT);
+  }
+
+  public GroupByOperator(QueryContext queryContext, AggregationInfo aggregationInfo, long numTotalDocs,
+      GroupKeyGeneratorProvider groupKeyGeneratorProvider) {
     assert queryContext.getAggregationFunctions() != null && queryContext.getGroupByExpressions() != null;
     _queryContext = queryContext;
     _aggregationFunctions = queryContext.getAggregationFunctions();
@@ -73,6 +80,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     _projectOperator = aggregationInfo.getProjectOperator();
     _useStarTree = aggregationInfo.isUseStarTree();
     _numTotalDocs = numTotalDocs;
+    _groupKeyGeneratorProvider = groupKeyGeneratorProvider;
 
     // NOTE: The indexedTable expects that the data schema will have group by columns before aggregation columns
     int numGroupByExpressions = _groupByExpressions.length;
@@ -123,10 +131,33 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     if (_useStarTree) {
       groupByExecutor = new StarTreeGroupByExecutor(_queryContext, _groupByExpressions, _projectOperator);
     } else {
-      groupByExecutor = new DefaultGroupByExecutor(_queryContext, _groupByExpressions, _projectOperator);
+      groupByExecutor = new DefaultGroupByExecutor(_queryContext, _groupByExpressions, _projectOperator,
+          _groupKeyGeneratorProvider);
     }
-    ValueBlock valueBlock;
+    GroupByResultsBlock resultsBlock;
+    boolean closeGroupKeyGenerator;
+    try {
+      resultsBlock = buildResultsBlock(groupByExecutor);
+      closeGroupKeyGenerator =
+          !_queryContext.isGroupingSets() && resultsBlock.getAggregationGroupByResult() == null;
+    } catch (RuntimeException | Error e) {
+      try {
+        groupByExecutor.getGroupKeyGenerator().close();
+      } catch (RuntimeException | Error closeError) {
+        if (closeError != e) {
+          e.addSuppressed(closeError);
+        }
+      }
+      throw e;
+    }
+    if (closeGroupKeyGenerator) {
+      groupByExecutor.getGroupKeyGenerator().close();
+    }
+    return resultsBlock;
+  }
 
+  private GroupByResultsBlock buildResultsBlock(GroupByExecutor groupByExecutor) {
+    ValueBlock valueBlock;
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
       _numDocsScanned += valueBlock.getNumDocs();
       QueryScanCostContext scanCost = getScanCostContext();
@@ -161,7 +192,6 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     int trimSize = _queryContext.getEffectiveSegmentGroupTrimSize();
     boolean unsafeTrim = _queryContext.isUnsafeTrim();
 
-    GroupByResultsBlock resultsBlock;
     /// Grouping-set queries use a per-set bucketed segment trim (keyed on the $groupingId discriminator) so
     /// that a global top-K cannot starve low-magnitude sets such as the grand total. The broker still applies
     /// the final ORDER BY + LIMIT across all sets.
@@ -172,15 +202,14 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
           groupByExecutor.getNumGroups(), _groupByExpressions.length, numGroupsLimitReached,
           numGroupsWarningLimitReached);
     }
+
+    GroupByResultsBlock resultsBlock;
     // sort and trim segment results if needed
     if (trimSize > 0 && groupByExecutor.getNumGroups() > trimSize) {
       TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
       // intermediateRecords is always sorted after trim
       List<IntermediateRecord> intermediateRecords =
           groupByExecutor.trimGroupByResult(trimSize, tableResizer, !unsafeTrim);
-      // close groupKeyGenerator after getting intermediateRecords
-      groupByExecutor.getGroupKeyGenerator().close();
-
       ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
       resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
       // set trim flag only if it's not safe
@@ -199,8 +228,6 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
       List<IntermediateRecord> intermediateRecords =
           tableResizer.sortInSegmentResults(groupByExecutor.getGroupKeyGenerator(),
               groupByExecutor.getGroupByResultHolders(), trimSize);
-      // close groupKeyGenerator after getting intermediateRecords
-      groupByExecutor.getGroupKeyGenerator().close();
       resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
     } else {
       // if not sort-aggregate and no trim needed, return segment result as it is

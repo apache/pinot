@@ -172,8 +172,9 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
     if (aggregationGroupByResult == null || resultsBlock.getIntermediateRecords() != null) {
       return resultsBlock;
     }
-    List<IntermediateRecord> records = new ArrayList<>(aggregationGroupByResult.getNumGroups());
-    try {
+    List<IntermediateRecord> records;
+    try (aggregationGroupByResult) {
+      records = new ArrayList<>(aggregationGroupByResult.getNumGroups());
       Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
       int extractedKeys = 0;
       while (groupKeyIterator.hasNext()) {
@@ -187,8 +188,6 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
         }
         records.add(IntermediateRecord.withoutOrderByValues(new Key(keys), new Record(values)));
       }
-    } finally {
-      aggregationGroupByResult.closeGroupKeyGenerator();
     }
     GroupByResultsBlock detached =
         new GroupByResultsBlock(resultsBlock.getDataSchema(), records, _queryContext);

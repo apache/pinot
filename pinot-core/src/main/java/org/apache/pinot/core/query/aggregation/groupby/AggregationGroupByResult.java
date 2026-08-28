@@ -26,7 +26,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 /// It provides an iterator over group-by keys, and provides a method
 /// to get the aggregation result for the given group-by key.
 @SuppressWarnings("rawtypes")
-public class AggregationGroupByResult {
+public class AggregationGroupByResult implements AutoCloseable {
   private final GroupKeyGenerator _groupKeyGenerator;
   private final AggregationFunction[] _aggregationFunctions;
   private final GroupByResultHolder[] _resultHolders;
@@ -49,6 +49,11 @@ public class AggregationGroupByResult {
 
   /// Clear and trim DictionaryBasedGroupKeyGenerator after use
   public void closeGroupKeyGenerator() {
+    close();
+  }
+
+  @Override
+  public void close() {
     _groupKeyGenerator.close();
   }
 

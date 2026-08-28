@@ -106,39 +106,40 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
         GroupByResultsBlock resultsBlock = (GroupByResultsBlock) operator.nextBlock();
-        if (_indexedTable == null) {
-          synchronized (this) {
-            if (_indexedTable == null) {
-              _indexedTable = GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, _numTasks,
-                  _executorService);
+        try (AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult()) {
+          if (_indexedTable == null) {
+            synchronized (this) {
+              if (_indexedTable == null) {
+                _indexedTable =
+                    GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, _numTasks,
+                        _executorService);
+              }
             }
           }
-        }
 
-        if (resultsBlock.isGroupsTrimmed()) {
-          _groupsTrimmed = true;
-        }
-        // Set groups limit reached flag.
-        if (resultsBlock.isNumGroupsLimitReached()) {
-          _numGroupsLimitReached = true;
-        }
-        if (resultsBlock.isNumGroupsWarningLimitReached()) {
-          _numGroupsWarningLimitReached = true;
-        }
+          if (resultsBlock.isGroupsTrimmed()) {
+            _groupsTrimmed = true;
+          }
+          // Set groups limit reached flag.
+          if (resultsBlock.isNumGroupsLimitReached()) {
+            _numGroupsLimitReached = true;
+          }
+          if (resultsBlock.isNumGroupsWarningLimitReached()) {
+            _numGroupsWarningLimitReached = true;
+          }
 
-        // Merge aggregation group-by result.
-        // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-        Collection<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
-        // Count the number of merged keys
-        int mergedKeys = 0;
-        // For now, only GroupBy OrderBy query has pre-constructed intermediate records
-        if (intermediateRecords == null) {
           // Merge aggregation group-by result.
-          AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-          if (aggregationGroupByResult != null) {
-            // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-            try {
-              Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+          // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
+          Collection<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
+          // Count the number of merged keys
+          int mergedKeys = 0;
+          // For now, only GroupBy OrderBy query has pre-constructed intermediate records
+          if (intermediateRecords == null) {
+            // Merge aggregation group-by result.
+            if (aggregationGroupByResult != null) {
+              // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
+              Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator =
+                  aggregationGroupByResult.getGroupKeyIterator();
               while (dicGroupKeyIterator.hasNext()) {
                 QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
                 GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
@@ -150,16 +151,13 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
                 }
                 _indexedTable.upsert(new Key(keys), new Record(values));
               }
-            } finally {
-              // Release the resources used by the group key generator
-              aggregationGroupByResult.closeGroupKeyGenerator();
             }
-          }
-        } else {
-          for (IntermediateRecord intermediateResult : intermediateRecords) {
-            QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
-            //TODO: change upsert api so that it accepts intermediateRecord directly
-            _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
+          } else {
+            for (IntermediateRecord intermediateResult : intermediateRecords) {
+              QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
+              //TODO: change upsert api so that it accepts intermediateRecord directly
+              _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
+            }
           }
         }
       } catch (RuntimeException e) {

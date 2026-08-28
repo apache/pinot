@@ -23,7 +23,10 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 
 
 /// Interface for generating group keys.
-/// It extends AutoCloseable for thread-local maps to be cleared
+/// It extends [AutoCloseable] so generators can deterministically release thread-local or native resources. Generator
+/// implementations that own resources must make [#close()] idempotent. Before `close` returns or throws, it must
+/// either release owned resources or durably transfer cleanup to an independent retry owner because callers may
+/// discard the generator after one close attempt.
 public interface GroupKeyGenerator extends AutoCloseable {
   char DELIMITER = '\0';
   int INVALID_ID = -1;
@@ -58,7 +61,9 @@ public interface GroupKeyGenerator extends AutoCloseable {
   /// @return current upper bound of the group key.
   int getCurrentGroupKeyUpperBound();
 
-  /// Returns an iterator of [GroupKey]. Use this interface to iterate through all the group keys.
+  /// Returns an iterator of [GroupKey]. The iterator may reuse the [GroupKey] wrapper, so callers must read its fields
+  /// before advancing. Each entry's `_keys` array and elements, however, must be stable, heap-owned values: consumers
+  /// can retain them after advancing the iterator and after this generator is closed.
   Iterator<GroupKey> getGroupKeys();
 
   /// Return current number of unique keys
