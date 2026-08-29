@@ -54,6 +54,7 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.RepeatOperator;
 import org.apache.pinot.query.runtime.operator.SortOperator;
+import org.apache.pinot.query.runtime.operator.SortedMailboxMergeReceiveOperator;
 import org.apache.pinot.query.runtime.operator.SortedMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.TransformOperator;
 import org.apache.pinot.query.runtime.operator.UnnestOperator;
@@ -193,7 +194,9 @@ public class PlanNodeToOpChain {
     @Override
     public MultiStageOperator visitMailboxReceive(MailboxReceiveNode node, OpChainExecutionContext context) {
       try {
-        if (node.isSort()) {
+        if (node.isSort() && node.isSortedOnSender()) {
+          return new SortedMailboxMergeReceiveOperator(context, node);
+        } else if (node.isSort()) {
           return new SortedMailboxReceiveOperator(context, node);
         } else {
           return new MailboxReceiveOperator(context, node);
