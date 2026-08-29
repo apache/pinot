@@ -44,6 +44,9 @@ message PlanNode {
     // serialized by an older-version broker can still be deserialized. No current broker sets this field.
     EnrichedJoinNode enrichedJoinNode = 17 [deprecated = true];
     UnnestNode unnestNode = 18;
+    // Rolling-upgrade boundary: servers released before MATCH_RECOGNIZE do not know field 19. Protobuf preserves it
+    // as an unknown field, but their PlanNodeDeserializer sees NODE_NOT_SET and cannot execute the stage. Upgrade all
+    // servers before issuing MATCH_RECOGNIZE queries; there is no mixed-version fallback to another node kind.
     MatchNode matchNode = 19;
   }
 }
@@ -300,7 +303,7 @@ enum RowPatternKind {
   // Alternation `|`, e.g. `A | B`. Two or more children, in pattern order (leftmost alternative wins).
   PATTERN_ALTERNATE = 2;
   // A quantifier applied to exactly one child. Carries quantifier.
-  PATTERN_QUANTIFY = 3;
+  PATTERN_QUANTIFIER = 3;
   // The `^` anchor: the match must start at the first row of the partition. No children.
   PATTERN_ANCHOR_START = 4;
   // The `$` anchor: the match must end at the last row of the partition. No children.
@@ -311,7 +314,7 @@ enum RowPatternKind {
   PATTERN_PERMUTE = 7;
 }
 
-// A `{n,m}` style repetition applied to the single child of a PATTERN_QUANTIFY node. `*`, `+` and `?` are
+// A `{n,m}` style repetition applied to the single child of a PATTERN_QUANTIFIER node. `*`, `+` and `?` are
 // normalized into this form: `*` is {0,-1}, `+` is {1,-1}, `?` is {0,1}.
 message RowPatternQuantifier {
   // Minimum number of repetitions, >= 0.
@@ -330,9 +333,9 @@ message RowPattern {
   // PATTERN_SYMBOL only: ordinal into MatchNode.patternSymbols.
   int32 symbolOrdinal = 2;
   // PATTERN_CONCAT / PATTERN_ALTERNATE / PATTERN_PERMUTE: two or more children, in pattern order.
-  // PATTERN_QUANTIFY / PATTERN_EXCLUDE: exactly one child. Empty for PATTERN_SYMBOL and the anchors.
+  // PATTERN_QUANTIFIER / PATTERN_EXCLUDE: exactly one child. Empty for PATTERN_SYMBOL and the anchors.
   repeated RowPattern children = 3;
-  // PATTERN_QUANTIFY only.
+  // PATTERN_QUANTIFIER only.
   RowPatternQuantifier quantifier = 4;
 }
 

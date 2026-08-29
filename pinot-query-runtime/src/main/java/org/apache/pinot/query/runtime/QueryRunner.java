@@ -128,7 +128,9 @@ public class QueryRunner {
   private Integer _maxRowsInWindow;
   @Nullable
   private WindowOverFlowMode _windowOverflowMode;
-  private Integer _maxRowsInMatch;
+  @Nullable
+  private Integer _maxRowsInMatchPartition;
+  @Nullable
   private Long _maxStepsPerMatchAttempt;
   @Nullable
   private PhysicalTimeSeriesServerPlanVisitor _timeSeriesPhysicalPlanVisitor;
@@ -191,8 +193,9 @@ public class QueryRunner {
     String windowOverflowModeStr = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_WINDOW_OVERFLOW_MODE);
     _windowOverflowMode = windowOverflowModeStr != null ? WindowOverFlowMode.valueOf(windowOverflowModeStr) : null;
 
-    String maxRowsInMatchStr = serverConf.getProperty(MatchLimits.KEY_OF_MAX_ROWS_IN_MATCH);
-    _maxRowsInMatch = maxRowsInMatchStr != null ? Integer.parseInt(maxRowsInMatchStr) : null;
+    String maxRowsInMatchPartitionStr = serverConf.getProperty(MatchLimits.KEY_OF_MAX_ROWS_IN_MATCH_PARTITION);
+    _maxRowsInMatchPartition =
+        maxRowsInMatchPartitionStr != null ? Integer.parseInt(maxRowsInMatchPartitionStr) : null;
 
     String maxStepsPerMatchAttemptStr = serverConf.getProperty(MatchLimits.KEY_OF_MAX_STEPS_PER_MATCH_ATTEMPT);
     _maxStepsPerMatchAttempt = maxStepsPerMatchAttemptStr != null ? Long.parseLong(maxStepsPerMatchAttemptStr) : null;
@@ -555,17 +558,23 @@ public class QueryRunner {
       opChainMetadata.put(QueryOptionKey.WINDOW_OVERFLOW_MODE, windowOverflowMode.name());
     }
 
-    // MATCH_RECOGNIZE limits: the cluster config only applies when the query did not set the option itself, which is
-    // the same query option over cluster config precedence the window and join limits use.
-    if (_maxRowsInMatch != null && !opChainMetadata.containsKey(MatchLimits.MAX_ROWS_IN_MATCH)) {
-      opChainMetadata.put(MatchLimits.MAX_ROWS_IN_MATCH, Integer.toString(_maxRowsInMatch));
-    }
-    if (_maxStepsPerMatchAttempt != null
-        && !opChainMetadata.containsKey(MatchLimits.MAX_STEPS_PER_MATCH_ATTEMPT)) {
-      opChainMetadata.put(MatchLimits.MAX_STEPS_PER_MATCH_ATTEMPT, Long.toString(_maxStepsPerMatchAttempt));
-    }
+    applyMatchLimitDefaults(opChainMetadata, _maxRowsInMatchPartition, _maxStepsPerMatchAttempt);
 
     return opChainMetadata;
+  }
+
+  /// Applies MATCH_RECOGNIZE cluster defaults after query options have been canonicalized and consolidated.
+  /// Package-private for focused precedence coverage without initializing a complete query server.
+  static void applyMatchLimitDefaults(Map<String, String> opChainMetadata,
+      @Nullable Integer maxRowsInMatchPartition, @Nullable Long maxStepsPerMatchAttempt) {
+    if (maxRowsInMatchPartition != null
+        && !opChainMetadata.containsKey(QueryOptionKey.MAX_ROWS_IN_MATCH_PARTITION)) {
+      opChainMetadata.put(QueryOptionKey.MAX_ROWS_IN_MATCH_PARTITION, Integer.toString(maxRowsInMatchPartition));
+    }
+    if (maxStepsPerMatchAttempt != null
+        && !opChainMetadata.containsKey(QueryOptionKey.MAX_STEPS_PER_MATCH_ATTEMPT)) {
+      opChainMetadata.put(QueryOptionKey.MAX_STEPS_PER_MATCH_ATTEMPT, Long.toString(maxStepsPerMatchAttempt));
+    }
   }
 
   public MailboxService getMailboxService() {
