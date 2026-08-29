@@ -192,6 +192,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     if (scatterResult.getSendException() != null) {
       brokerResponse.addException(new QueryProcessingException(QueryErrorCode.BROKER_REQUEST_SEND,
           scatterResult.getSendException().getMessage()));
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_SEND_EXCEPTIONS, 1);
     }
     List<ServerRoutingInstance> serversNotResponded = scatterResult.getServersNotResponded();
     if (!serversNotResponded.isEmpty()) {
@@ -323,6 +324,9 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     if (materializedViewSendException != null) {
       brokerResponse.addException(
           new QueryProcessingException(QueryErrorCode.BROKER_REQUEST_SEND, materializedViewSendException.getMessage()));
+    }
+    if (baseSendException != null || materializedViewSendException != null) {
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_SEND_EXCEPTIONS, 1);
     }
 
     int numServersNotResponded = serversNotResponded.size();
