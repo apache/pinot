@@ -18,10 +18,14 @@
  */
 package org.apache.pinot.query.planner.serde;
 
+import com.google.protobuf.DescriptorProtos;
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.DynamicMessage;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
@@ -163,8 +167,57 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
     assertEquals(ref.getIndex(), 1);
     assertEquals(ref.getAlpha(), "B");
 
+    RexExpression.PatternFieldRef universalRef =
+        (RexExpression.PatternFieldRef) deserialized.getMeasures().get(1).getExpression();
+    assertEquals(universalRef.getSymbolOrdinal(), RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL);
+    assertEquals(universalRef.getAlpha(), "prices");
+
     // Variables without a DEFINE entry match every row and must round-trip as "no definition", not as a default.
     assertNull(deserialized.getPatternSymbols().get(0).getDefinition());
+  }
+
+  @Test
+  public void testMatchNodeUsesPinnedWireFieldAndIsUnknownToAnOlderSchema()
+      throws Exception {
+    Plan.PlanNode serialized = PlanNodeSerializer.process(
+        buildMatchNode(MatchNode.AfterMatchSkipMode.PAST_LAST_ROW, MatchNode.NO_SKIP_TO_SYMBOL));
+
+    assertEquals(Plan.PlanNode.getDescriptor().findFieldByName("matchNode").getNumber(), 19);
+    Descriptors.Descriptor legacyPlanNodeDescriptor = buildLegacyPlanNodeDescriptor();
+    DynamicMessage legacyPlanNode = DynamicMessage.parseFrom(legacyPlanNodeDescriptor, serialized.toByteArray());
+
+    // A server schema predating MATCH_RECOGNIZE preserves field 19 but does not select a node in its oneof. Its plan
+    // deserializer therefore observes NODE_NOT_SET and cannot execute the stage, which is why all servers must be
+    // upgraded before MATCH_RECOGNIZE queries are issued.
+    assertNull(legacyPlanNode.getOneofFieldDescriptor(legacyPlanNodeDescriptor.getOneofs().get(0)));
+    assertEquals(legacyPlanNode.getUnknownFields().getField(19).getLengthDelimitedList().size(), 1);
+  }
+
+  private static Descriptors.Descriptor buildLegacyPlanNodeDescriptor()
+      throws Descriptors.DescriptorValidationException {
+    DescriptorProtos.DescriptorProto legacyUnnestNode = DescriptorProtos.DescriptorProto.newBuilder()
+        .setName("UnnestNode")
+        .build();
+    DescriptorProtos.DescriptorProto legacyPlanNode = DescriptorProtos.DescriptorProto.newBuilder()
+        .setName("PlanNode")
+        .addOneofDecl(DescriptorProtos.OneofDescriptorProto.newBuilder().setName("node"))
+        .addField(DescriptorProtos.FieldDescriptorProto.newBuilder()
+            .setName("unnestNode")
+            .setNumber(18)
+            .setLabel(DescriptorProtos.FieldDescriptorProto.Label.LABEL_OPTIONAL)
+            .setType(DescriptorProtos.FieldDescriptorProto.Type.TYPE_MESSAGE)
+            .setTypeName(".legacy.UnnestNode")
+            .setOneofIndex(0))
+        .build();
+    DescriptorProtos.FileDescriptorProto legacyFile = DescriptorProtos.FileDescriptorProto.newBuilder()
+        .setName("legacy_plan.proto")
+        .setPackage("legacy")
+        .setSyntax("proto3")
+        .addMessageType(legacyUnnestNode)
+        .addMessageType(legacyPlanNode)
+        .build();
+    return Descriptors.FileDescriptor.buildFrom(legacyFile, new Descriptors.FileDescriptor[0])
+        .findMessageTypeByName("PlanNode");
   }
 
   /// `AFTER MATCH SKIP PAST LAST ROW` has no target variable. Ordinal 0 is a valid pattern variable, so "no target"
@@ -181,18 +234,18 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
   /// A pattern field reference that was never bound to a pattern symbol must not reach the wire: an ambiguous
   /// reference would be resolved arbitrarily by the server and produce wrong-but-type-correct results.
   @Test
-  public void testUnresolvedPatternFieldRefIsRejected() {
+  public void testInvalidPatternFieldRefOrdinalsAreRejected() {
     DataSchema dataSchema = new DataSchema(new String[]{"sym", "startPrice"},
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.DOUBLE});
-    RexExpression.PatternFieldRef unresolved =
-        new RexExpression.PatternFieldRef(1, RexExpression.PatternFieldRef.UNRESOLVED_SYMBOL_ORDINAL, "A");
-    MatchNode node = new MatchNode(1, dataSchema, PlanNode.NodeHint.EMPTY, new ArrayList<>(),
-        List.of(new PatternSymbol("A", null)), new RowPattern.Symbol(0),
-        List.of(new MatchNode.Measure("startPrice", unresolved)), List.of(0),
-        List.of(new RelFieldCollation(1)), MatchNode.AfterMatchSkipMode.PAST_LAST_ROW, MatchNode.NO_SKIP_TO_SYMBOL,
-        MatchNode.RowsPerMatchMode.ONE_ROW_PER_MATCH);
-
-    assertThrows(IllegalStateException.class, () -> PlanNodeSerializer.process(node));
+    for (int invalidOrdinal : new int[]{RexExpression.PatternFieldRef.UNRESOLVED_SYMBOL_ORDINAL, -3, 1}) {
+      RexExpression.PatternFieldRef invalid = new RexExpression.PatternFieldRef(1, invalidOrdinal, "A");
+      assertThrows(IllegalArgumentException.class,
+          () -> new MatchNode(1, dataSchema, PlanNode.NodeHint.EMPTY, new ArrayList<>(),
+              List.of(new PatternSymbol("A", null)), new RowPattern.Symbol(0),
+              List.of(new MatchNode.Measure("startPrice", invalid)), List.of(0),
+              List.of(new RelFieldCollation(1)), MatchNode.AfterMatchSkipMode.PAST_LAST_ROW,
+              MatchNode.NO_SKIP_TO_SYMBOL, MatchNode.RowsPerMatchMode.ONE_ROW_PER_MATCH));
+    }
   }
 
   private static MatchNode buildMatchNode(MatchNode.AfterMatchSkipMode skipMode, int skipToSymbolOrdinal) {
@@ -210,16 +263,19 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
         RowPattern.AnchorStart.INSTANCE,
         new RowPattern.Symbol(0),
         new RowPattern.Alternate(List.of(
-            new RowPattern.Quantify(new RowPattern.Symbol(1), 2, 3, true),
-            new RowPattern.Quantify(new RowPattern.Symbol(2), 1, RowPattern.Quantify.UNBOUNDED, false))),
+            new RowPattern.Quantifier(new RowPattern.Symbol(1), 2, 3, true),
+            new RowPattern.Quantifier(new RowPattern.Symbol(2), 1, RowPattern.Quantifier.UNBOUNDED, false))),
         new RowPattern.Symbol(3),
         RowPattern.AnchorEnd.INSTANCE));
     List<MatchNode.Measure> measures = List.of(
         new MatchNode.Measure("startPrice", new RexExpression.PatternFieldRef(1, 0, "A")),
+        // For the universal ordinal, alpha is Calcite's row-source alias, not a pattern-variable name.
+        new MatchNode.Measure("lastUniversal",
+            new RexExpression.PatternFieldRef(1, RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL, "prices")),
         new MatchNode.Measure("matchNum",
             new RexExpression.FunctionCall(ColumnDataType.LONG, "MATCH_NUMBER", List.of())));
-    DataSchema dataSchema = new DataSchema(new String[]{"sym", "startPrice", "matchNum"},
-        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.DOUBLE, ColumnDataType.LONG});
+    DataSchema dataSchema = new DataSchema(new String[]{"sym", "startPrice", "lastUniversal", "matchNum"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.LONG});
 
     return new MatchNode(1, dataSchema, PlanNode.NodeHint.EMPTY, new ArrayList<>(), patternSymbols, pattern, measures,
         List.of(0), List.of(new RelFieldCollation(1)), skipMode, skipToSymbolOrdinal,

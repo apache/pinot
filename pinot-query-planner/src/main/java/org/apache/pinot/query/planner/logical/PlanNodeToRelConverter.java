@@ -488,14 +488,14 @@ public final class PlanNodeToRelConverter {
         case ALTERNATE:
           return toPatternRexCall(SqlStdOperatorTable.PATTERN_ALTER, ((RowPattern.Alternate) pattern).getChildren(),
               symbols);
-        case QUANTIFY:
-          RowPattern.Quantify quantify = (RowPattern.Quantify) pattern;
+        case QUANTIFIER:
+          RowPattern.Quantifier quantifier = (RowPattern.Quantifier) pattern;
           return rexBuilder.makeCall(_builder.getTypeFactory().createUnknownType(),
               SqlStdOperatorTable.PATTERN_QUANTIFIER,
-              List.of(toPatternRexNode(quantify.getChild(), symbols),
-                  rexBuilder.makeExactLiteral(BigDecimal.valueOf(quantify.getMinRepeat())),
-                  rexBuilder.makeExactLiteral(BigDecimal.valueOf(quantify.getMaxRepeat())),
-                  rexBuilder.makeLiteral(!quantify.isGreedy())));
+              List.of(toPatternRexNode(quantifier.getChild(), symbols),
+                  rexBuilder.makeExactLiteral(BigDecimal.valueOf(quantifier.getMinRepeat())),
+                  rexBuilder.makeExactLiteral(BigDecimal.valueOf(quantifier.getMaxRepeat())),
+                  rexBuilder.makeLiteral(!quantifier.isGreedy())));
         default:
           throw new IllegalStateException("Unsupported row pattern kind: " + pattern.getKind());
       }

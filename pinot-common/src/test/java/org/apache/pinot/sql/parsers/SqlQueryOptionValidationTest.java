@@ -30,6 +30,7 @@ import org.apache.logging.log4j.core.appender.AbstractAppender;
 import org.apache.logging.log4j.core.config.Property;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils.SqlQueryOptionValidationMode;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
@@ -109,6 +110,18 @@ public class SqlQueryOptionValidationTest {
   }
 
   @Test
+  public void matchRecognizeOptionsAreKnownAndCanonicalizedCaseInsensitively() {
+    QueryOptionsUtils.setSqlQueryOptionValidationMode(SqlQueryOptionValidationMode.REJECT);
+
+    Map<String, String> options = optionsOf("SET MAXROWSINMATCHPARTITION='100'; "
+        + "SET maxstepspermatchattempt='200'; SET ALLOWMATCHRECOGNIZEWITHOUTPARTITIONBY='true'; "
+        + "select * from vegetables");
+    assertEquals(options.get(QueryOptionKey.MAX_ROWS_IN_MATCH_PARTITION), "100");
+    assertEquals(options.get(QueryOptionKey.MAX_STEPS_PER_MATCH_ATTEMPT), "200");
+    assertEquals(options.get(QueryOptionKey.ALLOW_MATCH_RECOGNIZE_WITHOUT_PARTITION_BY), "true");
+  }
+
+  @Test
   public void rejectModeLeavesDmlOptionsFreeForm() {
     QueryOptionsUtils.setSqlQueryOptionValidationMode(SqlQueryOptionValidationMode.REJECT);
 
@@ -165,7 +178,9 @@ public class SqlQueryOptionValidationTest {
 
       // Known keys are never logged.
       int loggedSoFar = appender.messagesContaining("Unsupported query option").size();
-      optionsOf("SET timeoutMs='100'; select * from vegetables");
+      optionsOf("SET timeoutMs='100'; SET maxRowsInMatchPartition='200'; "
+          + "SET maxStepsPerMatchAttempt='300'; SET allowMatchRecognizeWithoutPartitionBy='true'; "
+          + "select * from vegetables");
       assertEquals(appender.messagesContaining("Unsupported query option").size(), loggedSoFar);
     } finally {
       appender.detach();

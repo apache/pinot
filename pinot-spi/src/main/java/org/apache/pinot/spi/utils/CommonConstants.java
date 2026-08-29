@@ -850,6 +850,11 @@ public class CommonConstants {
         /// plan by default; set this to true to accept single-worker execution (fine for small tables, or when the
         /// WHERE clause already narrows the input down to one logical partition).
         public static final String ALLOW_MATCH_RECOGNIZE_WITHOUT_PARTITION_BY = "allowMatchRecognizeWithoutPartitionBy";
+        /// Maximum number of rows that a single MATCH_RECOGNIZE partition may buffer on a worker. This is a
+        /// partition limit, not a per-match limit: all rows of a partition must be available before matching starts.
+        public static final String MAX_ROWS_IN_MATCH_PARTITION = "maxRowsInMatchPartition";
+        /// Maximum number of automaton transitions explored for one MATCH_RECOGNIZE start position.
+        public static final String MAX_STEPS_PER_MATCH_ATTEMPT = "maxStepsPerMatchAttempt";
         /// When set to true, the broker uses the long-lived `SubmitWithStream` bidi RPC to dispatch the query,
         /// receiving stage stats out-of-band as `OpChainComplete` messages instead of via mailbox EOS. The
         /// broker awaits stats completion as soon as the receiving mailbox finishes (early completion), bounded by

@@ -66,9 +66,12 @@ message PatternFieldRef {
   // Column index into the MatchNode input row.
   int32 index = 1;
   // Ordinal of the pattern variable this reference is bound to, i.e. the index into MatchNode.patternSymbols.
-  // This is the authoritative identification of the variable.
+  // The sentinel -2 denotes the SQL:2016 universal row pattern variable: an unqualified reference that ranges over
+  // every row in the match regardless of its pattern variable. -1 is reserved for an unresolved planner-local
+  // reference and must never reach the wire; values below -2 are invalid. This field is authoritative.
   int32 symbolOrdinal = 2;
-  // Pattern variable name as written in the query, carried for explain plans and error messages only.
+  // Pattern variable name as written in the query, carried for explain plans and error messages only. For the
+  // universal ordinal (-2), Calcite supplies the row-source/table alias here; it is not a pattern-variable name.
   // Consumers must resolve the variable through symbolOrdinal and never string-match on this field.
   string alpha = 3;
 }

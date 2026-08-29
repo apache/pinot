@@ -60,6 +60,7 @@ import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexWindowExclusion;
+import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlMatchRecognize;
 import org.apache.calcite.sql.type.SqlTypeName;
@@ -740,6 +741,11 @@ public final class RelToPlanNodeConverter {
               + "MEASURES, so add at least one measure, e.g. MEASURES MATCH_NUMBER() AS mno.");
     }
 
+    validateMatchPartitionKeyTypes(node);
+    for (Map.Entry<String, RexNode> measure : node.getMeasures().entrySet()) {
+      validateMatchAggregateOperandTypes(measure.getValue(), measure.getKey());
+    }
+
     // Order the symbol table by first appearance in PATTERN so the ordinals are deterministic and independent of the
     // iteration order of Calcite's pattern definition map.
     Map<String, Integer> symbolOrdinals = new LinkedHashMap<>();
@@ -782,6 +788,38 @@ public final class RelToPlanNodeConverter {
         convertInputs(node.getInputs()), patternSymbols, pattern, measures, partitionKeysInSourceOrder(node),
         node.getOrderKeys().getFieldCollations(), afterMatchSkipMode, afterMatchSkipToSymbolOrdinal,
         MatchNode.RowsPerMatchMode.ONE_ROW_PER_MATCH);
+  }
+
+  private static void validateMatchPartitionKeyTypes(Match node) {
+    List<RelDataTypeField> inputFields = node.getInput().getRowType().getFieldList();
+    for (int partitionKey : node.getPartitionKeys()) {
+      RelDataTypeField field = inputFields.get(partitionKey);
+      if (field.getType().getSqlTypeName() == SqlTypeName.ARRAY) {
+        throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+            "MATCH_RECOGNIZE does not support multi-value or ARRAY PARTITION BY columns: '" + field.getName()
+                + "'. Partition by a single-value column instead.");
+      }
+    }
+  }
+
+  private static void validateMatchAggregateOperandTypes(RexNode expression, String measureName) {
+    if (!(expression instanceof RexCall)) {
+      return;
+    }
+    RexCall call = (RexCall) expression;
+    if (call.getOperator() instanceof SqlAggFunction) {
+      for (RexNode operand : call.getOperands()) {
+        if (operand.getType().getSqlTypeName() == SqlTypeName.ARRAY) {
+          throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+              "MATCH_RECOGNIZE measure '" + measureName + "' applies aggregate '" + call.getOperator().getName()
+                  + "' to a multi-value or ARRAY operand, which is not supported. Aggregate a single-value column "
+                  + "instead.");
+        }
+      }
+    }
+    for (RexNode operand : call.getOperands()) {
+      validateMatchAggregateOperandTypes(operand, measureName);
+    }
   }
 
   /// The input column indexes of the `PARTITION BY` keys, in `PARTITION BY` **source** order.
@@ -869,7 +907,7 @@ public final class RelToPlanNodeConverter {
       case PATTERN_ALTER:
         return new RowPattern.Alternate(flattenRowPatterns(call, symbolOrdinals));
       case PATTERN_QUANTIFIER:
-        return toQuantify(call, symbolOrdinals);
+        return toQuantifier(call, symbolOrdinals);
       case PATTERN_PERMUTE:
         throw new QueryException(QueryErrorCode.QUERY_PLANNING,
             "PERMUTE is not supported yet in the MATCH_RECOGNIZE PATTERN clause. Expand the permutation into an "
@@ -905,7 +943,7 @@ public final class RelToPlanNodeConverter {
     }
   }
 
-  private RowPattern toQuantify(RexCall call, Map<String, Integer> symbolOrdinals) {
+  private RowPattern toQuantifier(RexCall call, Map<String, Integer> symbolOrdinals) {
     List<RexNode> operands = call.getOperands();
     Preconditions.checkState(operands.size() == 4,
         "Expecting 4 operands in MATCH_RECOGNIZE pattern quantifier, got: %s", operands.size());
@@ -917,13 +955,13 @@ public final class RelToPlanNodeConverter {
     if (minRepeat == UNSPECIFIED_QUANTIFIER_BOUND) {
       minRepeat = 0;
     }
-    if (maxRepeat != RowPattern.Quantify.UNBOUNDED && maxRepeat < minRepeat) {
+    if (maxRepeat != RowPattern.Quantifier.UNBOUNDED && maxRepeat < minRepeat) {
       throw new QueryException(QueryErrorCode.QUERY_PLANNING,
           "MATCH_RECOGNIZE pattern quantifier '" + call + "' has an upper bound (" + maxRepeat
               + ") smaller than its lower bound (" + minRepeat + "), so it can never match.");
     }
     // The reluctant forms (`*?`, `+?`, `??`, `{n,m}?`) prefer the shortest match.
-    return new RowPattern.Quantify(child, minRepeat, maxRepeat, !RexLiteral.booleanValue(operands.get(3)));
+    return new RowPattern.Quantifier(child, minRepeat, maxRepeat, !RexLiteral.booleanValue(operands.get(3)));
   }
 
   private int toQuantifierBound(RexNode bound, RexCall call) {

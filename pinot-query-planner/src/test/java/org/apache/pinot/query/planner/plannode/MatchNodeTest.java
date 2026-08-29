@@ -45,16 +45,21 @@ public class MatchNodeTest {
   @Test
   public void testPatternStringRendersQuantifiers() {
     // A* A+ A? A{3} A{3,} A{3,5}, and the reluctant form of each.
-    assertPattern("A*", new RowPattern.Quantify(new RowPattern.Symbol(0), 0, RowPattern.Quantify.UNBOUNDED, true));
-    assertPattern("A*?", new RowPattern.Quantify(new RowPattern.Symbol(0), 0, RowPattern.Quantify.UNBOUNDED, false));
-    assertPattern("A+", new RowPattern.Quantify(new RowPattern.Symbol(0), 1, RowPattern.Quantify.UNBOUNDED, true));
-    assertPattern("A+?", new RowPattern.Quantify(new RowPattern.Symbol(0), 1, RowPattern.Quantify.UNBOUNDED, false));
-    assertPattern("A?", new RowPattern.Quantify(new RowPattern.Symbol(0), 0, 1, true));
-    assertPattern("A??", new RowPattern.Quantify(new RowPattern.Symbol(0), 0, 1, false));
-    assertPattern("A{3}", new RowPattern.Quantify(new RowPattern.Symbol(0), 3, 3, true));
-    assertPattern("A{3,}", new RowPattern.Quantify(new RowPattern.Symbol(0), 3, RowPattern.Quantify.UNBOUNDED, true));
-    assertPattern("A{3,5}", new RowPattern.Quantify(new RowPattern.Symbol(0), 3, 5, true));
-    assertPattern("A{3,5}?", new RowPattern.Quantify(new RowPattern.Symbol(0), 3, 5, false));
+    assertPattern("A*",
+        new RowPattern.Quantifier(new RowPattern.Symbol(0), 0, RowPattern.Quantifier.UNBOUNDED, true));
+    assertPattern("A*?",
+        new RowPattern.Quantifier(new RowPattern.Symbol(0), 0, RowPattern.Quantifier.UNBOUNDED, false));
+    assertPattern("A+",
+        new RowPattern.Quantifier(new RowPattern.Symbol(0), 1, RowPattern.Quantifier.UNBOUNDED, true));
+    assertPattern("A+?",
+        new RowPattern.Quantifier(new RowPattern.Symbol(0), 1, RowPattern.Quantifier.UNBOUNDED, false));
+    assertPattern("A?", new RowPattern.Quantifier(new RowPattern.Symbol(0), 0, 1, true));
+    assertPattern("A??", new RowPattern.Quantifier(new RowPattern.Symbol(0), 0, 1, false));
+    assertPattern("A{3}", new RowPattern.Quantifier(new RowPattern.Symbol(0), 3, 3, true));
+    assertPattern("A{3,}",
+        new RowPattern.Quantifier(new RowPattern.Symbol(0), 3, RowPattern.Quantifier.UNBOUNDED, true));
+    assertPattern("A{3,5}", new RowPattern.Quantifier(new RowPattern.Symbol(0), 3, 5, true));
+    assertPattern("A{3,5}?", new RowPattern.Quantifier(new RowPattern.Symbol(0), 3, 5, false));
   }
 
   @Test
@@ -62,10 +67,10 @@ public class MatchNodeTest {
     // ^ (A B)* (B | C{2}) $ - a quantified concatenation must be parenthesized, an alternation parenthesizes itself.
     RowPattern pattern = new RowPattern.Concat(List.of(
         RowPattern.AnchorStart.INSTANCE,
-        new RowPattern.Quantify(new RowPattern.Concat(List.of(new RowPattern.Symbol(0), new RowPattern.Symbol(1))), 0,
-            RowPattern.Quantify.UNBOUNDED, true),
+        new RowPattern.Quantifier(new RowPattern.Concat(List.of(new RowPattern.Symbol(0), new RowPattern.Symbol(1))), 0,
+            RowPattern.Quantifier.UNBOUNDED, true),
         new RowPattern.Alternate(List.of(new RowPattern.Symbol(1),
-            new RowPattern.Quantify(new RowPattern.Symbol(2), 2, 2, true))),
+            new RowPattern.Quantifier(new RowPattern.Symbol(2), 2, 2, true))),
         RowPattern.AnchorEnd.INSTANCE));
     assertPattern("^ (A B)* (B | C{2}) $", pattern);
   }
@@ -94,8 +99,8 @@ public class MatchNodeTest {
     // A different pattern is a different node, even though everything else matches.
     assertNotEquals(node1, buildNode(new RowPattern.Symbol(1)));
     // A greedy and a reluctant quantifier select different matches and must never compare equal.
-    assertNotEquals(new RowPattern.Quantify(new RowPattern.Symbol(0), 1, 2, true),
-        new RowPattern.Quantify(new RowPattern.Symbol(0), 1, 2, false));
+    assertNotEquals(new RowPattern.Quantifier(new RowPattern.Symbol(0), 1, 2, true),
+        new RowPattern.Quantifier(new RowPattern.Symbol(0), 1, 2, false));
     // Alternation is ordered: the leftmost alternative wins, so a reordering is a different pattern.
     assertNotEquals(new RowPattern.Alternate(List.of(new RowPattern.Symbol(0), new RowPattern.Symbol(1))),
         new RowPattern.Alternate(List.of(new RowPattern.Symbol(1), new RowPattern.Symbol(0))));

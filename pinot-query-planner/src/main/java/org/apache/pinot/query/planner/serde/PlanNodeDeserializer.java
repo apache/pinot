@@ -307,11 +307,11 @@ public class PlanNodeDeserializer {
         return new RowPattern.Concat(convertRowPatterns(protoChildren));
       case PATTERN_ALTERNATE:
         return new RowPattern.Alternate(convertRowPatterns(protoChildren));
-      case PATTERN_QUANTIFY: {
+      case PATTERN_QUANTIFIER: {
         Preconditions.checkState(protoChildren.size() == 1,
-            "PATTERN_QUANTIFY must have exactly 1 child, got: %s", protoChildren.size());
+            "PATTERN_QUANTIFIER must have exactly 1 child, got: %s", protoChildren.size());
         Plan.RowPatternQuantifier quantifier = protoPattern.getQuantifier();
-        return new RowPattern.Quantify(convertRowPattern(protoChildren.get(0)), quantifier.getMinRepeat(),
+        return new RowPattern.Quantifier(convertRowPattern(protoChildren.get(0)), quantifier.getMinRepeat(),
             quantifier.getMaxRepeat(), quantifier.getGreedy());
       }
       case PATTERN_ANCHOR_START:
