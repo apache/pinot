@@ -27,6 +27,10 @@ public class ChannelUtils {
 
   public static final String MAILBOX_METADATA_BUFFER_SIZE_KEY = "buffer.size";
   public static final String MAILBOX_METADATA_REQUEST_EARLY_TERMINATE = "request.early.terminate";
+  /// Set on data messages whose sender sorted its complete stream by the exchange collation. Receivers introduced
+  /// before this metadata ignore it; receivers that understand it use its absence to detect an older sender and
+  /// fall back to a full sort.
+  public static final String MAILBOX_METADATA_SORTED_ON_SENDER = "sorted.on.sender";
 
   public static final Metadata.Key<String> MAILBOX_ID_METADATA_KEY =
       Metadata.Key.of("mailboxId", Metadata.ASCII_STRING_MARSHALLER);
