@@ -88,6 +88,25 @@ void SqlAtTimeZone(List<Object> list, ExprContext exprContext, Span s) :
     }
 }
 
+/// Parses the PostgreSQL infix `::` cast operator. The operator and its target type are appended to the enclosing
+/// expression list so `SqlParserUtil.toTree` applies the standard precedence rules, exactly like `SqlAtTimeZone`
+/// above; collapsing the list here instead would make `::` bind the whole expression to its left. PostgreSQL BYTEA
+/// literals are normalized after parsing so both query engines receive the same binary literal representation as
+/// SQL `X'...'`.
+void InfixCast(List<Object> list, ExprContext exprContext, Span s) :
+{
+    final SqlDataTypeSpec dataType;
+}
+{
+    <INFIX_CAST> {
+        checkNonQueryExpression(exprContext);
+    }
+    dataType = DataType() {
+        list.add(new SqlParserUtil.ToTreeListItem(SqlLibraryOperators.INFIX_CAST, s.pos()));
+        list.add(dataType);
+    }
+}
+
 SqlNode SqlPhysicalExplain() :
 {
     SqlNode stmt;
