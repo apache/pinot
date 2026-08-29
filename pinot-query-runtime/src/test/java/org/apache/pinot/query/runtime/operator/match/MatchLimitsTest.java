@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator.match;
 
 import java.util.Map;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -38,11 +39,12 @@ public class MatchLimitsTest {
 
   @Test
   public void testDefaultsApplyWhenNothingIsSet() {
-    assertEquals(MatchLimits.getMaxRowsInMatch(Map.of(), NO_HINT), MatchLimits.DEFAULT_MAX_ROWS_IN_MATCH);
+    assertEquals(MatchLimits.getMaxRowsInMatchPartition(Map.of(), NO_HINT),
+        MatchLimits.DEFAULT_MAX_ROWS_IN_MATCH_PARTITION);
     assertEquals(MatchLimits.getMaxStepsPerMatchAttempt(Map.of(), NO_HINT),
         MatchLimits.DEFAULT_MAX_STEPS_PER_MATCH_ATTEMPT);
     // The defaults the task pins: a million rows, and sixteen million steps.
-    assertEquals(MatchLimits.DEFAULT_MAX_ROWS_IN_MATCH, 1_000_000);
+    assertEquals(MatchLimits.DEFAULT_MAX_ROWS_IN_MATCH_PARTITION, 1_000_000);
     assertEquals(MatchLimits.DEFAULT_MAX_STEPS_PER_MATCH_ATTEMPT, 16_000_000L);
   }
 
@@ -52,42 +54,46 @@ public class MatchLimitsTest {
     // number of transitions per row (3 for PATTERN (A+), 5 for PATTERN ((A|B)+)), so a step budget below that
     // constant times the row budget would reject a partition that the row budget explicitly admits.
     assertTrue(
-        MatchLimits.DEFAULT_MAX_STEPS_PER_MATCH_ATTEMPT >= 6L * MatchLimits.DEFAULT_MAX_ROWS_IN_MATCH,
+        MatchLimits.DEFAULT_MAX_STEPS_PER_MATCH_ATTEMPT >= 6L * MatchLimits.DEFAULT_MAX_ROWS_IN_MATCH_PARTITION,
         "The step default (" + MatchLimits.DEFAULT_MAX_STEPS_PER_MATCH_ATTEMPT + ") must dominate the per-row cost "
-            + "of a linear match over the largest permitted partition (" + MatchLimits.DEFAULT_MAX_ROWS_IN_MATCH
+            + "of a linear match over the largest permitted partition ("
+            + MatchLimits.DEFAULT_MAX_ROWS_IN_MATCH_PARTITION
             + " rows)");
   }
 
   @Test
   public void testQueryOptionOverridesTheDefault() {
-    assertEquals(MatchLimits.getMaxRowsInMatch(Map.of(MatchLimits.MAX_ROWS_IN_MATCH, "42"), NO_HINT), 42);
+    assertEquals(MatchLimits.getMaxRowsInMatchPartition(
+        Map.of(QueryOptionKey.MAX_ROWS_IN_MATCH_PARTITION, "42"), NO_HINT), 42);
     assertEquals(
-        MatchLimits.getMaxStepsPerMatchAttempt(Map.of(MatchLimits.MAX_STEPS_PER_MATCH_ATTEMPT, "77"), NO_HINT), 77L);
+        MatchLimits.getMaxStepsPerMatchAttempt(Map.of(QueryOptionKey.MAX_STEPS_PER_MATCH_ATTEMPT, "77"), NO_HINT),
+        77L);
   }
 
   @Test
   public void testHintOverridesTheQueryOption() {
-    PlanNode.NodeHint hint = hint(Map.of(MatchLimits.MAX_ROWS_IN_MATCH_HINT, "7",
+    PlanNode.NodeHint hint = hint(Map.of(MatchLimits.MAX_ROWS_IN_MATCH_PARTITION_HINT, "7",
         MatchLimits.MAX_STEPS_PER_MATCH_ATTEMPT_HINT, "9"));
-    Map<String, String> queryOptions = Map.of(MatchLimits.MAX_ROWS_IN_MATCH, "1000",
-        MatchLimits.MAX_STEPS_PER_MATCH_ATTEMPT, "1000");
-    assertEquals(MatchLimits.getMaxRowsInMatch(queryOptions, hint), 7);
+    Map<String, String> queryOptions = Map.of(QueryOptionKey.MAX_ROWS_IN_MATCH_PARTITION, "1000",
+        QueryOptionKey.MAX_STEPS_PER_MATCH_ATTEMPT, "1000");
+    assertEquals(MatchLimits.getMaxRowsInMatchPartition(queryOptions, hint), 7);
     assertEquals(MatchLimits.getMaxStepsPerMatchAttempt(queryOptions, hint), 9L);
   }
 
   @Test
   public void testHintOfADifferentLimitDoesNotShadowTheQueryOption() {
     // A hint that only pins the row limit must leave the step limit resolving through the query option.
-    PlanNode.NodeHint hint = hint(Map.of(MatchLimits.MAX_ROWS_IN_MATCH_HINT, "7"));
-    Map<String, String> queryOptions = Map.of(MatchLimits.MAX_STEPS_PER_MATCH_ATTEMPT, "1000");
-    assertEquals(MatchLimits.getMaxRowsInMatch(queryOptions, hint), 7);
+    PlanNode.NodeHint hint = hint(Map.of(MatchLimits.MAX_ROWS_IN_MATCH_PARTITION_HINT, "7"));
+    Map<String, String> queryOptions = Map.of(QueryOptionKey.MAX_STEPS_PER_MATCH_ATTEMPT, "1000");
+    assertEquals(MatchLimits.getMaxRowsInMatchPartition(queryOptions, hint), 7);
     assertEquals(MatchLimits.getMaxStepsPerMatchAttempt(queryOptions, hint), 1000L);
   }
 
   @Test
   public void testHintsOfOtherOperatorsAreIgnored() {
     PlanNode.NodeHint windowHint = new PlanNode.NodeHint(Map.of("windowOptions", Map.of("max_rows_in_window", "3")));
-    assertEquals(MatchLimits.getMaxRowsInMatch(Map.of(), windowHint), MatchLimits.DEFAULT_MAX_ROWS_IN_MATCH);
+    assertEquals(MatchLimits.getMaxRowsInMatchPartition(Map.of(), windowHint),
+        MatchLimits.DEFAULT_MAX_ROWS_IN_MATCH_PARTITION);
   }
 
   @Test
@@ -95,8 +101,9 @@ public class MatchLimitsTest {
     // Silently falling back to the default would hide a typo behind a limit the user did not ask for.
     for (String bad : new String[]{"0", "-1", "abc", ""}) {
       IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
-          () -> MatchLimits.getMaxRowsInMatch(Map.of(MatchLimits.MAX_ROWS_IN_MATCH, bad), NO_HINT));
-      assertTrue(exception.getMessage().contains(MatchLimits.MAX_ROWS_IN_MATCH), exception.getMessage());
+          () -> MatchLimits.getMaxRowsInMatchPartition(
+              Map.of(QueryOptionKey.MAX_ROWS_IN_MATCH_PARTITION, bad), NO_HINT));
+      assertTrue(exception.getMessage().contains(QueryOptionKey.MAX_ROWS_IN_MATCH_PARTITION), exception.getMessage());
     }
   }
 
@@ -104,11 +111,12 @@ public class MatchLimitsTest {
   public void testMaxRowsInMatchDoesNotOverflowAnInt() {
     // The value is used as an int row count; a long that does not fit must be an error rather than a wrapped value.
     IllegalArgumentException exception = expectThrows(IllegalArgumentException.class, () -> MatchLimits
-        .getMaxRowsInMatch(Map.of(MatchLimits.MAX_ROWS_IN_MATCH, Long.toString(Integer.MAX_VALUE + 1L)), NO_HINT));
-    assertTrue(exception.getMessage().contains(MatchLimits.MAX_ROWS_IN_MATCH), exception.getMessage());
+        .getMaxRowsInMatchPartition(
+            Map.of(QueryOptionKey.MAX_ROWS_IN_MATCH_PARTITION, Long.toString(Integer.MAX_VALUE + 1L)), NO_HINT));
+    assertTrue(exception.getMessage().contains(QueryOptionKey.MAX_ROWS_IN_MATCH_PARTITION), exception.getMessage());
     // The step budget is a long, so the same value is perfectly legal there.
     assertEquals(MatchLimits.getMaxStepsPerMatchAttempt(
-        Map.of(MatchLimits.MAX_STEPS_PER_MATCH_ATTEMPT, Long.toString(Integer.MAX_VALUE + 1L)), NO_HINT),
+        Map.of(QueryOptionKey.MAX_STEPS_PER_MATCH_ATTEMPT, Long.toString(Integer.MAX_VALUE + 1L)), NO_HINT),
         Integer.MAX_VALUE + 1L);
   }
 

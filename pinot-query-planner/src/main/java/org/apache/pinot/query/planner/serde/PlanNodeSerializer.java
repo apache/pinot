@@ -346,14 +346,14 @@ public class PlanNodeSerializer {
           builder.setKind(Plan.RowPatternKind.PATTERN_ALTERNATE);
           addRowPatternChildren(builder, ((RowPattern.Alternate) pattern).getChildren());
           break;
-        case QUANTIFY: {
-          RowPattern.Quantify quantify = (RowPattern.Quantify) pattern;
-          builder.setKind(Plan.RowPatternKind.PATTERN_QUANTIFY)
-              .addChildren(convertRowPattern(quantify.getChild()))
+        case QUANTIFIER: {
+          RowPattern.Quantifier quantifier = (RowPattern.Quantifier) pattern;
+          builder.setKind(Plan.RowPatternKind.PATTERN_QUANTIFIER)
+              .addChildren(convertRowPattern(quantifier.getChild()))
               .setQuantifier(Plan.RowPatternQuantifier.newBuilder()
-                  .setMinRepeat(quantify.getMinRepeat())
-                  .setMaxRepeat(quantify.getMaxRepeat())
-                  .setGreedy(quantify.isGreedy())
+                  .setMinRepeat(quantifier.getMinRepeat())
+                  .setMaxRepeat(quantifier.getMaxRepeat())
+                  .setGreedy(quantifier.isGreedy())
                   .build());
           break;
         }

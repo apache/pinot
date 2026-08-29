@@ -20,6 +20,8 @@ package org.apache.pinot.query.runtime.operator.match;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -125,8 +127,9 @@ public class MatchExpression {
     if (expression instanceof RexExpression.PatternFieldRef) {
       // A bare column reference such as `A.price` is `LAST(A.price, 0)` per SQL:2016.
       RexExpression.PatternFieldRef ref = (RexExpression.PatternFieldRef) expression;
+      ColumnDataType sourceType = columnType(inputSchema, ref);
       return addTerm(terms, new MatchTerm.Navigation(ref.getSymbolOrdinal(), true, 0, 0, ref.getIndex(),
-          columnType(inputSchema, ref)));
+          sourceType, sourceType));
     }
     if (expression instanceof RexExpression.InputRef) {
       // Column references inside MEASURES / DEFINE always arrive as pattern field references. A plain input
@@ -162,7 +165,7 @@ public class MatchExpression {
       if (!containsPatternFieldRef(call)) {
         return rewrite(singleOperand(call), inputSchema, terms);
       }
-      return addTerm(terms, navigation(call));
+      return addTerm(terms, navigation(call, inputSchema));
     }
     if (AggregationFunctionType.isAggregationFunction(functionName)) {
       return addTerm(terms, aggregate(call, inputSchema));
@@ -185,11 +188,11 @@ public class MatchExpression {
   /// Flattens a nest of navigation calls such as `PREV(LAST(A.price, 1), 2)` into a single
   /// [MatchTerm.Navigation]: at most one logical step (`FIRST` / `LAST`) selects a row of the match,
   /// and the `PREV` / `NEXT` offsets around it add up into one physical delta.
-  private static MatchTerm.Navigation navigation(RexExpression.FunctionCall call) {
+  private static MatchTerm.Navigation navigation(RexExpression.FunctionCall call, DataSchema inputSchema) {
     boolean fromEnd = true;
     int logicalOffset = 0;
     boolean logicalSeen = false;
-    int physicalDelta = 0;
+    long physicalDelta = 0;
     RexExpression current = call;
     while (current instanceof RexExpression.FunctionCall) {
       RexExpression.FunctionCall currentCall = (RexExpression.FunctionCall) current;
@@ -205,18 +208,24 @@ public class MatchExpression {
                 + "FIRST / LAST / PREV / NEXT, is supported.");
       }
       int offset = navigationOffset(currentCall);
-      if (PREV.equals(functionName)) {
-        physicalDelta -= offset;
-      } else if (NEXT.equals(functionName)) {
-        physicalDelta += offset;
-      } else {
-        if (logicalSeen) {
-          throw QueryErrorCode.QUERY_EXECUTION.asException(
-              "Nested FIRST / LAST is not supported in MATCH_RECOGNIZE: '" + call + "'.");
+      try {
+        if (PREV.equals(functionName)) {
+          physicalDelta = Math.subtractExact(physicalDelta, offset);
+        } else if (NEXT.equals(functionName)) {
+          physicalDelta = Math.addExact(physicalDelta, offset);
+        } else {
+          if (logicalSeen) {
+            throw QueryErrorCode.QUERY_EXECUTION.asException(
+                "Nested FIRST / LAST is not supported in MATCH_RECOGNIZE: '" + call + "'.");
+          }
+          logicalSeen = true;
+          fromEnd = LAST.equals(functionName);
+          logicalOffset = offset;
         }
-        logicalSeen = true;
-        fromEnd = LAST.equals(functionName);
-        logicalOffset = offset;
+      } catch (ArithmeticException e) {
+        throw QueryErrorCode.QUERY_EXECUTION.asException(
+            "The combined PREV / NEXT offset in a MATCH_RECOGNIZE row pattern navigation exceeds the supported "
+                + "range of " + Integer.MIN_VALUE + " to " + Integer.MAX_VALUE + ": '" + call + "'.", e);
       }
       current = currentCall.getFunctionOperands().get(0);
     }
@@ -226,8 +235,15 @@ public class MatchExpression {
               + "'. Expecting a column reference qualified by a pattern variable.");
     }
     RexExpression.PatternFieldRef ref = (RexExpression.PatternFieldRef) current;
-    return new MatchTerm.Navigation(ref.getSymbolOrdinal(), fromEnd, logicalOffset, physicalDelta, ref.getIndex(),
-        call.getDataType());
+    ColumnDataType sourceType = columnType(inputSchema, ref);
+    try {
+      return new MatchTerm.Navigation(ref.getSymbolOrdinal(), fromEnd, logicalOffset, Math.toIntExact(physicalDelta),
+          ref.getIndex(), sourceType, call.getDataType());
+    } catch (ArithmeticException e) {
+      throw QueryErrorCode.QUERY_EXECUTION.asException(
+          "The combined PREV / NEXT offset in a MATCH_RECOGNIZE row pattern navigation exceeds the supported "
+              + "range of " + Integer.MIN_VALUE + " to " + Integer.MAX_VALUE + ": '" + call + "'.", e);
+    }
   }
 
   /// The offset operand of a navigation call. `PREV` and `NEXT` default to one row, `FIRST` and
@@ -248,12 +264,32 @@ public class MatchExpression {
       throw QueryErrorCode.QUERY_EXECUTION.asException(
           "The offset of a MATCH_RECOGNIZE row pattern navigation must be an integer, got: '" + value + "'.");
     }
-    int intValue = ((Number) value).intValue();
-    if (intValue < 0) {
-      throw QueryErrorCode.QUERY_EXECUTION.asException(
-          "The offset of a MATCH_RECOGNIZE row pattern navigation must not be negative, got: " + intValue + ".");
+    BigDecimal decimalValue;
+    if (value instanceof BigDecimal) {
+      decimalValue = (BigDecimal) value;
+    } else if (value instanceof BigInteger) {
+      decimalValue = new BigDecimal((BigInteger) value);
+    } else if (value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long) {
+      decimalValue = BigDecimal.valueOf(((Number) value).longValue());
+    } else {
+      double doubleValue = ((Number) value).doubleValue();
+      if (!Double.isFinite(doubleValue)) {
+        throw QueryErrorCode.QUERY_EXECUTION.asException(
+            "The offset of a MATCH_RECOGNIZE row pattern navigation must be a finite integer, got: '" + value + "'.");
+      }
+      decimalValue = BigDecimal.valueOf(doubleValue);
     }
-    return intValue;
+    if (decimalValue.signum() < 0) {
+      throw QueryErrorCode.QUERY_EXECUTION.asException(
+          "The offset of a MATCH_RECOGNIZE row pattern navigation must not be negative, got: " + value + ".");
+    }
+    try {
+      return decimalValue.intValueExact();
+    } catch (ArithmeticException e) {
+      throw QueryErrorCode.QUERY_EXECUTION.asException(
+          "The offset of a MATCH_RECOGNIZE row pattern navigation must be an exact integer between 0 and "
+              + Integer.MAX_VALUE + ", got: '" + value + "'.", e);
+    }
   }
 
   /// Compiles a single variable aggregate. The aggregated expression is compiled against the input schema so that it

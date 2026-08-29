@@ -31,7 +31,7 @@ import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.al
 import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.anySymbol;
 import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.concat;
 import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.labelSymbols;
-import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.quantify;
+import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.quantifier;
 import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.rows;
 import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.symbol;
 import static org.testng.Assert.assertEquals;
@@ -52,26 +52,26 @@ public class PatternToNfaCompilerTest {
   @Test
   public void testGreedyQuantifierPrefersTheLongestMatch() {
     // PATTERN (A*) over AAA: greedy takes all three rows.
-    assertMatch(quantify(symbol(0), 0, RowPattern.Quantify.UNBOUNDED, true), labelSymbols("A"), "AAA", "AAA");
+    assertMatch(quantifier(symbol(0), 0, RowPattern.Quantifier.UNBOUNDED, true), labelSymbols("A"), "AAA", "AAA");
   }
 
   @Test
   public void testReluctantQuantifierPrefersTheShortestMatch() {
     // PATTERN (A*?) over AAA: reluctant leaves the loop immediately, which is a legal empty match.
-    assertMatch(quantify(symbol(0), 0, RowPattern.Quantify.UNBOUNDED, false), labelSymbols("A"), "AAA", "");
+    assertMatch(quantifier(symbol(0), 0, RowPattern.Quantifier.UNBOUNDED, false), labelSymbols("A"), "AAA", "");
   }
 
   @Test
   public void testReluctantQuantifierStillHonoursItsMinimum() {
     // PATTERN (A+?) over AAA: reluctant, but one repetition is mandatory.
-    assertMatch(quantify(symbol(0), 1, RowPattern.Quantify.UNBOUNDED, false), labelSymbols("A"), "AAA", "A");
+    assertMatch(quantifier(symbol(0), 1, RowPattern.Quantifier.UNBOUNDED, false), labelSymbols("A"), "AAA", "A");
   }
 
   @Test
   public void testGreedyQuantifierBacktracksWhenTheRestOfThePatternNeedsRows() {
     // PATTERN (A* A) over AAA: the greedy loop must give one row back so the trailing A can match.
     RowPattern pattern =
-        concat(quantify(symbol(0), 0, RowPattern.Quantify.UNBOUNDED, true), symbol(1));
+        concat(quantifier(symbol(0), 0, RowPattern.Quantifier.UNBOUNDED, true), symbol(1));
     // Two symbols, both matching the label A, so the classification shows where the loop stopped.
     List<PatternSymbol> symbols = List.of(MatchTestFixtures.labelSymbol("A", 0), aliasOfA());
     assertMatch(pattern, symbols, "AAA", "AAX");
@@ -106,7 +106,7 @@ public class PatternToNfaCompilerTest {
   public void testReluctantQuantifierStopsAtTheFirstRowThatLetsTheRestOfThePatternMatch() {
     // PATTERN (A*? B) over A A B: reluctant prefers to leave the loop at once, but the trailing B forces it to take
     // exactly as many rows as it must - no more.
-    RowPattern pattern = concat(quantify(symbol(0), 0, RowPattern.Quantify.UNBOUNDED, false), symbol(1));
+    RowPattern pattern = concat(quantifier(symbol(0), 0, RowPattern.Quantifier.UNBOUNDED, false), symbol(1));
     assertMatch(pattern, labelSymbols("A", "B"), "AAB", "AAB");
   }
 
@@ -116,69 +116,79 @@ public class PatternToNfaCompilerTest {
     // Greedy gives the loop as many rows as it can while still letting the trailing A match; reluctant gives it the
     // fewest. Both are legal matches of the same pattern, which is exactly why the preference order decides.
     List<PatternSymbol> symbols = List.of(MatchTestFixtures.labelSymbol("A", 0), aliasOfA());
-    assertMatch(concat(quantify(symbol(0), 1, 3, true), symbol(1)), symbols, "AAAA", "AAAX");
-    assertMatch(concat(quantify(symbol(0), 1, 3, false), symbol(1)), symbols, "AAAA", "AX");
+    assertMatch(concat(quantifier(symbol(0), 1, 3, true), symbol(1)), symbols, "AAAA", "AAAX");
+    assertMatch(concat(quantifier(symbol(0), 1, 3, false), symbol(1)), symbols, "AAAA", "AX");
   }
 
   @Test
   public void testBoundedQuantifierRespectsItsUpperBound() {
     // PATTERN (A{2,3}) over AAAA: greedy stops at the upper bound rather than consuming everything.
-    assertMatch(quantify(symbol(0), 2, 3, true), labelSymbols("A"), "AAAA", "AAA");
+    assertMatch(quantifier(symbol(0), 2, 3, true), labelSymbols("A"), "AAAA", "AAA");
   }
 
   @Test
   public void testBoundedQuantifierRespectsItsLowerBound() {
     // PATTERN (A{2,3}) over A: a single row is not enough, so there is no match at all.
-    assertNoMatch(quantify(symbol(0), 2, 3, true), labelSymbols("A"), "A");
+    assertNoMatch(quantifier(symbol(0), 2, 3, true), labelSymbols("A"), "A");
   }
 
   @Test
   public void testExactQuantifier() {
-    assertMatch(quantify(symbol(0), 2, 2, true), labelSymbols("A"), "AAAA", "AA");
+    assertMatch(quantifier(symbol(0), 2, 2, true), labelSymbols("A"), "AAAA", "AA");
   }
 
   @Test
   public void testReluctantBoundedQuantifierStopsAtItsLowerBound() {
-    assertMatch(quantify(symbol(0), 2, 3, false), labelSymbols("A"), "AAAA", "AA");
+    assertMatch(quantifier(symbol(0), 2, 3, false), labelSymbols("A"), "AAAA", "AA");
   }
 
   @Test
   public void testBoundedQuantifierUsesCounterRegistersInsteadOfUnrollingStates() {
     // The whole point of counter registers: a huge repetition bound must not blow up the automaton.
-    PatternNfa small = PatternToNfaCompiler.compile(quantify(symbol(0), 1, 3, true));
-    PatternNfa huge = PatternToNfaCompiler.compile(quantify(symbol(0), 1, 100_000, true));
+    PatternNfa small = PatternToNfaCompiler.compile(quantifier(symbol(0), 1, 3, true));
+    PatternNfa huge = PatternToNfaCompiler.compile(quantifier(symbol(0), 1, 100_000, true));
     assertEquals(huge.getNumStates(), small.getNumStates());
     assertEquals(huge.getNumCounters(), 1);
     assertEquals(huge.getNumStates(), PatternToNfaCompiler.compile(
-        quantify(symbol(0), 1, RowPattern.Quantify.UNBOUNDED, true)).getNumStates());
+        quantifier(symbol(0), 1, RowPattern.Quantifier.UNBOUNDED, true)).getNumStates());
   }
 
   @Test
   public void testNestedQuantifiersGetIndependentCounterRegisters() {
-    PatternNfa nfa = PatternToNfaCompiler.compile(quantify(quantify(symbol(0), 2, 2, true), 3, 3, true));
+    PatternNfa nfa = PatternToNfaCompiler.compile(quantifier(quantifier(symbol(0), 2, 2, true), 3, 3, true));
     assertEquals(nfa.getNumCounters(), 2);
     // (A{2}){3} consumes exactly six rows: the inner register must be reset by each outer iteration.
-    assertMatch(quantify(quantify(symbol(0), 2, 2, true), 3, 3, true), labelSymbols("A"), "AAAAAAAA", "AAAAAA");
+    assertMatch(quantifier(quantifier(symbol(0), 2, 2, true), 3, 3, true), labelSymbols("A"), "AAAAAAAA", "AAAAAA");
   }
 
   @Test
   public void testGreedyLoopHeadListsRepeatBeforeExit() {
-    assertLoopHeadOrder(quantify(symbol(0), 0, RowPattern.Quantify.UNBOUNDED, true), TransitionKind.REPEAT,
+    assertLoopHeadOrder(quantifier(symbol(0), 0, RowPattern.Quantifier.UNBOUNDED, true), TransitionKind.REPEAT,
         TransitionKind.EXIT_LOOP);
   }
 
   @Test
   public void testReluctantLoopHeadListsExitBeforeRepeat() {
-    assertLoopHeadOrder(quantify(symbol(0), 0, RowPattern.Quantify.UNBOUNDED, false), TransitionKind.EXIT_LOOP,
+    assertLoopHeadOrder(quantifier(symbol(0), 0, RowPattern.Quantifier.UNBOUNDED, false), TransitionKind.EXIT_LOOP,
         TransitionKind.REPEAT);
+  }
+
+  @Test
+  public void testCompiledTransitionListsAreImmutable() {
+    PatternNfa nfa = PatternToNfaCompiler.compile(symbol(0));
+    List<Transition> transitions = nfa.getState(nfa.getStartState()).getTransitions();
+
+    expectThrows(UnsupportedOperationException.class, transitions::clear);
+    assertEquals(transitions.size(), 1);
+    assertEquals(transitions.get(0).getKind(), TransitionKind.MATCH);
   }
 
   @Test
   public void testEmptyCycleGuardTerminatesOnAStarStar() {
     // PATTERN ((A*)*) is the canonical non terminating pattern: the outer loop can iterate forever over an inner loop
     // that consumes nothing. It must terminate, and still consume everything it can.
-    RowPattern pattern = quantify(quantify(symbol(0), 0, RowPattern.Quantify.UNBOUNDED, true), 0,
-        RowPattern.Quantify.UNBOUNDED, true);
+    RowPattern pattern = quantifier(quantifier(symbol(0), 0, RowPattern.Quantifier.UNBOUNDED, true), 0,
+        RowPattern.Quantifier.UNBOUNDED, true);
     assertMatch(pattern, labelSymbols("A"), "AAA", "AAA");
     // With nothing to consume the same pattern still terminates, with an empty match.
     assertMatch(pattern, labelSymbols("A"), "BBB", "");
@@ -188,7 +198,7 @@ public class PatternToNfaCompilerTest {
   public void testEmptyCycleGuardTerminatesOnAnOptionalBody() {
     // PATTERN ((A?)+): the body may match zero rows, so the loop could spin forever.
     RowPattern pattern =
-        quantify(quantify(symbol(0), 0, 1, true), 1, RowPattern.Quantify.UNBOUNDED, true);
+        quantifier(quantifier(symbol(0), 0, 1, true), 1, RowPattern.Quantifier.UNBOUNDED, true);
     assertMatch(pattern, labelSymbols("A"), "AAB", "AA");
     assertMatch(pattern, labelSymbols("A"), "BBB", "");
   }
@@ -209,15 +219,15 @@ public class PatternToNfaCompilerTest {
   @Test
   public void testSymbolWithoutDefinitionMatchesEveryRow() {
     // SQL:2016: a PATTERN variable with no DEFINE entry has the condition TRUE.
-    assertMatch(quantify(symbol(0), 1, RowPattern.Quantify.UNBOUNDED, true), List.of(anySymbol("A")), "XYZ", "AAA");
+    assertMatch(quantifier(symbol(0), 1, RowPattern.Quantifier.UNBOUNDED, true), List.of(anySymbol("A")), "XYZ", "AAA");
   }
 
   @Test
   public void testStepBudgetThrowsInsteadOfGivingUp() {
     // An ambiguous pattern over a long partition: cut it off at a tiny budget and it must fail loudly, because
     // returning the matches it happened to find would silently drop the rest.
-    RowPattern pattern = concat(quantify(symbol(0), 0, RowPattern.Quantify.UNBOUNDED, true),
-        quantify(symbol(0), 0, RowPattern.Quantify.UNBOUNDED, true), symbol(1));
+    RowPattern pattern = concat(quantifier(symbol(0), 0, RowPattern.Quantifier.UNBOUNDED, true),
+        quantifier(symbol(0), 0, RowPattern.Quantifier.UNBOUNDED, true), symbol(1));
     List<PatternSymbol> symbols = List.of(MatchTestFixtures.labelSymbol("A", 0), labelledAs("Z", "Z", 1));
     PatternNfa nfa = PatternToNfaCompiler.compile(pattern);
     PartitionMatcher matcher = new PartitionMatcher(nfa, symbols, INPUT_SCHEMA, 20);
