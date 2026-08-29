@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.plannode;
 
 import java.util.List;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -66,6 +67,40 @@ public class MatchNode extends BasePlanNode {
     _afterMatchSkipMode = afterMatchSkipMode;
     _afterMatchSkipToSymbolOrdinal = afterMatchSkipToSymbolOrdinal;
     _rowsPerMatchMode = rowsPerMatchMode;
+    validatePatternFieldRefs(_patternSymbols, _measures);
+  }
+
+  private static void validatePatternFieldRefs(List<PatternSymbol> patternSymbols, List<Measure> measures) {
+    int numSymbols = patternSymbols.size();
+    for (PatternSymbol symbol : patternSymbols) {
+      validatePatternFieldRefs(symbol.getDefinition(), numSymbols);
+    }
+    for (Measure measure : measures) {
+      validatePatternFieldRefs(measure.getExpression(), numSymbols);
+    }
+  }
+
+  private static void validatePatternFieldRefs(@Nullable RexExpression expression, int numSymbols) {
+    if (expression == null) {
+      return;
+    }
+    if (expression instanceof RexExpression.PatternFieldRef) {
+      RexExpression.PatternFieldRef ref = (RexExpression.PatternFieldRef) expression;
+      int ordinal = ref.getSymbolOrdinal();
+      if (ordinal != RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL
+          && (ordinal < 0 || ordinal >= numSymbols)) {
+        throw new IllegalArgumentException(
+            "MATCH_RECOGNIZE pattern field reference '" + ref + "' has invalid symbol ordinal " + ordinal
+                + "; expected the universal ordinal " + RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL
+                + " or an index in [0, " + numSymbols + ")");
+      }
+      return;
+    }
+    if (expression instanceof RexExpression.FunctionCall) {
+      for (RexExpression operand : ((RexExpression.FunctionCall) expression).getFunctionOperands()) {
+        validatePatternFieldRefs(operand, numSymbols);
+      }
+    }
   }
 
   /// The pattern variable symbol table. A symbol's ordinal is its index in this list.
