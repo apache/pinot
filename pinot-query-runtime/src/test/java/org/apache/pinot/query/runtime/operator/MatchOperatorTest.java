@@ -35,6 +35,7 @@ import org.apache.pinot.query.runtime.operator.match.MatchTestFixtures;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -43,7 +44,7 @@ import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.VA
 import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.anySymbol;
 import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.concat;
 import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.labelSymbols;
-import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.quantify;
+import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.quantifier;
 import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.rows;
 import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.symbol;
 import static org.testng.Assert.assertEquals;
@@ -60,7 +61,7 @@ public class MatchOperatorTest {
   @Test
   public void testEmitsOneRowPerMatchWithMeasures() {
     // PATTERN (A B+) DEFINE A AS label = 'A', B AS label = 'B' over A B B A B.
-    RowPattern pattern = concat(symbol(0), quantify(symbol(1), 1, RowPattern.Quantify.UNBOUNDED, true));
+    RowPattern pattern = concat(symbol(0), quantifier(symbol(1), 1, RowPattern.Quantifier.UNBOUNDED, true));
     DataSchema resultSchema = new DataSchema(new String[]{"pid", "mno", "cls", "firstA", "lastB", "sumB", "cnt"},
         new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.INT,
@@ -90,7 +91,7 @@ public class MatchOperatorTest {
   @Test
   public void testSingleVariableAggregates() {
     // PATTERN (A B+) over A B B A B, where the value column equals the row index.
-    RowPattern pattern = concat(symbol(0), quantify(symbol(1), 1, RowPattern.Quantify.UNBOUNDED, true));
+    RowPattern pattern = concat(symbol(0), quantifier(symbol(1), 1, RowPattern.Quantifier.UNBOUNDED, true));
     DataSchema resultSchema = new DataSchema(new String[]{"pid", "countB", "minB", "maxB", "avgB"},
         new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.DOUBLE
@@ -208,10 +209,27 @@ public class MatchOperatorTest {
   }
 
   @Test
+  public void testInputErrorTakesPrecedenceOverBufferedOutput() {
+    DataSchema resultSchema = new DataSchema(new String[]{"pid", "mno"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
+    MatchNode node = node(resultSchema, List.of(anySymbol("A")), symbol(0),
+        List.of(measure("mno", matchNumber())), MatchNode.AfterMatchSkipMode.PAST_LAST_ROW,
+        MatchNode.NO_SKIP_TO_SYMBOL);
+    OpChainExecutionContext context = OperatorTestUtil.getContext(Map.of());
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(context, INPUT_SCHEMA)
+        .addRow(0, "A", 0).addRow(1, "A", 1).finishBlock()
+        .buildWithError(ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, "upstream failed"));
+
+    MseBlock block = new MatchOperator(context, input, INPUT_SCHEMA, node).nextBlock();
+
+    assertErrorContains(block, QueryErrorCode.INTERNAL, "upstream failed");
+  }
+
+  @Test
   public void testEmptyMatchIsEmittedAndAlwaysAdvancesOneRow() {
     // PATTERN (A*) over B A B: rows that are not an A still produce an empty match, and the scan must move on
     // instead of matching the same empty match forever.
-    RowPattern pattern = quantify(symbol(0), 0, RowPattern.Quantify.UNBOUNDED, true);
+    RowPattern pattern = quantifier(symbol(0), 0, RowPattern.Quantifier.UNBOUNDED, true);
     DataSchema resultSchema = new DataSchema(new String[]{"pid", "mno", "cnt"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.LONG});
     List<MatchNode.Measure> measures = List.of(measure("mno", matchNumber()),
@@ -230,7 +248,7 @@ public class MatchOperatorTest {
   public void testSkipToFirstThatCannotProgressIsAnError() {
     // AFTER MATCH SKIP TO FIRST A on PATTERN (A+) would resume at the first row of the match it just reported, which
     // never terminates. SQL:2016 makes that an error rather than a silently adjusted position.
-    RowPattern pattern = quantify(symbol(0), 1, RowPattern.Quantify.UNBOUNDED, true);
+    RowPattern pattern = quantifier(symbol(0), 1, RowPattern.Quantifier.UNBOUNDED, true);
     DataSchema resultSchema = new DataSchema(new String[]{"pid", "cnt"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
     List<MatchNode.Measure> measures =
@@ -281,8 +299,82 @@ public class MatchOperatorTest {
   }
 
   @Test
-  public void testMaxRowsInMatchThrowsRatherThanTruncating() {
-    RowPattern pattern = quantify(symbol(0), 1, RowPattern.Quantify.UNBOUNDED, true);
+  public void testOnePartitionEmitsBoundedOutputBlocks() {
+    int numRows = 2 * MatchOperator.MAX_OUTPUT_ROWS_PER_BLOCK + 17;
+    List<Object[]> inputRows = new ArrayList<>(numRows);
+    for (int i = 0; i < numRows; i++) {
+      inputRows.add(new Object[]{0, "A", i});
+    }
+    DataSchema resultSchema = new DataSchema(new String[]{"pid", "mno"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
+    MatchNode node = node(resultSchema, List.of(anySymbol("A")), symbol(0),
+        List.of(measure("mno", matchNumber())), MatchNode.AfterMatchSkipMode.PAST_LAST_ROW,
+        MatchNode.NO_SKIP_TO_SYMBOL);
+
+    OpChainExecutionContext context = OperatorTestUtil.getContext(Map.of());
+    BlockListMultiStageOperator.Builder builder = new BlockListMultiStageOperator.Builder(context, INPUT_SCHEMA);
+    for (Object[] row : inputRows) {
+      builder.addRow(row);
+    }
+    MatchOperator operator = new MatchOperator(context, builder.finishBlock().buildWithEos(), INPUT_SCHEMA, node);
+    int outputRows = 0;
+    int outputBlocks = 0;
+    long expectedMatchNumber = 1;
+    MseBlock block = operator.nextBlock();
+    while (!block.isEos()) {
+      MseBlock.Data dataBlock = (MseBlock.Data) block;
+      int blockRows = dataBlock.getNumRows();
+      assertTrue(blockRows > 0 && blockRows <= MatchOperator.MAX_OUTPUT_ROWS_PER_BLOCK);
+      for (Object[] row : dataBlock.asRowHeap().getRows()) {
+        assertEquals(row, new Object[]{0, expectedMatchNumber++});
+      }
+      outputRows += blockRows;
+      outputBlocks++;
+      block = operator.nextBlock();
+    }
+
+    assertTrue(!((MseBlock.Eos) block).isError(), "Expecting a successful end of stream, got: " + block);
+    assertEquals(outputRows, numRows);
+    assertEquals(outputBlocks, 3);
+    assertEquals(expectedMatchNumber, numRows + 1L);
+  }
+
+  @Test
+  public void testHighCardinalityPartitionsUseConstantValidationState() {
+    int numPartitions = 10_000;
+    List<Object[]> inputRows = new ArrayList<>(numPartitions);
+    for (int partition = 0; partition < numPartitions; partition++) {
+      inputRows.add(new Object[]{partition, "A", partition});
+    }
+    DataSchema resultSchema = new DataSchema(new String[]{"pid", "mno"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
+    List<Object[]> output = run(node(resultSchema, List.of(anySymbol("A")), symbol(0),
+        List.of(measure("mno", matchNumber())), MatchNode.AfterMatchSkipMode.PAST_LAST_ROW,
+        MatchNode.NO_SKIP_TO_SYMBOL), inputRows);
+
+    assertEquals(output.size(), numPartitions);
+    assertEquals(output.get(0), new Object[]{0, 1L});
+    assertEquals(output.get(numPartitions - 1), new Object[]{numPartitions - 1, 1L});
+  }
+
+  @Test
+  public void testMultiValuePartitionKeyIsRejectedAtRuntime() {
+    DataSchema inputSchema = new DataSchema(new String[]{"pid", "label", "value"},
+        new ColumnDataType[]{ColumnDataType.INT_ARRAY, ColumnDataType.STRING, ColumnDataType.INT});
+    DataSchema resultSchema = new DataSchema(new String[]{"pid"},
+        new ColumnDataType[]{ColumnDataType.INT_ARRAY});
+    MatchNode node = node(resultSchema, List.of(anySymbol("A")), symbol(0), List.of(),
+        MatchNode.AfterMatchSkipMode.PAST_LAST_ROW, MatchNode.NO_SKIP_TO_SYMBOL);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema).addBlock().buildWithEos();
+
+    QueryException exception = expectThrows(QueryException.class,
+        () -> new MatchOperator(OperatorTestUtil.getTracingContext(), input, inputSchema, node));
+    assertTrue(exception.getMessage().contains("requires single-value columns"), exception.getMessage());
+  }
+
+  @Test
+  public void testMaxRowsInMatchPartitionThrowsRatherThanTruncating() {
+    RowPattern pattern = quantifier(symbol(0), 1, RowPattern.Quantifier.UNBOUNDED, true);
     DataSchema resultSchema = new DataSchema(new String[]{"pid", "cnt"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
     List<MatchNode.Measure> measures =
@@ -290,7 +382,7 @@ public class MatchOperatorTest {
 
     MseBlock block = execute(node(resultSchema, List.of(anySymbol("A")), pattern, measures,
             MatchNode.AfterMatchSkipMode.PAST_LAST_ROW, MatchNode.NO_SKIP_TO_SYMBOL), rows("AAAA"),
-        Map.of(MatchLimits.MAX_ROWS_IN_MATCH, "2"));
+        Map.of(QueryOptionKey.MAX_ROWS_IN_MATCH_PARTITION, "2"));
 
     assertErrorContains(block, QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED,
         "exceeds the maximum of 2 rows");
@@ -298,7 +390,7 @@ public class MatchOperatorTest {
 
   @Test
   public void testMaxStepsPerMatchAttemptThrowsRatherThanTruncating() {
-    RowPattern pattern = quantify(symbol(0), 1, RowPattern.Quantify.UNBOUNDED, true);
+    RowPattern pattern = quantifier(symbol(0), 1, RowPattern.Quantifier.UNBOUNDED, true);
     DataSchema resultSchema = new DataSchema(new String[]{"pid", "cnt"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
     List<MatchNode.Measure> measures =
@@ -306,7 +398,7 @@ public class MatchOperatorTest {
 
     MseBlock block = execute(node(resultSchema, List.of(anySymbol("A")), pattern, measures,
             MatchNode.AfterMatchSkipMode.PAST_LAST_ROW, MatchNode.NO_SKIP_TO_SYMBOL), rows("AAAAAAAAAA"),
-        Map.of(MatchLimits.MAX_STEPS_PER_MATCH_ATTEMPT, "3"));
+        Map.of(QueryOptionKey.MAX_STEPS_PER_MATCH_ATTEMPT, "3"));
 
     assertErrorContains(block, QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED,
         "maximum of 3 pattern matching steps");
@@ -314,19 +406,19 @@ public class MatchOperatorTest {
 
   @Test
   public void testHintOutranksTheQueryOption() {
-    RowPattern pattern = quantify(symbol(0), 1, RowPattern.Quantify.UNBOUNDED, true);
+    RowPattern pattern = quantifier(symbol(0), 1, RowPattern.Quantifier.UNBOUNDED, true);
     DataSchema resultSchema = new DataSchema(new String[]{"pid", "cnt"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
     List<MatchNode.Measure> measures =
         List.of(measure("cnt", new RexExpression.FunctionCall(ColumnDataType.LONG, "COUNT", List.of())));
     PlanNode.NodeHint hint = new PlanNode.NodeHint(
-        Map.of(MatchLimits.MATCH_HINT_OPTIONS, Map.of(MatchLimits.MAX_ROWS_IN_MATCH_HINT, "2")));
+        Map.of(MatchLimits.MATCH_HINT_OPTIONS, Map.of(MatchLimits.MAX_ROWS_IN_MATCH_PARTITION_HINT, "2")));
 
     MatchNode node = new MatchNode(-1, resultSchema, hint, List.of(), List.of(anySymbol("A")), pattern, measures,
         List.of(MatchTestFixtures.PID_INDEX), List.of(), MatchNode.AfterMatchSkipMode.PAST_LAST_ROW,
         MatchNode.NO_SKIP_TO_SYMBOL, MatchNode.RowsPerMatchMode.ONE_ROW_PER_MATCH);
     // The query option is far more permissive, but the hint wins.
-    MseBlock block = execute(node, rows("AAAA"), Map.of(MatchLimits.MAX_ROWS_IN_MATCH, "1000"));
+    MseBlock block = execute(node, rows("AAAA"), Map.of(QueryOptionKey.MAX_ROWS_IN_MATCH_PARTITION, "1000"));
 
     assertErrorContains(block, QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED, "exceeds the maximum of 2 rows");
   }
@@ -357,7 +449,7 @@ public class MatchOperatorTest {
     PatternSymbol increasing = new PatternSymbol("A",
         new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, "GREATER_THAN", List.of(current, previous)));
 
-    RowPattern pattern = quantify(symbol(0), 1, RowPattern.Quantify.UNBOUNDED, true);
+    RowPattern pattern = quantifier(symbol(0), 1, RowPattern.Quantifier.UNBOUNDED, true);
     DataSchema resultSchema = new DataSchema(new String[]{"pid", "cnt"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
     List<MatchNode.Measure> measures =
@@ -385,7 +477,7 @@ public class MatchOperatorTest {
     PatternSymbol b = new PatternSymbol("B",
         new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, "GREATER_THAN", List.of(bValue, aValue)));
 
-    RowPattern pattern = concat(symbol(0), quantify(symbol(1), 1, RowPattern.Quantify.UNBOUNDED, true));
+    RowPattern pattern = concat(symbol(0), quantifier(symbol(1), 1, RowPattern.Quantifier.UNBOUNDED, true));
     DataSchema resultSchema = new DataSchema(new String[]{"pid", "lastB", "cnt"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.LONG});
     List<MatchNode.Measure> measures = List.of(
@@ -451,7 +543,7 @@ public class MatchOperatorTest {
   public void testLogicalOffsetSelectsTheNthRowMappedToTheVariable() {
     // FIRST(A.value, 1) is the second row mapped to A and LAST(A.value, 1) is the second to last, so over a match of
     // four rows valued 0..3 they must be different rows. An offset that was ignored would make them equal.
-    RowPattern pattern = quantify(symbol(0), 4, 4, true);
+    RowPattern pattern = quantifier(symbol(0), 4, 4, true);
     DataSchema resultSchema = new DataSchema(new String[]{"pid", "first1", "last1"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.INT});
     List<MatchNode.Measure> measures = List.of(
@@ -510,6 +602,27 @@ public class MatchOperatorTest {
 
     assertEquals(output.size(), 1);
     assertEquals(output.get(0), new Object[]{"A", 0, 2L});
+  }
+
+  @Test
+  public void testPartitionGroupingIsValidatedInExchangeCollationOrder() {
+    // PARTITION BY label, pid is emitted in SQL order, but the exchange sorts the input fields by ordinal: pid, label.
+    // These rows increase in exchange order and decrease in SQL order ("Z" then "A"), so using the output-key order
+    // for monotonic validation would reject valid input.
+    DataSchema resultSchema = new DataSchema(new String[]{"label", "pid", "cnt"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.LONG});
+    List<MatchNode.Measure> measures =
+        List.of(measure("cnt", new RexExpression.FunctionCall(ColumnDataType.LONG, "COUNT", List.of())));
+    MatchNode node = new MatchNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), List.of(anySymbol("A")),
+        symbol(0), measures, List.of(MatchTestFixtures.LABEL_INDEX, MatchTestFixtures.PID_INDEX), List.of(),
+        MatchNode.AfterMatchSkipMode.PAST_LAST_ROW, MatchNode.NO_SKIP_TO_SYMBOL,
+        MatchNode.RowsPerMatchMode.ONE_ROW_PER_MATCH);
+
+    List<Object[]> output = run(node, List.of(new Object[]{0, "Z", 0}, new Object[]{1, "A", 0}));
+
+    assertEquals(output.size(), 2);
+    assertEquals(output.get(0), new Object[]{"Z", 0, 1L});
+    assertEquals(output.get(1), new Object[]{"A", 1, 1L});
   }
 
   private static MatchNode node(DataSchema resultSchema, List<PatternSymbol> symbols, RowPattern pattern,

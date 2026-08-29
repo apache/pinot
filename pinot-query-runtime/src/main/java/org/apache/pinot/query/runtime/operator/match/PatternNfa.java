@@ -50,7 +50,11 @@ public class PatternNfa {
   private final int _numCounters;
 
   PatternNfa(List<State> states, int startState, int acceptState, int numCounters) {
-    _states = List.copyOf(states);
+    List<State> frozenStates = new ArrayList<>(states.size());
+    for (State state : states) {
+      frozenStates.add(state.frozenCopy());
+    }
+    _states = List.copyOf(frozenStates);
     _startState = startState;
     _acceptState = acceptState;
     _numCounters = numCounters;
@@ -172,7 +176,15 @@ public class PatternNfa {
 
   /// A state of the automaton. Mutable only while [PatternToNfaCompiler] builds it.
   public static final class State {
-    private final List<Transition> _transitions = new ArrayList<>(2);
+    private final List<Transition> _transitions;
+
+    State() {
+      _transitions = new ArrayList<>(2);
+    }
+
+    private State(List<Transition> transitions) {
+      _transitions = List.copyOf(transitions);
+    }
 
     /// The outgoing transitions in preference order, highest preference first.
     public List<Transition> getTransitions() {
@@ -181,6 +193,10 @@ public class PatternNfa {
 
     void addTransition(Transition transition) {
       _transitions.add(transition);
+    }
+
+    private State frozenCopy() {
+      return new State(_transitions);
     }
   }
 }
