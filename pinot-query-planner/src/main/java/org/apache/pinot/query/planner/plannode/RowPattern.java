@@ -43,7 +43,7 @@ public interface RowPattern {
   /// rejected at planning time. Their wire values are already pinned in `Plan.RowPatternKind` so that adding
   /// them later is a purely additive change.
   enum Kind {
-    SYMBOL, CONCAT, ALTERNATE, QUANTIFY, ANCHOR_START, ANCHOR_END
+    SYMBOL, CONCAT, ALTERNATE, QUANTIFIER, ANCHOR_START, ANCHOR_END
   }
 
   /// A single pattern variable, identified by its ordinal in the enclosing [MatchNode]'s symbol table.
@@ -180,7 +180,7 @@ public interface RowPattern {
 
   /// A repetition applied to a single sub-pattern. `*`, `+` and `?` are normalized into this form:
   /// `*` is `{0,UNBOUNDED}`, `+` is `{1,UNBOUNDED}` and `?` is `{0,1}`.
-  final class Quantify implements RowPattern {
+  final class Quantifier implements RowPattern {
     /// Sentinel for `maxRepeat` meaning "no upper bound", i.e. `*`, `+` and `{n,}`.
     public static final int UNBOUNDED = -1;
 
@@ -189,7 +189,7 @@ public interface RowPattern {
     private final int _maxRepeat;
     private final boolean _greedy;
 
-    public Quantify(RowPattern child, int minRepeat, int maxRepeat, boolean greedy) {
+    public Quantifier(RowPattern child, int minRepeat, int maxRepeat, boolean greedy) {
       _child = child;
       _minRepeat = minRepeat;
       _maxRepeat = maxRepeat;
@@ -217,7 +217,7 @@ public interface RowPattern {
 
     @Override
     public Kind getKind() {
-      return Kind.QUANTIFY;
+      return Kind.QUANTIFIER;
     }
 
     @Override
@@ -258,17 +258,17 @@ public interface RowPattern {
       if (this == o) {
         return true;
       }
-      if (!(o instanceof Quantify)) {
+      if (!(o instanceof Quantifier)) {
         return false;
       }
-      Quantify that = (Quantify) o;
+      Quantifier that = (Quantifier) o;
       return _minRepeat == that._minRepeat && _maxRepeat == that._maxRepeat && _greedy == that._greedy
           && _child.equals(that._child);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(Kind.QUANTIFY, _child, _minRepeat, _maxRepeat, _greedy);
+      return Objects.hash(Kind.QUANTIFIER, _child, _minRepeat, _maxRepeat, _greedy);
     }
   }
 

@@ -70,6 +70,12 @@ public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
   /// Whether the node currently being visited sits inside a MEASURES or DEFINE list, the only two places where the
   /// `RUNNING` / `FINAL` semantics modifiers are legal.
   private boolean _inMeasureOrDefine;
+  private boolean _matchRecognizeFound;
+
+  /// Whether the visited SQL tree contains at least one MATCH_RECOGNIZE clause.
+  public boolean hasMatchRecognize() {
+    return _matchRecognizeFound;
+  }
 
   @Override
   public Void visit(SqlCall call) {
@@ -89,6 +95,7 @@ public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
   }
 
   private void visitMatchRecognize(SqlMatchRecognize match) {
+    _matchRecognizeFound = true;
     validateAndRewrite(match);
     // Only MEASURES and DEFINE may contain RUNNING / FINAL. Every other operand has already been checked by
     // validateAndRewrite(), so the only one left to descend into is the table reference, which may itself hold a

@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.query.runtime.operator.match;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.PatternSymbol;
 import org.apache.pinot.query.runtime.operator.match.PatternNfa.Transition;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 
 
 /// Runs a [PatternNfa] over the rows of one partition and reports the SQL:2016 preferred match starting at a
@@ -37,12 +40,14 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 /// exactly the preferment order and [#match] can return as soon as it reaches the accepting state. No candidate
 /// match is ever scored or compared against another.
 ///
-/// ## Backtracking is O(1) per step
+/// ## Only choice points are retained
 ///
-/// The search stack is held in parallel primitive arrays rather than objects, and each frame records the single undo
-/// it needs: whether it pushed a row onto the [MatchTape], and which counter register it changed together with
-/// that register's previous value. Popping a frame therefore costs a couple of array writes; nothing is copied or
-/// rebuilt, and the classifier tape stays append only.
+/// Deterministic states are followed directly rather than pushed onto the search stack. The stack contains only
+/// states with more than one outgoing transition, together with a checkpoint into a separate primitive counter-undo
+/// log. Backtracking truncates the classifier tape to the choice point's row and restores that log. For a linear
+/// `A+` match this retains one compact choice point per row rather than three full frames per row. The combined
+/// primitive-array payload is hard-capped so raising the transition-step option cannot permit unbounded retained
+/// backtracking state.
 ///
 /// ## Running semantics come for free
 ///
@@ -55,32 +60,62 @@ public class PartitionMatcher {
   /// Returned by [#match] when no match starts at the requested row.
   public static final int NO_MATCH = -1;
 
-  private static final int NO_COUNTER = -1;
   private static final int NO_POS = -1;
   private static final int INITIAL_STACK_CAPACITY = 64;
+  private static final int TERMINATION_CHECK_INTERVAL = 1024;
+  private static final long MAX_RETAINED_BACKTRACKING_BYTES = 64L * 1024 * 1024;
+  private static final Runnable NO_OP_TERMINATION_CHECKER = () -> { };
 
   private final PatternNfa _nfa;
   /// DEFINE predicate per symbol ordinal; `null` means the variable matches every row, per SQL:2016.
   private final MatchExpression[] _definitions;
   private final MatchTape _tape;
   private final long _maxStepsPerMatchAttempt;
+  private final long _maxRetainedBacktrackingBytes;
+  private final Runnable _terminationChecker;
   private final int[] _counters;
   private final int[] _loopStartPos;
 
-  private int[] _frameState = new int[INITIAL_STACK_CAPACITY];
-  private int[] _framePos = new int[INITIAL_STACK_CAPACITY];
-  private int[] _frameNextTransition = new int[INITIAL_STACK_CAPACITY];
-  private int[] _frameUndoCounter = new int[INITIAL_STACK_CAPACITY];
-  private int[] _frameUndoCount = new int[INITIAL_STACK_CAPACITY];
-  private int[] _frameUndoLoopStart = new int[INITIAL_STACK_CAPACITY];
-  private boolean[] _frameUndoTapePush = new boolean[INITIAL_STACK_CAPACITY];
-  private int _stackSize;
+  private int[] _choiceState = new int[INITIAL_STACK_CAPACITY];
+  private int[] _choicePos = new int[INITIAL_STACK_CAPACITY];
+  private int[] _choiceNextTransition = new int[INITIAL_STACK_CAPACITY];
+  private int[] _choiceCounterUndoSize = new int[INITIAL_STACK_CAPACITY];
+  private int _choiceStackSize;
+
+  private int[] _undoCounter = new int[INITIAL_STACK_CAPACITY];
+  private int[] _undoCount = new int[INITIAL_STACK_CAPACITY];
+  private int[] _undoLoopStart = new int[INITIAL_STACK_CAPACITY];
+  private int _counterUndoSize;
+
+  private int _state;
+  private int _pos;
+  private int _partitionSize;
+  private int _matchStartPos;
+  private long _steps;
 
   public PartitionMatcher(PatternNfa nfa, List<PatternSymbol> patternSymbols, DataSchema inputSchema,
       long maxStepsPerMatchAttempt) {
+    this(nfa, patternSymbols, inputSchema, maxStepsPerMatchAttempt, NO_OP_TERMINATION_CHECKER,
+        MAX_RETAINED_BACKTRACKING_BYTES);
+  }
+
+  public PartitionMatcher(PatternNfa nfa, List<PatternSymbol> patternSymbols, DataSchema inputSchema,
+      long maxStepsPerMatchAttempt, Runnable terminationChecker) {
+    this(nfa, patternSymbols, inputSchema, maxStepsPerMatchAttempt, terminationChecker,
+        MAX_RETAINED_BACKTRACKING_BYTES);
+  }
+
+  @VisibleForTesting
+  PartitionMatcher(PatternNfa nfa, List<PatternSymbol> patternSymbols, DataSchema inputSchema,
+      long maxStepsPerMatchAttempt, Runnable terminationChecker, long maxRetainedBacktrackingBytes) {
     _nfa = nfa;
     _tape = new MatchTape(patternSymbols);
     _maxStepsPerMatchAttempt = maxStepsPerMatchAttempt;
+    if (maxRetainedBacktrackingBytes < getRetainedBacktrackingBytes()) {
+      throw new IllegalArgumentException("The retained backtracking byte limit must fit the initial matcher state");
+    }
+    _maxRetainedBacktrackingBytes = maxRetainedBacktrackingBytes;
+    _terminationChecker = Objects.requireNonNull(terminationChecker, "terminationChecker");
     _definitions = new MatchExpression[patternSymbols.size()];
     for (int i = 0; i < _definitions.length; i++) {
       // A pattern variable that appears in PATTERN without a DEFINE entry matches every row, per SQL:2016.
@@ -97,6 +132,13 @@ public class PartitionMatcher {
     return _tape;
   }
 
+  /// Releases the partition retained by the classifier tape after its final measures have been evaluated.
+  public void releasePartition() {
+    _tape.reset(List.of(), 0, 0);
+    _choiceStackSize = 0;
+    _counterUndoSize = 0;
+  }
+
   /// Finds the preferred match that starts exactly at `startPos`.
   ///
   /// @param matchNumber the value `MATCH_NUMBER()` reports; SQL:2016 assigns it before the match is known to
@@ -109,55 +151,49 @@ public class PartitionMatcher {
     _tape.reset(partitionRows, startPos, matchNumber);
     Arrays.fill(_counters, 0);
     Arrays.fill(_loopStartPos, NO_POS);
-    _stackSize = 0;
-    pushFrame(_nfa.getStartState(), startPos, NO_COUNTER, 0, 0, false);
+    _choiceStackSize = 0;
+    _counterUndoSize = 0;
+    _state = _nfa.getStartState();
+    _pos = startPos;
+    _partitionSize = partitionRows.size();
+    _matchStartPos = startPos;
+    _steps = 0;
 
-    int partitionSize = partitionRows.size();
     int acceptState = _nfa.getAcceptState();
-    long steps = 0;
-    while (_stackSize > 0) {
-      int top = _stackSize - 1;
-      if (_frameState[top] == acceptState) {
-        return _framePos[top];
+    while (true) {
+      if (_state == acceptState) {
+        return _pos;
       }
-      List<Transition> transitions = _nfa.getState(_frameState[top]).getTransitions();
-      boolean advanced = false;
-      while (_frameNextTransition[top] < transitions.size()) {
-        Transition transition = transitions.get(_frameNextTransition[top]++);
-        if (++steps > _maxStepsPerMatchAttempt) {
-          // The step count includes the transitions that make linear progress, so a long match over a large
-          // partition can hit this without any backtracking at all. Reporting the partition size and the number of
-          // rows consumed so far is what makes the two distinguishable, and the tuning remedy comes first because a
-          // linear blowup has no ambiguity to remove.
-          throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException(
-              "MATCH_RECOGNIZE exceeded the maximum of " + _maxStepsPerMatchAttempt
-                  + " pattern matching steps for the match attempt starting at row " + startPos + " of a "
-                  + partitionSize + "-row partition (" + (_framePos[top] - startPos) + " rows consumed so far). "
-                  + "Raise the '" + MatchLimits.MAX_STEPS_PER_MATCH_ATTEMPT + "' query option, or if the row count "
-                  + "consumed is far below the step count, make the PATTERN less ambiguous and tighten the DEFINE "
-                  + "predicates.");
+
+      List<Transition> transitions = _nfa.getState(_state).getTransitions();
+      if (transitions.size() > 1) {
+        pushChoice(_state, _pos);
+        if (takeNextChoice()) {
+          continue;
         }
-        if (tryApply(transition, top, partitionSize)) {
-          advanced = true;
-          break;
+      } else if (transitions.size() == 1) {
+        recordStep(_pos);
+        if (tryApply(transitions.get(0), _pos)) {
+          continue;
         }
       }
-      if (!advanced) {
-        popFrame();
+
+      if (takeNextChoice()) {
+        continue;
       }
+      restoreTo(startPos, 0);
+      return NO_MATCH;
     }
-    return NO_MATCH;
   }
 
-  /// Applies `transition` to the frame at `parent`, pushing the resulting frame if its guard holds.
+  /// Applies `transition` at `pos`, updating the current state when its guard holds.
   ///
-  /// @return whether the transition was taken
-  private boolean tryApply(Transition transition, int parent, int partitionSize) {
-    int pos = _framePos[parent];
+  /// @return whether the transition was taken; on success [#_state] and [#_pos] hold its target
+  private boolean tryApply(Transition transition, int pos) {
     int target = transition.getTarget();
     switch (transition.getKind()) {
       case MATCH: {
-        if (pos >= partitionSize) {
+        if (pos >= _partitionSize) {
           return false;
         }
         int symbolOrdinal = transition.getOperand();
@@ -168,18 +204,16 @@ public class PartitionMatcher {
           _tape.pop();
           return false;
         }
-        pushFrame(target, pos + 1, NO_COUNTER, 0, 0, true);
-        return true;
+        return advanceTo(target, pos + 1);
       }
       case EPSILON:
-        pushFrame(target, pos, NO_COUNTER, 0, 0, false);
-        return true;
+        return advanceTo(target, pos);
       case START_LOOP: {
         int counterId = transition.getOperand();
-        pushFrame(target, pos, counterId, _counters[counterId], _loopStartPos[counterId], false);
+        pushCounterUndo(counterId);
         _counters[counterId] = 0;
         _loopStartPos[counterId] = NO_POS;
-        return true;
+        return advanceTo(target, pos);
       }
       case REPEAT: {
         int counterId = transition.getOperand();
@@ -191,10 +225,10 @@ public class PartitionMatcher {
         if (_loopStartPos[counterId] == pos) {
           return false;
         }
-        pushFrame(target, pos, counterId, _counters[counterId], _loopStartPos[counterId], false);
+        pushCounterUndo(counterId);
         _counters[counterId]++;
         _loopStartPos[counterId] = pos;
-        return true;
+        return advanceTo(target, pos);
       }
       case EXIT_LOOP: {
         int counterId = transition.getOperand();
@@ -202,65 +236,133 @@ public class PartitionMatcher {
         if (_counters[counterId] < transition.getBound() && _loopStartPos[counterId] != pos) {
           return false;
         }
-        pushFrame(target, pos, NO_COUNTER, 0, 0, false);
-        return true;
+        return advanceTo(target, pos);
       }
       case ANCHOR_START:
         if (pos != 0) {
           return false;
         }
-        pushFrame(target, pos, NO_COUNTER, 0, 0, false);
-        return true;
+        return advanceTo(target, pos);
       case ANCHOR_END:
-        if (pos != partitionSize) {
+        if (pos != _partitionSize) {
           return false;
         }
-        pushFrame(target, pos, NO_COUNTER, 0, 0, false);
-        return true;
+        return advanceTo(target, pos);
       default:
         throw QueryErrorCode.QUERY_EXECUTION.asException(
             "Unsupported MATCH_RECOGNIZE pattern transition: " + transition.getKind());
     }
   }
 
-  /// Pushes a frame together with the undo of the transition that created it: at most one tape row and at most one
-  /// counter register change.
-  private void pushFrame(int state, int pos, int undoCounter, int undoCount, int undoLoopStart,
-      boolean undoTapePush) {
-    if (_stackSize == _frameState.length) {
-      growStack();
-    }
-    _frameState[_stackSize] = state;
-    _framePos[_stackSize] = pos;
-    _frameNextTransition[_stackSize] = 0;
-    _frameUndoCounter[_stackSize] = undoCounter;
-    _frameUndoCount[_stackSize] = undoCount;
-    _frameUndoLoopStart[_stackSize] = undoLoopStart;
-    _frameUndoTapePush[_stackSize] = undoTapePush;
-    _stackSize++;
+  private boolean advanceTo(int state, int pos) {
+    _state = state;
+    _pos = pos;
+    return true;
   }
 
-  private void popFrame() {
-    int top = --_stackSize;
-    if (_frameUndoTapePush[top]) {
+  private void pushChoice(int state, int pos) {
+    if (_choiceStackSize == _choiceState.length) {
+      growChoiceStack();
+    }
+    _choiceState[_choiceStackSize] = state;
+    _choicePos[_choiceStackSize] = pos;
+    _choiceNextTransition[_choiceStackSize] = 0;
+    _choiceCounterUndoSize[_choiceStackSize] = _counterUndoSize;
+    _choiceStackSize++;
+  }
+
+  /// Restores successive choice points and takes their next valid transition, in preference order.
+  private boolean takeNextChoice() {
+    while (_choiceStackSize > 0) {
+      int top = _choiceStackSize - 1;
+      int choicePos = _choicePos[top];
+      int undoSize = _choiceCounterUndoSize[top];
+      restoreTo(choicePos, undoSize);
+      List<Transition> transitions = _nfa.getState(_choiceState[top]).getTransitions();
+      while (_choiceNextTransition[top] < transitions.size()) {
+        Transition transition = transitions.get(_choiceNextTransition[top]++);
+        recordStep(choicePos);
+        if (tryApply(transition, choicePos)) {
+          return true;
+        }
+        restoreTo(choicePos, undoSize);
+      }
+      _choiceStackSize--;
+    }
+    return false;
+  }
+
+  private void pushCounterUndo(int counterId) {
+    if (_counterUndoSize == _undoCounter.length) {
+      growCounterUndoLog();
+    }
+    _undoCounter[_counterUndoSize] = counterId;
+    _undoCount[_counterUndoSize] = _counters[counterId];
+    _undoLoopStart[_counterUndoSize] = _loopStartPos[counterId];
+    _counterUndoSize++;
+  }
+
+  private void restoreTo(int pos, int undoSize) {
+    while (_tape.getEndPos() > pos) {
       _tape.pop();
     }
-    int undoCounter = _frameUndoCounter[top];
-    if (undoCounter != NO_COUNTER) {
-      _counters[undoCounter] = _frameUndoCount[top];
-      _loopStartPos[undoCounter] = _frameUndoLoopStart[top];
+    while (_counterUndoSize > undoSize) {
+      int undo = --_counterUndoSize;
+      int counterId = _undoCounter[undo];
+      _counters[counterId] = _undoCount[undo];
+      _loopStartPos[counterId] = _undoLoopStart[undo];
     }
   }
 
-  private void growStack() {
-    int capacity = _frameState.length * 2;
-    _frameState = Arrays.copyOf(_frameState, capacity);
-    _framePos = Arrays.copyOf(_framePos, capacity);
-    _frameNextTransition = Arrays.copyOf(_frameNextTransition, capacity);
-    _frameUndoCounter = Arrays.copyOf(_frameUndoCounter, capacity);
-    _frameUndoCount = Arrays.copyOf(_frameUndoCount, capacity);
-    _frameUndoLoopStart = Arrays.copyOf(_frameUndoLoopStart, capacity);
-    _frameUndoTapePush = Arrays.copyOf(_frameUndoTapePush, capacity);
+  private void recordStep(int pos) {
+    if (++_steps > _maxStepsPerMatchAttempt) {
+      // The step count includes the transitions that make linear progress, so a long match over a large partition can
+      // hit this without any backtracking at all. The partition and consumed row counts distinguish the two cases.
+      throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException(
+          "MATCH_RECOGNIZE exceeded the maximum of " + _maxStepsPerMatchAttempt
+              + " pattern matching steps for the match attempt starting at row " + _matchStartPos + " of a "
+              + _partitionSize + "-row partition (" + (pos - _matchStartPos) + " rows consumed so far). Raise the '"
+              + QueryOptionKey.MAX_STEPS_PER_MATCH_ATTEMPT + "' query option, or if the row count consumed is far "
+              + "below the step count, make the PATTERN less ambiguous and tighten the DEFINE predicates.");
+    }
+    if ((_steps & (TERMINATION_CHECK_INTERVAL - 1)) == 0) {
+      _terminationChecker.run();
+    }
+  }
+
+  private void growChoiceStack() {
+    int capacity = _choiceState.length * 2;
+    checkRetainedBacktrackingCapacity(capacity, _undoCounter.length);
+    _choiceState = Arrays.copyOf(_choiceState, capacity);
+    _choicePos = Arrays.copyOf(_choicePos, capacity);
+    _choiceNextTransition = Arrays.copyOf(_choiceNextTransition, capacity);
+    _choiceCounterUndoSize = Arrays.copyOf(_choiceCounterUndoSize, capacity);
+  }
+
+  private void growCounterUndoLog() {
+    int capacity = _undoCounter.length * 2;
+    checkRetainedBacktrackingCapacity(_choiceState.length, capacity);
+    _undoCounter = Arrays.copyOf(_undoCounter, capacity);
+    _undoCount = Arrays.copyOf(_undoCount, capacity);
+    _undoLoopStart = Arrays.copyOf(_undoLoopStart, capacity);
+  }
+
+  @VisibleForTesting
+  long getRetainedBacktrackingBytes() {
+    return retainedBacktrackingBytes(_choiceState.length, _undoCounter.length);
+  }
+
+  private void checkRetainedBacktrackingCapacity(int choiceCapacity, int undoCapacity) {
+    long retainedBytes = retainedBacktrackingBytes(choiceCapacity, undoCapacity);
+    if (retainedBytes > _maxRetainedBacktrackingBytes) {
+      throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException(
+          "MATCH_RECOGNIZE exceeded the hard limit of " + _maxRetainedBacktrackingBytes
+              + " bytes for retained pattern backtracking state. Reduce the partition size or simplify the PATTERN.");
+    }
+  }
+
+  private static long retainedBacktrackingBytes(int choiceCapacity, int undoCapacity) {
+    return (long) Integer.BYTES * (4L * choiceCapacity + 3L * undoCapacity);
   }
 
   /// The DEFINE predicate compiled for `symbolOrdinal`, or `null` if the variable matches every row.

@@ -113,8 +113,8 @@ public class PatternToNfaCompiler {
           return compileConcat((RowPattern.Concat) pattern, from);
         case ALTERNATE:
           return compileAlternate((RowPattern.Alternate) pattern, from);
-        case QUANTIFY:
-          return compileQuantify((RowPattern.Quantify) pattern, from);
+        case QUANTIFIER:
+          return compileQuantifier((RowPattern.Quantifier) pattern, from);
         case ANCHOR_START:
           return compileAnchor(TransitionKind.ANCHOR_START, from);
         case ANCHOR_END:
@@ -155,22 +155,22 @@ public class PatternToNfaCompiler {
     /// Emits the counter guarded cycle described in the class javadoc. The two loop head transitions are ordered
     /// `REPEAT` first for a greedy quantifier and `EXIT_LOOP` first for a reluctant one; that ordering is
     /// the only difference between the two.
-    private int compileQuantify(RowPattern.Quantify quantify, int from) {
+    private int compileQuantifier(RowPattern.Quantifier quantifier, int from) {
       int counterId = _numCounters++;
       int loopHead = newState();
       int exit = newState();
       int bodyStart = newState();
       addTransition(from, TransitionKind.START_LOOP, loopHead, counterId, 0);
-      int bodyEnd = compileInto(quantify.getChild(), bodyStart);
+      int bodyEnd = compileInto(quantifier.getChild(), bodyStart);
       addTransition(bodyEnd, TransitionKind.EPSILON, loopHead, 0, 0);
 
-      int maxRepeat = quantify.getMaxRepeat() == RowPattern.Quantify.UNBOUNDED ? PatternNfa.UNBOUNDED
-          : quantify.getMaxRepeat();
-      if (quantify.isGreedy()) {
+      int maxRepeat = quantifier.getMaxRepeat() == RowPattern.Quantifier.UNBOUNDED ? PatternNfa.UNBOUNDED
+          : quantifier.getMaxRepeat();
+      if (quantifier.isGreedy()) {
         addTransition(loopHead, TransitionKind.REPEAT, bodyStart, counterId, maxRepeat);
-        addTransition(loopHead, TransitionKind.EXIT_LOOP, exit, counterId, quantify.getMinRepeat());
+        addTransition(loopHead, TransitionKind.EXIT_LOOP, exit, counterId, quantifier.getMinRepeat());
       } else {
-        addTransition(loopHead, TransitionKind.EXIT_LOOP, exit, counterId, quantify.getMinRepeat());
+        addTransition(loopHead, TransitionKind.EXIT_LOOP, exit, counterId, quantifier.getMinRepeat());
         addTransition(loopHead, TransitionKind.REPEAT, bodyStart, counterId, maxRepeat);
       }
       return exit;

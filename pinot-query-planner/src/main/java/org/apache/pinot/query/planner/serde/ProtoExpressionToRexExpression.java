@@ -53,8 +53,15 @@ public class ProtoExpressionToRexExpression {
   }
 
   public static RexExpression.PatternFieldRef convertPatternFieldRef(Expressions.PatternFieldRef patternFieldRef) {
-    return new RexExpression.PatternFieldRef(patternFieldRef.getIndex(), patternFieldRef.getSymbolOrdinal(),
-        patternFieldRef.getAlpha());
+    int symbolOrdinal = patternFieldRef.getSymbolOrdinal();
+    if (symbolOrdinal == RexExpression.PatternFieldRef.UNRESOLVED_SYMBOL_ORDINAL
+        || symbolOrdinal < RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL) {
+      throw new IllegalStateException(
+          "Invalid MATCH_RECOGNIZE pattern variable ordinal on the wire: " + symbolOrdinal
+              + ". Expected a non-negative symbol-table index or the universal ordinal "
+              + RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL + ".");
+    }
+    return new RexExpression.PatternFieldRef(patternFieldRef.getIndex(), symbolOrdinal, patternFieldRef.getAlpha());
   }
 
   public static RexExpression.FunctionCall convertFunctionCall(Expressions.FunctionCall functionCall) {

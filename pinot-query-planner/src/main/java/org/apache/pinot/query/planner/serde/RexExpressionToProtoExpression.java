@@ -61,15 +61,21 @@ public class RexExpressionToProtoExpression {
     return Expressions.InputRef.newBuilder().setIndex(inputRef.getIndex()).build();
   }
 
-  /// Converts a MATCH_RECOGNIZE pattern field reference. Rejects an unresolved symbol ordinal rather than writing an
-  /// ambiguous reference to the wire: the MATCH_RECOGNIZE planning pass must bind every reference to a pattern symbol
-  /// before the plan is serialized.
+  /// Converts a MATCH_RECOGNIZE pattern field reference. Only a non-negative symbol-table index or the universal
+  /// ordinal is legal on the wire; the MATCH_RECOGNIZE planning pass must bind every unresolved reference before the
+  /// plan is serialized.
   public static Expressions.PatternFieldRef convertPatternFieldRef(RexExpression.PatternFieldRef patternFieldRef) {
     int symbolOrdinal = patternFieldRef.getSymbolOrdinal();
     if (symbolOrdinal == RexExpression.PatternFieldRef.UNRESOLVED_SYMBOL_ORDINAL) {
       throw new IllegalStateException(
           "Unresolved MATCH_RECOGNIZE pattern variable in reference to: " + patternFieldRef.getAlpha() + "."
               + patternFieldRef.getIndex() + ". The pattern symbol table must be bound before serialization.");
+    }
+    if (symbolOrdinal < RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL) {
+      throw new IllegalStateException(
+          "Invalid MATCH_RECOGNIZE pattern variable ordinal " + symbolOrdinal + " in reference to: "
+              + patternFieldRef + ". Expected a non-negative symbol-table index or the universal ordinal "
+              + RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL + ".");
     }
     return Expressions.PatternFieldRef.newBuilder()
         .setIndex(patternFieldRef.getIndex())
